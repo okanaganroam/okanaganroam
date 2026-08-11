@@ -1,8 +1,11 @@
 const http = require('http');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 const db = require('./db');
 
 const PORT = process.env.PORT || 3001;
+const SITE_PATH = path.join(__dirname, 'okanagan.html');
 
 // ---------- helpers ----------
 
@@ -176,6 +179,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    // Serve the website itself at / and /okanagan.html, so this same
+    // deployment is both the API and the live site.
+    if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
+      if (fs.existsSync(SITE_PATH)) {
+        const html = fs.readFileSync(SITE_PATH);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('okanagan.html not found on server');
+    }
+
     // GET /api/venues
     if (pathname === '/api/venues' && method === 'GET') {
       return sendJSON(res, 200, listVenues(query));
