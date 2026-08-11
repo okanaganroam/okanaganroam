@@ -1,0 +1,15 @@
+{
+  "name": "okanagan-roam-backend",
+  "version": "1.0.0",
+  "description": "REST API and SQLite database for the Okanagan Roam venue directory",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "seed": "node --no-warnings seed.js",
+    "start": "node --no-warnings server.js",
+    "extract": "python3 extract.py && npm run seed"
+  },
+  "license": "ISC"
+}
