@@ -107,6 +107,10 @@
   /* ---------- hero ---------- */
   .hero{ padding: 70px 0 40px; position:relative; overflow:hidden; }
   .hero .wrap{ display:grid; grid-template-columns: 1fr; gap:32px; align-items:center; }
+  @media (min-width: 900px){
+    .hero .wrap{ grid-template-columns: 1fr 1fr; gap:48px; align-items:center; }
+    .hero-right{ padding-top:4px; }
+  }
   .eyebrow{
     display:inline-flex; align-items:center; gap:8px;
     font-weight:700; font-size:0.82rem; letter-spacing:0.09em; text-transform:uppercase;
@@ -134,9 +138,6 @@
   }
 
   .hero-art{ position: relative; border-radius:20px; overflow:hidden; box-shadow: 0 14px 30px -18px var(--shadow); aspect-ratio: 420 / 340; }
-  @media (min-width: 700px){
-    .hero-art{ height: clamp(320px, 42vw, 480px); aspect-ratio: unset; }
-  }
   .hero-scene{
     position: absolute; top:0; left:0; width:100%; height:100%; opacity:0;
     pointer-events: none;
@@ -191,6 +192,32 @@
 
   /* ---------- featured venues ---------- */
   .featured-venues{ padding: 10px 0 36px; }
+  .weather-banner{
+    background: linear-gradient(120deg, var(--teal), #164848);
+    color: var(--paper); padding: 18px 0;
+  }
+  .weather-banner-inner{
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .weather-banner-icon{ font-size:2.2rem; line-height:1; flex-shrink:0; }
+  .weather-banner-text{ flex:1; min-width:200px; }
+  .weather-banner-condition{
+    margin:0; font-weight:800; font-size:0.98rem;
+  }
+  .weather-banner-suggestion{
+    margin:2px 0 0; font-size:0.86rem; color: rgba(255,255,255,0.85);
+  }
+  .weather-banner-btn{
+    background: var(--amber); color: var(--ink); border:none;
+    border-radius:999px; padding:9px 18px; font-weight:800; font-size:0.86rem;
+    cursor:pointer; white-space:nowrap; font-family:'Nunito',sans-serif;
+    transition: background 0.15s;
+  }
+  .weather-banner-btn:hover{ background: #ECB95C; }
+  @media (max-width: 640px){
+    .weather-banner-icon{ font-size:1.8rem; }
+    .weather-banner-btn{ width:100%; }
+  }
   .featured-head{ margin-bottom:16px; }
   .featured-head h2{ font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin-top:4px; }
   .featured-strip{
@@ -627,11 +654,18 @@
     background: rgba(107,44,64,0.12); color: var(--plum); font-weight:700;
   }
   .badge{
-    width:32px; height:32px; border-radius:50%;
+    display:inline-flex; align-items:center; gap:5px;
+    padding: 5px 10px 5px 8px; border-radius:999px;
     border:1px solid rgba(42,32,25,0.18);
-    display:flex; align-items:center; justify-content:center;
-    font-size:0.9rem; background: var(--sand);
-    position: relative; cursor: default;
+    background: var(--sand); color: var(--ink);
+    position: relative; cursor: default; white-space:nowrap;
+  }
+  .badge-text-icon{
+    font-size:0.64rem; font-weight:800; letter-spacing:0.02em;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .badge-label{
+    font-size:0.72rem; font-weight:700; font-family:'Nunito',sans-serif;
   }
   #floatingTooltip{
     position: fixed; z-index:200;
@@ -1015,6 +1049,7 @@
 
 <section class="hero">
   <div class="wrap">
+    <div class="hero-left">
     <div class="hero-heading">
       <span class="eyebrow">Worth the drive</span>
       <h2>Places you must visit</h2>
@@ -1107,12 +1142,24 @@
         </div>
       </div>
     </div>
-    <div>
+    </div>
+    <div class="hero-right">
       <span class="eyebrow">Enderby to Osoyoos</span>
       <h1>Find wineries, restaurants, cafes, breweries, and lounges across the Okanagan Valley.</h1>
       <p class="lead">Search by region, cuisine, and what matters to you — dog-friendly patios, vegan menus, kid-friendly spaces, and happy hour timing — across 812 verified venues.</p>
     </div>
 
+  </div>
+</section>
+
+<section class="weather-banner" id="weatherBanner" style="display:none;">
+  <div class="wrap weather-banner-inner">
+    <div class="weather-banner-icon" id="weatherIcon">☀️</div>
+    <div class="weather-banner-text">
+      <p class="weather-banner-condition" id="weatherCondition">Loading weather&hellip;</p>
+      <p class="weather-banner-suggestion" id="weatherSuggestion"></p>
+    </div>
+    <button class="weather-banner-btn" id="weatherBannerBtn">Show me →</button>
   </div>
 </section>
 
@@ -1130,7 +1177,7 @@
           <p class="featured-meta">West Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.7</span></p>
           <p class="featured-desc">Family-farmed since 1956, with a dog-friendly patio overlooking Okanagan Lake.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Dog-friendly" data-tooltip="Dog-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg></span><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Dog-friendly" data-tooltip="Dog-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg><span class="badge-label">Dog-friendly</span></span><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg><span class="badge-label">Patio</span></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg><span class="badge-label">Lake view</span></span></div>
       </div>
       <div class="featured-card" data-name="Terrafina at Hester Creek" data-region="oliver" data-phone="+1 250-498-2229">
         <a href="#directory" class="featured-title-link">
@@ -1139,7 +1186,7 @@
           <p class="featured-meta">Oliver &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.5</span></p>
           <p class="featured-desc">A patio restaurant at Hester Creek Estate Winery known for its focaccia spreads and seasonal pasta.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg><span class="badge-label">Patio</span></span></div>
       </div>
       <div class="featured-card" data-name="Frankie We Salute You!" data-region="kelowna" data-phone="+1 236-420-3338">
         <a href="#directory" class="featured-title-link">
@@ -1148,7 +1195,7 @@
           <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
           <p class="featured-desc">Trendy, industrial-feel vegan fine dining with real gluten-free items and a thoughtful lapsang mocktail.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span style="font-size:0.62rem; font-weight:800; letter-spacing:0.02em;">VG</span></span><span class="badge" aria-label="Gluten-free options" data-tooltip="Gluten-free options" style="font-size:0.6rem; font-weight:800;">GF</span><span class="badge" aria-label="Non-alcoholic options" data-tooltip="Non-alcoholic options"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l-5 8v8"/><path d="M9 19h6"/><path d="M4 3l3 5"/></svg></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg><span class="badge-label">Vegan</span></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span><span class="badge-label">Veg options</span></span><span class="badge" aria-label="Gluten-free options" data-tooltip="Gluten-free options"><span class="badge-text-icon">GF</span><span class="badge-label">Gluten-free</span></span><span class="badge" aria-label="Non-alcoholic options" data-tooltip="Non-alcoholic options"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l-5 8v8"/><path d="M9 19h6"/><path d="M4 3l3 5"/></svg><span class="badge-label">Mocktails</span></span></div>
       </div>
       <div class="featured-card" data-name="The Kal" data-region="vernon" data-phone="+1 250-549-1011">
         <a href="#directory" class="featured-title-link">
@@ -1175,7 +1222,7 @@
           <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.6</span></p>
           <p class="featured-desc">A dedicated vegan cafe known for its sushi bowls and Japanese curry, a longtime local favourite.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span style="font-size:0.62rem; font-weight:800; letter-spacing:0.02em;">VG</span></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg><span class="badge-label">Vegan</span></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span><span class="badge-label">Veg options</span></span></div>
       </div>
       <div class="featured-card" data-name="Giant's Head Brewing" data-region="summerland" data-phone="+1 250-404-1123">
         <a href="#directory" class="featured-title-link">
@@ -1184,7 +1231,7 @@
           <p class="featured-meta">Summerland &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.5</span></p>
           <p class="featured-desc">A cozy brewpub with a large street-side patio, wood-fired pizza, and a strong fish and chips.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg><span class="badge-label">Patio</span></span></div>
       </div>
       <div class="featured-card" data-name="Painted Rock Estate Winery" data-region="penticton" data-phone="+1 250-493-6809">
         <a href="#directory" class="featured-title-link">
@@ -1193,7 +1240,7 @@
           <p class="featured-meta">Penticton &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.6</span></p>
           <p class="featured-desc">A family-friendly estate with sweeping Skaha Lake views and a deck built for lingering.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span><span class="badge" aria-label="Kid-friendly" data-tooltip="Kid-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="2.6"/><path d="M6 20v-5a6 6 0 0 1 12 0v5"/></svg></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg><span class="badge-label">Patio</span></span><span class="badge" aria-label="Kid-friendly" data-tooltip="Kid-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="2.6"/><path d="M6 20v-5a6 6 0 0 1 12 0v5"/></svg><span class="badge-label">Kid-friendly</span></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg><span class="badge-label">Lake view</span></span></div>
       </div>
       <div class="featured-card" data-name="Angry Vegan" data-region="penticton" data-phone="+1 250-809-7610">
         <a href="#directory" class="featured-title-link">
@@ -1202,7 +1249,7 @@
           <p class="featured-meta">Penticton &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
           <p class="featured-desc">Penticton's oldest dedicated vegan restaurant, open since 2017, a fully plant-based menu.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span style="font-size:0.62rem; font-weight:800; letter-spacing:0.02em;">VG</span></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg><span class="badge-label">Vegan</span></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span><span class="badge-label">Veg options</span></span></div>
       </div>
       <div class="featured-card" data-name="Wildling" data-region="kelowna" data-phone="+1 250-980-6919">
         <a href="#directory" class="featured-title-link">
@@ -1211,7 +1258,7 @@
           <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
           <p class="featured-desc">An elevated tasting-menu restaurant praised for genuinely accommodating vegetarian diners.</p>
         </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span style="font-size:0.62rem; font-weight:800; letter-spacing:0.02em;">VG</span></span></div>
+        <div class="badge-row"><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span><span class="badge-label">Veg options</span></span></div>
       </div>
     </div>
   </div>
@@ -1278,7 +1325,7 @@
     <div class="list-venue-head">
       <span class="eyebrow">For business owners</span>
       <h2>Own a winery, restaurant, or cafe in the Okanagan?</h2>
-      <p>Get listed in the directory people actually use to find dog-friendly, kid-friendly, vegan, and gluten-free-aware spots across the valley and up the mountains. Free to list. Fill out the details below and we'll follow up before adding you.</p>
+      <p>Get listed in the directory people actually use to find dog-friendly, kid-friendly, vegan, and gluten-free-aware spots across the valley and up the mountains. Fill out the details below and we'll follow up before adding you.</p>
     </div>
     <form class="venue-form" id="venueForm">
       <div class="form-row">
@@ -1477,17 +1524,17 @@ var CARD_TYPE_LABEL = {
 };
 
 var CARD_BADGES = [
-  { field: 'dog_friendly', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg>', label: 'Dog-friendly' },
-  { field: 'vegan', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg>', label: 'Vegan-friendly' },
-  { field: 'vegetarian', text: 'VG', label: 'Vegetarian options' },
-  { field: 'gluten_free', text: 'GF', label: 'Gluten-free options' },
-  { field: 'patio', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg>', label: 'Patio' },
-  { field: 'kid_friendly', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="2.6"/><path d="M6 20v-5a6 6 0 0 1 12 0v5"/></svg>', label: 'Kid-friendly' },
-  { field: 'lake_view', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg>', label: 'Lake/vineyard view' },
-  { field: 'nonalcoholic', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l-5 8v8"/><path d="M9 19h6"/><path d="M4 3l3 5"/></svg>', label: 'Non-alcoholic options' },
-  { field: 'sports_tv', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M8 21h8"/></svg>', label: 'Sports on TV' },
-  { field: 'live_music', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>', label: 'Live music' },
-  { field: 'great_groups', icon: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>', label: 'Great for groups' }
+  { field: 'dog_friendly', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg>', label: 'Dog-friendly', short: 'Dog-friendly' },
+  { field: 'vegan', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c8 0 12-6 12-14-8 0-14 4-14 12 0 1 .1 1.5.2 2"/><path d="M6 20c0-4 2-8 6-11"/></svg>', label: 'Vegan-friendly', short: 'Vegan' },
+  { field: 'vegetarian', text: 'VG', label: 'Vegetarian options', short: 'Veg options' },
+  { field: 'gluten_free', text: 'GF', label: 'Gluten-free options', short: 'Gluten-free' },
+  { field: 'patio', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg>', label: 'Patio', short: 'Patio' },
+  { field: 'kid_friendly', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="2.6"/><path d="M6 20v-5a6 6 0 0 1 12 0v5"/></svg>', label: 'Kid-friendly', short: 'Kid-friendly' },
+  { field: 'lake_view', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg>', label: 'Lake/vineyard view', short: 'Lake view' },
+  { field: 'nonalcoholic', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l-5 8v8"/><path d="M9 19h6"/><path d="M4 3l3 5"/></svg>', label: 'Non-alcoholic options', short: 'Mocktails' },
+  { field: 'sports_tv', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M8 21h8"/></svg>', label: 'Sports on TV', short: 'Sports TV' },
+  { field: 'live_music', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>', label: 'Live music', short: 'Live music' },
+  { field: 'great_groups', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>', label: 'Great for groups', short: 'Groups' }
 ];
 
 function escapeAttr(s){
@@ -1507,9 +1554,8 @@ function venueCardHtml(v){
     : '';
 
   var badgesHtml = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
-    var styleAttr = b.text ? ' style="font-size:0.62rem; font-weight:800; letter-spacing:0.02em;"' : '';
-    var content = b.text || b.icon;
-    return '<span class="badge" aria-label="' + b.label + '" data-tooltip="' + b.label + '"' + styleAttr + '>' + content + '</span>';
+    var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
+    return '<span class="badge" aria-label="' + b.label + '" data-tooltip="' + b.label + '">' + content + '<span class="badge-label">' + b.short + '</span></span>';
   }).join('');
 
   return '' +
@@ -2789,6 +2835,28 @@ function initBlock12(){
     return R * c;
   }
 
+  // Exposed so other features (like the weather banner) can find the nearest
+  // region from a lat/lon without duplicating this module's coordinate set.
+  window.__findNearestRegion = function(userLat, userLon){
+    var closestSlug = null;
+    var closestKm = Infinity;
+    Object.keys(REGION_COORDS).forEach(function(slug){
+      var coords = REGION_COORDS[slug];
+      var km = haversineKm(userLat, userLon, coords[0], coords[1]);
+      if (km < closestKm) {
+        closestKm = km;
+        closestSlug = slug;
+      }
+    });
+    if (!closestSlug) return null;
+    return {
+      slug: closestSlug,
+      label: (window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[closestSlug]) || closestSlug,
+      coords: REGION_COORDS[closestSlug],
+      km: closestKm
+    };
+  };
+
   function showStatus(text){
     status.textContent = text;
     status.style.display = 'inline';
@@ -2900,6 +2968,115 @@ function initBlock12(){
   // Exposed so initBlock11 can re-sync once it actually builds the fav-btn
   // elements for the freshly-rendered cards (same timing issue as trip-btn).
   window.__syncFavButtons = syncButtons;
+})();
+
+/* ---------- Weather-aware suggestions: real current conditions for Kelowna, mapped to a relevant filter suggestion ---------- */
+(function(){
+  var banner = document.getElementById('weatherBanner');
+  var iconEl = document.getElementById('weatherIcon');
+  var conditionEl = document.getElementById('weatherCondition');
+  var suggestionEl = document.getElementById('weatherSuggestion');
+  var btn = document.getElementById('weatherBannerBtn');
+  if (!banner) return;
+
+  var KELOWNA_LAT = 49.888, KELOWNA_LON = -119.496;
+  var suggestedFilters = [];
+
+  function weatherCodeInfo(code){
+    if (code === 0) return { icon: '☀️', text: 'Clear skies' };
+    if (code === 1 || code === 2) return { icon: '🌤️', text: 'Mostly sunny' };
+    if (code === 3) return { icon: '☁️', text: 'Overcast' };
+    if (code === 45 || code === 48) return { icon: '🌫️', text: 'Foggy' };
+    if (code >= 51 && code <= 55) return { icon: '🌦️', text: 'Light drizzle' };
+    if (code >= 61 && code <= 65) return { icon: '🌧️', text: 'Rainy' };
+    if (code >= 80 && code <= 82) return { icon: '🌧️', text: 'Rain showers' };
+    if (code >= 71 && code <= 75) return { icon: '❄️', text: 'Snowy' };
+    if (code >= 95) return { icon: '⛈️', text: 'Thunderstorms' };
+    return { icon: '🌡️', text: 'Mixed conditions' };
+  }
+
+  function buildSuggestion(tempC, code){
+    var isRainy = (code >= 51 && code <= 65) || (code >= 80 && code <= 82) || code >= 95;
+    var isSnowy = code >= 71 && code <= 75;
+
+    if (isSnowy || tempC < 8) {
+      suggestedFilters = [];
+      return 'Bundle up — a great day for cozy indoor wine tasting.';
+    }
+    if (isRainy) {
+      suggestedFilters = ['groups'];
+      return 'Rainy day calls for good company somewhere warm and dry.';
+    }
+    if (tempC >= 28) {
+      suggestedFilters = ['patio', 'nonalc'];
+      return 'Hot one today — patios with a cold non-alcoholic option to cool off.';
+    }
+    if (tempC >= 20) {
+      suggestedFilters = ['patio', 'view'];
+      return 'Perfect patio weather — here\u2019s where to catch some sun with a view.';
+    }
+    suggestedFilters = [];
+    return 'Good day to explore the valley — here\u2019s what\u2019s nearby.';
+  }
+
+  var matchedRegionSlug = null;
+
+  function renderWeather(lat, lon, label){
+    return fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,weather_code&temperature_unit=celsius')
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        var tempC = Math.round(data.current.temperature_2m);
+        var code = data.current.weather_code;
+        var info = weatherCodeInfo(code);
+
+        iconEl.textContent = info.icon;
+        conditionEl.textContent = 'It\u2019s ' + tempC + '\u00b0C and ' + info.text.toLowerCase() + ' in ' + label + ' right now';
+        suggestionEl.textContent = buildSuggestion(tempC, code);
+        banner.style.display = '';
+      });
+  }
+
+  btn.addEventListener('click', function(){
+    suggestedFilters.forEach(function(f){
+      var chip = document.querySelector('.stamp-btn[data-filter="' + f + '"]');
+      if (chip && chip.getAttribute('aria-pressed') !== 'true') chip.click();
+    });
+    if (matchedRegionSlug) {
+      var regionChip = document.querySelector('.region-chip[data-region="' + matchedRegionSlug + '"]');
+      if (regionChip && regionChip.getAttribute('aria-pressed') !== 'true') regionChip.click();
+    }
+    document.dispatchEvent(new Event('wizard:showResults'));
+    if (window.__hideFilterBarNow) window.__hideFilterBarNow();
+    var grid = document.getElementById('venueGrid');
+    if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  function useKelownaFallback(){
+    renderWeather(KELOWNA_LAT, KELOWNA_LON, 'Kelowna').catch(function(){
+      // Weather unavailable — banner just stays hidden rather than showing broken/stale info.
+    });
+  }
+
+  // Only use location if the visitor has ALREADY granted it elsewhere (e.g. via
+  // "Use my location" in the wizard) — never prompt fresh from here, since a
+  // surprise permission popup on page load is bad UX. Falls back to Kelowna
+  // (the region's hub) for everyone else, same as before.
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'geolocation' }).then(function(result){
+      if (result.state !== 'granted' || !window.__findNearestRegion) {
+        useKelownaFallback();
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(function(pos){
+        var nearest = window.__findNearestRegion(pos.coords.latitude, pos.coords.longitude);
+        if (!nearest) { useKelownaFallback(); return; }
+        matchedRegionSlug = nearest.slug;
+        renderWeather(nearest.coords[0], nearest.coords[1], nearest.label).catch(useKelownaFallback);
+      }, useKelownaFallback, { timeout: 5000 });
+    }).catch(useKelownaFallback);
+  } else {
+    useKelownaFallback();
+  }
 })();
 
 loadVenuesAndInit();
