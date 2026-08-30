@@ -629,9 +629,10 @@
   }
   .phone-link:hover{ text-decoration:underline; }
   .card-links{
-    display:flex; gap:18px; flex-wrap:wrap;
+    display:flex; flex-direction:column; gap:8px; align-items:flex-start;
     margin: 0 22px 20px;
   }
+  .trip-fav-row{ display:flex; gap:10px; flex-wrap:wrap; }
   .trip-btn{
     display:inline-flex; align-items:center; gap:5px;
     font-size:0.82rem; font-weight:700; font-family:'Nunito',sans-serif;
@@ -2583,15 +2584,25 @@ function initBlock11(){
     linkRow.appendChild(bookingLink);
 
     // Real phone number, when we have one on file — a direct tel: link,
-    // not a search, since this one we can actually verify.
+    // not a search, since this one we can actually verify. Always create
+    // this row (even with no number) so every card reserves the same
+    // vertical space here — otherwise cards without a phone number end up
+    // shorter, throwing off alignment of everything below across the grid.
     var phone = card.dataset.phone;
+    var phoneLink = document.createElement('a');
+    phoneLink.className = 'phone-link';
     if (phone) {
-      var phoneLink = document.createElement('a');
-      phoneLink.className = 'phone-link';
       phoneLink.href = 'tel:' + phone.replace(/[^\d+]/g, '');
       phoneLink.textContent = '📞 ' + phone;
-      linkRow.appendChild(phoneLink);
+    } else {
+      phoneLink.style.visibility = 'hidden';
+      phoneLink.setAttribute('aria-hidden', 'true');
+      phoneLink.textContent = '📞 placeholder';
     }
+    linkRow.appendChild(phoneLink);
+
+    var tripFavRow = document.createElement('div');
+    tripFavRow.className = 'trip-fav-row';
 
     var tripBtn = document.createElement('button');
     tripBtn.type = 'button';
@@ -2600,14 +2611,16 @@ function initBlock11(){
     tripBtn.dataset.tripName = name;
     tripBtn.dataset.tripRegion = regionSlug;
     tripBtn.textContent = '🧳 Add to trip';
-    linkRow.appendChild(tripBtn);
+    tripFavRow.appendChild(tripBtn);
 
     var favBtn = document.createElement('button');
     favBtn.type = 'button';
     favBtn.className = 'fav-btn';
     favBtn.dataset.favName = name;
     favBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg> Favorite';
-    linkRow.appendChild(favBtn);
+    tripFavRow.appendChild(favBtn);
+
+    linkRow.appendChild(tripFavRow);
 
     var badgeRow = card.querySelector('.badge-row');
     if (badgeRow) {
