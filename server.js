@@ -39,16 +39,17 @@ function readBody(req) {
 const BOOL_FIELDS = [
   'dog_friendly', 'vegan', 'vegetarian', 'patio', 'kid_friendly',
   'gluten_free', 'lake_view', 'nonalcoholic', 'sports_tv', 'live_music',
+  'great_groups',
 ];
 
 const ALL_FIELDS = [
   'name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating',
-  'description', ...BOOL_FIELDS,
+  'description', 'description_fr', 'hours', ...BOOL_FIELDS,
 ];
 
 function rowToVenue(row) {
   const v = { id: row.id, created_at: row.created_at, updated_at: row.updated_at };
-  for (const f of ['name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description']) {
+  for (const f of ['name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description', 'description_fr', 'hours']) {
     v[f] = row[f];
   }
   for (const f of BOOL_FIELDS) {
