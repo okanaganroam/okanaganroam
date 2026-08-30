@@ -1641,11 +1641,28 @@ function applyTranslations(){
 function setLanguage(lang){
   try { window.localStorage.setItem('okanaganLang', lang); } catch (e) {}
   applyTranslations();
-  // Re-render venue cards so descriptions and status labels switch language
-  // too. window.__allVenues is populated once after the initial API fetch
-  // so this can re-render without another network round trip.
+  // Update existing venue cards in place rather than rebuilding them.
+  // renderVenueCards() would destroy and recreate every .venue-card, but
+  // the directions/menu/booking/phone/trip/favorite elements on each card
+  // are added afterward by initBlock11 (and other initBlocks attach click
+  // listeners to persistent filter chips that must only ever be bound
+  // once) — a full re-render would lose those without a much larger
+  // refactor, and re-running the initBlocks would double-bind those
+  // listeners. Swapping just the description and status text avoids both
+  // problems.
   if (window.__allVenues) {
-    renderVenueCards(window.__allVenues);
+    var venuesByName = {};
+    window.__allVenues.forEach(function(v){ venuesByName[v.name] = v; });
+    document.querySelectorAll('.venue-card').forEach(function(card){
+      var v = venuesByName[card.dataset.name];
+      if (!v) return;
+      var descEl = card.querySelector('.venue-desc');
+      if (descEl) {
+        descEl.textContent = (lang === 'fr' && v.description_fr) ? v.description_fr : (v.description || '');
+      }
+      var meta = card.querySelector('.venue-region');
+      if (meta) appendOpenStatusToMeta(meta, v.hours);
+    });
     applyOpenStatusToHeroAndFeatured(window.__allVenues);
   }
 }
