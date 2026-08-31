@@ -192,6 +192,57 @@ const server = http.createServer(async (req, res) => {
       return res.end('okanagan.html not found on server');
     }
 
+    // robots.txt — points crawlers at the sitemap and allows everything
+    // except the read/write API endpoints, which have no SEO value and
+    // shouldn't be indexed as pages.
+    if (pathname === '/robots.txt' && method === 'GET') {
+      const robots = [
+        'User-agent: *',
+        'Allow: /',
+        'Disallow: /api/',
+        '',
+        'Sitemap: https://okanaganroam.com/sitemap.xml',
+        '',
+      ].join('\n');
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(robots);
+    }
+
+    // sitemap.xml — this is a single-page app, so there's just the one
+    // crawlable URL, but having a sitemap still gives Search Console an
+    // explicit signal of the canonical page and its last-modified date.
+    if (pathname === '/sitemap.xml' && method === 'GET') {
+      const today = new Date().toISOString().slice(0, 10);
+      const sitemap = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        '  <url>',
+        '    <loc>https://okanaganroam.com/</loc>',
+        `    <lastmod>${today}</lastmod>`,
+        '    <changefreq>daily</changefreq>',
+        '    <priority>1.0</priority>',
+        '  </url>',
+        '</urlset>',
+        '',
+      ].join('\n');
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(sitemap);
+    }
+
+    // Open Graph / Twitter Card preview image, referenced from the HTML
+    // <head> so shared links show a proper branded thumbnail instead of a
+    // blank box on Facebook, Twitter/X, Slack, iMessage, etc.
+    if (pathname === '/og-image.png' && method === 'GET') {
+      const ogPath = path.join(__dirname, 'og-image.png');
+      if (fs.existsSync(ogPath)) {
+        const image = fs.readFileSync(ogPath);
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+        return res.end(image);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('og-image.png not found on server');
+    }
+
     // GET /api/venues
     if (pathname === '/api/venues' && method === 'GET') {
       return sendJSON(res, 200, listVenues(query));
