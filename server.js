@@ -39,7 +39,7 @@ function readBody(req) {
 const BOOL_FIELDS = [
   'dog_friendly', 'vegan', 'vegetarian', 'patio', 'kid_friendly',
   'gluten_free', 'lake_view', 'nonalcoholic', 'sports_tv', 'live_music',
-  'great_groups',
+  'great_groups', 'happy_hour',
 ];
 
 const ALL_FIELDS = [

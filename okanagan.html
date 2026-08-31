@@ -1091,7 +1091,7 @@
         <button class="stamp-btn" data-filter="music" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span data-i18n="stamp.liveMusic">Live music</span></button>
         <button class="stamp-btn" data-filter="nonalc" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg></span><span data-i18n="stamp.nonAlcoholicOptions">Non-alcoholic options</span></button>
         <button class="stamp-btn" data-filter="groups" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg></span><span data-i18n="stamp.greatForGroups">Great for groups</span></button>
-        <button class="happy-btn" id="happyNowBtn" aria-pressed="false" data-i18n="stamp.happyHourNow">🕐 Happy hour now</button>
+        <button class="stamp-btn" data-filter="happy_hour" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span data-i18n="stamp.happyHour">Has happy hour</span></button>
         <button class="happy-btn" id="favoritesOnlyBtn" aria-pressed="false">❤ <span data-i18n="stamp.myFavorites">My favorites</span> (<span id="favoritesCount">0</span>)</button>
       </div>
       <div class="wizard-nav">
@@ -1691,7 +1691,7 @@ var TRANSLATIONS = {
     'stamp.liveMusic': 'Live music',
     'stamp.nonAlcoholicOptions': 'Non-alcoholic options',
     'stamp.greatForGroups': 'Great for groups',
-    'stamp.happyHourNow': '\ud83d\udd50 Happy hour now',
+    'stamp.happyHour': 'Has happy hour',
     'stamp.myFavorites': 'My favorites',
 
     'badge.dogFriendly': 'Dog-friendly',
@@ -1705,6 +1705,7 @@ var TRANSLATIONS = {
     'badge.sportsTv': 'Sports on TV',
     'badge.liveMusic': 'Live music',
     'badge.greatGroups': 'Great for groups',
+    'badge.happyHour': 'Happy hour',
 
     'type.restaurant': 'Restaurant',
     'type.winery': 'Winery',
@@ -1843,7 +1844,7 @@ var TRANSLATIONS = {
     'stamp.liveMusic': 'Musique en direct',
     'stamp.nonAlcoholicOptions': 'Options sans alcool',
     'stamp.greatForGroups': 'Id\u00e9al pour les groupes',
-    'stamp.happyHourNow': '\ud83d\udd50 Happy hour en ce moment',
+    'stamp.happyHour': 'Offre l\u2019happy hour',
     'stamp.myFavorites': 'Mes favoris',
 
     'badge.dogFriendly': 'Accepte les chiens',
@@ -1857,6 +1858,7 @@ var TRANSLATIONS = {
     'badge.sportsTv': 'Sports \u00e0 la t\u00e9l\u00e9',
     'badge.liveMusic': 'Musique en direct',
     'badge.greatGroups': 'Id\u00e9al pour les groupes',
+    'badge.happyHour': 'Happy hour',
 
     'type.restaurant': 'Restaurant',
     'type.winery': 'Vignoble',
@@ -2167,7 +2169,8 @@ var CARD_BADGES = [
   { field: 'nonalcoholic', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg>', label: 'badge.nonalcoholic' },
   { field: 'sports_tv', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M8 21h8"/></svg>', label: 'badge.sportsTv' },
   { field: 'live_music', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>', label: 'badge.liveMusic' },
-  { field: 'great_groups', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>', label: 'badge.greatGroups' }
+  { field: 'great_groups', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>', label: 'badge.greatGroups' },
+  { field: 'happy_hour', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', label: 'badge.happyHour' }
 ];
 
 function formatTime12h(t){
@@ -2238,7 +2241,7 @@ function venueCardHtml(v){
     ' data-price="' + (v.price != null ? v.price : '') + '" data-reviews="' + (v.reviews != null ? v.reviews : '') + '"' +
     ' data-phone="' + escapeAttr(v.phone || '') + '" data-cuisine="' + escapeAttr(v.cuisine || '') + '"' +
     ' data-sports="' + (v.sports_tv ? 1 : 0) + '" data-music="' + (v.live_music ? 1 : 0) + '"' +
-    ' data-groups="' + (v.great_groups ? 1 : 0) + '">' +
+    ' data-groups="' + (v.great_groups ? 1 : 0) + '" data-happy_hour="' + (v.happy_hour ? 1 : 0) + '">' +
     '<div class="venue-top"><div><span class="venue-type type-' + v.type + '">' + typeLabel + '</span><h3>' + escapeAttr(v.name) + '</h3>' +
     '<div class="venue-region">' + regionLabel + ratingHtml + cuisineHtml + openStatusHtml + '</div></div></div>' +
     '<p class="venue-desc">' + escapeAttr((getCurrentLang() === 'fr' && v.description_fr) ? v.description_fr : (v.description || '')) + '</p>' +
@@ -2340,7 +2343,6 @@ function initBlock1(){
   var activeCuisine = 'all';
   var activePrice = 'all';
   var searchTerm = '';
-  var happyNowOnly = false;
   var favoritesOnly = false;
 
   var typeBtns = document.querySelectorAll('.type-chip');
@@ -2348,7 +2350,6 @@ function initBlock1(){
   var regionBtns = document.querySelectorAll('.region-chip');
   var priceBtns = document.querySelectorAll('.price-chip');
   var cuisineFilter = document.getElementById('cuisineFilter');
-  var happyBtn = document.getElementById('happyNowBtn');
   var favoritesOnlyBtn = document.getElementById('favoritesOnlyBtn');
   var cards = document.querySelectorAll('.venue-card');
   var resultsCount = document.getElementById('resultsCount');
@@ -2414,12 +2415,6 @@ function initBlock1(){
     applyFilters();
   });
 
-  happyBtn.addEventListener('click', function(){
-    happyNowOnly = !happyNowOnly;
-    happyBtn.setAttribute('aria-pressed', String(happyNowOnly));
-    applyFilters();
-  });
-
   if (favoritesOnlyBtn) {
     favoritesOnlyBtn.addEventListener('click', function(){
       favoritesOnly = !favoritesOnly;
@@ -2435,8 +2430,6 @@ function initBlock1(){
     stampBtns.forEach(function(b){ b.setAttribute('aria-pressed','false'); });
     regionBtns.forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.region === 'all' ? 'true':'false'); });
     priceBtns.forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.price === 'all' ? 'true':'false'); });
-    happyNowOnly = false;
-    happyBtn.setAttribute('aria-pressed','false');
     favoritesOnly = false;
     if (favoritesOnlyBtn) favoritesOnlyBtn.setAttribute('aria-pressed','false');
     activeRegions.clear();
@@ -2462,18 +2455,6 @@ function initBlock1(){
   searchBtn.addEventListener('click', runSearch);
   searchInput.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ runSearch(); } });
 
-  function isHappyHourNow(card){
-    var start = card.dataset.happyStart;
-    var end = card.dataset.happyEnd;
-    if(!start || !end){ return false; }
-    var now = new Date();
-    var nowMinutes = now.getHours() * 60 + now.getMinutes();
-    var sParts = start.split(':'); var eParts = end.split(':');
-    var startMinutes = parseInt(sParts[0],10)*60 + parseInt(sParts[1],10);
-    var endMinutes = parseInt(eParts[0],10)*60 + parseInt(eParts[1],10);
-    return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
-  }
-
   function applyFilters(){
     var visibleCount = 0;
     cards.forEach(function(card){
@@ -2492,10 +2473,9 @@ function initBlock1(){
         card.dataset.region.toLowerCase().includes(searchTerm) ||
         (card.dataset.cuisine || '').toLowerCase().includes(searchTerm) ||
         (card.querySelector('.venue-desc').textContent || '').toLowerCase().includes(searchTerm);
-      var matchesHappy = !happyNowOnly || isHappyHourNow(card);
       var matchesFavorite = !favoritesOnly || card.dataset.favorite === '1';
 
-      var show = matchesType && matchesFilters && matchesRegion && matchesCuisine && matchesPrice && matchesSearch && matchesHappy && matchesFavorite;
+      var show = matchesType && matchesFilters && matchesRegion && matchesCuisine && matchesPrice && matchesSearch && matchesFavorite;
       card.style.display = show ? '' : 'none';
       if(show){ visibleCount++; }
     });
@@ -2614,7 +2594,7 @@ function initBlock2(){
   });
 
   // Refresh map markers whenever filters change, piggyback on clicks to any filter control.
-  document.querySelectorAll('.type-chip, .stamp-btn, .region-chip, #happyNowBtn, #clearFilters, #searchBtn').forEach(function(el){
+  document.querySelectorAll('.type-chip, .stamp-btn, .region-chip, #clearFilters, #searchBtn').forEach(function(el){
     el.addEventListener('click', function(){ if (map) setTimeout(refreshMapMarkers, 10); });
   });
   var cuisineEl = document.getElementById('cuisineFilter');
@@ -2857,10 +2837,17 @@ function initBlock8(){
   if (to3) to3.addEventListener('click', function(){ showStep(3); });
   if (toResults) toResults.addEventListener('click', function(){
     if (window.trackEvent) {
+      // activeRegions/activeTypes/activeFilters live in a different IIFE
+      // (the filter-button click handlers), not reachable from here — read
+      // the same information straight off the DOM instead, matching the
+      // pattern updateCount() already uses for the same reason.
+      var regionCount = document.querySelectorAll('.region-chip[aria-pressed="true"]:not([data-region="all"])').length;
+      var typeCount = document.querySelectorAll('.type-chip[aria-pressed="true"]').length;
+      var filterCount = document.querySelectorAll('.stamp-btn[aria-pressed="true"]').length;
       window.trackEvent('wizard_complete', {
-        region_count: activeRegions.size,
-        type_count: activeTypes.size,
-        filter_count: activeFilters.size
+        region_count: regionCount,
+        type_count: typeCount,
+        filter_count: filterCount
       });
     }
     showStep('results');

@@ -32,6 +32,7 @@ db.exec(`
     sports_tv INTEGER DEFAULT 0,
     live_music INTEGER DEFAULT 0,
     great_groups INTEGER DEFAULT 0,
+    happy_hour INTEGER DEFAULT 0,
     hours TEXT,
     description_fr TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -60,6 +61,11 @@ try {
 } catch (err) {
   // Column already exists — expected on every restart after the first.
 }
+try {
+  db.exec('ALTER TABLE venues ADD COLUMN happy_hour INTEGER DEFAULT 0');
+} catch (err) {
+  // Column already exists — expected on every restart after the first.
+}
 
 // Seed from committed seed-data.json if the table is empty. This runs on
 // every startup but is a no-op once data exists — it exists so that a fresh
@@ -75,9 +81,9 @@ try {
         INSERT INTO venues (
           name, region, type, cuisine, phone, price, reviews, rating, description,
           dog_friendly, vegan, vegetarian, patio, kid_friendly, gluten_free, lake_view,
-          nonalcoholic, sports_tv, live_music, great_groups, hours, description_fr
+          nonalcoholic, sports_tv, live_music, great_groups, happy_hour, hours, description_fr
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `);
       for (const v of venues) {
@@ -87,7 +93,7 @@ try {
           v.dog_friendly ? 1 : 0, v.vegan ? 1 : 0, v.vegetarian ? 1 : 0, v.patio ? 1 : 0,
           v.kid_friendly ? 1 : 0, v.gluten_free ? 1 : 0, v.lake_view ? 1 : 0,
           v.nonalcoholic ? 1 : 0, v.sports_tv ? 1 : 0, v.live_music ? 1 : 0,
-          v.great_groups ? 1 : 0, v.hours ?? null, v.description_fr ?? null
+          v.great_groups ? 1 : 0, v.happy_hour ? 1 : 0, v.hours ?? null, v.description_fr ?? null
         );
       }
       console.log(`Seeded ${venues.length} venues from seed-data.json`);
