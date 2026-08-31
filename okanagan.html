@@ -781,14 +781,6 @@
     background: rgba(255,252,246,0.1); border:1px solid rgba(255,252,246,0.3);
     padding:11px 18px; border-radius:14px; font-weight:700; font-size:0.9rem;
   }
-  .phone-mock{
-    background: var(--paper); border-radius:32px; padding: 18px; max-width:260px; margin:0 auto;
-    box-shadow: 0 30px 50px -20px rgba(0,0,0,0.4);
-  }
-  .phone-mock .screen{ background: var(--sand); border-radius:20px; padding:16px; }
-  .phone-mock .mini-card{ background: var(--paper); border-radius:14px; padding:12px; margin-bottom:10px; box-shadow: 0 6px 14px -10px var(--shadow); }
-  .phone-mock .mini-card h4{ font-family:'Fraunces',serif; font-size:0.95rem; margin:0 0 4px; color: var(--ink); }
-  .phone-mock .mini-card p{ font-size:0.72rem; color: rgba(42,32,25,0.68); margin:0; }
 
   /* ---------- list your venue ---------- */
   .list-venue{ padding: 90px 0; }
@@ -906,14 +898,14 @@
 <div id="floatingTooltip"></div>
 <div id="tripTray">
   <div id="tripTrayPanel">
-    <h4>Your trip</h4>
+    <h4 data-i18n="trip.yourTrip">Your trip</h4>
     <p id="tripTrayMessage" style="display:none;"></p>
     <div id="tripTrayList"></div>
-    <button id="tripRouteBtn" disabled>Get route in Google Maps</button>
-    <button id="tripClearBtn">Clear trip</button>
+    <button id="tripRouteBtn" disabled data-i18n="trip.getRoute">Get route in Google Maps</button>
+    <button id="tripClearBtn" data-i18n="trip.clearTrip">Clear trip</button>
   </div>
   <button id="tripTrayToggle">
-    🧳 Trip <span id="tripTrayCount">0</span>
+    🧳 <span data-i18n="trip.label">Trip</span> <span id="tripTrayCount">0</span>
   </button>
 </div>
 
@@ -961,47 +953,47 @@
     </div>
 
     <div class="wizard-progress" id="wizardProgress">
-      <span class="wizard-step-dot" data-step="1"><span class="wizard-step-num">1</span>Where to?</span>
-      <span class="wizard-step-dot" data-step="2"><span class="wizard-step-num">2</span>What kind?</span>
-      <span class="wizard-step-dot" data-step="3"><span class="wizard-step-num">3</span>What matters?</span>
+      <span class="wizard-step-dot" data-step="1"><span class="wizard-step-num">1</span><span data-i18n="wizard.step1Title">Where to?</span></span>
+      <span class="wizard-step-dot" data-step="2"><span class="wizard-step-num">2</span><span data-i18n="wizard.step2Title">What kind?</span></span>
+      <span class="wizard-step-dot" data-step="3"><span class="wizard-step-num">3</span><span data-i18n="wizard.step3Title">What matters?</span></span>
     </div>
 
     <div class="wizard-step-panel" id="wizardStep1">
-      <p class="wizard-step-hint">Pick as many regions as you like, then continue — or tap "Use my location" below to find the closest ones for you.</p>
-      <div class="filter-group wizard-scroll-area wizard-regions-area">
-        <span class="filter-label">Near</span>
-        <button class="region-chip" data-region="all" aria-pressed="true">All regions</button>
-        <button class="near-me-btn" id="nearMeBtn" type="button">📍 Use my location</button>
+      <p class="wizard-step-hint" data-i18n="wizard.hint1">Pick as many regions as you like, then continue — or tap "Use my location" below to find the closest ones for you.</p>
+      <div class="filter-group">
+        <span class="filter-label" data-i18n="wizard.near">Near</span>
+        <button class="region-chip" data-region="all" aria-pressed="true" data-i18n="wizard.allRegions">All regions</button>
+        <button class="near-me-btn" id="nearMeBtn" type="button" data-i18n="wizard.useMyLocation">📍 Use my location</button>
         <span id="nearMeStatus" class="near-me-status" style="display:none;"></span>
-        <span class="region-divider-group region-divider-group-first">
-          <span class="region-divider">Central</span>
-          <button class="region-chip" data-region="kelowna" aria-pressed="false">Kelowna</button>
-        </span>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label" data-i18n="wizard.central">Central</span>
+        <button class="region-chip" data-region="kelowna" aria-pressed="false">Kelowna</button>
         <button class="region-chip" data-region="west-kelowna" aria-pressed="false">West Kelowna</button>
         <button class="region-chip" data-region="peachland" aria-pressed="false">Peachland</button>
         <button class="region-chip" data-region="lake-country" aria-pressed="false">Lake Country</button>
-        <span class="region-divider-group">
-          <span class="region-divider">South</span>
-          <button class="region-chip" data-region="naramata" aria-pressed="false">Naramata Bench</button>
-        </span>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label" data-i18n="wizard.south">South</span>
+        <button class="region-chip" data-region="naramata" aria-pressed="false">Naramata Bench</button>
         <button class="region-chip" data-region="penticton" aria-pressed="false">Penticton</button>
         <button class="region-chip" data-region="kaleden" aria-pressed="false">Kaleden</button>
         <button class="region-chip" data-region="okanagan-falls" aria-pressed="false">Okanagan Falls</button>
         <button class="region-chip" data-region="summerland" aria-pressed="false">Summerland</button>
         <button class="region-chip" data-region="oliver" aria-pressed="false">Oliver</button>
         <button class="region-chip" data-region="osoyoos" aria-pressed="false">Osoyoos</button>
-        <span class="region-divider-group">
-          <span class="region-divider">North</span>
-          <button class="region-chip" data-region="vernon" aria-pressed="false">Vernon</button>
-        </span>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label" data-i18n="wizard.north">North</span>
+        <button class="region-chip" data-region="vernon" aria-pressed="false">Vernon</button>
         <button class="region-chip" data-region="coldstream" aria-pressed="false">Coldstream</button>
         <button class="region-chip" data-region="lumby" aria-pressed="false">Lumby</button>
         <button class="region-chip" data-region="armstrong" aria-pressed="false">Armstrong</button>
         <button class="region-chip" data-region="enderby" aria-pressed="false">Enderby</button>
-        <span class="region-divider-group">
-          <span class="region-divider">Ski resorts</span>
-          <button class="region-chip" data-region="big-white" aria-pressed="false">Big White</button>
-        </span>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label" data-i18n="wizard.skiResorts">Ski resorts</span>
+        <button class="region-chip" data-region="big-white" aria-pressed="false">Big White</button>
         <button class="region-chip" data-region="silverstar" aria-pressed="false">SilverStar</button>
         <button class="region-chip" data-region="apex" aria-pressed="false">Apex</button>
         <button class="region-chip" data-region="baldy" aria-pressed="false">Mount Baldy</button>
@@ -1012,18 +1004,18 @@
     </div>
 
     <div class="wizard-step-panel" id="wizardStep2" style="display:none;">
-      <p class="wizard-step-hint">Pick as many types as you like, then continue.</p>
+      <p class="wizard-step-hint" data-i18n="wizard.hint2">Pick as many types as you like, then continue.</p>
       <div class="filter-group">
-        <span class="filter-label">Show me</span>
-        <button class="type-chip" data-type="winery" aria-pressed="false">Wineries</button>
-        <button class="type-chip" data-type="brewery" aria-pressed="false">Breweries</button>
-        <button class="type-chip" data-type="restaurant" aria-pressed="false">Restaurants</button>
-        <button class="type-chip" data-type="cocktail" aria-pressed="false">Cocktail Lounges</button>
-        <button class="type-chip" data-type="cafe" aria-pressed="false">Cafes</button>
-        <button class="type-chip" data-type="pub" aria-pressed="false">Pubs &amp; Bars</button>
+        <span class="filter-label" data-i18n="wizard.showMe">Show me</span>
+        <button class="type-chip" data-type="winery" aria-pressed="false" data-i18n="wizard.wineries">Wineries</button>
+        <button class="type-chip" data-type="brewery" aria-pressed="false" data-i18n="wizard.breweries">Breweries</button>
+        <button class="type-chip" data-type="restaurant" aria-pressed="false" data-i18n="wizard.restaurants">Restaurants</button>
+        <button class="type-chip" data-type="cocktail" aria-pressed="false" data-i18n="wizard.cocktailLounges">Cocktail Lounges</button>
+        <button class="type-chip" data-type="cafe" aria-pressed="false" data-i18n="wizard.cafes">Cafes</button>
+        <button class="type-chip" data-type="pub" aria-pressed="false" data-i18n="wizard.pubsAndBars">Pubs &amp; Bars</button>
       </div>
       <div class="wizard-nav">
-        <button class="wizard-back-btn" id="wizardTo1Back">← Back</button>
+        <button class="wizard-back-btn" id="wizardTo1Back" data-i18n="wizard.back">← Back</button>
         <button class="wizard-continue-btn" id="wizardTo3">Continue →</button>
       </div>
     </div>
@@ -1032,77 +1024,77 @@
       <p class="wizard-step-hint">Pick as many as you like, or skip straight to your results.</p>
       <div class="filter-group wizard-scroll-area wizard-unrestricted-area">
         <span class="filter-label">I need</span>
-        <button class="stamp-btn" data-filter="dog" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg></span>Dog-friendly</button>
-        <button class="stamp-btn" data-filter="vegan" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span>Vegan menu</button>
-        <button class="stamp-btn" data-filter="vegetarian" aria-pressed="false"><span class="dot"><span style="font-size:0.62rem; font-weight:800; letter-spacing:0.02em;">VG</span></span>Vegetarian options</button>
-        <button class="stamp-btn" data-filter="patio" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span>Patio available</button>
-        <button class="stamp-btn" data-filter="kids" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><circle cx="10" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><path d="M8 21c-1-4 0-9 4-9s5 5 4 9"/></svg></span>Kid-friendly</button>
-        <button class="stamp-btn" data-filter="gluten" aria-pressed="false"><span class="dot" style="font-size:0.68rem; font-weight:800;">GF</span>Gluten-free options</button>
-        <button class="stamp-btn" data-filter="view" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span>Lake/vineyard view</button>
-        <button class="stamp-btn" data-filter="sports" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M8 21h8"/></svg></span>Sports on TV</button>
-        <button class="stamp-btn" data-filter="music" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span>Live music</button>
-        <button class="stamp-btn" data-filter="nonalc" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg></span>Non-alcoholic options</button>
-        <button class="stamp-btn" data-filter="groups" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg></span>Great for groups</button>
-        <button class="happy-btn" id="happyNowBtn" aria-pressed="false">🕐 Happy hour now</button>
-        <button class="happy-btn" id="favoritesOnlyBtn" aria-pressed="false">❤ My favorites (<span id="favoritesCount">0</span>)</button>
+        <button class="stamp-btn" data-filter="dog" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg></span><span data-i18n="stamp.dogFriendly">Dog-friendly</span></button>
+        <button class="stamp-btn" data-filter="vegan" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span><span data-i18n="stamp.veganMenu">Vegan menu</span></button>
+        <button class="stamp-btn" data-filter="vegetarian" aria-pressed="false"><span class="dot"><span style="font-size:0.62rem; font-weight:800; letter-spacing:0.02em;">VG</span></span><span data-i18n="stamp.vegetarianOptions">Vegetarian options</span></button>
+        <button class="stamp-btn" data-filter="patio" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span><span data-i18n="stamp.patioAvailable">Patio available</span></button>
+        <button class="stamp-btn" data-filter="kids" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><circle cx="10" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><path d="M8 21c-1-4 0-9 4-9s5 5 4 9"/></svg></span><span data-i18n="stamp.kidFriendly">Kid-friendly</span></button>
+        <button class="stamp-btn" data-filter="gluten" aria-pressed="false"><span class="dot" style="font-size:0.68rem; font-weight:800;">GF</span><span data-i18n="stamp.glutenFreeOptions">Gluten-free options</span></button>
+        <button class="stamp-btn" data-filter="view" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span><span data-i18n="stamp.lakeView">Lake/vineyard view</span></button>
+        <button class="stamp-btn" data-filter="sports" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M8 21h8"/></svg></span><span data-i18n="stamp.sportsOnTv">Sports on TV</span></button>
+        <button class="stamp-btn" data-filter="music" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span data-i18n="stamp.liveMusic">Live music</span></button>
+        <button class="stamp-btn" data-filter="nonalc" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg></span><span data-i18n="stamp.nonAlcoholicOptions">Non-alcoholic options</span></button>
+        <button class="stamp-btn" data-filter="groups" aria-pressed="false"><span class="dot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg></span><span data-i18n="stamp.greatForGroups">Great for groups</span></button>
+        <button class="happy-btn" id="happyNowBtn" aria-pressed="false" data-i18n="stamp.happyHourNow">🕐 Happy hour now</button>
+        <button class="happy-btn" id="favoritesOnlyBtn" aria-pressed="false">❤ <span data-i18n="stamp.myFavorites">My favorites</span> (<span id="favoritesCount">0</span>)</button>
       </div>
       <div class="wizard-nav">
-        <button class="wizard-back-btn" id="wizardTo2Back">← Back</button>
+        <button class="wizard-back-btn" id="wizardTo2Back" data-i18n="wizard.back">← Back</button>
         <button class="wizard-continue-btn" id="wizardToResults">See results →</button>
       </div>
     </div>
 
     <div class="wizard-results-refine" id="wizardResultsRefine" style="display:none;">
-      <button class="wizard-edit-btn" id="wizardEditFilters">✎ Edit my choices</button>
-      <button class="clear-btn" id="clearFilters">Clear all</button>
+      <button class="wizard-edit-btn" id="wizardEditFilters" data-i18n="wizard.editChoices">✎ Edit my choices</button>
+      <button class="clear-btn" id="clearFilters" data-i18n="wizard.clearAll">Clear all</button>
 
-      <button class="wizard-edit-btn" id="refineSummaryBtn" style="display:none;">✎ Cuisine / price</button>
+      <button class="wizard-edit-btn" id="refineSummaryBtn" style="display:none;" data-i18n="wizard.cuisinePrice">✎ Cuisine / price</button>
 
       <div id="cuisinePriceGroup" style="display:flex; flex-wrap:wrap; gap:16px 24px;">
         <div class="filter-group">
-          <span class="filter-label">Cuisine</span>
+          <span class="filter-label" data-i18n="filter.cuisine">Cuisine</span>
           <select id="cuisineFilter" class="region-chip" style="cursor:pointer; padding:7px 12px;">
-            <option value="all">Any cuisine</option>
-            <option value="BBQ">BBQ</option>
-            <option value="Bubble Tea">Bubble Tea</option>
-            <option value="Caribbean">Caribbean</option>
-            <option value="Chinese">Chinese</option>
-            <option value="Dessert">Dessert &amp; Ice Cream</option>
-            <option value="Ethiopian">Ethiopian</option>
-            <option value="Farm-to-Table">Farm-to-Table</option>
-            <option value="Filipino">Filipino</option>
-            <option value="French">French</option>
-            <option value="German">German</option>
-            <option value="Greek">Greek</option>
-            <option value="Indian">Indian</option>
-            <option value="Italian">Italian</option>
-            <option value="Japanese">Japanese</option>
-            <option value="Korean">Korean</option>
-            <option value="Latin American">Latin American</option>
-            <option value="Lebanese">Lebanese</option>
-            <option value="Mediterranean">Mediterranean</option>
-            <option value="Mexican">Mexican</option>
-            <option value="Polish">Polish</option>
-            <option value="Portuguese">Portuguese</option>
-            <option value="Seafood">Seafood</option>
-            <option value="Spanish">Spanish</option>
-            <option value="Steakhouse">Steakhouse</option>
-            <option value="Thai">Thai</option>
-            <option value="Turkish">Turkish</option>
-            <option value="Ukrainian">Ukrainian</option>
-            <option value="Vietnamese">Vietnamese</option>
+            <option value="all" data-i18n="filter.anyCuisine">Any cuisine</option>
+            <option value="BBQ" data-i18n="cuisine.bbq">BBQ</option>
+            <option value="Bubble Tea" data-i18n="cuisine.bubbleTea">Bubble Tea</option>
+            <option value="Caribbean" data-i18n="cuisine.caribbean">Caribbean</option>
+            <option value="Chinese" data-i18n="cuisine.chinese">Chinese</option>
+            <option value="Dessert" data-i18n="cuisine.dessert">Dessert &amp; Ice Cream</option>
+            <option value="Ethiopian" data-i18n="cuisine.ethiopian">Ethiopian</option>
+            <option value="Farm-to-Table" data-i18n="cuisine.farmToTable">Farm-to-Table</option>
+            <option value="Filipino" data-i18n="cuisine.filipino">Filipino</option>
+            <option value="French" data-i18n="cuisine.french">French</option>
+            <option value="German" data-i18n="cuisine.german">German</option>
+            <option value="Greek" data-i18n="cuisine.greek">Greek</option>
+            <option value="Indian" data-i18n="cuisine.indian">Indian</option>
+            <option value="Italian" data-i18n="cuisine.italian">Italian</option>
+            <option value="Japanese" data-i18n="cuisine.japanese">Japanese</option>
+            <option value="Korean" data-i18n="cuisine.korean">Korean</option>
+            <option value="Latin American" data-i18n="cuisine.latinAmerican">Latin American</option>
+            <option value="Lebanese" data-i18n="cuisine.lebanese">Lebanese</option>
+            <option value="Mediterranean" data-i18n="cuisine.mediterranean">Mediterranean</option>
+            <option value="Mexican" data-i18n="cuisine.mexican">Mexican</option>
+            <option value="Polish" data-i18n="cuisine.polish">Polish</option>
+            <option value="Portuguese" data-i18n="cuisine.portuguese">Portuguese</option>
+            <option value="Seafood" data-i18n="cuisine.seafood">Seafood</option>
+            <option value="Spanish" data-i18n="cuisine.spanish">Spanish</option>
+            <option value="Steakhouse" data-i18n="cuisine.steakhouse">Steakhouse</option>
+            <option value="Thai" data-i18n="cuisine.thai">Thai</option>
+            <option value="Turkish" data-i18n="cuisine.turkish">Turkish</option>
+            <option value="Ukrainian" data-i18n="cuisine.ukrainian">Ukrainian</option>
+            <option value="Vietnamese" data-i18n="cuisine.vietnamese">Vietnamese</option>
           </select>
         </div>
 
         <div class="filter-group">
-          <span class="filter-label">Price</span>
-          <button class="price-chip" data-price="all" aria-pressed="true">Any price</button>
-          <button class="price-chip" data-price="1" aria-pressed="false">$ Cheap</button>
-          <button class="price-chip" data-price="2" aria-pressed="false">$$ Moderate</button>
-          <button class="price-chip" data-price="3" aria-pressed="false">$$$ Expensive</button>
+          <span class="filter-label" data-i18n="filter.price">Price</span>
+          <button class="price-chip" data-price="all" aria-pressed="true" data-i18n="filter.anyPrice">Any price</button>
+          <button class="price-chip" data-price="1" aria-pressed="false" data-i18n="filter.cheap">$ Cheap</button>
+          <button class="price-chip" data-price="2" aria-pressed="false" data-i18n="filter.moderate">$$ Moderate</button>
+          <button class="price-chip" data-price="3" aria-pressed="false" data-i18n="filter.expensive">$$$ Expensive</button>
         </div>
 
-        <button class="wizard-continue-btn" id="refineSearchBtn">🔍 Search</button>
+        <button class="wizard-continue-btn" id="refineSearchBtn" data-i18n="wizard.search">🔍 Search</button>
       </div>
     </div>
 
@@ -1368,30 +1360,30 @@
   <div class="wrap">
 
     <div class="map-toggle-row">
-      <button class="map-toggle-btn" id="mapToggleBtn" aria-pressed="false">🗺️ Open the map view</button>
+      <button class="map-toggle-btn" id="mapToggleBtn" aria-pressed="false" data-i18n="map.openView">🗺️ Open the map view</button>
     </div>
     <div class="map-panel" id="mapPanel">
       <div id="okMap"></div>
-      <div class="map-note">Pins mark each town/area center, not individual addresses, click a pin to see what's currently filtered there, then use "Get directions" on any venue for its exact location.</div>
+      <div class="map-note" data-i18n="map.note">Pins mark each town/area center, not individual addresses, click a pin to see what's currently filtered there, then use "Get directions" on any venue for its exact location.</div>
     </div>
 
     <div class="results-head">
-      <h2 style="font-size:1.6rem;">Places you'll love</h2>
+      <h2 style="font-size:1.6rem;" data-i18n="results.heading">Places you'll love</h2>
       <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
         <span class="results-count" id="resultsCount">812 places to explore</span>
         <select id="sortSelect" class="region-chip" style="cursor:pointer; padding:6px 12px; font-size:0.85rem;">
-          <option value="default">Sort: Featured order</option>
-          <option value="rating-desc">Sort: Highest rated</option>
-          <option value="name-asc">Sort: A–Z</option>
+          <option value="default" data-i18n="results.sortFeatured">Sort: Featured order</option>
+          <option value="rating-desc" data-i18n="results.sortRating">Sort: Highest rated</option>
+          <option value="name-asc" data-i18n="results.sortAz">Sort: A–Z</option>
         </select>
       </div>
     </div>
-    <p style="max-width:640px; margin:0 0 30px; font-size:0.88rem; color:rgba(42,32,25,0.65); background:var(--paper); border-radius:10px; padding:14px 18px; border:1px solid rgba(42,32,25,0.15);">
+    <p style="max-width:640px; margin:0 0 30px; font-size:0.88rem; color:rgba(42,32,25,0.65); background:var(--paper); border-radius:10px; padding:14px 18px; border:1px solid rgba(42,32,25,0.15);" data-i18n="results.disclaimer">
       Every place below is a real Okanagan venue, pulled from live Google Places data and cross-checked against reviews for dog, patio, vegan, kid, and gluten-free signals (only flagged when a review said so, not guessed). Covers the Central, South, and North Okanagan plus Big White, SilverStar, Apex, and Mount Baldy. It's not every venue in the valley (200+ wineries alone). Amenities change seasonally, happy hour times aren't confirmed yet so that filter won't return results, and price level ($/$$/$$$) is still being added venue by venue. Double check before you go.
     </p>
 
     <div class="venue-grid" id="venueGrid"></div>
-    <p class="no-results" id="noResults">Nothing matches that combo just yet, try clearing a filter and let's find you somewhere good.</p>
+    <p class="no-results" id="noResults" data-i18n="results.noResults">Nothing matches that combo just yet, try clearing a filter and let's find you somewhere good.</p>
   </div>
 </section>
 
@@ -1494,7 +1486,7 @@
 </section>
 
 <section class="app-teaser" id="app">
-  <div class="wrap">
+  <div class="wrap" style="grid-template-columns:1fr; max-width:640px;">
     <div>
       <span class="eyebrow" style="color:#E0A94E;">Coming soon</span>
       <h2>This directory is becoming the Okanagan Roam app</h2>
@@ -1502,13 +1494,6 @@
       <div class="store-row">
         <div class="store-badge">📱 App Store</div>
         <div class="store-badge">▶ Google Play</div>
-      </div>
-    </div>
-    <div class="phone-mock">
-      <div class="screen">
-        <div class="mini-card"><h4>Quails' Gate Winery</h4><p><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg> · West Kelowna</p></div>
-        <div class="mini-card"><h4>Cannery Brewing Co.</h4><p><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><circle cx="10" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><path d="M8 21c-1-4 0-9 4-9s5 5 4 9"/></svg> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg> · Penticton</p></div>
-        <div class="mini-card"><h4>Angry Vegan</h4><p><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg> · Penticton</p></div>
       </div>
     </div>
   </div>
@@ -1528,16 +1513,16 @@
       </div>
       <div class="foot-cols">
         <div class="foot-col">
-          <h4>Directory</h4>
+          <h4 data-i18n="footer.directory">Directory</h4>
           <ul>
-            <li><a href="#directory">Wineries</a></li>
-            <li><a href="#directory">Breweries</a></li>
-            <li><a href="#directory">Restaurants</a></li>
-            <li><a href="#directory">Cocktail Lounges</a></li>
+            <li><a href="#directory" data-i18n="wizard.wineries">Wineries</a></li>
+            <li><a href="#directory" data-i18n="wizard.breweries">Breweries</a></li>
+            <li><a href="#directory" data-i18n="wizard.restaurants">Restaurants</a></li>
+            <li><a href="#directory" data-i18n="wizard.cocktailLounges">Cocktail Lounges</a></li>
           </ul>
         </div>
         <div class="foot-col">
-          <h4>Regions</h4>
+          <h4 data-i18n="footer.regions">Regions</h4>
           <ul>
             <li>Kelowna</li>
             <li>Naramata Bench</li>
@@ -1546,15 +1531,15 @@
           </ul>
         </div>
         <div class="foot-col">
-          <h4>About</h4>
+          <h4 data-i18n="footer.about">About</h4>
           <ul>
-            <li><a href="#app">App coming soon</a></li>
-            <li><a href="#list-venue">List your venue</a></li>
-            <li><a href="mailto:okanaganroam@gmail.com">Contact</a></li>
+            <li><a href="#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
+            <li><a href="#list-venue" data-i18n="footer.listVenue">List your venue</a></li>
+            <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
           </ul>
         </div>
         <div class="foot-col">
-          <h4>Follow Along</h4>
+          <h4 data-i18n="footer.followAlong">Follow Along</h4>
           <div class="social-row">
             <a class="social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
@@ -1605,7 +1590,145 @@ var TRANSLATIONS = {
     'search.placeholder': "Search a place, cuisine, or what you're craving",
     'status.open': 'Open now',
     'status.closingSoon': 'Closing soon',
-    'status.closed': 'Closed now'
+    'status.closed': 'Closed now',
+
+    'wizard.step1Title': 'Where to?',
+    'wizard.step2Title': 'What kind?',
+    'wizard.step3Title': 'What matters?',
+    'wizard.hint1': 'Pick as many regions as you like, then continue \u2014 or tap "Use my location" below to find the closest ones for you.',
+    'wizard.hint2': 'Pick as many types as you like, then continue.',
+    'wizard.hint3': 'Pick as many as you like, or skip straight to your results.',
+    'wizard.showMe': 'Show me',
+    'wizard.iNeed': 'I need',
+    'wizard.wineries': 'Wineries',
+    'wizard.breweries': 'Breweries',
+    'wizard.restaurants': 'Restaurants',
+    'wizard.cocktailLounges': 'Cocktail Lounges',
+    'wizard.cafes': 'Cafes',
+    'wizard.pubsAndBars': 'Pubs & Bars',
+    'wizard.continue': 'Continue \u2192',
+    'wizard.continueLabel': 'Continue',
+    'wizard.seeResultsLabel': 'See results',
+    'wizard.selected': 'selected',
+    'wizard.back': '\u2190 Back',
+    'wizard.seeResults': 'See results \u2192',
+    'wizard.editChoices': '\u270e Edit my choices',
+    'wizard.clearAll': 'Clear all',
+    'wizard.cuisinePrice': '\u270e Cuisine / price',
+    'wizard.search': '\ud83d\udd0d Search',
+    'wizard.useMyLocation': '\ud83d\udccd Use my location',
+    'wizard.allRegions': 'All regions',
+    'wizard.near': 'Near',
+    'wizard.central': 'Central',
+    'wizard.south': 'South',
+    'wizard.north': 'North',
+    'wizard.skiResorts': 'Ski resorts',
+
+    'stamp.dogFriendly': 'Dog-friendly',
+    'stamp.veganMenu': 'Vegan menu',
+    'stamp.vegetarianOptions': 'Vegetarian options',
+    'stamp.patioAvailable': 'Patio available',
+    'stamp.kidFriendly': 'Kid-friendly',
+    'stamp.glutenFreeOptions': 'Gluten-free options',
+    'stamp.lakeView': 'Lake/vineyard view',
+    'stamp.sportsOnTv': 'Sports on TV',
+    'stamp.liveMusic': 'Live music',
+    'stamp.nonAlcoholicOptions': 'Non-alcoholic options',
+    'stamp.greatForGroups': 'Great for groups',
+    'stamp.happyHourNow': '\ud83d\udd50 Happy hour now',
+    'stamp.myFavorites': 'My favorites',
+
+    'badge.dogFriendly': 'Dog-friendly',
+    'badge.vegan': 'Vegan-friendly',
+    'badge.vegetarian': 'Vegetarian options',
+    'badge.glutenFree': 'Gluten-free options',
+    'badge.patio': 'Patio',
+    'badge.kidFriendly': 'Kid-friendly',
+    'badge.lakeView': 'Lake/vineyard view',
+    'badge.nonalcoholic': 'Non-alcoholic options',
+    'badge.sportsTv': 'Sports on TV',
+    'badge.liveMusic': 'Live music',
+    'badge.greatGroups': 'Great for groups',
+
+    'type.restaurant': 'Restaurant',
+    'type.winery': 'Winery',
+    'type.brewery': 'Brewery',
+    'type.pub': 'Pub/Bar',
+    'type.cocktail': 'Cocktail Lounge',
+    'type.cafe': 'Cafe',
+
+    'filter.cuisine': 'Cuisine',
+    'filter.price': 'Price',
+    'filter.anyCuisine': 'Any cuisine',
+    'filter.anyPrice': 'Any price',
+    'filter.cheap': '$ Cheap',
+    'filter.moderate': '$$ Moderate',
+    'filter.expensive': '$$$ Expensive',
+
+    'cuisine.bbq': 'BBQ',
+    'cuisine.bubbleTea': 'Bubble Tea',
+    'cuisine.caribbean': 'Caribbean',
+    'cuisine.chinese': 'Chinese',
+    'cuisine.dessert': 'Dessert & Ice Cream',
+    'cuisine.ethiopian': 'Ethiopian',
+    'cuisine.farmToTable': 'Farm-to-Table',
+    'cuisine.filipino': 'Filipino',
+    'cuisine.french': 'French',
+    'cuisine.german': 'German',
+    'cuisine.greek': 'Greek',
+    'cuisine.indian': 'Indian',
+    'cuisine.italian': 'Italian',
+    'cuisine.japanese': 'Japanese',
+    'cuisine.korean': 'Korean',
+    'cuisine.latinAmerican': 'Latin American',
+    'cuisine.lebanese': 'Lebanese',
+    'cuisine.mediterranean': 'Mediterranean',
+    'cuisine.mexican': 'Mexican',
+    'cuisine.polish': 'Polish',
+    'cuisine.portuguese': 'Portuguese',
+    'cuisine.seafood': 'Seafood',
+    'cuisine.spanish': 'Spanish',
+    'cuisine.steakhouse': 'Steakhouse',
+    'cuisine.thai': 'Thai',
+    'cuisine.turkish': 'Turkish',
+    'cuisine.ukrainian': 'Ukrainian',
+    'cuisine.vietnamese': 'Vietnamese',
+
+    'trip.label': 'Trip',
+    'trip.yourTrip': 'Your trip',
+    'trip.getRoute': 'Get route in Google Maps',
+    'trip.clearTrip': 'Clear trip',
+    'trip.emptyState': 'No venues added yet. Click "Add to trip" on any venue card.',
+    'trip.addToTrip': '\ud83e\uddf3 Add to trip',
+    'trip.inTrip': '\u2713 In trip',
+    'trip.sameArea': 'Same area',
+    'trip.kmToNextStop': 'km to next stop',
+
+    'card.getDirections': '\ud83d\udccd Get directions',
+    'card.findMenu': '\ud83d\udccb Find menu',
+    'card.checkBooking': '\ud83d\udcc5 Check for online booking',
+    'card.favorite': 'Favorite',
+    'card.favorited': 'Favorited',
+
+    'map.openView': '\ud83d\uddfa\ufe0f Open the map view',
+    'map.closeView': '\ud83d\uddfa\ufe0f Close the map view',
+    'map.note': 'Pins mark each town/area center, not individual addresses, click a pin to see what\'s currently filtered there, then use "Get directions" on any venue for its exact location.',
+
+    'results.heading': "Places you'll love",
+    'results.placesToExplore': 'places to explore',
+    'results.placeToExplore': 'place to explore',
+    'results.sortFeatured': 'Sort: Featured order',
+    'results.sortRating': 'Sort: Highest rated',
+    'results.sortAz': 'Sort: A\u2013Z',
+    'results.disclaimer': 'Every place below is a real Okanagan venue, pulled from live Google Places data and cross-checked against reviews for dog, patio, vegan, kid, and gluten-free signals (only flagged when a review said so, not guessed). Covers the Central, South, and North Okanagan plus Big White, SilverStar, Apex, and Mount Baldy. It\'s not every venue in the valley (200+ wineries alone). Amenities change seasonally, happy hour times aren\'t confirmed yet so that filter won\'t return results, and price level ($/$$/$$$) is still being added venue by venue. Double check before you go.',
+    'results.noResults': "Nothing matches that combo just yet, try clearing a filter and let's find you somewhere good.",
+
+    'footer.directory': 'Directory',
+    'footer.regions': 'Regions',
+    'footer.about': 'About',
+    'footer.followAlong': 'Follow Along',
+    'footer.listVenue': 'List your venue',
+    'footer.contact': 'Contact'
   },
   fr: {
     'nav.directory': 'R\u00e9pertoire',
@@ -1619,7 +1742,145 @@ var TRANSLATIONS = {
     'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
     'status.open': 'Ouvert',
     'status.closingSoon': 'Ferme bient\u00f4t',
-    'status.closed': 'Ferm\u00e9'
+    'status.closed': 'Ferm\u00e9',
+
+    'wizard.step1Title': 'O\u00f9 aller\u00a0?',
+    'wizard.step2Title': 'Quel genre\u00a0?',
+    'wizard.step3Title': 'Qu\u2019est-ce qui compte\u00a0?',
+    'wizard.hint1': 'Choisissez autant de r\u00e9gions que vous le souhaitez, puis continuez \u2014 ou touchez \u00ab\u00a0Utiliser ma position\u00a0\u00bb ci-dessous pour trouver les plus proches.',
+    'wizard.hint2': 'Choisissez autant de types que vous le souhaitez, puis continuez.',
+    'wizard.hint3': 'Choisissez-en autant que vous voulez, ou passez directement \u00e0 vos r\u00e9sultats.',
+    'wizard.showMe': 'Montrez-moi',
+    'wizard.iNeed': 'J\u2019ai besoin de',
+    'wizard.wineries': 'Vignobles',
+    'wizard.breweries': 'Brasseries',
+    'wizard.restaurants': 'Restaurants',
+    'wizard.cocktailLounges': 'Bars \u00e0 cocktails',
+    'wizard.cafes': 'Caf\u00e9s',
+    'wizard.pubsAndBars': 'Pubs et bars',
+    'wizard.continue': 'Continuer \u2192',
+    'wizard.continueLabel': 'Continuer',
+    'wizard.seeResultsLabel': 'Voir les r\u00e9sultats',
+    'wizard.selected': 'choisi(s)',
+    'wizard.back': '\u2190 Retour',
+    'wizard.seeResults': 'Voir les r\u00e9sultats \u2192',
+    'wizard.editChoices': '\u270e Modifier mes choix',
+    'wizard.clearAll': 'Tout effacer',
+    'wizard.cuisinePrice': '\u270e Cuisine / prix',
+    'wizard.search': '\ud83d\udd0d Rechercher',
+    'wizard.useMyLocation': '\ud83d\udccd Utiliser ma position',
+    'wizard.allRegions': 'Toutes les r\u00e9gions',
+    'wizard.near': 'Pr\u00e8s d\u2019ici',
+    'wizard.central': 'Centre',
+    'wizard.south': 'Sud',
+    'wizard.north': 'Nord',
+    'wizard.skiResorts': 'Stations de ski',
+
+    'stamp.dogFriendly': 'Accepte les chiens',
+    'stamp.veganMenu': 'Menu v\u00e9gane',
+    'stamp.vegetarianOptions': 'Options v\u00e9g\u00e9tariennes',
+    'stamp.patioAvailable': 'Terrasse disponible',
+    'stamp.kidFriendly': 'Adapt\u00e9 aux enfants',
+    'stamp.glutenFreeOptions': 'Options sans gluten',
+    'stamp.lakeView': 'Vue sur le lac ou le vignoble',
+    'stamp.sportsOnTv': 'Sports \u00e0 la t\u00e9l\u00e9',
+    'stamp.liveMusic': 'Musique en direct',
+    'stamp.nonAlcoholicOptions': 'Options sans alcool',
+    'stamp.greatForGroups': 'Id\u00e9al pour les groupes',
+    'stamp.happyHourNow': '\ud83d\udd50 Happy hour en ce moment',
+    'stamp.myFavorites': 'Mes favoris',
+
+    'badge.dogFriendly': 'Accepte les chiens',
+    'badge.vegan': 'V\u00e9gane',
+    'badge.vegetarian': 'Options v\u00e9g\u00e9tariennes',
+    'badge.glutenFree': 'Options sans gluten',
+    'badge.patio': 'Terrasse',
+    'badge.kidFriendly': 'Adapt\u00e9 aux enfants',
+    'badge.lakeView': 'Vue sur le lac ou le vignoble',
+    'badge.nonalcoholic': 'Options sans alcool',
+    'badge.sportsTv': 'Sports \u00e0 la t\u00e9l\u00e9',
+    'badge.liveMusic': 'Musique en direct',
+    'badge.greatGroups': 'Id\u00e9al pour les groupes',
+
+    'type.restaurant': 'Restaurant',
+    'type.winery': 'Vignoble',
+    'type.brewery': 'Brasserie',
+    'type.pub': 'Pub/Bar',
+    'type.cocktail': 'Bar \u00e0 cocktails',
+    'type.cafe': 'Caf\u00e9',
+
+    'filter.cuisine': 'Cuisine',
+    'filter.price': 'Prix',
+    'filter.anyCuisine': 'Toute cuisine',
+    'filter.anyPrice': 'Tout prix',
+    'filter.cheap': '$ \u00c9conomique',
+    'filter.moderate': '$$ Mod\u00e9r\u00e9',
+    'filter.expensive': '$$$ \u00c9lev\u00e9',
+
+    'cuisine.bbq': 'BBQ',
+    'cuisine.bubbleTea': 'Th\u00e9 aux perles',
+    'cuisine.caribbean': 'Cara\u00efbes',
+    'cuisine.chinese': 'Chinoise',
+    'cuisine.dessert': 'Desserts et crème glac\u00e9e',
+    'cuisine.ethiopian': '\u00c9thiopienne',
+    'cuisine.farmToTable': 'De la ferme \u00e0 la table',
+    'cuisine.filipino': 'Philippine',
+    'cuisine.french': 'Fran\u00e7aise',
+    'cuisine.german': 'Allemande',
+    'cuisine.greek': 'Grecque',
+    'cuisine.indian': 'Indienne',
+    'cuisine.italian': 'Italienne',
+    'cuisine.japanese': 'Japonaise',
+    'cuisine.korean': 'Cor\u00e9enne',
+    'cuisine.latinAmerican': 'Latino-am\u00e9ricaine',
+    'cuisine.lebanese': 'Libanaise',
+    'cuisine.mediterranean': 'M\u00e9diterran\u00e9enne',
+    'cuisine.mexican': 'Mexicaine',
+    'cuisine.polish': 'Polonaise',
+    'cuisine.portuguese': 'Portugaise',
+    'cuisine.seafood': 'Fruits de mer',
+    'cuisine.spanish': 'Espagnole',
+    'cuisine.steakhouse': 'Grilladerie',
+    'cuisine.thai': 'Tha\u00eflandaise',
+    'cuisine.turkish': 'Turque',
+    'cuisine.ukrainian': 'Ukrainienne',
+    'cuisine.vietnamese': 'Vietnamienne',
+
+    'trip.label': 'Voyage',
+    'trip.yourTrip': 'Votre voyage',
+    'trip.getRoute': 'Obtenir l\u2019itin\u00e9raire dans Google Maps',
+    'trip.clearTrip': 'Effacer le voyage',
+    'trip.emptyState': 'Aucun \u00e9tablissement ajout\u00e9 pour l\u2019instant. Cliquez sur \u00ab\u00a0Ajouter au voyage\u00a0\u00bb sur n\u2019importe quelle fiche.',
+    'trip.addToTrip': '\ud83e\uddf3 Ajouter au voyage',
+    'trip.inTrip': '\u2713 Dans le voyage',
+    'trip.sameArea': 'M\u00eame secteur',
+    'trip.kmToNextStop': 'km jusqu\u2019au prochain arr\u00eat',
+
+    'card.getDirections': '\ud83d\udccd Obtenir l\u2019itin\u00e9raire',
+    'card.findMenu': '\ud83d\udccb Voir le menu',
+    'card.checkBooking': '\ud83d\udcc5 V\u00e9rifier la r\u00e9servation en ligne',
+    'card.favorite': 'Favori',
+    'card.favorited': 'Ajout\u00e9 aux favoris',
+
+    'map.openView': '\ud83d\uddfa\ufe0f Ouvrir la carte',
+    'map.closeView': '\ud83d\uddfa\ufe0f Fermer la carte',
+    'map.note': 'Les \u00e9pingles indiquent le centre de chaque ville ou secteur, pas les adresses exactes. Cliquez sur une \u00e9pingle pour voir ce qui y est actuellement filtr\u00e9, puis utilisez \u00ab\u00a0Obtenir l\u2019itin\u00e9raire\u00a0\u00bb sur n\u2019importe quel \u00e9tablissement pour son emplacement exact.',
+
+    'results.heading': 'Des endroits \u00e0 aimer',
+    'results.placesToExplore': '\u00e9tablissements \u00e0 explorer',
+    'results.placeToExplore': '\u00e9tablissement \u00e0 explorer',
+    'results.sortFeatured': 'Trier\u00a0: ordre vedette',
+    'results.sortRating': 'Trier\u00a0: mieux not\u00e9s',
+    'results.sortAz': 'Trier\u00a0: A\u2013Z',
+    'results.disclaimer': 'Chaque endroit ci-dessous est un v\u00e9ritable \u00e9tablissement de l\u2019Okanagan, tir\u00e9 des donn\u00e9es en direct de Google Places et v\u00e9rifi\u00e9 dans les avis pour les signaux chien, terrasse, v\u00e9gane, enfant et sans gluten (indiqu\u00e9s seulement quand un avis le mentionne, jamais devin\u00e9s). Couvre le Centre, le Sud et le Nord de l\u2019Okanagan, ainsi que Big White, SilverStar, Apex et Mount Baldy. Ce n\u2019est pas la totalit\u00e9 des \u00e9tablissements de la vall\u00e9e (plus de 200 vignobles \u00e0 eux seuls). Les commodit\u00e9s changent selon la saison, les heures de l\u2019happy hour ne sont pas encore confirm\u00e9es donc ce filtre ne donnera pas de r\u00e9sultats, et le niveau de prix ($/$$/$$$) est encore ajout\u00e9 \u00e9tablissement par \u00e9tablissement. V\u00e9rifiez avant de vous d\u00e9placer.',
+    'results.noResults': 'Rien ne correspond \u00e0 cette combinaison pour l\u2019instant, essayez de retirer un filtre et trouvons-vous un bon endroit.',
+
+    'footer.directory': 'R\u00e9pertoire',
+    'footer.regions': 'R\u00e9gions',
+    'footer.about': '\u00c0 propos',
+    'footer.followAlong': 'Suivez-nous',
+    'footer.listVenue': 'Inscrire votre \u00e9tablissement',
+    'footer.contact': 'Contact'
   }
 };
 
@@ -1643,6 +1904,38 @@ function applyTranslations(){
   });
   var toggle = document.getElementById('langToggle');
   if (toggle) toggle.textContent = lang === 'fr' ? 'FR / EN' : 'EN / FR';
+
+  // The three wizard "Continue"/"See results" buttons show a live selected
+  // count and are managed entirely by updateCount() (scoped inside a later
+  // IIFE, not reachable from here), so re-derive their text directly here
+  // rather than only via data-i18n, otherwise they'd stay in the old
+  // language until the visitor next clicks through a step.
+  [
+    { id: 'wizardTo2', selector: '.region-chip', panelId: 'wizardStep1', key: 'wizard.continueLabel', excludeAll: true },
+    { id: 'wizardTo3', selector: '.type-chip', panelId: 'wizardStep2', key: 'wizard.continueLabel', excludeAll: false },
+    { id: 'wizardToResults', selector: '.stamp-btn', panelId: 'wizardStep3', key: 'wizard.seeResultsLabel', excludeAll: false }
+  ].forEach(function(cfg){
+    var btn = document.getElementById(cfg.id);
+    var panel = document.getElementById(cfg.panelId);
+    if (!btn || !panel) return;
+    var count = 0;
+    panel.querySelectorAll(cfg.selector).forEach(function(el){
+      if (cfg.excludeAll && el.dataset.region === 'all') return;
+      if (el.getAttribute('aria-pressed') === 'true') count++;
+    });
+    var base = t(cfg.key);
+    btn.textContent = count > 0 ? base + ' (' + count + ' ' + t('wizard.selected') + ') \u2192' : base + ' \u2192';
+  });
+
+  // Same idea for the map toggle button — its label depends on whether the
+  // map panel is currently open, a piece of state that lives on the DOM
+  // (a CSS class) rather than in a reachable JS closure.
+  var mapToggleBtn = document.getElementById('mapToggleBtn');
+  var mapPanel = document.getElementById('mapPanel');
+  if (mapToggleBtn && mapPanel) {
+    var mapIsOpen = mapPanel.classList.contains('open');
+    mapToggleBtn.textContent = mapIsOpen ? t('map.closeView') : t('map.openView');
+  }
 }
 
 function setLanguage(lang){
@@ -1669,9 +1962,40 @@ function setLanguage(lang){
       }
       var meta = card.querySelector('.venue-region');
       if (meta) appendOpenStatusToMeta(meta, v.hours);
+      var typeEl = card.querySelector('.venue-type');
+      if (typeEl) typeEl.textContent = t(CARD_TYPE_LABEL[v.type]) || v.type;
+      var badgeRow = card.querySelector('.badge-row');
+      if (badgeRow) {
+        badgeRow.innerHTML = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
+          var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
+          var label = escapeAttr(t(b.label));
+          return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
+        }).join('');
+      }
+    });
+    // The 10 "Featured this month" cards are static HTML, not built by
+    // venueCardHtml(), and use a differently-named type-badge class — same
+    // refresh, just a different selector.
+    document.querySelectorAll('.featured-card').forEach(function(card){
+      var v = venuesByName[card.dataset.name];
+      if (!v) return;
+      var typeEl = card.querySelector('.featured-type');
+      if (typeEl) typeEl.textContent = t(CARD_TYPE_LABEL[v.type]) || v.type;
+      var badgeRow = card.querySelector('.badge-row');
+      if (badgeRow) {
+        badgeRow.innerHTML = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
+          var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
+          var label = escapeAttr(t(b.label));
+          return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
+        }).join('');
+      }
     });
     applyOpenStatusToHeroAndFeatured(window.__allVenues);
   }
+  if (window.__syncTripButtons) window.__syncTripButtons();
+  if (window.__renderTripTray) window.__renderTripTray();
+  if (window.__syncFavButtons) window.__syncFavButtons();
+  if (window.__applyFilters) window.__applyFilters();
 }
 
 (function(){
@@ -1771,22 +2095,22 @@ var CARD_REGION_LABEL = {
 };
 
 var CARD_TYPE_LABEL = {
-  "restaurant": "Restaurant", "winery": "Winery", "brewery": "Brewery",
-  "pub": "Pub/Bar", "cocktail": "Cocktail Lounge", "cafe": "Cafe"
+  "restaurant": "type.restaurant", "winery": "type.winery", "brewery": "type.brewery",
+  "pub": "type.pub", "cocktail": "type.cocktail", "cafe": "type.cafe"
 };
 
 var CARD_BADGES = [
-  { field: 'dog_friendly', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg>', label: 'Dog-friendly', short: 'Dog-friendly' },
-  { field: 'vegan', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg>', label: 'Vegan-friendly', short: 'Vegan' },
-  { field: 'vegetarian', text: 'VG', label: 'Vegetarian options', short: 'Veg options' },
-  { field: 'gluten_free', text: 'GF', label: 'Gluten-free options', short: 'Gluten-free' },
-  { field: 'patio', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg>', label: 'Patio', short: 'Patio' },
-  { field: 'kid_friendly', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><circle cx="10" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><path d="M8 21c-1-4 0-9 4-9s5 5 4 9"/></svg>', label: 'Kid-friendly', short: 'Kid-friendly' },
-  { field: 'lake_view', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg>', label: 'Lake/vineyard view', short: 'Lake view' },
-  { field: 'nonalcoholic', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg>', label: 'Non-alcoholic options', short: 'Mocktails' },
-  { field: 'sports_tv', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M8 21h8"/></svg>', label: 'Sports on TV', short: 'Sports TV' },
-  { field: 'live_music', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>', label: 'Live music', short: 'Live music' },
-  { field: 'great_groups', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>', label: 'Great for groups', short: 'Groups' }
+  { field: 'dog_friendly', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg>', label: 'badge.dogFriendly' },
+  { field: 'vegan', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg>', label: 'badge.vegan' },
+  { field: 'vegetarian', text: 'VG', label: 'badge.vegetarian' },
+  { field: 'gluten_free', text: 'GF', label: 'badge.glutenFree' },
+  { field: 'patio', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg>', label: 'badge.patio' },
+  { field: 'kid_friendly', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><circle cx="10" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><path d="M8 21c-1-4 0-9 4-9s5 5 4 9"/></svg>', label: 'badge.kidFriendly' },
+  { field: 'lake_view', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg>', label: 'badge.lakeView' },
+  { field: 'nonalcoholic', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg>', label: 'badge.nonalcoholic' },
+  { field: 'sports_tv', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M8 21h8"/></svg>', label: 'badge.sportsTv' },
+  { field: 'live_music', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>', label: 'badge.liveMusic' },
+  { field: 'great_groups', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>', label: 'badge.greatGroups' }
 ];
 
 function formatTime12h(t){
@@ -1822,7 +2146,7 @@ function escapeAttr(s){
 
 function venueCardHtml(v){
   var regionLabel = CARD_REGION_LABEL[v.region] || v.region;
-  var typeLabel = CARD_TYPE_LABEL[v.type] || v.type;
+  var typeLabel = t(CARD_TYPE_LABEL[v.type]) || v.type;
   var ratingHtml = v.rating != null
     ? ' &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; ' + v.rating + '</span>'
     : '';
@@ -1845,7 +2169,8 @@ function venueCardHtml(v){
 
   var badgesHtml = CARD_BADGES.filter(function(b){ return v[b.field]; }).map(function(b){
     var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-    return '<span class="badge" aria-label="' + b.label + '" data-tooltip="' + b.label + '">' + content + '</span>';
+    var label = escapeAttr(t(b.label));
+    return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
   }).join('');
 
   return '' +
@@ -2115,7 +2440,7 @@ function initBlock1(){
       card.style.display = show ? '' : 'none';
       if(show){ visibleCount++; }
     });
-    resultsCount.textContent = visibleCount + (visibleCount === 1 ? ' place to explore' : ' places to explore');
+    resultsCount.textContent = visibleCount + ' ' + (visibleCount === 1 ? t('results.placeToExplore') : t('results.placesToExplore'));
     noResults.classList.toggle('show', visibleCount === 0);
   }
 
@@ -2222,7 +2547,7 @@ function initBlock2(){
   toggleBtn.addEventListener('click', function(){
     var isOpen = panel.classList.toggle('open');
     toggleBtn.setAttribute('aria-pressed', String(isOpen));
-    toggleBtn.textContent = isOpen ? '🗺️ Close the map view' : '🗺️ Open the map view';
+    toggleBtn.textContent = isOpen ? t('map.closeView') : t('map.openView');
     if (isOpen){ initMap(); refreshMapMarkers(); if(map){ setTimeout(function(){ map.invalidateSize(); }, 50); } }
   });
 
@@ -2412,7 +2737,7 @@ function initBlock8(){
 
   if (!steps[1] || !steps[2] || !steps[3]) return;
 
-  function showStep(n){
+  function showStep(n, skipScroll){
     // n can be 1, 2, 3, or 'results'
     steps[1].style.display = n === 1 ? '' : 'none';
     steps[2].style.display = n === 2 ? '' : 'none';
@@ -2426,6 +2751,14 @@ function initBlock8(){
       if (n !== 'results' && dotStep === n) dot.classList.add('wizard-step-active');
       else if (n === 'results' || dotStep < n) dot.classList.add('wizard-step-done');
     });
+
+    // Callers that already know they're about to scroll to one specific
+    // card (the weekly spotlight, say) pass skipScroll=true here, since
+    // this function's own "jump to results" scroll would otherwise start
+    // a competing smooth-scroll animation a beat before the more precise
+    // one — two simultaneous smooth scrolls race each other and the page
+    // can end up settling on neither destination.
+    if (skipScroll) return;
 
     if (n !== 'results') {
       var target = document.getElementById('directory');
@@ -2446,6 +2779,11 @@ function initBlock8(){
     }
   }
 
+  // Exposed so callers that will follow up with their own precise scroll
+  // (e.g. window.__scrollToVenueCard) can reveal the results view without
+  // triggering showStep's own competing scroll animation.
+  window.__showResultsNoScroll = function(){ showStep('results', true); };
+
   var to2 = document.getElementById('wizardTo2');
   var to3 = document.getElementById('wizardTo3');
   var toResults = document.getElementById('wizardToResults');
@@ -2465,22 +2803,23 @@ function initBlock8(){
 
   // Live "X selected" count on each Continue button, so it's clear what
   // moving forward will carry with it.
-  function updateCount(step, selector, btn, baseLabel, excludeAll){
+  function updateCount(step, selector, btnKey, btn, excludeAll){
     var count = 0;
     step.querySelectorAll(selector).forEach(function(el){
       if (excludeAll && el.dataset.region === 'all') return;
       if (el.getAttribute('aria-pressed') === 'true') count++;
     });
-    btn.textContent = count > 0 ? baseLabel + ' (' + count + ' selected) →' : baseLabel + ' →';
+    var base = t(btnKey);
+    btn.textContent = count > 0 ? base + ' (' + count + ' ' + t('wizard.selected') + ') \u2192' : base + ' \u2192';
   }
   steps[1].addEventListener('click', function(){
-    if (to2) updateCount(steps[1], '.region-chip', to2, 'Continue', true);
+    if (to2) updateCount(steps[1], '.region-chip', 'wizard.continueLabel', to2, true);
   });
   steps[2].addEventListener('click', function(){
-    if (to3) updateCount(steps[2], '.type-chip', to3, 'Continue', false);
+    if (to3) updateCount(steps[2], '.type-chip', 'wizard.continueLabel', to3, false);
   });
   steps[3].addEventListener('click', function(){
-    if (toResults) updateCount(steps[3], '.stamp-btn', toResults, 'See results', false);
+    if (toResults) updateCount(steps[3], '.stamp-btn', 'wizard.seeResultsLabel', toResults, false);
   });
 
   showStep(1);
@@ -2556,7 +2895,7 @@ function initBlock11(){
     directionsLink.href = mapsUrl;
     directionsLink.target = '_blank';
     directionsLink.rel = 'noopener';
-    directionsLink.textContent = '📍 Get directions';
+    directionsLink.textContent = t('card.getDirections');
 
     // Menu link searches for the venue's menu rather than linking a specific
     // page — we don't have a verified menu URL for every venue, and a search
@@ -2569,7 +2908,7 @@ function initBlock11(){
     menuLink.href = menuUrl;
     menuLink.target = '_blank';
     menuLink.rel = 'noopener';
-    menuLink.textContent = '📋 Find menu';
+    menuLink.textContent = t('card.findMenu');
 
     // Same honest approach as the menu link: we don't have a verified booking
     // system for every venue, so this searches rather than claiming one exists.
@@ -2581,7 +2920,7 @@ function initBlock11(){
     bookingLink.href = bookingUrl;
     bookingLink.target = '_blank';
     bookingLink.rel = 'noopener';
-    bookingLink.textContent = '📅 Check for online booking';
+    bookingLink.textContent = t('card.checkBooking');
 
     var linkRow = document.createElement('div');
     linkRow.className = 'card-links';
@@ -2616,14 +2955,14 @@ function initBlock11(){
     tripBtn.dataset.tripQuery = query;
     tripBtn.dataset.tripName = name;
     tripBtn.dataset.tripRegion = regionSlug;
-    tripBtn.textContent = '🧳 Add to trip';
+    tripBtn.textContent = t('trip.addToTrip');
     tripFavRow.appendChild(tripBtn);
 
     var favBtn = document.createElement('button');
     favBtn.type = 'button';
     favBtn.className = 'fav-btn';
     favBtn.dataset.favName = name;
-    favBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg> Favorite';
+    favBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg> ' + t('card.favorite');
     tripFavRow.appendChild(favBtn);
 
     linkRow.appendChild(tripFavRow);
@@ -3016,7 +3355,7 @@ window.__scrollToVenueCard = function(name){
     document.querySelectorAll('.trip-btn').forEach(function(btn){
       var inTrip = trip.some(function(t){ return t.name === btn.dataset.tripName; });
       btn.classList.toggle('in-trip', inTrip);
-      btn.textContent = inTrip ? '✓ In trip' : '🧳 Add to trip';
+      btn.textContent = inTrip ? t('trip.inTrip') : t('trip.addToTrip');
     });
   }
 
@@ -3024,7 +3363,7 @@ window.__scrollToVenueCard = function(name){
     if (!window.__distanceBetweenRegions) return '';
     var km = window.__distanceBetweenRegions(fromRegion, toRegion);
     if (km === null) return '';
-    var text = km === 0 ? 'Same area' : '~' + Math.round(km) + ' km to next stop';
+    var text = km === 0 ? t('trip.sameArea') : '~' + Math.round(km) + ' ' + t('trip.kmToNextStop');
     return '<div class="trip-distance">' + text + '</div>';
   }
 
@@ -3033,7 +3372,7 @@ window.__scrollToVenueCard = function(name){
     routeBtn.disabled = trip.length === 0;
 
     if (trip.length === 0) {
-      listEl.innerHTML = '<p class="trip-empty">No venues added yet. Click "Add to trip" on any venue card.</p>';
+      listEl.innerHTML = '<p class="trip-empty">' + t('trip.emptyState') + '</p>';
       return;
     }
 
@@ -3156,7 +3495,10 @@ window.__scrollToVenueCard = function(name){
   // Exposed so initBlock11 can re-sync once it actually builds the trip-btn
   // elements for the freshly-rendered cards — DOMContentLoaded/load don't
   // reliably fire after that async work finishes, so we call this directly.
+  // Also exposed so a language switch can refresh the trip tray's own text
+  // (empty-state message, distance labels) without needing a page reload.
   window.__syncTripButtons = syncButtons;
+  window.__renderTripTray = render;
 })();
 
 /* ---------- Near me: geolocation-based distance to each region ---------- */
@@ -3316,7 +3658,7 @@ window.__scrollToVenueCard = function(name){
     document.querySelectorAll('.fav-btn').forEach(function(btn){
       var isFav = favorites.has(btn.dataset.favName);
       btn.classList.toggle('is-fav', isFav);
-      btn.innerHTML = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? 'Favorited' : 'Favorite');
+      btn.innerHTML = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? t('card.favorited') : t('card.favorite'));
 
       var card = btn.closest('.venue-card, .featured-card');
       if (card) card.dataset.favorite = isFav ? '1' : '0';
@@ -3423,10 +3765,13 @@ window.__scrollToVenueCard = function(name){
       var regionChip = document.querySelector('.region-chip[data-region="' + matchedRegionSlug + '"]');
       if (regionChip && regionChip.getAttribute('aria-pressed') !== 'true') regionChip.click();
     }
+    // showStep('results') (triggered by this event) already scrolls to the
+    // grid with the correct sticky-header offset — an additional manual
+    // grid.scrollIntoView() here used to fire a second, competing smooth
+    // scroll with no offset, and the two would race and settle somewhere
+    // between their targets.
     document.dispatchEvent(new Event('wizard:showResults'));
     if (window.__hideFilterBarNow) window.__hideFilterBarNow();
-    var grid = document.getElementById('venueGrid');
-    if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   function useKelownaFallback(){
@@ -3471,7 +3816,8 @@ window.__scrollToVenueCard = function(name){
 
   btn.addEventListener('click', function(){
     if (!spotlightVenue) return;
-    document.dispatchEvent(new Event('wizard:showResults'));
+    if (window.__showResultsNoScroll) { window.__showResultsNoScroll(); }
+    else { document.dispatchEvent(new Event('wizard:showResults')); }
     if (window.__hideFilterBarNow) window.__hideFilterBarNow();
     setTimeout(function(){
       window.__scrollToVenueCard(spotlightVenue.name);
@@ -3496,7 +3842,7 @@ window.__scrollToVenueCard = function(name){
       spotlightVenue = v;
 
       var regionLabel = (window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[v.region]) || v.region;
-      var typeLabel = v.type.charAt(0).toUpperCase() + v.type.slice(1);
+      var typeLabel = t((window.CARD_TYPE_LABEL && window.CARD_TYPE_LABEL[v.type]) || '') || (v.type.charAt(0).toUpperCase() + v.type.slice(1));
 
       nameEl.innerHTML = '<a href="#directory">' + v.name.replace(/</g, '&lt;') + '</a>';
       metaEl.textContent = regionLabel + ' \u00b7 ' + typeLabel + ' \u00b7 \u2605 ' + v.rating + ' (' + v.reviews + ' reviews)';
@@ -3505,7 +3851,8 @@ window.__scrollToVenueCard = function(name){
       if (window.CARD_BADGES) {
         badgesEl.innerHTML = window.CARD_BADGES.filter(function(b){ return v[b.field]; }).slice(0, 4).map(function(b){
           var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          return '<span class="badge" aria-label="' + b.label + '" data-tooltip="' + b.label + '">' + content + '</span>';
+          var label = escapeAttr(t(b.label));
+          return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
         }).join('');
       }
 
@@ -3515,6 +3862,52 @@ window.__scrollToVenueCard = function(name){
       // Spotlight data unavailable — banner just stays hidden.
     });
 })();
+
+/* ---------- Internal hash-anchor navigation: wait for the venue grid to
+   finish loading before scrolling ----------
+   The page has scroll-behavior:smooth set globally, and the ~810 venue
+   cards load asynchronously and get inserted above several anchor targets
+   (#list-venue, #app). If a link like "List Your Venue" is clicked before
+   or during that async load, the page's height keeps growing mid-scroll
+   animation and the browser ends up wherever the target USED to be —
+   landing partway through the venue grid instead of the intended section.
+   This intercepts internal hash links and only scrolls once the venue
+   content has actually loaded and the page height has settled. */
+document.addEventListener('click', function(e){
+  var link = e.target.closest('a[href^="#"]');
+  if (!link) return;
+  var id = link.getAttribute('href').slice(1);
+  if (!id) return;
+  var target = document.getElementById(id);
+  if (!target) return;
+
+  e.preventDefault();
+
+  function doScroll(){
+    var headerEl = document.querySelector('header');
+    var offset = (headerEl ? headerEl.offsetHeight : 0) + 12;
+    var top = target.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: top, behavior: 'smooth' });
+    try { history.pushState(null, '', '#' + id); } catch (err) {}
+  }
+
+  if (window.__allVenues) {
+    doScroll();
+  } else {
+    // Venues haven't loaded yet — wait briefly rather than scrolling to a
+    // position that's about to shift underneath the animation. Gives up
+    // after 4s and scrolls anyway so a slow/failed fetch never leaves the
+    // link feeling unresponsive.
+    var tries = 0;
+    var poll = setInterval(function(){
+      tries++;
+      if (window.__allVenues || tries > 40) {
+        clearInterval(poll);
+        doScroll();
+      }
+    }, 100);
+  }
+});
 
 loadVenuesAndInit();
 </script>
