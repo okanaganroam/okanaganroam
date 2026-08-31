@@ -931,6 +931,24 @@
   }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<!-- Google Analytics (GA4) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-J312FGJPSC"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  gtag('js', new Date());
+  gtag('config', 'G-J312FGJPSC');
+
+  // Small wrapper so every custom event call site below stays short and
+  // never throws if gtag hasn't loaded yet (ad blockers, slow network,
+  // offline testing) — analytics failing silently should never be able to
+  // break the actual site.
+  window.trackEvent = function(name, params){
+    try {
+      if (typeof gtag === 'function') gtag('event', name, params || {});
+    } catch (e) { /* analytics must never break the site */ }
+  };
+</script>
 </head>
 <body>
 <div id="floatingTooltip"></div>
@@ -1978,6 +1996,7 @@ function applyTranslations(){
 
 function setLanguage(lang){
   try { window.localStorage.setItem('okanaganLang', lang); } catch (e) {}
+  if (window.trackEvent) window.trackEvent('language_change', { language: lang });
   applyTranslations();
   // Update existing venue cards in place rather than rebuilding them.
   // renderVenueCards() would destroy and recreate every .venue-card, but
@@ -2343,7 +2362,7 @@ function initBlock1(){
       var t = btn.dataset.type;
       var pressed = btn.getAttribute('aria-pressed') === 'true';
       btn.setAttribute('aria-pressed', String(!pressed));
-      if(pressed){ activeTypes.delete(t); } else { activeTypes.add(t); }
+      if(pressed){ activeTypes.delete(t); } else { activeTypes.add(t); if (window.trackEvent) window.trackEvent('select_venue_type', { venue_type: t }); }
       applyFilters();
     });
   });
@@ -2353,7 +2372,7 @@ function initBlock1(){
       var f = btn.dataset.filter;
       var pressed = btn.getAttribute('aria-pressed') === 'true';
       btn.setAttribute('aria-pressed', String(!pressed));
-      if(pressed){ activeFilters.delete(f); } else { activeFilters.add(f); }
+      if(pressed){ activeFilters.delete(f); } else { activeFilters.add(f); if (window.trackEvent) window.trackEvent('select_filter', { filter_name: f }); }
       applyFilters();
     });
   });
@@ -2373,6 +2392,7 @@ function initBlock1(){
       } else {
         activeRegions.add(btn.dataset.region);
         btn.setAttribute('aria-pressed', 'true');
+        if (window.trackEvent) window.trackEvent('select_region', { region: btn.dataset.region });
       }
       var allBtn = document.querySelector('.region-chip[data-region="all"]');
       if (allBtn) allBtn.setAttribute('aria-pressed', activeRegions.size === 0 ? 'true' : 'false');
@@ -2433,6 +2453,7 @@ function initBlock1(){
     searchTerm = searchInput.value.trim().toLowerCase();
     applyFilters();
     if (searchTerm) {
+      if (window.trackEvent) window.trackEvent('search', { search_term: searchTerm });
       document.dispatchEvent(new Event('wizard:showResults'));
       if (window.__hideFilterBarNow) window.__hideFilterBarNow();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2586,7 +2607,10 @@ function initBlock2(){
     var isOpen = panel.classList.toggle('open');
     toggleBtn.setAttribute('aria-pressed', String(isOpen));
     toggleBtn.textContent = isOpen ? t('map.closeView') : t('map.openView');
-    if (isOpen){ initMap(); refreshMapMarkers(); if(map){ setTimeout(function(){ map.invalidateSize(); }, 50); } }
+    if (isOpen){
+      if (window.trackEvent) window.trackEvent('open_map');
+      initMap(); refreshMapMarkers(); if(map){ setTimeout(function(){ map.invalidateSize(); }, 50); }
+    }
   });
 
   // Refresh map markers whenever filters change, piggyback on clicks to any filter control.
@@ -2831,7 +2855,16 @@ function initBlock8(){
 
   if (to2) to2.addEventListener('click', function(){ showStep(2); });
   if (to3) to3.addEventListener('click', function(){ showStep(3); });
-  if (toResults) toResults.addEventListener('click', function(){ showStep('results'); });
+  if (toResults) toResults.addEventListener('click', function(){
+    if (window.trackEvent) {
+      window.trackEvent('wizard_complete', {
+        region_count: activeRegions.size,
+        type_count: activeTypes.size,
+        filter_count: activeFilters.size
+      });
+    }
+    showStep('results');
+  });
   if (to1Back) to1Back.addEventListener('click', function(){ showStep(1); });
   if (to2Back) to2Back.addEventListener('click', function(){ showStep(2); });
   if (editBtn) editBtn.addEventListener('click', function(){ showStep(1); });
@@ -3440,6 +3473,7 @@ window.__scrollToVenueCard = function(name){
       return;
     }
     trip.push({ name: name, query: query, region: region || null });
+    if (window.trackEvent) window.trackEvent('add_to_trip', { venue_name: name, region: region || null, trip_size: trip.length });
     save();
     syncButtons();
     render();
@@ -3447,6 +3481,7 @@ window.__scrollToVenueCard = function(name){
 
   function removeFromTrip(name){
     trip = trip.filter(function(t){ return t.name !== name; });
+    if (window.trackEvent) window.trackEvent('remove_from_trip', { venue_name: name });
     save();
     syncButtons();
     render();
@@ -3707,8 +3742,10 @@ window.__scrollToVenueCard = function(name){
   function toggleFavorite(name){
     if (favorites.has(name)) {
       favorites.delete(name);
+      if (window.trackEvent) window.trackEvent('remove_from_favorites', { venue_name: name });
     } else {
       favorites.add(name);
+      if (window.trackEvent) window.trackEvent('add_to_favorites', { venue_name: name });
     }
     save();
     syncButtons();
@@ -3854,6 +3891,7 @@ window.__scrollToVenueCard = function(name){
 
   btn.addEventListener('click', function(){
     if (!spotlightVenue) return;
+    if (window.trackEvent) window.trackEvent('spotlight_click', { venue_name: spotlightVenue.name });
     if (window.__showResultsNoScroll) { window.__showResultsNoScroll(); }
     else { document.dispatchEvent(new Event('wizard:showResults')); }
     if (window.__hideFilterBarNow) window.__hideFilterBarNow();
@@ -3945,6 +3983,22 @@ document.addEventListener('click', function(e){
       }
     }, 100);
   }
+});
+
+/* ---------- Outbound link tracking ----------
+   directions/menu/booking links are generated per-card by initBlock11 for
+   all 810 venues — attaching an individual listener to each would be
+   wasteful and would need to be redone every time cards re-render, so a
+   single delegated listener on document covers every card, present and
+   future, with one line of setup. */
+document.addEventListener('click', function(e){
+  var link = e.target.closest('.directions-link, .menu-link, .booking-link');
+  if (!link) return;
+  var card = link.closest('.venue-card, .featured-card');
+  var venueName = card ? card.dataset.name : null;
+  var linkType = link.classList.contains('directions-link') ? 'directions'
+    : link.classList.contains('menu-link') ? 'menu' : 'booking';
+  if (window.trackEvent) window.trackEvent('outbound_click', { link_type: linkType, venue_name: venueName });
 });
 
 loadVenuesAndInit();
