@@ -936,7 +936,7 @@
   }
 
   .back-to-top{
-    position:fixed; bottom:20px; left:20px; z-index:150;
+    position:fixed; bottom:80px; right:20px; z-index:150;
     width:44px; height:44px; border-radius:50%;
     background:#2A6B67; color:#FFFCF6; border:none;
     display:flex; align-items:center; justify-content:center;
@@ -4023,7 +4023,7 @@ loadVenuesAndInit();
   var btn = document.getElementById('backToTop');
   if (!btn) return;
   window.addEventListener('scroll', function(){
-    if (window.scrollY > 500) btn.classList.add('show');
+    if (window.scrollY > 900) btn.classList.add('show');
     else btn.classList.remove('show');
   }, { passive: true });
   btn.addEventListener('click', function(){
