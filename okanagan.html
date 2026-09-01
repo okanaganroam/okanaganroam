@@ -1534,7 +1534,7 @@
         </div>
       </div>
       <button type="submit" class="venue-form-submit">Submit your venue</button>
-      <p class="form-note">This opens your email client with the details filled in. Nothing is sent automatically.</p>
+      <p class="form-note">This sends your submission directly to us. We will follow up by email before adding you.</p>
       <div class="form-success" id="vfSuccess">Thanks! Your email client should be open with everything filled in. Just hit send and we'll follow up.</div>
     </form>
   </div>
@@ -2702,28 +2702,34 @@ function initBlock5(){
     if (document.getElementById('vfSports').checked) amenities.push('Sports on TV');
     if (document.getElementById('vfMusic').checked) amenities.push('Live music');
 
-    var bodyLines = [
-      'New venue submission for Okanagan Roam',
-      '',
-      'Venue name: ' + name,
-      'Type: ' + type,
-      'Region: ' + region,
-      'Cuisine: ' + (cuisine || 'n/a'),
-      'Contact email: ' + email,
-      'Phone: ' + (phone || 'n/a'),
-      '',
-      'Description:',
-      desc,
-      '',
-      'Amenities they say genuinely apply: ' + (amenities.length ? amenities.join(', ') : 'none selected')
-    ];
+    var payload = {
+      _subject: 'Venue submission: ' + name,
+      'Venue name': name,
+      'Type': type,
+      'Region': region,
+      'Cuisine': cuisine || 'n/a',
+      'Contact email': email,
+      'Phone': phone || 'n/a',
+      'Description': desc,
+      'Amenities they say genuinely apply': (amenities.length ? amenities.join(', ') : 'none selected')
+    };
 
-    var subject = encodeURIComponent('Venue submission: ' + name);
-    var body = encodeURIComponent(bodyLines.join('\n'));
-    var mailto = 'mailto:okanaganroam@gmail.com?subject=' + subject + '&body=' + body;
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
 
-    window.location.href = mailto;
-    success.classList.add('show');
+    fetch('https://formsubmit.co/ajax/okanaganroam@gmail.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function(res){ return res.json(); }).then(function(){
+      success.classList.add('show');
+      form.reset();
+      if (descCount) { descCount.textContent = '500 characters left'; }
+    }).catch(function(){
+      alert('Something went wrong submitting your venue. Please try again or email us directly at okanaganroam@gmail.com.');
+    }).finally(function(){
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit your venue'; }
+    });
   });
 }
 
