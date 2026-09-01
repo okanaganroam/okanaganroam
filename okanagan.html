@@ -2304,7 +2304,7 @@ function renderVenueCards(venues){
 async function loadVenuesAndInit(){
   var grid = document.getElementById('venueGrid');
   try {
-    var res = await fetch(API_BASE + '/api/venues?limit=1000');
+    var res = await fetch(API_BASE + '/api/venues?limit=5000');
     if (!res.ok) throw new Error('API responded with ' + res.status);
     var data = await res.json();
     window.__allVenues = data.venues;
@@ -3893,7 +3893,7 @@ window.__scrollToVenueCard = function(name){
     }, 50);
   });
 
-  fetch(API_BASE + '/api/venues?limit=1000')
+  fetch(API_BASE + '/api/venues?limit=5000')
     .then(function(res){ return res.json(); })
     .then(function(data){
       var venues = data.venues || [];
