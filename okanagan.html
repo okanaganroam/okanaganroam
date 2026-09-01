@@ -930,6 +930,20 @@
   @media (prefers-reduced-motion: reduce){
     *{ transition:none !important; animation:none !important; scroll-behavior:auto !important; }
   }
+
+  .back-to-top{
+    position:fixed; bottom:20px; left:20px; z-index:150;
+    width:44px; height:44px; border-radius:50%;
+    background:#2A6B67; color:#FFFCF6; border:none;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; box-shadow:0 4px 14px rgba(74,32,25,0.14);
+    opacity:0; visibility:hidden; transform:translateY(10px);
+    transition:opacity .25s ease, transform .25s ease, visibility .25s;
+  }
+  .back-to-top.show{
+    opacity:1; visibility:visible; transform:translateY(0);
+  }
+  .back-to-top:hover{ background:#235550; }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <!-- Google Analytics (GA4) -->
@@ -3997,5 +4011,21 @@ document.addEventListener('click', function(e){
 loadVenuesAndInit();
 </script>
 
+<button class="back-to-top" id="backToTop" aria-label="Back to top" title="Back to top">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+<script>
+(function(){
+  var btn = document.getElementById('backToTop');
+  if (!btn) return;
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 500) btn.classList.add('show');
+    else btn.classList.remove('show');
+  }, { passive: true });
+  btn.addEventListener('click', function(){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+</script>
 </body>
 </html>
