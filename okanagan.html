@@ -465,6 +465,11 @@
       padding-bottom: 76px;
     }
   }
+  @media (max-width: 640px){
+    body.wizard-active .filter-bar{
+      position: static;
+    }
+  }
   .wizard-back-btn{
     background:none; border:none; font-weight:700; font-size:0.82rem;
     color: rgba(42,32,25,0.68); cursor:pointer; text-decoration:underline;
@@ -979,7 +984,7 @@
   };
 </script>
 </head>
-<body>
+<body class="wizard-active">
 <div id="floatingTooltip"></div>
 <div id="tripTray">
   <div id="tripTrayPanel">
@@ -2815,6 +2820,7 @@ function initBlock8(){
 
   function showStep(n, skipScroll){
     // n can be 1, 2, 3, or 'results'
+    document.body.classList.toggle('wizard-active', n !== 'results');
     steps[1].style.display = n === 1 ? '' : 'none';
     steps[2].style.display = n === 2 ? '' : 'none';
     steps[3].style.display = n === 3 ? '' : 'none';
