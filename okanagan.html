@@ -4041,5 +4041,19 @@ loadVenuesAndInit();
   });
 })();
 </script>
+<script>
+(function(){
+  document.addEventListener('click', function(e){
+    var chip = e.target.closest && e.target.closest('.region-chip');
+    if (!chip) return;
+    setTimeout(function(){
+      var continueBtn = document.getElementById('wizardTo2');
+      if (continueBtn && continueBtn.offsetParent !== null) {
+        continueBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
+  });
+})();
+</script>
 </body>
 </html>
