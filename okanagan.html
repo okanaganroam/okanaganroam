@@ -3261,6 +3261,16 @@ function initBlock12(){
       return;
     }
 
+    var s1 = document.getElementById('wizardStep1');
+    var s2 = document.getElementById('wizardStep2');
+    var s3 = document.getElementById('wizardStep3');
+    var wizardActive = (s1 && s1.style.display !== 'none') || (s2 && s2.style.display !== 'none') || (s3 && s3.style.display !== 'none');
+    if (wizardActive) {
+      bar.classList.remove('filter-bar-hidden');
+      ticking = false;
+      return;
+    }
+
     if (currentY <= topThreshold) {
       bar.classList.remove('filter-bar-hidden');
     } else if (currentY > hideThreshold) {
