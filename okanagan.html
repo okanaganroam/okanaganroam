@@ -451,6 +451,20 @@
   }
   .wizard-continue-btn:hover{ background: var(--teal-deep); }
   .wizard-continue-btn:active{ transform: scale(0.97); }
+  @media (max-width: 640px){
+    .wizard-nav{
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--sand);
+      padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+      margin: 0;
+      box-shadow: 0 -4px 14px rgba(74,32,25,0.16);
+      z-index: 140;
+    }
+    .wizard-step-panel{
+      padding-bottom: 76px;
+    }
+  }
   .wizard-back-btn{
     background:none; border:none; font-weight:700; font-size:0.82rem;
     color: rgba(42,32,25,0.68); cursor:pointer; text-decoration:underline;
