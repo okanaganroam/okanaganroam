@@ -329,7 +329,37 @@ ${JSON.stringify({
 </html>`;
 }
 
-// ---------- router ----------
+function renderGuideFooterHTML() {
+  const combos = listGuideCombos(MIN_GUIDE_VENUES);
+  if (combos.length === 0) return '';
+
+  const byRegion = {};
+  for (const c of combos) {
+    (byRegion[c.region] = byRegion[c.region] || []).push(c);
+  }
+
+  const sections = Object.keys(byRegion)
+    .sort((a, b) => byRegion[b].length - byRegion[a].length)
+    .map((region) => {
+      const links = byRegion[region]
+        .sort((a, b) => b.count - a.count)
+        .map(
+          (c) =>
+            `<a href="/guide/${c.region}/${c.badge}">${escapeHtml(BADGE_LABELS[c.badge].title)} (${c.count})</a>`
+        )
+        .join(', ');
+      return `<div class="og-guide-region"><strong>${escapeHtml(REGION_LABELS[region])}:</strong> ${links}</div>`;
+    })
+    .join('\n');
+
+  return `
+<footer id="og-guides" style="max-width:960px;margin:40px auto;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;line-height:1.8;color:#52606d;border-top:1px solid #e4e7eb;">
+  <p style="margin:0 0 10px;font-weight:600;color:#1f2933;">Browse Okanagan Roam by guide</p>
+  ${sections}
+</footer>`;
+}
+
+
 
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
@@ -350,7 +380,15 @@ const server = http.createServer(async (req, res) => {
     // deployment is both the API and the live site.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
-        const html = fs.readFileSync(SITE_PATH);
+        let html = fs.readFileSync(SITE_PATH, 'utf8');
+        // Inject real, crawlable internal links to the guide pages so search
+        // engines can discover them by following links from the homepage,
+        // not just via the sitemap (which some crawlers deprioritize). This
+        // is plain visible HTML, not hidden/cloaked content.
+        const footer = renderGuideFooterHTML();
+        html = html.includes('</body>')
+          ? html.replace('</body>', `${footer}\n</body>`)
+          : html + footer;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
