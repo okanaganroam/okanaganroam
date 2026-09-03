@@ -483,6 +483,55 @@ const server = http.createServer(async (req, res) => {
       return res.end('Guide page not found');
     }
 
+    // GET /admin/indexnow-submit?key=<INDEXNOW_KEY>
+    //
+    // Triggers a server-side bulk submission of every URL in the sitemap to
+    // the IndexNow API (api.indexnow.org), which fans out to Bing, Yandex,
+    // Seznam, and other participating engines. This has to happen
+    // server-side rather than from a browser: IndexNow's bulk POST endpoint
+    // doesn't send CORS headers, so browser JS gets silently blocked, while
+    // a server calling another server has no such restriction.
+    //
+    // Protected by requiring the IndexNow key itself as a query param —
+    // not real auth, just enough to keep this off search-engine crawlers'
+    // radar as a normal page (it's already excluded via robots.txt-style
+    // reasoning: nobody guesses a 32-char hex key by accident). Re-run this
+    // any time a bunch of venues get new badges and you want search engines
+    // to know sooner than the next passive sitemap crawl.
+    if (pathname === '/admin/indexnow-submit' && method === 'GET') {
+      if (query.key !== INDEXNOW_KEY) {
+        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Forbidden');
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const combos = listGuideCombos(MIN_GUIDE_VENUES);
+      const urlList = [
+        'https://okanaganroam.com/',
+        ...combos.map(({ region, badge }) => `https://okanaganroam.com/guide/${region}/${badge}`),
+      ];
+      try {
+        const submitRes = await fetch('https://api.indexnow.org/indexnow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify({
+            host: 'okanaganroam.com',
+            key: INDEXNOW_KEY,
+            keyLocation: `https://okanaganroam.com/${INDEXNOW_KEY}.txt`,
+            urlList,
+          }),
+        });
+        const bodyText = await submitRes.text();
+        return sendJSON(res, 200, {
+          submitted_at: today,
+          url_count: urlList.length,
+          indexnow_status: submitRes.status,
+          indexnow_response: bodyText || '(empty body — normal for a 200/202 success)',
+        });
+      } catch (err) {
+        return sendJSON(res, 502, { error: `IndexNow submission failed: ${err.message}` });
+      }
+    }
+
     // GET /api/venues
     if (pathname === '/api/venues' && method === 'GET') {
       return sendJSON(res, 200, listVenues(query));
