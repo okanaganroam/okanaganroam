@@ -7,6 +7,13 @@ const db = require('./db');
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
 
+// IndexNow key — proves domain ownership so Bing/Yandex/Seznam etc. accept
+// instant-indexing submissions instead of waiting for a passive crawl.
+// The key itself has no secrecy requirement (it's published at
+// /{key}.txt by design, per the IndexNow protocol) — it just has to match
+// between the hosted file and whatever key is sent with a submission.
+const INDEXNOW_KEY = 'b25ba530bda42cb30e339b0dd848dadf';
+
 // ---------- helpers ----------
 
 function sendJSON(res, status, data) {
@@ -394,6 +401,13 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('okanagan.html not found on server');
+    }
+
+    // IndexNow key file — required at the domain root so search engines can
+    // verify submissions actually come from whoever controls this site.
+    if (pathname === `/${INDEXNOW_KEY}.txt` && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(INDEXNOW_KEY);
     }
 
     // robots.txt — points crawlers at the sitemap and allows everything
