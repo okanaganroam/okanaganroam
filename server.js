@@ -446,16 +446,43 @@ function renderOpenNowScript() {
 </script>`;
 }
 
-function renderHiddenElementsCSS() {
+function renderHiddenElementsScript() {
   // Hides two existing UI pieces the site owner asked to remove: the
   // "Open the map view" toggle and the "Live search the whole Okanagan
-  // (beta)" panel. Plain CSS rather than JS/DOM removal — it's simpler,
-  // applies automatically to re-renders with no observer needed, and is
-  // trivially reversible by deleting this block later.
+  // (beta)" panel.
+  //
+  // This was originally a plain injected <style> tag, which turned out
+  // not to work: only one <style> element is ever present in the live
+  // DOM (the app's own ~39KB stylesheet), meaning an injected <style>
+  // tag placed before </body> doesn't survive whatever the app's mount/
+  // render lifecycle does to the page. The Open Now button's approach
+  // (create/re-apply via JS on a MutationObserver) is proven to survive
+  // that same lifecycle, so this uses the identical technique instead.
   return `
-<style>
-  .map-toggle-row, .live-search { display: none !important; }
-</style>`;
+<script>
+(function(){
+  var D = document;
+  var scheduled = false;
+
+  function apply(){
+    var toHide = D.querySelectorAll('.map-toggle-row, .live-search');
+    for (var i = 0; i < toHide.length; i++) {
+      toHide[i].style.display = 'none';
+    }
+  }
+
+  function scheduleApply(){
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(function(){ scheduled = false; apply(); });
+  }
+
+  var observer = new MutationObserver(scheduleApply);
+  observer.observe(D.body, { childList: true, subtree: true });
+
+  scheduleApply();
+})();
+</script>`;
 }
 
 
@@ -487,10 +514,10 @@ const server = http.createServer(async (req, res) => {
         // is plain visible HTML, not hidden/cloaked content.
         const footer = renderGuideFooterHTML();
         const openNowScript = renderOpenNowScript();
-        const hiddenElementsCSS = renderHiddenElementsCSS();
+        const hiddenElementsScript = renderHiddenElementsScript();
         html = html.includes('</body>')
-          ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsCSS}\n</body>`)
-          : html + footer + openNowScript + hiddenElementsCSS;
+          ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n</body>`)
+          : html + footer + openNowScript + hiddenElementsScript;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
