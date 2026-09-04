@@ -412,9 +412,18 @@ function renderOpenNowScript() {
     // render thousands of pixels down this long-scrolling page, making a
     // button placed there effectively invisible without scrolling. A
     // fixed pill stays visible and reachable no matter where the user is.
-    // Bottom-LEFT specifically, since the app already has its own "Your
-    // trip" floating widget fixed to the bottom-right corner.
-    btn.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483000;padding:10px 18px;border-radius:999px;border:1px solid #0b6e4f;background:#fff;color:#0b6e4f;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.15);';
+    //
+    // Position differs by viewport width because the app already claims
+    // the bottom of the screen for its own UI: the "Your trip" widget
+    // sits bottom-right on all sizes, and on narrow/mobile viewports the
+    // wizard's step "Continue" button becomes a bottom-anchored bar too.
+    // Bottom-left is clear on desktop, but not reliably clear on mobile,
+    // so on narrow screens we place it just under the sticky header
+    // instead, which stays clear of both.
+    var isNarrow = window.matchMedia('(max-width: 700px)').matches;
+    btn.style.cssText = isNarrow
+      ? 'position:fixed;left:12px;top:80px;z-index:2147483000;padding:8px 14px;border-radius:999px;border:1px solid #0b6e4f;background:#fff;color:#0b6e4f;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.15);'
+      : 'position:fixed;left:16px;bottom:16px;z-index:2147483000;padding:10px 18px;border-radius:999px;border:1px solid #0b6e4f;background:#fff;color:#0b6e4f;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.15);';
     btn.addEventListener('click', function(){
       active = !active;
       btn.setAttribute('aria-pressed', String(active));
