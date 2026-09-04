@@ -449,38 +449,44 @@ function renderOpenNowScript() {
 function renderHiddenElementsScript() {
   // Hides two existing UI pieces the site owner asked to remove: the
   // "Open the map view" toggle and the "Live search the whole Okanagan
-  // (beta)" panel.
+  // (beta)" panel. Also rounds the big "N places to explore" count down
+  // to a friendly "1000+" display once it crosses 1000, rather than
+  // showing the exact, ever-growing venue count (which will keep
+  // climbing as more venues get added and would otherwise need editing
+  // here every time). Smaller/filtered counts are left exact — this
+  // only kicks in once the number is genuinely in the thousands.
   //
-  // This was originally a plain injected <style> tag, which turned out
-  // not to work: only one <style> element is ever present in the live
-  // DOM (the app's own ~39KB stylesheet), meaning an injected <style>
-  // tag placed before </body> doesn't survive whatever the app's mount/
-  // render lifecycle does to the page. The Open Now button's approach
-  // (create/re-apply via JS on a MutationObserver) is proven to survive
-  // that same lifecycle, so this uses the identical technique instead.
+  // History: first tried a plain <style> tag — didn't survive the app's
+  // DOM lifecycle (only one <style> element, the app's own, ever ended
+  // up in the live DOM). Then tried the MutationObserver technique that
+  // works for the Open Now button — the elements still resurfaced,
+  // meaning whatever re-renders them isn't reliably caught as a
+  // childList/subtree mutation in time. Verified live in the browser
+  // console that a simple interval-based poll reliably keeps them
+  // hidden, so that's what this uses: cheap, and doesn't depend on
+  // guessing exactly when/how the app re-renders these elements.
   return `
 <script>
 (function(){
   var D = document;
-  var scheduled = false;
-
   function apply(){
     var toHide = D.querySelectorAll('.map-toggle-row, .live-search');
     for (var i = 0; i < toHide.length; i++) {
       toHide[i].style.display = 'none';
     }
+    var countEl = D.querySelector('.results-count');
+    if (countEl) {
+      var m = countEl.textContent.match(/^([\\d,]+)(\\s.*)$/);
+      if (m) {
+        var n = parseInt(m[1].replace(/,/g, ''), 10);
+        if (n >= 1000 && !/^1000\\+/.test(countEl.textContent)) {
+          countEl.textContent = '1000+' + m[2];
+        }
+      }
+    }
   }
-
-  function scheduleApply(){
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(function(){ scheduled = false; apply(); });
-  }
-
-  var observer = new MutationObserver(scheduleApply);
-  observer.observe(D.body, { childList: true, subtree: true });
-
-  scheduleApply();
+  apply();
+  setInterval(apply, 300);
 })();
 </script>`;
 }
