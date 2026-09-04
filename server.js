@@ -492,6 +492,17 @@ function renderHiddenElementsScript() {
         ps[j].style.display = 'none';
       }
     }
+    // The app's own CSS clamps .venue-desc to 5 lines with overflow:hidden,
+    // which was fine for the old one-sentence descriptions but truncates
+    // (with a trailing "...") the longer, rewritten venue descriptions.
+    // Remove the clamp so the full text renders.
+    var descs = D.querySelectorAll('.venue-desc');
+    for (var k = 0; k < descs.length; k++) {
+      descs[k].style.setProperty('-webkit-line-clamp', 'unset', 'important');
+      descs[k].style.setProperty('overflow', 'visible', 'important');
+      descs[k].style.setProperty('display', 'block', 'important');
+      descs[k].style.setProperty('max-height', 'none', 'important');
+    }
   }
   apply();
   setInterval(apply, 300);
