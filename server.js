@@ -484,6 +484,14 @@ function renderHiddenElementsScript() {
         }
       }
     }
+    // The data-sourcing disclaimer paragraph has no class to target, so
+    // match on its distinctive opening text instead.
+    var ps = D.querySelectorAll('p');
+    for (var j = 0; j < ps.length; j++) {
+      if (/^Every place below is a real Okanagan venue/.test(ps[j].textContent.trim())) {
+        ps[j].style.display = 'none';
+      }
+    }
   }
   apply();
   setInterval(apply, 300);
