@@ -442,6 +442,21 @@ function renderOpenNowScript() {
 
   ensureButton();
   scheduleApply();
+
+  // The search wizard panel (body.wizard-active) is supposed to collapse
+  // once the person starts scrolling into the results, but that stopped
+  // happening. Restore it directly: past a small scroll threshold, drop
+  // the class so the wizard collapses; scrolling back to the very top
+  // brings it back, matching the original intended behaviour.
+  var wizardScrollHandler = function(){
+    if (window.scrollY > 80) {
+      D.body.classList.remove('wizard-active');
+    } else {
+      D.body.classList.add('wizard-active');
+    }
+  };
+  window.addEventListener('scroll', wizardScrollHandler, { passive: true });
+  wizardScrollHandler();
 })();
 </script>`;
 }
