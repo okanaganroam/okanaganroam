@@ -493,15 +493,45 @@ function renderHiddenElementsScript() {
       }
     }
     // The app's own CSS clamps .venue-desc to 5 lines with overflow:hidden,
-    // which was fine for the old one-sentence descriptions but truncates
-    // (with a trailing "...") the longer, rewritten venue descriptions.
-    // Remove the clamp so the full text renders.
-    var descs = D.querySelectorAll('.venue-desc');
+    // which truncated the longer, rewritten venue descriptions with no way
+    // to read the rest. Re-clamp to 6 lines (keeps card heights aligned in
+    // the grid) and add a "Read more" toggle for any description that
+    // actually overflows. data-desc-init marks elements already processed
+    // so we don't reprocess them (and don't re-clamp one a user just
+    // expanded) on every 300ms poll.
+    var descs = D.querySelectorAll('.venue-desc:not([data-desc-init])');
     for (var k = 0; k < descs.length; k++) {
-      descs[k].style.setProperty('-webkit-line-clamp', 'unset', 'important');
-      descs[k].style.setProperty('overflow', 'visible', 'important');
-      descs[k].style.setProperty('display', 'block', 'important');
-      descs[k].style.setProperty('max-height', 'none', 'important');
+      var desc = descs[k];
+      desc.setAttribute('data-desc-init', '1');
+      desc.style.setProperty('display', '-webkit-box', 'important');
+      desc.style.setProperty('-webkit-box-orient', 'vertical', 'important');
+      desc.style.setProperty('-webkit-line-clamp', '6', 'important');
+      desc.style.setProperty('overflow', 'hidden', 'important');
+      desc.style.setProperty('max-height', 'none', 'important');
+      desc.style.setProperty('min-height', '0', 'important');
+
+      if (desc.scrollHeight > desc.clientHeight + 2) {
+        var btn = D.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Read more';
+        btn.style.cssText = 'display:block;margin:4px 22px 0;padding:0;border:none;background:none;color:#8A631F;font-size:0.85rem;font-weight:700;cursor:pointer;text-decoration:underline;';
+        var expanded = false;
+        btn.addEventListener('click', function(el, b){
+          return function(){
+            expanded = !expanded;
+            if (expanded) {
+              el.style.setProperty('-webkit-line-clamp', 'unset', 'important');
+              el.style.setProperty('overflow', 'visible', 'important');
+              b.textContent = 'Read less';
+            } else {
+              el.style.setProperty('-webkit-line-clamp', '6', 'important');
+              el.style.setProperty('overflow', 'hidden', 'important');
+              b.textContent = 'Read more';
+            }
+          };
+        }(desc, btn));
+        desc.insertAdjacentElement('afterend', btn);
+      }
     }
   }
   apply();
