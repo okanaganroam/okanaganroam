@@ -366,6 +366,73 @@ function renderGuideFooterHTML() {
 </footer>`;
 }
 
+function renderOpenNowScript() {
+  // Self-contained "Open Now" toggle. Deliberately does NOT touch the app's
+  // own filter/search logic (activeFilters Set, applyFilters(), etc.) —
+  // instead it piggybacks on something the app already computes for us:
+  // every rendered .venue-card already carries a child element with class
+  // "open-status-open" or "open-status-closed" (used to show the "Open
+  // now" / "Closed now" text). We just show/hide whole cards based on
+  // that existing, already-correct, already-timezone-aware computation.
+  //
+  // Because search/filter/pagination re-renders the .venue-grid contents
+  // via React, we re-apply on every DOM mutation (rAF-debounced so it's
+  // cheap) rather than trying to hook into the app's own render cycle.
+  return `
+<script>
+(function(){
+  var D = document;
+  var active = false;
+  var scheduled = false;
+
+  function apply(){
+    var cards = D.querySelectorAll('.venue-card');
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      if (!active) { card.style.display = ''; continue; }
+      var isOpen = card.querySelector('.open-status-open');
+      card.style.display = isOpen ? '' : 'none';
+    }
+  }
+
+  function scheduleApply(){
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(function(){ scheduled = false; apply(); });
+  }
+
+  function ensureButton(){
+    if (D.querySelector('.og-open-now-btn')) return;
+    var head = D.querySelector('.results-head');
+    if (!head) return;
+    var btn = D.createElement('button');
+    btn.type = 'button';
+    btn.className = 'og-open-now-btn';
+    btn.textContent = 'Open Now';
+    btn.setAttribute('aria-pressed', 'false');
+    btn.style.cssText = 'margin-left:10px;padding:6px 14px;border-radius:999px;border:1px solid #0b6e4f;background:#fff;color:#0b6e4f;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit;';
+    btn.addEventListener('click', function(){
+      active = !active;
+      btn.setAttribute('aria-pressed', String(active));
+      btn.style.background = active ? '#0b6e4f' : '#fff';
+      btn.style.color = active ? '#fff' : '#0b6e4f';
+      apply();
+    });
+    head.appendChild(btn);
+  }
+
+  var observer = new MutationObserver(function(){
+    ensureButton();
+    scheduleApply();
+  });
+  observer.observe(D.body, { childList: true, subtree: true });
+
+  ensureButton();
+  scheduleApply();
+})();
+</script>`;
+}
+
 
 
 const server = http.createServer(async (req, res) => {
@@ -393,9 +460,10 @@ const server = http.createServer(async (req, res) => {
         // not just via the sitemap (which some crawlers deprioritize). This
         // is plain visible HTML, not hidden/cloaked content.
         const footer = renderGuideFooterHTML();
+        const openNowScript = renderOpenNowScript();
         html = html.includes('</body>')
-          ? html.replace('</body>', `${footer}\n</body>`)
-          : html + footer;
+          ? html.replace('</body>', `${footer}\n${openNowScript}\n</body>`)
+          : html + footer + openNowScript;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
