@@ -403,14 +403,16 @@ function renderOpenNowScript() {
 
   function ensureButton(){
     if (D.querySelector('.og-open-now-btn')) return;
-    var head = D.querySelector('.results-head');
-    if (!head) return;
     var btn = D.createElement('button');
     btn.type = 'button';
     btn.className = 'og-open-now-btn';
     btn.textContent = 'Open Now';
     btn.setAttribute('aria-pressed', 'false');
-    btn.style.cssText = 'margin-left:10px;padding:6px 14px;border-radius:999px;border:1px solid #0b6e4f;background:#fff;color:#0b6e4f;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit;';
+    // Fixed position, not appended into .results-head: that element can
+    // render thousands of pixels down this long-scrolling page, making a
+    // button placed there effectively invisible without scrolling. A
+    // fixed pill stays visible and reachable no matter where the user is.
+    btn.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483000;padding:10px 18px;border-radius:999px;border:1px solid #0b6e4f;background:#fff;color:#0b6e4f;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.15);';
     btn.addEventListener('click', function(){
       active = !active;
       btn.setAttribute('aria-pressed', String(active));
@@ -418,7 +420,7 @@ function renderOpenNowScript() {
       btn.style.color = active ? '#fff' : '#0b6e4f';
       apply();
     });
-    head.appendChild(btn);
+    D.body.appendChild(btn);
   }
 
   var observer = new MutationObserver(function(){
