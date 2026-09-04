@@ -446,6 +446,19 @@ function renderOpenNowScript() {
 </script>`;
 }
 
+function renderHiddenElementsCSS() {
+  // Hides two existing UI pieces the site owner asked to remove: the
+  // "Open the map view" toggle and the "Live search the whole Okanagan
+  // (beta)" panel. Plain CSS rather than JS/DOM removal — it's simpler,
+  // applies automatically to re-renders with no observer needed, and is
+  // trivially reversible by deleting this block later.
+  return `
+<style>
+  .map-toggle-row, .live-search { display: none !important; }
+</style>`;
+}
+
+
 
 
 const server = http.createServer(async (req, res) => {
@@ -474,9 +487,10 @@ const server = http.createServer(async (req, res) => {
         // is plain visible HTML, not hidden/cloaked content.
         const footer = renderGuideFooterHTML();
         const openNowScript = renderOpenNowScript();
+        const hiddenElementsCSS = renderHiddenElementsCSS();
         html = html.includes('</body>')
-          ? html.replace('</body>', `${footer}\n${openNowScript}\n</body>`)
-          : html + footer + openNowScript;
+          ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsCSS}\n</body>`)
+          : html + footer + openNowScript + hiddenElementsCSS;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
