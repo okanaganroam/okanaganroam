@@ -156,6 +156,76 @@ function updateVenue(id, data) {
   return getVenue(id);
 }
 
+// ---------- Phase 2.5: hardened, empty-field-only enrichment update ----------
+//
+// Purpose: a future enrichment process needs to write address/latitude/
+// longitude ONLY when the existing value is genuinely empty, and must
+// NEVER be able to overwrite an already-populated value — even under a
+// stale-read race, where a process checked the value with a separate GET
+// some time ago and is now writing based on that possibly-outdated belief.
+//
+// The critical design point: the "is this field empty" check and the
+// actual write happen in the SAME SQL statement, evaluated atomically by
+// SQLite at the moment the UPDATE runs — not as a separate check
+// beforehand in application code. A stale application-level belief that a
+// field was empty cannot cause an overwrite, because the database
+// re-evaluates the WHERE clause against whatever the row's real, current
+// state is right now, not whatever some earlier GET returned. This is
+// what makes it safe against the exact race the phase asked to test:
+// Process A's write, even if based on a stale read, will only actually
+// change a row if that row is STILL empty at the instant the UPDATE runs.
+//
+// This function is intentionally NOT wired to any HTTP route in this
+// phase — it exists as tested, available infrastructure for a future
+// enrichment phase to call, per the "no new API routes" restriction here.
+//
+// Only address, latitude, and longitude are supported — deliberately
+// narrow, matching the exact fields this hardening was requested for.
+// Unknown fields are ignored rather than silently accepted.
+const ENRICH_GUARDED_FIELDS = {
+  address: {
+    // Treat both NULL and empty-string as "empty", matching how the rest
+    // of the app already treats an empty address.
+    whereClause: `(address IS NULL OR address = '')`,
+  },
+  latitude: {
+    whereClause: `latitude IS NULL`,
+  },
+  longitude: {
+    whereClause: `longitude IS NULL`,
+  },
+};
+
+// Attempts to write one or more of address/latitude/longitude for a
+// venue, each independently guarded so a field already populated is left
+// completely untouched. Returns a per-field result so the caller knows
+// exactly which fields were actually written vs. skipped because they
+// were already populated — this is important: a caller must never assume
+// success just because the call didn't throw.
+//
+// data: { address?, latitude?, longitude? } — only keys present are
+// considered; a key explicitly set to undefined is treated as "not
+// requested" and left alone entirely.
+function guardedEnrichUpdate(id, data) {
+  const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  if (!existing) return { found: false, results: {} };
+
+  const results = {};
+  for (const field of Object.keys(ENRICH_GUARDED_FIELDS)) {
+    if (data[field] === undefined) continue;
+    const { whereClause } = ENRICH_GUARDED_FIELDS[field];
+    // The empty-check and the write are the same atomic UPDATE statement.
+    const info = db
+      .prepare(`UPDATE venues SET ${field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND ${whereClause}`)
+      .run(data[field], id);
+    // info.changes === 1 means the row was still empty and got written.
+    // info.changes === 0 means the row already had a value (or the id
+    // didn't match, already excluded above) and was correctly left alone.
+    results[field] = info.changes === 1 ? 'written' : 'skipped_not_empty';
+  }
+  return { found: true, results, venue: getVenue(id) };
+}
+
 function deleteVenue(id) {
   const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   return info.changes > 0;
