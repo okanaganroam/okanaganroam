@@ -269,32 +269,89 @@ function slugify(name) {
 // regenerated if a name changes later. Collisions (same region+type+slug)
 // are resolved deterministically by appending the venue's own id, so the
 // result is stable and reproducible even if this runs again.
+// One-time, idempotent backfill: assigns a permanent slug to any venue
+// that doesn't have one yet. Never touches a venue that already has a
+// slug — per the "permanent stored slugs" decision, slugs are not
+// regenerated if a name changes later.
+//
+// Collision resolution is a deterministic loop: base -> base-{id} ->
+// base-{id}-2 -> base-{id}-3 -> ... Each candidate is checked against
+// BOTH the in-memory set built for this run AND the database directly
+// (the database is the final authority — the in-memory set is a fast
+// pre-check, not a substitute for asking the actual table). This
+// protects against any second-order collision where a disambiguated
+// candidate (e.g. "foo-25") coincidentally matches another venue's own
+// independently-generated slug.
+//
+// Returns { count, errors } and NEVER throws — if a specific row
+// genuinely cannot be given a unique slug (should be structurally
+// impossible, since the loop can extend indefinitely), that row's id,
+// name, region, and type are recorded in `errors` and processing
+// continues with the next venue rather than aborting the whole batch or
+// silently pretending success.
 function backfillSlugs() {
   const rows = db.prepare('SELECT id, name, region, type FROM venues WHERE slug IS NULL ORDER BY id').all();
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) return { count: 0, errors: [] };
+
   const usedInScope = new Set(
     db.prepare('SELECT region, type, slug FROM venues WHERE slug IS NOT NULL').all()
       .map((r) => `${r.region}|${r.type}|${r.slug}`)
   );
-  let count = 0;
-  for (const row of rows) {
-    const base = slugify(row.name);
-    let slug = base;
-    let scopeKey = `${row.region}|${row.type}|${slug}`;
-    if (usedInScope.has(scopeKey)) {
-      slug = `${base}-${row.id}`;
-      scopeKey = `${row.region}|${row.type}|${slug}`;
-    }
-    usedInScope.add(scopeKey);
-    db.prepare('UPDATE venues SET slug = ? WHERE id = ?').run(slug, row.id);
-    count++;
-  }
-  return count;
-}
 
-const slugsBackfilled = backfillSlugs();
-if (slugsBackfilled > 0) {
-  console.log(`[seo] backfilled slugs for ${slugsBackfilled} venue(s)`);
+  const existsInDb = db.prepare(
+    'SELECT 1 FROM venues WHERE region = ? AND type = ? AND slug = ? LIMIT 1'
+  );
+  const updateSlug = db.prepare('UPDATE venues SET slug = ? WHERE id = ?');
+
+  const MAX_ATTEMPTS = 1000; // structurally should never be reached; a safety bound, not a real expectation
+  let count = 0;
+  const errors = [];
+
+  for (const row of rows) {
+    // Defensive fallback for empty/unusual names (e.g. "", "   ", "!!!")
+    // that would otherwise slugify to an empty string.
+    const base = slugify(row.name) || `venue-${row.id}`;
+
+    let attempt = 0;
+    let candidate = base;
+    let scopeKey = `${row.region}|${row.type}|${candidate}`;
+
+    while (
+      usedInScope.has(scopeKey) ||
+      existsInDb.get(row.region, row.type, candidate)
+    ) {
+      attempt++;
+      if (attempt > MAX_ATTEMPTS) {
+        errors.push({
+          id: row.id,
+          name: row.name,
+          region: row.region,
+          type: row.type,
+          reason: `could not find a unique slug after ${MAX_ATTEMPTS} attempts`,
+        });
+        candidate = null;
+        break;
+      }
+      candidate = attempt === 1 ? `${base}-${row.id}` : `${base}-${row.id}-${attempt}`;
+      scopeKey = `${row.region}|${row.type}|${candidate}`;
+    }
+
+    if (candidate === null) continue; // recorded in errors above; do not update, do not fake success
+
+    usedInScope.add(scopeKey);
+    try {
+      updateSlug.run(candidate, row.id);
+      count++;
+    } catch (err) {
+      // The database is the final authority: if it still rejects this
+      // candidate for any reason (should be unreachable given the checks
+      // above), record exactly which venue failed rather than crash or
+      // silently skip.
+      errors.push({ id: row.id, name: row.name, region: row.region, type: row.type, reason: err.message });
+    }
+  }
+
+  return { count, errors };
 }
 
 function getRegionCategoryCounts(region) {
@@ -1364,4 +1421,27 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
+
+  // Slug backfill runs AFTER the server is already listening and serving
+  // every existing route (homepage, /api/*, /guide/*, etc.) — deliberately
+  // not at module-load time. This way, if this step ever fails for an
+  // unexpected reason, the site stays up and continues serving everything
+  // it already could; only the not-yet-slugged venues' new pages would be
+  // affected, never the whole site. The migration/schema setup in db.js
+  // (adding columns, fixing the index) still runs at module-load — that
+  // part is purely additive/idempotent and has been safe in every test.
+  try {
+    const { count, errors } = backfillSlugs();
+    if (count > 0) {
+      console.log(`[seo] backfilled slugs for ${count} venue(s)`);
+    }
+    if (errors.length > 0) {
+      console.error(`[seo] WARNING: ${errors.length} venue(s) could NOT be given a unique slug:`);
+      for (const e of errors) {
+        console.error(`[seo]   id=${e.id} name="${e.name}" region=${e.region} type=${e.type} — ${e.reason}`);
+      }
+    }
+  } catch (err) {
+    console.error('[seo] slug backfill failed unexpectedly (site remains up):', err);
+  }
 });

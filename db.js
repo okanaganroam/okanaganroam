@@ -58,9 +58,36 @@ for (const [col, type] of newColumns) {
     db.exec(`ALTER TABLE venues ADD COLUMN ${col} ${type}`);
   }
 }
-// Unique index on slug (nullable — many rows can be NULL simultaneously in
-// SQLite since NULL never equals NULL, so this is safe before the backfill
-// below runs, and stays correct after every row has a real slug).
-db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_slug ON venues(slug)`);
+// The old index enforced slug uniqueness GLOBALLY across the whole table.
+// That was wrong: slugs only need to be unique *within* a region+category,
+// because the URL scheme is /region/category/slug — a chain venue with
+// locations in two different regions (e.g. "Cactus Club Café" in both
+// Kelowna and Vernon) legitimately produces the same base slug in each,
+// and that's fine, since the region+category prefix disambiguates the URL.
+//
+// Safety ordering: create the new composite index FIRST, verify with a
+// direct read against sqlite_master that it actually exists, and only
+// THEN drop the old global index. This way, if anything ever went wrong
+// between these two statements, the database is left with the (overly
+// strict but still safe) old index rather than no unique constraint at
+// all. Dropping an index only removes a lookup structure, never any row
+// data, so this remains safe to run against a database that already has
+// the old (incorrectly-scoped) index from a prior deploy attempt — and
+// the whole sequence is idempotent (every statement is IF [NOT] EXISTS,
+// and the verification check is a plain read).
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_region_type_slug ON venues(region, type, slug)`);
+
+const newIndexExists = !!db
+  .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_region_type_slug'`)
+  .get();
+
+if (newIndexExists) {
+  db.exec(`DROP INDEX IF EXISTS idx_slug`);
+} else {
+  // Should be unreachable (the CREATE above would throw first if it
+  // failed), but if it somehow happened, refuse to drop the old
+  // constraint rather than leave the table with no unique index at all.
+  console.error('[seo] WARNING: idx_region_type_slug was not found after attempting to create it — leaving the old idx_slug in place rather than dropping it unverified.');
+}
 
 module.exports = db;
