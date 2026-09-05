@@ -408,6 +408,76 @@ function breadcrumbListSchema(items) {
   };
 }
 
+// Phase 2.1: builds schema.org OpeningHoursSpecification entries from the
+// EXISTING venues.hours column only. Reads real stored data, generates
+// nothing, invents nothing, calls nothing external.
+//
+// Expected shape of the parsed hours JSON (already in production use by
+// the visible "Hours" section on venue pages):
+//   { mon: [["09:00","17:00"]], tue: [], wed: null, ... , sun: [...] }
+// - A day mapped to a non-empty array means one OpeningHoursSpecification
+//   per [start, end] pair in that array (this is how split shifts, e.g.
+//   lunch + dinner, are already represented).
+// - A day mapped to null, an empty array, or simply absent all mean the
+//   same thing: no opening period is generated for that day. This matches
+//   how the existing HTML "Hours" rendering already treats these three
+//   cases identically as "Closed".
+// - Any per-day or per-range value that isn't in the expected shape is
+//   skipped individually rather than aborting the whole venue, so one bad
+//   entry can't take down the others or crash rendering.
+// Returns undefined (not an empty array) when there's nothing valid to
+// show, so the property is cleanly omitted from the schema object exactly
+// like every other conditional field already in localBusiness.
+const DAY_SCHEMA_NAMES = {
+  mon: 'https://schema.org/Monday',
+  tue: 'https://schema.org/Tuesday',
+  wed: 'https://schema.org/Wednesday',
+  thu: 'https://schema.org/Thursday',
+  fri: 'https://schema.org/Friday',
+  sat: 'https://schema.org/Saturday',
+  sun: 'https://schema.org/Sunday',
+};
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const VALID_TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/; // accepts "9:00" and "09:00" alike; output is always zero-padded
+
+function normalizeTime(t) {
+  const m = VALID_TIME.exec(t);
+  if (!m) return null;
+  return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+function buildOpeningHoursSpecification(hoursRaw) {
+  if (!hoursRaw) return undefined;
+
+  let hoursObj;
+  try {
+    hoursObj = JSON.parse(hoursRaw);
+  } catch (e) {
+    return undefined; // malformed JSON — omit rather than guess
+  }
+  if (!hoursObj || typeof hoursObj !== 'object') return undefined;
+
+  const specs = [];
+  for (const day of DAY_ORDER) {
+    const ranges = hoursObj[day];
+    if (!Array.isArray(ranges)) continue; // null, missing, or wrong type -> treated as closed, same as existing HTML rendering
+    for (const range of ranges) {
+      if (!Array.isArray(range) || range.length !== 2) continue; // malformed single entry -> skip just this one
+      const opens = normalizeTime(range[0]);
+      const closes = normalizeTime(range[1]);
+      if (!opens || !closes) continue; // malformed time -> skip just this one
+      specs.push({
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: DAY_SCHEMA_NAMES[day],
+        opens,
+        closes,
+      });
+    }
+  }
+
+  return specs.length > 0 ? specs : undefined;
+}
+
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -798,6 +868,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
       ratingValue: venue.rating,
       reviewCount: venue.reviews,
     } : undefined,
+    openingHoursSpecification: buildOpeningHoursSpecification(venue.hours),
   };
 
   const attributeChips = BOOL_FIELDS.filter((f) => venue[f])
