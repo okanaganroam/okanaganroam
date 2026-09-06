@@ -2,6 +2,7 @@ const http = require('http');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const db = require('./db');
 
 const PORT = process.env.PORT || 3001;
@@ -13,6 +14,17 @@ const SITE_PATH = path.join(__dirname, 'okanagan.html');
 // /{key}.txt by design, per the IndexNow protocol) — it just has to match
 // between the hosted file and whatever key is sent with a submission.
 const INDEXNOW_KEY = 'b25ba530bda42cb30e339b0dd848dadf';
+
+// Phase 2.5B: a genuine shared-secret bearer token for the new enrichment
+// endpoint below. This is deliberately NOT hardcoded — it's read from an
+// environment variable that must be set on Railway (Variables tab) before
+// the endpoint will accept any request at all. If the variable is unset,
+// the endpoint fails closed (rejects everything) rather than falling back
+// to any default or accepting unauthenticated requests. This is a
+// different, unrelated value from INDEXNOW_KEY above, which is meant to be
+// public — this one must be kept secret and never committed to source.
+const ENRICHMENT_ADMIN_TOKEN = process.env.ENRICHMENT_ADMIN_TOKEN || null;
+
 
 // ---------- helpers ----------
 
@@ -41,6 +53,18 @@ function readBody(req) {
     });
     req.on('error', reject);
   });
+}
+
+// Constant-time comparison for the enrichment bearer token, so a caller
+// can't learn anything about the correct token's contents by measuring
+// response timing. If the lengths differ we return false immediately —
+// a minor, widely-accepted length leak, not a content leak — rather than
+// throwing (timingSafeEqual requires equal-length buffers).
+function safeTokenEquals(provided, expected) {
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(String(expected));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 const BOOL_FIELDS = [
@@ -1446,10 +1470,103 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // POST /admin/enrich-venue
+    //
+    // The ONLY invocation path for guardedEnrichUpdate(). Deliberately
+    // narrow: one venue per call, exactly three allowed fields, no read
+    // functionality beyond confirming what was actually written, no path
+    // to updateVenue() or any other write function, no arbitrary SQL or
+    // column names possible (the three field names are hardcoded below,
+    // never taken from the request).
+    if (pathname === '/admin/enrich-venue' && method === 'POST') {
+      // Fail CLOSED if the secret isn't configured — never fall back to
+      // an unauthenticated or default-permitted state.
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Enrichment endpoint is not configured.' });
+      }
+
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      // --- id validation ---
+      const id = body.id;
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+
+      // --- allowlist validation: reject the WHOLE request if any
+      // unexpected key is present, rather than silently ignoring it ---
+      const ALLOWED_ENRICH_KEYS = ['id', 'address', 'latitude', 'longitude'];
+      const unexpectedKeys = Object.keys(body).filter((k) => !ALLOWED_ENRICH_KEYS.includes(k));
+      if (unexpectedKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      }
+
+      const hasAddress = body.address !== undefined;
+      const hasLat = body.latitude !== undefined;
+      const hasLng = body.longitude !== undefined;
+      if (!hasAddress && !hasLat && !hasLng) {
+        return sendJSON(res, 400, { error: 'At least one of address, latitude, longitude is required.' });
+      }
+
+      // --- per-field validation, no silent coercion ---
+      if (hasAddress && (typeof body.address !== 'string' || body.address.trim() === '')) {
+        return sendJSON(res, 400, { error: 'address must be a non-empty string.' });
+      }
+      // Okanagan Valley sanity bounds, deliberately tighter than global
+      // lat/long ranges — this app only ever covers this one region, so a
+      // coordinate outside this box is almost certainly wrong data, not a
+      // legitimate edge case.
+      const OKANAGAN_LAT_RANGE = [48.5, 51.0];
+      const OKANAGAN_LNG_RANGE = [-121.0, -118.0];
+      if (hasLat) {
+        if (typeof body.latitude !== 'number' || !Number.isFinite(body.latitude)) {
+          return sendJSON(res, 400, { error: 'latitude must be a finite number.' });
+        }
+        if (body.latitude < OKANAGAN_LAT_RANGE[0] || body.latitude > OKANAGAN_LAT_RANGE[1]) {
+          return sendJSON(res, 400, { error: 'latitude is outside the expected Okanagan range.' });
+        }
+      }
+      if (hasLng) {
+        if (typeof body.longitude !== 'number' || !Number.isFinite(body.longitude)) {
+          return sendJSON(res, 400, { error: 'longitude must be a finite number.' });
+        }
+        if (body.longitude < OKANAGAN_LNG_RANGE[0] || body.longitude > OKANAGAN_LNG_RANGE[1]) {
+          return sendJSON(res, 400, { error: 'longitude is outside the expected Okanagan range.' });
+        }
+      }
+
+      // Build the payload for guardedEnrichUpdate() using ONLY the three
+      // hardcoded field names below — the request body's keys are never
+      // used as column names, so arbitrary-column injection is not
+      // possible through this path regardless of what a caller sends.
+      const enrichData = {};
+      if (hasAddress) enrichData.address = body.address;
+      if (hasLat) enrichData.latitude = body.latitude;
+      if (hasLng) enrichData.longitude = body.longitude;
+
+      const result = guardedEnrichUpdate(id, enrichData);
+      if (!result.found) {
+        return sendJSON(res, 404, { error: 'Venue not found.' });
+      }
+      return sendJSON(res, 200, { id, results: result.results });
+    }
+
     // GET /api/venues
     if (pathname === '/api/venues' && method === 'GET') {
       return sendJSON(res, 200, listVenues(query));
     }
+
 
     // GET /api/stats
     if (pathname === '/api/stats' && method === 'GET') {
