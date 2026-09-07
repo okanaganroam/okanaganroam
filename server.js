@@ -81,7 +81,7 @@ const ALL_FIELDS = [
 
 function rowToVenue(row) {
   const v = { id: row.id, created_at: row.created_at, updated_at: row.updated_at };
-  for (const f of ['name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description', 'description_fr', 'hours', 'address', 'website', 'image_url', 'slug', 'latitude', 'longitude']) {
+  for (const f of ['name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description', 'description_fr', 'hours', 'address', 'website', 'image_url', 'slug', 'latitude', 'longitude', 'redirect_to']) {
     v[f] = row[f];
   }
   for (const f of BOOL_FIELDS) {
@@ -94,7 +94,7 @@ function rowToVenue(row) {
 
 // GET /api/venues  (supports ?region=&type=&dog_friendly=1&vegetarian=1&vegan=1&search=&min_rating=&page=&limit=)
 function listVenues(query) {
-  const clauses = [];
+  const clauses = ['redirect_to IS NULL'];
   const params = [];
 
   if (query.region) {
@@ -360,16 +360,87 @@ function guardedCorrectUpdate(id, expectedCurrent, corrected, meta) {
   }
 }
 
+// ---------- Phase 2.8D: duplicate-retirement (redirect_to) ----------
+//
+// Sets redirect_to on a duplicate venue, pointing at its canonical. This
+// is a SEPARATE code path from both guardedEnrichUpdate() and
+// guardedCorrectUpdate() above and does not alter either of their
+// behavior in any way.
+//
+// Even though this application's node:sqlite connection enforces foreign
+// keys by default (verified: PRAGMA foreign_keys returns 1), that alone
+// only guarantees the target ROW exists -- it says nothing about
+// self-redirects, chains, or the target already being a duplicate
+// itself. All of those are checked explicitly here, at the application
+// layer, as the primary safeguard; FK enforcement is a secondary/bonus
+// backstop, not something this function relies on.
+function guardedRetireUpdate(duplicateId, canonicalId) {
+  // Self-redirect check.
+  if (duplicateId === canonicalId) {
+    return { ok: false, reason: 'self_redirect' };
+  }
+
+  const duplicate = db.prepare('SELECT * FROM venues WHERE id = ?').get(duplicateId);
+  if (!duplicate) {
+    return { ok: false, reason: 'duplicate_not_found' };
+  }
+  if (duplicate.redirect_to !== null && duplicate.redirect_to !== undefined) {
+    return { ok: false, reason: 'duplicate_already_redirected', current_redirect_to: duplicate.redirect_to };
+  }
+
+  const canonical = db.prepare('SELECT * FROM venues WHERE id = ?').get(canonicalId);
+  if (!canonical) {
+    return { ok: false, reason: 'canonical_not_found' };
+  }
+  // Refuse if the canonical is itself already a duplicate of something
+  // else -- writing this would create a two-hop chain.
+  if (canonical.redirect_to !== null && canonical.redirect_to !== undefined) {
+    return { ok: false, reason: 'canonical_is_itself_a_duplicate', canonical_redirect_to: canonical.redirect_to };
+  }
+  // Refuse if any OTHER existing duplicate already points at this same
+  // duplicateId as ITS canonical -- i.e. duplicateId is itself someone
+  // else's canonical target. Retiring it would orphan that other
+  // duplicate's redirect into a chain.
+  const dependents = db.prepare('SELECT id FROM venues WHERE redirect_to = ?').all(duplicateId);
+  if (dependents.length > 0) {
+    return { ok: false, reason: 'duplicate_is_a_canonical_for_others', dependents: dependents.map((d) => d.id) };
+  }
+
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const info = db
+      .prepare('UPDATE venues SET redirect_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND redirect_to IS NULL')
+      .run(canonicalId, duplicateId);
+    if (info.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'precondition_changed_mid_write' };
+    }
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, venue: getVenue(duplicateId) };
+  } catch (err) {
+    if (txOpen) {
+      try {
+        db.exec('ROLLBACK');
+      } catch (_) {}
+    }
+    throw err;
+  }
+}
+
 function deleteVenue(id) {
   const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   return info.changes > 0;
 }
 
 function getStats() {
-  const total = db.prepare('SELECT COUNT(*) AS n FROM venues').get().n;
-  const phoned = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE phone IS NOT NULL AND phone != ''").get().n;
-  const vegetarian = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegetarian = 1').get().n;
-  const vegan = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegan = 1').get().n;
+  const total = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE redirect_to IS NULL').get().n;
+  const phoned = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE phone IS NOT NULL AND phone != '' AND redirect_to IS NULL").get().n;
+  const vegetarian = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegetarian = 1 AND redirect_to IS NULL').get().n;
+  const vegan = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegan = 1 AND redirect_to IS NULL').get().n;
   const byRegion = db.prepare('SELECT region, COUNT(*) AS n FROM venues GROUP BY region ORDER BY n DESC').all();
   const byType = db.prepare('SELECT type, COUNT(*) AS n FROM venues GROUP BY type ORDER BY n DESC').all();
   return { total, phoned, vegetarian, vegan, by_region: byRegion, by_type: byType };
@@ -569,7 +640,7 @@ function getRegionCategoryCounts(region) {
 
 function getVenuesByRegionCategory(region, type) {
   return db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? ORDER BY name ASC')
+    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL ORDER BY name ASC')
     .all(region, type)
     .map(rowToVenue);
 }
@@ -584,7 +655,7 @@ function findVenueBySlug(region, type, slug) {
 function getRelatedVenues(venue, limit = 6) {
   // Same region + same category, excluding itself
   return db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND id != ? ORDER BY rating DESC, name ASC LIMIT ?')
+    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND id != ? AND redirect_to IS NULL ORDER BY rating DESC, name ASC LIMIT ?')
     .all(venue.region, venue.type, venue.id, limit)
     .map(rowToVenue);
 }
@@ -593,7 +664,7 @@ function getNearbyVenues(venue, limit = 6) {
   // Same region, any other category, excluding itself — a broader
   // "explore this region more" set distinct from same-category related venues
   return db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type != ? AND id != ? ORDER BY rating DESC, name ASC LIMIT ?')
+    .prepare('SELECT * FROM venues WHERE region = ? AND type != ? AND id != ? AND redirect_to IS NULL ORDER BY rating DESC, name ASC LIMIT ?')
     .all(venue.region, venue.type, venue.id, limit)
     .map(rowToVenue);
 }
@@ -700,7 +771,7 @@ function listGuideCombos(minCount) {
   for (const region of Object.keys(REGION_LABELS)) {
     for (const badge of BOOL_FIELDS) {
       const row = db
-        .prepare(`SELECT COUNT(*) AS n FROM venues WHERE region = ? AND ${badge} = 1`)
+        .prepare(`SELECT COUNT(*) AS n FROM venues WHERE region = ? AND ${badge} = 1 AND redirect_to IS NULL`)
         .get(region);
       if (row.n >= minCount) combos.push({ region, badge, count: row.n });
     }
@@ -1448,14 +1519,14 @@ const server = http.createServer(async (req, res) => {
 
       // Region pages: one per region that has at least one venue.
       const regionCounts = db
-        .prepare('SELECT region, COUNT(*) AS n FROM venues GROUP BY region')
+        .prepare('SELECT region, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY region')
         .all()
         .filter((r) => REGION_LABELS[r.region] && r.n > 0);
 
       // Category pages: one per region+type combo that has at least one
       // venue — computed live, same pattern as the guide-page combos above.
       const categoryCombos = db
-        .prepare('SELECT region, type, COUNT(*) AS n FROM venues GROUP BY region, type')
+        .prepare('SELECT region, type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY region, type')
         .all()
         .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && r.n > 0);
 
@@ -1463,7 +1534,7 @@ const server = http.createServer(async (req, res) => {
       // all of them after the startup backfill, but this guards against any
       // edge case rather than emitting a broken sitemap entry).
       const venueRows = db
-        .prepare('SELECT region, type, slug FROM venues WHERE slug IS NOT NULL')
+        .prepare('SELECT region, type, slug FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
         .all()
         .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
 
@@ -1519,7 +1590,7 @@ const server = http.createServer(async (req, res) => {
       const badge = guideMatch[2];
       if (REGION_LABELS[region] && BOOL_FIELDS.includes(badge)) {
         const rows = db
-          .prepare(`SELECT * FROM venues WHERE region = ? AND ${badge} = 1 ORDER BY reviews DESC`)
+          .prepare(`SELECT * FROM venues WHERE region = ? AND ${badge} = 1 AND redirect_to IS NULL ORDER BY reviews DESC`)
           .all(region);
         if (rows.length >= MIN_GUIDE_VENUES) {
           const html = renderGuidePage(region, badge, rows.map(rowToVenue));
@@ -1805,6 +1876,65 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // POST /admin/retire-duplicate
+    //
+    // Sets redirect_to on a duplicate venue. Reuses the exact same
+    // bearer-token check as /admin/enrich-venue and /admin/correct-venue.
+    // Scoped for the 2.8D canary: accepts exactly {duplicate_id,
+    // canonical_id} and nothing else.
+    if (pathname === '/admin/retire-duplicate' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Retire-duplicate endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      const ALLOWED_KEYS = ['duplicate_id', 'canonical_id'];
+      const unexpected = Object.keys(body).filter((k) => !ALLOWED_KEYS.includes(k));
+      if (unexpected.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+      }
+      const duplicateId = body.duplicate_id;
+      const canonicalId = body.canonical_id;
+      if (!Number.isInteger(duplicateId) || duplicateId <= 0) {
+        return sendJSON(res, 400, { error: 'duplicate_id must be a positive integer.' });
+      }
+      if (!Number.isInteger(canonicalId) || canonicalId <= 0) {
+        return sendJSON(res, 400, { error: 'canonical_id must be a positive integer.' });
+      }
+
+      let result;
+      try {
+        result = guardedRetireUpdate(duplicateId, canonicalId);
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Retire operation failed and was rolled back.', detail: String(err.message || err) });
+      }
+
+      if (!result.ok) {
+        const statusMap = {
+          self_redirect: 400,
+          duplicate_not_found: 404,
+          canonical_not_found: 404,
+          duplicate_already_redirected: 409,
+          canonical_is_itself_a_duplicate: 409,
+          duplicate_is_a_canonical_for_others: 409,
+          precondition_changed_mid_write: 409,
+        };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
+      }
+      return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, venue: result.venue });
+    }
+
     // GET /api/venues
     if (pathname === '/api/venues' && method === 'GET') {
       return sendJSON(res, 200, listVenues(query));
@@ -1863,6 +1993,22 @@ const server = http.createServer(async (req, res) => {
       if (REGION_LABELS[region] && type) {
         const venue = findVenueBySlug(region, type, slug);
         if (venue) {
+          // Phase 2.8D: duplicate-retirement redirect check. Resolve at
+          // most ONE hop -- if the canonical target is missing, or is
+          // itself redirected (a chain), fail OPEN by rendering this
+          // venue's own page normally rather than producing a broken or
+          // chained redirect. A dangling/chained redirect_to is a data
+          // problem to be fixed at the source, never resolved at request
+          // time by following multiple hops.
+          if (venue.redirect_to) {
+            const canonical = getVenue(venue.redirect_to);
+            if (canonical && !canonical.redirect_to && CATEGORY_SLUGS[canonical.type] && canonical.slug) {
+              const target = `/${canonical.region}/${CATEGORY_SLUGS[canonical.type]}/${canonical.slug}${parsed.search || ''}`;
+              res.writeHead(301, { Location: target });
+              return res.end();
+            }
+            console.error(`[redirect] venue ${venue.id} has redirect_to=${venue.redirect_to} but the target is missing/chained/invalid -- rendering venue ${venue.id} normally instead of redirecting.`);
+          }
           const relatedVenues = getRelatedVenues(venue);
           const nearbyVenues = getNearbyVenues(venue);
           const venueGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && venue[c.badge]);

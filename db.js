@@ -58,6 +58,28 @@ for (const [col, type] of newColumns) {
     db.exec(`ALTER TABLE venues ADD COLUMN ${col} ${type}`);
   }
 }
+
+// --- Phase 2.8D: duplicate-resolution infrastructure (additive only) ---
+// A single nullable column recording that this venue is a duplicate of
+// another, canonical venue. NULL (the default) means "not a duplicate".
+// A non-null value is the id of the canonical venue this one should
+// redirect to at the HTTP layer.
+//
+// IMPORTANT: this application's node:sqlite connection enforces foreign
+// keys BY DEFAULT (verified directly: a fresh connection's `PRAGMA
+// foreign_keys` returns 1, with no explicit pragma set anywhere in this
+// file) -- unlike the traditional SQLite C library, whose default is
+// off. So the `REFERENCES venues(id)` clause below IS actually enforced:
+// SQLite will reject a write whose redirect_to value does not match an
+// existing venues.id. The CHECK constraint is enforced independently of
+// the foreign_keys pragma and guards against obviously-invalid values
+// (zero/negative). Neither mechanism, however, prevents self-redirects,
+// redirect chains, or a canonical later becoming someone else's
+// duplicate -- those remain the application layer's responsibility,
+// enforced explicitly in the write endpoint, not relied upon here.
+if (!existingCols.includes('redirect_to')) {
+  db.exec(`ALTER TABLE venues ADD COLUMN redirect_to INTEGER REFERENCES venues(id) CHECK (redirect_to IS NULL OR redirect_to > 0)`);
+}
 // The old index enforced slug uniqueness GLOBALLY across the whole table.
 // That was wrong: slugs only need to be unique *within* a region+category,
 // because the URL scheme is /region/category/slug — a chain venue with
