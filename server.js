@@ -250,6 +250,116 @@ function guardedEnrichUpdate(id, data) {
   return { found: true, results, venue: getVenue(id) };
 }
 
+// ---------- Phase 2.6R-support: authenticated correction of already-
+// populated address/latitude/longitude, with mandatory expected-current
+// verification and an audit trail. ----------
+//
+// This is deliberately a SEPARATE code path from guardedEnrichUpdate()
+// above and does not alter its behavior in any way. Where the enrichment
+// path guards against overwriting a POPULATED field, this path guards
+// against overwriting a value that has DRIFTED from what the caller
+// believes it currently is — the expected_current values must match the
+// live row exactly, checked atomically in the same UPDATE statement,
+// before any write happens.
+//
+// Only address, latitude, and longitude are supported, matching the
+// enrichment path's narrow scope. Field names are hardcoded throughout
+// (never taken from the request body), so arbitrary-column writes are
+// not possible via this path either.
+const CORRECT_GUARDED_FIELDS = ['address', 'latitude', 'longitude'];
+
+// Returns one of:
+//   { found: false }
+//   { found: true, mismatch: true, live: {...} }               -- expected_current didn't match; nothing written
+//   { found: true, mismatch: false, changedFields: [...], venue }  -- write succeeded (or no fields actually differed)
+function guardedCorrectUpdate(id, expectedCurrent, corrected, meta) {
+  const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  if (!existing) return { found: false };
+
+  // Determine which fields actually differ between corrected and
+  // expectedCurrent -- a field where corrected === expectedCurrent is not
+  // a real change and does not need to be written or logged, but is not
+  // an error either.
+  const changedFields = CORRECT_GUARDED_FIELDS.filter(
+    (f) => corrected[f] !== expectedCurrent[f]
+  );
+
+  if (changedFields.length === 0) {
+    // Nothing to do -- expected_current and corrected are identical.
+    return { found: true, mismatch: false, changedFields: [], venue: getVenue(id) };
+  }
+
+  // Build a single atomic UPDATE whose WHERE clause requires ALL THREE
+  // expected_current values to match the row's CURRENT live state at the
+  // instant the statement runs -- not a separate check beforehand. If the
+  // row has drifted from what the caller expects (any of the three
+  // fields), changes will be 0 and nothing is written, exactly mirroring
+  // the atomicity guarantee guardedEnrichUpdate() already relies on.
+  const setClause = CORRECT_GUARDED_FIELDS.map((f) => `${f} = ?`).join(', ');
+  const setValues = CORRECT_GUARDED_FIELDS.map((f) => corrected[f]);
+
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+
+    const info = db
+      .prepare(
+        `UPDATE venues SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND address = ? AND latitude = ? AND longitude = ?`
+      )
+      .run(...setValues, id, expectedCurrent.address, expectedCurrent.latitude, expectedCurrent.longitude);
+
+    if (info.changes !== 1) {
+      // Live row didn't match expected_current -- roll back (nothing was
+      // actually written, but this keeps the transaction discipline
+      // uniform) and report the mismatch along with the real live values
+      // so the caller can see what actually changed underneath them.
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { found: true, mismatch: true, live: getVenue(id) };
+    }
+
+    // Write one audit-log row per field that actually changed. If ANY of
+    // these inserts fails, the whole transaction (including the venue
+    // UPDATE above) is rolled back -- the correction must never be left
+    // partially applied.
+    const logStmt = db.prepare(
+      `INSERT INTO venue_enrichment_log
+         (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`
+    );
+    for (const field of changedFields) {
+      logStmt.run(
+        id,
+        field,
+        String(expectedCurrent[field]),
+        String(corrected[field]),
+        'manual_correction',
+        meta.reason,
+        'high',
+        meta.batch_id,
+        meta.reviewed_by || null
+      );
+    }
+
+    db.exec('COMMIT');
+    txOpen = false;
+    return { found: true, mismatch: false, changedFields, venue: getVenue(id) };
+  } catch (err) {
+    if (txOpen) {
+      try {
+        db.exec('ROLLBACK');
+      } catch (_) {
+        // ROLLBACK itself failing means there's nothing left to roll back
+        // (e.g. the failure happened before BEGIN took effect) -- safe to
+        // ignore, since the original error is what matters to the caller.
+      }
+    }
+    throw err;
+  }
+}
+
 function deleteVenue(id) {
   const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   return info.changes > 0;
@@ -1560,6 +1670,139 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 404, { error: 'Venue not found.' });
       }
       return sendJSON(res, 200, { id, results: result.results });
+    }
+
+    // POST /admin/correct-venue
+    //
+    // A separate, narrowly-scoped path for correcting address/latitude/
+    // longitude that were already populated (typically incorrectly) by a
+    // prior enrichment. Does not alter /admin/enrich-venue in any way --
+    // entirely separate function, entirely separate route. Reuses the
+    // exact same bearer-token check as /admin/enrich-venue.
+    if (pathname === '/admin/correct-venue' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Correction endpoint is not configured.' });
+      }
+
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      // --- allowlist validation: reject the WHOLE request if any
+      // unexpected top-level key is present ---
+      const ALLOWED_CORRECT_KEYS = ['id', 'expected_current', 'corrected', 'reason', 'batch_id'];
+      const unexpectedKeys = Object.keys(body).filter((k) => !ALLOWED_CORRECT_KEYS.includes(k));
+      if (unexpectedKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      }
+
+      // --- required top-level fields ---
+      const id = body.id;
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (typeof body.reason !== 'string' || body.reason.trim() === '') {
+        return sendJSON(res, 400, { error: 'reason is required and must be a non-empty string.' });
+      }
+      if (typeof body.batch_id !== 'string' || body.batch_id.trim() === '') {
+        return sendJSON(res, 400, { error: 'batch_id is required and must be a non-empty string.' });
+      }
+      if (typeof body.expected_current !== 'object' || body.expected_current === null || Array.isArray(body.expected_current)) {
+        return sendJSON(res, 400, { error: 'expected_current is required and must be an object.' });
+      }
+      if (typeof body.corrected !== 'object' || body.corrected === null || Array.isArray(body.corrected)) {
+        return sendJSON(res, 400, { error: 'corrected is required and must be an object.' });
+      }
+
+      // --- expected_current and corrected must each contain exactly
+      // address, latitude, longitude -- no more, no less ---
+      const REQUIRED_SUBFIELDS = ['address', 'latitude', 'longitude'];
+      for (const [label, obj] of [['expected_current', body.expected_current], ['corrected', body.corrected]]) {
+        const keys = Object.keys(obj);
+        const missing = REQUIRED_SUBFIELDS.filter((f) => !(f in obj));
+        const extra = keys.filter((k) => !REQUIRED_SUBFIELDS.includes(k));
+        if (missing.length > 0) {
+          return sendJSON(res, 400, { error: `${label} is missing required field(s): ${missing.join(', ')}` });
+        }
+        if (extra.length > 0) {
+          return sendJSON(res, 400, { error: `${label} has unexpected field(s): ${extra.join(', ')}` });
+        }
+      }
+
+      // --- per-field validation on the CORRECTED values, reusing the
+      // exact same rules and bounds as /admin/enrich-venue ---
+      const { address, latitude, longitude } = body.corrected;
+      if (typeof address !== 'string' || address.trim() === '') {
+        return sendJSON(res, 400, { error: 'corrected.address must be a non-empty string.' });
+      }
+      const OKANAGAN_LAT_RANGE = [48.5, 51.0];
+      const OKANAGAN_LNG_RANGE = [-121.0, -118.0];
+      if (typeof latitude !== 'number' || !Number.isFinite(latitude)) {
+        return sendJSON(res, 400, { error: 'corrected.latitude must be a finite number.' });
+      }
+      if (latitude < OKANAGAN_LAT_RANGE[0] || latitude > OKANAGAN_LAT_RANGE[1]) {
+        return sendJSON(res, 400, { error: 'corrected.latitude is outside the expected Okanagan range.' });
+      }
+      if (typeof longitude !== 'number' || !Number.isFinite(longitude)) {
+        return sendJSON(res, 400, { error: 'corrected.longitude must be a finite number.' });
+      }
+      if (longitude < OKANAGAN_LNG_RANGE[0] || longitude > OKANAGAN_LNG_RANGE[1]) {
+        return sendJSON(res, 400, { error: 'corrected.longitude is outside the expected Okanagan range.' });
+      }
+
+      // --- basic shape validation on expected_current (values are
+      // whatever the live row's current values are, so we only check
+      // types here -- the atomic UPDATE's WHERE clause is what actually
+      // verifies correctness against the live row) ---
+      const ec = body.expected_current;
+      if (ec.address !== null && typeof ec.address !== 'string') {
+        return sendJSON(res, 400, { error: 'expected_current.address must be a string or null.' });
+      }
+      if (ec.latitude !== null && typeof ec.latitude !== 'number') {
+        return sendJSON(res, 400, { error: 'expected_current.latitude must be a number or null.' });
+      }
+      if (ec.longitude !== null && typeof ec.longitude !== 'number') {
+        return sendJSON(res, 400, { error: 'expected_current.longitude must be a number or null.' });
+      }
+
+      let result;
+      try {
+        result = guardedCorrectUpdate(
+          id,
+          { address: ec.address, latitude: ec.latitude, longitude: ec.longitude },
+          { address, latitude, longitude },
+          { reason: body.reason, batch_id: body.batch_id, reviewed_by: null }
+        );
+      } catch (err) {
+        // Any failure inside the transaction (including a failed audit-
+        // log insert) rolls back the venue update too -- report a clean
+        // 500 rather than leaving ambiguity about what was persisted.
+        return sendJSON(res, 500, { error: 'Correction failed and was rolled back.', detail: String(err.message || err) });
+      }
+
+      if (!result.found) {
+        return sendJSON(res, 404, { error: 'Venue not found.' });
+      }
+      if (result.mismatch) {
+        return sendJSON(res, 409, {
+          error: 'expected_current did not match the live venue record; no changes were made.',
+          live: { address: result.live.address, latitude: result.live.latitude, longitude: result.live.longitude },
+        });
+      }
+      return sendJSON(res, 200, {
+        id,
+        changedFields: result.changedFields,
+        venue: { address: result.venue.address, latitude: result.venue.latitude, longitude: result.venue.longitude },
+      });
     }
 
     // GET /api/venues
