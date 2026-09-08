@@ -432,8 +432,64 @@ function guardedRetireUpdate(duplicateId, canonicalId) {
   }
 }
 
+// ---------- Phase 2.8G: guarded single-field region correction ----------
+//
+// A SEPARATE, standalone code path. Does not touch guardedEnrichUpdate(),
+// guardedCorrectUpdate(), guardedRetireUpdate(), or
+// guardedMergeAndRetireUpdate() in any way, and is not reachable through
+// any of their routes.
+//
+// Deliberately NOT built by extending guardedCorrectUpdate()'s
+// CORRECT_GUARDED_FIELDS, so that this new capability's blast radius stays
+// scoped to exactly one column rather than widening an existing
+// multi-field mechanism.
+//
+// The SQL below has NO dynamic column construction anywhere -- "region" is
+// a literal in the SET clause, never a variable. The only two values ever
+// bound as parameters are the corrected region value and the
+// expected-current region value; a column NAME is never accepted from the
+// caller in this function at all.
+const VALID_REGIONS = [
+  'kelowna', 'penticton', 'vernon', 'west-kelowna', 'oliver', 'osoyoos',
+  'summerland', 'naramata', 'lake-country', 'okanagan-falls', 'big-white',
+  'peachland', 'armstrong', 'silverstar', 'enderby', 'coldstream', 'lumby',
+  'apex', 'kaleden', 'baldy',
+];
+
+function guardedRegionCorrectUpdate(id, expectedCurrentRegion, correctedRegion) {
+  if (!VALID_REGIONS.includes(correctedRegion)) {
+    return { ok: false, reason: 'invalid_region_value' };
+  }
+
+  const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  if (!existing) {
+    return { ok: false, reason: 'venue_not_found' };
+  }
+
+  if (existing.region === correctedRegion) {
+    // Already correct -- nothing to do. Not an error, but no write either.
+    return { ok: true, noop: true, venue: getVenue(id) };
+  }
+
+  const info = db
+    .prepare('UPDATE venues SET region = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND region = ?')
+    .run(correctedRegion, id, expectedCurrentRegion);
+
+  if (info.changes === 0) {
+    return { ok: false, reason: 'precondition_failed_region_mismatch', live_region: existing.region };
+  }
+  if (info.changes > 1) {
+    // Structurally should be impossible (id is the primary key), but
+    // treat defensively as a hard failure rather than assume success.
+    return { ok: false, reason: 'unexpected_multi_row_match', changes: info.changes };
+  }
+
+  return { ok: true, noop: false, venue: getVenue(id) };
+}
+
 function deleteVenue(id) {
   const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+
   return info.changes > 0;
 }
 
@@ -2065,6 +2121,66 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
       }
       return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, venue: result.venue });
+    }
+
+    // POST /admin/correct-region
+    //
+    // A dedicated, standalone endpoint for the single-field region
+    // correction case. Deliberately NOT part of /admin/correct-venue --
+    // see guardedRegionCorrectUpdate()'s comment for why. Accepts exactly
+    // {id, expected_current_region, corrected_region} and nothing else.
+    if (pathname === '/admin/correct-region' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Correct-region endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      const ALLOWED_KEYS = ['id', 'expected_current_region', 'corrected_region'];
+      const unexpected = Object.keys(body).filter((k) => !ALLOWED_KEYS.includes(k));
+      if (unexpected.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+      }
+      const id = body.id;
+      const expectedCurrentRegion = body.expected_current_region;
+      const correctedRegion = body.corrected_region;
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (typeof expectedCurrentRegion !== 'string' || expectedCurrentRegion.length === 0) {
+        return sendJSON(res, 400, { error: 'expected_current_region must be a non-empty string.' });
+      }
+      if (typeof correctedRegion !== 'string' || correctedRegion.length === 0) {
+        return sendJSON(res, 400, { error: 'corrected_region must be a non-empty string.' });
+      }
+
+      let result;
+      try {
+        result = guardedRegionCorrectUpdate(id, expectedCurrentRegion, correctedRegion);
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Region correction failed.', detail: String(err.message || err) });
+      }
+
+      if (!result.ok) {
+        const statusMap = {
+          invalid_region_value: 400,
+          venue_not_found: 404,
+          precondition_failed_region_mismatch: 409,
+          unexpected_multi_row_match: 500,
+        };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
+      }
+      return sendJSON(res, 200, { id, noop: result.noop, venue: result.venue });
     }
 
     // POST /admin/merge-and-retire-duplicate
