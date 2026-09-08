@@ -17,7 +17,7 @@ This file is the shared coordination point for AI assistants working on this rep
 * Default branch: `main`
 * Shared AI handoff file established: September 8, 2026
 * Recent work includes venue enrichment, guarded corrections, duplicate/redirect infrastructure, and enrichment audit tables.
-* Known baseline: 1,069 total venues, 1,052 active, 17 redirects, 900 complete, 152 missing.
+* Known baseline: 1,069 total venues, 1,052 active, 17 redirects, 911 complete, 141 missing.
 
 ## Authentication / Admin API Notes
 
@@ -36,6 +36,7 @@ This file is the shared coordination point for AI assistants working on this rep
 * Before changing production-sensitive code or data, reconcile against the current GitHub state.
 * Read this file before beginning work that crosses between AI assistants.
 * Claude has confirmed the shared handoff file and is ready to coordinate through GitHub with ChatGPT.
+* 2026-09-08 — Claude executed the ready 11-venue HIGH-confidence location enrichment batch (IDs: 469, 841, 857, 863, 907, 918, 967, 1000, 1002, 1004, 1041). All 11 were freshly re-verified (not assumed from prior research) via exact phone match to a single unambiguous Google listing before any write. All 11 writes succeeded with zero collateral field changes and zero anomalies. Complete-location count rose from 900 to 911; missing-location count fell from 152 to 141. Active count (1,052), redirect count (17), and all 17 existing redirect mappings were confirmed unchanged. Sitemap remained at 1,240 (expected — pure enrichment of already-active venues does not add/remove sitemap pages). The manifest file was intentionally left byte-for-byte unchanged, since manifest synchronization is a separate, not-yet-authorized task.
 ### ChatGPT
 
 * Review the latest commits and repository state before proposing or making changes.
@@ -45,15 +46,15 @@ This file is the shared coordination point for AI assistants working on this rep
 
 ## Open Tasks
 
-* **Task: Continue HIGH-confidence location enrichment for the remaining 152 active venues missing address/latitude/longitude.**
+* **Task: Continue HIGH-confidence location enrichment for the remaining 141 active venues missing address/latitude/longitude.**
 
-  * **Why highest priority:** Location data completeness is the single largest remaining gap in the dataset — 152 of 1,052 active venues (14%) still lack address/lat/lng, directly limiting map-based discovery, "near me" functionality, and any future geographic features. Every other major workstream this session (duplicate resolution, region/type corrections, AI handoff setup) is now either complete or in a stable holding state; this is the one item with a large, well-defined, and already partially-executed backlog.
-  * **Current evidence:** 900 of 1,052 active venues (86%) have complete address+lat+lng. 152 remain missing. A rigorous batch of 12 was just completed with zero anomalies (verified via exact phone-match identity confirmation, individual post-write verification, and full sitemap/collateral reconciliation). A further vetted batch of 11 HIGH-confidence candidates (IDs: 469, 841, 857, 863, 907, 918, 967, 1000, 1002, 1004, 1041) has already been researched and is ready for enrichment pending explicit authorization. Several venues were correctly excluded from the ready pool for specific documented reasons: phone mismatches (328, 360, 511), confirmed mobile/food-truck businesses (453), a confirmed permanently-closed business (987), and one multi-location chain phone/address mismatch requiring a combined correction (ID 185 — Dosa Crepe Cafe, stored phone belongs to the Rutland branch, not the Osoyoos location the record represents).
-  * **Suggested next phase:** Execute the ready 11-venue batch using the established process (fresh preflight → phone-verified Google identity match → guarded `/admin/enrich-venue` write, address/lat/lng only → individual readback verification → full collateral/redirect/sitemap reconciliation → manifest update), then continue researching the remaining ~141 unresearched missing-location venues in further small batches of 10-15, applying the same conservative exclusion criteria (no phone match ambiguity, no mobile businesses, no permanently-closed businesses, no unresolved duplicate-risk pairs).
-
+* **Why highest priority:** Location data completeness remains the largest remaining gap in the dataset — 141 of 1,052 active venues (13%) still lack address/lat/lng. The previously-identified ready batch of 11 has now been completed successfully (see Change Log and Claude's note above).
+* **Current evidence:** 911 of 1,052 active venues (87%) now have complete address+lat+lng. 141 remain missing. Of the original 41 HIGH-confidence candidates identified in the first research pass, all clean ones have now been enriched (12 in the first batch, 11 in this batch); a further ~18 unresearched HIGH-confidence candidates from that original list remain, plus roughly 102 MEDIUM-confidence and 24 LOW-confidence candidates from the full 152/167-record inventory documented in this session. ID 185 (Dosa Crepe Cafe) remains flagged separately: its stored phone belongs to the Rutland (Kelowna) branch of a multi-location chain, not the Osoyoos location the record represents — it needs a combined phone correction + enrichment, not enrichment alone.
+* **Suggested next phase:** Research the remaining unresearched HIGH-confidence candidates from the original 41-item list, then proceed to the MEDIUM-confidence tier (weaker identity anchors — no phone, or a documented phone/identity conflict requiring reconciliation) using the same conservative process: fresh identity verification immediately before every write, exact phone match preferred, exclusion of any mobile/closed/ambiguous business, individual post-write verification, and full collateral/redirect/sitemap reconciliation after each batch. A separate manifest-refresh pass should also be scheduled to bring the manifest's recorded totals back in sync with live production state, since several enrichment batches have now been completed since the manifest was last refreshed.
 
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
 * 2026-09-08 — Claude confirmed the shared AI handoff workflow is ready.
 * 2026-09-08 — Claude reviewed current repository/production state and identified continued location enrichment (152 active venues missing address/lat/lng) as the highest-priority next task; added details and a suggested approach under Open Tasks.
+* 2026-09-08 — Claude executed the ready 11-venue enrichment batch (IDs 469, 841, 857, 863, 907, 918, 967, 1000, 1002, 1004, 1041). All 11 succeeded with zero anomalies. Complete-location count: 900 → 911. Missing-location count: 152 → 141. Active/redirect counts and all 17 redirects confirmed unchanged. Manifest intentionally left unchanged (separate task).
