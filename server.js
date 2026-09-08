@@ -367,13 +367,14 @@ function guardedCorrectUpdate(id, expectedCurrent, corrected, meta) {
 // guardedCorrectUpdate() above and does not alter either of their
 // behavior in any way.
 //
-// Even though this application's node:sqlite connection enforces foreign
-// keys by default (verified: PRAGMA foreign_keys returns 1), that alone
-// only guarantees the target ROW exists -- it says nothing about
-// self-redirects, chains, or the target already being a duplicate
-// itself. All of those are checked explicitly here, at the application
-// layer, as the primary safeguard; FK enforcement is a secondary/bonus
-// backstop, not something this function relies on.
+// This application's node:sqlite connection enforces foreign keys by
+// default (verified: PRAGMA foreign_keys returns 1), so SQLite itself
+// will reject a redirect_to value that doesn't match an existing
+// venues.id. That guarantees the target ROW exists, but says nothing
+// about self-redirects, chains, or the target already being a duplicate
+// itself -- all of those are checked explicitly here, at the
+// application layer, as the primary safeguard. FK enforcement is a
+// welcome secondary backstop, not something this function relies on.
 function guardedRetireUpdate(duplicateId, canonicalId) {
   // Self-redirect check.
   if (duplicateId === canonicalId) {
@@ -434,6 +435,117 @@ function guardedRetireUpdate(duplicateId, canonicalId) {
 function deleteVenue(id) {
   const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   return info.changes > 0;
+}
+
+// ---------- Phase 2.8E: narrow field-merge + retire (944 -> 210 style) ----------
+//
+// A SEPARATE, additional code path from guardedRetireUpdate() above -- that
+// function is completely unmodified and unaffected by this one. This one is
+// scoped specifically to the case where a duplicate carries a small,
+// explicit set of null-vs-value fields that should be transferred to the
+// canonical BEFORE/WITH the redirect, rather than lost.
+//
+// MERGEABLE_FIELDS is a hardcoded allowlist -- exactly the three fields
+// authorized for this operation. Field names are NEVER taken from the
+// request body; only VALUES are. This makes arbitrary-column writes
+// structurally impossible via this endpoint, matching the existing
+// guardedEnrichUpdate()/guardedCorrectUpdate()/guardedRetireUpdate() pattern.
+const MERGEABLE_FIELDS = ['phone', 'price', 'reviews'];
+
+function guardedMergeAndRetireUpdate(duplicateId, canonicalId, fieldValues) {
+  // Self-redirect check.
+  if (duplicateId === canonicalId) {
+    return { ok: false, reason: 'self_redirect' };
+  }
+
+  // Validate fieldValues keys are an exact match to the allowlist -- no
+  // more, no less. Reject anything unexpected rather than silently
+  // ignoring it.
+  const providedKeys = Object.keys(fieldValues);
+  const unexpectedKeys = providedKeys.filter((k) => !MERGEABLE_FIELDS.includes(k));
+  if (unexpectedKeys.length > 0) {
+    return { ok: false, reason: 'unexpected_merge_fields', unexpectedKeys };
+  }
+  const missingKeys = MERGEABLE_FIELDS.filter((k) => !providedKeys.includes(k));
+  if (missingKeys.length > 0) {
+    return { ok: false, reason: 'missing_merge_fields', missingKeys };
+  }
+
+  const duplicate = db.prepare('SELECT * FROM venues WHERE id = ?').get(duplicateId);
+  if (!duplicate) {
+    return { ok: false, reason: 'duplicate_not_found' };
+  }
+  if (duplicate.redirect_to !== null && duplicate.redirect_to !== undefined) {
+    return { ok: false, reason: 'duplicate_already_redirected', current_redirect_to: duplicate.redirect_to };
+  }
+
+  const canonical = db.prepare('SELECT * FROM venues WHERE id = ?').get(canonicalId);
+  if (!canonical) {
+    return { ok: false, reason: 'canonical_not_found' };
+  }
+  if (canonical.redirect_to !== null && canonical.redirect_to !== undefined) {
+    return { ok: false, reason: 'canonical_is_itself_a_duplicate', canonical_redirect_to: canonical.redirect_to };
+  }
+  const dependents = db.prepare('SELECT id FROM venues WHERE redirect_to = ?').all(duplicateId);
+  if (dependents.length > 0) {
+    return { ok: false, reason: 'duplicate_is_a_canonical_for_others', dependents: dependents.map((d) => d.id) };
+  }
+
+  // Precondition: every one of the three canonical fields must currently
+  // be NULL. This is checked here (informationally, for a clear error
+  // message) AND enforced again atomically inside the UPDATE's WHERE
+  // clause below -- the WHERE clause is what actually guards against a
+  // race, this check just produces a better error message in the common
+  // case.
+  const nonNullOnCanonical = MERGEABLE_FIELDS.filter(
+    (f) => canonical[f] !== null && canonical[f] !== undefined
+  );
+  if (nonNullOnCanonical.length > 0) {
+    return { ok: false, reason: 'canonical_field_not_null', fields: nonNullOnCanonical };
+  }
+
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+
+    // Statement 1: merge the three fields onto the canonical, guarded by
+    // requiring all three to still be NULL at write time.
+    const mergeInfo = db
+      .prepare(
+        'UPDATE venues SET phone = ?, price = ?, reviews = ?, updated_at = CURRENT_TIMESTAMP ' +
+          'WHERE id = ? AND phone IS NULL AND price IS NULL AND reviews IS NULL'
+      )
+      .run(fieldValues.phone, fieldValues.price, fieldValues.reviews, canonicalId);
+
+    if (mergeInfo.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'canonical_precondition_changed_mid_write' };
+    }
+
+    // Statement 2: the redirect, identical guard to guardedRetireUpdate().
+    const redirectInfo = db
+      .prepare('UPDATE venues SET redirect_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND redirect_to IS NULL')
+      .run(canonicalId, duplicateId);
+
+    if (redirectInfo.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'duplicate_precondition_changed_mid_write' };
+    }
+
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, canonical: getVenue(canonicalId), duplicate: getVenue(duplicateId) };
+  } catch (err) {
+    if (txOpen) {
+      try {
+        db.exec('ROLLBACK');
+      } catch (_) {}
+    }
+    throw err;
+  }
 }
 
 function getStats() {
@@ -1933,6 +2045,75 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
       }
       return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, venue: result.venue });
+    }
+
+    // POST /admin/merge-and-retire-duplicate
+    //
+    // Scoped for the 944->210 case: transfers an explicit, hardcoded set
+    // of null-vs-value fields (MERGEABLE_FIELDS) onto the canonical in
+    // the SAME transaction as setting redirect_to on the duplicate.
+    // Reuses the exact same bearer-token check as every other admin
+    // endpoint. Does not alter /admin/enrich-venue, /admin/correct-venue,
+    // or /admin/retire-duplicate in any way.
+    if (pathname === '/admin/merge-and-retire-duplicate' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Merge-and-retire endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      const ALLOWED_KEYS = ['duplicate_id', 'canonical_id', 'fields'];
+      const unexpected = Object.keys(body).filter((k) => !ALLOWED_KEYS.includes(k));
+      if (unexpected.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+      }
+      const duplicateId = body.duplicate_id;
+      const canonicalId = body.canonical_id;
+      const fields = body.fields;
+      if (!Number.isInteger(duplicateId) || duplicateId <= 0) {
+        return sendJSON(res, 400, { error: 'duplicate_id must be a positive integer.' });
+      }
+      if (!Number.isInteger(canonicalId) || canonicalId <= 0) {
+        return sendJSON(res, 400, { error: 'canonical_id must be a positive integer.' });
+      }
+      if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) {
+        return sendJSON(res, 400, { error: 'fields must be an object.' });
+      }
+
+      let result;
+      try {
+        result = guardedMergeAndRetireUpdate(duplicateId, canonicalId, fields);
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Merge-and-retire failed and was rolled back.', detail: String(err.message || err) });
+      }
+
+      if (!result.ok) {
+        const statusMap = {
+          self_redirect: 400,
+          unexpected_merge_fields: 400,
+          missing_merge_fields: 400,
+          duplicate_not_found: 404,
+          canonical_not_found: 404,
+          duplicate_already_redirected: 409,
+          canonical_is_itself_a_duplicate: 409,
+          duplicate_is_a_canonical_for_others: 409,
+          canonical_field_not_null: 409,
+          canonical_precondition_changed_mid_write: 409,
+          duplicate_precondition_changed_mid_write: 409,
+        };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
+      }
+      return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, canonical: result.canonical, duplicate: result.duplicate });
     }
 
     // GET /api/venues
