@@ -437,7 +437,7 @@ function deleteVenue(id) {
   return info.changes > 0;
 }
 
-// ---------- Phase 2.8E: narrow field-merge + retire (944 -> 210 style) ----------
+// ---------- Phase 2.8E/2.8F: narrow field-merge + retire ----------
 //
 // A SEPARATE, additional code path from guardedRetireUpdate() above -- that
 // function is completely unmodified and unaffected by this one. This one is
@@ -445,12 +445,20 @@ function deleteVenue(id) {
 // explicit set of null-vs-value fields that should be transferred to the
 // canonical BEFORE/WITH the redirect, rather than lost.
 //
-// MERGEABLE_FIELDS is a hardcoded allowlist -- exactly the three fields
-// authorized for this operation. Field names are NEVER taken from the
-// request body; only VALUES are. This makes arbitrary-column writes
-// structurally impossible via this endpoint, matching the existing
-// guardedEnrichUpdate()/guardedCorrectUpdate()/guardedRetireUpdate() pattern.
-const MERGEABLE_FIELDS = ['phone', 'price', 'reviews'];
+// MERGEABLE_FIELDS is a hardcoded master allowlist. Field NAMES are NEVER
+// taken from the request body -- only VALUES are, and only for keys that
+// already appear in this hardcoded array. This makes arbitrary-column
+// writes structurally impossible via this endpoint, matching the existing
+// guardedEnrichUpdate()/guardedCorrectUpdate()/guardedRetireUpdate()
+// pattern.
+//
+// Phase 2.8F extends this from "always require exactly phone+price+reviews"
+// to "accept any non-empty SUBSET of this master list", so a single pair
+// can be authorized to transfer just e.g. description_fr, without widening
+// what field names are reachable at all. The set of fields actually
+// touched by the SQL statement is built from Object.keys(fieldValues)
+// filtered against MERGEABLE_FIELDS -- never from arbitrary request input.
+const MERGEABLE_FIELDS = ['phone', 'price', 'reviews', 'description_fr'];
 
 function guardedMergeAndRetireUpdate(duplicateId, canonicalId, fieldValues) {
   // Self-redirect check.
@@ -458,18 +466,24 @@ function guardedMergeAndRetireUpdate(duplicateId, canonicalId, fieldValues) {
     return { ok: false, reason: 'self_redirect' };
   }
 
-  // Validate fieldValues keys are an exact match to the allowlist -- no
-  // more, no less. Reject anything unexpected rather than silently
-  // ignoring it.
+  // Validate fieldValues keys are a NON-EMPTY SUBSET of the master
+  // allowlist. Reject anything unexpected rather than silently ignoring
+  // it. Reject an empty payload (a merge call must actually merge
+  // something, or callers should use plain /admin/retire-duplicate
+  // instead).
   const providedKeys = Object.keys(fieldValues);
+  if (providedKeys.length === 0) {
+    return { ok: false, reason: 'no_merge_fields_provided' };
+  }
   const unexpectedKeys = providedKeys.filter((k) => !MERGEABLE_FIELDS.includes(k));
   if (unexpectedKeys.length > 0) {
     return { ok: false, reason: 'unexpected_merge_fields', unexpectedKeys };
   }
-  const missingKeys = MERGEABLE_FIELDS.filter((k) => !providedKeys.includes(k));
-  if (missingKeys.length > 0) {
-    return { ok: false, reason: 'missing_merge_fields', missingKeys };
-  }
+  // De-duplicate and fix the exact field order deterministically (the
+  // order of MERGEABLE_FIELDS, not the order keys happened to arrive in
+  // the request), so the generated SQL is always identical for a given
+  // field set regardless of client-supplied key ordering.
+  const fieldsToMerge = MERGEABLE_FIELDS.filter((f) => providedKeys.includes(f));
 
   const duplicate = db.prepare('SELECT * FROM venues WHERE id = ?').get(duplicateId);
   if (!duplicate) {
@@ -491,13 +505,11 @@ function guardedMergeAndRetireUpdate(duplicateId, canonicalId, fieldValues) {
     return { ok: false, reason: 'duplicate_is_a_canonical_for_others', dependents: dependents.map((d) => d.id) };
   }
 
-  // Precondition: every one of the three canonical fields must currently
-  // be NULL. This is checked here (informationally, for a clear error
-  // message) AND enforced again atomically inside the UPDATE's WHERE
-  // clause below -- the WHERE clause is what actually guards against a
-  // race, this check just produces a better error message in the common
-  // case.
-  const nonNullOnCanonical = MERGEABLE_FIELDS.filter(
+  // Precondition: every field being merged IN THIS CALL must currently be
+  // NULL on the canonical -- not the full master list, just whatever
+  // subset this call specified. Checked here for a clear error message,
+  // AND enforced again atomically inside the UPDATE's WHERE clause below.
+  const nonNullOnCanonical = fieldsToMerge.filter(
     (f) => canonical[f] !== null && canonical[f] !== undefined
   );
   if (nonNullOnCanonical.length > 0) {
@@ -509,14 +521,21 @@ function guardedMergeAndRetireUpdate(duplicateId, canonicalId, fieldValues) {
     db.exec('BEGIN');
     txOpen = true;
 
-    // Statement 1: merge the three fields onto the canonical, guarded by
-    // requiring all three to still be NULL at write time.
+    // Statement 1: merge only the requested (validated, allowlisted)
+    // fields onto the canonical. Column names come only from
+    // fieldsToMerge, which is itself filtered from MERGEABLE_FIELDS --
+    // never from raw request keys. Guarded by requiring every one of
+    // those specific fields to still be NULL at write time.
+    const setClause = fieldsToMerge.map((f) => `${f} = ?`).join(', ');
+    const whereNullClause = fieldsToMerge.map((f) => `${f} IS NULL`).join(' AND ');
+    const setValues = fieldsToMerge.map((f) => fieldValues[f]);
+
     const mergeInfo = db
       .prepare(
-        'UPDATE venues SET phone = ?, price = ?, reviews = ?, updated_at = CURRENT_TIMESTAMP ' +
-          'WHERE id = ? AND phone IS NULL AND price IS NULL AND reviews IS NULL'
+        `UPDATE venues SET ${setClause}, updated_at = CURRENT_TIMESTAMP ` +
+          `WHERE id = ? AND ${whereNullClause}`
       )
-      .run(fieldValues.phone, fieldValues.price, fieldValues.reviews, canonicalId);
+      .run(...setValues, canonicalId);
 
     if (mergeInfo.changes !== 1) {
       db.exec('ROLLBACK');
@@ -537,12 +556,13 @@ function guardedMergeAndRetireUpdate(duplicateId, canonicalId, fieldValues) {
 
     db.exec('COMMIT');
     txOpen = false;
-    return { ok: true, canonical: getVenue(canonicalId), duplicate: getVenue(duplicateId) };
+    return { ok: true, canonical: getVenue(canonicalId), duplicate: getVenue(duplicateId), mergedFields: fieldsToMerge };
   } catch (err) {
     if (txOpen) {
       try {
         db.exec('ROLLBACK');
       } catch (_) {}
+
     }
     throw err;
   }
@@ -2100,6 +2120,7 @@ const server = http.createServer(async (req, res) => {
       if (!result.ok) {
         const statusMap = {
           self_redirect: 400,
+          no_merge_fields_provided: 400,
           unexpected_merge_fields: 400,
           missing_merge_fields: 400,
           duplicate_not_found: 404,
@@ -2113,7 +2134,7 @@ const server = http.createServer(async (req, res) => {
         };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
       }
-      return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, canonical: result.canonical, duplicate: result.duplicate });
+      return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, merged_fields: result.mergedFields, canonical: result.canonical, duplicate: result.duplicate });
     }
 
     // GET /api/venues
