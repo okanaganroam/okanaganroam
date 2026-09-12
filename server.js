@@ -994,30 +994,7 @@ function renderGuidePage(region, badge, venues) {
         .join(', ')}</p>`
     : '';
 
-  const cards = venues
-    .map((v) => {
-      const badgeChips = BOOL_FIELDS.filter((f) => v[f])
-        .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
-        .join(' ');
-      const desc = v.description ? `<p>${escapeHtml(v.description)}</p>` : '';
-      const meta = [
-        v.type ? escapeHtml(v.type) : null,
-        v.cuisine ? escapeHtml(v.cuisine) : null,
-        v.rating ? `${v.rating}★` : null,
-      ].filter(Boolean).join(' &middot; ');
-      const venueHref = (v.slug && CATEGORY_SLUGS[v.type]) ? `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}` : null;
-      const nameHtml = venueHref
-        ? `<a href="${venueHref}">${escapeHtml(v.name)}</a>`
-        : escapeHtml(v.name);
-      return `
-      <li class="venue-card">
-        <h2>${nameHtml}</h2>
-        <p class="venue-meta">${meta}</p>
-        ${desc}
-        <p class="chips">${badgeChips}</p>
-      </li>`;
-    })
-    .join('\n');
+  const cards = venues.map((v) => venueCardHtml(v, { showType: true })).join('\n');
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -1045,7 +1022,11 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 </head>
 <body>
   ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
-  <nav class="breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/${region}">${escapeHtml(regionLabel)}</a> &rsaquo; ${escapeHtml(badgeInfo.title)} Venues</nav>
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: regionLabel, href: `/${region}` },
+    { name: `${badgeInfo.title} Venues` },
+  ])}
   <h1>${escapeHtml(badgeInfo.title)} Venues in ${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(badgeInfo.noun)} in ${escapeHtml(regionLabel)} — badge-checked from real listings, not guessed.</p>
   ${categoryLinksHtml}
@@ -1091,39 +1072,45 @@ function renderGuideFooterHTML() {
 // ---------- shared SEO page CSS (region / category / venue pages) ----------
 // One shared style block so these three page types look and feel
 // consistent, and so it's defined once rather than duplicated three times.
+// Phase 5 Sprint 1: recolored to reference the shared design tokens
+// (loaded via the <link rel="stylesheet" href="/styles/tokens.css"> that
+// pageHead() now emits) instead of this block's own, previously
+// disconnected hardcoded palette. Layout/structure is unchanged — this is
+// the "single source of truth for styling" step; the full Sprint 2 visual
+// redesign of these templates is separate, later work.
 const SEO_PAGE_CSS = `
   :root { color-scheme: light; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 860px; margin: 0 auto; padding: 24px 20px 64px; color: #1f2933; line-height: 1.5; }
-  a { color: #0b6e4f; }
+  body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 860px; margin: 0 auto; padding: 24px 20px 64px; color: var(--ink); background: var(--paper); line-height: 1.5; }
+  a { color: var(--teal); }
   header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-  header.top a.brand { font-weight: 700; text-decoration: none; color: #1f2933; font-size: 1.1rem; }
-  nav.breadcrumb { font-size: 0.82rem; color: #7b8794; margin-bottom: 20px; }
-  nav.breadcrumb a { color: #52606d; text-decoration: none; }
+  header.top a.brand { font-weight: 700; text-decoration: none; color: var(--ink); font-size: 1.1rem; }
+  nav.breadcrumb { font-size: 0.82rem; color: var(--ink); opacity: 0.68; margin-bottom: 20px; }
+  nav.breadcrumb a { color: var(--teal-deep); text-decoration: none; }
   nav.breadcrumb a:hover { text-decoration: underline; }
-  h1 { font-size: 1.6rem; margin-bottom: 4px; }
-  .subtitle { color: #52606d; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.6rem; margin-bottom: 4px; }
+  .subtitle { color: var(--ink); opacity: 0.68; margin-bottom: 24px; }
   .card-grid { padding: 0; margin: 0; }
-  .venue-card, .category-card { list-style: none; border: 1px solid #e4e7eb; border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
-  .venue-card h2, .category-card h2 { font-size: 1.05rem; margin: 0 0 4px; }
-  .venue-card h2 a, .category-card h2 a { color: #1f2933; text-decoration: none; }
+  .venue-card, .category-card { list-style: none; border: 1px solid var(--sand-deep); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
+  .venue-card h2, .category-card h2 { font-family: 'Fraunces', serif; font-size: 1.05rem; margin: 0 0 4px; }
+  .venue-card h2 a, .category-card h2 a { color: var(--ink); text-decoration: none; }
   .venue-card h2 a:hover, .category-card h2 a:hover { text-decoration: underline; }
-  .venue-meta { color: #7b8794; font-size: 0.85rem; margin: 0 0 8px; }
+  .venue-meta { color: var(--ink); opacity: 0.68; font-size: 0.85rem; margin: 0 0 8px; }
   .venue-card p, .category-card p { margin: 0 0 8px; font-size: 0.95rem; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { background: #eaf6f0; color: #0b6e4f; font-size: 0.75rem; padding: 3px 9px; border-radius: 999px; }
+  .chip { background: var(--sand-deep); color: var(--plum); font-size: 0.75rem; padding: 3px 9px; border-radius: 999px; }
   .related-section { margin-top: 32px; }
-  .related-section h2 { font-size: 1.15rem; margin-bottom: 12px; }
+  .related-section h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin-bottom: 12px; }
   .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-  .related-card { border: 1px solid #e4e7eb; border-radius: 8px; padding: 10px 12px; }
-  .related-card a { font-weight: 600; text-decoration: none; color: #1f2933; }
-  .related-card .related-meta { font-size: 0.8rem; color: #7b8794; }
+  .related-card { border: 1px solid var(--sand-deep); border-radius: 8px; padding: 10px 12px; }
+  .related-card a { font-weight: 600; text-decoration: none; color: var(--ink); }
+  .related-card .related-meta { font-size: 0.8rem; color: var(--ink); opacity: 0.68; }
   .detail-row { display: flex; gap: 8px; margin: 4px 0; font-size: 0.95rem; }
-  .detail-row .label { color: #7b8794; min-width: 90px; }
-  .cta { display: inline-block; margin-top: 28px; background: #0b6e4f; color: #fff; text-decoration: none; padding: 12px 22px; border-radius: 8px; font-weight: 600; }
-  .cta.secondary { background: #fff; color: #0b6e4f; border: 1px solid #0b6e4f; }
+  .detail-row .label { color: var(--ink); opacity: 0.68; min-width: 90px; }
+  .cta { display: inline-block; margin-top: 28px; background: var(--plum); color: var(--paper); text-decoration: none; padding: 12px 22px; border-radius: 8px; font-weight: 600; }
+  .cta.secondary { background: var(--paper); color: var(--plum); border: 1px solid var(--plum); }
   .hours-list { list-style: none; padding: 0; margin: 8px 0; font-size: 0.9rem; }
   .hours-list li { display: flex; justify-content: space-between; max-width: 260px; padding: 2px 0; }
-  footer.site-footer { margin-top: 40px; font-size: 0.85rem; color: #7b8794; }
+  footer.site-footer { margin-top: 40px; font-size: 0.85rem; color: var(--ink); opacity: 0.68; }
 `;
 
 function pageHead(title, description, canonical, jsonLdBlocks) {
@@ -1141,6 +1128,7 @@ function pageHead(title, description, canonical, jsonLdBlocks) {
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
 ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.stringify(block)}\n</script>`).join('\n')}
+<link rel="stylesheet" href="/styles/tokens.css">
 <style>${SEO_PAGE_CSS}</style>`;
 }
 
@@ -1153,6 +1141,68 @@ function siteHeader(rightLinkHref, rightLinkText) {
 
 function siteFooter() {
   return `<footer class="site-footer">Okanagan Roam &middot; <a href="https://okanaganroam.com/">okanaganroam.com</a></footer>`;
+}
+
+// ---------- Phase 5 Sprint 1 — shared presentation components ----------
+// Small, reusable functions extending the pageHead/siteHeader/siteFooter
+// pattern already established above. Each one replaces markup that was
+// previously duplicated (in slightly different shapes) across two or more
+// of the four render*Page functions below. Nothing here changes any URL,
+// slug, canonical, JSON-LD, or metadata behavior — these only produce the
+// human-visible HTML fragments that sit inside the unchanged page shells.
+
+// Visible breadcrumb <nav>, as opposed to breadcrumbListSchema() above
+// (which produces the separate, JSON-LD structured-data version of the
+// same information). items: [{ name, href }], in order from Home to the
+// current page. The current/last item is rendered as plain text, not a
+// link, matching every existing call site's behavior.
+function breadcrumbNavHtml(items) {
+  const parts = items.map((item, i) => {
+    const isLast = i === items.length - 1;
+    return isLast || !item.href
+      ? escapeHtml(item.name)
+      : `<a href="${item.href}">${escapeHtml(item.name)}</a>`;
+  });
+  return `<nav class="breadcrumb">${parts.join(' &rsaquo; ')}</nav>`;
+}
+
+// The `<span class="chip">` badge row used on venue/category/guide pages —
+// one chip per true boolean amenity flag on the venue. Identical output to
+// what all three call sites built inline before this extraction.
+function badgeChipsHtml(venue) {
+  return BOOL_FIELDS.filter((f) => venue[f])
+    .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
+    .join(' ');
+}
+
+// The `<li class="venue-card">` list-item used on category and guide
+// pages. The two previous call sites differed only in whether the venue
+// type itself appears in the meta line (guide pages, which mix
+// categories, show it; category pages, which are already scoped to one
+// category, don't) and in how defensively the name needs to be linked
+// (guide pages tolerate a venue with no slug/category mapping yet by
+// falling back to plain text; category pages always have both). Both
+// behaviors are preserved exactly via the options below.
+function venueCardHtml(venue, opts = {}) {
+  const { showType = false } = opts;
+  const catSlug = CATEGORY_SLUGS[venue.type];
+  const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
+  const nameHtml = href
+    ? `<a href="${href}">${escapeHtml(venue.name)}</a>`
+    : escapeHtml(venue.name);
+  const meta = [
+    showType && venue.type ? escapeHtml(venue.type) : null,
+    venue.cuisine ? escapeHtml(venue.cuisine) : null,
+    venue.rating ? `${venue.rating}\u2605` : null,
+  ].filter(Boolean).join(' &middot; ');
+  const desc = venue.description ? `<p>${escapeHtml(venue.description)}</p>` : '';
+  return `
+      <li class="venue-card">
+        <h2>${nameHtml}</h2>
+        <p class="venue-meta">${meta}</p>
+        ${desc}
+        <p class="chips">${badgeChipsHtml(venue)}</p>
+      </li>`;
 }
 
 // GET /:region — region hub page
@@ -1198,7 +1248,10 @@ ${pageHead(title, description, canonical, [breadcrumb])}
 </head>
 <body>
   ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
-  <nav class="breadcrumb"><a href="/">Home</a> &rsaquo; ${escapeHtml(regionLabel)}</nav>
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: regionLabel },
+  ])}
   <h1>${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${totalVenues} verified venues across ${categoryCards ? Object.keys(categoryCounts).length : 0} categories in ${escapeHtml(regionLabel)}.</p>
   <ul class="card-grid">
@@ -1243,25 +1296,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
     })),
   };
 
-  const cards = venues
-    .map((v) => {
-      const badgeChips = BOOL_FIELDS.filter((f) => v[f])
-        .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
-        .join(' ');
-      const meta = [
-        v.cuisine ? escapeHtml(v.cuisine) : null,
-        v.rating ? `${v.rating}\u2605` : null,
-      ].filter(Boolean).join(' &middot; ');
-      const desc = v.description ? `<p>${escapeHtml(v.description)}</p>` : '';
-      return `
-      <li class="venue-card">
-        <h2><a href="/${region}/${catSlug}/${v.slug}">${escapeHtml(v.name)}</a></h2>
-        <p class="venue-meta">${meta}</p>
-        ${desc}
-        <p class="chips">${badgeChips}</p>
-      </li>`;
-    })
-    .join('\n');
+  const cards = venues.map((v) => venueCardHtml(v)).join('\n');
 
   const guideLinks = categoryGuidePages.length
     ? `<div class="related-section">
@@ -1279,7 +1314,11 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 </head>
 <body>
   ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
-  <nav class="breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/${region}">${escapeHtml(regionLabel)}</a> &rsaquo; ${escapeHtml(label.plural)}</nav>
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: regionLabel, href: `/${region}` },
+    { name: label.plural },
+  ])}
   <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}.</p>
   <ul class="card-grid">
@@ -1334,9 +1373,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     openingHoursSpecification: buildOpeningHoursSpecification(venue.hours),
   };
 
-  const attributeChips = BOOL_FIELDS.filter((f) => venue[f])
-    .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
-    .join(' ');
+  const attributeChips = badgeChipsHtml(venue);
 
   let hoursHtml = '';
   if (venue.hours) {
@@ -1407,7 +1444,12 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
 </head>
 <body>
   ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
-  <nav class="breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/${venue.region}">${escapeHtml(regionLabel)}</a> &rsaquo; <a href="/${venue.region}/${catSlug}">${escapeHtml(label.plural)}</a> &rsaquo; ${escapeHtml(venue.name)}</nav>
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: regionLabel, href: `/${venue.region}` },
+    { name: label.plural, href: `/${venue.region}/${catSlug}` },
+    { name: venue.name },
+  ])}
   ${imageHtml}
   <h1>${escapeHtml(venue.name)}</h1>
   <p class="subtitle">${escapeHtml(label.singular)} in ${escapeHtml(regionLabel)}, BC</p>
@@ -1769,6 +1811,30 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('og-image.png not found on server');
+    }
+
+    // Phase 5 Sprint 1 — shared static assets. These three files are the
+    // extracted, single-source-of-truth CSS/JS that both the SPA
+    // (okanagan.html, via <link>/<script src>) and the server-rendered SEO
+    // pages (via pageHead()'s tokens.css <link>) now depend on. Served the
+    // same simple way as og-image.png above: read from disk, no build step,
+    // no bundler. Cached for an hour rather than a day (unlike og-image.png)
+    // since these are actively being iterated on during Phase 5.
+    const STATIC_ASSETS = {
+      '/styles/tokens.css': { file: 'public/styles/tokens.css', type: 'text/css; charset=utf-8' },
+      '/styles/app.css': { file: 'public/styles/app.css', type: 'text/css; charset=utf-8' },
+      '/scripts/app.js': { file: 'public/scripts/app.js', type: 'application/javascript; charset=utf-8' },
+    };
+    if (STATIC_ASSETS[pathname] && method === 'GET') {
+      const asset = STATIC_ASSETS[pathname];
+      const assetPath = path.join(__dirname, asset.file);
+      if (fs.existsSync(assetPath)) {
+        const body = fs.readFileSync(assetPath, 'utf8');
+        res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': 'public, max-age=3600' });
+        return res.end(body);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end(`${pathname} not found on server`);
     }
 
     // GET /guide/:region/:badge — server-rendered SEO landing page.
@@ -2384,29 +2450,81 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
+function startServer() {
+  server.listen(PORT, () => {
+    console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
 
-  // Slug backfill runs AFTER the server is already listening and serving
-  // every existing route (homepage, /api/*, /guide/*, etc.) — deliberately
-  // not at module-load time. This way, if this step ever fails for an
-  // unexpected reason, the site stays up and continues serving everything
-  // it already could; only the not-yet-slugged venues' new pages would be
-  // affected, never the whole site. The migration/schema setup in db.js
-  // (adding columns, fixing the index) still runs at module-load — that
-  // part is purely additive/idempotent and has been safe in every test.
-  try {
-    const { count, errors } = backfillSlugs();
-    if (count > 0) {
-      console.log(`[seo] backfilled slugs for ${count} venue(s)`);
-    }
-    if (errors.length > 0) {
-      console.error(`[seo] WARNING: ${errors.length} venue(s) could NOT be given a unique slug:`);
-      for (const e of errors) {
-        console.error(`[seo]   id=${e.id} name="${e.name}" region=${e.region} type=${e.type} — ${e.reason}`);
+    // Slug backfill runs AFTER the server is already listening and serving
+    // every existing route (homepage, /api/*, /guide/*, etc.) — deliberately
+    // not at module-load time. This way, if this step ever fails for an
+    // unexpected reason, the site stays up and continues serving everything
+    // it already could; only the not-yet-slugged venues' new pages would be
+    // affected, never the whole site. The migration/schema setup in db.js
+    // (adding columns, fixing the index) still runs at module-load — that
+    // part is purely additive/idempotent and has been safe in every test.
+    try {
+      const { count, errors } = backfillSlugs();
+      if (count > 0) {
+        console.log(`[seo] backfilled slugs for ${count} venue(s)`);
       }
+      if (errors.length > 0) {
+        console.error(`[seo] WARNING: ${errors.length} venue(s) could NOT be given a unique slug:`);
+        for (const e of errors) {
+          console.error(`[seo]   id=${e.id} name="${e.name}" region=${e.region} type=${e.type} — ${e.reason}`);
+        }
+      }
+    } catch (err) {
+      console.error('[seo] slug backfill failed unexpectedly (site remains up):', err);
     }
-  } catch (err) {
-    console.error('[seo] slug backfill failed unexpectedly (site remains up):', err);
-  }
-});
+  });
+}
+
+// Phase 5 Sprint 1 — testability guard. `require.main === module` is true
+// only when this file is the one actually launched (`node server.js`,
+// exactly how Railway/`npm start` run it today via package.json's
+// "start" script) — so production behavior is byte-for-byte unchanged.
+// When a test file instead does `require('../server.js')`, require.main
+// is the test runner, not this file, so the guard is false and the real
+// HTTP listener never starts — letting tests exercise the exported pure
+// functions below in-process without binding a port or affecting a
+// running instance.
+if (require.main === module) {
+  startServer();
+}
+
+// Exported for the Phase 5 Sprint 1 test foundation (tests/*.test.js).
+// Every exported item is a pure function or a function whose only
+// side effect is reading the already-open `db` connection — nothing here
+// starts the server or opens a second database connection. Kept
+// deliberately narrow: only what the test foundation in Section 14 of the
+// Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
+// database reads), not a blanket re-export of the whole module.
+module.exports = {
+  startServer,
+  server,
+  slugify,
+  escapeHtml,
+  breadcrumbListSchema,
+  buildOpeningHoursSpecification,
+  badgeChipsHtml,
+  breadcrumbNavHtml,
+  venueCardHtml,
+  listVenues,
+  getVenue,
+  getVenuesByRegionCategory,
+  findVenueBySlug,
+  getRelatedVenues,
+  getNearbyVenues,
+  getRegionCategoryCounts,
+  listGuideCombos,
+  getStats,
+  renderVenuePage,
+  renderCategoryPage,
+  renderRegionPage,
+  renderGuidePage,
+  render404Page,
+  CATEGORY_SLUGS,
+  REGION_LABELS,
+  MIN_GUIDE_VENUES,
+  MIN_CATEGORY_VENUES,
+};
