@@ -1,0 +1,19 @@
+/* Okanagan Roam — shared design tokens (Phase 5 Sprint 1)
+ * Single source of truth for brand colors, used by both the SPA
+ * (okanagan.html) and the server-rendered SEO pages (server.js).
+ * Extracted verbatim from okanagan.html's original inline :root block
+ * — no values changed. */
+:root{
+    --sand: #F5EDDD;
+    --sand-deep: #EBDFC5;
+    --plum: #6B2C40;
+    --plum-dark: #4A2030;
+    --teal: #2A6B67;
+    --teal-deep: #1E4F4C;
+    --amber: #E0A94E;
+    --cocktail: #86477C;
+    --cafe: #A0662E;
+    --pub: #4A6741;
+    --ink: #4A3428;
+    --paper: #FFFCF6;
+}
