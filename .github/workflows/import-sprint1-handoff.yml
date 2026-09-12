@@ -41,6 +41,8 @@ jobs:
           test -f "$root/package.json"
           test -f "$root/SPRINT1-MANIFEST.txt"
 
+          mkdir -p public/styles public/scripts tests
+
           cp "$root/server.js" server.js
           cp "$root/okanagan.html" okanagan.html
           cp "$root/public/styles/tokens.css" public/styles/tokens.css
