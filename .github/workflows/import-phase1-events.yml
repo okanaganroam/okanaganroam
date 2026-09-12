@@ -1,0 +1,78 @@
+name: Import Phase 1 Events Handoff
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout phase1-events
+        uses: actions/checkout@v4
+        with:
+          ref: phase1-events
+
+      - name: Verify handoff ZIP
+        run: |
+          expected="b9a6982246af895b160eec7024fada3e7fe0a5cf73caec7dbb514d155d172277"
+          actual="$(sha256sum phase1-events-handoff.zip | awk '{print $1}')"
+
+          echo "Expected: $expected"
+          echo "Actual:   $actual"
+
+          test "$actual" = "$expected"
+
+      - name: Extract and verify files
+        run: |
+          rm -rf /tmp/events-handoff
+          mkdir -p /tmp/events-handoff
+
+          unzip -q phase1-events-handoff.zip -d /tmp/events-handoff
+
+          test -f /tmp/events-handoff/phase1-events-handoff/db.js
+          test -f /tmp/events-handoff/phase1-events-handoff/server.js
+          test -f /tmp/events-handoff/phase1-events-handoff/tests/server.test.js
+
+          test "$(sha256sum /tmp/events-handoff/phase1-events-handoff/db.js | awk '{print $1}')" = "13b7222bf4cc269b970147c0f08f1757842e7969913c4a3a02e3f07ce9999a27"
+          test "$(sha256sum /tmp/events-handoff/phase1-events-handoff/server.js | awk '{print $1}')" = "a0bd63f432e34547287cd2319459c46a203818197d361867b089002e40081382"
+          test "$(sha256sum /tmp/events-handoff/phase1-events-handoff/tests/server.test.js | awk '{print $1}')" = "e2ced7c768869d7aa5b6acd901c89c0af6e5ae2131a98e044c57b64381182e48"
+
+          echo "All three handoff files match Claude's exact approved content."
+
+      - name: Install approved files
+        run: |
+          mkdir -p tests
+
+          cp /tmp/events-handoff/phase1-events-handoff/db.js db.js
+          cp /tmp/events-handoff/phase1-events-handoff/server.js server.js
+          cp /tmp/events-handoff/phase1-events-handoff/tests/server.test.js tests/server.test.js
+
+          rm phase1-events-handoff.zip
+
+      - name: Verify exact changed-file set
+        run: |
+          git status --short
+
+          git diff --name-only main...HEAD || true
+
+          test "$(git status --short | wc -l | tr -d ' ')" = "4"
+
+          git status --short | grep -q "^ M db.js$"
+          git status --short | grep -q "^ M server.js$"
+          git status --short | grep -q "^ M tests/server.test.js$"
+          git status --short | grep -q "^ D phase1-events-handoff.zip$"
+
+      - name: Commit imported files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add db.js server.js tests/server.test.js phase1-events-handoff.zip
+
+          git commit -m "Import Phase 1 Events implementation"
+
+          git push origin phase1-events
