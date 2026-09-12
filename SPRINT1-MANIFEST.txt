@@ -1,0 +1,30 @@
+SPRINT 1 HANDOFF MANIFEST — Okanagan Roam Phase 5 Sprint 1
+Generated: 2026-09-12T19:04:38Z
+
+=== COMMIT INFO ===
+Local Sprint 1 commit SHA (local-only git repo, never pushed): 81f1f7023fa27e829865e2667d37fd954dbc6eae
+Baseline commit this work sits on top of (production main at session start): abbb221c176f9637ac13e75779a5bcfdff45ce07
+
+=== FILES (path | bytes | SHA-256) ===
+server.js                            112137 bytes   15e494f8e1773c93baa5cb879adf876b71ea634d27f1f8429c47012be18e18db
+okanagan.html                       1080705 bytes   dc481bcdbc89f2a5ed4868d80677eb37548f630d1a7cfdbd8ed57bff6b933623
+package.json                            440 bytes   8efefadb573b4554d17b0d5dd7d55694b6f15419d85181757cd6822e2c3d494f
+public/styles/tokens.css                572 bytes   f9bd9d7e2ccd9766baf6bf40be0d51235eb13a024661a1c1d110cc9f484fa87d
+public/styles/app.css                 38859 bytes   b3666601467b29942169c4286a0319b8a3f590162c5326d571a92c64ef5cb2cb
+public/scripts/app.js                104787 bytes   4786518f00df9ff23fb7a54d862d0938dd344eed7ce0b067de81281582cdc9c3
+tests/server.test.js                  10349 bytes   841508535d00b6c87d5b33d8bd20bb867b981502433bd712e6d54b0b8c7bb7cc
+
+=== TEST RESULT ===
+node --no-warnings --test tests/server.test.js : 19/19 passed, 0 failed
+
+=== VERIFICATION RESULTS ===
+- Local server start: OK
+- Homepage GET /: 200, correct <link>/<script src> to tokens.css/app.css/app.js
+- Static assets: /styles/tokens.css 200, /styles/app.css 200, /scripts/app.js 200
+- Route dispatch: unknown route 404, /robots.txt 200, /sitemap.xml 200; region/category/venue pages confirmed 200 when data present (verified with a seeded fixture row), correctly 404 only when the underlying DB has no matching data — not a routing defect
+- okanagan.html: 10/10 original hero-carousel base64 images present, byte-identical to baseline, in original order
+- No secrets, .env files, credentials, or unrelated files present (confirmed via git ls-files: exactly the 7 intended files)
+
+=== NOT PUSHED ANYWHERE ===
+This commit exists only in a local, throwaway git repo in the sandbox that generated this package.
+Nothing has been pushed to GitHub. Production and Railway are untouched.
