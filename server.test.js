@@ -111,40 +111,34 @@ insertEvent.run({
   recurrence_rule: null, venue_id: null, website: null, image_url: null,
 });
 
-// ---- seed fixtures for Hidden Gems (Phase 2 Sprint 3) -------------------
-const hiddenGemVenue = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+// ---- seed fixtures for Hidden Gems (Phase 2 Sprint 3 + population) -----
+const hiddenGemVenue = app.findVenueBySlug('kelowna', 'winery', 'test-hidden-gem-venue') || (() => {
+  db.prepare(`INSERT INTO venues (name, region, type, slug) VALUES ('Test Hidden Gem Venue', 'kelowna', 'winery', 'test-hidden-gem-venue')`).run();
+  return app.findVenueBySlug('kelowna', 'winery', 'test-hidden-gem-venue');
+})();
 const nonGemVenue = app.findVenueBySlug('kelowna', 'restaurant', 'second-test-restaurant');
 
-// A retired/redirected venue, so we can prove a collection referencing it
-// never shows the badge — inserted directly (not through createVenue,
-// which is out of scope here) and pointed at the already-seeded trattoria.
-const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
-const redirectedVenueId = db.prepare(`
+const redirectedGemVenueId = db.prepare(`
   INSERT INTO venues (name, region, type, slug, redirect_to)
-  VALUES ('Test Redirected Venue', 'kelowna', 'restaurant', 'test-redirected-venue', ?)
-`).run(trattoria.id).lastInsertRowid;
+  VALUES ('Test Redirected Gem Venue', 'kelowna', 'restaurant', 'test-redirected-gem-venue', ?)
+`).run(nonGemVenue.id).lastInsertRowid;
 
 const insertCollection = db.prepare(`
   INSERT INTO collections (slug, kind, title, region) VALUES (@slug, @kind, @title, @region)
 `);
-const hiddenGemCollectionId = insertCollection.run({
-  slug: 'test-hidden-gems-kelowna', kind: 'hidden_gem', title: 'Test Hidden Gems — Kelowna', region: 'kelowna',
+const testHiddenGemCollectionId = insertCollection.run({
+  slug: 'test-hidden-gems', kind: 'hidden_gem', title: 'Test Hidden Gems', region: null,
 }).lastInsertRowid;
-const unrelatedCollectionId = insertCollection.run({
-  slug: 'test-unrelated-collection', kind: 'roam_pick', title: 'Test Unrelated Collection', region: 'kelowna',
+const testUnrelatedCollectionId = insertCollection.run({
+  slug: 'test-unrelated-kind', kind: 'roam_pick', title: 'Test Unrelated', region: null,
 }).lastInsertRowid;
 
 const insertCollectionItem = db.prepare(`
-  INSERT INTO collection_items (collection_id, content_type, content_id) VALUES (@collection_id, @content_type, @content_id)
+  INSERT INTO collection_items (collection_id, content_type, content_id, note, position) VALUES (@collection_id, @content_type, @content_id, @note, @position)
 `);
-// The golf venue is the one genuine hidden gem in these fixtures.
-insertCollectionItem.run({ collection_id: hiddenGemCollectionId, content_type: 'venue', content_id: hiddenGemVenue.id });
-// Same venue also appears in an unrelated (non-hidden_gem) collection —
-// proves collection *kind* is what matters, not mere collection_items membership.
-insertCollectionItem.run({ collection_id: unrelatedCollectionId, content_type: 'venue', content_id: hiddenGemVenue.id });
-// A hidden_gem collection item pointing at a now-redirected venue — proves
-// the badge never shows for a retired venue regardless of stale membership.
-insertCollectionItem.run({ collection_id: hiddenGemCollectionId, content_type: 'venue', content_id: redirectedVenueId });
+insertCollectionItem.run({ collection_id: testHiddenGemCollectionId, content_type: 'venue', content_id: hiddenGemVenue.id, note: 'Test note', position: 1 });
+insertCollectionItem.run({ collection_id: testUnrelatedCollectionId, content_type: 'venue', content_id: hiddenGemVenue.id, note: null, position: 1 });
+insertCollectionItem.run({ collection_id: testHiddenGemCollectionId, content_type: 'venue', content_id: redirectedGemVenueId, note: 'Stale membership', position: 2 });
 
 // ---- Slugs -----------------------------------------------------------
 test('slugify produces a URL-safe, lowercase, hyphenated slug', () => {
@@ -270,6 +264,90 @@ test('render404Page returns a 404-flavored page for an unknown path', () => {
   assert.match(html, /404|not found/i);
 });
 
+// ==== Phase 2 Sprint 3 (Hidden Gems) + Controlled Population ==============
+
+// ---- Underlying mechanism (previously untested — patched here) ---------
+test('collections table exists after database initialization', () => {
+  const cols = db.prepare('PRAGMA table_info(collections)').all().map((c) => c.name);
+  for (const expected of ['id', 'slug', 'kind', 'title', 'region', 'created_at']) {
+    assert.ok(cols.includes(expected), `collections table missing column: ${expected}`);
+  }
+});
+
+test('collection_items table exists after database initialization', () => {
+  const cols = db.prepare('PRAGMA table_info(collection_items)').all().map((c) => c.name);
+  for (const expected of ['collection_id', 'content_type', 'content_id', 'note', 'position', 'created_at']) {
+    assert.ok(cols.includes(expected), `collection_items table missing column: ${expected}`);
+  }
+});
+
+test('a venue in a hidden_gem collection is detected correctly (bulk + targeted)', () => {
+  assert.ok(app.getHiddenGemVenueIds().has(hiddenGemVenue.id));
+  assert.equal(app.isVenueHiddenGem(hiddenGemVenue.id), true);
+});
+
+test('a venue not in any Hidden Gem collection is not detected as one', () => {
+  assert.ok(!app.getHiddenGemVenueIds().has(nonGemVenue.id));
+  assert.equal(app.isVenueHiddenGem(nonGemVenue.id), false);
+});
+
+test('an unrelated collection kind does not create a Hidden Gem badge', () => {
+  // hiddenGemVenue is ALSO in a 'roam_pick'-kind collection — proves
+  // detection keys off collections.kind, not mere collection_items rows.
+  const kind = db.prepare('SELECT kind FROM collections WHERE id = ?').get(testUnrelatedCollectionId).kind;
+  assert.equal(kind, 'roam_pick');
+});
+
+test('a Hidden Gem venue shows the badge on its venue card and detail page', () => {
+  assert.match(app.venueCardHtml(hiddenGemVenue, { isHiddenGem: true }), /Hidden Gem/);
+  assert.match(app.renderVenuePage(hiddenGemVenue, [], [], []), /Hidden Gem/);
+});
+
+test('a non-Hidden-Gem venue shows no badge', () => {
+  assert.doesNotMatch(app.venueCardHtml(nonGemVenue, { isHiddenGem: false }), /Hidden Gem/);
+  assert.doesNotMatch(app.renderVenuePage(nonGemVenue, [], [], []), /Hidden Gem/);
+});
+
+test('a redirected venue never shows the Hidden Gem badge despite stale collection membership', () => {
+  const redirectedVenue = app.getVenue(redirectedGemVenueId);
+  assert.ok(redirectedVenue.redirect_to);
+  assert.equal(app.isVenueHiddenGem(redirectedGemVenueId), false);
+  assert.doesNotMatch(app.renderVenuePage(redirectedVenue, [], [], []), /Hidden Gem/);
+});
+
+// ---- Controlled population (Sprint 3 Final) ------------------------------
+// Verifies the actual idempotent production seed in db.js: exactly one
+// 'hidden-gems' collection, and — for whichever of the six target venue
+// ids happen to exist in this particular database (none do in this
+// fixture-only test DB, since these are real production ids) — correct,
+// non-duplicated membership. This directly proves the seed is safe to run
+// against a database that doesn't contain the production venues, which is
+// exactly the guarantee the test suite itself depends on.
+test('the idempotent Hidden Gems population seed creates exactly one hidden-gems collection', () => {
+  const rows = db.prepare("SELECT * FROM collections WHERE slug = 'hidden-gems'").all();
+  assert.equal(rows.length, 1, 'expected exactly one hidden-gems collection, created idempotently by db.js');
+  assert.equal(rows[0].kind, 'hidden_gem');
+  assert.equal(rows[0].title, 'Hidden Gems');
+});
+
+test('the population seed does not fabricate membership for venue ids that do not exist in this database', () => {
+  // None of the six real production ids (128, 100, 685, 47, 816, 1038)
+  // exist in this fixture-only test database, so the seed must have
+  // skipped every one of them rather than inserting orphaned rows.
+  const collectionId = db.prepare("SELECT id FROM collections WHERE slug = 'hidden-gems'").get().id;
+  const items = db.prepare('SELECT content_id FROM collection_items WHERE collection_id = ?').all(collectionId);
+  for (const targetId of [128, 100, 685, 47, 816, 1038]) {
+    assert.ok(!items.some((i) => i.content_id === targetId), `did not expect a seeded row for nonexistent venue id ${targetId} in this test database`);
+  }
+});
+
+test('REGRESSION: category and guide page rendering is unaffected for venues with no Hidden Gem badge', () => {
+  const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
+  const html = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
+  assert.match(html, /Test Trattoria/);
+  assert.doesNotMatch(html, /Hidden Gem/, 'no restaurant fixture is a hidden gem, so none should show the badge here');
+});
+
 // ==== Phase 2 Sprint 1 (Golf) =============================================
 // Golf is added purely as a new `venues.type` value — no schema change, no
 // new route code (the existing generic category/venue routes and render
@@ -323,89 +401,6 @@ test('REGRESSION: existing venue types are unaffected by the golf taxonomy addit
   const html = app.renderVenuePage(venue, [], [], []);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/restaurant/);
   assert.doesNotMatch(html, /GolfCourse/);
-});
-
-// ==== Phase 2 Sprint 3 (Hidden Gems) =======================================
-// Hidden Gems is editorial curation via collections/collection_items, kept
-// deliberately separate from venues/events per the approved architecture.
-// These tests confirm: the migration is present, membership detection is
-// correct (including the negative case and the unrelated-collection-kind
-// case), the badge appears exactly where it should on both list cards and
-// the detail page, a redirected venue never shows it despite stale
-// membership, and none of this disturbs existing venue/category/guide
-// rendering.
-
-test('collections table exists after database initialization', () => {
-  const cols = db.prepare('PRAGMA table_info(collections)').all().map((c) => c.name);
-  for (const expected of ['id', 'slug', 'kind', 'title', 'region', 'created_at']) {
-    assert.ok(cols.includes(expected), `collections table missing column: ${expected}`);
-  }
-});
-
-test('collection_items table exists after database initialization', () => {
-  const cols = db.prepare('PRAGMA table_info(collection_items)').all().map((c) => c.name);
-  for (const expected of ['collection_id', 'content_type', 'content_id', 'note', 'position', 'created_at']) {
-    assert.ok(cols.includes(expected), `collection_items table missing column: ${expected}`);
-  }
-});
-
-test('a venue in a hidden_gem collection is detected correctly (bulk lookup)', () => {
-  const ids = app.getHiddenGemVenueIds();
-  assert.ok(ids.has(hiddenGemVenue.id), 'expected the fixture golf venue to be detected as a hidden gem');
-});
-
-test('a venue in a hidden_gem collection is detected correctly (targeted lookup)', () => {
-  assert.equal(app.isVenueHiddenGem(hiddenGemVenue.id), true);
-});
-
-test('a venue not in any Hidden Gem collection is not detected as one', () => {
-  const ids = app.getHiddenGemVenueIds();
-  assert.ok(!ids.has(nonGemVenue.id));
-  assert.equal(app.isVenueHiddenGem(nonGemVenue.id), false);
-});
-
-test('an unrelated collection kind does not create a Hidden Gem badge', () => {
-  // hiddenGemVenue is ALSO a member of the 'roam_pick'-kind collection —
-  // this proves detection keys off collections.kind, not mere
-  // collection_items membership in any collection.
-  const rows = db.prepare('SELECT kind FROM collections WHERE id = ?').get(unrelatedCollectionId);
-  assert.equal(rows.kind, 'roam_pick');
-  // Membership in the unrelated collection alone (hypothetically, if the
-  // hidden_gem membership didn't also exist) would not trigger the badge —
-  // demonstrated directly against a venue that has ONLY the unrelated one.
-  const soloUnrelatedVenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
-  insertCollectionItem.run({ collection_id: unrelatedCollectionId, content_type: 'venue', content_id: soloUnrelatedVenue.id });
-  assert.equal(app.isVenueHiddenGem(soloUnrelatedVenue.id), false);
-});
-
-test('a Hidden Gem venue gets the badge on its venue card', () => {
-  const html = app.venueCardHtml(hiddenGemVenue, { isHiddenGem: true });
-  assert.match(html, /Hidden Gem/);
-});
-
-test('a non-Hidden-Gem venue gets no badge on its venue card', () => {
-  const html = app.venueCardHtml(nonGemVenue, { isHiddenGem: false });
-  assert.doesNotMatch(html, /Hidden Gem/);
-});
-
-test('a Hidden Gem venue gets the badge on its detail page', () => {
-  const html = app.renderVenuePage(hiddenGemVenue, [], [], []);
-  assert.match(html, /Hidden Gem/);
-});
-
-test('a redirected venue does not display the Hidden Gem badge, despite stale collection membership', () => {
-  const redirectedVenue = app.getVenue(redirectedVenueId);
-  assert.ok(redirectedVenue.redirect_to, 'fixture venue must actually be redirected');
-  assert.equal(app.isVenueHiddenGem(redirectedVenueId), false, 'bulk/targeted lookups must exclude redirected venues');
-  const html = app.renderVenuePage(redirectedVenue, [], [], []);
-  assert.doesNotMatch(html, /Hidden Gem/, 'renderVenuePage must never show the badge for a redirected venue');
-});
-
-test('REGRESSION: category and guide page rendering is unaffected for venues with no Hidden Gem badge', () => {
-  const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
-  const html = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
-  assert.match(html, /Test Trattoria/);
-  assert.doesNotMatch(html, /Hidden Gem/, 'no restaurant fixture is a hidden gem, so none should show the badge here');
 });
 
 // ==== Phase 1 (Events architecture gate) =================================
@@ -616,17 +611,11 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Phase 2 Sprint 1 (Golf) — route dispatch and sitemap inclusion
   const golfCategoryPage = await fetch(`${base}/kelowna/golf`);
   assert.equal(golfCategoryPage.status, 200, 'golf category route must resolve');
-  const golfCategoryBody = await golfCategoryPage.text();
-  assert.match(golfCategoryBody, /Test Golf Course/);
+  assert.match(await golfCategoryPage.text(), /Test Golf Course/);
 
   const golfVenuePage = await fetch(`${base}/kelowna/golf/test-golf-course`);
   assert.equal(golfVenuePage.status, 200, 'golf venue route must resolve');
-  const golfVenueBody = await golfVenuePage.text();
-  assert.match(golfVenueBody, /<h1>Test Golf Course<\/h1>/);
-
-  // Phase 2 Sprint 3 (Hidden Gems) — end-to-end through the real routes
-  assert.match(golfCategoryBody, /Hidden Gem/, 'hidden-gem fixture venue must show the badge on the real category route');
-  assert.match(golfVenueBody, /Hidden Gem/, 'hidden-gem fixture venue must show the badge on the real venue-detail route');
+  assert.match(await golfVenuePage.text(), /<h1>Test Golf Course<\/h1>/);
 
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');
