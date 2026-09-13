@@ -233,4 +233,22 @@ CREATE INDEX IF NOT EXISTS idx_events_start ON events(start_datetime);
 CREATE INDEX IF NOT EXISTS idx_events_venue ON events(venue_id);
 `);
 
+// --- Phase 2 Sprint 2 (Event Types): nullable events.type (additive) ---
+// Same idempotent ALTER TABLE ADD COLUMN pattern already used above for
+// venues' incremental columns (address/website/image_url/slug/lat/lng).
+// No CHECK constraint — the small, closed taxonomy (sporting/festival/
+// concert) is enforced at the application layer only, exactly like
+// venues.type. No index: no query pattern anywhere in this codebase
+// currently filters or sorts by event type, so an index would be
+// speculative rather than justified by an actual read pattern.
+const existingEventCols = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+const newEventColumns = [
+  ['type', 'TEXT'],
+];
+for (const [col, colType] of newEventColumns) {
+  if (!existingEventCols.includes(col)) {
+    db.exec(`ALTER TABLE events ADD COLUMN ${col} ${colType}`);
+  }
+}
+
 module.exports = db;

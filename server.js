@@ -864,6 +864,7 @@ function rowToEvent(row) {
     venue_id: row.venue_id,
     website: row.website,
     image_url: row.image_url,
+    type: row.type,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -1535,6 +1536,18 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
 // `hostVenue` is the optional linked venues row (already fetched by the
 // route handler via the existing getVenue()), or null for a standalone
 // event with no venue_id.
+// Phase 2 Sprint 2 (Event Types): small, closed application-level taxonomy
+// mapping to real schema.org Event subtypes — same discipline as
+// SCHEMA_TYPE_MAP for venues. Any event with type = NULL, or any value not
+// in this map, falls back to plain 'Event' — the exact JSON-LD this project
+// already emitted before this sprint, so existing/untyped events are
+// completely unaffected.
+const EVENT_SCHEMA_TYPE_MAP = {
+  sporting: 'SportsEvent',
+  festival: 'Festival',
+  concert: 'MusicEvent',
+};
+
 function renderEventPage(event, hostVenue) {
   const regionLabel = REGION_LABELS[event.region];
   const canonical = `https://okanaganroam.com/${event.region}/events/${event.slug}`;
@@ -1554,7 +1567,7 @@ function renderEventPage(event, hostVenue) {
   // matching the existing venue JSON-LD's "never fabricate" convention.
   const eventSchema = {
     '@context': 'https://schema.org',
-    '@type': 'Event',
+    '@type': EVENT_SCHEMA_TYPE_MAP[event.type] || 'Event',
     name: event.name,
     description: event.description || undefined,
     startDate: event.start_datetime ? event.start_datetime.replace(' ', 'T') : undefined,
@@ -2707,4 +2720,6 @@ module.exports = {
   listEventsForSitemap,
   renderEventPage,
   pageHead,
+  // Phase 2 Sprint 2 (Event Types)
+  EVENT_SCHEMA_TYPE_MAP,
 };
