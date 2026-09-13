@@ -1184,37 +1184,132 @@ function renderGuideFooterHTML() {
 // redesign of these templates is separate, later work.
 const SEO_PAGE_CSS = `
   :root { color-scheme: light; }
-  body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 860px; margin: 0 auto; padding: 24px 20px 64px; color: var(--ink); background: var(--paper); line-height: 1.5; }
-  a { color: var(--teal); }
-  header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-  header.top a.brand { font-weight: 700; text-decoration: none; color: var(--ink); font-size: 1.1rem; }
-  nav.breadcrumb { font-size: 0.82rem; color: var(--ink); opacity: 0.68; margin-bottom: 20px; }
-  nav.breadcrumb a { color: var(--teal-deep); text-decoration: none; }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 900px; margin: 0 auto; padding: 28px 20px 72px;
+    color: var(--ink); background: var(--sand); line-height: 1.65;
+  }
+  a { color: var(--teal-deep); }
+  a:hover { color: var(--teal); }
+
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 16px; margin-bottom: 24px;
+    border-bottom: 1px solid rgba(74,52,40,0.14);
+  }
+  header.top a.brand {
+    font-family: 'Fraunces', serif; font-weight: 700; letter-spacing: -0.01em;
+    text-decoration: none; color: var(--ink); font-size: 1.2rem;
+  }
+  header.top a:not(.brand) {
+    font-size: 0.86rem; font-weight: 700; color: var(--teal-deep); text-decoration: none;
+  }
+  header.top a:not(.brand):hover { text-decoration: underline; }
+
+  nav.breadcrumb {
+    font-size: 0.8rem; color: var(--ink); opacity: 0.62;
+    margin-bottom: 22px; letter-spacing: 0.01em;
+  }
+  nav.breadcrumb a { color: var(--teal-deep); text-decoration: none; opacity: 1; }
   nav.breadcrumb a:hover { text-decoration: underline; }
-  h1 { font-family: 'Fraunces', serif; font-size: 1.6rem; margin-bottom: 4px; }
-  .subtitle { color: var(--ink); opacity: 0.68; margin-bottom: 24px; }
+
+  h1 {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem;
+    line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 6px;
+  }
+  .subtitle { color: var(--ink); opacity: 0.66; font-size: 1.02rem; margin: 0 0 26px; }
+
   .card-grid { padding: 0; margin: 0; }
-  .venue-card, .category-card { list-style: none; border: 1px solid var(--sand-deep); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
-  .venue-card h2, .category-card h2 { font-family: 'Fraunces', serif; font-size: 1.05rem; margin: 0 0 4px; }
+  .venue-card, .category-card {
+    list-style: none; background: var(--paper);
+    border: 1px solid rgba(74,52,40,0.10); border-radius: 14px;
+    padding: 18px 20px; margin-bottom: 14px;
+    box-shadow: 0 8px 20px -16px rgba(74,52,40,0.35);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .venue-card h2, .category-card h2 {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px;
+  }
   .venue-card h2 a, .category-card h2 a { color: var(--ink); text-decoration: none; }
-  .venue-card h2 a:hover, .category-card h2 a:hover { text-decoration: underline; }
-  .venue-meta { color: var(--ink); opacity: 0.68; font-size: 0.85rem; margin: 0 0 8px; }
-  .venue-card p, .category-card p { margin: 0 0 8px; font-size: 0.95rem; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { background: var(--sand-deep); color: var(--plum); font-size: 0.75rem; padding: 3px 9px; border-radius: 999px; }
-  .related-section { margin-top: 32px; }
-  .related-section h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin-bottom: 12px; }
-  .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-  .related-card { border: 1px solid var(--sand-deep); border-radius: 8px; padding: 10px 12px; }
-  .related-card a { font-weight: 600; text-decoration: none; color: var(--ink); }
-  .related-card .related-meta { font-size: 0.8rem; color: var(--ink); opacity: 0.68; }
-  .detail-row { display: flex; gap: 8px; margin: 4px 0; font-size: 0.95rem; }
-  .detail-row .label { color: var(--ink); opacity: 0.68; min-width: 90px; }
-  .cta { display: inline-block; margin-top: 28px; background: var(--plum); color: var(--paper); text-decoration: none; padding: 12px 22px; border-radius: 8px; font-weight: 600; }
-  .cta.secondary { background: var(--paper); color: var(--plum); border: 1px solid var(--plum); }
-  .hours-list { list-style: none; padding: 0; margin: 8px 0; font-size: 0.9rem; }
-  .hours-list li { display: flex; justify-content: space-between; max-width: 260px; padding: 2px 0; }
-  footer.site-footer { margin-top: 40px; font-size: 0.85rem; color: var(--ink); opacity: 0.68; }
+  .venue-card h2 a:hover, .category-card h2 a:hover { color: var(--plum); text-decoration: underline; }
+  .venue-meta { color: var(--ink); opacity: 0.62; font-size: 0.86rem; margin: 0 0 10px; }
+  .venue-card p, .category-card p { margin: 0 0 10px; font-size: 0.95rem; color: var(--ink); opacity: 0.85; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    background: var(--sand-deep); color: var(--plum); font-weight: 700;
+    font-size: 0.74rem; letter-spacing: 0.01em; padding: 4px 11px; border-radius: 999px;
+  }
+  /* Hidden Gem badge gets its own visual identity, distinct from ordinary
+     amenity chips — same underlying .chip base (per Sprint 3), extended
+     here with a warmer, gold-leaning treatment so it reads as editorial
+     curation rather than a factual attribute. */
+  .chip.hidden-gem-badge {
+    background: var(--amber); color: var(--plum-dark);
+    box-shadow: inset 0 0 0 1px rgba(74,52,40,0.12);
+  }
+
+  .related-section { margin-top: 40px; }
+  .related-section h2 {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.25rem; margin-bottom: 14px;
+  }
+  .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .related-card {
+    background: var(--paper); border: 1px solid rgba(74,52,40,0.10);
+    border-radius: 12px; padding: 12px 14px;
+    box-shadow: 0 6px 16px -14px rgba(74,52,40,0.35);
+  }
+  .related-card a { font-weight: 700; text-decoration: none; color: var(--ink); }
+  .related-card a:hover { color: var(--plum); }
+  .related-card .related-meta { font-size: 0.8rem; color: var(--ink); opacity: 0.62; }
+
+  .detail-row {
+    display: flex; gap: 10px; margin: 0; padding: 9px 0; font-size: 0.95rem;
+    border-bottom: 1px solid rgba(74,52,40,0.08);
+  }
+  .detail-row:last-of-type { border-bottom: none; }
+  .detail-row .label {
+    color: var(--ink); opacity: 0.58; min-width: 100px; font-weight: 700;
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px;
+  }
+
+  .cta {
+    display: inline-block; margin-top: 28px; margin-right: 10px;
+    background: var(--plum); color: var(--paper); text-decoration: none;
+    padding: 12px 24px; border-radius: 9px; font-weight: 700; font-size: 0.92rem;
+    transition: background 0.15s ease;
+  }
+  .cta:hover { background: var(--plum-dark); color: var(--paper); }
+  .cta.secondary {
+    background: var(--paper); color: var(--plum); border: 1.5px solid var(--plum);
+  }
+  .cta.secondary:hover { background: var(--sand-deep); color: var(--plum); }
+
+  .hours-list { list-style: none; padding: 0; margin: 6px 0 0; font-size: 0.92rem; }
+  .hours-list li {
+    display: flex; justify-content: space-between; max-width: 280px;
+    padding: 4px 0; border-bottom: 1px dotted rgba(74,52,40,0.14);
+  }
+  .hours-list li:last-child { border-bottom: none; }
+
+  footer.site-footer {
+    margin-top: 48px; padding-top: 20px;
+    border-top: 1px solid rgba(74,52,40,0.14);
+    font-size: 0.85rem; color: var(--ink); opacity: 0.62;
+  }
+  footer.site-footer a { color: var(--teal-deep); }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 16px 56px; }
+    h1 { font-size: 1.6rem; }
+    .subtitle { font-size: 0.95rem; margin-bottom: 20px; }
+    .venue-card, .category-card { padding: 14px 16px; }
+    .related-grid { grid-template-columns: 1fr; }
+    .detail-row .label { min-width: 84px; }
+    .cta { display: block; text-align: center; margin-right: 0; }
+    .cta + .cta { margin-top: 10px; }
+  }
 `;
 
 // Phase 1 (Events): `opts.noindex` is a new, optional, backward-compatible
@@ -1239,6 +1334,9 @@ ${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:t
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
 ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.stringify(block)}\n</script>`).join('\n')}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/tokens.css">
 <style>${SEO_PAGE_CSS}</style>`;
 }
