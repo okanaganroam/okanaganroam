@@ -297,4 +297,65 @@ CREATE TABLE IF NOT EXISTS collection_items (
 );
 `);
 
+// --- Phase 2 Sprint 3 Final: Hidden Gems controlled population -----------
+// Idempotent data seed, following the exact same "check first, then
+// insert only if missing" discipline already used for schema migrations
+// above — the difference here is seeding specific *rows*, not columns/
+// tables. Safe to run on every app startup:
+//   - The collection itself is looked up by its unique slug before any
+//     insert, so re-running this never creates a second 'hidden-gems'
+//     collection.
+//   - Each collection_item is looked up by (collection_id, content_type,
+//     content_id) before insert, so re-running never creates duplicate
+//     membership rows.
+//   - Each target venue_id is confirmed to actually exist AND not be
+//     redirected before its collection_item is inserted. This makes the
+//     block safe to run unconditionally against any database — including
+//     a test suite's freshly-created fixture database, where these
+//     specific production venue ids won't exist — without ever creating
+//     an orphaned or incorrect membership row there. It also means a
+//     venue that were to become redirected in the future simply stops
+//     being (re-)seeded here, though — per the approved scope — this
+//     block does not remove a membership row that already exists; the
+//     existing badge-rendering logic (isVenueHiddenGem/
+//     getHiddenGemVenueIds) already excludes redirected venues from
+//     display regardless.
+const HIDDEN_GEMS_COLLECTION_SLUG = 'hidden-gems';
+const HIDDEN_GEMS_MEMBERS = [
+  { position: 1, venue_id: 128, note: 'A small-batch gelato stop in Naramata with genuine Italian craft and unusually little visibility for the quality.' },
+  { position: 2, venue_id: 100, note: 'A tucked-away Kelowna brewery pairing craft beer with an entirely plant-based kitchen.' },
+  { position: 3, venue_id: 685, note: 'A historic Oliver building transformed into a proper gastropub whose food punches well above its modest profile.' },
+  { position: 4, venue_id: 47, note: "A family-run organic winery near Enderby offering distinctive blueberry and honey wines away from the Okanagan's main wine routes." },
+  { position: 5, venue_id: 816, note: 'A family-run Naramata winery with an unusual gravity-flow design and a reputation as an underrated stop.' },
+  { position: 6, venue_id: 1038, note: 'A small Lake Country patisserie led by a pastry chef with Michelin-starred experience and highly distinctive creations.' },
+];
+
+let hiddenGemsCollection = db
+  .prepare('SELECT id FROM collections WHERE slug = ?')
+  .get(HIDDEN_GEMS_COLLECTION_SLUG);
+
+if (!hiddenGemsCollection) {
+  const info = db
+    .prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(HIDDEN_GEMS_COLLECTION_SLUG, 'hidden_gem', 'Hidden Gems');
+  hiddenGemsCollection = { id: info.lastInsertRowid };
+}
+
+for (const member of HIDDEN_GEMS_MEMBERS) {
+  const venue = db
+    .prepare('SELECT id FROM venues WHERE id = ? AND redirect_to IS NULL')
+    .get(member.venue_id);
+  if (!venue) continue; // venue doesn't exist (or is redirected) in this database — skip, don't fabricate membership
+
+  const existingItem = db
+    .prepare("SELECT 1 FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
+    .get(hiddenGemsCollection.id, member.venue_id);
+  if (existingItem) continue; // already seeded — idempotent no-op
+
+  db.prepare(`
+    INSERT INTO collection_items (collection_id, content_type, content_id, note, position)
+    VALUES (?, 'venue', ?, ?, ?)
+  `).run(hiddenGemsCollection.id, member.venue_id, member.note, member.position);
+}
+
 module.exports = db;
