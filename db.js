@@ -251,4 +251,50 @@ for (const [col, colType] of newEventColumns) {
   }
 }
 
+// --- Phase 2 Sprint 3 (Hidden Gems): collections + collection_items ------
+// (additive only)
+//
+// Editorial curation deliberately lives in its own pair of tables, kept
+// structurally separate from `venues`/`events` — the same "facts vs.
+// editorial opinion" principle already applied throughout this project.
+// A Hidden Gem is not a fact about a venue (unlike its amenities), so it
+// does not become a 13th boolean column on `venues`; it becomes membership
+// in an editorial collection instead.
+//
+// `collections.kind` is a small, closed, application-enforced taxonomy —
+// only 'hidden_gem' is used this sprint, following the exact same
+// no-CHECK-constraint discipline already used for venues.type/events.type
+// (future kinds, e.g. a future Roam Picks collection, can reuse this same
+// table without a schema change).
+//
+// `collection_items.content_type` is likewise a small closed taxonomy —
+// only 'venue' is used this sprint (an `events`-referencing collection is
+// possible later without any schema change here).
+//
+// No index on either table: there is no existing query pattern in this
+// codebase that would benefit from one yet — both tables are expected to
+// stay small, and the one read this sprint actually needs (find all
+// hidden-gem venue ids) is a single full scan of a small table, not a
+// per-row lookup that would benefit from indexing today. Revisit only if
+// a real read pattern justifies it later, per the same discipline already
+// applied to events.type.
+db.exec(`
+CREATE TABLE IF NOT EXISTS collections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  region TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS collection_items (
+  collection_id INTEGER NOT NULL REFERENCES collections(id),
+  content_type TEXT NOT NULL,
+  content_id INTEGER NOT NULL,
+  note TEXT,
+  position INTEGER,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 module.exports = db;
