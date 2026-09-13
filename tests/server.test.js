@@ -56,6 +56,15 @@ insert.run({
   slug: 'test-winery',
 });
 
+// ---- seed fixture golf venue (Phase 2 Sprint 1 — Golf) ------------------
+insert.run({
+  name: 'Test Golf Course', region: 'kelowna', type: 'golf', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'A fixture golf course used only by the automated test suite.',
+  address: '456 Fairway Dr, Kelowna, BC V1Y 0B0', latitude: 49.89, longitude: -119.49, hours: null,
+  slug: 'test-golf-course',
+});
+
 // ---- seed fixture events (Phase 1 — Events architecture gate) ----------
 const testVenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
 
@@ -224,6 +233,61 @@ test('renderRegionPage lists category counts for the region', () => {
 test('render404Page returns a 404-flavored page for an unknown path', () => {
   const html = app.render404Page('/nonexistent/path');
   assert.match(html, /404|not found/i);
+});
+
+// ==== Phase 2 Sprint 1 (Golf) =============================================
+// Golf is added purely as a new `venues.type` value — no schema change, no
+// new route code (the existing generic category/venue routes and render
+// functions already key off CATEGORY_SLUGS/CATEGORY_LABELS/SCHEMA_TYPE_MAP).
+// These tests confirm the taxonomy addition actually reaches every
+// downstream consumer of those three constants.
+
+test('golf is present in CATEGORY_SLUGS with the expected slug', () => {
+  assert.equal(app.CATEGORY_SLUGS.golf, 'golf');
+});
+
+test('renderCategoryPage renders the golf category with the correct URL and label', () => {
+  const rows = app.getVenuesByRegionCategory('kelowna', 'golf');
+  assert.equal(rows.length, 1);
+  const html = app.renderCategoryPage('kelowna', 'golf', rows, []);
+  assert.match(html, /Golf Courses in Kelowna, BC/);
+  assert.match(html, /Test Golf Course/);
+});
+
+test('renderVenuePage renders a golf venue with the correct URL and GolfCourse JSON-LD', () => {
+  const venue = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  assert.ok(venue, 'expected to find the fixture golf venue');
+  const html = app.renderVenuePage(venue, [], [], []);
+  assert.match(html, /<h1>Test Golf Course<\/h1>/);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course"/);
+  assert.match(html, /"@type":"GolfCourse"/);
+});
+
+test('getRegionCategoryCounts includes golf once a golf venue exists in the region', () => {
+  const counts = app.getRegionCategoryCounts('kelowna');
+  assert.ok(counts.golf >= 1, 'expected golf to appear in the region category counts');
+});
+
+test('renderRegionPage lists the golf category card for a region with a golf venue', () => {
+  const counts = app.getRegionCategoryCounts('kelowna');
+  const html = app.renderRegionPage('kelowna', counts, []);
+  assert.match(html, /href="\/kelowna\/golf"/);
+  assert.match(html, /Golf Courses/);
+});
+
+test('venueCardHtml links correctly for a golf venue', () => {
+  const venue = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const html = app.venueCardHtml(venue);
+  assert.match(html, /href="\/kelowna\/golf\/test-golf-course"/);
+});
+
+test('REGRESSION: existing venue types are unaffected by the golf taxonomy addition', () => {
+  assert.equal(app.CATEGORY_SLUGS.restaurant, 'restaurants');
+  assert.equal(app.CATEGORY_SLUGS.winery, 'wineries');
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const html = app.renderVenuePage(venue, [], [], []);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/restaurant/);
+  assert.doesNotMatch(html, /GolfCourse/);
 });
 
 // ==== Phase 1 (Events architecture gate) =================================
@@ -430,6 +494,18 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
 
   // Existing venue sitemap entries must be unaffected by the Events addition.
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/restaurants\/test-trattoria<\/loc>/, 'existing venue sitemap entry must be unchanged');
+
+  // Phase 2 Sprint 1 (Golf) — route dispatch and sitemap inclusion
+  const golfCategoryPage = await fetch(`${base}/kelowna/golf`);
+  assert.equal(golfCategoryPage.status, 200, 'golf category route must resolve');
+  assert.match(await golfCategoryPage.text(), /Test Golf Course/);
+
+  const golfVenuePage = await fetch(`${base}/kelowna/golf/test-golf-course`);
+  assert.equal(golfVenuePage.status, 200, 'golf venue route must resolve');
+  assert.match(await golfVenuePage.text(), /<h1>Test Golf Course<\/h1>/);
+
+  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
+  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');
 
   const tokensCss = await fetch(`${base}/styles/tokens.css`);
   assert.equal(tokensCss.status, 200, 'shared tokens.css must be served');
