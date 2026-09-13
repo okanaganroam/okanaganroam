@@ -896,6 +896,53 @@ function listEventsForSitemap() {
   return rows.filter((e) => !isEventExpired(e));
 }
 
+// ---------- Phase 2 Sprint 3 (Hidden Gems) — minimal data access ----------
+// Deliberately narrow: exactly the two reads this sprint's badge-only scope
+// needs. No create/update/delete endpoints are added — out of scope, same
+// boundary already applied to Events in Phase 1.
+
+// One query, called ONCE per category/guide page render (never per card) —
+// returns every currently-active hidden-gem venue id as a Set, so
+// membership checks while building N cards are simple O(1) lookups rather
+// than N separate queries. Redirected venues are excluded here directly
+// (not left to callers to remember), so this Set can never contain a
+// retired venue's id even if collection membership was never explicitly
+// cleaned up for it.
+function getHiddenGemVenueIds() {
+  const rows = db.prepare(`
+    SELECT DISTINCT ci.content_id AS id
+    FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    JOIN venues v ON v.id = ci.content_id
+    WHERE c.kind = 'hidden_gem' AND ci.content_type = 'venue' AND v.redirect_to IS NULL
+  `).all();
+  return new Set(rows.map((r) => r.id));
+}
+
+// A single targeted lookup for the one-venue-at-a-time venue detail page —
+// explicitly acceptable per Sprint 3 scope, unlike the N+1 pattern the
+// bulk function above avoids for list pages. Still excludes redirected
+// venues directly, so a retired venue's page can never show the badge
+// regardless of any stale collection_items row.
+function isVenueHiddenGem(venueId) {
+  const row = db.prepare(`
+    SELECT 1
+    FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    JOIN venues v ON v.id = ci.content_id
+    WHERE c.kind = 'hidden_gem' AND ci.content_type = 'venue' AND ci.content_id = ? AND v.redirect_to IS NULL
+    LIMIT 1
+  `).get(venueId);
+  return !!row;
+}
+
+// Small, shared badge fragment — reuses the existing `.chip` styling
+// convention already used by badgeChipsHtml, so no new CSS class or
+// design-system addition is needed for this sprint's minimal scope.
+function hiddenGemBadgeHtml() {
+  return '<span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem</span>';
+}
+
 function getRelatedVenues(venue, limit = 6) {
   // Same region + same category, excluding itself
   return db
@@ -1050,7 +1097,8 @@ function renderGuidePage(region, badge, venues) {
         .join(', ')}</p>`
     : '';
 
-  const cards = venues.map((v) => venueCardHtml(v, { showType: true })).join('\n');
+  const hiddenGemIds = getHiddenGemVenueIds();
+  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -1247,7 +1295,7 @@ function badgeChipsHtml(venue) {
 // falling back to plain text; category pages always have both). Both
 // behaviors are preserved exactly via the options below.
 function venueCardHtml(venue, opts = {}) {
-  const { showType = false } = opts;
+  const { showType = false, isHiddenGem = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   const nameHtml = href
@@ -1259,12 +1307,17 @@ function venueCardHtml(venue, opts = {}) {
     venue.rating ? `${venue.rating}\u2605` : null,
   ].filter(Boolean).join(' &middot; ');
   const desc = venue.description ? `<p>${escapeHtml(venue.description)}</p>` : '';
+  // Defensive: never show the badge for a retired/redirected venue, even
+  // if a caller ever passed isHiddenGem=true for one by mistake — the
+  // bulk/targeted lookups already exclude these, but this keeps the
+  // guarantee local to the render function itself, not just its callers.
+  const showBadge = isHiddenGem && !venue.redirect_to;
   return `
       <li class="venue-card">
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>
         ${desc}
-        <p class="chips">${badgeChipsHtml(venue)}</p>
+        <p class="chips">${showBadge ? hiddenGemBadgeHtml() + ' ' : ''}${badgeChipsHtml(venue)}</p>
       </li>`;
 }
 
@@ -1359,7 +1412,8 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
     })),
   };
 
-  const cards = venues.map((v) => venueCardHtml(v)).join('\n');
+  const hiddenGemIds = getHiddenGemVenueIds();
+  const cards = venues.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
 
   const guideLinks = categoryGuidePages.length
     ? `<div class="related-section">
@@ -1437,6 +1491,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   };
 
   const attributeChips = badgeChipsHtml(venue);
+  const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
+  const hiddenGemChip = isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '';
 
   let hoursHtml = '';
   if (venue.hours) {
@@ -1517,7 +1573,7 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
   <h1>${escapeHtml(venue.name)}</h1>
   <p class="subtitle">${escapeHtml(label.singular)} in ${escapeHtml(regionLabel)}, BC</p>
   <p>${escapeHtml(venue.description || '')}</p>
-  <p class="chips">${attributeChips}</p>
+  <p class="chips">${hiddenGemChip}${attributeChips}</p>
   ${detailRows}
   ${hoursHtml}
   ${guideLinks}
@@ -2722,4 +2778,8 @@ module.exports = {
   pageHead,
   // Phase 2 Sprint 2 (Event Types)
   EVENT_SCHEMA_TYPE_MAP,
+  // Phase 2 Sprint 3 (Hidden Gems)
+  getHiddenGemVenueIds,
+  isVenueHiddenGem,
+  hiddenGemBadgeHtml,
 };

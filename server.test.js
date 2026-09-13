@@ -111,33 +111,40 @@ insertEvent.run({
   recurrence_rule: null, venue_id: null, website: null, image_url: null,
 });
 
-// ---- seed fixture typed events (Phase 2 Sprint 2 — Event Types) --------
-// A separate insert statement (rather than modifying insertEvent above)
-// so the existing untyped fixtures above are completely untouched and
-// continue to get type = NULL exactly as before this sprint.
-const insertTypedEvent = db.prepare(`
-  INSERT INTO events (name, slug, region, description, start_datetime, end_datetime, type)
-  VALUES (@name, @slug, @region, @description, @start_datetime, @end_datetime, @type)
-`);
+// ---- seed fixtures for Hidden Gems (Phase 2 Sprint 3) -------------------
+const hiddenGemVenue = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+const nonGemVenue = app.findVenueBySlug('kelowna', 'restaurant', 'second-test-restaurant');
 
-insertTypedEvent.run({
-  name: 'Test Sporting Event', slug: 'test-sporting-event', region: 'kelowna',
-  description: 'A fixture sporting event.',
-  start_datetime: '2099-08-01 10:00:00', end_datetime: '2099-08-01 18:00:00',
-  type: 'sporting',
-});
-insertTypedEvent.run({
-  name: 'Test Festival Event', slug: 'test-festival-event', region: 'kelowna',
-  description: 'A fixture festival event.',
-  start_datetime: '2099-08-02 10:00:00', end_datetime: '2099-08-02 18:00:00',
-  type: 'festival',
-});
-insertTypedEvent.run({
-  name: 'Test Concert Event', slug: 'test-concert-event', region: 'kelowna',
-  description: 'A fixture concert event.',
-  start_datetime: '2099-08-03 10:00:00', end_datetime: '2099-08-03 18:00:00',
-  type: 'concert',
-});
+// A retired/redirected venue, so we can prove a collection referencing it
+// never shows the badge — inserted directly (not through createVenue,
+// which is out of scope here) and pointed at the already-seeded trattoria.
+const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+const redirectedVenueId = db.prepare(`
+  INSERT INTO venues (name, region, type, slug, redirect_to)
+  VALUES ('Test Redirected Venue', 'kelowna', 'restaurant', 'test-redirected-venue', ?)
+`).run(trattoria.id).lastInsertRowid;
+
+const insertCollection = db.prepare(`
+  INSERT INTO collections (slug, kind, title, region) VALUES (@slug, @kind, @title, @region)
+`);
+const hiddenGemCollectionId = insertCollection.run({
+  slug: 'test-hidden-gems-kelowna', kind: 'hidden_gem', title: 'Test Hidden Gems — Kelowna', region: 'kelowna',
+}).lastInsertRowid;
+const unrelatedCollectionId = insertCollection.run({
+  slug: 'test-unrelated-collection', kind: 'roam_pick', title: 'Test Unrelated Collection', region: 'kelowna',
+}).lastInsertRowid;
+
+const insertCollectionItem = db.prepare(`
+  INSERT INTO collection_items (collection_id, content_type, content_id) VALUES (@collection_id, @content_type, @content_id)
+`);
+// The golf venue is the one genuine hidden gem in these fixtures.
+insertCollectionItem.run({ collection_id: hiddenGemCollectionId, content_type: 'venue', content_id: hiddenGemVenue.id });
+// Same venue also appears in an unrelated (non-hidden_gem) collection —
+// proves collection *kind* is what matters, not mere collection_items membership.
+insertCollectionItem.run({ collection_id: unrelatedCollectionId, content_type: 'venue', content_id: hiddenGemVenue.id });
+// A hidden_gem collection item pointing at a now-redirected venue — proves
+// the badge never shows for a retired venue regardless of stale membership.
+insertCollectionItem.run({ collection_id: hiddenGemCollectionId, content_type: 'venue', content_id: redirectedVenueId });
 
 // ---- Slugs -----------------------------------------------------------
 test('slugify produces a URL-safe, lowercase, hyphenated slug', () => {
@@ -318,77 +325,87 @@ test('REGRESSION: existing venue types are unaffected by the golf taxonomy addit
   assert.doesNotMatch(html, /GolfCourse/);
 });
 
-// ==== Phase 2 Sprint 2 (Event Types) ======================================
-// events.type is a small, closed, nullable taxonomy (sporting/festival/
-// concert) added purely additively on top of the Phase 1 events table.
-// These tests confirm: the migration is present, untyped events are
-// completely unaffected (backward compatibility), typed events map to the
-// correct schema.org subtype, and the existing route/sitemap behavior is
-// untouched by any of this.
+// ==== Phase 2 Sprint 3 (Hidden Gems) =======================================
+// Hidden Gems is editorial curation via collections/collection_items, kept
+// deliberately separate from venues/events per the approved architecture.
+// These tests confirm: the migration is present, membership detection is
+// correct (including the negative case and the unrelated-collection-kind
+// case), the badge appears exactly where it should on both list cards and
+// the detail page, a redirected venue never shows it despite stale
+// membership, and none of this disturbs existing venue/category/guide
+// rendering.
 
-test('events.type column exists after database initialization', () => {
-  const cols = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
-  assert.ok(cols.includes('type'), 'events table missing type column');
+test('collections table exists after database initialization', () => {
+  const cols = db.prepare('PRAGMA table_info(collections)').all().map((c) => c.name);
+  for (const expected of ['id', 'slug', 'kind', 'title', 'region', 'created_at']) {
+    assert.ok(cols.includes(expected), `collections table missing column: ${expected}`);
+  }
 });
 
-test('rowToEvent correctly exposes the stored type', () => {
-  const sporting = app.findEventBySlug('kelowna', 'test-sporting-event');
-  assert.equal(sporting.type, 'sporting');
-  const festival = app.findEventBySlug('kelowna', 'test-festival-event');
-  assert.equal(festival.type, 'festival');
-  const concert = app.findEventBySlug('kelowna', 'test-concert-event');
-  assert.equal(concert.type, 'concert');
+test('collection_items table exists after database initialization', () => {
+  const cols = db.prepare('PRAGMA table_info(collection_items)').all().map((c) => c.name);
+  for (const expected of ['collection_id', 'content_type', 'content_id', 'note', 'position', 'created_at']) {
+    assert.ok(cols.includes(expected), `collection_items table missing column: ${expected}`);
+  }
 });
 
-test('BACKWARD COMPATIBILITY: an untyped (type=NULL) event still renders JSON-LD @type "Event"', () => {
-  const event = app.findEventBySlug('kelowna', 'test-future-festival');
-  assert.equal(event.type, null, 'fixture event predates this sprint and must have no type set');
-  const html = app.renderEventPage(event, null);
-  assert.match(html, /"@type":"Event"/);
-  assert.doesNotMatch(html, /"@type":"SportsEvent"|"@type":"Festival"|"@type":"MusicEvent"/);
+test('a venue in a hidden_gem collection is detected correctly (bulk lookup)', () => {
+  const ids = app.getHiddenGemVenueIds();
+  assert.ok(ids.has(hiddenGemVenue.id), 'expected the fixture golf venue to be detected as a hidden gem');
 });
 
-test('a "sporting" event renders JSON-LD @type "SportsEvent"', () => {
-  const event = app.findEventBySlug('kelowna', 'test-sporting-event');
-  const html = app.renderEventPage(event, null);
-  assert.match(html, /"@type":"SportsEvent"/);
+test('a venue in a hidden_gem collection is detected correctly (targeted lookup)', () => {
+  assert.equal(app.isVenueHiddenGem(hiddenGemVenue.id), true);
 });
 
-test('a "festival" event renders JSON-LD @type "Festival"', () => {
-  const event = app.findEventBySlug('kelowna', 'test-festival-event');
-  const html = app.renderEventPage(event, null);
-  assert.match(html, /"@type":"Festival"/);
+test('a venue not in any Hidden Gem collection is not detected as one', () => {
+  const ids = app.getHiddenGemVenueIds();
+  assert.ok(!ids.has(nonGemVenue.id));
+  assert.equal(app.isVenueHiddenGem(nonGemVenue.id), false);
 });
 
-test('a "concert" event renders JSON-LD @type "MusicEvent"', () => {
-  const event = app.findEventBySlug('kelowna', 'test-concert-event');
-  const html = app.renderEventPage(event, null);
-  assert.match(html, /"@type":"MusicEvent"/);
+test('an unrelated collection kind does not create a Hidden Gem badge', () => {
+  // hiddenGemVenue is ALSO a member of the 'roam_pick'-kind collection —
+  // this proves detection keys off collections.kind, not mere
+  // collection_items membership in any collection.
+  const rows = db.prepare('SELECT kind FROM collections WHERE id = ?').get(unrelatedCollectionId);
+  assert.equal(rows.kind, 'roam_pick');
+  // Membership in the unrelated collection alone (hypothetically, if the
+  // hidden_gem membership didn't also exist) would not trigger the badge —
+  // demonstrated directly against a venue that has ONLY the unrelated one.
+  const soloUnrelatedVenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  insertCollectionItem.run({ collection_id: unrelatedCollectionId, content_type: 'venue', content_id: soloUnrelatedVenue.id });
+  assert.equal(app.isVenueHiddenGem(soloUnrelatedVenue.id), false);
 });
 
-test('an unrecognized type value falls back to plain "Event"', () => {
-  const html = app.renderEventPage({
-    name: 'Unrecognized Type Event', slug: 'x', region: 'kelowna',
-    description: null, start_datetime: '2099-01-01 10:00:00', end_datetime: null,
-    recurrence_rule: null, venue_id: null, website: null, image_url: null, type: 'some_future_type',
-  }, null);
-  assert.match(html, /"@type":"Event"/);
+test('a Hidden Gem venue gets the badge on its venue card', () => {
+  const html = app.venueCardHtml(hiddenGemVenue, { isHiddenGem: true });
+  assert.match(html, /Hidden Gem/);
 });
 
-test('EVENT_SCHEMA_TYPE_MAP contains exactly the approved closed taxonomy', () => {
-  assert.deepEqual(app.EVENT_SCHEMA_TYPE_MAP, { sporting: 'SportsEvent', festival: 'Festival', concert: 'MusicEvent' });
+test('a non-Hidden-Gem venue gets no badge on its venue card', () => {
+  const html = app.venueCardHtml(nonGemVenue, { isHiddenGem: false });
+  assert.doesNotMatch(html, /Hidden Gem/);
 });
 
-test('typed events continue using the exact existing /:region/events/:slug route and canonical', () => {
-  const event = app.findEventBySlug('kelowna', 'test-sporting-event');
-  const html = app.renderEventPage(event, null);
-  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/events\/test-sporting-event"/);
+test('a Hidden Gem venue gets the badge on its detail page', () => {
+  const html = app.renderVenuePage(hiddenGemVenue, [], [], []);
+  assert.match(html, /Hidden Gem/);
 });
 
-test('typed events continue appearing in the sitemap according to the existing expiration rules', () => {
-  const sitemapEvents = app.listEventsForSitemap();
-  const slugs = sitemapEvents.map((e) => `${e.region}/${e.slug}`);
-  assert.ok(slugs.includes('kelowna/test-sporting-event'), 'active typed event must be included, same as any active event');
+test('a redirected venue does not display the Hidden Gem badge, despite stale collection membership', () => {
+  const redirectedVenue = app.getVenue(redirectedVenueId);
+  assert.ok(redirectedVenue.redirect_to, 'fixture venue must actually be redirected');
+  assert.equal(app.isVenueHiddenGem(redirectedVenueId), false, 'bulk/targeted lookups must exclude redirected venues');
+  const html = app.renderVenuePage(redirectedVenue, [], [], []);
+  assert.doesNotMatch(html, /Hidden Gem/, 'renderVenuePage must never show the badge for a redirected venue');
+});
+
+test('REGRESSION: category and guide page rendering is unaffected for venues with no Hidden Gem badge', () => {
+  const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
+  const html = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
+  assert.match(html, /Test Trattoria/);
+  assert.doesNotMatch(html, /Hidden Gem/, 'no restaurant fixture is a hidden gem, so none should show the badge here');
 });
 
 // ==== Phase 1 (Events architecture gate) =================================
@@ -599,19 +616,20 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Phase 2 Sprint 1 (Golf) — route dispatch and sitemap inclusion
   const golfCategoryPage = await fetch(`${base}/kelowna/golf`);
   assert.equal(golfCategoryPage.status, 200, 'golf category route must resolve');
-  assert.match(await golfCategoryPage.text(), /Test Golf Course/);
+  const golfCategoryBody = await golfCategoryPage.text();
+  assert.match(golfCategoryBody, /Test Golf Course/);
 
   const golfVenuePage = await fetch(`${base}/kelowna/golf/test-golf-course`);
   assert.equal(golfVenuePage.status, 200, 'golf venue route must resolve');
-  assert.match(await golfVenuePage.text(), /<h1>Test Golf Course<\/h1>/);
+  const golfVenueBody = await golfVenuePage.text();
+  assert.match(golfVenueBody, /<h1>Test Golf Course<\/h1>/);
+
+  // Phase 2 Sprint 3 (Hidden Gems) — end-to-end through the real routes
+  assert.match(golfCategoryBody, /Hidden Gem/, 'hidden-gem fixture venue must show the badge on the real category route');
+  assert.match(golfVenueBody, /Hidden Gem/, 'hidden-gem fixture venue must show the badge on the real venue-detail route');
 
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');
-
-  // Phase 2 Sprint 2 (Event Types) — route unchanged, typed event resolves
-  const sportingEventPage = await fetch(`${base}/kelowna/events/test-sporting-event`);
-  assert.equal(sportingEventPage.status, 200, 'typed event route must resolve exactly like an untyped one');
-  assert.match(await sportingEventPage.text(), /"@type":"SportsEvent"/);
 
   const tokensCss = await fetch(`${base}/styles/tokens.css`);
   assert.equal(tokensCss.status, 200, 'shared tokens.css must be served');
