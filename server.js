@@ -693,6 +693,7 @@ const CATEGORY_SLUGS = {
   brewery: 'breweries',
   pub: 'pubs',
   cocktail: 'cocktail-lounges',
+  golf: 'golf',
 };
 const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([type, slug]) => [slug, type]));
 
@@ -704,11 +705,14 @@ const CATEGORY_LABELS = {
   brewery: { singular: 'Brewery', plural: 'Breweries' },
   pub: { singular: 'Pub', plural: 'Pubs' },
   cocktail: { singular: 'Cocktail Lounge', plural: 'Cocktail Lounges' },
+  golf: { singular: 'Golf Course', plural: 'Golf Courses' },
 };
 
 // DB `type` -> schema.org @type. Every one of these is a real, valid
-// schema.org type under LocalBusiness > FoodEstablishment — no generic
-// fallback needed for the 6 types this site currently has.
+// schema.org type — no generic fallback needed for any of the 7 types
+// this site currently has (Phase 2 Sprint 1 added `golf` -> GolfCourse,
+// itself a real LocalBusiness subtype, alongside the original 6
+// FoodEstablishment/BarOrPub types).
 const SCHEMA_TYPE_MAP = {
   restaurant: 'Restaurant',
   winery: 'Winery',
@@ -716,6 +720,7 @@ const SCHEMA_TYPE_MAP = {
   brewery: 'Brewery',
   pub: 'BarOrPub',
   cocktail: 'BarOrPub', // schema.org has no distinct "cocktail lounge" type; BarOrPub is the correct closest official type
+  golf: 'GolfCourse',
 };
 
 function slugify(name) {
@@ -1267,7 +1272,7 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
   const totalVenues = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
   const title = `${regionLabel} Restaurants, Wineries & More, BC | Okanagan Roam`;
-  const description = `${totalVenues} verified venues in ${regionLabel}, BC — browse restaurants, wineries, breweries, cafes, pubs, and cocktail lounges, all reviewed and badge-checked by Okanagan Roam.`;
+  const description = `${totalVenues} verified venues in ${regionLabel}, BC — restaurants, wineries, breweries, golf courses, and more, all reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}`;
 
   const breadcrumb = breadcrumbListSchema([
