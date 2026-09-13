@@ -184,4 +184,53 @@ CREATE TABLE IF NOT EXISTS venue_source_mapping (
 // external identity. Nothing about this table can conflate two locations
 // of the same chain, because venue_id is never shared between them.
 
+// --- Phase 1 (Events architecture gate): events table (additive only) ---
+// A deliberately separate table from `venues`, per the Phase 1 architecture
+// decision: events are time-bound (a start, optionally an end, optionally a
+// recurrence description) rather than permanent addressable places, and
+// forcing them into `venues` would mean either fake permanent rows for
+// one-time events or a pile of nullable event-only columns on every venue.
+//
+// No `type` column: Phase 1 is Events as a single, undifferentiated concept.
+// Sub-categorizing (sporting/festival/live-music/etc.) is explicitly out of
+// scope for this phase.
+//
+// venue_id is a real, enforced foreign key (this connection has
+// `PRAGMA foreign_keys` on by default, verified above for `redirect_to`) —
+// nullable, because a standalone event (e.g. a running race with no single
+// host venue) legitimately has no venue. Unlike `redirect_to`, NULL here is
+// the common/default case, not an edge case, so no CHECK constraint forcing
+// positivity is applied — any non-null value must still reference a real,
+// existing venues.id or the write is rejected by the foreign key itself.
+//
+// recurrence_rule is a free-text description (e.g. "weekly on Saturdays"),
+// not a structured RRULE and not an occurrence generator — per Phase 1
+// scope, one row represents one event *series*, and expanding a recurring
+// series into individual future occurrence rows/pages is explicitly
+// deferred to a later phase.
+//
+// Region-scoped (not global) slug uniqueness mirrors the venues table's
+// own region+type+slug reasoning, simplified to region+slug since events
+// have no category taxonomy of their own in this phase.
+db.exec(`
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  region TEXT NOT NULL,
+  description TEXT,
+  start_datetime TEXT NOT NULL,
+  end_datetime TEXT,
+  recurrence_rule TEXT,
+  venue_id INTEGER REFERENCES venues(id),
+  website TEXT,
+  image_url TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_region_slug ON events(region, slug);
+CREATE INDEX IF NOT EXISTS idx_events_start ON events(start_datetime);
+CREATE INDEX IF NOT EXISTS idx_events_venue ON events(venue_id);
+`);
+
 module.exports = db;

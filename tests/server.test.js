@@ -56,6 +56,52 @@ insert.run({
   slug: 'test-winery',
 });
 
+// ---- seed fixture events (Phase 1 — Events architecture gate) ----------
+const testVenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+
+const insertEvent = db.prepare(`
+  INSERT INTO events (name, slug, region, description, start_datetime, end_datetime,
+    recurrence_rule, venue_id, website, image_url)
+  VALUES (@name, @slug, @region, @description, @start_datetime, @end_datetime,
+    @recurrence_rule, @venue_id, @website, @image_url)
+`);
+
+// An event far in the future — "active" for the lifetime of this test run.
+insertEvent.run({
+  name: 'Test Future Festival', slug: 'test-future-festival', region: 'kelowna',
+  description: 'A fixture event used only by the automated test suite.',
+  start_datetime: '2099-06-01 10:00:00', end_datetime: '2099-06-01 18:00:00',
+  recurrence_rule: null, venue_id: testVenue.id, website: 'https://example.com/festival',
+  image_url: null,
+});
+
+// An event far in the past — always "expired".
+insertEvent.run({
+  name: 'Test Past Market', slug: 'test-past-market', region: 'kelowna',
+  description: 'A fixture expired event.',
+  start_datetime: '2000-01-01 10:00:00', end_datetime: '2000-01-01 14:00:00',
+  recurrence_rule: null, venue_id: null, website: null, image_url: null,
+});
+
+// A recurring series, represented as ONE row (per Phase 1 scope — no
+// occurrence expansion), with its end_datetime kept as a future date to
+// represent the next upcoming occurrence.
+insertEvent.run({
+  name: 'Test Weekly Market', slug: 'test-weekly-market', region: 'kelowna',
+  description: 'A fixture recurring event series.',
+  start_datetime: '2099-01-03 09:00:00', end_datetime: '2099-01-03 13:00:00',
+  recurrence_rule: 'weekly on Saturdays', venue_id: null, website: null, image_url: null,
+});
+
+// A standalone event in a different region, to confirm region-scoped slug
+// uniqueness doesn't collide with the 'kelowna' events above.
+insertEvent.run({
+  name: 'Test Vernon Event', slug: 'test-future-festival', region: 'vernon',
+  description: 'Same slug as the Kelowna festival, different region — must not collide.',
+  start_datetime: '2099-07-01 10:00:00', end_datetime: '2099-07-01 18:00:00',
+  recurrence_rule: null, venue_id: null, website: null, image_url: null,
+});
+
 // ---- Slugs -----------------------------------------------------------
 test('slugify produces a URL-safe, lowercase, hyphenated slug', () => {
   assert.equal(app.slugify("Domino's Pizza Oliver"), 'domino-s-pizza-oliver');
@@ -180,6 +226,148 @@ test('render404Page returns a 404-flavored page for an unknown path', () => {
   assert.match(html, /404|not found/i);
 });
 
+// ==== Phase 1 (Events architecture gate) =================================
+
+// ---- Schema / data access ----------------------------------------------
+test('events table exists with the expected columns', () => {
+  const cols = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+  for (const expected of [
+    'id', 'name', 'slug', 'region', 'description', 'start_datetime',
+    'end_datetime', 'recurrence_rule', 'venue_id', 'website', 'image_url',
+    'created_at', 'updated_at',
+  ]) {
+    assert.ok(cols.includes(expected), `events table missing column: ${expected}`);
+  }
+});
+
+test('venue_id foreign key is enforced against a nonexistent venue', () => {
+  const NONEXISTENT_VENUE_ID = 999999;
+  assert.throws(() => {
+    db.prepare(`
+      INSERT INTO events (name, slug, region, start_datetime, venue_id)
+      VALUES ('Bad FK Event', 'bad-fk-event', 'kelowna', '2099-01-01 10:00:00', ?)
+    `).run(NONEXISTENT_VENUE_ID);
+  }, 'expected the foreign key constraint to reject a nonexistent venue_id');
+});
+
+test('venue_id is nullable — a standalone event with no venue is valid', () => {
+  const event = app.findEventBySlug('kelowna', 'test-past-market');
+  assert.equal(event.venue_id, null);
+});
+
+test('an event can reference a real venue via venue_id', () => {
+  const event = app.findEventBySlug('kelowna', 'test-future-festival');
+  assert.equal(event.venue_id, testVenue.id);
+});
+
+test('(region, slug) uniqueness allows the same slug in different regions', () => {
+  const kelownaEvent = app.findEventBySlug('kelowna', 'test-future-festival');
+  const vernonEvent = app.findEventBySlug('vernon', 'test-future-festival');
+  assert.ok(kelownaEvent);
+  assert.ok(vernonEvent);
+  assert.notEqual(kelownaEvent.id, vernonEvent.id);
+});
+
+test('(region, slug) uniqueness is actually enforced by the database', () => {
+  assert.throws(() => {
+    db.prepare(`
+      INSERT INTO events (name, slug, region, start_datetime)
+      VALUES ('Duplicate', 'test-future-festival', 'kelowna', '2099-01-01 10:00:00')
+    `).run();
+  }, 'expected a duplicate (region, slug) pair to be rejected');
+});
+
+test('recurring events are represented as a single series row, not expanded occurrences', () => {
+  const rows = db.prepare("SELECT * FROM events WHERE slug = 'test-weekly-market'").all();
+  assert.equal(rows.length, 1, 'a recurring series must be exactly one row in Phase 1');
+  assert.equal(rows[0].recurrence_rule, 'weekly on Saturdays');
+});
+
+test('findEventBySlug returns null for a nonexistent event', () => {
+  assert.equal(app.findEventBySlug('kelowna', 'does-not-exist'), null);
+});
+
+test('isEventExpired correctly classifies past vs. future events', () => {
+  const future = app.findEventBySlug('kelowna', 'test-future-festival');
+  const past = app.findEventBySlug('kelowna', 'test-past-market');
+  assert.equal(app.isEventExpired(future), false);
+  assert.equal(app.isEventExpired(past), true);
+});
+
+// ---- Sitemap inclusion/exclusion ----------------------------------------
+test('listEventsForSitemap includes active events and excludes expired ones', () => {
+  const sitemapEvents = app.listEventsForSitemap();
+  const slugs = sitemapEvents.map((e) => `${e.region}/${e.slug}`);
+  assert.ok(slugs.includes('kelowna/test-future-festival'), 'active event must be included');
+  assert.ok(slugs.includes('kelowna/test-weekly-market'), 'active recurring event must be included');
+  assert.ok(!slugs.includes('kelowna/test-past-market'), 'expired event must be excluded');
+});
+
+// ---- Event page rendering + SEO (noindex) --------------------------------
+test('renderEventPage renders the event name as H1 and a correct canonical', () => {
+  const event = app.findEventBySlug('kelowna', 'test-future-festival');
+  const html = app.renderEventPage(event, testVenue);
+  assert.match(html, /<h1>Test Future Festival<\/h1>/);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/events\/test-future-festival"/);
+  assert.match(html, /"@type":"Event"/);
+});
+
+test('renderEventPage does NOT add noindex for an active event', () => {
+  const event = app.findEventBySlug('kelowna', 'test-future-festival');
+  const html = app.renderEventPage(event, testVenue);
+  assert.doesNotMatch(html, /name="robots" content="noindex"/);
+});
+
+test('renderEventPage DOES add noindex for an expired event, while still rendering fully', () => {
+  const event = app.findEventBySlug('kelowna', 'test-past-market');
+  const html = app.renderEventPage(event, null);
+  assert.match(html, /name="robots" content="noindex"/);
+  assert.match(html, /<h1>Test Past Market<\/h1>/, 'expired event page must still fully render, not be blanked');
+});
+
+test('renderEventPage shows the recurrence rule when present', () => {
+  const event = app.findEventBySlug('kelowna', 'test-weekly-market');
+  const html = app.renderEventPage(event, null);
+  assert.match(html, /weekly on Saturdays/);
+});
+
+test('renderEventPage links to the host venue when venue_id is set', () => {
+  const event = app.findEventBySlug('kelowna', 'test-future-festival');
+  const html = app.renderEventPage(event, testVenue);
+  assert.match(html, new RegExp(`href="/kelowna/${app.CATEGORY_SLUGS.restaurant}/test-trattoria"`));
+});
+
+// ---- pageHead() backward-compatibility + noindex regression -------------
+test('pageHead is backward-compatible: existing 4-argument call sites are unaffected', () => {
+  const html = app.pageHead('Title', 'Description', 'https://okanaganroam.com/kelowna', []);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna"/);
+  assert.doesNotMatch(html, /name="robots" content="noindex"/);
+});
+
+test('pageHead only adds noindex when explicitly requested via opts', () => {
+  const withNoindex = app.pageHead('Title', 'Description', 'https://okanaganroam.com/x', [], { noindex: true });
+  const withoutNoindex = app.pageHead('Title', 'Description', 'https://okanaganroam.com/x', [], { noindex: false });
+  assert.match(withNoindex, /name="robots" content="noindex"/);
+  assert.doesNotMatch(withoutNoindex, /name="robots" content="noindex"/);
+});
+
+test('REGRESSION: existing venue/category/region/guide pages retain unchanged canonical and no noindex', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const venueHtml = app.renderVenuePage(venue, [], [], []);
+  assert.match(venueHtml, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/restaurant/);
+  assert.doesNotMatch(venueHtml, /name="robots" content="noindex"/);
+
+  const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
+  const categoryHtml = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
+  assert.match(categoryHtml, /rel="canonical"/);
+  assert.doesNotMatch(categoryHtml, /name="robots" content="noindex"/);
+
+  const counts = app.getRegionCategoryCounts('kelowna');
+  const regionHtml = app.renderRegionPage('kelowna', counts, []);
+  assert.match(regionHtml, /rel="canonical"/);
+  assert.doesNotMatch(regionHtml, /name="robots" content="noindex"/);
+});
+
 // ---- Full HTTP integration test (real routing dispatch table) ---------
 // Exercises the actual regex-based route matching in server.js end to
 // end — distinct from the render-function-level tests above, which skip
@@ -209,11 +397,39 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.equal(robots.status, 200);
   assert.match(await robots.text(), /Sitemap:/);
 
+  // Phase 1 (Events architecture gate) — route dispatch
+  const activeEventPage = await fetch(`${base}/kelowna/events/test-future-festival`);
+  assert.equal(activeEventPage.status, 200, 'active event route must resolve');
+  const activeEventBody = await activeEventPage.text();
+  assert.match(activeEventBody, /<h1>Test Future Festival<\/h1>/);
+  assert.doesNotMatch(activeEventBody, /name="robots" content="noindex"/, 'active event must not be noindexed');
+
+  const expiredEventPage = await fetch(`${base}/kelowna/events/test-past-market`);
+  assert.equal(expiredEventPage.status, 200, 'expired event route must still resolve (200), not 404');
+  const expiredEventBody = await expiredEventPage.text();
+  assert.match(expiredEventBody, /<h1>Test Past Market<\/h1>/);
+  assert.match(expiredEventBody, /name="robots" content="noindex"/, 'expired event must be noindexed');
+
+  const nonexistentEventPage = await fetch(`${base}/kelowna/events/does-not-exist`);
+  assert.equal(nonexistentEventPage.status, 404, 'nonexistent event must 404');
+
+  // Confirm the events route does not accidentally shadow the pre-existing
+  // generic venue-page route (both share a /segment/segment/segment shape).
+  const stillWorksVenuePage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
+  assert.equal(stillWorksVenuePage.status, 200, 'existing venue route must be unaffected by the new events route');
+
   const sitemap = await fetch(`${base}/sitemap.xml`);
   assert.equal(sitemap.status, 200);
   const sitemapBody = await sitemap.text();
   assert.match(sitemapBody, /<urlset/);
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/<\/loc>/);
+
+  // Phase 1 (Events architecture gate) — sitemap inclusion/exclusion
+  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/events\/test-future-festival<\/loc>/, 'active event must appear in the sitemap');
+  assert.doesNotMatch(sitemapBody, /kelowna\/events\/test-past-market/, 'expired event must NOT appear in the sitemap');
+
+  // Existing venue sitemap entries must be unaffected by the Events addition.
+  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/restaurants\/test-trattoria<\/loc>/, 'existing venue sitemap entry must be unchanged');
 
   const tokensCss = await fetch(`${base}/styles/tokens.css`);
   assert.equal(tokensCss.status, 200, 'shared tokens.css must be served');

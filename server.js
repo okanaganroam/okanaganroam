@@ -840,6 +840,56 @@ function findVenueBySlug(region, type, slug) {
   return row ? rowToVenue(row) : null;
 }
 
+// ---------- Phase 1 (Events architecture gate) — minimal data access ----------
+// Deliberately narrow: exactly what Phase 1's route/render/sitemap code
+// below needs. No create/update/delete endpoints are added in this phase —
+// out of scope per the Phase 1 boundary (Events schema + read/render/sitemap
+// only).
+
+function rowToEvent(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    region: row.region,
+    description: row.description,
+    start_datetime: row.start_datetime,
+    end_datetime: row.end_datetime,
+    recurrence_rule: row.recurrence_rule,
+    venue_id: row.venue_id,
+    website: row.website,
+    image_url: row.image_url,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function findEventBySlug(region, slug) {
+  const row = db.prepare('SELECT * FROM events WHERE region = ? AND slug = ?').get(region, slug);
+  return row ? rowToEvent(row) : null;
+}
+
+// An event is "expired" once its published end (or, if it has none, its
+// start) is in the past. A recurring series' end_datetime is expected to
+// represent its next/current upcoming occurrence (per the Phase 1
+// architecture decision — this phase does not expand occurrences), so this
+// same check correctly keeps an active recurring series "not expired" for
+// as long as its stored end_datetime is kept current.
+function isEventExpired(event, now = new Date()) {
+  const reference = event.end_datetime || event.start_datetime;
+  const referenceDate = new Date(reference.replace(' ', 'T') + 'Z');
+  if (Number.isNaN(referenceDate.getTime())) return false; // malformed date — do not guess; treat as not expired rather than silently hiding it
+  return referenceDate.getTime() < now.getTime();
+}
+
+// Only non-expired events belong in the sitemap — the same reasoning the
+// existing sitemap already applies to retired venues via `redirect_to IS
+// NULL`: a sitemap should not advertise pages with no ongoing value.
+function listEventsForSitemap() {
+  const rows = db.prepare('SELECT * FROM events').all().map(rowToEvent);
+  return rows.filter((e) => !isEventExpired(e));
+}
+
 function getRelatedVenues(venue, limit = 6) {
   // Same region + same category, excluding itself
   return db
@@ -1113,13 +1163,20 @@ const SEO_PAGE_CSS = `
   footer.site-footer { margin-top: 40px; font-size: 0.85rem; color: var(--ink); opacity: 0.68; }
 `;
 
-function pageHead(title, description, canonical, jsonLdBlocks) {
+// Phase 1 (Events): `opts.noindex` is a new, optional, backward-compatible
+// parameter. Every pre-existing call site (region/category/venue/guide
+// pages) passes exactly 4 arguments, so `opts` defaults to `{}` and
+// `opts.noindex` is `undefined` (falsy) for all of them — their output is
+// byte-for-byte unchanged. Only a caller that explicitly passes
+// `{ noindex: true }` (expired events) gets the extra robots meta tag.
+function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
+  const { noindex = false } = opts;
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
 <link rel="canonical" href="${canonical}">
-<meta property="og:type" content="website">
+${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:image" content="https://okanaganroam.com/og-image.png">
@@ -1467,6 +1524,85 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
 </html>`;
 }
 
+// GET /:region/events/:slug — Phase 1 (Events architecture gate).
+// Built entirely on the Sprint 1 shared foundation (pageHead/siteHeader/
+// siteFooter/breadcrumbNavHtml) — no new presentation infrastructure.
+// `hostVenue` is the optional linked venues row (already fetched by the
+// route handler via the existing getVenue()), or null for a standalone
+// event with no venue_id.
+function renderEventPage(event, hostVenue) {
+  const regionLabel = REGION_LABELS[event.region];
+  const canonical = `https://okanaganroam.com/${event.region}/events/${event.slug}`;
+  const title = `${event.name} \u2014 Event in ${regionLabel}, BC | Okanagan Roam`;
+  const rawDesc = event.description || `${event.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`;
+  const description = rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc;
+  const expired = isEventExpired(event);
+
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: regionLabel, url: `https://okanaganroam.com/${event.region}` },
+    { name: event.name, url: canonical },
+  ]);
+
+  // schema.org Event — a distinct, correct type from the LocalBusiness
+  // subtypes used for venues; only conditionally-real fields are included,
+  // matching the existing venue JSON-LD's "never fabricate" convention.
+  const eventSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: event.name,
+    description: event.description || undefined,
+    startDate: event.start_datetime ? event.start_datetime.replace(' ', 'T') : undefined,
+    endDate: event.end_datetime ? event.end_datetime.replace(' ', 'T') : undefined,
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    eventStatus: 'https://schema.org/EventScheduled',
+    url: canonical,
+    location: hostVenue
+      ? { '@type': 'Place', name: hostVenue.name, address: hostVenue.address || undefined }
+      : { '@type': 'Place', name: regionLabel },
+  };
+
+  const dateRangeText = event.end_datetime && event.end_datetime !== event.start_datetime
+    ? `${event.start_datetime} \u2013 ${event.end_datetime}`
+    : event.start_datetime;
+
+  const detailRows = [
+    ['When', escapeHtml(dateRangeText)],
+    event.recurrence_rule ? ['Recurs', escapeHtml(event.recurrence_rule)] : null,
+    ['Region', `<a href="/${event.region}">${escapeHtml(regionLabel)}</a>`],
+    hostVenue ? ['Venue', `<a href="/${hostVenue.region}/${CATEGORY_SLUGS[hostVenue.type]}/${hostVenue.slug}">${escapeHtml(hostVenue.name)}</a>`] : null,
+    event.website ? ['Website', `<a href="${escapeHtml(event.website)}" rel="nofollow noopener" target="_blank">${escapeHtml(event.website)}</a>`] : null,
+  ].filter(Boolean)
+    .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
+    .join('\n');
+
+  const imageHtml = event.image_url
+    ? `<img src="${escapeHtml(event.image_url)}" alt="${escapeHtml(event.name)}" style="width:100%;max-height:340px;object-fit:cover;border-radius:10px;margin-bottom:20px;">`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, eventSchema], { noindex: expired })}
+</head>
+<body>
+  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: regionLabel, href: `/${event.region}` },
+    { name: event.name },
+  ])}
+  ${imageHtml}
+  <h1>${escapeHtml(event.name)}</h1>
+  <p class="subtitle">Event in ${escapeHtml(regionLabel)}, BC${expired ? ' \u2014 this event has ended' : ''}</p>
+  <p>${escapeHtml(event.description || '')}</p>
+  ${detailRows}
+  <a class="cta" href="/${event.region}">Explore all of ${escapeHtml(regionLabel)}</a>
+  ${siteFooter()}
+</body>
+</html>`;
+}
+
 function render404Page(pathname) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1786,6 +1922,15 @@ const server = http.createServer(async (req, res) => {
           ({ region, type, slug }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>`
         ),
+        // Phase 1 (Events architecture gate): only non-expired events —
+        // listEventsForSitemap() already applies the same "don't advertise
+        // dead pages" filtering the venue rows above get via redirect_to.
+        ...listEventsForSitemap()
+          .filter((e) => REGION_LABELS[e.region])
+          .map(
+            ({ region, slug }) =>
+              `  <url>\n    <loc>https://okanaganroam.com/${region}/events/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
+          ),
       ];
       const sitemap = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -2362,6 +2507,29 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 201, created);
     }
 
+    // GET /:region/events/:slug — Phase 1 (Events architecture gate).
+    // Registered BEFORE the generic /:region/:category/:slug venue-page
+    // pattern below, since that broader regex would otherwise also match
+    // an events URL and shadow this route entirely (both have the same
+    // /segment/segment/segment shape). Expired events still render (200),
+    // just with noindex applied inside renderEventPage/pageHead — they are
+    // never 404'd purely for having ended.
+    const eventPageMatch = pathname.match(/^\/([a-z-]+)\/events\/([a-z0-9-]+)\/?$/);
+    if (eventPageMatch && method === 'GET') {
+      const [, region, slug] = eventPageMatch;
+      if (REGION_LABELS[region]) {
+        const event = findEventBySlug(region, slug);
+        if (event) {
+          const hostVenue = event.venue_id ? getVenue(event.venue_id) : null;
+          const html = renderEventPage(event, hostVenue);
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // ---------- SEO architecture: region / category / venue pages ----------
     // Registered last, after every fixed route and every /api/* route above,
     // so these broad patterns can never shadow anything that already exists.
@@ -2527,4 +2695,11 @@ module.exports = {
   REGION_LABELS,
   MIN_GUIDE_VENUES,
   MIN_CATEGORY_VENUES,
+  // Phase 1 (Events architecture gate)
+  rowToEvent,
+  findEventBySlug,
+  isEventExpired,
+  listEventsForSitemap,
+  renderEventPage,
+  pageHead,
 };
