@@ -508,55 +508,6 @@
     text-stroke: 1px rgba(42,32,25,0.75);
   }
 
-  /* ---------- live search panel ---------- */
-  .live-search{
-    background: var(--sand-deep);
-    border-top: 1px solid rgba(42,32,25,0.14);
-    padding: 20px 0 26px;
-  }
-  .live-search-inner{
-    background: var(--paper);
-    border-radius: 16px;
-    padding: 18px 22px;
-    box-shadow: 0 10px 24px -16px var(--shadow);
-  }
-  .live-search-head{
-    display:flex; align-items:center; gap:10px; cursor:pointer;
-    font-weight:700; font-size:0.95rem;
-  }
-  .live-search-head .chev{ transition: transform .2s ease; margin-left:auto; font-size:0.8rem; color: var(--teal); }
-  .live-search-head.open .chev{ transform: rotate(180deg); }
-  .live-search-body{ display:none; margin-top:16px; }
-  .live-search-body.open{ display:block; }
-  .live-search-note{
-    font-size:0.85rem; color: rgba(42,32,25,0.68); line-height:1.6; margin-bottom:14px;
-    background: var(--sand); border-radius:10px; padding:10px 14px;
-  }
-  .live-search-note a{ color: var(--teal); font-weight:700; }
-  .live-search-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
-  .live-search-row input{
-    flex:1; min-width:160px; padding:11px 14px; border-radius:9px;
-    border:1.5px solid rgba(42,32,25,0.25); font-family:'Nunito',sans-serif; font-size:0.92rem;
-  }
-  .live-search-row button{
-    background: var(--teal); color: var(--paper); border:none; border-radius:9px;
-    padding: 0 22px; font-weight:700; font-size:0.92rem; cursor:pointer;
-  }
-  .live-search-row button:disabled{ opacity:0.5; cursor:not-allowed; }
-  .live-search-status{ font-size:0.85rem; color: rgba(42,32,25,0.68); margin: 6px 0 14px; min-height:1.2em; }
-  .live-results-grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:16px; }
-  .live-result-card{
-    background: var(--sand); border-radius:12px; padding:16px 18px;
-    border: 1px solid rgba(42,32,25,0.15);
-  }
-  .live-result-card h4{ font-family:'Fraunces',serif; font-size:1.02rem; margin:0 0 4px; }
-  .live-result-card .lr-meta{ font-size:0.8rem; color: rgba(42,32,25,0.68); margin-bottom:6px; }
-  .live-result-card .lr-addr{ font-size:0.82rem; color: rgba(42,32,25,0.7); }
-  .live-result-card .lr-warn{
-    font-size:0.74rem; color: var(--plum); margin-top:8px; font-weight:700;
-  }
-  @media (max-width: 700px){ .live-results-grid{ grid-template-columns:1fr; } }
-
   /* ---------- results ---------- */
   .results{ padding: 46px 0 100px; }
   .results-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:28px; flex-wrap:wrap; gap:10px; }
