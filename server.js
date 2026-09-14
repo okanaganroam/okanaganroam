@@ -708,6 +708,120 @@ const CATEGORY_LABELS = {
   golf: { singular: 'Golf Course', plural: 'Golf Courses' },
 };
 
+// Design Sprint 4: static editorial micro-copy, following the exact same
+// plain-constant pattern as CATEGORY_LABELS/REGION_LABELS above -- no new
+// schema, no new taxonomy, just short approved copy keyed by the existing
+// type/region keys. Deliberately does not cover every region: Kaleden,
+// Coldstream, Lumby, and Baldy were explicitly excluded during creative
+// review for lack of enough evidence to write a genuine (non-filler) line
+// -- looking one up simply returns undefined, handled gracefully wherever
+// it's used below.
+const CATEGORY_TAGLINES = {
+  restaurant: 'Sit-down meals worth planning your day around.',
+  cafe: 'Coffee, baking, and a good reason to slow down.',
+  winery: "Tasting rooms across the valley's growing wine country.",
+  brewery: "Local beer, made close to where you're standing.",
+  pub: 'Casual food and a drink, no reservation needed.',
+  golf: "Courses across the Okanagan's valleys and benches.",
+};
+
+const REGION_TAGLINES = {
+  kelowna: "The valley's largest hub, with the widest spread of everything.",
+  'west-kelowna': 'Across the bridge, with its own quieter wine and lake scene.',
+  peachland: "A small lakeside community on Okanagan Lake's west shore.",
+  'lake-country': 'North of Kelowna, where orchards meet a string of small lakes.',
+  naramata: 'A quiet bench road lined with small, walkable wineries.',
+  summerland: "A lakeside town with a slower pace than its bigger neighbours.",
+  penticton: 'Set between two lakes, with a compact, walkable downtown.',
+  'okanagan-falls': 'A small South Okanagan community along the wine route.',
+  oliver: "Self-described 'Wine Capital of Canada,' deep in vineyard country.",
+  osoyoos: "Canada's warmest lake, near the valley's southern desert landscape.",
+  vernon: "The North Okanagan's main hub, near three lakes.",
+  armstrong: 'A small North Okanagan farming community.',
+  enderby: "A small community at the Okanagan's northern edge.",
+  'big-white': 'A ski resort community above the Okanagan Valley.',
+  silverstar: 'A ski resort above Vernon, in the North Okanagan.',
+  apex: 'A small ski resort near Penticton.',
+};
+
+// One JS source of truth for the compact-band accent colors used by
+// Design Sprint 4's new compact visual band (Hidden Gems homepage cards,
+// related/nearby venue cards). Mirrors -- but does not modify -- the
+// color values Design Sprint 2 already hardcoded directly into
+// SEO_PAGE_CSS's .venue-hero-* gradient rules; kept as a single lookup
+// here so the two *new* compact-band stylesheets generated below (one for
+// SEO_PAGE_CSS's related/nearby cards, one for the homepage's injected
+// styles) both read from the same values instead of hardcoding them
+// twice, without touching Sprint 2's already-shipped venue-hero CSS at
+// all. 'golf' again has no prior SPA tag color to match, so it reuses the
+// same complementary green already chosen for it in Sprint 2.
+const TYPE_ACCENT_GRADIENTS = {
+  restaurant: ['#2A6B67', '#1E4F4C'],
+  winery: ['#8C4A5E', '#6B2C40'],
+  brewery: ['#E0A94E', '#B8802E'],
+  cafe: ['#C08A4E', '#8A631F'],
+  pub: ['#6B8B5E', '#4A6741'],
+  cocktail: ['#A25C93', '#7A3B6E'],
+  golf: ['#4E7A5E', '#345942'],
+};
+
+function compactBandCSSRules(className) {
+  return Object.keys(TYPE_ACCENT_GRADIENTS).map((type) => {
+    const [c1, c2] = TYPE_ACCENT_GRADIENTS[type];
+    return `.${className}-${type} { background: linear-gradient(135deg, ${c1}, ${c2}); }`;
+  }).join('\n  ');
+}
+
+// Shared HTML helper for Design Sprint 4's compact visual band --
+// deterministic, requires no image, reused identically by both the
+// homepage Hidden Gems cards and venue-page related/nearby cards so the
+// same category-color logic exists in exactly one place rather than being
+// reimplemented per call site.
+function compactVisualBandHtml(type, opts = {}) {
+  const sizeClass = opts.size === 'small' ? 'compact-band-sm' : '';
+  const label = CATEGORY_LABELS[type] ? CATEGORY_LABELS[type].singular : type;
+  return `<div class="compact-band compact-band-${type} ${sizeClass}"><span class="compact-band-label">${escapeHtml(label)}</span></div>`;
+}
+
+// Design Sprint 4: the Hidden Gems homepage card has a genuinely
+// different structure from the shared venueCardHtml() (compact band,
+// badge overlapping the band, a short blurb instead of the full
+// description) -- kept as its own function rather than adding several
+// new conditional branches to venueCardHtml(), so that function's
+// existing behavior on category/guide pages is completely unaffected.
+function hiddenGemHomepageCardHtml(venue) {
+  const catSlug = CATEGORY_SLUGS[venue.type];
+  const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : '#';
+  const regionLabel = REGION_LABELS[venue.region] || venue.region;
+  const meta = [regionLabel, venue.rating ? `${venue.rating}\u2605` : null].filter(Boolean).join(' &middot; ');
+  const blurb = HIDDEN_GEM_HOMEPAGE_BLURBS[venue.slug] || (venue.description || '').split('.').slice(0, 1).join('.') + '.';
+  return `<a class="hidden-gem-card" href="${href}">
+    ${compactVisualBandHtml(venue.type)}
+    <span class="chip hidden-gem-badge hidden-gem-card-badge">\u{1F48E} Hidden Gem</span>
+    <div class="hidden-gem-card-body">
+      <h3>${escapeHtml(venue.name)}</h3>
+      <div class="hidden-gem-card-meta">${meta}</div>
+      <p>${escapeHtml(blurb)}</p>
+    </div>
+  </a>`;
+}
+
+// Short homepage-card blurbs for the 6 editorially approved Hidden Gems,
+// keyed by their existing slugs (no new database field). Each is a
+// distinct, shorter rewrite of that venue's own existing longer
+// description already in the database -- no fact, claim, award, or
+// detail appears here that isn't already stated there. The full existing
+// descriptions remain completely unchanged and still render in full on
+// each venue's own detail page.
+const HIDDEN_GEM_HOMEPAGE_BLURBS = {
+  'chabendo-gelato': "Hand-made gelato on Naramata's Old Main Rd — try the lemon, the flavour reviewers keep comparing to Italy.",
+  'buffalo-rouge-brewing-co': 'A Kelowna brewpub built entirely around vegan and vegetarian food, with a dedicated gluten-free fryer and live music nights.',
+  'black-widow-winery': 'A family-run boutique winery on the Naramata Bench, known for gold-medal wines and a founder who leads tastings personally.',
+  'beat-patisserie': 'A Lake Country patisserie built around genuinely exceptional gluten-free baking — try the brownies, carrot cake, or pavlova.',
+  'baccata-ridge-winery': 'A one-family organic winery near Enderby making distinctive blueberry and honey wines, named for the yew trees on its land.',
+  'the-flealess-hound-pub': 'A historic Oliver pub renovated into a proper gastropub, with food reviewers say rivals a restaurant at twice the price.',
+};
+
 // DB `type` -> schema.org @type. Every one of these is a real, valid
 // schema.org type — no generic fallback needed for any of the 7 types
 // this site currently has (Phase 2 Sprint 1 added `golf` -> GolfCourse,
@@ -1210,7 +1324,7 @@ function renderHiddenGemsHomepageHTML() {
 
   if (rows.length === 0) return ''; // graceful empty state: omit the whole module
 
-  const cards = rows.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: true })).join('\n');
+  const cards = rows.map(hiddenGemHomepageCardHtml).join('\n');
 
   return `
 <section class="discover-section" id="hiddenGems">
@@ -1219,7 +1333,7 @@ function renderHiddenGemsHomepageHTML() {
       <span class="eyebrow">Editors' picks</span>
       <h2>Hidden Gems</h2>
     </div>
-    <ul class="card-grid discover-grid">${cards}</ul>
+    <div class="discover-grid hidden-gem-grid">${cards}</div>
   </div>
 </section>`;
 }
@@ -1250,7 +1364,10 @@ function renderExploreByCategoryHTML() {
     .map((type) => {
       const region = bestRegionForType[type];
       const label = CATEGORY_LABELS[type];
-      return `<a class="category-tile category-tile-${type}" href="/${region}/${CATEGORY_SLUGS[type]}">${escapeHtml(label.plural)}</a>`;
+      const tagline = CATEGORY_TAGLINES[type]
+        ? `<span class="tile-tagline">${escapeHtml(CATEGORY_TAGLINES[type])}</span>`
+        : '';
+      return `<a class="category-tile category-tile-${type}" href="/${region}/${CATEGORY_SLUGS[type]}"><span class="tile-label">${escapeHtml(label.plural)}</span>${tagline}</a>`;
     }).join('\n');
 
   if (!tiles) return '';
@@ -1277,7 +1394,12 @@ function renderExploreRegionsHTML() {
   const curated = ['kelowna', 'penticton', 'vernon', 'west-kelowna', 'oliver', 'osoyoos', 'summerland', 'naramata'];
   const tiles = curated
     .filter((region) => REGION_LABELS[region])
-    .map((region) => `<a class="region-tile" href="/${region}">${escapeHtml(REGION_LABELS[region])}</a>`)
+    .map((region) => {
+      const tagline = REGION_TAGLINES[region]
+        ? `<span class="tile-tagline">${escapeHtml(REGION_TAGLINES[region])}</span>`
+        : '';
+      return `<a class="region-tile" href="/${region}"><span class="tile-label">${escapeHtml(REGION_LABELS[region])}</span>${tagline}</a>`;
+    })
     .join('\n');
 
   if (!tiles) return '';
@@ -1327,27 +1449,45 @@ function renderHomepageDiscoveryStyles() {
   .discover-card-body h3 { font-family:'Fraunces',serif; font-size:1.02rem; margin:0 0 6px; line-height:1.25; }
 
   .discover-grid.card-grid { flex-wrap: nowrap; }
-  .discover-grid .venue-card { flex: 0 0 240px; margin-bottom:0; padding: 18px 20px; }
-  /* venueCardHtml() (shared with the server-rendered SEO pages) produces a
-     different inner DOM shape than the SPA's own hand-authored cards
-     (h2/.venue-meta/.chips here, vs h3/.venue-top/.venue-region there) —
-     the outer .venue-card box styling already matches since app.css
-     defines that class too, but these scoped rules give the reused
-     markup's actual inner elements proper homepage typography without
-     touching app.css or duplicating card markup. */
-  .discover-grid .venue-card h2 { font-family:'Fraunces',serif; font-size:1.15rem; margin:0 0 6px; line-height:1.25; }
-  .discover-grid .venue-card h2 a { color: var(--ink); text-decoration:none; }
-  .discover-grid .venue-card h2 a:hover { color: var(--plum); }
-  .discover-grid .venue-card .venue-meta { font-size:0.85rem; color: rgba(42,32,25,0.68); margin:0 0 10px; }
-  .discover-grid .venue-card .chips { display:flex; flex-wrap:wrap; gap:6px; }
-  .discover-grid .venue-card .chip { background: var(--sand-deep); color: var(--plum); font-weight:700; font-size:0.72rem; padding:3px 9px; border-radius:999px; }
-  .discover-grid .venue-card .chip.hidden-gem-badge { background: var(--amber); color: var(--plum-dark); }
+
+  /* Design Sprint 4: Hidden Gems homepage card. Replaces the previous
+     reuse of venueCardHtml() here (that markup's h2/.venue-meta/.chips
+     shape is still used correctly on category/guide pages elsewhere —
+     only the *homepage* Hidden Gems presentation changes in this sprint).
+     The compact band + gradient rules are generated once via
+     compactBandCSSRules(), shared with SEO_PAGE_CSS's related/nearby
+     cards rather than hardcoded twice. */
+  .hidden-gem-grid { flex-wrap: nowrap; }
+  .hidden-gem-card {
+    position: relative; flex: 0 0 250px; display: block; text-decoration: none; color: var(--ink);
+    background: var(--paper); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
+    border: 1px solid rgba(74,52,40,0.08);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .hidden-gem-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
+  .hidden-gem-card .compact-band { margin: 0; border-radius: 14px 14px 0 0; }
+  ${compactBandCSSRules('compact-band')}
+  .hidden-gem-card-badge {
+    position: absolute; top: 78px; left: 14px; transform: translateY(-50%);
+    background: var(--amber); color: var(--plum-dark); box-shadow: 0 2px 6px rgba(74,52,40,0.25);
+  }
+  .hidden-gem-card-body { padding: 20px 18px 16px; }
+  .hidden-gem-card-body h3 { font-family:'Fraunces',serif; font-size:1.1rem; margin:0 0 4px; line-height:1.25; }
+  .hidden-gem-card-meta { font-size:0.82rem; color: rgba(42,32,25,0.68); margin-bottom:8px; }
+  .hidden-gem-card-body p { font-size:0.88rem; line-height:1.5; margin:0; color: rgba(42,32,25,0.85); }
+
+  .tile-label { display:block; }
+  .tile-tagline {
+    display:block; font-family:'Nunito',sans-serif; font-weight:500; font-size:0.76rem;
+    color: rgba(42,32,25,0.62); margin-top:4px; line-height:1.35;
+  }
 
   .category-tile-grid, .region-tile-grid {
     display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:12px;
   }
   .category-tile, .region-tile {
-    display:flex; align-items:center; justify-content:center; text-align:center;
+    display:flex; flex-direction: column; align-items:center; justify-content:center; text-align:center;
     background: var(--paper); border: 1.5px solid rgba(74,52,40,0.12); border-radius:12px;
     padding:18px 14px; font-weight:700; color: var(--ink); text-decoration:none;
     font-family:'Fraunces',serif; font-size:1.02rem;
@@ -1358,7 +1498,9 @@ function renderHomepageDiscoveryStyles() {
 
   @media (max-width: 640px) {
     .discover-card { flex-basis: 200px; }
+    .hidden-gem-card { flex-basis: 210px; }
     .category-tile-grid, .region-tile-grid { grid-template-columns: repeat(2, 1fr); }
+    .tile-tagline { font-size: 0.72rem; }
   }
 </style>`;
 }
@@ -1581,6 +1723,21 @@ const SEO_PAGE_CSS = `
   .related-card-cocktail { border-top-color: #7A3B6E; }
   .related-card-golf { border-top-color: #345942; }
 
+  /* Design Sprint 4: compact visual band, shared with the homepage Hidden
+     Gems cards via the same compactVisualBandHtml() helper and the same
+     TYPE_ACCENT_GRADIENTS color source — generated here rather than
+     hardcoded a second time. */
+  .compact-band {
+    height: 78px; border-radius: 10px 10px 0 0; margin: -1px -1px 10px -1px;
+    display: flex; align-items: flex-end; padding: 8px 12px; box-sizing: border-box;
+  }
+  .compact-band-sm { height: 56px; }
+  .compact-band-label {
+    color: var(--paper); font-size: 0.68rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.92;
+  }
+  ${compactBandCSSRules('compact-band')}
+
   @media (max-width: 640px) {
     body { padding: 20px 16px 56px; }
     h1 { font-size: 1.6rem; }
@@ -1596,6 +1753,7 @@ const SEO_PAGE_CSS = `
     .venue-at-a-glance { font-size: 0.9rem; }
     .venue-cta-row { flex-direction: column; }
     .venue-cta-row .cta { width: 100%; }
+    .compact-band-sm { height: 48px; }
   }
 `;
 
@@ -1952,11 +2110,19 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}">Call</a>` : null,
   ].filter(Boolean).join('\n  ');
 
+  // One bulk lookup for all related+nearby cards together (reusing the
+  // existing getHiddenGemVenueIds(), not a new query) -- O(1) Set lookups
+  // per card below, not a per-card query, so this stays N+1-safe no
+  // matter how many related/nearby venues render.
+  const relatedNearbyHiddenGemIds = (relatedVenues.length || nearbyVenues.length) ? getHiddenGemVenueIds() : new Set();
+
   function relatedCard(v) {
     const meta = [v.cuisine, v.rating ? `${v.rating}\u2605` : null].filter(Boolean).join(' \u00b7 ');
+    const badge = (relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '';
     return `<div class="related-card related-card-${v.type}">
+      ${compactVisualBandHtml(v.type, { size: 'small' })}
       <a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>
-      <div class="related-meta">${escapeHtml(meta)}</div>
+      <div class="related-meta">${meta ? escapeHtml(meta) + ' ' : ''}${badge}</div>
     </div>`;
   }
 
@@ -3244,4 +3410,10 @@ module.exports = {
   renderHiddenGemsHomepageHTML,
   renderExploreByCategoryHTML,
   renderExploreRegionsHTML,
+  // Design Sprint 4 (Visual & Editorial Polish)
+  CATEGORY_TAGLINES,
+  REGION_TAGLINES,
+  HIDDEN_GEM_HOMEPAGE_BLURBS,
+  compactVisualBandHtml,
+  hiddenGemHomepageCardHtml,
 };
