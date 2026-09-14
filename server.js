@@ -1143,6 +1143,226 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 </html>`;
 }
 
+// ---------- Design Sprint 3: homepage discovery modules ----------
+// All four follow the exact same server-side injection pattern already
+// established by renderGuideFooterHTML/renderOpenNowScript/
+// renderHiddenElementsScript below: small, self-contained HTML strings
+// computed once per homepage request and spliced into the served
+// okanagan.html. No new API endpoints, no new client-side fetches.
+
+function renderHappeningSoonHTML() {
+  // One query, filtered AND limited entirely in SQL — mirrors
+  // isEventExpired()'s exact semantics (reference = end_datetime if set,
+  // else start_datetime; expired when reference < now) rather than
+  // fetching every event and filtering/slicing in JS.
+  const rows = db.prepare(`
+    SELECT * FROM events
+    WHERE (end_datetime IS NOT NULL AND end_datetime >= datetime('now'))
+       OR (end_datetime IS NULL AND start_datetime >= datetime('now'))
+    ORDER BY start_datetime ASC
+    LIMIT 6
+  `).all().map(rowToEvent);
+
+  if (rows.length === 0) return ''; // graceful empty state: omit the whole module
+
+  const cards = rows.map((e) => {
+    const regionLabel = REGION_LABELS[e.region] || e.region;
+    const href = `/${e.region}/events/${e.slug}`;
+    const dateLabel = escapeHtml(e.start_datetime.slice(0, 10));
+    const typeLabel = e.type ? `<span class="chip">${escapeHtml(e.type)}</span>` : '';
+    const imageHtml = e.image_url
+      ? `<div class="discover-card-media"><img src="${escapeHtml(e.image_url)}" alt="${escapeHtml(e.name)}" loading="lazy"></div>`
+      : '';
+    return `<a class="discover-card" href="${href}">
+      ${imageHtml}
+      <div class="discover-card-body">
+        <div class="discover-card-date">${dateLabel} &middot; ${escapeHtml(regionLabel)}</div>
+        <h3>${escapeHtml(e.name)}</h3>
+        ${typeLabel}
+      </div>
+    </a>`;
+  }).join('\n');
+
+  return `
+<section class="discover-section" id="happeningSoon">
+  <div class="wrap">
+    <div class="discover-heading">
+      <span class="eyebrow">Happening soon</span>
+      <h2>What's on in the Okanagan</h2>
+    </div>
+    <div class="discover-strip">${cards}</div>
+  </div>
+</section>`;
+}
+
+function renderHiddenGemsHomepageHTML() {
+  // One bulk query — every result is already known to be a hidden gem by
+  // construction (the JOIN itself is the membership check), so no
+  // per-item isVenueHiddenGem() lookup is needed here at all.
+  const rows = db.prepare(`
+    SELECT v.* FROM venues v
+    JOIN collection_items ci ON ci.content_id = v.id AND ci.content_type = 'venue'
+    JOIN collections c ON c.id = ci.collection_id AND c.kind = 'hidden_gem'
+    WHERE v.redirect_to IS NULL
+    ORDER BY v.rating DESC
+    LIMIT 6
+  `).all().map(rowToVenue);
+
+  if (rows.length === 0) return ''; // graceful empty state: omit the whole module
+
+  const cards = rows.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: true })).join('\n');
+
+  return `
+<section class="discover-section" id="hiddenGems">
+  <div class="wrap">
+    <div class="discover-heading">
+      <span class="eyebrow">Editors' picks</span>
+      <h2>Hidden Gems</h2>
+    </div>
+    <ul class="card-grid discover-grid">${cards}</ul>
+  </div>
+</section>`;
+}
+
+function renderExploreByCategoryHTML() {
+  // One lightweight aggregate query — deliberately not per-category (which
+  // would be N+1). Also serves a real correctness need: it tells us which
+  // categories genuinely have at least one venue *and* which region is the
+  // best real landing page for each, so a category with zero venues today
+  // (e.g. Golf, currently) is skipped entirely rather than linking to a
+  // category page that would 404.
+  const rows = db.prepare(`
+    SELECT type, region, COUNT(*) AS n
+    FROM venues
+    WHERE redirect_to IS NULL
+    GROUP BY type, region
+    ORDER BY n DESC
+  `).all();
+
+  const bestRegionForType = {};
+  for (const row of rows) {
+    if (!bestRegionForType[row.type]) bestRegionForType[row.type] = row.region;
+  }
+
+  const preferredOrder = ['restaurant', 'cafe', 'winery', 'brewery', 'pub', 'golf', 'cocktail'];
+  const tiles = preferredOrder
+    .filter((type) => bestRegionForType[type] && CATEGORY_SLUGS[type] && CATEGORY_LABELS[type])
+    .map((type) => {
+      const region = bestRegionForType[type];
+      const label = CATEGORY_LABELS[type];
+      return `<a class="category-tile category-tile-${type}" href="/${region}/${CATEGORY_SLUGS[type]}">${escapeHtml(label.plural)}</a>`;
+    }).join('\n');
+
+  if (!tiles) return '';
+
+  return `
+<section class="discover-section" id="exploreByCategory">
+  <div class="wrap">
+    <div class="discover-heading">
+      <span class="eyebrow">Explore</span>
+      <h2>Browse by category</h2>
+    </div>
+    <div class="category-tile-grid">${tiles}</div>
+  </div>
+</section>`;
+}
+
+function renderExploreRegionsHTML() {
+  // Zero database queries — a curated subset of the existing, authoritative
+  // REGION_LABELS taxonomy (no new destination schema, nothing invented).
+  // Curated by real relative size (largest, most-visited regions), not
+  // arbitrarily. "See all regions" links back to the existing wizard's own
+  // region picker via its existing #directory anchor rather than a new
+  // route, since no standalone all-regions index page exists today.
+  const curated = ['kelowna', 'penticton', 'vernon', 'west-kelowna', 'oliver', 'osoyoos', 'summerland', 'naramata'];
+  const tiles = curated
+    .filter((region) => REGION_LABELS[region])
+    .map((region) => `<a class="region-tile" href="/${region}">${escapeHtml(REGION_LABELS[region])}</a>`)
+    .join('\n');
+
+  if (!tiles) return '';
+
+  return `
+<section class="discover-section" id="exploreRegions">
+  <div class="wrap">
+    <div class="discover-heading">
+      <span class="eyebrow">Destinations</span>
+      <h2>Explore the Okanagan</h2>
+    </div>
+    <div class="region-tile-grid">${tiles}</div>
+    <a class="cta secondary discover-see-all" href="#directory">See all regions</a>
+  </div>
+</section>`;
+}
+
+// Shared CSS for the four modules above — reuses the existing shared
+// design tokens (/styles/tokens.css, already loaded by okanagan.html)
+// rather than inventing a new palette. Injected once via a single <style>
+// block alongside the HTML, not added to the SPA's own app.css file.
+function renderHomepageDiscoveryStyles() {
+  return `
+<style>
+  .discover-section { padding: 12px 0 36px; }
+  .discover-heading { margin-bottom: 18px; }
+  .discover-heading .eyebrow {
+    display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:0.82rem;
+    letter-spacing:0.09em; text-transform:uppercase; color: var(--teal); margin-bottom:8px;
+  }
+  .discover-heading .eyebrow::before { content:""; width:20px; height:2px; background: var(--teal); display:inline-block; }
+  .discover-heading h2 { font-family:'Fraunces',serif; font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin:0; }
+
+  .discover-strip, .discover-grid {
+    display:flex; gap:16px; overflow-x:auto; padding-bottom:8px; list-style:none; margin:0;
+  }
+  .discover-card {
+    flex: 0 0 240px; background: var(--paper); border-radius:14px; overflow:hidden;
+    box-shadow: 0 10px 22px -16px var(--shadow, rgba(74,52,40,0.35));
+    text-decoration:none; color: var(--ink); border: 1px solid rgba(74,52,40,0.08);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .discover-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
+  .discover-card-media img { width:100%; height:120px; object-fit:cover; display:block; }
+  .discover-card-body { padding:14px 16px; }
+  .discover-card-date { font-size:0.78rem; font-weight:700; color: var(--teal-deep); margin-bottom:4px; }
+  .discover-card-body h3 { font-family:'Fraunces',serif; font-size:1.02rem; margin:0 0 6px; line-height:1.25; }
+
+  .discover-grid.card-grid { flex-wrap: nowrap; }
+  .discover-grid .venue-card { flex: 0 0 240px; margin-bottom:0; padding: 18px 20px; }
+  /* venueCardHtml() (shared with the server-rendered SEO pages) produces a
+     different inner DOM shape than the SPA's own hand-authored cards
+     (h2/.venue-meta/.chips here, vs h3/.venue-top/.venue-region there) —
+     the outer .venue-card box styling already matches since app.css
+     defines that class too, but these scoped rules give the reused
+     markup's actual inner elements proper homepage typography without
+     touching app.css or duplicating card markup. */
+  .discover-grid .venue-card h2 { font-family:'Fraunces',serif; font-size:1.15rem; margin:0 0 6px; line-height:1.25; }
+  .discover-grid .venue-card h2 a { color: var(--ink); text-decoration:none; }
+  .discover-grid .venue-card h2 a:hover { color: var(--plum); }
+  .discover-grid .venue-card .venue-meta { font-size:0.85rem; color: rgba(42,32,25,0.68); margin:0 0 10px; }
+  .discover-grid .venue-card .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .discover-grid .venue-card .chip { background: var(--sand-deep); color: var(--plum); font-weight:700; font-size:0.72rem; padding:3px 9px; border-radius:999px; }
+  .discover-grid .venue-card .chip.hidden-gem-badge { background: var(--amber); color: var(--plum-dark); }
+
+  .category-tile-grid, .region-tile-grid {
+    display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:12px;
+  }
+  .category-tile, .region-tile {
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    background: var(--paper); border: 1.5px solid rgba(74,52,40,0.12); border-radius:12px;
+    padding:18px 14px; font-weight:700; color: var(--ink); text-decoration:none;
+    font-family:'Fraunces',serif; font-size:1.02rem;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .category-tile:hover, .region-tile:hover { border-color: var(--plum); transform: translateY(-2px); }
+  .discover-see-all { margin-top:16px; }
+
+  @media (max-width: 640px) {
+    .discover-card { flex-basis: 200px; }
+    .category-tile-grid, .region-tile-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>`;
+}
+
 function renderGuideFooterHTML() {
   const combos = listGuideCombos(MIN_GUIDE_VENUES);
   if (combos.length === 0) return '';
@@ -2126,6 +2346,34 @@ const server = http.createServer(async (req, res) => {
         const footer = renderGuideFooterHTML();
         const openNowScript = renderOpenNowScript();
         const hiddenElementsScript = renderHiddenElementsScript();
+
+        // Design Sprint 3: homepage discovery modules. Same server-side
+        // injection approach as the three pieces above — computed once per
+        // request, spliced into specific, uniquely-matched anchor points so
+        // the new sections land in the right visual order without touching
+        // the wizard or the existing Worth the Drive hero carousel at all.
+        const discoveryStyles = renderHomepageDiscoveryStyles();
+        const happeningSoon = renderHappeningSoonHTML();
+        const hiddenGemsSection = renderHiddenGemsHomepageHTML();
+        const exploreByCategory = renderExploreByCategoryHTML();
+        const exploreRegions = renderExploreRegionsHTML();
+
+        const wizardToHeroAnchor = '</section>\n\n<section class="hero">';
+        if (html.includes(wizardToHeroAnchor)) {
+          html = html.replace(
+            wizardToHeroAnchor,
+            `</section>\n${discoveryStyles}\n${happeningSoon}\n${hiddenGemsSection}\n\n<section class="hero">`
+          );
+        }
+
+        const heroToWeatherAnchor = '</section>\n\n<section class="weather-banner" id="weatherBanner"';
+        if (html.includes(heroToWeatherAnchor)) {
+          html = html.replace(
+            heroToWeatherAnchor,
+            `</section>\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
+          );
+        }
+
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n</body>`)
           : html + footer + openNowScript + hiddenElementsScript;
@@ -2991,4 +3239,9 @@ module.exports = {
   getHiddenGemVenueIds,
   isVenueHiddenGem,
   hiddenGemBadgeHtml,
+  // Design Sprint 3 (Homepage Discovery)
+  renderHappeningSoonHTML,
+  renderHiddenGemsHomepageHTML,
+  renderExploreByCategoryHTML,
+  renderExploreRegionsHTML,
 };
