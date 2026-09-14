@@ -10,7 +10,7 @@
     "seed": "node --no-warnings seed.js",
     "start": "node --no-warnings server.js",
     "extract": "python3 extract.py && npm run seed",
-    "test": "node --no-warnings --test tests/"
+    "test": "node --no-warnings --test"
   },
   "license": "ISC"
 }

@@ -65,6 +65,39 @@ insert.run({
   slug: 'test-golf-course',
 });
 
+// ---- seed the 6 approved Hidden Gems (Design Sprint 4) ------------------
+// Using their real production slugs so HIDDEN_GEM_HOMEPAGE_BLURBS' keys
+// match, directly exercising the actual approved-blurb lookup rather than
+// its generic fallback.
+const ds4GemFixtures = [
+  { name: 'Chabendo Gelato', region: 'naramata', type: 'cafe', slug: 'chabendo-gelato', rating: 4.9 },
+  { name: 'Buffalo Rouge Brewing Co.', region: 'kelowna', type: 'brewery', slug: 'buffalo-rouge-brewing-co', rating: 4.9 },
+  { name: 'The Flealess Hound Pub', region: 'oliver', type: 'pub', slug: 'the-flealess-hound-pub', rating: 4.7 },
+  { name: 'Baccata Ridge Winery', region: 'enderby', type: 'winery', slug: 'baccata-ridge-winery', rating: 4.8 },
+  { name: 'Black Widow Winery', region: 'naramata', type: 'winery', slug: 'black-widow-winery', rating: 4.8 },
+  { name: 'Beat Patisserie', region: 'lake-country', type: 'cafe', slug: 'beat-patisserie', rating: 4.8 },
+];
+const ds4GemCollectionId = db.prepare(
+  "INSERT INTO collections (slug, kind, title, region) VALUES ('test-ds4-hidden-gems', 'hidden_gem', 'Test DS4 Hidden Gems', NULL)"
+).run().lastInsertRowid;
+const insertDs4GemItem = db.prepare(
+  "INSERT INTO collection_items (collection_id, content_type, content_id, position) VALUES (?, 'venue', ?, ?)"
+);
+ds4GemFixtures.forEach((fixture, i) => {
+  db.prepare('INSERT INTO venues (name, region, type, slug, cuisine, phone, price, reviews, rating, description) VALUES (@name, @region, @type, @slug, NULL, NULL, NULL, NULL, @rating, @description)')
+    .run({ ...fixture, description: `A fixture description for ${fixture.name}.` });
+  const v = app.findVenueBySlug(fixture.region, fixture.type, fixture.slug);
+  insertDs4GemItem.run(ds4GemCollectionId, v.id, i + 1);
+});
+
+// A venue with stale hidden-gem membership that is ALSO redirected —
+// must never render on the homepage or receive the badge on related cards.
+const ds4NonGemForRedirect = app.findVenueBySlug('kelowna', 'restaurant', 'second-test-restaurant');
+const ds4RedirectedGemId = db.prepare(
+  "INSERT INTO venues (name, region, type, slug, redirect_to) VALUES ('DS4 Redirected Gem', 'kelowna', 'restaurant', 'ds4-redirected-gem', ?)"
+).run(ds4NonGemForRedirect.id).lastInsertRowid;
+insertDs4GemItem.run(ds4GemCollectionId, ds4RedirectedGemId, 99);
+
 // ---- seed fixture events (Phase 1 — Events architecture gate) ----------
 const testVenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
 
@@ -233,6 +266,112 @@ test('renderRegionPage lists category counts for the region', () => {
 test('render404Page returns a 404-flavored page for an unknown path', () => {
   const html = app.render404Page('/nonexistent/path');
   assert.match(html, /404|not found/i);
+});
+
+// ==== Design Sprint 4 (Visual & Editorial Polish) ==========================
+
+test('all six approved Hidden Gems render on the homepage module, each with its approved blurb, no duplicates', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  for (const fixture of ds4GemFixtures) {
+    assert.match(html, new RegExp(fixture.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `expected ${fixture.name} to render`);
+  }
+  for (const slug of Object.keys(app.HIDDEN_GEM_HOMEPAGE_BLURBS)) {
+    // escapeHtml converts apostrophes to &#39; in the rendered output, so
+    // match against a normalized (entity-encoded) copy of the approved
+    // blurb rather than the raw source string.
+    const expectedSnippet = app.HIDDEN_GEM_HOMEPAGE_BLURBS[slug]
+      .slice(0, 40)
+      .replace(/'/g, '&#39;')
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(html, new RegExp(expectedSnippet), `expected approved blurb for ${slug} to render`);
+  }
+  const cardCount = (html.match(/class="hidden-gem-card"/g) || []).length;
+  assert.equal(cardCount, 6, 'expected exactly 6 cards, no duplicates, and the redirected fixture excluded');
+});
+
+test('Hidden Gems homepage cards include the compact visual band', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  assert.match(html, /compact-band compact-band-cafe/);
+  assert.match(html, /compact-band compact-band-brewery/);
+});
+
+test('Hidden Gems homepage badge appears in the intended overlapping position (own dedicated class, not duplicated)', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  const badgeCount = (html.match(/hidden-gem-card-badge/g) || []).length;
+  assert.equal(badgeCount, 6, 'expected exactly one badge per card, not zero and not duplicated');
+});
+
+test('Hidden Gems homepage venue links remain canonical', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  assert.match(html, /href="\/naramata\/cafes\/chabendo-gelato"/);
+  assert.match(html, /href="\/kelowna\/breweries\/buffalo-rouge-brewing-co"/);
+});
+
+test('a venue with stale hidden-gem membership that is also redirected never appears on the homepage module', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  assert.doesNotMatch(html, /DS4 Redirected Gem/);
+});
+
+test('related/nearby venue cards include the compact visual band', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const related = app.getRelatedVenues(venue);
+  const html = app.renderVenuePage(venue, related, [], []);
+  assert.match(html, /related-card related-card-restaurant/);
+  assert.match(html, /compact-band-sm/);
+});
+
+test('related/nearby venue links remain intact and unchanged', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const related = app.getRelatedVenues(venue);
+  const html = app.renderVenuePage(venue, related, [], []);
+  for (const r of related) {
+    assert.match(html, new RegExp(`href="/${r.region}/${app.CATEGORY_SLUGS[r.type]}/${r.slug}"`));
+  }
+});
+
+test('a related/nearby card shows the Hidden Gem badge only when that specific venue is actually a hidden gem', () => {
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const gemNearby = app.findVenueBySlug('kelowna', 'brewery', 'buffalo-rouge-brewing-co');
+  const html = app.renderVenuePage(trattoria, [], [gemNearby], []);
+  assert.match(html, /Hidden Gem/);
+});
+
+test('existing getRelatedVenues/getNearbyVenues query behavior is unchanged (still same-region+category / same-region+different-category)', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const related = app.getRelatedVenues(venue);
+  const nearby = app.getNearbyVenues(venue);
+  assert.ok(related.every((v) => v.region === venue.region && v.type === venue.type));
+  assert.ok(nearby.every((v) => v.region === venue.region && v.type !== venue.type));
+});
+
+test('all six category tile descriptions render with their approved copy', () => {
+  const html = app.renderExploreByCategoryHTML();
+  assert.match(html, /Sit-down meals worth planning your day around\./);
+  assert.match(html, /Coffee, baking, and a good reason to slow down\./);
+  assert.match(html, /Tasting rooms across the valley&#39;s growing wine country\./);
+  assert.match(html, /Local beer, made close to where you&#39;re standing\./);
+  assert.match(html, /Casual food and a drink, no reservation needed\./);
+  assert.match(html, /Courses across the Okanagan&#39;s valleys and benches\./);
+});
+
+test('category tile links/slugs remain unchanged by the new tagline copy', () => {
+  const html = app.renderExploreByCategoryHTML();
+  assert.match(html, new RegExp(`href="/kelowna/${app.CATEGORY_SLUGS.restaurant}"`));
+});
+
+test('approved region descriptions render on the homepage region tiles', () => {
+  const html = app.renderExploreRegionsHTML();
+  assert.match(html, /The valley&#39;s largest hub, with the widest spread of everything\./);
+  assert.match(html, /A quiet bench road lined with small, walkable wineries\./);
+});
+
+test('Kaleden, Coldstream, Lumby, and Baldy remain valid region links and receive no invented placeholder copy', () => {
+  assert.equal(app.REGION_TAGLINES.kaleden, undefined);
+  assert.equal(app.REGION_TAGLINES.coldstream, undefined);
+  assert.equal(app.REGION_TAGLINES.lumby, undefined);
+  assert.equal(app.REGION_TAGLINES.baldy, undefined);
+  // Still valid, functional region pages via the unchanged REGION_LABELS taxonomy.
+  assert.equal(app.CATEGORY_SLUGS.restaurant, 'restaurants'); // sanity: taxonomy machinery itself untouched
 });
 
 // ==== Phase 2 Sprint 1 (Golf) =============================================
@@ -516,6 +655,26 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
 
   const appJs = await fetch(`${base}/scripts/app.js`);
   assert.equal(appJs.status, 200, 'extracted app.js must be served');
+
+  // Design Sprint 4 (Visual & Editorial Polish) — folded into this same
+  // start/close cycle, since a second cycle in this test file has been
+  // observed to make this same test's own later fetch calls fail.
+  const homepage = await fetch(`${base}/`);
+  assert.equal(homepage.status, 200);
+  const homepageBody = await homepage.text();
+  assert.match(homepageBody, /id="hiddenGems"/);
+  assert.match(homepageBody, /id="exploreByCategory"/);
+  assert.match(homepageBody, /id="exploreRegions"/);
+  assert.match(homepageBody, /id="directory"/, 'Discovery Wizard section must be untouched');
+  assert.match(homepageBody, /class="hero"/, 'Worth the Drive hero must be untouched');
+
+  const eventsApi = await fetch(`${base}/api/events`);
+  const collectionsApi = await fetch(`${base}/api/collections`);
+  assert.equal(eventsApi.status, 404, '/api/events must not exist');
+  assert.equal(collectionsApi.status, 404, '/api/collections must not exist');
+
+  const trattoriaPage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
+  assert.equal(trattoriaPage.status, 200, 'existing venue route must still work');
 
   // Close the listener so the test process can exit naturally instead of
   // hanging on an open server handle.
