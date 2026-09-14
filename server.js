@@ -1300,6 +1300,67 @@ const SEO_PAGE_CSS = `
   }
   footer.site-footer a { color: var(--teal-deep); }
 
+  /* ---- Design Sprint 2: richer venue pages ---- */
+  .venue-hero {
+    border-radius: 16px; overflow: hidden; margin-bottom: 24px;
+    box-shadow: 0 10px 24px -16px rgba(74,52,40,0.35);
+  }
+  .venue-hero-photo img { width: 100%; max-height: 420px; object-fit: cover; display: block; }
+  .venue-hero-fallback {
+    display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+    min-height: 220px; padding: 28px 30px; color: var(--paper);
+  }
+  .venue-hero-fallback .venue-hero-type {
+    font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
+    opacity: 0.85; margin-bottom: 6px;
+  }
+  .venue-hero-fallback .venue-hero-name {
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.9rem; line-height: 1.15;
+  }
+  /* Per-type gradient — the exact hue family already used for each type's
+     badge/tag color elsewhere in this project (the SPA's .type-* rules),
+     deepened into a two-stop gradient suitable for a large hero rather
+     than a small tag. 'golf' has no prior SPA tag color to match (added
+     after the SPA's original palette), so it uses a complementary green
+     consistent with the existing 'pub' hue family rather than reusing it
+     outright. */
+  .venue-hero-restaurant { background: linear-gradient(135deg, #2A6B67, #1E4F4C); }
+  .venue-hero-winery     { background: linear-gradient(135deg, #8C4A5E, #6B2C40); }
+  .venue-hero-brewery    { background: linear-gradient(135deg, #E0A94E, #B8802E); }
+  .venue-hero-cafe       { background: linear-gradient(135deg, #C08A4E, #8A631F); }
+  .venue-hero-pub        { background: linear-gradient(135deg, #6B8B5E, #4A6741); }
+  .venue-hero-cocktail   { background: linear-gradient(135deg, #A25C93, #7A3B6E); }
+  .venue-hero-golf       { background: linear-gradient(135deg, #4E7A5E, #345942); }
+
+  .venue-header { margin-bottom: 18px; }
+  .venue-at-a-glance { color: var(--ink); opacity: 0.7; font-size: 0.98rem; margin: 6px 0 12px; }
+  .venue-at-a-glance a { color: var(--teal-deep); text-decoration: none; }
+  .venue-at-a-glance a:hover { text-decoration: underline; }
+
+  .venue-description { font-size: 1.02rem; line-height: 1.7; margin: 0 0 22px; color: var(--ink); }
+
+  .venue-cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+  .venue-cta-row .cta { margin: 0; }
+
+  .venue-section { margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(74,52,40,0.12); }
+  .venue-section h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.2rem; margin: 0 0 12px; }
+  .venue-address { margin: 0 0 8px; font-size: 0.96rem; }
+  .map-link { display: inline-block; font-weight: 700; font-size: 0.88rem; color: var(--teal-deep); text-decoration: none; }
+  .map-link:hover { text-decoration: underline; }
+
+  /* related-card type accent — reuses the same hue family as the hero
+     gradients above, applied as a thin top border so related/nearby cards
+     feel visually consistent with the page's new hero treatment even
+     though (per Sprint 2 scope) they still have no photos of their own. */
+  .related-card { border-top: 3px solid var(--sand-deep); }
+  .related-card-restaurant { border-top-color: #2A6B67; }
+  .related-card-winery { border-top-color: #6B2C40; }
+  .related-card-brewery { border-top-color: #B8802E; }
+  .related-card-cafe { border-top-color: #8A631F; }
+  .related-card-pub { border-top-color: #4A6741; }
+  .related-card-cocktail { border-top-color: #7A3B6E; }
+  .related-card-golf { border-top-color: #345942; }
+
   @media (max-width: 640px) {
     body { padding: 20px 16px 56px; }
     h1 { font-size: 1.6rem; }
@@ -1309,6 +1370,12 @@ const SEO_PAGE_CSS = `
     .detail-row .label { min-width: 84px; }
     .cta { display: block; text-align: center; margin-right: 0; }
     .cta + .cta { margin-top: 10px; }
+    .venue-hero-photo img { max-height: 220px; }
+    .venue-hero-fallback { min-height: 160px; padding: 20px; }
+    .venue-hero-fallback .venue-hero-name { font-size: 1.4rem; }
+    .venue-at-a-glance { font-size: 0.9rem; }
+    .venue-cta-row { flex-direction: column; }
+    .venue-cta-row .cta { width: 100%; }
   }
 `;
 
@@ -1625,12 +1692,49 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     .join('\n');
 
   const imageHtml = venue.image_url
-    ? `<img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" style="width:100%;max-height:340px;object-fit:cover;border-radius:10px;margin-bottom:20px;">`
+    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>`
+    : `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}">
+        <span class="venue-hero-type">${escapeHtml(label.singular)}</span>
+        <span class="venue-hero-name">${escapeHtml(venue.name)}</span>
+      </div>`;
+
+  // At-a-glance summary strip — purely additive: every value shown here
+  // already exists in `detailRows` below too. Nothing is removed from the
+  // page by adding this; it's a second, higher-visibility presentation of
+  // facts that were previously only available further down the page.
+  const atAGlanceParts = [
+    label.singular,
+    `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
+    venue.price ? '$'.repeat(venue.price) : null,
+    venue.rating ? `${venue.rating}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
+  ].filter(Boolean).join(' &middot; ');
+
+  // Location section — static-map only, per Sprint 2 scope: a plain link
+  // built from existing latitude/longitude (no map library, no new script,
+  // no new dependency). Falls back to showing the existing address text
+  // alone when coordinates are absent; renders nothing when neither exists.
+  const mapsUrl = (venue.latitude && venue.longitude)
+    ? `https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`
+    : (venue.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}` : null);
+  const locationHtml = (venue.address || mapsUrl)
+    ? `<div class="venue-section venue-location">
+        <h2>Location</h2>
+        ${venue.address ? `<p class="venue-address">${escapeHtml(venue.address)}</p>` : ''}
+        ${mapsUrl ? `<a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank">View on map \u2197</a>` : ''}
+      </div>`
     : '';
+
+  // CTA buttons — only ever rendered when the underlying data already
+  // exists; nothing here fabricates a website, phone number, or address.
+  const ctaButtons = [
+    venue.website ? `<a class="cta" href="${escapeHtml(venue.website)}" rel="nofollow noopener" target="_blank">Visit Website</a>` : null,
+    mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank">Get Directions</a>` : null,
+    venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}">Call</a>` : null,
+  ].filter(Boolean).join('\n  ');
 
   function relatedCard(v) {
     const meta = [v.cuisine, v.rating ? `${v.rating}\u2605` : null].filter(Boolean).join(' \u00b7 ');
-    return `<div class="related-card">
+    return `<div class="related-card related-card-${v.type}">
       <a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>
       <div class="related-meta">${escapeHtml(meta)}</div>
     </div>`;
@@ -1668,16 +1772,23 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
     { name: venue.name },
   ])}
   ${imageHtml}
-  <h1>${escapeHtml(venue.name)}</h1>
-  <p class="subtitle">${escapeHtml(label.singular)} in ${escapeHtml(regionLabel)}, BC</p>
-  <p>${escapeHtml(venue.description || '')}</p>
-  <p class="chips">${hiddenGemChip}${attributeChips}</p>
-  ${detailRows}
-  ${hoursHtml}
+  <div class="venue-header">
+    <h1>${escapeHtml(venue.name)}</h1>
+    <p class="venue-at-a-glance">${atAGlanceParts}</p>
+    <p class="chips">${hiddenGemChip}${attributeChips}</p>
+  </div>
+  <p class="venue-description">${escapeHtml(venue.description || '')}</p>
+  ${ctaButtons ? `<div class="venue-cta-row">\n  ${ctaButtons}\n</div>` : ''}
+  <div class="venue-section venue-key-info">
+    <h2>Good to Know</h2>
+    ${detailRows}
+  </div>
+  ${locationHtml}
+  ${hoursHtml ? `<div class="venue-section venue-hours">${hoursHtml}</div>` : ''}
   ${guideLinks}
   ${relatedHtml}
   ${nearbyHtml}
-  <a class="cta" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
+  <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
   <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
   ${siteFooter()}
 </body>
