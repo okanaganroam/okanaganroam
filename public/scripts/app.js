@@ -719,7 +719,6 @@ async function loadVenuesAndInit(){
   initBlock9();
   initBlock10();
   initBlock11();
-  initBlock12();
 }
 
 function initBlock1(){
@@ -1428,109 +1427,6 @@ function initBlock11(){
 
   if (window.__syncTripButtons) window.__syncTripButtons();
   if (window.__syncFavButtons) window.__syncFavButtons();
-}
-
-/* ---------- Live Google Places search (beta) ---------- */
-function initBlock12(){
-  var toggle = document.getElementById('liveSearchToggle');
-  var body = document.getElementById('liveSearchBody');
-  var apiKeyInput = document.getElementById('apiKeyInput');
-  var queryInput = document.getElementById('liveQueryInput');
-  var searchBtn = document.getElementById('liveSearchBtn');
-  var status = document.getElementById('liveSearchStatus');
-  var resultsGrid = document.getElementById('liveResultsGrid');
-
-  // Remember the API key in this browser only (never sent anywhere but Google).
-  try {
-    var savedKey = localStorage.getItem('okanaganRoamPlacesKey');
-    if (savedKey) apiKeyInput.value = savedKey;
-  } catch (e) { /* localStorage unavailable, ignore */ }
-
-  toggle.addEventListener('click', function(){
-    toggle.classList.toggle('open');
-    body.classList.toggle('open');
-  });
-
-  async function runLiveSearch(){
-    var key = apiKeyInput.value.trim();
-    var query = queryInput.value.trim();
-    resultsGrid.innerHTML = '';
-
-    if (!key){
-      status.textContent = 'Paste a Google Places API key first (see note above).';
-      return;
-    }
-    if (!query){
-      status.textContent = 'Type something to search for, e.g. "wineries in Kelowna".';
-      return;
-    }
-
-    try { localStorage.setItem('okanaganRoamPlacesKey', key); } catch (e) {}
-
-    searchBtn.disabled = true;
-    status.textContent = 'Searching Google Places…';
-
-    try {
-      var res = await fetch('https://places.googleapis.com/v1/places:searchText', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.types'
-        },
-        body: JSON.stringify({
-          textQuery: query + ' Okanagan Valley British Columbia',
-          maxResultCount: 12
-        })
-      });
-
-      if (!res.ok){
-        var errBody = await res.text();
-        status.textContent = 'Google returned an error (' + res.status + '). Check that your API key is valid, billing is enabled, and the "Places API (New)" is turned on for your project.';
-        console.error('Places API error:', errBody);
-        searchBtn.disabled = false;
-        return;
-      }
-
-      var data = await res.json();
-      var places = data.places || [];
-
-      if (places.length === 0){
-        status.textContent = 'No results found for that search.';
-        searchBtn.disabled = false;
-        return;
-      }
-
-      status.textContent = 'Found ' + places.length + ' result' + (places.length === 1 ? '' : 's') + ', amenities not verified, double check before adding to your trip.';
-
-      places.forEach(function(place){
-        var name = (place.displayName && place.displayName.text) || 'Unnamed place';
-        var addr = place.formattedAddress || '';
-        var rating = place.rating ? ('★ ' + place.rating + (place.userRatingCount ? ' (' + place.userRatingCount + ')' : '')) : 'No rating yet';
-
-        var card = document.createElement('div');
-        card.className = 'live-result-card';
-        card.innerHTML =
-          '<h4></h4>' +
-          '<div class="lr-meta"></div>' +
-          '<div class="lr-addr"></div>' +
-          '<div class="lr-warn">Not yet verified, amenities unknown</div>';
-        card.querySelector('h4').textContent = name;
-        card.querySelector('.lr-meta').textContent = rating;
-        card.querySelector('.lr-addr').textContent = addr;
-        resultsGrid.appendChild(card);
-      });
-
-    } catch (err){
-      status.textContent = 'Something went wrong reaching Google Places. Check your internet connection and API key.';
-      console.error(err);
-    }
-
-    searchBtn.disabled = false;
-  }
-
-  searchBtn.addEventListener('click', runLiveSearch);
-  queryInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') runLiveSearch(); });
 }
 
 /* ---------- Featured venues: slow auto-scroll, pauses when the user takes control ---------- */
