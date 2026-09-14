@@ -2389,9 +2389,11 @@ function renderOpenNowScript() {
 }
 
 function renderHiddenElementsScript() {
-  // Hides two existing UI pieces the site owner asked to remove: the
-  // "Open the map view" toggle and the "Live search the whole Okanagan
-  // (beta)" panel. Also rounds the big "N places to explore" count down
+  // Hides an existing UI piece the site owner asked to remove: the
+  // "Open the map view" toggle. (The "Live search the whole Okanagan
+  // (beta)" panel this used to also hide here was removed entirely from
+  // the codebase in the Google Places cleanup, so it no longer needs
+  // hiding at runtime.) Also rounds the big "N places to explore" count down
   // to a friendly "1000+" display once it crosses 1000, rather than
   // showing the exact, ever-growing venue count (which will keep
   // climbing as more venues get added and would otherwise need editing
@@ -2412,7 +2414,7 @@ function renderHiddenElementsScript() {
 (function(){
   var D = document;
   function apply(){
-    var toHide = D.querySelectorAll('.map-toggle-row, .live-search');
+    var toHide = D.querySelectorAll('.map-toggle-row');
     for (var i = 0; i < toHide.length; i++) {
       toHide[i].style.display = 'none';
     }
