@@ -846,6 +846,31 @@ All four relationships freshly re-verified against live data just now; **no chan
 * **Not ready — needs more research: #154, #337, #724, #1051** — no regression from prior status, just no fresh evidence to justify upgrading them to HIGH this round despite genuine effort.
 * **No production data was changed, no admin endpoint was called, no merge/retire performed, no phone corrected, no application code was changed, no manifest change, no deployment.** This entire pass was public web research (search, restaurantguru.com raw-HTML fetches, Photon) plus live `GET` verification only.
 
+## Production Preflight — 4 Duplicate Pairs (2026-09-15) — READ-ONLY, NOTHING MERGED
+
+### Claude — full live re-verification of both records in all 4 pairs immediately before any potential merge approval. Zero anomalies.
+
+* **Status: read-only. `/admin/merge-and-retire-duplicate` and `/admin/enrich-venue` were NOT called. No production data was changed, no phone corrected, no code changed, no manifest change, no deployment. `main` untouched.**
+* **Method:** pulled the complete live record (every field) for all 8 IDs across the 4 pairs, immediately before writing this entry — not reused from any prior pull.
+
+**Per-pair verification:**
+
+| Pair | Names match research | Region/Type match | Phone match (dup vs canonical) | `redirect_to` on both (must be null) | Canonical address/lat/lon (must be null) | Mergeable fields (re-derived from this exact live data) |
+|---|---|---|---|---|---|---|
+| #252 → #1019 | ✅ Greenside Bar and Grill → Greenside Bar & Grill | ✅ osoyoos/restaurant on both | ✅ both `+1 250-495-7003` | ✅ null / null | ✅ null/null/null on #1019 | `description_fr` only |
+| #965 → #535 | ✅ Range Lounge & Grill → RANGE restaurant, bar + patio | ✅ vernon/restaurant on both | ✅ both `+1 250-503-3556` | ✅ null / null | ✅ null/null/null on #535 | none (canonical already has non-null price/reviews/description_fr) |
+| #972 → #581 | ✅ Shahi Pakwaan → Shahi Pakwan | ✅ vernon/restaurant on both | ✅ both `+1 236-426-2627` | ✅ null / null | ✅ null/null/null on #581 | `price`, `reviews` |
+| #537 → #536 | ✅ Rail Trail Cafe Ice Cream Parlor → Rail Trail Cafe & Market | ✅ coldstream/cafe on both | ✅ both `null` (neither has a stored phone) | ✅ null / null | ✅ null/null/null on #536 | none (canonical already has non-null description_fr, distinct text) |
+
+* **All 4 mergeable-field results are byte-for-byte identical to the prior research** — zero drift since the last check. No field conflict, no unexpected value change, no phone change on any of the 8 records.
+* **Duplicate relationships all still valid; canonical/duplicate IDs unchanged** — confirmed by the same identity/phone evidence already on record (Osoyoos Golf Club, Predator Ridge Resort, the Vernon Pakistani restaurant, and the Coldstream rail-trail site respectively).
+* **Active venue count: 1,055** (unchanged from every prior check this session — expected, since no write of any kind has occurred).
+* **Redirect count: 26** — not re-swept via the full 28-gap-id method in this pass (that's a broader operation than this preflight calls for), but mechanically guaranteed unchanged: no `/admin/merge-and-retire-duplicate` or `/admin/retire-duplicate` call has been made anywhere in production this entire session, and all 8 records here directly confirm their own `redirect_to: null`.
+* **No other venue is unexpectedly involved in any of these 4 pairs:** cross-checked the duplicate IDs (252, 965, 972, 537) against the full list of 26 known redirect targets established earlier this session — **none of the 4 duplicates is itself the target of any other venue's redirect**, so retiring any of them cannot orphan a redirect chain. None of the 4 canonicals (1019, 535, 581, 536) has its own `redirect_to` set, so none is itself already a duplicate of something else.
+* **Zero anomalies of any kind found.** No unexpected drift, no field conflict, no missing record, no changed phone, no changed canonical data.
+
+**Conclusion: all 4 pairs remain exactly as documented and are still eligible for merge approval, with no new blocker found.** Nothing was merged, retired, enriched, or otherwise modified during this preflight.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
