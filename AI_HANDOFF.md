@@ -770,6 +770,82 @@ Verified programmatically: **all 52 missing-location IDs appear in the classific
 * **No merge, retire, delete, redirect, or venue creation occurred. No manifest change. No application code change. No deployment.**
 * **Remaining from the full classification pass:** Category A is now fully complete (all 3 members written). Category B (8, including the 4 duplicate-pair canonicals), Category C (13, ambiguous), Category D (3, need phone correction), Category E (5, duplicate), and Category F (20, exclude) remain entirely unwritten, awaiting separate approval.
 
+## Category B Next-Group Preparation — 8 Records (2026-09-15) — READ-ONLY, NOT WRITTEN
+
+### Claude — fresh live verification + strengthened coordinate research. No production changes.
+
+* **Status: read-only. No admin endpoint was called (neither `/admin/enrich-venue` nor `/admin/merge-and-retire-duplicate`), no production data was changed, no merge/retire performed, no phone corrected, no code changed, no manifest change, no deployment. `main` untouched.**
+* **Fresh live re-read of all 8 target records plus their 4 duplicate counterparts (252, 965, 972, 537) performed just now — zero drift** from the classification pass a few turns ago: every ID/name/region/type/phone/`redirect_to` matches exactly (all `redirect_to: null`, confirming none of the duplicate pairs have been merged).
+* **New research this pass:** attempted a second independent coordinate source for every record in this group of 8 that was still single-source. **Found strong results for all 4 duplicate-pair canonicals** via restaurantguru.com (searched for and confirmed the correct listing URL for each, rather than guessing a slug) — all four now have genuine two-independent-source, building-level agreement well under 50m. Also attempted (but did not find) a second source for #1051.
+
+---
+
+### Classification
+
+**READY — HIGH confidence (4):**
+
+| ID | Name | Region | Phone | Verified Address | Lat | Lon | Sources | Agreement |
+|---|---|---|---|---|---|---|---|---|
+| 1019 | Greenside Bar & Grill | osoyoos | +1 250-495-7003 | 12300 Golf Course Dr, Osoyoos, BC V0H 1V0 | 49.015736 | -119.491028 | geocoder.ca + restaurantguru.com | **36.6m** |
+| 535 | RANGE restaurant, bar + patio | vernon | +1 250-503-3556 | 301 Village Centre Place, Vernon, BC V1H 1T2 | 50.189133 | -119.387605 | geocoder.ca + restaurantguru.com | **5.4m** |
+| 581 | Shahi Pakwan | vernon | +1 236-426-2627 | 2810 43rd Ave, Vernon, BC V1T 3L3 | 50.274629 | -119.269786 | geocoder.ca + restaurantguru.com | **5.3m** |
+| 536 | Rail Trail Cafe & Market | coldstream | none | 13904 Kalamalka Rd, Coldstream, BC V1B 1Y9 | 50.232437 | -119.268655 | geocoder.ca + restaurantguru.com | **35.6m** |
+
+geocoder.ca's value is kept as the recommended coordinate for each (already the value referenced elsewhere in this document); restaurantguru.com's independently-sourced value is the corroborating second source. **These 4 all now meet the same HIGH-confidence bar used for every write so far.**
+
+**MORE RESEARCH NEEDED (4) — unchanged from the prior classification pass, no new evidence found this round:**
+
+| ID | Name | Region | Phone | Verified Address | Lat | Lon | Sources | Agreement | What's still missing |
+|---|---|---|---|---|---|---|---|---|---|
+| 154 | Craft 42 Roasters | kelowna | none | 1178 High Road, Kelowna, BC V1Y 7B1 | 49.892941 | -119.476575 | geocoder.ca + restaurantguru.com | 83.9m | A closer-agreeing or POI-exact third source |
+| 337 | King's Vegetarian Food | kelowna | none | 1631 Dickson Ave, Kelowna, BC | 49.879876 | -119.461448 | geocoder.ca + restaurantguru.com | 68.3m | Same as above |
+| 724 | Tickleberry's at the Peach | penticton | none | 185 Lakeshore Drive, Penticton, BC | 49.502472 | -119.595796 | geocoder.ca + Nominatim/Photon exact POI "The Peach" | 103.0m | A non-OSM-backed third source (Nominatim/Photon share an underlying dataset) |
+| 1051 | Moose Lounge | big-white | none | 5315 Big White Rd, Kelowna, BC V1P 1P3 (Happy Valley Day Lodge, Big White) | 49.721408 | -118.926566 | geocoder.ca only, confidence 1.0 | n/a | Tried restaurantguru.com and Photon again this pass — neither has a listing for this specific venue. Identity is solidly confirmed (Big White's own site, TripAdvisor) but the coordinate remains single-source |
+
+**DO NOT ENRICH (0):** none of these 8 records warrant exclusion — all are confirmed fixed, real, currently-operating businesses.
+
+---
+
+### Duplicate-pair reconfirmation (investigation only — nothing merged)
+
+All four relationships freshly re-verified against live data just now; **no change from the prior conclusion for any of them.**
+
+**#252 → #1019 (Greenside Bar and Grill / Greenside Bar & Grill)**
+- Merge still appropriate: **yes** — phone identical on both (+1 250-495-7003, live-confirmed again), same business (Osoyoos Golf Club).
+- Canonical: **#1019**. Duplicate: **#252**.
+- What the guarded merge would preserve: `description_fr` (populated on #252, null on canonical #1019).
+- Not reconciled by the merge: nothing else — `price`/`reviews` are already correctly populated on the canonical.
+- Conflict to review before merging: none found.
+
+**#965 → #535 (Range Lounge & Grill / RANGE restaurant, bar + patio)**
+- Merge still appropriate: **yes** — phone identical (+1 250-503-3556, live-confirmed again), same business (Predator Ridge Resort).
+- Canonical: **#535**. Duplicate: **#965**.
+- What the guarded merge would preserve: nothing is actually mergeable — canonical already has non-null `price`/`reviews`/`description_fr`.
+- Not reconciled by the merge: `reviews` differ (965=546 vs 535=535) — not lost, just not reconciled into one number (the duplicate's row is retained, not deleted, when retired).
+- Conflict to review before merging: none found.
+
+**#972 → #581 (Shahi Pakwaan / Shahi Pakwan)**
+- Merge still appropriate: **yes** — phone identical (+1 236-426-2627, live-confirmed again), same business, spelling-variant duplicate.
+- Canonical: **#581**. Duplicate: **#972**.
+- What the guarded merge would preserve: `price` (2) and `reviews` (705), both populated on #972, null on canonical #581.
+- Not reconciled by the merge: nothing else — `description_fr` already correctly populated on the canonical.
+- Conflict to review before merging: none found.
+
+**#537 → #536 (Rail Trail Cafe Ice Cream Parlor / Rail Trail Cafe & Market)**
+- Merge still appropriate: **yes** — same physical site (one building housing both the "market" and "ice cream" functions these two records separately describe).
+- Canonical: **#536**. Duplicate: **#537**.
+- What the guarded merge would preserve: nothing is mergeable — `description_fr` is populated on BOTH sides with genuinely different text.
+- Not reconciled by the merge: the duplicate's distinct `description_fr` text is not folded into the canonical (not lost, just retained on the retired row rather than merged).
+- Conflict to review before merging: none found.
+
+---
+
+### Final recommendation for this group of 8
+
+* **Ready for the next production-write approval: #1019, #535, #581, #536** (all newly confirmed HIGH confidence this pass) — **but note these are duplicate-pair canonicals.** The standing recommendation (unchanged from earlier research) is still to **merge the duplicate first** (#252→#1019, #965→#535, #972→#581, #537→#536) before or as part of enriching the canonical, so the merge's own precondition (`canonical_field_not_null`) doesn't later block reconciling `description_fr` for the two pairs where that's mergeable (#252→#1019 and #972→#581). Enriching address/lat/lng first would not itself block a later merge, but doing the merge first keeps the sequence clean and auditable.
+* **Not ready — needs more research: #154, #337, #724, #1051** — no regression from prior status, just no fresh evidence to justify upgrading them to HIGH this round despite genuine effort.
+* **No production data was changed, no admin endpoint was called, no merge/retire performed, no phone corrected, no application code was changed, no manifest change, no deployment.** This entire pass was public web research (search, restaurantguru.com raw-HTML fetches, Photon) plus live `GET` verification only.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
