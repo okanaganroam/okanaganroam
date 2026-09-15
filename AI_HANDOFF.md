@@ -481,6 +481,33 @@ Note the important distinction within this category: #95, #225, #311, #702, #806
 * IDs requiring review: none
 * IDs already completed: 180, 934, 987 (and 360, 426, 484 from the prior batch)
 
+## FINAL STATUS — #180, #934, #987 Production Enrichment: COMPLETED (2026-09-15)
+
+### Claude — consolidated, freshly re-verified execution record. This supersedes any earlier partial mentions of this batch scattered above; this is the authoritative summary.
+
+**Result for all three: COMPLETED.** Freshly re-verified against live production immediately before writing this entry (not reused from memory).
+
+| Field | #180 Dolci Thai Bistro | #934 14th Ave Bar & Grill | #987 China Palace |
+|---|---|---|---|
+| Write status | **COMPLETED** | **COMPLETED** | **COMPLETED** |
+| Address written | 8710 Main St, Osoyoos, BC V0H 1V0 | 1101 14 Avenue, Vernon, BC V1B 2S6 | 1933 Main Street, Penticton, BC V2A 5H5 |
+| Latitude written | 49.032963 | 50.2517967 | 49.476851 |
+| Longitude written | -119.467977 | -119.2458648 | -119.583657 |
+| Pre-write state | address/lat/lon all `null` (verified) | address/lat/lon all `null` (verified) | address/lat/lon all `null` (verified) |
+| Post-write live values (just re-checked) | address/lat/lon match exactly | address/lat/lon match exactly | address/lat/lon match exactly |
+| Phone unchanged | +1 250-495-6807 ✓ | +1 250-549-4653 ✓ | +1 250-492-9883 ✓ |
+| `redirect_to` unchanged | null ✓ | null ✓ | null ✓ |
+| `updated_at` | 2026-09-15 06:58:58 (only field-level timestamp changed) | 2026-09-15 06:59:00 | 2026-09-15 06:59:01 |
+
+* **Mechanism used:** `POST /admin/enrich-venue` (the existing guarded `guardedEnrichUpdate()` path), executed via `railway run` so `ENRICHMENT_ADMIN_TOKEN` was never exposed. No code was modified to perform this write — it used the endpoint already shipped and reviewed earlier in this branch's history.
+* **All other fields confirmed unchanged on all three** — `name`, `region`, `type`, `slug`, `cuisine`, `rating`, `price`, `reviews`, `description`, `description_fr`, `hours`, `website`, `image_url`, and all 12 boolean amenity flags, verified by direct re-read just now against the values recorded at write time. Only `updated_at` changed, as expected of any successful write.
+* **Active venue count:** 1,055 both before and after this batch (re-confirmed via `GET /api/stats` just now) — unchanged, as expected (enrichment never adds/removes active venues).
+* **Redirect count:** unchanged — structurally guaranteed, since `guardedEnrichUpdate()` never touches `redirect_to`, and all three records still show `redirect_to: null` directly.
+* **No other venue was modified.** Only these three IDs were targeted by any write call in this batch. `#360`, `#426`, and `#484` (from the prior batch) remain untouched and complete; confirmed via this same session's git/branch state that no merge, retire, or code change accompanied this write.
+* **Commit SHA for the original execution record:** `5a480b9` ("Record executed production enrichment for IDs 180, 934, 987") — the write itself happened before that commit; this new entry is a fresh, independent re-verification, not a restatement from memory.
+* **Commit SHA for this consolidated FINAL STATUS entry:** this entry's own commit, reported in the chat response accompanying this update (a file cannot embed its own future commit hash).
+* **No production writes, code changes, merges/retirements, manifest changes, or deployments were performed as part of producing this status report.** This entry is documentation of an already-completed action, re-verified read-only.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
