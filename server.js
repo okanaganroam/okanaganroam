@@ -2753,6 +2753,22 @@ const server = http.createServer(async (req, res) => {
       return res.end('og-image.png not found on server');
     }
 
+    // Homepage hero photo. Replaces the old approach of embedding 10 hero
+    // carousel images as inline base64 directly in okanagan.html (~95% of
+    // that file's payload) — a single real file served with a normal cache
+    // header instead, so the browser (and any CDN in front of this) can
+    // cache it independently of the HTML document.
+    if (pathname === '/images/hero.jpg' && method === 'GET') {
+      const heroImagePath = path.join(__dirname, 'public/images/hero.jpg');
+      if (fs.existsSync(heroImagePath)) {
+        const image = fs.readFileSync(heroImagePath);
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' });
+        return res.end(image);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('hero.jpg not found on server');
+    }
+
     // Phase 5 Sprint 1 — shared static assets. These three files are the
     // extracted, single-source-of-truth CSS/JS that both the SPA
     // (okanagan.html, via <link>/<script src>) and the server-rendered SEO
