@@ -1671,3 +1671,92 @@ Read `server.js`'s current Section 1 (hero) and Section 2 (Start Exploring) impl
 **No application code, venue data, database records, production data, or admin endpoints were touched. No production write occurred at any point — this entire pass was public, unauthenticated `GET` requests against `/api/venues` and local, read-only inspection of `server.js`/`db.js`. `main` was never touched.**
 
 **Commit SHA for this research update: `f066388af5d202eb3dce73b5f16cc4b3066e73c2`** (verified: `main`'s SHA is unchanged at `9373c28121c3bfbfad95d0ada496974392da9610`, both locally and on `origin/main`, before and after this commit).
+
+## Homepage Section 3 — "Worth the Roam" Implementation (2026-09-15)
+
+### Claude — implemented the approved "Worth the Roam" section. Sections 1–2 untouched.
+
+* **Status: implemented and verified. Committed to `ai-handoff/2026-09-15` only. Sections 1 (hero) and 2 (Start Exploring) confirmed byte-for-byte unchanged. No venue data changed. No production write occurred. No deploy. `main` untouched.**
+* **Commit SHA: `5b9ad2673ba11fddf241d4017ba8905eb72cfe10`**
+
+---
+
+### Exact files changed
+
+* **`db.js`** — one new, additive, idempotent seed block (mirroring the existing Hidden Gems seed exactly): a new `worth_the_roam` collection (slug `worth-the-roam`) in the existing `collections` table, and six `collection_items` rows referencing real venue IDs with a `position` (1–6) and a `note` (the editorial blurb). No schema change, no new table — reuses `collections`/`collection_items`, whose own existing code comment already anticipated this exact reuse ("a future Roam Picks collection can reuse this same table without a schema change").
+* **`server.js`** — two changes:
+  1. New `renderWorthTheRoamHTML()` function: queries the `worth_the_roam` collection (joined to `venues`, excluding redirected venues, ordered by the seed's own `position`), and renders six cards. Self-omits entirely if the collection is empty, same graceful-empty pattern every other discovery module already uses.
+  2. New CSS appended to the existing `renderHomepageDiscoveryStyles()` — no new stylesheet, no new `<style>` block.
+  3. One new line wiring `renderWorthTheRoamHTML()` into the existing `heroToWeatherAnchor` homepage-assembly replace, immediately after `startExploring` and before `exploreByCategory`/`exploreRegions` (which keep their own unchanged position).
+* **Not touched:** `okanagan.html`, `public/styles/app.css`, `public/scripts/app.js`, `public/images/` — confirmed via `git diff --stat` showing zero changes to any of them. No new route, no new image asset (this section is intentionally photo-free — see Design Decisions). No venue table row was modified — the seed only ever *reads* `venues` (`SELECT id FROM venues WHERE id = ? AND redirect_to IS NULL`) to confirm a venue exists before recording collection membership; it never writes to `venues`.
+
+---
+
+### Final design decisions
+
+* **No photos, by design, not by placeholder.** The verified Section 3 research (already in `AI_HANDOFF.md`) found zero non-null `image_url` values across all 1,051 active production venues, and only one of the six selected venues (Turtle Jack's West Kelowna) has any real recoverable photography at all — using it alone would have made one card look different from the other five for no principled reason. Per the task's explicit instruction, no new photography was sourced. Instead, the section leans fully into typography, a slim category-color accent, and editorial voice — deliberately different from Section 2's photo cards, which already establish the "these six are visually rich" register elsewhere on the page.
+* **Deliberately not a Hidden Gems reskin.** The existing `.hidden-gem-card` pattern (also used on this homepage, a section above the hero) has a large colored band with a "💎 Hidden Gem" pill badge overlapping it. Reusing that exact language here would make Section 3 look like a duplicate of an already-visible module. Instead, `.roam-card` uses a slim 4px top accent (same `TYPE_ACCENT_GRADIENTS` colors as Hidden Gems, via the same shared `compactBandCSSRules()` helper — so the *underlying* design-token reuse is real, only the visual weight differs), a plain small-caps meta line (type · region · rating) instead of pills, and an understated "Explore →" text link instead of a button — reads as "a local guide's recommendation," not another directory card.
+* **Layout — asymmetric 2 + 4, not six identical cards.** Desktop/laptop: a 12-column grid, two "featured" cards at 6 columns each (larger padding, larger title) in the top row, four "supporting" cards at 3 columns each in the row below. Mobile: a genuine single column, not a shrunk copy of the desktop grid — all six cards stack full-width, with the two featured cards keeping slightly larger type to preserve the same visual hierarchy.
+* **Featured vs. supporting was an editorial call, explained here rather than left arbitrary:** Miradoro Restaurant (Oliver) and Linden Gardens (Kaleden) are featured — the two most distinctive, story-rich picks in the set (a vineyard-view destination restaurant, and a working botanical garden/cafe with animals) — rather than picking by rating or review count, which would have just reproduced a "top-rated" logic the approved concept explicitly wants to avoid.
+* **Insertion point:** immediately after Section 2, before the existing "Browse by category"/"Explore the Okanagan" modules, exactly as specified — confirmed live in the rendered page order.
+
+---
+
+### The six selected venues
+
+In the order they render (positions 1–6 in the `worth_the_roam` collection):
+
+| # | Venue | ID | Region | Type | Rating / reviews | Slug |
+|---|---|---|---|---|---|---|
+| 1 (featured) | Miradoro Restaurant | 1029 | Oliver | Restaurant | 4.5 / 932 | `miradoro-restaurant-1029` |
+| 2 (featured) | Linden Gardens | 368 | Kaleden | Cafe | 4.7 / 257 | `linden-gardens` |
+| 3 | Turtle Jack's West Kelowna | 740 | West Kelowna | Pub | 4.5 / 527 | `turtle-jack-s-west-kelowna` |
+| 4 | Checkmate Artisanal Winery | 824 | Oliver | Winery | 4.8 / 341 | `checkmate-artisanal-winery` |
+| 5 | Intermezzo Restaurant and Wine Cellar | 289 | Vernon | Restaurant | 4.8 / 1,187 | `intermezzo-restaurant-and-wine-cellar` |
+| 6 | Red Rooster Winery | 863 | Naramata | Winery | 4.7 / 334 | `red-rooster-winery` |
+
+All six IDs/slugs/data are exactly as verified in the earlier Section 3 research pass against live production — nothing invented.
+
+---
+
+### Editorial copy
+
+Each is one sentence, grounded only in that venue's own existing `description` field (re-read in full from production immediately before writing, not from memory):
+
+* **Miradoro Restaurant:** "Tinhorn Creek Vineyards' fine-dining restaurant, known for some of the best views in the South Okanagan and a black pepper carbonara worth the trip alone." *(grounded in: "the fine-dining restaurant at Tinhorn Creek Vineyards," "some of the best views in the entire South Okanagan," "black pepper carbonara.")*
+* **Linden Gardens:** "A working botanical garden in Kaleden with a cafe attached — wander past goats and bunnies on your way to a club sandwich and a homemade oat-milk London fog." *(grounded in: "pairs a genuine botanical garden with a cafe, goats, bunnies, and chickens," "hearty club sandwich," "homemade oat-milk London fog.")*
+* **Turtle Jack's West Kelowna:** "A family-friendly West Kelowna grill built around chicken rolls and a lively happy hour, just as welcoming if you're dining solo." *(grounded in: "family-friendly grill in West Kelowna around chicken rolls, a lively happy hour and a genuinely welcoming vibe for solo diners too.")*
+* **Checkmate Artisanal Winery:** "An appointment-only Oliver winery focused entirely on chardonnay and merlot, with a patio regulars call the best in the Okanagan." *(grounded in: "upscale, appointment-based Oliver winery specializing entirely in chardonnay and merlot," "what regulars call the best patio in the Okanagan.")*
+* **Intermezzo Restaurant and Wine Cellar:** "Elegant fine-dining Italian in Vernon, with a genuine gluten-free French onion soup and live Spanish guitar on select nights." *(grounded in: "elegant fine-dining Italian," "a real gluten-free French onion soup," "Live Spanish guitar on select nights.")*
+* **Red Rooster Winery:** "A well-known Naramata Bench winery with sweeping views, a wide-ranging wine list, and tasting-room staff regulars describe as refreshingly unpushy." *(grounded in: "well-known Naramata Bench winery around stunning views and a wide-ranging wine list," "a knowledgeable, unpushy tasting staff.")*
+
+No award, ownership history, or atmosphere claim beyond what each venue's own record already states. None of the six needed flagging as data-too-thin-for-a-blurb — all six had enough concrete, specific detail in their existing description to write an honest sentence without padding or invention.
+
+---
+
+### Tests and results
+
+`npm test` — **58/58 passing**, no regressions.
+
+### Visual QA at all four widths
+
+Verified using a temporary, fully-reversible local setup: the six real venues (exact production field values — name, address, phone, rating, reviews, description, slug, coordinates) were mirrored into a **backed-up copy** of the local dev `okanagan.db` purely so the new section could be rendered and screenshotted through a real running server (the app's DB path isn't configurable via environment variable, so this was the only way to visually verify without a live production connection). The database was backed up before this, and **fully restored to its original byte-for-byte state afterward** (verified via matching MD5 checksum, `912b94d5...`, before and after) — no trace of the test data was left in the working tree, and none of it was ever committed.
+
+* **1440px / 1280px:** Two featured cards side by side (Miradoro, Linden Gardens), four supporting cards in a row below (Turtle Jack's, Checkmate, Intermezzo, Red Rooster). Generous whitespace, no borders beyond a hairline, no badges/pills, slim category-color accent bars, clean "Explore →" links. Reads as an editorial recommendation module, not a directory grid.
+* **390px / 375px:** Clean single column, all six cards full-width and easy to scan, featured cards keep slightly larger type. No cramped text, no awkward truncation.
+* **Horizontal overflow — directly measured, not eyeballed:** `document.documentElement.scrollWidth === window.innerWidth` exactly at all four widths (1440/1280/390/375), confirmed via CDP `Runtime.evaluate`.
+* **Card links verified correct and resolving:** all six `<a class="roam-card">` hrefs checked against the actual rendered HTML and confirmed to match the real `/<region>/<category>/<slug>` pattern, then each fetched directly and confirmed `200 OK`:
+  `/oliver/restaurants/miradoro-restaurant-1029`, `/kaleden/cafes/linden-gardens`, `/west-kelowna/pubs/turtle-jack-s-west-kelowna`, `/oliver/wineries/checkmate-artisanal-winery`, `/vernon/restaurants/intermezzo-restaurant-and-wine-cellar`, `/naramata/wineries/red-rooster-winery`.
+* **Console/runtime errors:** checked at all four widths via real CDP `Runtime.exceptionThrown`/`Log.entryAdded` events. Only the same single, pre-existing, already-documented `initBlock12` error appears at every width — no new error introduced by this section.
+
+### Sections 1–2 — confirmed unchanged
+
+`git diff --stat` shows zero changes to `okanagan.html`, `public/styles/app.css`, `public/scripts/app.js`, or `public/images/` — the hero and "Start Exploring" are untouched at the file level, not just visually. Both were also re-screenshotted as part of this pass (visible in the same captures used for Section 3 QA, scrolled past on the way to `#worthTheRoam`) and confirmed rendering identically to their previously-approved state.
+
+### Production data — confirmed unaffected
+
+No production request of any kind was made this task (no `curl` against `okanaganroam.com`, no admin endpoint, no Railway connection). The new `db.js` seed is application code that runs against whichever database the app connects to *when started* — it was only ever executed against a local, backed-up-and-restored dev database copy during this task, never against production. It will only ever create the real `worth_the_roam` collection rows in production once this code is actually deployed there, which this task explicitly did not do.
+
+---
+
+**No venue data, database records, or production data were changed. No admin endpoint was called. No deployment happened. Nothing was merged or committed to `main`.** All changes described above are implemented and committed on `ai-handoff/2026-09-15` only, commit `5b9ad2673ba11fddf241d4017ba8905eb72cfe10`.
