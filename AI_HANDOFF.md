@@ -622,6 +622,129 @@ The rest of Category B (154, 337, 724, 1051, 766, 1069) remain at MODERATE-HIGH 
 
 * **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, no manifest change, no deployment.** This entire pass was public web research (search, geocoding APIs, raw-HTML fetches, Overpass structured queries) only.
 
+## COMPLETE READ-ONLY RESEARCH & CLASSIFICATION PASS — All 52 Remaining Missing-Location Venues (2026-09-15)
+
+### Claude — full reconciliation, full classification, zero production writes.
+
+* **Status: read-only research only. No admin endpoint was called, no production data was changed, no merge/retire performed, no phone corrected, no code changed, no manifest change, no deployment, `main` untouched.**
+* **Step 1 — independent reconciliation, not reliant on old notes:** pulled `GET /api/venues?limit=2000` fresh just now. **Result: 1,055 active venues, exactly 52 missing address/lat/lng, identical IDs to every prior count this session.** Also pulled fresh `name`/`region`/`type`/`phone`/`redirect_to` for all 52 directly from this live pull — **zero drift** from any earlier research: every identity/phone value matches exactly what prior research (all from earlier in this same live session, not an old manifest) already established. `redirect_to` is `null` on all 52 — none are already-redirected duplicates.
+* **Step 2 — gap analysis:** cross-checked all 52 against everything researched so far this session. **Result: all 52 already had at least initial research from this session** — none were untouched. This pass's job was therefore to (a) close specific known gaps (two-source coordinate verification for #185 and #328, the correct phone for #547), (b) consolidate every classification into one complete, internally-consistent table, and (c) preserve prior conclusions where fresh evidence didn't change them, per instruction.
+* **New research closed this pass:**
+  * **#185 Dosa Crepe Cafe** now has a genuine second coordinate source: restaurantguru.com (49.0318206, -119.4635092) agrees with geocoder.ca (49.031811, -119.463718) within **~15m** — HIGH-tier coordinate agreement. (Note: Photon also surfaced a *different* "Dosa Crepe Cafe" at Gray Road, Kelowna — that's the already-known Rutland branch, and a possible third "523 Bernard Avenue" location — both irrelevant to Osoyoos but reinforcing why the phone-branch confusion this record has is a real, multi-location risk, not a one-off.)
+  * **#328 Kelly O'Bryan's (West Kelowna)** now has a second coordinate source: restaurantguru.com (49.8395276, -119.6103717) vs. geocoder.ca (49.838433, -119.609413) — **~140m apart**, a real but non-trivial gap (MODERATE-HIGH coordinate tier, not HIGH).
+  * **#547 Red Tomato Pies** — found the correct Vernon-specific phone via the business's own official website (redtomatopies.com/vernon): **(236) 426-1234**. This is a different number from both the stored (wrong, Kelowna's) number and any number previously floated — sourced directly from the official site, high confidence. No second coordinate source was found (Photon surfaced 5 *other* Red Tomato Pies franchise locations across BC, none in Vernon) — coordinate remains single-source geocoder.ca (confidence 0.77).
+
+---
+
+### Full classification — every one of the 52 IDs, exactly once
+
+**A. HIGH — ready for production enrichment (3)**
+
+| ID | Name | Region | Type | Phone | Verified Address | Lat | Lon | Sources | Agreement | Reason |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 896 | Kelly & Carlos O'Bryans Restaurant | kelowna | restaurant | +1 250-861-1338 | 262 Bernard Ave, Kelowna, BC V1Y 6N4 | 49.886535 | -119.497750 | geocoder.ca + restaurantguru.com | 9.2m | Two genuinely independent sources, tight agreement, confirmed distinct restaurantguru listing from #328's |
+| 39 | BNA Brewing Kelowna | kelowna | brewery | +1 236-420-0025 | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | geocoder.ca + restaurantguru.com | 0.0m | Two independent sources, effectively identical |
+| 41 | BNA Burger | kelowna | restaurant | +1 236-420-0025 | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | co-located sibling of #39 | 0.0m | Same building, same evidence as #39 |
+
+**B. MODERATE-HIGH — probably correct, stronger evidence would help (8)**
+
+| ID | Name | Region | Type | Phone | Verified Address | Lat | Lon | Sources | Agreement | What's missing for HIGH |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 154 | Craft 42 Roasters | kelowna | cafe | none | 1178 High Road, Kelowna, BC V1Y 7B1 | 49.892941 | -119.476575 | geocoder.ca + restaurantguru.com | 83.9m | A closer-agreeing third source, or a POI-name-exact match |
+| 337 | King's Vegetarian Food | kelowna | restaurant | none | 1631 Dickson Ave, Kelowna, BC | 49.879876 | -119.461448 | geocoder.ca + restaurantguru.com | 68.3m | Same as above |
+| 724 | Tickleberry's at the Peach | penticton | cafe | none | 185 Lakeshore Drive, Penticton, BC | 49.502472 | -119.595796 | geocoder.ca + Nominatim/Photon exact POI "The Peach" | 103.0m | Nominatim/Photon share an OSM backend, not fully independent of each other; a third, non-OSM source would close this |
+| 1051 | Moose Lounge | big-white | restaurant | none | 5315 Big White Rd, Kelowna, BC V1P 1P3 (Happy Valley Lodge) | 49.721408 | -118.926566 | geocoder.ca only, confidence 1.0 | n/a | Overpass queries for the resort timed out twice (server overload, not a real negative) — retry when the server is less loaded |
+| 1019 | Greenside Bar & Grill | osoyoos | restaurant | +1 250-495-7003 | 12300 Golf Course Dr, Osoyoos, BC V0H 1V0 | 49.015736 | -119.491028 | geocoder.ca only, confidence 0.8 | n/a | Single source; canonical of duplicate pair with #252 — merge first (see below) |
+| 535 | RANGE restaurant, bar + patio | vernon | restaurant | +1 250-503-3556 | 301 Village Centre Place, Vernon, BC V1H 1T2 | 50.189133 | -119.387605 | geocoder.ca only, confidence 0.9 | n/a | Single source; canonical of duplicate pair with #965 — merge first |
+| 581 | Shahi Pakwan | vernon | restaurant | +1 236-426-2627 | 2810 43rd Ave, Vernon, BC V1T 3L3 | 50.274629 | -119.269786 | geocoder.ca only, confidence 1.0 | n/a | Single source; canonical of duplicate pair with #972 — merge first |
+| 536 | Rail Trail Cafe & Market | coldstream | cafe | none | 13904 Kalamalka Rd, Coldstream, BC V1B 1Y9 | 50.232437 | -119.268655 | geocoder.ca only, confidence 0.9 | n/a | Single source; canonical of duplicate pair with #537 — merge first |
+
+**C. MODERATE / AMBIGUOUS — insufficient evidence for a safe write (13)**
+
+| ID | Name | Region | Type | Phone | Issue | What would resolve it |
+|---|---|---|---|---|---|---|
+| 95 | Bright Jenny Coffee | kelowna | cafe | +1 250-860-8848 | 3-4 Kelowna locations found, phone not disambiguated | Calling the stored number directly, or finding a per-location phone listing |
+| 225 | Freshslice Pizza | penticton | restaurant | none | 2 Penticton locations found, no phone to disambiguate | A phone lookup, or accepting one location on other grounds |
+| 311 | Jugo Juice | kelowna | cafe | none | 2 Kelowna locations found, no phone to disambiguate | Same as above |
+| 379 | MEX-KELOWNA TACOS | west-kelowna | restaurant | none | Food truck consistently at one fixed address (4+ sources) — a policy question, not a data gap | A team decision on whether fixed-location food trucks are enrichable |
+| 459 | Okanagan premium fruit juice | kelowna | cafe | none | **Identity could not be confirmed at all** despite genuine search effort | Manual confirmation of whether this business still exists under this name |
+| 511 | Pizza Factory | osoyoos | restaurant | +1 250-860-4149 | Address found (8115 Main St) but its published phone (250-495-2033) doesn't match stored — unconfirmed which is correct | A definitive source stating the current correct number (unlike #185/#328/#547, no authoritative replacement was found, just a conflicting one) |
+| 592 | Sky High Diner | vernon | restaurant | +1 778-212-8759 | Address found (6300 Tronson Rd) but one source calls it "Food Truck in Vernon" | Confirmation of fixed-vs-mobile status |
+| 650 | Tacos del cartel | oliver | restaurant | none | **Identity could not be confirmed at all** | Same as #459 |
+| 702 | The Mission Creamery | kelowna | cafe | +1 250-764-6171 | 2 Kelowna locations found, phone not disambiguated | Same as #95/#225/#311 |
+| 766 | Viva Mexicana Taco Bar | vernon | restaurant | none | Single source only (geocoder.ca 0.9); restaurantguru 404'd, Nominatim road-level, Photon found only unrelated same-named restaurants elsewhere | A second genuinely independent source — none found despite real effort |
+| 806 | barBURRITO | vernon | restaurant | +1 250-717-0959 | 2 Vernon locations found, **neither** matches stored phone | Confirming whether the stored number is simply outdated, or belongs to a third location |
+| 1066 | Francuccino's Gelato and Fries | silverstar | cafe | none | Business confirmed real, but geocoding is weak and internally inconsistent (two attempts ~1.3km apart, both low confidence) | Manual verification in SilverStar Village |
+| 1069 | Pit Stop Cafeteria | apex | restaurant | none | Single source (confidence 0.77, weakest in the set); new Apex resort structured data found this pass does **not** corroborate it — reveals a genuine 216-253m gap instead | A source that actually names this specific cafeteria within Apex Village, not just the resort's general address |
+
+**D. NEEDS PHONE CORRECTION (3)**
+
+| ID | Name | Region | Type | Stored Phone (WRONG) | Correct Phone | Verified Address | Lat | Lon | Coordinate Confidence |
+|---|---|---|---|---|---|---|---|---|---|
+| 185 | Dosa Crepe Cafe | osoyoos | restaurant | +1 778-753-6939 (Rutland/Kelowna branch's number) | 778-597-0245 (per dosacrepecafe.com official site) | 8143 Main St, Osoyoos, BC V0H 1V0 | 49.031811 | -119.463718 | **HIGH** (2 sources, ~15m — newly closed this pass) |
+| 328 | Kelly O'Bryan's Restaurant and Carlos O'Bryan's Pub | west-kelowna | pub | +1 250-549-2112 (Vernon #954's number) | +1 250-768-8442 (per kobcob.com official chain locations page) | 3470 Carrington Rd, West Kelowna, BC V4T 3C1 | 49.838433 | -119.609413 | MODERATE-HIGH (2 sources, ~140m — newly closed this pass) |
+| 547 | Red Tomato Pies | vernon | restaurant | +1 236-420-1515 (Kelowna location's number) | **(236) 426-1234** (per redtomatopies.com/vernon official site — newly found this pass) | 3002 41st Ave, Vernon, BC V1T 3H6 | 50.272171 | -119.272075 | MODERATE (single source, confidence 0.77; no second coordinate source found — Photon surfaced 5 other franchise locations, none in Vernon) |
+
+**E. DUPLICATE — requires merge decision, not ordinary enrichment (5)**
+
+See the full duplicate-pair investigation already on record above in this file (same-business confirmation, canonical choice, mergeable-field comparison, reasons not to merge — none found for any pair). Summary:
+
+| Duplicate ID | Canonical ID | Business |
+|---|---|---|
+| 252 | 1019 | Greenside Bar and Grill / Greenside Bar & Grill (Osoyoos Golf Club) |
+| 965 | 535 | Range Lounge & Grill / RANGE restaurant, bar + patio (Predator Ridge) |
+| 972 | 581 | Shahi Pakwaan / Shahi Pakwan (Vernon) |
+| 537 | 536 | Rail Trail Cafe Ice Cream Parlor / Rail Trail Cafe & Market (Coldstream) |
+| 1026 | #213 (already complete, not in the missing-52) | Pappa's Firehall Bistro / Firehall Bistro (Oliver) |
+
+For all 5, the same-business determination, canonical recommendation, and exact mergeable-field breakdown were freshly re-confirmed against live data this session (see the full writeup above) — no change from the prior conclusion. **None have been merged.**
+
+**F. EXCLUDE / DO NOT ENRICH — mobile, seasonal-touring, or otherwise unsuitable (20)**
+
+*Freshly confirmed via external research this session (not just internal signal):*
+
+| ID | Name | Evidence |
+|---|---|---|
+| 94 | Bread & Cheese Co | Own website explicitly calls it "Summerland Food Truck"; a separate "Bread & Cheese Truck" also exists on Facebook (Delta, BC) |
+| 131 | Charros Takos | Social posts describe rotating "Now at 📍[address]" placements; phone found at that address doesn't match stored |
+| 453 | Ogopogo Concessions | Own site/socials explicitly state it tours "a variety of venues throughout BC and Alberta during the summer season" — no fixed public location |
+
+*Carried forward from the original internal keyword audit (each record's own description text explicitly says "food truck" or equivalent) — not independently re-verified externally this specific pass, flagged transparently rather than overclaiming fresh verification:*
+
+130 CharCo Wood Fired Sandwiches · 156 Crepe Bistro · 158 Creperie Ooolala - Food truck · 196 El Sabor De Marina · 208 Eye Tasty Food · 260 Hammer's House of Hog · 304 Jeffer's Fryzz · 405 Mi Taqueria- Mexican Cantina (pop-up) · 450 OKF Grill · 507 Pit Stop Smokery · 531 Queen City Eats · 569 Same Same But Different Thai Food · 642 THE MAGIC FOOD TRUCK LTD · 644 TORI DORI Japanese Chicken & Grill · 652 Tak-Oh · 691 The Hot Box · 809 reggaefusionfood
+
+---
+
+### Reconciliation check — completeness proof
+
+Verified programmatically: **all 52 missing-location IDs appear in the classification above exactly once, no ID is missing, no ID is duplicated.** (39, 41, 94, 95, 130, 131, 154, 156, 158, 185, 196, 208, 225, 252, 260, 304, 311, 328, 337, 379, 405, 450, 453, 459, 507, 511, 531, 535, 536, 537, 547, 569, 581, 592, 642, 644, 650, 652, 691, 702, 724, 766, 806, 809, 896, 965, 972, 1019, 1026, 1051, 1066, 1069.) Counts: A=3, B=8, C=13, D=3, E=5, F=20 → **3+8+13+3+5+20 = 52.**
+
+---
+
+### Final proposed production worklist — ranked in safest order
+
+**1. First — straightforward HIGH-confidence enrichments (3 IDs, no dependencies):** #896, #39, #41.
+
+**2. Second — phone corrections that unlock safe enrichment (3 IDs, each phone+address+coordinates now fully documented):** #185, #328, #547 — in decreasing coordinate confidence order (185 HIGH-tier coordinate, 328 MODERATE-HIGH, 547 MODERATE). Each needs the phone correction and the address/lat/lng write together (the existing `/admin/enrich-venue` path can't touch phone; the reviewed-but-not-yet-committed `/admin/correct-phone` work from earlier in this branch's history would be the mechanism once it's live).
+
+**3. Third — duplicate merges (4 pairs + 1 pre-resolved, requiring explicit approval before any merge tool call):** #252→#1019, #965→#535, #972→#581, #537→#536, #1026→#213. Once merged, the 4 canonicals (#1019, #535, #581, #536) become immediately enrichable with their already-documented (single-source, MODERATE-HIGH) coordinates — or could be enriched with a fresh second-source pass first, at your discretion.
+
+**4. Fourth — remaining research/ambiguous cases needing more work before any write (13 in Category C):** #95, #225, #311, #379, #459, #511, #592, #650, #702, #766, #806, #1066, #1069 — none recommended for a near-term write; each has a specific documented blocker and a specific documented next research step.
+
+**Not on the worklist at all — excluded (20 in Category F):** confirmed or carried-forward mobile/food-truck businesses; no further action recommended unless the team wants deeper individual reconsideration of any specific one.
+
+---
+
+### Final live counts (confirmed at the end of this pass)
+
+* **Active venue count: 1,055**
+* **Redirect count: 26** (last independently verified this session via a full per-ID sweep of every gap in the id range — not re-swept in this pass since no merge/retire operation has occurred anywhere in production since that count was established, so it's mechanically guaranteed unchanged; every one of the 52 records checked in this pass also directly confirms its own `redirect_to: null`)
+* **Total rows (active + redirected): 1,081** (same basis as above)
+* **Active venues still missing address/lat/lng: 52** (unchanged by this pass — read-only, no writes)
+* **Exact IDs still missing:** 39, 41, 94, 95, 130, 131, 154, 156, 158, 185, 196, 208, 225, 252, 260, 304, 311, 328, 337, 379, 405, 450, 453, 459, 507, 511, 531, 535, 536, 537, 547, 569, 581, 592, 642, 644, 650, 652, 691, 702, 724, 766, 806, 809, 896, 965, 972, 1019, 1026, 1051, 1066, 1069
+
+* **Production remained completely untouched throughout this entire pass.** No admin endpoint was called, no venue was written, merged, retired, redirected, created, or deleted. No phone was corrected. No application code was modified. No manifest was modified. Nothing was deployed. `main` was not touched — this update exists only on `ai-handoff/2026-09-15`.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
