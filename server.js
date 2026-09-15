@@ -1500,6 +1500,61 @@ function renderStartExploringHTML() {
 </section>`;
 }
 
+// Homepage Section 3 ("Worth the Roam") — an editorial, no-photo
+// recommendation module, inserted immediately after "Start Exploring."
+// Deliberately distinct from both renderHiddenGemsHomepageHTML() (uses
+// the same collections/collection_items mechanism, a different `kind`)
+// and the photo-card renderStartExploringHTML() above (no images here,
+// intentionally — see the Section 3 research note in AI_HANDOFF.md:
+// production has zero venue image_url values today). Card membership,
+// order (via ci.position), and editorial blurb (via ci.note) all come
+// from the 'worth_the_roam' collection seeded in db.js — nothing here
+// is queried/derived from ratings or hardcoded venue IDs directly.
+function renderWorthTheRoamHTML() {
+  const rows = db.prepare(`
+    SELECT v.*, ci.note AS roam_note, ci.position AS roam_position
+    FROM venues v
+    JOIN collection_items ci ON ci.content_id = v.id AND ci.content_type = 'venue'
+    JOIN collections c ON c.id = ci.collection_id AND c.kind = 'worth_the_roam'
+    WHERE v.redirect_to IS NULL
+    ORDER BY ci.position ASC
+  `).all();
+
+  if (rows.length === 0) return ''; // graceful empty state: omit the whole module
+
+  const cards = rows.map((row, i) => {
+    const venue = rowToVenue(row);
+    const catSlug = CATEGORY_SLUGS[venue.type];
+    const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : '#';
+    const regionLabel = REGION_LABELS[venue.region] || venue.region;
+    const typeLabel = CATEGORY_LABELS[venue.type] ? CATEGORY_LABELS[venue.type].singular : venue.type;
+    const metaParts = [typeLabel, regionLabel];
+    if (venue.rating) metaParts.push(`★ ${venue.rating}${venue.reviews ? ` (${venue.reviews})` : ''}`);
+    const sizeClass = i < 2 ? 'roam-card-featured' : 'roam-card-supporting';
+    return `<a class="roam-card ${sizeClass}" href="${href}">
+      <div class="roam-card-accent roam-card-accent-${venue.type}"></div>
+      <div class="roam-card-body">
+        <div class="roam-card-meta">${metaParts.map(escapeHtml).join(' &middot; ')}</div>
+        <h3 class="roam-card-title">${escapeHtml(venue.name)}</h3>
+        <p class="roam-card-blurb">${escapeHtml(row.roam_note || '')}</p>
+        <span class="roam-card-cta">Explore <span aria-hidden="true">→</span></span>
+      </div>
+    </a>`;
+  }).join('\n');
+
+  return `
+<section class="discover-section worth-the-roam" id="worthTheRoam">
+  <div class="wrap">
+    <div class="discover-heading">
+      <span class="eyebrow">Worth the Roam</span>
+      <h2>A few places we think are worth the drive.</h2>
+      <p class="discover-lead">Good food, great drinks, and local spots worth making a little detour for.</p>
+    </div>
+    <div class="roam-grid">${cards}</div>
+  </div>
+</section>`;
+}
+
 function renderExploreByCategoryHTML() {
   // One lightweight aggregate query — deliberately not per-category (which
   // would be N+1). Also serves a real correctness need: it tells us which
@@ -1713,6 +1768,53 @@ function renderHomepageDiscoveryStyles() {
   .explore-card-whats-on{ grid-column: span 6; }
   .explore-card-explore{ grid-column: span 3; }
 
+  /* "Worth the Roam" (homepage Section 3) — editorial, no-photo
+     recommendation cards. Deliberately not a photo grid (see the Section
+     3 research note in AI_HANDOFF.md — production has no venue imagery
+     today) and deliberately not the Hidden Gems module's bold color-band
+     + pill-badge language, to avoid two visually-identical "badge card"
+     sections back to back on the same page. Reuses the same
+     TYPE_ACCENT_GRADIENTS colors via compactBandCSSRules (just a slim
+     4px top accent instead of a large labeled band), the same
+     .discover-section/.discover-heading/.eyebrow/.discover-lead used by
+     every other homepage module, and the same border-radius/box-shadow/
+     hover language as .discover-card and .explore-card. */
+  .roam-grid{
+    display:grid; grid-template-columns: repeat(12, 1fr); gap:20px;
+  }
+  .roam-card{
+    position:relative; display:flex; flex-direction:column;
+    background: var(--paper); border-radius:16px; overflow:hidden;
+    text-decoration:none; color: var(--ink);
+    box-shadow: 0 10px 22px -16px rgba(74,52,40,0.3);
+    border: 1px solid rgba(74,52,40,0.07);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .roam-card:hover{ transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.38); }
+  .roam-card-accent{ height:4px; width:100%; flex-shrink:0; }
+  ${compactBandCSSRules('roam-card-accent')}
+  .roam-card-body{ padding:26px 24px 22px; display:flex; flex-direction:column; gap:10px; flex:1; }
+  .roam-card-meta{
+    font-size:0.76rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+    color: rgba(42,32,25,0.55);
+  }
+  .roam-card-title{
+    font-family:'Fraunces',serif; font-weight:700; line-height:1.22; margin:0;
+    font-size:1.12rem; color: var(--ink);
+  }
+  .roam-card-blurb{
+    font-size:0.92rem; line-height:1.6; color: rgba(42,32,25,0.82); margin:0; flex:1;
+  }
+  .roam-card-cta{
+    font-family:'Nunito',sans-serif; font-weight:700; font-size:0.85rem; color: var(--plum);
+  }
+  .roam-card:hover .roam-card-cta{ text-decoration: underline; }
+  .roam-card-featured{ grid-column: span 6; }
+  .roam-card-supporting{ grid-column: span 3; }
+  .roam-card-featured .roam-card-body{ padding:34px 32px 28px; }
+  .roam-card-featured .roam-card-title{ font-size:1.5rem; }
+  .roam-card-featured .roam-card-blurb{ font-size:1rem; }
+
   @media (max-width: 640px) {
     .discover-card { flex-basis: 200px; }
     .hidden-gem-card { flex-basis: 210px; }
@@ -1729,6 +1831,11 @@ function renderHomepageDiscoveryStyles() {
     .explore-card-explore{ order:5; }
     .explore-card-whats-on{ grid-column: span 2; min-height:170px; order:6; }
     .explore-card-primary .explore-card-title{ font-size:1.3rem; }
+    .roam-grid{ grid-template-columns: 1fr; gap:16px; }
+    .roam-card-featured, .roam-card-supporting{ grid-column: span 1; }
+    .roam-card-body{ padding:22px 20px 20px; }
+    .roam-card-featured .roam-card-body{ padding:24px 22px 20px; }
+    .roam-card-featured .roam-card-title{ font-size:1.28rem; }
   }
 </style>`;
 }
@@ -2752,6 +2859,7 @@ const server = http.createServer(async (req, res) => {
         const happeningSoon = renderHappeningSoonHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
         const startExploring = renderStartExploringHTML();
+        const worthTheRoam = renderWorthTheRoamHTML();
         const exploreByCategory = renderExploreByCategoryHTML();
         const exploreRegions = renderExploreRegionsHTML();
 
@@ -2763,15 +2871,15 @@ const server = http.createServer(async (req, res) => {
           );
         }
 
-        // "Start Exploring" is the approved homepage Section 2 — rendered
-        // immediately after the hero, ahead of the existing "Browse by
-        // category"/"Explore the Okanagan" tile modules, which keep their
-        // own unchanged position right after it.
+        // "Start Exploring" (Section 2) and "Worth the Roam" (Section 3) are
+        // rendered immediately after the hero, in that order, ahead of the
+        // existing "Browse by category"/"Explore the Okanagan" tile modules,
+        // which keep their own unchanged position right after them.
         const heroToWeatherAnchor = '</section>\n\n<section class="weather-banner" id="weatherBanner"';
         if (html.includes(heroToWeatherAnchor)) {
           html = html.replace(
             heroToWeatherAnchor,
-            `</section>\n${startExploring}\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
+            `</section>\n${startExploring}\n${worthTheRoam}\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
           );
         }
 
