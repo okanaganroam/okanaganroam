@@ -239,6 +239,31 @@ This file is the shared coordination point for AI assistants working on this rep
 * **Manifest was not touched. No other venue was modified. No duplicates were merged or retired. No application code was changed. No deployment occurred.**
 * **Remaining in the original 6-venue batch:** #934 (moderate-high, ~390m spread between two sources), #987 and #180 (moderate, single-source each) — **not written, awaiting separate approval as instructed.**
 
+## Further Read-Only Research: #934, #987, #180 (2026-09-15) — Proposed, NOT Written
+
+### Claude — additional independent-source research. #934 resolved to HIGH; #987 and #180 remain single-source after exhausted search.
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, no merge/retire performed, no code changed, no deployment.**
+* **Method:** beyond the geocoder.ca / OSM (Nominatim + Photon) sources already tried, this pass added: Overpass API (structured name + house-number queries directly against OSM, more precise than Photon's fuzzy text ranking), golf-specific directories (GolfPass, Hole19, InteGolf), and raw-HTML fetches (bypassing AI-summarization, which can miss embedded JSON-LD) against Yelp, restaurantji, foodpages.ca, canpages.ca, and yellowpages.ca.
+
+**#934 14th Ave Bar & Grill (Hillview Golf Course) — RESOLVED to HIGH confidence.**
+
+Found a genuinely independent **third** source: **InteGolf**'s own course listing page embeds `schema.org GeoCoordinates` structured data for Hillview Golf Course specifically, including its own geocode timestamp (`"geocodeFetchedAt":"2026-03-17T08:13:26.551Z"`) — proof it's InteGolf's own independently-run geocode, not copied from OSM or geocoder.ca.
+
+| Source | Lat | Lon | Independent of |
+|---|---|---|---|
+| golftraxx (golf scorecard site, used earlier) | 50.2518398 | -119.2509141 | — |
+| geocoder.ca | 50.251750 | -119.245500 | OSM |
+| **InteGolf** (new) | **50.2517967** | **-119.2458648** | OSM and geocoder.ca |
+
+geocoder.ca and InteGolf — two genuinely independent sources — agree to within **~27 meters**. The golftraxx point is now the clear outlier, off by **~360m in longitude** from both. Combined with the earlier finding that geocoder.ca's point falls inside OSM's own mapped golf-course boundary polygon while golftraxx's point falls just outside it, there are now three separate pieces of evidence converging on the same ~50.2518, -119.2459 area and one outlier. **Recommended coordinate: latitude 50.2517967, longitude -119.2458648** (InteGolf's value, chosen for being both course-specific and independently timestamped; geocoder.ca's near-identical value serves as corroboration). **Confidence: HIGH — ready to write.**
+
+**#987 China Palace and #180 Dolci Thai Bistro — still single-source, despite a genuinely exhausted search.**
+
+Neither business is tagged as a named POI in OpenStreetMap (confirmed via both Photon fuzzy search and Overpass structured name/house-number queries — Overpass returned a clean, complete **empty result** for Dolci Thai's exact address, and a **timeout** for China Palace's structured query after two attempts, so that one specific check remains inconclusive rather than a clean negative). All of Yelp, restaurantji, foodpages.ca, canpages.ca, and yellowpages.ca either 403'd bot traffic or had no embedded geo data in their raw HTML. Neither business's own website has an embedded map. Both remain resting on their single geocoder.ca result documented earlier (#180: 49.032963, -119.467977, postal V0H 1V0 exact match, confidence 0.9; #987: 49.476851, -119.583657, postal V2A 5H5 exact match, confidence 1.0). **Confidence: MODERATE for both — unchanged from the prior pass. Your call on whether the single strong source is sufficient to write, given further free-tier search has been genuinely exhausted for these two.**
+
+* **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, nothing was deployed.**
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
