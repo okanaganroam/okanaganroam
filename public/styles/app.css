@@ -131,10 +131,14 @@
     position:absolute; inset:0;
     background: linear-gradient(180deg, rgba(20,14,10,0.58) 0%, rgba(20,14,10,0.32) 45%, rgba(20,14,10,0.64) 100%);
   }
+  /* Widened from the original 640px so the headline (below) has enough
+     room to land as two clean lines, one per sentence, instead of
+     wrapping mid-sentence. .hero-lead and .search-box keep their own
+     narrower max-width (unchanged, further down) regardless of this. */
   .hero-inner{
     position:relative; z-index:1;
     display:flex; flex-direction:column; align-items:center; text-align:center;
-    width:100%; min-width:0; max-width:640px; margin:0 auto;
+    width:100%; min-width:0; max-width:920px; margin:0 auto;
     box-sizing:border-box; padding-left:24px; padding-right:24px;
   }
   .hero-title{
