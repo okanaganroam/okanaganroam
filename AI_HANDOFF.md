@@ -1298,3 +1298,62 @@ I chose **not** to reorder the wizard or the discovery modules relative to the h
 ---
 
 **No production data was touched, no admin endpoint was called, no deployment happened, nothing was merged or committed to `main`.** All changes described above are implemented and committed on `ai-handoff/2026-09-15` only.
+
+## Homepage Hero — Visual QA Pass (2026-09-15)
+
+### Claude — visual QA only. No design changes made, no other sections touched, no production changes.
+
+* **Status: QA/documentation only. No CSS/HTML/JS was modified. No other homepage section was touched. No venue data or database was touched. No deploy. Nothing merged to `main`.**
+* **Verdict: NEEDS REVISION** — one genuine, reproducible visual defect found at every tested width (headline wraps to 4 lines instead of the intended 2), plus a related vertical-balance issue and one pre-existing, out-of-scope header issue at 375px. Full detail below.
+
+---
+
+### Method
+
+Screenshotted the real local homepage (`http://localhost:3099/`, this branch's code, small local dev dataset) using a purpose-built CDP-driven screenshot tool, not the Chrome CLI `--screenshot` flag. **Why:** the CLI flag was already found, empirically, in the previous session to silently enforce an undocumented ~500px minimum layout viewport regardless of the requested `--window-size` (confirmed by rendering a page that reports `window.innerWidth` back — asking for 390px returned 500px), which would have made the 390px/375px mobile checks this task explicitly asks for inaccurate. Built a small script (`cdp_screenshot.js`, local scratchpad only, not part of the repo) using Node's built-in `WebSocket` client to talk directly to Chrome DevTools Protocol: `Emulation.setDeviceMetricsOverride` for a true viewport width, `Page.captureScreenshot` for the image, and `Log`/`Runtime` events for real console-error capture. Verified this approach gets a genuine 390px viewport (same `innerWidth`-reporting test page, this time correctly returned 390) before trusting it for the actual QA screenshots.
+
+Also discovered and corrected for a real quirk in the page itself: the wizard's own init code (`showStep(1)`, pre-existing, untouched by the hero task) calls `scrollIntoView()` on the filter-bar section on every page load, so a screenshot taken right after load without forcing scroll position lands somewhere other than the true top of the page. Forced an explicit scroll position before every capture (either `scrollTo(0,0)` for header checks, or `scrollIntoView()` on `.hero` for hero checks) so results are deterministic rather than dependent on load-timing luck.
+
+---
+
+### 1–4. Screenshots captured at all four requested widths
+
+All four widths were captured both (a) at the true top of the page (header/logo check) and (b) scrolled precisely to the hero section (hero content check):
+
+| # | Width | Header check | Hero check |
+|---|---|---|---|
+| 1 | Desktop, 1440px | clean | 4-line headline wrap (see Issue 1) |
+| 2 | Laptop, 1280px | clean | 4-line headline wrap (see Issue 1) |
+| 3 | Mobile, 390px | clean | 4-line headline wrap, no horizontal overflow |
+| 4 | Mobile, 375px | **logo/EN-FR-toggle wrap** (see Issue 3) | 4-line headline wrap, no horizontal overflow |
+
+---
+
+### Findings
+
+**Issue 1 — Headline wraps to 4 lines instead of 2, at every width tested (genuine defect).**
+The approved copy and the implementation's own design intent (documented in the previous AI_HANDOFF entry) was a clean two-line headline: "Explore the Okanagan." on its own line, "Find your next favourite place." on its own line, via two separate `display:block` spans. In practice, at **all four widths (1440/1280/390/375)**, each sentence *itself* wraps onto a second line inside its own span — "Explore the" / "Okanagan." / "Find your next" / "favourite place." — producing a 4-line headline block, not 2. Root cause (diagnosis only, not fixed): `.hero-inner`'s `max-width: 640px` is narrower than either full sentence needs at the current `font-size: clamp(2.1rem, 5vw, 3.4rem)`. This is reproducible at every width, not a one-off. It works against the "confident, editorial, calm" brief — a 4-line, visually "busy" headline reads differently than the clean 2-line mark that was intended.
+
+**Issue 2 — Vertical balance: noticeably more empty hero-photo space below the quick-action buttons than above the headline**, most visible on desktop/laptop (1440/1280). Not broken, but doesn't read as tightly composed as the brief's "visually calm" / "confident" goals ask for. Likely compounded by Issue 1 — a taller, 4-line headline shifts the whole content block's effective vertical footprint, which may be interacting with `.hero`'s `align-items:center` vertical centering in a way that doesn't distribute evenly. Flagging as an observation to revisit together with Issue 1, not a separately-diagnosed root cause.
+
+**Issue 3 — Pre-existing header issue, NOT caused by the hero redesign, but genuinely observed at 375px:** the header's logo wordmark ("Okanagan Roam") wraps to two lines, and the EN/FR language toggle wraps to two lines ("EN /" / "FR"), specifically at 375px (not at 390px, where both fit on one line). This is entirely inside the header/nav markup and CSS, which the hero task never touched. Documenting it because the QA checklist explicitly asked for a 375px header/logo check and this is what's actually there — flagging for whoever owns header work next, not something addressed here.
+
+**Console/runtime errors — clean, no new errors at any width.** Checked all four widths via real `Runtime.exceptionThrown`/`Log.entryAdded` CDP events (not just eyeballing screenshots). Found exactly the same single **pre-existing** error at every width — `Uncaught TypeError: Cannot read properties of null (reading 'addEventListener') at initBlock12 (app.js:1457)` — which is the already-documented orphaned Google-Places "live search" dead code identified in the original homepage audit and reconfirmed (not introduced) during the hero implementation's own verification pass last turn. No second or new error appeared at any of the four widths.
+
+**Things that check out cleanly, no issues found:**
+* **No horizontal overflow at 390px or 375px** — confirmed at the *true* viewport width via CDP (not the CLI tool's inflated ~500px floor). The `min-width:0` flexbox fix from the implementation pass holds correctly at real narrow-phone widths, not just the ~500px width that was the smallest the previous verification pass could actually screenshot.
+* **Search field** — good size, contrast (dark placeholder text on off-white input, clear teal button), and placement at all four widths. On mobile it correctly stacks to a full-width input above a full-width button (pre-existing `.search-box` responsive rule, working correctly in its new hero context).
+* **Quick-action buttons (Eat/Drink/Explore/Hidden Gems)** — all four fit comfortably in one row at 1440px and 1280px; wrap to a 2-up + 2-full-width layout at 390px/375px exactly as the brief allowed ("may wrap/reflow naturally"). Good contrast (semi-transparent glass-style buttons read clearly over the photo at every width tested), no crowding, no text clipping inside any button at any width.
+* **Image composition/focal point** — consistent across all four widths (`object-fit:cover` recentring correctly, no stretching or broken crop). The building/barrels sit left-of-center at narrower widths with more open sky visible on the right — a legitimate stylistic observation, not a defect; worth a look if a tighter/more centered focal point is wanted, but nothing is broken.
+* **Header/logo positioning at 1440/1280/390** — clean, correctly aligned, unaffected by the hero changes (expected, since the header itself was never touched).
+
+---
+
+### Screenshot files
+
+All captured this pass, stored in this session's local scratchpad only (not committed to the repo — no existing convention in this project for storing QA screenshots in git, and committing binary QA artifacts wasn't part of the request):
+`v3_desktop_1440_top.png`, `v3_desktop_1440_hero.png`, `v3_laptop_1280_top.png`, `v3_laptop_1280_hero.png`, `v3_mobile_390_top.png`, `v3_mobile_390_hero.png`, `v3_mobile_375_top.png`, `v3_mobile_375_hero.png`.
+
+---
+
+**No design change was made. No other homepage section was modified. No venue data or database was touched. No deploy. Nothing merged to `main`.** This entire pass was screenshot capture, console-log capture, and visual inspection only.
