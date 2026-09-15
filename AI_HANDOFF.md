@@ -76,6 +76,76 @@ This file is the shared coordination point for AI assistants working on this rep
   * `okanagan.db` shows as modified in `git status` purely as a side effect of running `npm test` locally (it's a disposable fixture DB per the test file's own design) — not a real change, safe to ignore/not stage.
   * This is still an uncommitted, local-only diff. Nothing has been staged or committed pending this review.
 
+## Next Enrichment Batch — Proposed, NOT Executed (2026-09-15)
+
+### Claude — HIGH-confidence re-triage + fresh verification for the 66 missing-location venues
+
+* **Status: read-only preparation only. No admin endpoint was called, no production data was changed, nothing committed/pushed/deployed.**
+* **Step 1 — reconciliation:** Pulled `GET https://okanaganroam.com/api/venues?limit=2000` fresh just now and recomputed the missing-address/lat/lng list. **Result: still exactly 66 active venues, identical IDs** to the set identified earlier this session (20, 39, 41, 94, 95, 130, 131, 154, 156, 158, 180, 185, 196, 208, 225, 252, 260, 304, 311, 328, 337, 360, 379, 405, 426, 450, 453, 459, 484, 507, 511, 521, 531, 535, 536, 537, 547, 569, 581, 592, 597, 642, 644, 650, 652, 691, 702, 724, 725, 766, 768, 769, 806, 809, 896, 908, 934, 965, 972, 987, 1014, 1019, 1026, 1051, 1066, 1069). Nothing changed on production since the last check — the earlier HIGH/MEDIUM/LOW internal tiering (done from internal signals only: phone presence, duplicate/mobile/seasonal keyword hits) is still current and not stale, but see the next step for why "internal HIGH" and "verified HIGH" are two different things.
+* **Step 2 — fresh external verification of the 13 internally-HIGH candidates** (IDs 95, 131, 180, 360, 426, 484, 511, 547, 592, 702, 806, 934, 987): each was independently web-searched by name+region and cross-checked against its stored phone number, per the same conservative standard as the 2026-09-08 batch (exact phone match to a single unambiguous listing required before treating an address as safe to write). **Result: only 6 of the 13 survived fresh verification.** The other 7 looked clean from internal data alone but turned out to have a real-world complication only visible once actually researched externally — which is exactly why this verification step exists rather than trusting the internal tier alone.
+
+**READY — 6 venues, exact phone match confirmed, single unambiguous location, safe for a write batch:**
+
+| ID | Name | Region | Stored phone | Verified address | Source confidence |
+|---|---|---|---|---|---|
+| 180 | Dolci Thai Bistro | osoyoos | +1 250-495-6807 | 8710 Main St, Osoyoos, BC V0H 1V0 | Exact phone+address match (Yelp + direct query); one aggregator (tableagent.com) listed a different number, judged to be that third-party booking site's own forwarding line, not the restaurant's real number — the restaurant's own number and address are consistently confirmed together elsewhere |
+| 360 | Lala Ji's pizzeria | penticton | +1 778-622-2211 | 625 Main St, Penticton, BC V2A 5C9 | Exact phone+address match (multiple independent sources) |
+| 426 | Murray's Pizza Kelowna | kelowna | +1 778-484-3000 | 107-1924 Summit Drive, Kelowna, BC V1V 3E9 | Exact phone+address match; a separate West Kelowna location exists under the same brand with a different address/phone — confirmed our record is the Kelowna one specifically |
+| 484 | Parlour Ice Cream | kelowna | +1 250-300-7071 | 1571 Abbott Street, Kelowna, BC V1Y 1A8 | Exact phone+address match (multiple independent sources) |
+| 934 | 14th Ave Bar & Grill | vernon | +1 250-549-4653 | 1101 14 Avenue, Vernon, BC V1B 2S6 (Hillview Golf Course) | Exact phone match to Hillview Golf Course's own listed number; venue's name literally derives from the course's street address, a nice corroborating detail. Seasonally closed in winter (normal for a golf-course restaurant) — this is a fixed address, not a mobile concern |
+| 987 | China Palace | penticton | +1 250-492-9883 | 1933 Main Street, Penticton, BC V2A 5H5 | Exact phone+address match (multiple independent sources) |
+
+**Note: none of the 6 above have latitude/longitude yet** — only street addresses were verified this pass (no geocoding tool was available/used). Getting precise coordinates should be the next step immediately before any write, consistent with "fresh verification immediately before every write."
+
+**NOT READY — 7 venues downgraded out of the internal-HIGH tier, each for a specific, verified reason:**
+
+| ID | Name | Region | Stored phone | Issue found | Disposition |
+|---|---|---|---|---|---|
+| 95 | Bright Jenny Coffee | kelowna | +1 250-860-8848 | Genuine multi-location chain (at least 3 Kelowna locations found: Lakeshore Rd, Kane Rd, Kirschner Rd, plus a possible 4th at Laurel Ave); the stored phone could not be tied to one specific location via search | Needs per-location phone lookup before it can be enriched safely — do not write yet |
+| 131 | Charros Takos | kelowna | +1 250-870-2854 | Social posts describe it as a rotating food truck ("Now at 📍 1948 Windsor Rd" — a dated, location-specific post, not a fixed address), and the phone found for that address (587-888-9976) doesn't match our stored number | Likely mobile — should probably move to the food-truck exclusion list, not the enrichment queue. Needs a human/product call, not a straightforward write either way |
+| 511 | Pizza Factory | osoyoos | +1 250-860-4149 | Address found (8115 Main St, Osoyoos) but its phone (250-495-2033) does not match our stored number | Phone mismatch unresolved — do not write yet |
+| 547 | Red Tomato Pies | vernon | +1 236-420-1515 | Confirmed: that exact phone number belongs to the **Kelowna** location of this franchise, not Vernon (401 Glenmore Rd, Kelowna) — same class of error as the Kelly O'Bryan's #328 case found earlier this session | Needs a phone correction (via the new `/admin/correct-phone`, once that work is reviewed/committed/deployed) combined with enrichment, not enrichment alone |
+| 592 | Sky High Diner | vernon | +1 778-212-8759 | Address found (6300 Tronson Rd, near Vernon Airport) but one listing explicitly titles it "Food Truck in Vernon" | Possibly a semi-permanent food-truck/trailer at a fixed pad rather than a building — needs confirmation of fixed-vs-mobile status before writing |
+| 702 | The Mission Creamery | kelowna | +1 250-764-6171 | Two Kelowna locations found (450 Cook Road "AQUA Boat Club" and 4649 Lakeshore Road); the phone could not be tied to one specific location | Needs per-location disambiguation before it can be enriched safely — do not write yet |
+| 806 | barBURRITO | vernon | +1 250-717-0959 | Two Vernon locations found (Square Mall: 236-426-2626; Polson Park: 778-943-0776) — **neither** matches our stored phone | Stored phone may be outdated/wrong or belong to a third, unlisted location — do not write yet |
+
+* **No production data was changed, no admin endpoint was called, nothing was committed, pushed, or deployed.** This entire pass was `GET` requests to the live public API plus external web research only.
+* **For ChatGPT to review:** the proposed 6-venue READY batch above (180, 360, 426, 484, 934, 987) is the recommended next enrichment batch, pending (a) a final geocoding pass for lat/lng immediately before writing, and (b) your review/agreement on the verification evidence. The 7 downgraded venues should stay out of any batch until their specific issues are separately resolved — three of them (95, 702, 806) need per-location phone disambiguation, two (131, 592) need a fixed-vs-mobile determination, one (511) has an unexplained phone mismatch, and one (547) needs a phone correction bundled with its enrichment (same pattern as #328 and #185).
+
+## Lat/Lng Geocoding Attempt for the 6 READY Venues (2026-09-15) — Read-Only, Mixed Result
+
+### Claude — geocoding pass, honest result: only 1 of 6 reached verifiable building-level precision
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, nothing committed/pushed/deployed.**
+* **Method:** No paid/authoritative geocoding API is available to me directly, so I used OpenStreetMap's public Nominatim search API (`nominatim.openstreetmap.org/search`, `addressdetails=1`) against each verified street address from the prior batch, then checked the **match precision** of each result (does it resolve to the actual building/POI, or just to the street in general?) rather than trusting the returned lat/lon at face value. This caught real problems — several results were street-midpoint matches with no house number, one had a postal code that didn't match the business's real postal code, and one matched to a completely different business at a shared/multi-tenant address.
+* **Result: only #484 (Parlour Ice Cream) reached genuine building-level confidence.** The other 5 did not meet the same bar this project has used throughout ("verify each coordinate against the exact verified street address" — not just "get some coordinate"), so their lat/lng is being reported as **unresolved**, not written or approximated.
+
+| ID | Name | Verified address | Nominatim result | Match precision | Confidence |
+|---|---|---|---|---|---|
+| 484 | Parlour Ice Cream | 1571 Abbott Street, Kelowna, BC V1Y 1A8 | lat 49.8860040, lon -119.4992216 | **Exact POI name+house-number match**: `display_name` = "Parlour Ice Cream, 1571, Abbott Street, Kelowna..." | **HIGH — ready to write** |
+| 426 | Murray's Pizza Kelowna | 107-1924 Summit Drive, Kelowna, BC V1V 3E9 | lat 49.9013835, lon -119.4532433 | House number 1924 matched exactly, **but** the indexed POI at that point is "Glenmore Martial Arts" (a different business), and the postal code returned (V1V 1N9) doesn't match the business's own postal code (V1V 3E9) — likely a shared/multi-tenant building where OSM only tagged one unit | **LOW-MODERATE — do not write yet**; the street/building location is probably close, but neither the tenant nor the postal code independently confirm it |
+| 934 | 14th Ave Bar & Grill (Hillview Golf Course) | 1101 14 Avenue, Vernon, BC V1B 2S6 | Two conflicting results: (a) an earlier web search tied specifically to "Hillview Golf Course" gave 50.2518398, -119.2509141; (b) a plain Nominatim address search gave 50.2522626, -119.3048354, road-level only, in a **different-sounding neighborhood** ("Okanagan Landing" vs. the golf course's actual area) | The two results are **~4 km apart** — a real discrepancy, not rounding noise | **UNRESOLVED — do not write yet**; the venue-specific source (a) is more likely correct but has no second independent source confirming it |
+| 180 | Dolci Thai Bistro | 8710 Main St, Osoyoos, BC V0H 1V0 | lat 49.0284355, lon -119.4596481 | Road-level only (no house number in the result), postal code returned (V0H 1V7) doesn't match the business's confirmed postal code (V0H 1V0) | **LOW — do not write yet** |
+| 360 | Lala Ji's pizzeria | 625 Main St, Penticton, BC V2A 5C9 | lat 49.4853834, lon -119.5864221 | Road-level only, postal code returned (V2A 5G1) doesn't match confirmed postal code (V2A 5C9) | **LOW — do not write yet** |
+| 987 | China Palace | 1933 Main Street, Penticton, BC V2A 5H5 | lat 49.4823519, lon -119.5853958 | Road-level only, postal code returned (V2A 5G5) doesn't match confirmed postal code (V2A 5H5) | **LOW — do not write yet** |
+
+### Follow-up (2026-09-15) — #484 Parlour Ice Cream coordinate independently cross-verified
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, nothing committed/pushed/deployed.**
+* The single-source OSM coordinate reported above was cross-checked against a second, genuinely independent source (not OSM-derived): **geocoder.ca**, a Canada-specific geocoding service built on Canada Post/StatCan address data.
+
+| Source | Data pipeline | Latitude | Longitude | Corroborating detail |
+|---|---|---|---|---|
+| OpenStreetMap (queried via both Nominatim and Photon — two different query engines, same underlying dataset, so counted as one source) | Crowd-sourced OSM | 49.886004 | -119.4992216 | Matched a POI node **explicitly named "Parlour Ice Cream"** at house number 1571, Abbott Street |
+| geocoder.ca | Canada Post / StatCan civic address data — independent of OSM | 49.886150 | -119.499270 | Returned postal code **V1Y 1A8** — an exact match to the business's own confirmed postal code; self-reported confidence 0.8 |
+
+* **The two independent sources agree to within ~17 meters** (a normal spread between a business's POI pin and its parcel/address centroid), and the independent source's postal code exactly matches the verified business address — this is a genuine two-independent-source confirmation, not just the same dataset queried twice.
+* **Recommended coordinate for #484: latitude 49.886004, longitude -119.4992216** (the OSM value, chosen because it's tied to the actual named business POI rather than a generic address centroid — geocoder.ca's centroid-based point serves as corroboration, not the primary value).
+* **No production data was changed, no admin endpoint was called, nothing was committed, pushed, or deployed.** This pass was public geocoding-API `GET` requests only.
+
+* **Recommendation:** only **#484 (Parlour Ice Cream)** is ready for an actual enrichment write with both address and lat/lng — now with two-source-verified coordinates (49.886004, -119.4992216). The other 5 venues' street addresses remain verified and safe to write on their own (per the earlier phone-match research), but their coordinates should either come from a real geocoding API (Google Maps Geocoding API, which the live site likely already depends on for its own "get directions" links) or a manual human check in Google Maps — not from this free-tier lookup, which has now demonstrably produced wrong-postal-code and wrong-POI results for this specific set of small-town/rural BC addresses.
+* **No production data was changed, no admin endpoint was called, nothing was committed, pushed, or deployed.** This pass was public geocoding-API `GET` requests only.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
