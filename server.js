@@ -487,6 +487,102 @@ function guardedRegionCorrectUpdate(id, expectedCurrentRegion, correctedRegion) 
   return { ok: true, noop: false, venue: getVenue(id) };
 }
 
+// ---------- Phase 2.6R-support-2: guarded single-field phone correction ----------
+//
+// A SEPARATE, standalone code path. Does not touch guardedEnrichUpdate(),
+// guardedCorrectUpdate(), guardedRetireUpdate(), guardedRegionCorrectUpdate(),
+// or guardedMergeAndRetireUpdate() in any way, and is not reachable through
+// any of their routes.
+//
+// Modeled closely on guardedRegionCorrectUpdate()'s single-field pattern
+// rather than widening guardedCorrectUpdate()'s fixed three-field
+// (address/latitude/longitude) contract -- phone is a different kind of
+// correction (a free-text identity field, not part of that geo-bounded
+// trio), so it gets its own narrow function and route instead of stretching
+// an existing one's documented, deliberately-narrow scope.
+//
+// Unlike region (NOT NULL in the schema), phone IS nullable. A plain
+// `phone = ?` comparison in the WHERE clause would never match when the
+// live value is NULL (SQL NULL is never equal to anything, including
+// another NULL), so a caller correcting a venue whose phone is currently
+// empty would always get a false "mismatch" with the naive comparison.
+// The WHERE clause below handles both the populated-value and NULL cases
+// explicitly, checked atomically in the same UPDATE statement -- not as a
+// separate check beforehand -- exactly like every other guarded* function
+// in this file.
+//
+// Unlike guardedRegionCorrectUpdate() (no audit trail), this DOES write a
+// venue_enrichment_log row on a real change, matching guardedCorrectUpdate()'s
+// precedent instead -- auditability was an explicit requirement for this
+// addition, and the audit-log table already exists with no schema change
+// needed (field_name is free TEXT, not an enum).
+//
+// Returns one of:
+//   { found: false }
+//   { found: true, mismatch: false, changed: false, venue }              -- no-op: expected_current_phone === corrected_phone
+//   { found: true, mismatch: true, live: {...} }                         -- expected_current_phone didn't match the live row; nothing written
+//   { found: true, mismatch: false, changed: true, venue }               -- write succeeded, one audit-log row written
+function guardedPhoneCorrectUpdate(id, expectedCurrentPhone, correctedPhone, meta) {
+  const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  if (!existing) return { found: false };
+
+  if (expectedCurrentPhone === correctedPhone) {
+    // Nothing to do -- expected_current_phone and corrected_phone are
+    // identical, matching guardedCorrectUpdate()'s no-op behavior for an
+    // unchanged field. No write, no audit row, not treated as an error.
+    return { found: true, mismatch: false, changed: false, venue: getVenue(id) };
+  }
+
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+
+    const info = db
+      .prepare(
+        `UPDATE venues SET phone = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND (phone = ? OR (phone IS NULL AND ? IS NULL))`
+      )
+      .run(correctedPhone, id, expectedCurrentPhone, expectedCurrentPhone);
+
+    if (info.changes !== 1) {
+      // Live row didn't match expected_current_phone -- roll back (nothing
+      // was actually written) and report the mismatch along with the real
+      // live value, exactly mirroring guardedCorrectUpdate()'s behavior.
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { found: true, mismatch: true, live: getVenue(id) };
+    }
+
+    db.prepare(
+      `INSERT INTO venue_enrichment_log
+         (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+       VALUES (?, 'phone', ?, ?, 'manual_correction', ?, 'high', ?, 0, ?)`
+    ).run(
+      id,
+      existing.phone === null ? null : String(existing.phone),
+      String(correctedPhone),
+      meta.reason,
+      meta.batch_id,
+      meta.reviewed_by || null
+    );
+
+    db.exec('COMMIT');
+    txOpen = false;
+    return { found: true, mismatch: false, changed: true, venue: getVenue(id) };
+  } catch (err) {
+    if (txOpen) {
+      try {
+        db.exec('ROLLBACK');
+      } catch (_) {
+        // ROLLBACK itself failing means there's nothing left to roll back --
+        // safe to ignore, since the original error is what matters to the caller.
+      }
+    }
+    throw err;
+  }
+}
+
 function deleteVenue(id) {
   const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
 
@@ -3091,6 +3187,92 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
       }
       return sendJSON(res, 200, { id, noop: result.noop, venue: result.venue });
+    }
+
+    // POST /admin/correct-phone
+    //
+    // A separate, narrowly-scoped path for correcting an already-populated
+    // (typically incorrect) phone number -- e.g. a value copied from the
+    // wrong branch/location of a chain during scraping. Does not alter
+    // /admin/enrich-venue, /admin/correct-venue, /admin/correct-region,
+    // /admin/retire-duplicate, or /admin/merge-and-retire-duplicate in any
+    // way. Reuses the exact same bearer-token check as every other admin
+    // endpoint.
+    if (pathname === '/admin/correct-phone' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Correct-phone endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      // --- allowlist validation: reject the WHOLE request if any
+      // unexpected top-level key is present ---
+      const ALLOWED_CORRECT_PHONE_KEYS = ['id', 'expected_current_phone', 'corrected_phone', 'reason', 'batch_id'];
+      const unexpectedPhoneKeys = Object.keys(body).filter((k) => !ALLOWED_CORRECT_PHONE_KEYS.includes(k));
+      if (unexpectedPhoneKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedPhoneKeys.join(', ')}` });
+      }
+
+      const id = body.id;
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (typeof body.reason !== 'string' || body.reason.trim() === '') {
+        return sendJSON(res, 400, { error: 'reason is required and must be a non-empty string.' });
+      }
+      if (typeof body.batch_id !== 'string' || body.batch_id.trim() === '') {
+        return sendJSON(res, 400, { error: 'batch_id is required and must be a non-empty string.' });
+      }
+      if (!('expected_current_phone' in body)) {
+        return sendJSON(res, 400, { error: 'expected_current_phone is required.' });
+      }
+      const expectedCurrentPhone = body.expected_current_phone;
+      if (expectedCurrentPhone !== null && typeof expectedCurrentPhone !== 'string') {
+        return sendJSON(res, 400, { error: 'expected_current_phone must be a string or null.' });
+      }
+      if (typeof body.corrected_phone !== 'string' || body.corrected_phone.trim() === '') {
+        return sendJSON(res, 400, { error: 'corrected_phone must be a non-empty string.' });
+      }
+      // Trim once here -- the TRIMMED value is both what gets validated for
+      // emptiness above (via .trim() === '') and what actually gets stored,
+      // so a caller can't accidentally persist leading/trailing whitespace.
+      const correctedPhone = body.corrected_phone.trim();
+
+      let result;
+      try {
+        result = guardedPhoneCorrectUpdate(id, expectedCurrentPhone, correctedPhone, {
+          reason: body.reason,
+          batch_id: body.batch_id,
+          reviewed_by: null,
+        });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Phone correction failed and was rolled back.', detail: String(err.message || err) });
+      }
+
+      if (!result.found) {
+        return sendJSON(res, 404, { error: 'Venue not found.' });
+      }
+      if (result.mismatch) {
+        return sendJSON(res, 409, {
+          error: 'expected_current_phone did not match the live venue record; no changes were made.',
+          live: { phone: result.live.phone },
+        });
+      }
+      return sendJSON(res, 200, {
+        id,
+        changed: result.changed,
+        venue: { phone: result.venue.phone },
+      });
     }
 
     // POST /admin/merge-and-retire-duplicate

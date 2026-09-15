@@ -17,10 +17,19 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
+const { spawn } = require('node:child_process');
 
 const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 // Guarantee a clean slate every run.
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
+
+// ENRICHMENT_ADMIN_TOKEN is read once, at module load, by server.js — it
+// must be set BEFORE the require() below for /admin/correct-phone's auth
+// tests to have a real (non-503) token configured. This is a fixture
+// value only, never a real credential, and only exists in this test
+// process's environment.
+process.env.ENRICHMENT_ADMIN_TOKEN = 'test-fixture-admin-token';
 
 const app = require('../server.js');
 const db = require('../db.js');
@@ -63,6 +72,29 @@ insert.run({
   description: 'A fixture golf course used only by the automated test suite.',
   address: '456 Fairway Dr, Kelowna, BC V1Y 0B0', latitude: 49.89, longitude: -119.49, hours: null,
   slug: 'test-golf-course',
+});
+
+// ---- seed fixtures for /admin/correct-phone tests -----------------------
+insert.run({
+  name: 'Test Phone Fixture', region: 'kelowna', type: 'restaurant', cuisine: null,
+  phone: '+1 250-555-0177', price: null, reviews: null, rating: null,
+  description: 'A fixture venue with a known, populated phone number, used only by the /admin/correct-phone test suite.',
+  address: null, latitude: null, longitude: null, hours: null,
+  slug: 'test-phone-fixture',
+});
+insert.run({
+  name: 'Test Null Phone Fixture', region: 'kelowna', type: 'restaurant', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'A fixture venue with a NULL phone number, used only by the /admin/correct-phone NULL-precondition tests.',
+  address: null, latitude: null, longitude: null, hours: null,
+  slug: 'test-null-phone-fixture',
+});
+insert.run({
+  name: 'Test Populated Phone For Null Check', region: 'kelowna', type: 'restaurant', cuisine: null,
+  phone: '+1 250-555-0188', price: null, reviews: null, rating: null,
+  description: 'A dedicated fixture with a populated phone, used only to test expected_current_phone: null against a POPULATED live value -- kept separate from Test Phone Fixture so it is never mutated by other /admin/correct-phone tests.',
+  address: null, latitude: null, longitude: null, hours: null,
+  slug: 'test-populated-phone-for-null-check',
 });
 
 // ---- seed the 6 approved Hidden Gems (Design Sprint 4) ------------------
@@ -676,7 +708,262 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   const trattoriaPage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
   assert.equal(trattoriaPage.status, 200, 'existing venue route must still work');
 
+  // ---- /admin/correct-phone ---------------------------------------------
+  // Folded into this same start/close cycle for the same reason as the
+  // Design Sprint 4 block above: a second app.startServer()/server.close()
+  // cycle in this file has been observed to make later fetch calls fail.
+  const phoneFixture = app.findVenueBySlug('kelowna', 'restaurant', 'test-phone-fixture');
+  const nullPhoneFixture = app.findVenueBySlug('kelowna', 'restaurant', 'test-null-phone-fixture');
+  const populatedForNullCheckFixture = app.findVenueBySlug('kelowna', 'restaurant', 'test-populated-phone-for-null-check');
+  const ADMIN_TOKEN = process.env.ENRICHMENT_ADMIN_TOKEN;
+
+  async function correctPhone(bodyObj, token = ADMIN_TOKEN) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${base}/admin/correct-phone`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(bodyObj),
+    });
+    return { status: res.status, body: await res.json() };
+  }
+
+  // 401 — wrong bearer token, no write attempted.
+  {
+    const { status } = await correctPhone(
+      { id: phoneFixture.id, expected_current_phone: '+1 250-555-0177', corrected_phone: '+1 250-555-9999', reason: 'test', batch_id: 'test-batch' },
+      'wrong-token'
+    );
+    assert.equal(status, 401, 'wrong bearer token must be rejected');
+  }
+
+  // 400 — unexpected top-level key.
+  {
+    const { status, body } = await correctPhone({ id: phoneFixture.id, expected_current_phone: '+1 250-555-0177', corrected_phone: '+1 250-555-9999', reason: 'test', batch_id: 'test-batch', extra: 'nope' });
+    assert.equal(status, 400);
+    assert.match(body.error, /Unexpected field/);
+  }
+
+  // 400 — missing expected_current_phone entirely.
+  {
+    const { status, body } = await correctPhone({ id: phoneFixture.id, corrected_phone: '+1 250-555-9999', reason: 'test', batch_id: 'test-batch' });
+    assert.equal(status, 400);
+    assert.match(body.error, /expected_current_phone is required/);
+  }
+
+  // 400 — empty corrected_phone.
+  {
+    const { status, body } = await correctPhone({ id: phoneFixture.id, expected_current_phone: '+1 250-555-0177', corrected_phone: '   ', reason: 'test', batch_id: 'test-batch' });
+    assert.equal(status, 400);
+    assert.match(body.error, /corrected_phone/);
+  }
+
+  // 404 — nonexistent venue id.
+  {
+    const { status } = await correctPhone({ id: 999999999, expected_current_phone: '+1 250-555-0177', corrected_phone: '+1 250-555-9999', reason: 'test', batch_id: 'test-batch' });
+    assert.equal(status, 404);
+  }
+
+  // 409 — wrong expected_current_phone on a POPULATED field; nothing written,
+  // including no audit-log row (the INSERT is unreachable before this early
+  // return, but assert it directly rather than relying on that by inspection).
+  {
+    const before = venue_enrichment_log_count(phoneFixture.id);
+    const { status, body } = await correctPhone({ id: phoneFixture.id, expected_current_phone: '+1 250-000-0000', corrected_phone: '+1 250-555-9999', reason: 'test', batch_id: 'test-batch' });
+    assert.equal(status, 409, 'mismatched expected_current_phone must be rejected');
+    assert.equal(body.live.phone, '+1 250-555-0177', 'the response must report the real live phone');
+    const stillUnchanged = app.getVenue(phoneFixture.id);
+    assert.equal(stillUnchanged.phone, '+1 250-555-0177', 'phone must be unchanged after a 409');
+    assert.equal(venue_enrichment_log_count(phoneFixture.id), before, 'a 409 must not write an audit-log row');
+  }
+
+  // 409 — NULL-precondition case: wrong (non-null) expected_current_phone
+  // asserted against a venue whose live phone is actually NULL. Must
+  // mismatch cleanly, not throw, and report the real (null) live value.
+  {
+    const { status, body } = await correctPhone({ id: nullPhoneFixture.id, expected_current_phone: '+1 250-555-0000', corrected_phone: '+1 250-555-1234', reason: 'test', batch_id: 'test-batch' });
+    assert.equal(status, 409, 'a non-null expected_current_phone must mismatch against a genuinely NULL live phone');
+    assert.equal(body.live.phone, null);
+  }
+
+  // 409 — the reverse NULL-precondition case: expected_current_phone: null
+  // asserted against a venue whose live phone is actually POPULATED. Must
+  // mismatch (the caller's belief that the field is empty is wrong), not
+  // silently match or throw, and the phone must remain unchanged.
+  {
+    const { status, body } = await correctPhone({ id: populatedForNullCheckFixture.id, expected_current_phone: null, corrected_phone: '+1 250-555-2222', reason: 'test', batch_id: 'test-batch' });
+    assert.equal(status, 409, 'expected_current_phone: null must mismatch against a genuinely POPULATED live phone');
+    assert.equal(body.live.phone, '+1 250-555-0188', 'the response must report the real, populated live phone');
+    assert.equal(app.getVenue(populatedForNullCheckFixture.id).phone, '+1 250-555-0188', 'phone must be unchanged after a 409');
+  }
+
+  // 200 — NULL-precondition MATCH case: expected_current_phone: null
+  // correctly matches a live NULL phone, and the write succeeds. Exercises
+  // the "(phone IS NULL AND ? IS NULL)" branch of the WHERE clause, not
+  // just its negative (mismatch) case above.
+  {
+    const before = venue_enrichment_log_count(nullPhoneFixture.id);
+    const { status, body } = await correctPhone({ id: nullPhoneFixture.id, expected_current_phone: null, corrected_phone: '+1 250-555-4321', reason: 'null-precondition match test', batch_id: 'test-batch-null-match' });
+    assert.equal(status, 200, 'expected_current_phone: null must match a genuinely NULL live phone');
+    assert.equal(body.venue.phone, '+1 250-555-4321');
+    assert.equal(app.getVenue(nullPhoneFixture.id).phone, '+1 250-555-4321');
+    const logRows = db.prepare('SELECT * FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ?').all(nullPhoneFixture.id, 'phone');
+    assert.equal(logRows.length, before + 1, 'exactly one new audit-log row must be written');
+    const newest = logRows[logRows.length - 1];
+    assert.equal(newest.old_value, null);
+    assert.equal(newest.new_value, '+1 250-555-4321');
+    assert.equal(newest.source, 'manual_correction');
+    assert.equal(newest.batch_id, 'test-batch-null-match');
+  }
+
+  // corrected_phone trimming: padded input must be validated as non-empty
+  // (it is, after trimming) AND stored as the TRIMMED value, not verbatim.
+  {
+    const { status, body } = await correctPhone({ id: nullPhoneFixture.id, expected_current_phone: '+1 250-555-4321', corrected_phone: '  +1 250-555-8765  ', reason: 'trim test', batch_id: 'test-batch-trim' });
+    assert.equal(status, 200);
+    assert.equal(body.venue.phone, '+1 250-555-8765', 'response must reflect the trimmed value, not the padded one');
+    assert.equal(app.getVenue(nullPhoneFixture.id).phone, '+1 250-555-8765', 'stored phone must be trimmed, with no leading/trailing whitespace');
+  }
+
+  function venue_enrichment_log_count(venueId) {
+    return db.prepare('SELECT COUNT(*) AS n FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ?').get(venueId, 'phone').n;
+  }
+
+  // 200 — success path on the originally-populated fixture, with exactly
+  // one audit-log row written recording the real old/new values.
+  {
+    const before = venue_enrichment_log_count(phoneFixture.id);
+    const { status, body } = await correctPhone({ id: phoneFixture.id, expected_current_phone: '+1 250-555-0177', corrected_phone: '+1 250-555-9999', reason: 'confirmed via chain locations page', batch_id: 'test-batch-success' });
+    assert.equal(status, 200);
+    assert.equal(body.changed, true);
+    assert.equal(body.venue.phone, '+1 250-555-9999');
+    assert.equal(app.getVenue(phoneFixture.id).phone, '+1 250-555-9999');
+
+    const logRows = db.prepare('SELECT * FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ?').all(phoneFixture.id, 'phone');
+    assert.equal(logRows.length, before + 1, 'exactly one new audit-log row must be written');
+    const newest = logRows[logRows.length - 1];
+    assert.equal(newest.old_value, '+1 250-555-0177');
+    assert.equal(newest.new_value, '+1 250-555-9999');
+    assert.equal(newest.source, 'manual_correction');
+    assert.equal(newest.source_ref, 'confirmed via chain locations page');
+    assert.equal(newest.batch_id, 'test-batch-success');
+    assert.equal(newest.confidence, 'high');
+    assert.equal(newest.auto_accepted, 0);
+  }
+
+  // Concurrent stale-precondition race: a second caller holding the SAME
+  // (now-stale) expected_current_phone that was true before the successful
+  // correction above must be rejected with 409, not silently overwrite the
+  // just-applied correction. Simulates "process A wrote based on a stale
+  // read" — the exact scenario this atomic WHERE-clause guard exists for.
+  {
+    const { status, body } = await correctPhone({ id: phoneFixture.id, expected_current_phone: '+1 250-555-0177', corrected_phone: '+1 250-555-0000', reason: 'stale caller', batch_id: 'test-batch-stale' });
+    assert.equal(status, 409, 'a stale expected_current_phone must be rejected even though it WAS correct before the prior write');
+    assert.equal(body.live.phone, '+1 250-555-9999', 'must report the value the prior write actually left in place');
+    assert.equal(app.getVenue(phoneFixture.id).phone, '+1 250-555-9999', 'the stale caller must not have changed anything');
+  }
+
+  // No-op case: expected_current_phone === corrected_phone. Must succeed
+  // without writing an audit-log row (mirrors guardedCorrectUpdate()'s
+  // existing no-op behavior for an unchanged field).
+  {
+    const before = venue_enrichment_log_count(phoneFixture.id);
+    const { status, body } = await correctPhone({ id: phoneFixture.id, expected_current_phone: '+1 250-555-9999', corrected_phone: '+1 250-555-9999', reason: 'noop', batch_id: 'test-batch-noop' });
+    assert.equal(status, 200);
+    assert.equal(body.changed, false);
+    assert.equal(venue_enrichment_log_count(phoneFixture.id), before, 'a true no-op must not write an audit-log row');
+  }
+
   // Close the listener so the test process can exit naturally instead of
   // hanging on an open server handle.
   await new Promise((resolve) => app.server.close(resolve));
+});
+
+// ---- /admin/correct-phone: 503 when ENRICHMENT_ADMIN_TOKEN is unset -----
+//
+// server.js reads ENRICHMENT_ADMIN_TOKEN exactly once, at module load. The
+// shared test harness above already sets a fixture token before its single
+// require('../server.js') call, for the whole rest of this file -- so the
+// "token genuinely unset" path can't be exercised in-process here without
+// either re-requiring server.js (Node's CommonJS cache would just return
+// the already-loaded module with the token already baked in) or spinning
+// up a second app.startServer()/server.close() cycle in THIS process,
+// which the file's own comments already document as breaking later
+// fetches in the shared test above.
+//
+// Isolation strategy: copy server.js + db.js (their real, unmodified
+// content -- byte-for-byte, via fs.copyFileSync, nothing rewritten) into a
+// fresh OS temp directory, then launch that copy as a genuinely separate
+// `node <copy>/server.js` CHILD PROCESS with its own process.env (built
+// from a shallow copy of the parent's env with ENRICHMENT_ADMIN_TOKEN
+// explicitly deleted, so it's unset regardless of what the parent
+// process's own environment happens to contain) and its own PORT (3098,
+// distinct from the shared harness's 3001). This gives three independent
+// axes of isolation from both the real project and the shared test run
+// above:
+//   1. Separate OS process -> its own require() cache, so
+//      ENRICHMENT_ADMIN_TOKEN is read fresh at THAT process's module-load
+//      time, from THAT process's env, not this test file's already-primed
+//      one.
+//   2. Separate directory (a fresh os.tmpdir() subdirectory) -> db.js
+//      resolves its DB_PATH relative to ITS OWN __dirname, which is now
+//      the temp directory, not the project root -- so it opens/creates an
+//      entirely new, empty SQLite file there, never touching the real
+//      project's okanagan.db or the shared test run's copy of it.
+//   3. Separate port (3098 vs. 3001) -> no listener conflict with the
+//      shared test above, even though that test has already closed its
+//      server by the time this one runs.
+// The temp directory and child process are both torn down in `finally`,
+// so a failed assertion can't leak either.
+test('/admin/correct-phone returns 503 when ENRICHMENT_ADMIN_TOKEN is unset (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-503-isolation-test-'));
+  const projectRoot = path.join(__dirname, '..');
+  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
+  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+
+  const ISOLATED_PORT = '3098';
+  const childEnv = { ...process.env };
+  delete childEnv.ENRICHMENT_ADMIN_TOKEN; // explicitly unset, regardless of the parent's own env
+  childEnv.PORT = ISOLATED_PORT;
+
+  const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], {
+    cwd: tempDir,
+    env: childEnv,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let stderrOutput = '';
+  child.stderr.on('data', (chunk) => { stderrOutput += chunk.toString(); });
+
+  try {
+    // Poll a harmless, always-public route until the isolated child is
+    // actually accepting connections, rather than guessing a fixed delay.
+    const deadline = Date.now() + 10000;
+    let ready = false;
+    while (Date.now() < deadline && !ready) {
+      try {
+        const res = await fetch(`http://localhost:${ISOLATED_PORT}/robots.txt`);
+        if (res.status === 200) ready = true;
+      } catch (_) {
+        // Connection refused -- not listening yet. Retry shortly.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+    assert.ok(ready, `isolated child server on port ${ISOLATED_PORT} never became ready. stderr: ${stderrOutput}`);
+
+    const res = await fetch(`http://localhost:${ISOLATED_PORT}/admin/correct-phone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // Even a well-formed body must never get past the token check --
+      // the unset-token 503 is the very first thing the route checks.
+      body: JSON.stringify({ id: 1, expected_current_phone: null, corrected_phone: 'x', reason: 'x', batch_id: 'x' }),
+    });
+    assert.equal(res.status, 503, `expected 503 with ENRICHMENT_ADMIN_TOKEN unset in the isolated process. stderr: ${stderrOutput}`);
+    const body = await res.json();
+    assert.match(body.error, /not configured/);
+  } finally {
+    child.kill();
+    await new Promise((resolve) => child.once('exit', resolve));
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
