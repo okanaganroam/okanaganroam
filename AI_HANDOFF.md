@@ -147,6 +147,23 @@ This file is the shared coordination point for AI assistants working on this rep
 * **Recommendation:** only **#484 (Parlour Ice Cream)** is ready for an actual enrichment write with both address and lat/lng — now with two-source-verified coordinates (49.886004, -119.4992216). The other 5 venues' street addresses remain verified and safe to write on their own (per the earlier phone-match research), but their coordinates should either come from a real geocoding API (Google Maps Geocoding API, which the live site likely already depends on for its own "get directions" links) or a manual human check in Google Maps — not from this free-tier lookup, which has now demonstrably produced wrong-postal-code and wrong-POI results for this specific set of small-town/rural BC addresses.
 * **No production data was changed, no admin endpoint was called, nothing was committed, pushed, or deployed.** This pass was public geocoding-API `GET` requests only.
 
+## EXECUTED — #484 Parlour Ice Cream Production Enrichment (2026-09-15)
+
+### Claude — single-venue write, completed and verified
+
+* **Status: DONE. This is the one production data write authorized and performed this session.**
+* **Mechanism:** `POST /admin/enrich-venue` via the existing guarded `guardedEnrichUpdate()` path — no new code, no schema change, no bypass. Auth was handled via `railway run` (the Railway CLI, already linked to this project's production environment), which injects the real `ENRICHMENT_ADMIN_TOKEN` into a local subprocess's environment; the literal token value was never printed, logged, committed, or written anywhere, including here.
+* **Pre-write verification:** live `GET /api/venues/484` confirmed identity (name "Parlour Ice Cream", region `kelowna`, type `cafe`, phone `+1 250-300-7071`) and confirmed `address`/`latitude`/`longitude` were all still `null`. Active count baseline: 1,055.
+* **Write performed:** `{"id": 484, "address": "1571 Abbott Street, Kelowna, BC V1Y 1A8", "latitude": 49.886004, "longitude": -119.4992216}`. Server response: `{"id":484,"results":{"address":"written","latitude":"written","longitude":"written"}}` — all three fields were genuinely empty beforehand and were written (none skipped as already-populated).
+* **Post-write verification (all passed):**
+  * `address`, `latitude`, `longitude` on the live record now exactly match the approved values.
+  * Every other field — `phone`, `name`, `region`, `type`, `slug`, `cuisine`, `rating`, `price`, `reviews`, `description`, `description_fr`, `hours`, `website`, `image_url`, `redirect_to` (still null), and all 12 boolean amenity flags — is byte-for-byte identical to the pre-write record. Only `updated_at` changed, as expected.
+  * Active venue count: still 1,055 (unchanged).
+  * Redirect count: not independently checkable via any public endpoint (same long-standing limitation noted earlier in this file), but structurally guaranteed unchanged — `guardedEnrichUpdate()` never touches `redirect_to`.
+* **Anomaly found and reported, not hidden: no audit-log record exists for this write, and that's expected given the actual code, not a verification failure.** `guardedEnrichUpdate()` (used here, for filling empty fields) was never wired to write to `venue_enrichment_log` — only `guardedCorrectUpdate()` (used for fixing already-wrong values) does that. There was nothing to find because this code path doesn't create one. **Flagging for ChatGPT/team decision:** should `guardedEnrichUpdate()` gain the same audit trail `guardedCorrectUpdate()` already has, for parity? This affects every future enrichment write, not just this one.
+* **Missing-location count impact:** 66 → 65 active venues now missing address/lat/lng (arithmetic inference from this single write; not independently re-pulled as part of this entry).
+* **Manifest was not touched. No other venue was modified. No duplicates were merged. No application code was changed. No unrelated deploy occurred.**
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
