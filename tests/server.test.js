@@ -698,7 +698,13 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(homepageBody, /id="exploreByCategory"/);
   assert.match(homepageBody, /id="exploreRegions"/);
   assert.match(homepageBody, /id="directory"/, 'Discovery Wizard section must be untouched');
-  assert.match(homepageBody, /class="hero"/, 'Worth the Drive hero must be untouched');
+
+  // Milestone 1 (approved homepage redesign) — the old "Worth the Drive"
+  // carousel is intentionally replaced by a scenic hero + a new "What are
+  // you in the mood for?" section, both ahead of the wizard.
+  assert.match(homepageBody, /class="hero-scenic"/, 'New scenic hero (Milestone 1) must render');
+  assert.match(homepageBody, /id="moodCards"/, 'Mood cards section (Milestone 1) must render');
+  assert.doesNotMatch(homepageBody, /class="hero">/, 'Old "Worth the Drive" hero carousel must be gone');
 
   const eventsApi = await fetch(`${base}/api/events`);
   const collectionsApi = await fetch(`${base}/api/collections`);

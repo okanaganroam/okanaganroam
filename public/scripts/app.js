@@ -24,9 +24,23 @@ var TRANSLATIONS = {
     'nav.directory': 'Directory',
     'nav.listVenue': 'List Your Venue',
     'nav.appComingSoon': 'App coming soon',
-    'hero.eyebrow': 'Enderby to Osoyoos',
-    'hero.headline': 'Find wineries, restaurants, cafes, breweries, and lounges across the Okanagan Valley.',
-    'hero.lead': 'Search by region, cuisine, and what matters to you \u2014 dog-friendly patios, vegan menus, kid-friendly spaces, and happy hour timing \u2014 across 1,000+ verified venues.',
+    'hero.eyebrow': 'Okanagan Valley, BC',
+    'hero.headline': 'Let\u2019s find your next favourite place in the Okanagan.',
+    'hero.lead': 'From lakeside patios to hidden wineries, discover where to eat, drink, and explore across the valley.',
+    'mood.heading': 'What are you in the mood for?',
+    'mood.lead': 'Start with what sounds good. We\u2019ll help you find somewhere worth going.',
+    'mood.eat.title': 'Eat',
+    'mood.eat.desc': 'Find your next favourite table.',
+    'mood.drink.title': 'Drink',
+    'mood.drink.desc': 'Wineries, breweries, cocktails & more.',
+    'mood.hiddenGems.title': 'Hidden Gems',
+    'mood.hiddenGems.desc': 'The places you might drive past.',
+    'mood.golf.title': 'Golf',
+    'mood.golf.desc': 'Tee off somewhere beautiful.',
+    'mood.whatsOn.title': 'What\u2019s On',
+    'mood.whatsOn.desc': 'See what\u2019s happening around the valley.',
+    'mood.explore.title': 'Explore',
+    'mood.explore.desc': 'Let\u2019s see where the road takes you.',
     'featured.eyebrow': 'Worth the trip',
     'featured.heading': 'Featured this month',
     'search.placeholder': "Search a place, cuisine, or what you're craving",
@@ -177,9 +191,23 @@ var TRANSLATIONS = {
     'nav.directory': 'R\u00e9pertoire',
     'nav.listVenue': '\u00c9crivez votre \u00e9tablissement',
     'nav.appComingSoon': 'Application bient\u00f4t disponible',
-    'hero.eyebrow': "D'Enderby \u00e0 Osoyoos",
-    'hero.headline': 'D\u00e9couvrez vignobles, restaurants, caf\u00e9s, brasseries et bars-salons dans toute la vall\u00e9e de l\u2019Okanagan.',
-    'hero.lead': 'Recherchez par r\u00e9gion, cuisine et ce qui compte pour vous \u2014 terrasses acceptant les chiens, menus v\u00e9gans, espaces adapt\u00e9s aux enfants et horaires de l\u2019happy hour \u2014 parmi plus de 1 069 \u00e9tablissements v\u00e9rifi\u00e9s.',
+    'hero.eyebrow': "Vall\u00e9e de l'Okanagan, C.-B.",
+    'hero.headline': 'Trouvons votre prochain endroit pr\u00e9f\u00e9r\u00e9 dans l\u2019Okanagan.',
+    'hero.lead': 'Des terrasses au bord du lac aux vignobles cach\u00e9s, d\u00e9couvrez o\u00f9 manger, boire et explorer dans toute la vall\u00e9e.',
+    'mood.heading': "Qu'est-ce qui vous tente aujourd'hui\u00a0?",
+    'mood.lead': 'Commencez par ce qui vous fait envie. On vous aide \u00e0 trouver un endroit qui en vaut la peine.',
+    'mood.eat.title': 'Manger',
+    'mood.eat.desc': 'Trouvez votre prochaine table pr\u00e9f\u00e9r\u00e9e.',
+    'mood.drink.title': 'Boire',
+    'mood.drink.desc': 'Vignobles, brasseries, cocktails et plus encore.',
+    'mood.hiddenGems.title': 'Tr\u00e9sors cach\u00e9s',
+    'mood.hiddenGems.desc': 'Les endroits que vous pourriez manquer.',
+    'mood.golf.title': 'Golf',
+    'mood.golf.desc': 'Jouez dans un cadre magnifique.',
+    'mood.whatsOn.title': "Quoi de neuf",
+    'mood.whatsOn.desc': 'D\u00e9couvrez ce qui se passe dans la vall\u00e9e.',
+    'mood.explore.title': 'Explorer',
+    'mood.explore.desc': 'Voyons o\u00f9 la route vous m\u00e8ne.',
     'featured.eyebrow': '\u00c7a vaut le d\u00e9tour',
     'featured.heading': 'En vedette ce mois-ci',
     'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
@@ -1273,7 +1301,16 @@ function initBlock8(){
     if (toResults) updateCount(steps[3], '.stamp-btn', 'wizard.seeResultsLabel', toResults, false);
   });
 
-  showStep(1);
+  // Milestone 1 (approved homepage redesign): showStep(1) used to be a
+  // harmless no-op scroll on page load, back when the wizard was the very
+  // first section on the page. Now that the hero + mood cards sit above
+  // it, an unconditional scrollIntoView here would yank every visitor
+  // straight past both of them on first load. skipScroll (already
+  // supported by showStep for exactly this kind of case, see
+  // __showResultsNoScroll above) keeps the wizard's own step-1 state
+  // correct without moving the viewport -- explicit wizard navigation
+  // (Back/Edit/reset, handled above) still scrolls as before.
+  showStep(1, true);
 }
 
 /* ---------- Collapse Cuisine/Price once the user hits Search, to free up
@@ -1672,46 +1709,6 @@ function initBlock12(){
   };
 })();
 
-/* ---------- Hero slideshow: auto-advance plus manual prev/next arrows ---------- */
-(function(){
-  var scenes = Array.prototype.slice.call(document.querySelectorAll('.hero-scene'));
-  var prevBtn = document.getElementById('heroPrev');
-  var nextBtn = document.getElementById('heroNext');
-  if (!scenes.length) return;
-
-  var current = 0;
-  scenes.forEach(function(s, i){ if (s.classList.contains('hero-scene-active')) current = i; });
-
-  var autoAdvanceMs = 5000;
-  var timer = null;
-
-  function show(index){
-    scenes[current].classList.remove('hero-scene-active');
-    current = (index + scenes.length) % scenes.length;
-    scenes[current].classList.add('hero-scene-active');
-  }
-
-  function restartAutoAdvance(){
-    if (timer) clearInterval(timer);
-    timer = setInterval(function(){ show(current + 1); }, autoAdvanceMs);
-  }
-
-  if (prevBtn) prevBtn.addEventListener('click', function(e){
-    e.stopPropagation();
-    show(current - 1);
-    restartAutoAdvance();
-  });
-  if (nextBtn) nextBtn.addEventListener('click', function(e){
-    e.stopPropagation();
-    show(current + 1);
-    restartAutoAdvance();
-  });
-
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    restartAutoAdvance();
-  }
-})();
-
 /* ---------- Shared: scroll to a venue's card by name and briefly highlight it ---------- */
 window.__scrollToVenueCard = function(name){
   if (!name) return false;
@@ -1733,17 +1730,53 @@ window.__scrollToVenueCard = function(name){
   return true;
 };
 
-/* ---------- Hero scenes: click to jump to that venue's card in the directory ---------- */
+/* ---------- Milestone 1 (approved homepage redesign): scenic hero search.
+   Delegates entirely to the existing #searchInput/#searchBtn search
+   implementation in initBlock1() -- copies the typed value across and
+   clicks the real search button, so the existing runSearch()/applyFilters()
+   logic, wizard:showResults dispatch, and scroll behavior all run exactly
+   as they already do for the directory's own search box. No new filtering
+   logic. ---------- */
 (function(){
-  var heroArt = document.querySelector('.hero-art');
-  if (!heroArt) return;
+  var form = document.getElementById('heroSearchForm');
+  var heroInput = document.getElementById('heroSearchInput');
+  var mainInput = document.getElementById('searchInput');
+  var mainBtn = document.getElementById('searchBtn');
+  if (!form || !heroInput || !mainInput || !mainBtn) return;
 
-  heroArt.addEventListener('click', function(e){
-    var scene = e.target.closest('.hero-scene-clickable');
-    if (!scene) return;
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    mainInput.value = heroInput.value;
+    mainBtn.click();
+  });
+})();
 
-    var name = scene.getAttribute('data-venue-name');
-    window.__scrollToVenueCard(name);
+/* ---------- Milestone 1 (approved homepage redesign): "What are you in
+   the mood for?" cards. Eat/Drink press the existing .type-chip buttons
+   (the exact same multi-select filter initBlock1() already implements)
+   and dispatch the existing wizard:showResults event to reveal the
+   results grid -- no new filtering system. Hidden Gems/Golf/What's
+   On/Explore are plain links (to #hiddenGems, a real category page,
+   #happeningSoon, and #exploreRegions respectively) and are left to
+   navigate normally. ---------- */
+(function(){
+  var grid = document.querySelector('.mood-card-grid');
+  if (!grid) return;
+
+  function setTypeFilter(types){
+    document.querySelectorAll('.type-chip').forEach(function(chip){
+      var shouldBePressed = types.indexOf(chip.dataset.type) !== -1;
+      var isPressed = chip.getAttribute('aria-pressed') === 'true';
+      if (shouldBePressed !== isPressed) chip.click();
+    });
+    document.dispatchEvent(new Event('wizard:showResults'));
+  }
+
+  grid.addEventListener('click', function(e){
+    var card = e.target.closest('[data-mood-filter]');
+    if (!card) return;
+    e.preventDefault();
+    setTypeFilter(card.dataset.moodFilter.split(','));
   });
 })();
 

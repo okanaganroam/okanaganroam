@@ -1513,6 +1513,80 @@ function renderExploreRegionsHTML() {
 </section>`;
 }
 
+// Milestone 1 (approved homepage redesign): "What are you in the mood
+// for?" -- six visual discovery cards immediately after the new hero.
+// Eat/Drink reuse the existing wizard type-chip multi-select filter
+// exactly as-is (see the "Mood cards" block in app.js, which presses the
+// real .type-chip buttons and dispatches the existing wizard:showResults
+// event) -- no new filtering system. Hidden Gems/What's On/Explore are
+// plain anchor links into sections that already exist on this page
+// (#hiddenGems, #happeningSoon, #exploreRegions). Golf has no wizard
+// chip on this codebase's filter UI, so it links directly to the real,
+// existing golf category page for whichever region actually has golf
+// venues -- reusing the exact same bestRegionForType aggregate query
+// renderExploreByCategoryHTML() already runs, computed independently
+// here since that function returns HTML, not data. If no golf venues
+// exist at all in the current database, the card falls back to
+// #directory (opens the wizard) rather than linking to a page that
+// would 404 -- the card itself always renders; only its destination is
+// conditional, since the six cards are a fixed design, not a
+// data-driven list like Browse by Category.
+function renderMoodCardsHTML() {
+  const rows = db.prepare(`
+    SELECT type, region, COUNT(*) AS n
+    FROM venues
+    WHERE redirect_to IS NULL
+    GROUP BY type, region
+    ORDER BY n DESC
+  `).all();
+  const bestRegionForType = {};
+  for (const row of rows) {
+    if (!bestRegionForType[row.type]) bestRegionForType[row.type] = row.region;
+  }
+  const golfRegion = bestRegionForType.golf;
+  const golfHref = golfRegion && CATEGORY_SLUGS.golf ? `/${golfRegion}/${CATEGORY_SLUGS.golf}` : '#directory';
+
+  // Placeholder imagery (public/images/mood/*.png) pending real
+  // AI-generated photography -- see public/images/PLACEHOLDER_IMAGES.md.
+  const cards = [
+    { key: 'eat', tier: 'primary', href: '#directory', filter: 'restaurant,cafe', img: '/images/mood/eat.png', titleKey: 'mood.eat.title', title: 'Eat', descKey: 'mood.eat.desc', desc: 'Find your next favourite table.' },
+    { key: 'drink', tier: 'primary', href: '#directory', filter: 'winery,brewery,cocktail,pub', img: '/images/mood/drink.png', titleKey: 'mood.drink.title', title: 'Drink', descKey: 'mood.drink.desc', desc: 'Wineries, breweries, cocktails & more.' },
+    { key: 'hidden-gems', tier: 'primary', href: '#hiddenGems', filter: null, img: '/images/mood/hidden-gems.png', titleKey: 'mood.hiddenGems.title', title: 'Hidden Gems', descKey: 'mood.hiddenGems.desc', desc: 'The places you might drive past.' },
+    { key: 'golf', tier: 'secondary', href: golfHref, filter: null, img: '/images/mood/golf.png', titleKey: 'mood.golf.title', title: 'Golf', descKey: 'mood.golf.desc', desc: 'Tee off somewhere beautiful.' },
+    { key: 'whats-on', tier: 'secondary', href: '#happeningSoon', filter: null, img: '/images/mood/whats-on.png', titleKey: 'mood.whatsOn.title', title: "What's On", descKey: 'mood.whatsOn.desc', desc: 'See what’s happening around the valley.' },
+    { key: 'explore', tier: 'secondary', href: '#exploreRegions', filter: null, img: '/images/mood/explore.png', titleKey: 'mood.explore.title', title: 'Explore', descKey: 'mood.explore.desc', desc: 'Let’s see where the road takes you.' },
+  ];
+
+  function cardHtmlFor(c) {
+    const filterAttr = c.filter ? ` data-mood-filter="${c.filter}"` : '';
+    const dims = c.tier === 'primary' ? 'width="900" height="1200"' : 'width="960" height="540"';
+    return `<a class="mood-card mood-card-${c.tier} mood-card-${c.key}" href="${c.href}"${filterAttr}>
+      <img class="mood-card-img" src="${c.img}" ${dims} alt="" loading="lazy">
+      <span class="mood-card-overlay">
+        <span class="mood-card-title" data-i18n="${c.titleKey}">${escapeHtml(c.title)}</span>
+        <span class="mood-card-desc" data-i18n="${c.descKey}">${escapeHtml(c.desc)}</span>
+      </span>
+    </a>`;
+  }
+
+  const primaryHtml = cards.filter((c) => c.tier === 'primary').map(cardHtmlFor).join('\n');
+  const secondaryHtml = cards.filter((c) => c.tier === 'secondary').map(cardHtmlFor).join('\n');
+
+  return `
+<section class="discover-section mood-section" id="moodCards">
+  <div class="wrap">
+    <div class="discover-heading">
+      <h2 data-i18n="mood.heading">What are you in the mood for?</h2>
+      <p class="discover-lead" data-i18n="mood.lead">Start with what sounds good. We'll help you find somewhere worth going.</p>
+    </div>
+    <div class="mood-card-grid">
+      <div class="mood-card-row mood-card-row-primary">${primaryHtml}</div>
+      <div class="mood-card-row mood-card-row-secondary">${secondaryHtml}</div>
+    </div>
+  </div>
+</section>`;
+}
+
 // Shared CSS for the four modules above — reuses the existing shared
 // design tokens (/styles/tokens.css, already loaded by okanagan.html)
 // rather than inventing a new palette. Injected once via a single <style>
@@ -1597,6 +1671,103 @@ function renderHomepageDiscoveryStyles() {
     .hidden-gem-card { flex-basis: 210px; }
     .category-tile-grid, .region-tile-grid { grid-template-columns: repeat(2, 1fr); }
     .tile-tagline { font-size: 0.72rem; }
+  }
+
+  /* Milestone 1 (approved homepage redesign): scenic hero. Reuses the
+     existing --plum/--teal/--amber token palette and Fraunces/Nunito
+     font pairing already established above rather than inventing a new
+     visual language. */
+  .hero-scenic {
+    position: relative; overflow: hidden; color: #fff;
+    min-height: 560px; display: flex; align-items: flex-end;
+  }
+  .hero-media { position: absolute; inset: 0; z-index: 0; }
+  .hero-media-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(20,14,10,0.10) 0%, rgba(20,14,10,0.72) 100%);
+  }
+  .hero-inner { position: relative; z-index: 1; padding: 72px 0 56px; max-width: 640px; }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.82rem;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--amber); margin-bottom: 10px;
+  }
+  .hero-title {
+    font-family: 'Fraunces', serif; font-size: clamp(2rem, 5vw, 3.2rem);
+    line-height: 1.1; margin: 0 0 16px; max-width: 16ch;
+    color: #fff; /* app.css's global h1,h2,h3,.display rule sets color:
+                    var(--ink) directly on every h1, which otherwise wins
+                    over the inherited white from .hero-scenic -- a
+                    same-property declaration on the element itself beats
+                    an ancestor's inherited value regardless of the
+                    ancestor's specificity. */
+  }
+  .hero-lead {
+    font-family: 'Nunito', sans-serif; font-size: clamp(0.95rem, 1.6vw, 1.08rem);
+    line-height: 1.5; margin: 0 0 26px; max-width: 46ch; color: rgba(255,255,255,0.92);
+  }
+  .hero-search-box {
+    display: flex; align-items: center; max-width: 420px; background: rgba(255,255,255,0.97);
+    border-radius: 999px; padding: 6px; gap: 6px; box-shadow: 0 10px 26px -14px rgba(20,14,10,0.5);
+  }
+  .hero-search-box input {
+    flex: 1; min-width: 0; border: none; background: transparent; padding: 10px 14px;
+    font-size: 0.95rem; color: var(--ink); outline: none; font-family: 'Nunito', sans-serif;
+  }
+  .hero-search-box button {
+    border: none; background: var(--plum); color: #fff; border-radius: 999px;
+    width: 42px; height: 42px; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; transition: background-color .15s ease;
+  }
+  .hero-search-box button:hover { background: var(--plum-dark); }
+
+  @media (max-width: 640px) {
+    .hero-scenic { min-height: 440px; }
+    .hero-inner { padding: 44px 0 32px; max-width: 100%; }
+    .hero-title { max-width: 100%; }
+    .hero-search-box { max-width: 100%; }
+  }
+
+  /* Milestone 1: "What are you in the mood for?" cards. Primary three
+     (Eat/Drink/Hidden Gems) get a taller, larger-type treatment; the
+     secondary three (Golf/What's On/Explore) are deliberately quieter --
+     smaller type, shorter aspect ratio -- so all six never read as
+     identical generic buttons. */
+  .mood-section .discover-lead {
+    font-family: 'Nunito', sans-serif; font-size: 0.98rem; color: rgba(42,32,25,0.72);
+    margin: 6px 0 0; max-width: 52ch;
+  }
+  .mood-card-row-primary {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  .mood-card-row-secondary {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px;
+  }
+  .mood-card {
+    position: relative; display: block; border-radius: 16px; overflow: hidden;
+    text-decoration: none; color: #fff;
+    box-shadow: 0 10px 22px -16px rgba(74,52,40,0.4);
+  }
+  .mood-card-primary { aspect-ratio: 3 / 4; }
+  .mood-card-secondary { aspect-ratio: 16 / 9; }
+  .mood-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
+  .mood-card:hover .mood-card-img { transform: scale(1.045); }
+  .mood-card-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 18px; background: linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(20,14,10,0.78) 100%);
+  }
+  .mood-card-primary .mood-card-title { font-family: 'Fraunces', serif; font-size: 1.3rem; font-weight: 700; }
+  .mood-card-secondary .mood-card-title { font-family: 'Fraunces', serif; font-size: 1.02rem; font-weight: 700; }
+  .mood-card-desc { font-family: 'Nunito', sans-serif; font-size: 0.85rem; opacity: 0.92; margin-top: 4px; display: block; }
+  .mood-card-secondary .mood-card-desc { font-size: 0.78rem; }
+
+  @media (max-width: 640px) {
+    .mood-card-row-primary { grid-template-columns: 1fr; gap: 12px; }
+    .mood-card-primary { aspect-ratio: 16 / 10; }
+    .mood-card-row-secondary {
+      display: flex; overflow-x: auto; gap: 12px; margin-top: 12px; padding-bottom: 4px;
+    }
+    .mood-card-secondary { flex: 0 0 62%; aspect-ratio: 4 / 3; }
   }
 </style>`;
 }
@@ -2613,28 +2784,40 @@ const server = http.createServer(async (req, res) => {
 
         // Design Sprint 3: homepage discovery modules. Same server-side
         // injection approach as the three pieces above — computed once per
-        // request, spliced into specific, uniquely-matched anchor points so
-        // the new sections land in the right visual order without touching
-        // the wizard or the existing Worth the Drive hero carousel at all.
+        // request, spliced into specific, uniquely-matched anchor points.
+        //
+        // Milestone 1 (approved homepage redesign, hero + mood cards only):
+        // the static hero markup in okanagan.html moved from between the
+        // wizard and Weather to right after the header, ahead of the
+        // wizard, replacing the old "Worth the Drive" carousel. Mood cards
+        // are new and land immediately after the hero, ahead of the
+        // wizard. Happening Soon/Hidden Gems/Browse by category/Explore
+        // the Okanagan are unmodified by this milestone and keep the exact
+        // same relative order as before (happeningSoon, hiddenGems, then
+        // exploreByCategory, exploreRegions) — only their anchor point
+        // moved, from "before the old hero" to "after the wizard", since
+        // the hero itself is no longer physically between the wizard and
+        // Weather.
         const discoveryStyles = renderHomepageDiscoveryStyles();
+        const moodCards = renderMoodCardsHTML();
         const happeningSoon = renderHappeningSoonHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
         const exploreByCategory = renderExploreByCategoryHTML();
         const exploreRegions = renderExploreRegionsHTML();
 
-        const wizardToHeroAnchor = '</section>\n\n<section class="hero">';
-        if (html.includes(wizardToHeroAnchor)) {
+        const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
+        if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
-            wizardToHeroAnchor,
-            `</section>\n${discoveryStyles}\n${happeningSoon}\n${hiddenGemsSection}\n\n<section class="hero">`
+            heroToWizardAnchor,
+            `</section>\n${discoveryStyles}\n${moodCards}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
-        const heroToWeatherAnchor = '</section>\n\n<section class="weather-banner" id="weatherBanner"';
-        if (html.includes(heroToWeatherAnchor)) {
+        const wizardToWeatherAnchor = '</section>\n\n<section class="weather-banner" id="weatherBanner"';
+        if (html.includes(wizardToWeatherAnchor)) {
           html = html.replace(
-            heroToWeatherAnchor,
-            `</section>\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
+            wizardToWeatherAnchor,
+            `</section>\n${happeningSoon}\n${hiddenGemsSection}\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
           );
         }
 
@@ -2771,6 +2954,34 @@ const server = http.createServer(async (req, res) => {
       if (fs.existsSync(assetPath)) {
         const body = fs.readFileSync(assetPath, 'utf8');
         res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': 'public, max-age=3600' });
+        return res.end(body);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end(`${pathname} not found on server`);
+    }
+
+    // Milestone 1 (approved homepage redesign) — GET /images/*. The first
+    // static-serving route for homepage photography on this codebase (the
+    // old hero carousel embedded its images as inline base64 data URIs in
+    // okanagan.html instead). Deliberately narrow and safe rather than a
+    // generic static-file server: resolves the requested path against a
+    // fixed base directory and rejects anything that resolves outside it
+    // (blocks ../ traversal and absolute-path tricks alike), and only
+    // serves a small allowlisted set of image extensions — a request for
+    // any other file under public/images/, or any file outside it, 404s.
+    const IMAGE_EXTENSIONS = {
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
+    };
+    if (pathname.startsWith('/images/') && method === 'GET') {
+      const imagesRoot = path.join(__dirname, 'public/images');
+      const requestedPath = path.join(imagesRoot, pathname.slice('/images/'.length));
+      const ext = path.extname(requestedPath).toLowerCase();
+      const contentType = IMAGE_EXTENSIONS[ext];
+      const isWithinImagesRoot = requestedPath === imagesRoot
+        || requestedPath.startsWith(imagesRoot + path.sep);
+      if (contentType && isWithinImagesRoot && fs.existsSync(requestedPath) && fs.statSync(requestedPath).isFile()) {
+        const body = fs.readFileSync(requestedPath);
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400' });
         return res.end(body);
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
