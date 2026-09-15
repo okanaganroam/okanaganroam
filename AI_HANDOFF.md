@@ -520,6 +520,38 @@ Direct, minimal re-check of live production, no writes performed:
 
 All three fields are populated on all three venues, live, right now. This matches the FINAL STATUS entry immediately above and the original execution record at commit `5a480b9`. **Note for anyone not seeing this file's history: this content exists only on the `ai-handoff/2026-09-15` branch, never on `main`** — that separation was set up deliberately earlier in this session so `main` stays untouched until a human explicitly merges. If this content isn't visible, check that the branch selector is set to `ai-handoff/2026-09-15`, not `main`.
 
+## EXECUTED — 8-Venue Production Enrichment Batch (2026-09-15)
+
+### Claude — IDs 20, 521, 597, 725, 768, 769, 908, 1014. Completed and fully verified. Strict scope, zero anomalies.
+
+* **Status: DONE.** All 8 approved IDs written successfully. No other venue was touched.
+* **Mechanism:** `POST /admin/enrich-venue` via the existing guarded `guardedEnrichUpdate()` path — no new code, no schema change, no bypass. Auth via `railway run` (already-linked Railway project); `ENRICHMENT_ADMIN_TOKEN`'s value was never printed, logged, or exposed.
+* **Pre-write verification (all 8):** live `GET /api/venues/:id` confirmed identity, region, type, and phone for every one of the 8 matched the approved research exactly, and all 8 had `address`/`latitude`/`longitude` entirely `null`. No precondition mismatches — nothing needed to be stopped or flagged. Baseline: active count 1,055; missing-location count 60.
+
+| ID | Name | Address Written | Lat | Lon | Write Result |
+|---|---|---|---|---|---|
+| 20 | Anarchy Coffee Roasters | 1880 Baron Rd C, Kelowna, BC V1X 6G3 | 49.8849 | -119.424325 | written / written / written |
+| 521 | Poplar Grove Winery | 425 Middle Bench Rd N, Penticton, BC V2A 8S5 | 49.5124383 | -119.5738655 | written / written / written |
+| 597 | Snowshoe Sam's | Big White Ski Resort, 5375 Big White Rd, Beaverdell, BC V1P 1P3 | 49.7218817 | -118.9288701 | written / written / written |
+| 725 | Tickleberry's on the Beach | 3798 Parkview St, Penticton, BC V2A 3W4 | 49.453079 | -119.585694 | written / written / written |
+| 768 | WINGS Restaurants & Pubs - Kelowna | 1-590 Highway 33 West, Kelowna, BC V1X 6A8 | 49.890341 | -119.397449 | written / written / written |
+| 769 | WINGS Restaurants & Pubs - Penticton | 152 Riverside Dr, Penticton, BC V2A 5Y4 | 49.498786 | -119.612814 | written / written / written |
+| 908 | Quench on the Boardwalk | 1310 Water St, Kelowna, BC V1Y 9P3 | 49.89164 | -119.496681 | written / written / written |
+| 1014 | Bench Patio Bistro | 1775 Naramata Rd, Penticton, BC V2A 8T8 | 49.5467438 | -119.5697538 | written / written / written |
+
+* **Every response showed all three fields as `"written"`** (never `"skipped_not_empty"`), confirming all 8 were genuinely empty immediately before the write.
+* **Post-write verification (all 8, all passed):**
+  * `address`/`latitude`/`longitude` on all 8 live records exactly match the table above.
+  * Every other field on all 8 — `phone`, `name`, `region`, `type`, `slug`, `cuisine`, `rating`, `price`, `reviews`, `description`, `description_fr`, `hours`, `website`, `image_url`, `redirect_to` (still null on all 8), and all 12 boolean amenity flags — confirmed unchanged via direct comparison against the pre-write values. Only `updated_at` changed on each, as expected.
+  * **Active venue count: 1,055 both before and after — unchanged.**
+  * **Redirect count: structurally unchanged** — `guardedEnrichUpdate()` never touches `redirect_to`; all 8 records confirmed `redirect_to: null` directly.
+  * **Missing-location count: 60 → 52, a decrease of exactly 8.** Verified precisely via a full before/after set diff (not just a count comparison): the set of ids removed from "missing" was exactly `{20, 521, 597, 725, 768, 769, 908, 1014}` — an exact match to the approved batch — and the set of ids newly added to "missing" was empty. No other venue's missing/complete status changed in either direction.
+* **No anomalies of any kind.** No write failed, no precondition mismatch, no unexpected field change, no count drift.
+* **No merge, retire, delete, redirect, or venue creation occurred. No manifest change. No application code change. No deployment.**
+* **Category A (HIGH confidence, 11 total) is now FULLY COMPLETE:** all 8 written this batch (20, 521, 597, 725, 768, 769, 908, 1014) plus the 3 written in the prior batch (180, 934, 987) account for the entire Category A list — verified by exact set comparison, no Category A member remains unwritten.
+* **Category B (MODERATE-HIGH, 13 total) remains entirely unwritten** — none of this batch's 8 IDs were Category B members (confirmed: zero overlap). Category B still needs a decision on its 4 duplicate-pair canonicals (1019, 535, 581, 536 — each has a duplicate, #252/#965/#972/#537 respectively, that should be merged first) plus the 9 non-duplicate members (896, 39, 41, 154, 337, 724, 766, 1051, 1069).
+* **Category C (3, need phone correction), Category D (11, ambiguous), and Category E (25, exclude/duplicate) remain entirely unwritten**, awaiting separate approval.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
