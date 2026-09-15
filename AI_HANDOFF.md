@@ -871,6 +871,48 @@ All four relationships freshly re-verified against live data just now; **no chan
 
 **Conclusion: all 4 pairs remain exactly as documented and are still eligible for merge approval, with no new blocker found.** Nothing was merged, retired, enriched, or otherwise modified during this preflight.
 
+## EXECUTED — 4 Duplicate Merges (2026-09-15)
+
+### Claude — all 4 approved merges completed and fully verified. Zero anomalies.
+
+* **Status: DONE.** All 4 approved duplicate pairs merged. No other venue was touched, no venue was enriched, no phone was corrected, no code/schema/manifest was changed, nothing deployed, `main` untouched.
+* **Mechanism:** `POST /admin/merge-and-retire-duplicate` (for the 2 pairs with mergeable fields) and `POST /admin/retire-duplicate` (for the 2 pairs with nothing to merge — using the correct existing endpoint for each case, not forcing merge-and-retire with an empty payload). Auth via `railway run`; `ENRICHMENT_ADMIN_TOKEN` never exposed.
+* **Pre-merge verification (all 4 pairs, immediately before each individual merge call):** re-fetched both live records for each pair right before executing that pair's merge. All identities, phones, and mergeable-field sets matched the approved preflight exactly — no drift, no precondition failure, no need to stop for any pair.
+
+**Per-pair execution and verification:**
+
+| Pair | Endpoint used | Mergeable fields | Result | Canonical fields changed | Duplicate `redirect_to` after |
+|---|---|---|---|---|---|
+| #252 → #1019 | `merge-and-retire-duplicate` | `description_fr` | ok | `description_fr` (null→set), `updated_at` — **nothing else** | 1019 ✓ |
+| #965 → #535 | `retire-duplicate` (no mergeable fields) | none | ok | **none** — #535's `updated_at` confirmed unchanged (`2026-09-04 16:11:08`, byte-identical before and after) | 535 ✓ |
+| #972 → #581 | `merge-and-retire-duplicate` | `price`, `reviews` | ok | `price` (null→2), `reviews` (null→705), `updated_at` — **nothing else** | 581 ✓ |
+| #537 → #536 | `retire-duplicate` (no mergeable fields) | none | ok | **none** — #536's `updated_at` confirmed unchanged | 536 ✓ |
+
+Field-level diff performed on both changed canonicals (#1019, #581) confirms **only** the intended merged field(s) plus `updated_at` changed — nothing else.
+
+**Post-merge reconciliation (whole-dataset, not just the 8 involved records):**
+* Pulled the complete live venue list before and after. **Active set diff: exactly `{252, 965, 972, 537}` left the active set (moved to redirect status), nothing else changed, nothing unexpected added.**
+* **Every venue present in both before/after snapshots was diffed field-by-field. Only #1019 and #581 differ — exactly the intended merged fields. Zero unrelated venues changed.**
+* **Active venue count: 1,055 → 1,051** (decrease of exactly 4, matching the 4 retired duplicates leaving the active set).
+* **Missing-location count: 49 → 45** (decrease of exactly 4 — the removed IDs are exactly `{252, 965, 972, 537}`, the same 4 that left the active set; none of the 4 canonicals were enriched, so this is purely the duplicates leaving the missing/active accounting, not new location data).
+* **Redirect count: 26 → 30**, confirmed via a full ID-range gap-set analysis (not just a delta assumption) — the only new gaps in the active ID range are exactly the 4 just-merged duplicates; the 2 previously-confirmed nonexistent IDs (1070, 1073) are unchanged.
+* **All 4 redirect mappings verified exactly correct**, both in the raw data (`redirect_to` field) and in live site behavior:
+
+| Duplicate | `redirect_to` | Live URL behavior |
+|---|---|---|
+| #252 | 1019 | `GET /osoyoos/restaurants/greenside-bar-and-grill` → **301** → `/osoyoos/restaurants/greenside-bar-grill` |
+| #965 | 535 | `GET /vernon/restaurants/range-lounge-grill` → **301** → `/vernon/restaurants/range-restaurant-bar-patio` |
+| #972 | 581 | `GET /vernon/restaurants/shahi-pakwaan` → **301** → `/vernon/restaurants/shahi-pakwan` |
+| #537 | 536 | `GET /coldstream/cafes/rail-trail-cafe-ice-cream-parlor` → **301** → `/coldstream/cafes/rail-trail-cafe-market` |
+
+* **Sitemap behavior confirmed correct:** retired duplicates' own slugs no longer appear in `/sitemap.xml` (0 occurrences each); canonical slugs still appear. Each canonical's own page still resolves 200.
+* **Existing test suite:** `npm test` — **58/58 passing**, unaffected (no code was changed, as expected — this was a pure data operation through already-shipped, already-reviewed guarded endpoints).
+* **No anomalies of any kind found anywhere in this batch.**
+
+**Missing-location breakdown after this batch:** the four canonicals (#1019, #535, #581, #536) remain in the missing-location set — they were confirmed HIGH confidence for enrichment in the preflight but were **not** enriched as part of this merge batch, per the strict scope (merges only). They're now unblocked for a future `/admin/enrich-venue` batch with their already-documented HIGH-confidence coordinates.
+
+* **No other production action was taken.** No venue besides the 8 involved in these 4 pairs was read-write touched. No application code changed. No manifest changed. No deployment occurred. `main` was not merged into or otherwise modified — this record exists only on `ai-handoff/2026-09-15`.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
