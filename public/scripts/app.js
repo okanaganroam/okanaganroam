@@ -1732,6 +1732,41 @@ window.__scrollToVenueCard = function(name){
   });
 })();
 
+/* ---------- "Start Exploring" section (Section 2): Eat / Drink / Explore
+   cards press the same type chips and reveal results the exact same way
+   the hero's own quick actions do, just against this section's own
+   buttons -- a separate, self-contained listener rather than touching
+   the hero's IIFE above. Hidden Gems / Golf / What's On are plain <a>
+   links (to #hiddenGems, a real category page, and #happeningSoon
+   respectively), handled entirely by the existing global hash-link
+   interceptor / normal navigation -- no JS needed for those three. ---------- */
+(function(){
+  var grid = document.querySelector('.explore-grid');
+  if (!grid) return;
+
+  var TYPE_GROUPS = {
+    eat: ['restaurant', 'cafe'],
+    drink: ['winery', 'brewery', 'cocktail', 'pub']
+  };
+
+  function pressTypes(types){
+    types.forEach(function(type){
+      var chip = document.querySelector('.type-chip[data-type="' + type + '"]');
+      if (chip && chip.getAttribute('aria-pressed') !== 'true') chip.click();
+    });
+  }
+
+  grid.addEventListener('click', function(e){
+    var card = e.target.closest('[data-explore-action]');
+    if (!card) return;
+    var action = card.dataset.exploreAction;
+    if (window.trackEvent) window.trackEvent('start_exploring_click', { action: action });
+    if (TYPE_GROUPS[action]) pressTypes(TYPE_GROUPS[action]);
+    document.dispatchEvent(new Event('wizard:showResults'));
+    if (window.__hideFilterBarNow) window.__hideFilterBarNow();
+  });
+})();
+
 /* ---------- Floating tooltip for badges: measured live, so it can never be clipped by a card's rounded-corner overflow, and never runs off the edge of the screen ---------- */
 (function(){
   var tooltip = document.getElementById('floatingTooltip');
