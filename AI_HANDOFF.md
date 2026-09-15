@@ -913,6 +913,61 @@ Field-level diff performed on both changed canonicals (#1019, #581) confirms **o
 
 * **No other production action was taken.** No venue besides the 8 involved in these 4 pairs was read-write touched. No application code changed. No manifest changed. No deployment occurred. `main` was not merged into or otherwise modified — this record exists only on `ai-handoff/2026-09-15`.
 
+## Next Location-Enrichment Batch Preparation (2026-09-15, post-merge) — READ-ONLY
+
+### Claude — full reconciliation after the 4-merge batch, fresh re-triage. No production changes.
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, no merge/retire performed, no phone corrected, no code changed, no manifest change, no deployment. `main` untouched.**
+* **Step 1 — independent recalculation from fresh live data** (`GET /api/venues?limit=2000`, pulled just now, not reused from any prior file):
+  * **Active venue count: 1,051**
+  * **Complete-location count: 1,006**
+  * **Missing-location count: 45**
+  * **Redirect count: 30** — confirmed via a full ID-range gap-set sweep (not assumed from the prior delta): 32 gaps in the 1–1083 ID range, of which 2 are confirmed-nonexistent IDs (1070, 1073, both previously verified 404) and 30 are genuine redirects.
+* **Step 2 — reconciliation against the prior 52-venue classification:** the current 45 missing IDs are **exactly** the prior 52 minus the 3 written in the last enrichment batch (896, 39, 41) minus the 4 that left the active set entirely in the merge batch (252, 965, 972, 537) = 52 − 3 − 4 = 45, confirmed by exact set match. **No new venue appeared in the missing list, no previously-classified venue is unaccounted for.** #1026 (the fifth known duplicate, of already-complete #213) remains in the missing list — it was never part of the 4 approved pairs this round and still needs its own separate merge approval.
+
+---
+
+### Fresh re-triage of all 45
+
+**HIGH confidence — safe for the next enrichment batch (4):**
+
+The four just-unblocked canonicals from this session's merge batch. All four were independently verified earlier this same session (not old/stale research) via phone-number cross-checks against external directories and two-independent-coordinate-source agreement — re-confirmed against live data just now (post-merge state: all four have `redirect_to: null`, confirming they're no longer shielded by an un-merged duplicate; phones and identity fields unchanged from verification time).
+
+| ID | Name | Region | Type | Stored Phone | Verified Address | Coordinate Source(s) | Confidence | Evidence | Ambiguity |
+|---|---|---|---|---|---|---|---|---|---|
+| 1019 | Greenside Bar & Grill | osoyoos | restaurant | +1 250-495-7003 | 12300 Golf Course Dr, Osoyoos, BC V0H 1V0 | geocoder.ca + restaurantguru.com, **36.6m agreement** | HIGH | Exact phone match to the single restaurant at Osoyoos Golf Club, confirmed across Yelp, Destination Osoyoos, Facebook, and the golf club's own site (golfosoyoos.com) — one unambiguous location, no other business shares this phone | None found |
+| 535 | RANGE restaurant, bar + patio | vernon | restaurant | +1 250-503-3556 | 301 Village Centre Place, Vernon, BC V1H 1T2 | geocoder.ca + restaurantguru.com, **5.4m agreement** | HIGH | Exact phone match to Predator Ridge Resort's own restaurant, confirmed via Predator Ridge's own site (predatorridge.com/dining/range-restaurant) plus independent directories — one unambiguous location | None found |
+| 581 | Shahi Pakwan | vernon | restaurant | +1 236-426-2627 | 2810 43rd Ave, Vernon, BC V1T 3L3 | geocoder.ca + restaurantguru.com, **5.3m agreement** | HIGH | Exact phone match confirmed across multiple independent directories to one single family-run restaurant — no other business shares this phone | Name-spelling variance exists in the wild ("Shahi Pakwan" vs "Shahi Pakwaan" vs the domain's "shaipakwan") but all variants resolve to the same phone/address, not a different business |
+| 536 | Rail Trail Cafe & Market | coldstream | cafe | none stored | 13904 Kalamalka Rd, Coldstream, BC V1B 1Y9 | geocoder.ca + restaurantguru.com, **35.6m agreement** | HIGH | No phone to cross-check, but identity is unambiguous: one single building at the start of the Okanagan Rail Trail, confirmed via Facebook, Tripadvisor, Vernon.com, and the correct restaurantguru.com listing (verified by URL, not guessed) — no competing business of this name exists in the region | Lower identity-confirmation strength than the 3 phone-matched candidates above, since there's no phone to anchor it — flagged explicitly rather than treated as equal-strength evidence |
+
+**No other venue among the 45 meets this same conservative bar right now.** Everything else remains at its prior classification (MEDIUM/MORE RESEARCH NEEDED or LOW/EXCLUDE) — reconciled against live data, no drift found for any of them either:
+
+* **MEDIUM / needs more research (17):** 154, 337, 724, 1051 (each has a real single or partial-agreement coordinate source but doesn't clear the same bar as the 4 above), 95, 225, 311, 379, 459, 511, 592, 650, 702, 766, 806, 1066, 1069 (chain-location ambiguity, unconfirmed identity, weak/inconsistent geocoding, or an unresolved phone conflict — specific blocker already documented per-venue earlier in this file).
+* **NEEDS PHONE CORRECTION (3):** 185, 328, 547 — address and coordinates already researched, but the stored phone is confirmed wrong and must be corrected together with enrichment, not enrichment alone.
+* **DUPLICATE, not yet merged (1):** 1026 → #213 (already complete) — a fifth known duplicate outside this round's approved 4 pairs, still needs its own separate merge approval.
+* **EXCLUDE — mobile/food truck (20):** 94, 130, 131, 156, 158, 196, 208, 260, 304, 405, 450, 453, 507, 531, 569, 642, 644, 652, 691, 809 — unchanged from prior research (3 of these — 94, 131, 453 — were externally re-confirmed mobile earlier this session; the remaining 17 carry the original internal description-text signal, flagged as such rather than overclaiming independent re-verification of all 17 again this round).
+
+**Reconciliation check:** 4 (HIGH) + 17 (MEDIUM) + 3 (phone correction) + 1 (duplicate) + 20 (exclude) = **45** — matches the live missing count exactly, no gaps, no double-counting.
+
+---
+
+### Special-case cautions applied in this pass (per the specific risk categories flagged)
+
+* **Multi-location chains:** #95 (Bright Jenny Coffee), #225 (Freshslice Pizza), #311 (Jugo Juice), #702 (Mission Creamery), #806 (barBURRITO) — all correctly kept out of the HIGH batch; none has a phone-to-single-location match.
+* **Mobile/food trucks:** #94, #131, #453 externally confirmed mobile; the broader internal-signal-only 17 (description text) kept excluded rather than assumed safe.
+* **Seasonal businesses:** none of the 4 HIGH candidates are seasonal — all four are confirmed year-round or resort-based fixed operations.
+* **Conflicting phone numbers:** #511 (Pizza Factory) and #547 (Red Tomato Pies) both showed a phone-belongs-elsewhere pattern — #547 already has its correct number documented (needs the phone-correction endpoint); #511's conflict remains unresolved and it stays in MEDIUM.
+* **Shared/multi-tenant addresses:** #328's West Kelowna coordinate (from a shared restaurantguru listing) was already flagged at MODERATE-HIGH, not HIGH, for exactly this reason — correctly excluded from this batch.
+* **Rural/small-town street-midpoint risk:** every one of the 4 HIGH candidates has a genuine two-independent-source, sub-40m building-level agreement — none relies on a bare geocoder street-centroid.
+
+---
+
+### Proposed next batch
+
+**#1019, #535, #581, #536** — write `address`/`latitude`/`longitude` only, using the exact values already documented earlier in this file (Category B research and the 8-record upgrade round). No other venue recommended for this round.
+
+* **No production data was changed, no admin endpoint was called, no merge/retire performed, no phone corrected, no application code was changed, no manifest change, no deployment.** This entire pass was live `GET` verification plus reconciliation against research already completed this session.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
