@@ -1918,3 +1918,164 @@ The wizard's new position above is directional, not a specification — moving l
 ---
 
 **No application code, venue data, database records, or production data were changed. No admin endpoint was called. No deployment happened. Nothing was merged or committed to `main`.** This entire pass was source-code reading plus screenshot-based visual verification of the current live-rendered homepage; the only local-database change made during the pass (temporarily mirroring six real venues so Section 3 would render for this review) was fully reversed before finishing, confirmed by deleting the exact rows added, and was never committed or pushed anywhere.
+
+### Homepage Architecture Recommendation — Pre-Section 4 (2026-09-15)
+
+#### Claude — read-only architecture proposal, building directly on the holistic UX audit above. No code, data, or production changes.
+
+* **Status: read-only architecture document only. No application code, venue data, or database records were touched. No admin endpoint was called. No production request was made. No deployment happened. `main` was never touched.**
+* **Source of truth:** the actual current implementation (`server.js`'s homepage assembly, `db.js`, `okanagan.html`, `app.css`/`app.js`) as it exists right now on this branch, not the original redesign plan. Builds directly on the "Homepage Holistic UX Audit — Sections 1–3" findings above; nothing here contradicts that audit, it converts its findings into one concrete proposal.
+
+---
+
+## 1. Proposed final homepage order
+
+1. Header
+2. **Hero** (Section 1)
+3. **Start Exploring** (Section 2)
+4. **Worth the Roam** (Section 3)
+5. **Hidden Gems** *(moved)*
+6. **Discovery Wizard** *(moved)*
+7. **Weather banner**
+8. **Browse by category**
+9. **Explore the Okanagan / regions**
+10. **Happening Soon** *(moved)*
+11. **Results / "Places You'll Love"**
+12. List Your Venue
+13. App teaser
+14. Footer
+
+This reads as three deliberate tiers: a curated editorial welcome (2–5), a set of practical discovery tools for visitors who want to drive their own search (6–10), and the complete directory plus site utility (11–14). Nothing in this order requires inventing new sections — it's a reordering and two retirements of what already exists.
+
+---
+
+## 2. Section disposition
+
+| Section | Disposition |
+|---|---|
+| Hero | **KEEP** — position and content unchanged, stays first |
+| Start Exploring | **KEEP** — position and content unchanged |
+| Worth the Roam | **KEEP** — elevated to the homepage's one primary recommendation system |
+| Hidden Gems (pre-existing module) | **MOVE** — to directly after Worth the Roam |
+| Discovery Wizard | **MOVE** — out of the pre-hero position, to a bridge point between the editorial cluster and the browsing tier |
+| Happening Soon | **MOVE** — out of the pre-hero position, into the browsing/practical tier |
+| Browse by category | **KEEP** — role and content unchanged |
+| Explore the Okanagan / regions | **KEEP** — role and content unchanged |
+| Weather banner | **KEEP** — stays a light, low-cost utility near the other practical tools |
+| Spotlight banner | **RETIRE** — see §4 |
+| Featured this month / "Worth the Trip" | **RETIRE** — see §4 |
+| Results / "Places You'll Love" | **KEEP** — the core product, unchanged |
+| List Your Venue | **KEEP** — unrelated to this narrative, unchanged |
+| App teaser | **KEEP** — unrelated to this narrative, unchanged |
+| Footer | **KEEP** — unchanged |
+
+No section is recommended for **MERGE** or **DEFER** at this phase — Hidden Gems and Worth the Roam are related but distinct enough in concept (confident "worth a special trip" picks vs. "overlooked, worth seeking out" picks) that merging them would lose real brand value, and every remaining pre-existing section already earns its place once the two retirements happen.
+
+---
+
+## 3. The role of each major section (one sentence each)
+
+* **Hero** — states the brand promise and gives an immediate way to search or jump into a mood.
+* **Start Exploring** — lets a visitor choose a starting mood or category without committing to specifics yet.
+* **Worth the Roam** — makes a small number of specific, confident, reasoned recommendations, in the site's own editorial voice.
+* **Hidden Gems** — surfaces overlooked, lower-visibility venues worth seeking out, distinct in tone from Worth the Roam's more confident/mainstream picks.
+* **Discovery Wizard** — lets a visitor who wants to drive their own search filter the full directory by region, type, and amenities.
+* **Weather banner** — a light, real-time nudge toward a type of venue that suits current conditions.
+* **Browse by category** — an exhaustive, structured way to browse by venue type.
+* **Explore the Okanagan / regions** — an exhaustive, structured way to browse by geography.
+* **Happening Soon** — surfaces genuinely time-sensitive events, a practical planning tool rather than a taste recommendation.
+* **Results / "Places You'll Love"** — the complete, filterable directory; the site's actual product.
+* **List Your Venue** — lead generation for venue owners.
+* **App teaser** — sets expectation for a future product.
+* **Footer** — standard site navigation/utility.
+
+---
+
+## 4. The recommendation-system decision
+
+The homepage currently runs three systems that all answer some version of "which places are good": Worth the Roam (hand-curated, editorial), Spotlight (algorithmic, one venue, rotates weekly), and Featured this month / "Worth the Trip" (hardcoded, directory-styled, unchanged since before this redesign). The previous audit confirmed these can and do collide — in this session's own test render, Spotlight's algorithmic pick and a Worth the Roam card surfaced the same venue on the same page load.
+
+**Worth the Roam survives as the homepage's one primary recommendation system.** It is the best-executed, most on-brand, most intentional version of "here are places worth visiting" already in the codebase, and it's the section this whole redesign has been building toward.
+
+* **Spotlight banner: RETIRE as a separate section.** Its one genuinely valuable property — a rotating, always-fresh single highlight — isn't unique to it as infrastructure; that freshness idea can be revisited later as a rotation mechanic *within* Worth the Roam itself (e.g., periodically refreshing which venues are in the six), rather than kept as a second, competing system. Not recommending that rotation be built now — only that Spotlight's job doesn't need its own section once Worth the Roam exists.
+* **Featured this month / "Worth the Trip": RETIRE.** It is functionally superseded by Worth the Roam (near-identical name and intent), and it is the single section on the homepage furthest from the brand goal — a directory card with six equally-weighted micro-actions (Get directions / Find menu / Check for online booking / phone / Add to trip / Favorite), the most "Yelp-like" moment on the page. Nothing about it survives that Worth the Roam doesn't already do better.
+
+Retiring both is a direct application of "do not preserve something merely because it already exists" — neither has a job left once Worth the Roam is the page's editorial voice.
+
+---
+
+## 5. The Wizard decision
+
+**Recommendation: move the Wizard out of its current pre-hero position to a bridge point between the editorial cluster and the practical-tools tier — directly after Hidden Gems, before Browse by category** (position 6 in §1) — rather than rebuilding it as a compact header control or collapsing its own internal step-by-step UX.
+
+Why this option over the others the brief raised:
+* **A compact trigger/control near the header** would require real new UI (a modal, drawer, or expandable panel) that doesn't exist today, and would duplicate a job the hero's own search field and Eat/Drink/Explore/Hidden Gems quick actions already do — those are already a fast, compact, near-top entry point into filtered results. Building a second compact trigger risks a fourth "here's how to start" mechanism on top of the three the page already has (hero quick actions, Start Exploring cards, and the wizard itself).
+* **Collapsing it into a smaller discovery control** means redesigning the wizard's own three-step internal UX, which is a real, separate design project with its own risks — bigger surgery than the actual problem requires. The problem isn't that the wizard is *badly designed*; it's that it's *first*.
+* **Simply repositioning it** is the lowest-risk fix available, uses the exact mechanism already proven three times this session (the same anchor-splice pattern that placed Start Exploring and Worth the Roam), requires no new UI, and directly solves the one real problem the audit identified — the wizard destroying the hero's first-impression job — without touching anything about how the wizard itself works.
+
+Net effect: nothing about the Wizard's functionality changes. A visitor who wants to search immediately still can, via the hero. A visitor who wants to filter deliberately by region/type/amenity still can, a bit further down, positioned as the natural bridge into the exhaustive browsing tools (Browse by category, Explore regions) rather than as a gate in front of the entire homepage.
+
+---
+
+## 6. The Hidden Gems decision
+
+**Recommendation: move the pre-existing Hidden Gems module to sit directly after Worth the Roam** (position 5 in §1), making it the fourth section in the editorial/curated cluster rather than a pre-hero module referenced backward by a Start Exploring card.
+
+Why here specifically: Hidden Gems and Worth the Roam are doing adjacent but genuinely distinct editorial jobs — Worth the Roam says "these are confidently worth a special trip," Hidden Gems says "these are worth seeking out precisely because they're overlooked." Placing them back to back turns that into a coherent one-two punch (confident picks, then the more adventurous/insider layer) instead of splitting them to opposite ends of the page. It also fixes a real navigation smell: today, Start Exploring's "Hidden Gems" card scrolls *backward*, past the hero, to reach content that already rendered before the visitor got there; once moved, that same card scrolls forward to content that hasn't been seen yet, which is both better UX and removes the "same content surfaced twice" feeling the audit flagged.
+
+This is classified as **MOVE**, not **REWORK** — its current visual language (colored band + "💎 Hidden Gem" pill) doesn't need to change for this fix to work. That said, once it sits directly beside Worth the Roam's more restrained editorial cards, a future visual pass to bring it closer to that language is a reasonable next step — noted here as a real observation, not a requirement of this phase.
+
+---
+
+## 7. The proposed homepage narrative
+
+A first-time visitor now sees, in order: a calm, premium statement of what the site is and an immediate way to search (Hero); a choice of moods to start from (Start Exploring); a small set of confident, specific, human-written recommendations (Worth the Roam); a second, more adventurous layer of overlooked picks (Hidden Gems). That's the entire editorial "trust us" pitch, uninterrupted, and it's the strongest four-section run the homepage has.
+
+Only after that does the page shift register into practical tools for a visitor who wants to drive their own search: the filtering Wizard, a weather-based nudge, exhaustive category and region browsing, and genuinely time-sensitive events. That shift is intentional and legible — the visitor has already been given the site's *opinion*; now they're given the site's *tools*.
+
+The page closes with the actual directory (every venue, fully filterable) and the standard site-utility sections (list a venue, app teaser, footer). Nothing about the ending changes — it was already doing its job.
+
+---
+
+## 8. What should NOT be added
+
+* **A fourth "here are good places" system.** The homepage is going from three overlapping recommendation mechanisms down to one on purpose — adding a new curated-picks-shaped section later would recreate the exact problem just solved.
+* **Another flat tile grid.** Browse by category and Explore regions already cover exhaustive, structured browsing; a third version of that pattern (e.g., a tile grid for "things to do" or "amenities") would be repetitive, not additive.
+* **A second events section.** Happening Soon already covers "what's on"; a "Sporting Events" section would either duplicate it or require an entirely new, currently-nonexistent data model for a narrow slice of content.
+* **A dedicated single-category section (e.g., a standalone Golf section).** Golf is already represented as a Start Exploring card with a real, working destination; promoting one category to its own full homepage section isn't proportionate to how the rest of the taxonomy is treated.
+* **Multiple new sections at once.** Whatever comes after this cleanup should ship and be validated on its own before anything else is layered on top of it — the homepage got into its current state partly by accumulating sections one redesign phase at a time without reconciling them against each other; the fix is to stop doing that, not repeat it with new content.
+
+---
+
+## 9. Section 4 recommendation
+
+Ranked by genuine product value and what the *current* implementation actually supports:
+
+1. **Map / geographic discovery — preferred.** No section on the homepage today gives a visitor any spatial understanding of the valley — region tiles are text-only, the wizard's region picker is a flat list of buttons, and nothing shows what's near what. That's a real, currently-unaddressed gap, and it's *useful* in a way none of the list-based sections can be (trip-planning by proximity, not just by category). It also has a genuine feasibility head start: a fully-built Leaflet map component already exists in `app.js` (`initBlock2`, wired to real venue markers and popups) and is currently force-hidden by `renderHiddenElementsScript()` — this would be surfacing and refining an asset that already exists, not building one from nothing. It performs a job nothing else on the page does: relational/spatial discovery ("what else is near here") rather than categorical discovery ("here's a list of things").
+2. **Seasonal content.** A genuine, currently-unaddressed gap — nothing on the homepage speaks to "right now, this season" beyond individual event listings in Happening Soon. Lower urgency than the map and no existing head-start component to build from, so it would be closer to new design work.
+3. **Sporting events / a dedicated Golf section — not recommended, ranked for completeness.** Golf is already adequately represented as a Start Exploring card with a real destination; a dedicated section would be disproportionate. Sporting Events has no underlying data model in this codebase today (no venue or event field represents it) and would require real new data work this task's own scope explicitly avoids recommending casually. "What's Happening" and "regions" (also offered as options) are excluded from this ranking entirely because they're not gaps — they already exist on the homepage (Happening Soon; Browse by category / Explore regions) and are being retained, just repositioned.
+
+**Preferred: map/geographic discovery**, once the architecture cleanup above has shipped and been validated — not before (see §10).
+
+---
+
+## 10. Implementation sequence
+
+**First — the structural fixes, lowest risk, highest leverage, unblocks everything else:**
+1. Move the Discovery Wizard out of the pre-hero position (§5).
+2. Retire Featured this month / "Worth the Trip" (§4).
+3. Retire the Spotlight banner (§4).
+
+**Second — completing the new narrative:**
+4. Move the pre-existing Hidden Gems module to directly after Worth the Roam (§6).
+5. Update Start Exploring's "Hidden Gems" card to point at its new position (a trivial follow-on once #4 lands).
+6. Move Happening Soon out of the pre-hero position into the practical-tools tier (§1).
+
+**Wait until after the above ships and is validated:**
+7. Section 4 (map/geographic discovery, per §9) — deliberately deferred. The whole point of this cleanup is to stop stacking new content on an unreconciled page; validate the reordered, three-system-to-one-system homepage first.
+8. Any visual rework of Hidden Gems to bring its card language closer to Worth the Roam's (a real future improvement, not required for the reposition to work).
+9. Any deeper redesign of the Wizard's own internal UX (e.g., a genuinely compact control) — the reposition solves the stated problem; further wizard-specific design is optional polish, not a blocker.
+
+---
+
+**No application code, venue data, database records, or production data were changed. No admin endpoint was called. No deployment happened. Nothing was merged or committed to `main`.** This entire pass was a design/architecture proposal built directly on the prior read-only audit's findings and the current, live-verified implementation — no code was written, no visual mockups were produced, and nothing described above has been implemented.
