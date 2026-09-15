@@ -1418,3 +1418,104 @@ None from the original QA defect — the 2-line desktop/laptop presentation now 
 ---
 
 **No other homepage section was modified. No venue data or database was touched. No deploy happened. `main` was never touched — verified unchanged (SHA `9373c28`, same as before this session) both before starting this fix and after committing it.**
+
+## Homepage Section 2 — "Start Exploring" Implementation (2026-09-15)
+
+### Claude — implemented the approved "Start Exploring" section only. Hero and all other sections untouched.
+
+* **Status: implemented and verified. Committed to `ai-handoff/2026-09-15` only. No other homepage section touched. Hero markup/CSS confirmed byte-for-byte unchanged. No venue data written (one new read-only query only). No deploy. `main` untouched.**
+* **Commit SHA: `eca7ab0517b4acd50ae7131a2cdefd4b6ea882f2`**
+
+---
+
+### Exact files changed
+
+* **`server.js`** — added:
+  * `renderStartExploringHTML()` (new function, ~55 lines) — builds the section's markup. Contains exactly one new database call, a read-only `SELECT` aggregating golf venues by region to find the best-supported region for a real `/<region>/golf` link (same pattern `renderExploreByCategoryHTML` already uses elsewhere, not shared/refactored into a helper — kept fully self-contained so nothing about that existing, untouched function needed to change).
+  * A new CSS block appended to the existing `renderHomepageDiscoveryStyles()` function (the established shared stylesheet for all homepage discovery modules) — `.discover-lead`, `.explore-grid`, `.explore-card*` rules, plus a mobile reflow block inside the existing `@media (max-width: 640px)` query. No new `<style>` block, no new file — reuses the exact mechanism the site's other discovery modules already use.
+  * One new static-image route, `/images/explore/<file>.jpg`, gated by an explicit 5-filename whitelist, mirroring the exact pattern already used for `/images/hero.jpg` and `/og-image.png`.
+  * One new line wiring `renderStartExploringHTML()` into the existing `heroToWeatherAnchor` homepage-assembly replace, inserted immediately after the hero and before the existing "Browse by category"/"Explore the Okanagan" modules (which keep their own unchanged position right after it).
+* **`public/scripts/app.js`** — added one new, fully self-contained IIFE (~30 lines) directly after the hero's own quick-actions IIFE, which it does **not** modify. Handles clicks on the 3 interactive cards (Eat/Drink/Explore) using the identical type-chip-press + `wizard:showResults` reveal mechanism the hero's quick actions already use — copied, not shared via refactor, so the hero's existing code stays completely untouched.
+* **`public/images/explore/`** (new directory, 5 new files) — `eat.jpg`, `drink.jpg`, `hidden-gems.jpg`, `whats-on.jpg`, `explore.jpg`.
+* **Not touched:** `okanagan.html`, `public/styles/app.css` (confirmed via `git diff --stat` showing zero changes to either file), any other render function, any route besides the one new image route, the database schema, or any venue row.
+
+---
+
+### Design implemented
+
+* Section label "START EXPLORING", headline "Find something worth going out for.", and the exact approved supporting copy — all present verbatim.
+* **Desktop/laptop (≥641px):** a 12-column CSS Grid, asymmetric per the approved concept — Eat (span 5), Drink (span 4), and Hidden Gems (span 3) form a tall top row (primary, ~2x the height of the row below); Golf (span 3), What's On (span 6, "wider"), and Explore (span 3) form a shorter second row (secondary). Matches the brief's suggested arrangement directly — no deviation was needed.
+* **Mobile (≤640px):** reflows to a 2-column grid, not a shrunk copy of the desktop grid — Eat, Drink, and Hidden Gems each go full-width and stay visually prominent (as required); Golf and Explore pair up side-by-side; What's On becomes a full-width strip. Visual order is remapped for this layout via CSS `order` (not a DOM change), so keyboard/screen-reader order still follows the logical Eat→Drink→HiddenGems→Golf→WhatsOn→Explore sequence.
+* Each photo card: full-bleed image, bottom gradient scrim for text contrast, a single title in the site's existing Fraunces serif, restrained hover (`translateY(-3px)` lift + a 1.04x image scale — the same lift/shadow language `.discover-card`/`.hidden-gem-card` already use elsewhere on this homepage, not a new hover language). Rounded corners at 16px, consistent with the existing 12–16px range already used across `.discover-card`/`.hidden-gem-card`/`.category-tile`.
+* No icon-only tiles anywhere — every card is either a real photograph or (Golf only) a deliberate gradient treatment with real title + tagline text, never a bare icon.
+
+### A real bug found and fixed during implementation, not shipped broken
+
+The first version had the Golf card's title and tagline (its two text lines, since it has no photo) laid out as side-by-side flex siblings instead of a stacked column, because the card container's `display:flex` with no `flex-direction:column` was inherited by both text spans directly. Screenshotted it, saw the tagline floating oddly instead of stacking under the title, diagnosed it (a single-item vs. two-item flex-row layout quirk that only showed up on the one card with two text lines), fixed it by wrapping every card's text content in a shared `.explore-card-body` (flex-column) container, and re-screenshotted to confirm the fix before moving on.
+
+---
+
+### Imagery/assets added — where they came from and why
+
+No image generation or web-fetch tool was available or appropriate to use mid-task for new licensed photography. Rather than invent images or leave cards without real photography, 5 of the 6 cards reuse real Okanagan venue photography that was **already live on this site's own homepage before the hero redesign** — recovered from this repository's own git history (the commit immediately before the hero redesign, `a29c96a^:okanagan.html`, which still had the original 10-image hero carousel), the same legitimate technique used to source the hero's own photo last session. This is not new sourcing, just reuse of imagery the site itself was already displaying at equal or greater prominence.
+
+Each was screened before use: photos with visible business branding/signage (e.g. a "FRIND" sign, "ROLLINGDALE WINERY" signage) or clearly identifiable people (a bowling-alley photo with several recognizable faces) were rejected, same standard applied to the hero photo choice last session. Final picks, all generic/non-venue-specific in how they're captioned (just "Eat"/"Drink"/etc., no venue name attached):
+
+* **Eat** — a plated lamb/mezze dish (no people, no signage).
+* **Drink** — a moody cocktail-bar interior (no people, no signage).
+* **Hidden Gems** — a bakery pastry spread (a small "buss" logo is visible on a coffee cup — incidental, not a storefront sign, judged acceptable at the same level as background details already accepted for the hero photo).
+* **What's On** — a moody evening restaurant interior, chosen for its "something's happening this evening" ambiance rather than because it depicts a specific event (there is no real per-event static image to draw from for this card — see Known Limitations).
+* **Explore** — a vibrant top-down spread of dishes, chosen for its "variety/abundance" read as a generic "explore" image.
+
+All 5 were re-encoded (JPEG quality ~72, and the two largest resized down from 900px to 700px wide) and saved as real files under `public/images/explore/`, served via the new whitelisted route with `Cache-Control: public, max-age=86400` — same caching approach as the hero image, same reasoning: independently cacheable, not embedded in the HTML document. **Total added payload: 472KB across 5 files** — no base64, no inline images, nothing embedded in `okanagan.html` (which this task never touched anyway).
+
+**Golf has no photo** — see Known Limitations below for why, and what it uses instead.
+
+---
+
+### Interaction — what's real vs. what's a graceful fallback
+
+* **Eat** → presses the existing `restaurant` + `cafe` type-chip filters and reveals results, via the identical mechanism the hero's own Eat button already uses.
+* **Drink** → presses `winery` + `brewery` + `cocktail` + `pub`, same mechanism.
+* **Explore** → reveals the full, unfiltered results grid, same mechanism.
+* **Hidden Gems** → a plain `<a href="#hiddenGems">`, the same existing homepage section used by the hero's own Hidden Gems button.
+* **Golf** → turned out to have a genuine, already-existing, fully working destination: a real golf category page (confirmed locally at `/kelowna/golf`, HTTP 200), built and tested in an earlier phase of this project (the existing `golf` entries in `CATEGORY_SLUGS`/`CATEGORY_LABELS`/`CATEGORY_TAGLINES`, and a passing test suite already covering golf category pages). Linked directly — nothing was invented. If a live database genuinely had zero golf venues at request time, the card falls back to `#directory` (the wizard) rather than link to a page that would 404, the same graceful-empty-state pattern `renderExploreByCategoryHTML` already uses.
+* **What's On** → also turned out to have a genuine, already-existing destination: the homepage's existing `#happeningSoon` section (built from the real `events` table, already rendering 3 upcoming test events locally). Linked directly for the same reason as Golf — a real destination already existed, so nothing needed to be invented.
+
+Both Golf and What's On were flagged in the brief as possibly needing placeholder treatment "if there is no existing underlying destination" — in practice, both already had one, so both got real, working links instead.
+
+---
+
+### Tests and results
+
+`npm test` — **58/58 passing**, both immediately after implementation and again after the Golf-card layout fix. No regressions.
+
+### Visual QA results at all four widths
+
+Screenshotted via the same CDP-driven tool built for the hero QA pass (true viewport widths, not the Chrome CLI's inflated ~500px floor).
+
+* **1440px / 1280px:** Eat/Drink/Hidden Gems clearly read as the strongest destinations (larger, taller, top row); Golf/What's On/Explore clearly secondary. Generous whitespace around and within the grid, consistent card corner radius, restrained hover states, no clutter. "Browse by category" and "Explore the Okanagan" (the pre-existing, untouched modules) render immediately below, unaffected.
+* **390px / 375px:** Reflows to 2 columns as designed — Eat/Drink/Hidden Gems each full-width and prominent, Golf+Explore paired, What's On full-width below. Titles fully readable at every card size, no text clipping, comfortable touch-target sizing (even the smallest paired cards are well over 150px wide). Golf's 3-line tagline wraps cleanly.
+* **Horizontal overflow — directly measured, not eyeballed:** `document.documentElement.scrollWidth === window.innerWidth` exactly at all four widths (1440/1280/390/375), confirmed via CDP `Runtime.evaluate`, not just visual inspection.
+* **Image crops:** all 5 photos crop sensibly at their card's aspect ratio via `object-fit:cover`; no obviously broken or awkward crop at any of the four widths.
+* **Console/runtime errors:** checked at all four widths via real CDP `Runtime.exceptionThrown`/`Log.entryAdded` events. Only the same single, pre-existing, already-documented `initBlock12` error appears at every width — no new error introduced by this section.
+* **One false alarm caught and ruled out during QA, not reported as a defect:** an early screenshot (scrolled programmatically straight to `#startExploring`) appeared to show a stray "Hidden Gems" pill overlapping the header. Investigated with a full top-to-bottom capture instead of trusting the single scrolled screenshot — confirmed this was purely an artifact of the synthetic scroll-then-capture timing in the test tool (the hero's own, unrelated Hidden Gems quick-action button, briefly caught mid-frame), not a real rendering or z-index bug. No overlap exists in an actual top-to-bottom page render.
+
+### Hero and other sections — confirmed unchanged
+
+* `okanagan.html` and `public/styles/app.css` — zero lines changed (`git diff --stat` shows both absent from the diff entirely).
+* Hero headline, image, search field, and quick-action buttons all visually re-verified identical to the previous QA-approved state in every screenshot taken this pass.
+* "Happening Soon," "Hidden Gems" (the pre-existing section), "Browse by category," and "Explore the Okanagan" all confirmed rendering exactly as before, in their same positions, via direct screenshot comparison.
+* No venue data modified — the only new database call is a read-only `SELECT` for golf-region lookup.
+
+---
+
+### Known limitations
+
+1. **Golf has no dedicated photograph.** None of the recoverable real venue photos (from the pre-hero-redesign carousel) depict a golf course — using a mismatched restaurant/bar photo would have been actively misleading. Used a deliberate, premium-feeling gradient treatment instead (the site's own existing golf brand color pair, `#4E7A5E`/`#345942`, already defined in `TYPE_ACCENT_GRADIENTS` for this exact purpose elsewhere), with the existing, already-approved `CATEGORY_TAGLINES.golf` copy for richness. If real golf photography becomes available, swapping it in is a one-line change (add the `<img>`/`.explore-card-scrim` markup matching the other 5 cards).
+2. **"What's On" imagery is a mood photo, not an event photo.** There's no static, non-per-event image representing "things happening" in general — the moody evening-restaurant photo used is a reasonable, honest stand-in, not a claim about any specific event.
+3. **Total new photo payload is 472KB across 5 files** — lightweight and independently cacheable, but worth knowing if a future pass wants to further compress or convert to a modern format (WebP/AVIF) — not done here to keep the change minimal and because the existing hero.jpg/og-image.png precedent in this codebase is also plain JPEG.
+
+---
+
+**No production data was touched, no admin endpoint was called, no deployment happened, nothing was merged or committed to `main`.** All changes described above are implemented and committed on `ai-handoff/2026-09-15` only.
