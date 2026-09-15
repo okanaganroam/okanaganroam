@@ -2850,11 +2850,19 @@ const server = http.createServer(async (req, res) => {
         const openNowScript = renderOpenNowScript();
         const hiddenElementsScript = renderHiddenElementsScript();
 
-        // Design Sprint 3: homepage discovery modules. Same server-side
-        // injection approach as the three pieces above — computed once per
-        // request, spliced into specific, uniquely-matched anchor points so
-        // the new sections land in the right visual order without touching
-        // the wizard or the existing Worth the Drive hero carousel at all.
+        // Homepage architecture cleanup (2026-09-15, approved architecture
+        // recommendation): the editorial cluster (Start Exploring, Worth
+        // the Roam, Hidden Gems) now renders directly after the hero and
+        // before the Discovery Wizard, so a visitor's first experience is
+        // Hero -> Start Exploring -> Worth the Roam -> Hidden Gems, not the
+        // Wizard/Happening Soon/Hidden Gems block that used to precede the
+        // hero. okanagan.html itself was physically reordered (hero now
+        // precedes the wizard in the static file; the old pre-hero
+        // Happening Soon/Hidden Gems injection point no longer exists).
+        // Spotlight and "Featured this month" were retired outright (their
+        // <section> markup removed from okanagan.html, their now-dead
+        // client JS removed from app.js) — Worth the Roam is now the
+        // homepage's one recommendation system.
         const discoveryStyles = renderHomepageDiscoveryStyles();
         const happeningSoon = renderHappeningSoonHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
@@ -2863,23 +2871,23 @@ const server = http.createServer(async (req, res) => {
         const exploreByCategory = renderExploreByCategoryHTML();
         const exploreRegions = renderExploreRegionsHTML();
 
-        const wizardToHeroAnchor = '</section>\n\n<section class="hero">';
-        if (html.includes(wizardToHeroAnchor)) {
+        // Hero -> [Start Exploring, Worth the Roam, Hidden Gems] -> Wizard
+        const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
+        if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
-            wizardToHeroAnchor,
-            `</section>\n${discoveryStyles}\n${happeningSoon}\n${hiddenGemsSection}\n\n<section class="hero">`
+            heroToWizardAnchor,
+            `</section>\n${discoveryStyles}\n${startExploring}\n${worthTheRoam}\n${hiddenGemsSection}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
-        // "Start Exploring" (Section 2) and "Worth the Roam" (Section 3) are
-        // rendered immediately after the hero, in that order, ahead of the
-        // existing "Browse by category"/"Explore the Okanagan" tile modules,
-        // which keep their own unchanged position right after them.
-        const heroToWeatherAnchor = '</section>\n\n<section class="weather-banner" id="weatherBanner"';
-        if (html.includes(heroToWeatherAnchor)) {
+        // Weather -> [Browse by category, Explore the Okanagan, Happening
+        // Soon] -> Results. The Wizard and Weather banner keep their own
+        // relative order (Wizard, then Weather) from the static file.
+        const weatherToResultsAnchor = '</section>\n\n<section class="results">';
+        if (html.includes(weatherToResultsAnchor)) {
           html = html.replace(
-            heroToWeatherAnchor,
-            `</section>\n${startExploring}\n${worthTheRoam}\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
+            weatherToResultsAnchor,
+            `</section>\n${exploreByCategory}\n${exploreRegions}\n${happeningSoon}\n\n<section class="results">`
           );
         }
 

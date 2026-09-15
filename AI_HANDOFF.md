@@ -2079,3 +2079,94 @@ Ranked by genuine product value and what the *current* implementation actually s
 ---
 
 **No application code, venue data, database records, or production data were changed. No admin endpoint was called. No deployment happened. Nothing was merged or committed to `main`.** This entire pass was a design/architecture proposal built directly on the prior read-only audit's findings and the current, live-verified implementation — no code was written, no visual mockups were produced, and nothing described above has been implemented.
+
+## Homepage Architecture Cleanup — Implementation (2026-09-15)
+
+### Claude — implemented the approved Homepage Architecture Recommendation.
+
+* **Status: implemented and verified. Committed to `ai-handoff/2026-09-15` only. No production data changed. No admin endpoint called. No Railway deployment. `main` untouched.**
+
+---
+
+### Exact homepage order after the change (verified live, not just source order)
+
+```
+Header
+→ Hero
+→ Start Exploring
+→ Worth the Roam
+→ Hidden Gems
+→ Discovery Wizard
+→ Weather banner
+→ Browse by category
+→ Explore the Okanagan / regions
+→ Happening Soon
+→ Results ("Places you'll love")
+→ List Your Venue
+→ App teaser
+→ Footer
+```
+
+Confirmed via a live DOM query (`document.querySelectorAll('section[id], section.hero')`) at all four QA widths — identical order at every width, not just correct in the template source.
+
+---
+
+### What was moved
+
+* **Hero** — physically repositioned in `okanagan.html` to sit directly after the header (previously came after the Discovery Wizard).
+* **Discovery Wizard / filter-bar** — physically repositioned in `okanagan.html` to sit after Worth the Roam and Hidden Gems, directly before the Weather banner. No change to its own markup, IDs, or behavior.
+* **Happening Soon** — its server-injection anchor moved from before the hero to after Explore the Okanagan/regions. No change to its own render function.
+* **Hidden Gems (pre-existing module)** — its server-injection anchor moved from before the hero to directly after Worth the Roam. No change to its own render function, IDs, or query. This is still the one and only Hidden Gems implementation — Start Exploring's "Hidden Gems" card continues to link to `#hiddenGems`, which now resolves to this same module in its new position (confirmed live: clicking that card scrolls to and reveals the relocated section correctly).
+
+### What was retired
+
+* **Spotlight banner** — `<section class="spotlight-banner" id="spotlightBanner">` removed entirely from `okanagan.html`. Its client-side JS (the "Weekly spotlight" IIFE in `app.js`, which fetched `/api/venues?limit=5000` and picked a deterministic weekly pick) was also removed, since its DOM target no longer exists — this also removes one of the two redundant full-venue-list fetches the original homepage audit flagged. No venue data, database rows, or backend infrastructure were touched; this was purely a homepage template + client-JS change.
+* **Featured this month / "Worth the Trip"** — `<section class="featured-venues">` (the 10 hardcoded venues) removed entirely from `okanagan.html`. Its client-side JS (the featured-strip auto-scroll IIFE in `app.js`) was also removed, since its DOM target no longer exists. No venue data, database rows, or backend infrastructure were touched.
+
+### A necessary behavioral fix, required to make the reposition actually work
+
+The Wizard's own init code (`showStep(1)`, called unconditionally at the end of `initBlock8()` in `app.js`) auto-smooth-scrolls the page to the wizard on every load. With the wizard now positioned much further down the page, leaving this unchanged would have made every page load auto-scroll straight past the hero and the entire editorial cluster — silently defeating the whole point of this reordering. Fixed with a one-line, narrowly-scoped change: the initial call is now `showStep(1, true)`, using the `skipScroll` parameter the function already supported (previously used for an analogous purpose, per its own existing code comment). All user-triggered calls to `showStep(1)` (Back button, Edit-filters button, `wizard:reset` event) are unchanged and still scroll normally — only the automatic page-load call was affected. Verified directly: `window.scrollY` is `0` after a full page load and settle at every one of the four QA widths.
+
+---
+
+### Exact files changed
+
+* **`okanagan.html`** — hero moved before the wizard; wizard moved after Hidden Gems; weather-banner now sits directly after the wizard; spotlight-banner and featured-venues sections removed entirely. No other markup changed. (166 lines removed net, mostly the two retired sections.)
+* **`server.js`** — the two homepage-assembly anchor points were updated to match the new physical layout (`heroToWizardAnchor` replaces the old `wizardToHeroAnchor`; `weatherToResultsAnchor` replaces the old `heroToWeatherAnchor`), and the discovery-module injection order was rearranged: Start Exploring + Worth the Roam + Hidden Gems now inject between the hero and the wizard; Browse-by-category + Explore-regions + Happening Soon now inject between the weather banner and the results grid. No render function's own internals were changed — only which anchor each one attaches to and in what order.
+* **`public/scripts/app.js`** — removed the two now-fully-dead IIFEs (Weekly Spotlight, Featured-strip auto-scroll) whose DOM targets no longer exist; changed one line (`showStep(1)` → `showStep(1, true)`) to prevent the page auto-scrolling to the relocated wizard on load.
+* **Not touched:** `public/styles/app.css` (confirmed via `git diff --stat` showing zero changes — the now-unused CSS rules for `.spotlight-banner`/`.featured-venues`/`.featured-strip`/`.featured-card` were deliberately left in place rather than hunted down and removed, since this task was scoped to homepage architecture, not a stylesheet cleanup pass), `db.js`, `public/images/`, and no venue data or database rows of any kind.
+
+---
+
+### Test result
+
+`npm test` — **58/58 passing**, no regressions.
+
+### Visual QA at all four widths
+
+Verified using the same temporary, fully-reversible local-db approach as the Section 3 implementation pass: the six real "Worth the Roam" venues were mirrored into the local dev `okanagan.db` (backed up first) purely so Worth the Roam would render for a complete, accurate check — then deleted again immediately after (confirmed by direct query), never committed, never touched production.
+
+* **1440px / 1280px:** the entire new top-of-page order — Hero → Start Exploring → Worth the Roam → Hidden Gems → Wizard → Weather — confirmed in one continuous, correctly-rendered scroll, with no old pre-hero content anywhere. Further down, Browse by category → Explore the Okanagan → Happening Soon → Results confirmed in the correct new order, with neither Spotlight nor Featured-this-month appearing anywhere on the page.
+* **390px / 375px:** same order confirmed, reflowed correctly (Hero and Start Exploring's photo cards stack cleanly; Worth the Roam's featured/supporting cards stack; Hidden Gems' cards scroll horizontally as before; the Wizard renders correctly in its new position with all filter controls present).
+* **Horizontal overflow — directly measured at all four widths, not eyeballed:** `document.documentElement.scrollWidth === window.innerWidth` exactly in every case (1440/1280/390/375).
+* **No auto-scroll regression — directly measured:** `window.scrollY === 0` after full load + settle at all four widths, confirming the `skipScroll` fix works consistently.
+* **No duplicate Hidden Gems:** `document.querySelectorAll('#hiddenGems').length === 1` at all four widths.
+* **Spotlight and Featured this month confirmed absent:** `document.querySelector('.spotlight-banner')` and `document.querySelector('.featured-venues')` both `null` at all four widths.
+* **Live functional checks, not just static inspection:**
+  * Clicking Start Exploring's "Hidden Gems" card (`document.querySelector('.explore-card-hidden-gems').click()`) correctly smooth-scrolled the page and left the relocated `#hiddenGems` section visibly in the viewport.
+  * Clicking a Discovery Wizard region chip (Kelowna) correctly toggled `aria-pressed` to `true` — filter interaction still works after the move.
+  * Clicking the hero's "Eat" quick action correctly pressed both the `restaurant` and `cafe` type chips — Section 1's own functionality confirmed unaffected.
+  * The hero's search box (`#searchInput`/`#searchBtn`) confirmed present and unchanged.
+  * All six Worth the Roam card hrefs confirmed still resolving to the correct real venue detail pages (`/oliver/restaurants/miradoro-restaurant-1029`, `/kaleden/cafes/linden-gardens`, `/west-kelowna/pubs/turtle-jack-s-west-kelowna`, `/oliver/wineries/checkmate-artisanal-winery`, `/vernon/restaurants/intermezzo-restaurant-and-wine-cellar`, `/naramata/wineries/red-rooster-winery`).
+
+### Pre-existing console issue observed (not a regression)
+
+At all four widths, the browser console shows exactly one error: `Uncaught TypeError: Cannot read properties of null (reading 'addEventListener')` inside `initBlock12` in `app.js` — this is the orphaned Google-Places "live search" dead code first documented in the original homepage audit, present before this task began. Its line number shifted slightly (from 1457 to 1464) purely because this task removed unrelated code above it in the same file; the bug itself is unchanged and was not introduced or worsened by this work. No new console errors were observed at any width.
+
+---
+
+### Confirmation
+
+* **No production data, admin endpoint, or Railway deployment was touched.** Every venue-shaped change made during verification was against a local, backed-up, and fully-restored dev database copy; no request was made to `okanaganroam.com` or any admin route at any point in this task.
+* **`main` was never touched** — verified unchanged (SHA `9373c28121c3bfbfad95d0ada496974392da9610`) both before starting this work and again after committing it, both locally and on `origin/main`.
+* All changes described above are implemented and committed on `ai-handoff/2026-09-15` only.

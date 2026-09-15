@@ -1281,7 +1281,14 @@ function initBlock8(){
     if (toResults) updateCount(steps[3], '.stamp-btn', 'wizard.seeResultsLabel', toResults, false);
   });
 
-  showStep(1);
+  // skipScroll=true on this initial call only (homepage architecture
+  // cleanup, 2026-09-15): the Wizard no longer sits at the top of the
+  // page, so auto-scrolling to it on every load (this same function's
+  // normal behavior, used correctly for the user-triggered calls above)
+  // would immediately scroll a visitor straight past the hero and the
+  // editorial cluster. User-initiated navigation back into the wizard
+  // (Back/Edit buttons, wizard:reset above) still scrolls normally.
+  showStep(1, true);
 }
 
 /* ---------- Collapse Cuisine/Price once the user hits Search, to free up
@@ -1540,85 +1547,6 @@ function initBlock12(){
   searchBtn.addEventListener('click', runLiveSearch);
   queryInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') runLiveSearch(); });
 }
-
-/* ---------- Featured venues: slow auto-scroll, pauses when the user takes control ---------- */
-(function(){
-  var strip = document.querySelector('.featured-strip');
-  var section = document.querySelector('.featured-venues');
-  if (!strip) return;
-
-  var autoSpeed = 0.4; // px per frame, slow drift
-  var paused = false;
-  var resumeTimer = null;
-  var rafId = null;
-  var loopRunning = false;
-  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  function setPaused(val){
-    paused = val;
-    strip.classList.toggle('featured-strip-manual', val);
-    if (!val) ensureLoopRunning();
-  }
-
-  function step(){
-    if (paused) { loopRunning = false; return; }
-    var maxScroll = strip.scrollWidth - strip.clientWidth;
-    if (maxScroll > 0) {
-      if (strip.scrollLeft >= maxScroll - 1) {
-        strip.scrollLeft = 0;
-      } else {
-        strip.scrollLeft += autoSpeed;
-      }
-    }
-    rafId = window.requestAnimationFrame(step);
-  }
-
-  function ensureLoopRunning(){
-    if (loopRunning || reduceMotion) return;
-    loopRunning = true;
-    rafId = window.requestAnimationFrame(step);
-  }
-
-  function pauseForAWhile(){
-    setPaused(true);
-    if (resumeTimer) clearTimeout(resumeTimer);
-    resumeTimer = setTimeout(function(){ setPaused(false); }, 3500);
-  }
-
-  function startWithDelay(){
-    if (resumeTimer) clearTimeout(resumeTimer);
-    setPaused(true);
-    resumeTimer = setTimeout(function(){ setPaused(false); }, 2000);
-  }
-
-  ['wheel', 'touchstart', 'mousedown', 'pointerdown'].forEach(function(evt){
-    strip.addEventListener(evt, pauseForAWhile, { passive: true });
-  });
-  strip.addEventListener('mouseenter', function(){ setPaused(true); });
-  strip.addEventListener('mouseleave', function(){
-    if (resumeTimer) clearTimeout(resumeTimer);
-    resumeTimer = setTimeout(function(){ setPaused(false); }, 2000);
-  });
-
-  if (!reduceMotion) {
-    startWithDelay();
-
-    if (section && 'IntersectionObserver' in window) {
-      var observer = new IntersectionObserver(function(entries){
-        entries.forEach(function(entry){
-          if (entry.isIntersecting) {
-            strip.scrollLeft = 0;
-            startWithDelay();
-          } else {
-            if (resumeTimer) clearTimeout(resumeTimer);
-            setPaused(true);
-          }
-        });
-      }, { threshold: 0.3 });
-      observer.observe(section);
-    }
-  }
-})();
 
 /* ---------- Hide filter bar on scroll down, reveal only at the very top ---------- */
 (function(){
@@ -2285,68 +2213,6 @@ window.__scrollToVenueCard = function(name){
   } else {
     useKelownaFallback();
   }
-})();
-
-/* ---------- Weekly spotlight: an automatically-rotating highlight from the full venue list, not manually curated ---------- */
-(function(){
-  var banner = document.getElementById('spotlightBanner');
-  var nameEl = document.getElementById('spotlightName');
-  var metaEl = document.getElementById('spotlightMeta');
-  var descEl = document.getElementById('spotlightDesc');
-  var badgesEl = document.getElementById('spotlightBadges');
-  var btn = document.getElementById('spotlightBtn');
-  if (!banner) return;
-
-  var spotlightVenue = null;
-
-  btn.addEventListener('click', function(){
-    if (!spotlightVenue) return;
-    if (window.trackEvent) window.trackEvent('spotlight_click', { venue_name: spotlightVenue.name });
-    if (window.__showResultsNoScroll) { window.__showResultsNoScroll(); }
-    else { document.dispatchEvent(new Event('wizard:showResults')); }
-    if (window.__hideFilterBarNow) window.__hideFilterBarNow();
-    setTimeout(function(){
-      window.__scrollToVenueCard(spotlightVenue.name);
-    }, 50);
-  });
-
-  fetch(API_BASE + '/api/venues?limit=5000')
-    .then(function(res){ return res.json(); })
-    .then(function(data){
-      var venues = data.venues || [];
-      // Quality bar: only genuinely well-regarded venues are spotlight-worthy.
-      var pool = venues.filter(function(v){
-        return v.rating && v.rating >= 4.5 && v.reviews && v.reviews >= 100 && v.description;
-      });
-      if (pool.length === 0) return;
-
-      // Deterministic weekly rotation: same pick all week, automatically
-      // different next week — no manual curation needed.
-      var weekNumber = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
-      var index = weekNumber % pool.length;
-      var v = pool[index];
-      spotlightVenue = v;
-
-      var regionLabel = (window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[v.region]) || v.region;
-      var typeLabel = t((window.CARD_TYPE_LABEL && window.CARD_TYPE_LABEL[v.type]) || '') || (v.type.charAt(0).toUpperCase() + v.type.slice(1));
-
-      nameEl.innerHTML = '<a href="#directory">' + v.name.replace(/</g, '&lt;') + '</a>';
-      metaEl.textContent = regionLabel + ' \u00b7 ' + typeLabel + ' \u00b7 \u2605 ' + v.rating + ' (' + v.reviews + ' reviews)';
-      descEl.textContent = v.description;
-
-      if (window.CARD_BADGES) {
-        badgesEl.innerHTML = window.CARD_BADGES.filter(function(b){ return v[b.field]; }).slice(0, 4).map(function(b){
-          var content = b.text ? '<span class="badge-text-icon">' + b.text + '</span>' : b.icon;
-          var label = escapeAttr(t(b.label));
-          return '<span class="badge" aria-label="' + label + '" data-tooltip="' + label + '">' + content + '</span>';
-        }).join('');
-      }
-
-      banner.style.display = '';
-    })
-    .catch(function(){
-      // Spotlight data unavailable — banner just stays hidden.
-    });
 })();
 
 /* ---------- Internal hash-anchor navigation: wait for the venue grid to
