@@ -552,6 +552,76 @@ All three fields are populated on all three venues, live, right now. This matche
 * **Category B (MODERATE-HIGH, 13 total) remains entirely unwritten** — none of this batch's 8 IDs were Category B members (confirmed: zero overlap). Category B still needs a decision on its 4 duplicate-pair canonicals (1019, 535, 581, 536 — each has a duplicate, #252/#965/#972/#537 respectively, that should be merged first) plus the 9 non-duplicate members (896, 39, 41, 154, 337, 724, 766, 1051, 1069).
 * **Category C (3, need phone correction), Category D (11, ambiguous), and Category E (25, exclude/duplicate) remain entirely unwritten**, awaiting separate approval.
 
+## Category B (MODERATE-HIGH) Research — Duplicate Pairs + Non-Duplicate Candidates (2026-09-15)
+
+### Claude — read-only research only. No production writes, no merges, no code changes, no deployment.
+
+* **Status: read-only.** No admin endpoint was called, no production data was changed, no merge/retire performed, no code changed, no manifest change, nothing deployed.
+* **Step 1 — reconciliation:** pulled `GET /api/venues?limit=2000` fresh. **Result: exactly 52 active venues missing address/lat/lng, identical to the count/IDs reported after the Category A batch completed.** No drift since the last check.
+* **Step 2 — fresh field comparison for the 4 duplicate pairs**, pulled directly from live data (not reused from memory) to confirm nothing has changed since the earlier reconciliation research.
+
+---
+
+### Duplicate pairs — investigation, NOT executed
+
+**#252 → #1019 (Greenside Bar and Grill / Greenside Bar & Grill, Osoyoos)**
+- Same real-world business: confirmed — both are the restaurant at Osoyoos Golf Club. Phone identical on both (`+1 250-495-7003`, live-confirmed), rating identical (4.3), address 12300 Golf Course Dr, Osoyoos, BC V0H 1V0 (externally corroborated via Yelp/Destination Osoyoos/Facebook).
+- Canonical recommendation: **#1019** (fuller description explicitly naming "Osoyoos Golf Club" and matching menu detail).
+- What a merge would preserve: `description_fr` (populated on #252, null on canonical #1019) — **mergeable**. `price`/`reviews` already populated on the canonical (2 / 83) — not mergeable, nothing lost (canonical's values are correct and untouched either way).
+- Reason not to merge: none found.
+
+**#965 → #535 (Range Lounge & Grill / RANGE restaurant, bar + patio, Vernon/Predator Ridge)**
+- Same real-world business: confirmed — both are the Predator Ridge Resort restaurant. Phone identical (`+1 250-503-3556`, live-confirmed), rating identical (4.3). Current official branding is "RANGE restaurant, bar + patio" per Predator Ridge's own site; "Range Lounge & Grill" is a legacy name still present in some directories.
+- Canonical recommendation: **#535** (matches current official branding).
+- What a merge would preserve: nothing is actually mergeable this time — `reviews` differ (965=546, 535=535) but the canonical is already non-null so the guarded merge path can't touch it (not lost — the duplicate's row is retained, not deleted, when retired, just not reconciled into one number). `price` and `description_fr` are already populated identically/appropriately on the canonical.
+- Reason not to merge: none found.
+
+**#972 → #581 (Shahi Pakwaan / Shahi Pakwan, Vernon)**
+- Same real-world business: confirmed — single family-run Vernon restaurant, a name-spelling duplicate. Phone identical (`+1 236-426-2627`, live-confirmed), rating identical (4.5), address 2810 43rd Ave, Vernon, BC V1T 3L3 (multiple independent sources).
+- Canonical recommendation: **#581** ("Shahi Pakwan" — matches the majority of external listings; the business's own domain is oddly spelled "shaipakwan.ca" but that's not treated as decisive).
+- What a merge would preserve: `price` (2) and `reviews` (705) are populated on the duplicate #972 but null on canonical #581 — **both mergeable**. `description_fr` already populated on canonical.
+- Reason not to merge: none found.
+
+**#537 → #536 (Rail Trail Cafe Ice Cream Parlor / Rail Trail Cafe & Market, Coldstream)**
+- Same real-world business: confirmed — one physical site at 13904 Kalamalka Rd, Coldstream, BC V1B 1Y9. An independent source explicitly describes one building housing both the "market" and "ice cream" functions these two records separately describe. Neither has a phone stored. Ratings differ (537=4.9, 536=4.5) — real variance in scraped review sentiment, not evidence against being the same site.
+- Canonical recommendation: **#536** ("Rail Trail Cafe & Market" matches the official name used by Facebook/Tripadvisor/Google).
+- What a merge would preserve: nothing is mergeable — `description_fr` is populated on BOTH sides with genuinely different text (not lost, just not reconciled into one field; both texts remain readable on the retired duplicate's row).
+- Reason not to merge: none found.
+
+**Summary: all 4 pairs are genuine duplicates with a clear canonical choice and no reason found not to merge. None were merged — this is investigation only, awaiting separate approval.**
+
+---
+
+### Non-duplicate Category B candidates — fresh identity + second-source coordinate research
+
+Dispatched two parallel research passes specifically hunting for a SECOND independent building-level coordinate source for every single-source candidate (restaurantguru.com raw-HTML fetch, Photon/Nominatim POI-name search, Overpass structured queries, ski-resort/golf directories) — the same techniques that worked for the already-written Category A batch.
+
+| ID | Name | Region | Phone | Verified Address | Lat | Lon | Sources | Agreement | Confidence | Caveat |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 896 | Kelly & Carlos O'Bryans Restaurant | kelowna | +1 250-861-1338 | 262 Bernard Ave, Kelowna, BC V1Y 6N4 | 49.886535 | -119.497750 | geocoder.ca + restaurantguru.com | **9.2m** | **HIGH** (upgraded) | restaurantguru.com carries a separate listing for the West Kelowna location (#328) — confirmed the correct downtown listing was used, not confused with #328 |
+| 39 | BNA Brewing Kelowna | kelowna | +1 236-420-0025 | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | geocoder.ca + restaurantguru.com | **0.0m** | **HIGH** (upgraded) | none |
+| 41 | BNA Burger | kelowna | +1 236-420-0025 | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | co-located sibling of #39, same building | 0.0m | **HIGH** (upgraded) | none |
+| 154 | Craft 42 Roasters | kelowna | none | 1178 High Road, Kelowna, BC V1Y 7B1 | 49.892941 | -119.476575 | geocoder.ca + restaurantguru.com (reconfirmed) | 83.9m | MODERATE-HIGH (unchanged) | none |
+| 337 | King's Vegetarian Food | kelowna | none | 1631 Dickson Ave, Kelowna, BC | 49.879876 | -119.461448 | geocoder.ca + restaurantguru.com (reconfirmed) | 68.3m | MODERATE-HIGH (unchanged) | none |
+| 724 | Tickleberry's at the Peach | penticton | none | 185 Lakeshore Drive, Penticton, BC | 49.502472 | -119.595796 | geocoder.ca + Nominatim/Photon exact POI "The Peach" (ice_cream amenity, house-number exact) | **103.0m** | MODERATE-HIGH (upgraded from a weak prior match) | Nominatim and Photon aren't fully independent of each other (same underlying OSM data), but both are independent of geocoder.ca and this is a genuine POI+housenumber match, not a road midpoint |
+| 766 | Viva Mexicana Taco Bar | vernon | none | 3414 Coldstream Ave, Vernon, BC V1T 1Y1 | 50.263247 | -119.278873 | geocoder.ca only | n/a | MODERATE (unchanged) | Genuine second-source search exhausted — restaurantguru 404'd (3 URL variants tried), Nominatim only road-level, Photon found only unrelated same-named restaurants elsewhere |
+| 1051 | Moose Lounge | big-white | none | 5315 Big White Rd, Kelowna, BC V1P 1P3 (Happy Valley Lodge) | 49.721408 | -118.926566 | geocoder.ca only | n/a | MODERATE-HIGH (unchanged) | Overpass queries for the resort timed out twice (server overload, inconclusive rather than a real negative) — worth retrying later, not a confirmed dead end |
+| 1069 | Pit Stop Cafeteria | apex | none | 100 Strayhorse Rd, Penticton, BC V1M 8L7 (Apex Mountain Resort's general address) | 49.392108 | -119.903267 | geocoder.ca only, confidence 0.77 (weakest in this batch) | n/a | **MODERATE — explicitly do NOT upgrade** | Overpass found real Apex Mountain Resort structured data (a specific building "Apex Mtn Inn," the resort's own sports-centre node) but **neither matches this address** — both are 216–253m away. This is new evidence of genuine uncertainty about exactly where within Apex Village this cafeteria sits, not corroboration. Recommend holding this one back rather than treating it as ready. |
+
+---
+
+### Proposed next batch — meets the same HIGH-confidence standard as the already-written Category A batch
+
+Applying the same bar used throughout this project (two independent sources agreeing within ~50m, or a single very-high-confidence source reused directly from an already-verified sibling record — neither applies loosely here):
+
+**#896, #39, #41** — all three newly upgraded to HIGH confidence this pass (9.2m and 0.0m agreement respectively). These are the only Category B members that meet the strict HIGH bar right now.
+
+The rest of Category B (154, 337, 724, 1051, 766, 1069) remain at MODERATE-HIGH or MODERATE and are **not** included in this proposed batch — presented above for your own judgment call on whether to accept a looser bar for any of them, but not recommended as "HIGH-confidence ready" under the standard this project has used for every actual write so far.
+
+**#1069 specifically is flagged as weaker than before this pass, not stronger** — the new Apex Mountain Resort structured data revealed a real 216–253m gap rather than closing it. Recommend treating this one with more caution than its prior single-source MODERATE rating already implied.
+
+* **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, no manifest change, no deployment.** This entire pass was public web research (search, geocoding APIs, raw-HTML fetches, Overpass structured queries) only.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
