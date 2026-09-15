@@ -428,6 +428,27 @@ Note the important distinction within this category: #95, #225, #311, #702, #806
 
 * **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, no manifest change, no deployment.** This entire batch was public web research (search, geocoding APIs, raw-HTML fetches of publicly-accessible pages) only.
 
+## EXECUTED — #180, #934, #987 Production Enrichment (2026-09-15)
+
+### Claude — three-venue write, completed and verified. Scope strictly limited to these three IDs, per instruction.
+
+* **Status: DONE.** Only IDs 180, 934, and 987 were touched — the three Category A (HIGH confidence) venues from the full 63-venue batch report whose coordinates weren't already covered by the earlier #426/#360 write. #360, #426, and #484 were not touched (already complete from prior batches). No other venue from the 63-venue report was written, merged, retired, or otherwise modified.
+* **Mechanism:** `POST /admin/enrich-venue` via the existing guarded `guardedEnrichUpdate()` path, same as every prior write this session — no new code, no schema change, no bypass. Auth via `railway run` (already-linked Railway project), so `ENRICHMENT_ADMIN_TOKEN`'s value was never printed, logged, or exposed anywhere.
+* **Pre-write verification (all three):** live `GET /api/venues/{180,934,987}` confirmed identity — #180 "Dolci Thai Bistro", osoyoos, phone `+1 250-495-6807`; #934 "14th Ave Bar & Grill", vernon, phone `+1 250-549-4653`; #987 "China Palace", penticton, phone `+1 250-492-9883`. All three had `address`/`latitude`/`longitude` all `null`. Active count baseline: 1,055.
+* **Writes performed (the exact HIGH-confidence values documented in the full batch report above):**
+  * `#180`: `{"address": "8710 Main St, Osoyoos, BC V0H 1V0", "latitude": 49.032963, "longitude": -119.467977}` → `{"id":180,"results":{"address":"written","latitude":"written","longitude":"written"}}`
+  * `#934`: `{"address": "1101 14 Avenue, Vernon, BC V1B 2S6", "latitude": 50.2517967, "longitude": -119.2458648}` → `{"id":934,"results":{"address":"written","latitude":"written","longitude":"written"}}`
+  * `#987`: `{"address": "1933 Main Street, Penticton, BC V2A 5H5", "latitude": 49.476851, "longitude": -119.583657}` → `{"id":987,"results":{"address":"written","latitude":"written","longitude":"written"}}`
+  * All three responses show all three fields as `"written"` (not `"skipped_not_empty"`), confirming all were genuinely empty beforehand.
+* **Post-write verification (all passed, all three venues):**
+  * `address`, `latitude`, `longitude` on all three live records now exactly match the values written.
+  * Every other field on all three — `phone`, `name`, `region`, `type`, `slug`, `cuisine`, `rating`, `price`, `reviews`, `description`, `description_fr`, `hours`, `website`, `image_url`, `redirect_to` (still null on all three), and all 12 boolean amenity flags — confirmed unchanged (structurally guaranteed by `guardedEnrichUpdate()`'s field allowlist, which only ever touches address/latitude/longitude; independently re-confirmed via direct comparison against the pre-write values for name/region/type/phone/redirect_to). Only `updated_at` changed on each, as expected.
+  * Active venue count: still 1,055 (unchanged).
+  * Redirect count: structurally unchanged — `guardedEnrichUpdate()` never touches `redirect_to`, and all three records still show `redirect_to: null` directly.
+* **No anomalies found.**
+* **Missing-location count impact:** 63 → 60 active venues now missing address/lat/lng (arithmetic inference from these three writes; not independently re-pulled as part of this entry).
+* **Manifest was not touched. No other venue was modified. No duplicates were merged or retired. No application code was changed. No deployment occurred.**
+* **Remaining from the full 63-venue batch report:** Category B (13 venues), Category C (3, need phone correction), Category D (11, ambiguous), and Category E (25, exclude/duplicate) — **none written, awaiting separate approval.**
 
 ## Change Log
 
