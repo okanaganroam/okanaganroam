@@ -1434,6 +1434,72 @@ function renderHiddenGemsHomepageHTML() {
 </section>`;
 }
 
+// "Start Exploring" homepage section (approved design, 2026-09-15) — a
+// photography-led editorial card grid, deliberately distinct from the
+// icon-free but photo-free "Browse by category" tile grid just below it
+// (renderExploreByCategoryHTML, completely unchanged by this). Eat/Drink/
+// Explore reuse the exact same type-chip-press + wizard:showResults
+// reveal pattern the hero's own quick-action buttons already use (see the
+// "Start Exploring quick actions" block in app.js) — same mechanism, not
+// a new one. Hidden Gems links to the existing #hiddenGems section.
+// Golf and What's On both turned out to already have real, working
+// destinations elsewhere in this codebase (a real golf category page,
+// and the existing #happeningSoon section) — linked directly rather than
+// treated as placeholders, since nothing needed to be invented for them.
+function renderStartExploringHTML() {
+  const golfRow = db.prepare(`
+    SELECT region, COUNT(*) AS n FROM venues
+    WHERE redirect_to IS NULL AND type = 'golf'
+    GROUP BY region ORDER BY n DESC LIMIT 1
+  `).get();
+  // No golf venues today -> fall back to the wizard/directory rather than
+  // link to a category page that would 404, same graceful pattern
+  // renderExploreByCategoryHTML already uses for an empty category.
+  const golfHref = golfRow ? `/${golfRow.region}/${CATEGORY_SLUGS.golf}` : '#directory';
+
+  return `
+<section class="discover-section start-exploring" id="startExploring">
+  <div class="wrap">
+    <div class="discover-heading">
+      <span class="eyebrow">Start Exploring</span>
+      <h2>Find something worth going out for.</h2>
+      <p class="discover-lead">From favourite local spots to hidden gems and things happening around the valley, start wherever your mood takes you.</p>
+    </div>
+    <div class="explore-grid">
+      <button type="button" class="explore-card explore-card-primary explore-card-eat" data-explore-action="eat">
+        <img class="explore-card-img" src="/images/explore/eat.jpg" width="394" height="450" alt="" loading="lazy">
+        <div class="explore-card-scrim" aria-hidden="true"></div>
+        <div class="explore-card-body"><span class="explore-card-title">Eat</span></div>
+      </button>
+      <button type="button" class="explore-card explore-card-primary explore-card-drink" data-explore-action="drink">
+        <img class="explore-card-img" src="/images/explore/drink.jpg" width="679" height="452" alt="" loading="lazy">
+        <div class="explore-card-scrim" aria-hidden="true"></div>
+        <div class="explore-card-body"><span class="explore-card-title">Drink</span></div>
+      </button>
+      <a class="explore-card explore-card-primary explore-card-hidden-gems" href="#hiddenGems">
+        <img class="explore-card-img" src="/images/explore/hidden-gems.jpg" width="480" height="596" alt="" loading="lazy">
+        <div class="explore-card-scrim" aria-hidden="true"></div>
+        <div class="explore-card-body"><span class="explore-card-title">Hidden Gems</span></div>
+      </a>
+      <a class="explore-card explore-card-secondary explore-card-golf" href="${golfHref}">
+        <div class="explore-card-golf-bg" aria-hidden="true"></div>
+        <div class="explore-card-body"><span class="explore-card-title">Golf</span><span class="explore-card-tagline">${escapeHtml(CATEGORY_TAGLINES.golf)}</span></div>
+      </a>
+      <a class="explore-card explore-card-secondary explore-card-whats-on" href="#happeningSoon">
+        <img class="explore-card-img" src="/images/explore/whats-on.jpg" width="700" height="437" alt="" loading="lazy">
+        <div class="explore-card-scrim" aria-hidden="true"></div>
+        <div class="explore-card-body"><span class="explore-card-title">What's On</span></div>
+      </a>
+      <button type="button" class="explore-card explore-card-secondary explore-card-explore" data-explore-action="explore">
+        <img class="explore-card-img" src="/images/explore/explore.jpg" width="700" height="560" alt="" loading="lazy">
+        <div class="explore-card-scrim" aria-hidden="true"></div>
+        <div class="explore-card-body"><span class="explore-card-title">Explore</span></div>
+      </button>
+    </div>
+  </div>
+</section>`;
+}
+
 function renderExploreByCategoryHTML() {
   // One lightweight aggregate query — deliberately not per-category (which
   // would be N+1). Also serves a real correctness need: it tells us which
@@ -1592,11 +1658,77 @@ function renderHomepageDiscoveryStyles() {
   .category-tile:hover, .region-tile:hover { border-color: var(--plum); transform: translateY(-2px); }
   .discover-see-all { margin-top:16px; }
 
+  /* "Start Exploring" (homepage Section 2) — photography-led editorial
+     card grid. Reuses .discover-section/.discover-heading/.eyebrow above
+     for the section header, and the same border-radius/box-shadow/hover
+     language as .discover-card and .hidden-gem-card, rather than a
+     parallel set of conventions. */
+  .discover-lead{
+    font-size:1rem; line-height:1.55; color: rgba(42,32,25,0.78);
+    max-width:60ch; margin:8px 0 0;
+  }
+  .explore-grid{
+    display:grid; grid-template-columns: repeat(12, 1fr);
+    grid-auto-rows:190px; gap:16px;
+  }
+  .explore-card{
+    position:relative; display:flex; align-items:flex-end; justify-content:flex-start;
+    border:none; margin:0; padding:0; border-radius:16px; overflow:hidden;
+    cursor:pointer; text-align:left; text-decoration:none; color: var(--paper);
+    font-family:inherit; background: var(--paper);
+    box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .explore-card:hover{ transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
+  .explore-card:hover .explore-card-img{ transform: scale(1.04); }
+  .explore-card-img{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;
+    transition: transform .35s ease;
+  }
+  .explore-card-scrim{
+    position:absolute; inset:0;
+    background: linear-gradient(180deg, rgba(20,14,10,0) 38%, rgba(20,14,10,0.75) 100%);
+  }
+  .explore-card-golf-bg{ position:absolute; inset:0; background: linear-gradient(135deg, #4E7A5E, #345942); }
+  .explore-card-body{
+    position:relative; z-index:1; width:100%; box-sizing:border-box;
+    padding:18px 20px; display:flex; flex-direction:column; gap:4px;
+  }
+  .explore-card-title{
+    font-family:'Fraunces',serif; font-weight:700; line-height:1.2;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  }
+  .explore-card-tagline{
+    font-family:'Nunito',sans-serif; font-size:0.82rem; font-weight:500;
+    color: rgba(255,252,246,0.9);
+  }
+  .explore-card-primary{ grid-row: span 2; }
+  .explore-card-secondary{ grid-row: span 1; }
+  .explore-card-primary .explore-card-title{ font-size:1.55rem; }
+  .explore-card-secondary .explore-card-title{ font-size:1.1rem; }
+  .explore-card-eat{ grid-column: span 5; }
+  .explore-card-drink{ grid-column: span 4; }
+  .explore-card-hidden-gems{ grid-column: span 3; }
+  .explore-card-golf{ grid-column: span 3; }
+  .explore-card-whats-on{ grid-column: span 6; }
+  .explore-card-explore{ grid-column: span 3; }
+
   @media (max-width: 640px) {
     .discover-card { flex-basis: 200px; }
     .hidden-gem-card { flex-basis: 210px; }
     .category-tile-grid, .region-tile-grid { grid-template-columns: repeat(2, 1fr); }
     .tile-tagline { font-size: 0.72rem; }
+    .discover-lead{ font-size:0.94rem; }
+    .explore-grid{ grid-template-columns: repeat(2, 1fr); grid-auto-rows:auto; }
+    .explore-card-primary, .explore-card-secondary{ grid-row: span 1; }
+    .explore-card-eat, .explore-card-drink, .explore-card-hidden-gems{ grid-column: span 2; min-height:220px; order:1; }
+    .explore-card-drink{ order:2; }
+    .explore-card-hidden-gems{ order:3; }
+    .explore-card-golf, .explore-card-explore{ grid-column: span 1; min-height:170px; }
+    .explore-card-golf{ order:4; }
+    .explore-card-explore{ order:5; }
+    .explore-card-whats-on{ grid-column: span 2; min-height:170px; order:6; }
+    .explore-card-primary .explore-card-title{ font-size:1.3rem; }
   }
 </style>`;
 }
@@ -2619,6 +2751,7 @@ const server = http.createServer(async (req, res) => {
         const discoveryStyles = renderHomepageDiscoveryStyles();
         const happeningSoon = renderHappeningSoonHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
+        const startExploring = renderStartExploringHTML();
         const exploreByCategory = renderExploreByCategoryHTML();
         const exploreRegions = renderExploreRegionsHTML();
 
@@ -2630,11 +2763,15 @@ const server = http.createServer(async (req, res) => {
           );
         }
 
+        // "Start Exploring" is the approved homepage Section 2 — rendered
+        // immediately after the hero, ahead of the existing "Browse by
+        // category"/"Explore the Okanagan" tile modules, which keep their
+        // own unchanged position right after it.
         const heroToWeatherAnchor = '</section>\n\n<section class="weather-banner" id="weatherBanner"';
         if (html.includes(heroToWeatherAnchor)) {
           html = html.replace(
             heroToWeatherAnchor,
-            `</section>\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
+            `</section>\n${startExploring}\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
           );
         }
 
@@ -2767,6 +2904,25 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('hero.jpg not found on server');
+    }
+
+    // "Start Exploring" homepage section card photos. Same real-file
+    // approach as hero.jpg above — served individually rather than a
+    // generic static-directory handler, with an explicit filename
+    // whitelist, so this doesn't grow into an arbitrary-file-read route.
+    const EXPLORE_IMAGES = new Set(['eat.jpg', 'drink.jpg', 'hidden-gems.jpg', 'whats-on.jpg', 'explore.jpg']);
+    if (pathname.startsWith('/images/explore/') && method === 'GET') {
+      const filename = pathname.slice('/images/explore/'.length);
+      if (EXPLORE_IMAGES.has(filename)) {
+        const imagePath = path.join(__dirname, 'public/images/explore', filename);
+        if (fs.existsSync(imagePath)) {
+          const image = fs.readFileSync(imagePath);
+          res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' });
+          return res.end(image);
+        }
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end(`${pathname} not found on server`);
     }
 
     // Phase 5 Sprint 1 — shared static assets. These three files are the
