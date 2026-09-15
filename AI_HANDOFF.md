@@ -450,6 +450,37 @@ Note the important distinction within this category: #95, #225, #311, #702, #806
 * **Manifest was not touched. No other venue was modified. No duplicates were merged or retired. No application code was changed. No deployment occurred.**
 * **Remaining from the full 63-venue batch report:** Category B (13 venues), Category C (3, need phone correction), Category D (11, ambiguous), and Category E (25, exclude/duplicate) — **none written, awaiting separate approval.**
 
+## Preflight — Category A (HIGH confidence) Batch, Pre-Approval Check (2026-09-15)
+
+### Claude — read-only preflight only. No production writes performed.
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, no merge/retire performed, no code changed, nothing deployed.**
+* **Scope:** all 11 Category A (HIGH confidence) IDs from the full 63-venue batch report (20, 180, 521, 597, 725, 768, 769, 908, 934, 987, 1014). Pulled fresh `GET /api/venues/:id` for every one of them.
+* **Already completed (3) — confirmed untouched by this preflight, matches the approved write exactly:**
+  * `#180` Dolci Thai Bistro — address/lat/lon populated, matches the approved values exactly.
+  * `#934` 14th Ave Bar & Grill — address/lat/lon populated, matches the approved values exactly.
+  * `#987` China Palace — address/lat/lon populated, matches the approved values exactly.
+* **Still safe to enrich (8) — all pass preflight cleanly, no drift since the original research, identity/region/type/phone all still match:**
+
+| ID | Name | Region | Type | Phone | Still Empty? | Matches Research? |
+|---|---|---|---|---|---|---|
+| 20 | Anarchy Coffee Roasters | kelowna | cafe | none | yes | yes |
+| 521 | Poplar Grove Winery | penticton | winery | +1 250-493-9463 | yes | yes |
+| 597 | Snowshoe Sam's | big-white | pub | +1 250-765-5959 | yes | yes |
+| 725 | Tickleberry's on the Beach | penticton | cafe | none | yes | yes |
+| 768 | WINGS Restaurants & Pubs - Kelowna | kelowna | pub | none | yes | yes |
+| 769 | WINGS Restaurants & Pubs - Penticton | penticton | pub | none | yes | yes |
+| 908 | Quench on the Boardwalk | kelowna | restaurant | none | yes | yes |
+| 1014 | Bench Patio Bistro | naramata | restaurant | +1 250-490-4965 | yes | yes |
+
+* **No venues required flagging.** No identity drift, no phone changes, no region/type changes, no field already populated by another process since the research was recorded.
+* **No production data was changed, no admin endpoint was called, nothing was deployed.** This was `GET`-only verification.
+
+**READY FOR NEXT APPROVAL:**
+* IDs still safe to enrich: 20, 521, 597, 725, 768, 769, 908, 1014
+* IDs requiring review: none
+* IDs already completed: 180, 934, 987 (and 360, 426, 484 from the prior batch)
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
