@@ -1357,3 +1357,64 @@ All captured this pass, stored in this session's local scratchpad only (not comm
 ---
 
 **No design change was made. No other homepage section was modified. No venue data or database was touched. No deploy. Nothing merged to `main`.** This entire pass was screenshot capture, console-log capture, and visual inspection only.
+
+## Homepage Hero — Headline 4-Line Wrap Fix (2026-09-15)
+
+### Claude — fixed the single defect identified in the hero QA pass. Nothing else changed.
+
+* **Status: fix implemented and verified. Committed to `ai-handoff/2026-09-15` only. No other homepage section touched. No venue data or database touched. No deploy. `main` untouched.**
+
+---
+
+### Exactly what was changed
+
+One file, one property value, in `public/styles/app.css`:
+
+```diff
+   .hero-inner{
+     position:relative; z-index:1;
+     display:flex; flex-direction:column; align-items:center; text-align:center;
+-    width:100%; min-width:0; max-width:640px; margin:0 auto;
++    width:100%; min-width:0; max-width:920px; margin:0 auto;
+     box-sizing:border-box; padding-left:24px; padding-right:24px;
+   }
+```
+
+**Root cause (confirmed, not just theorized):** `.hero-inner`'s `max-width:640px` was narrower than either headline sentence needs at the hero's `font-size: clamp(2.1rem, 5vw, 3.4rem)` on desktop/laptop, so each sentence wrapped a second time inside its own `display:block` span, producing 4 lines instead of the intended 2.
+
+**Why widening `.hero-inner` alone was sufficient, with no other rule touched:** `.hero-title` has no `max-width` of its own, so it was simply inheriting whatever room its parent (`.hero-inner`) gave it — widening the parent gives the headline room to lay out as one line per sentence. `.hero-lead` (`max-width:46ch`) and `.hero .search-box` (`max-width:520px`) both already had their own, smaller, independent `max-width` values further down in the same file, unchanged — so they stay exactly the width they were, correctly centered under the now-wider headline, which is a normal and common hero pattern (bold headline wider than the supporting copy beneath it). Nothing else in the hero — image, scrim, search field, quick-action buttons, their CSS, or their markup — was touched.
+
+At mobile widths (≤640px), `.hero-inner` is still `width:100%`, so this change has **zero effect there** — the `max-width:920px` ceiling was already far above what a 390px or 375px viewport could ever reach, confirmed by direct measurement (see Verification).
+
+---
+
+### Test result
+
+`npm test` — **58/58 passing**, no regressions.
+
+---
+
+### Visual QA result at all four widths
+
+Re-screenshotted the real homepage (same local dev setup and CDP-driven screenshot method used in the QA pass, which correctly reaches true narrow viewports rather than the Chrome CLI tool's inflated ~500px floor) at all four required widths, scrolled precisely to the hero section:
+
+* **1440px (desktop):** Headline now renders as a clean, intentional **2 lines** — "Explore the Okanagan." / "Find your next favourite place." — exactly as intended. Search field and all four quick-action buttons unaffected, still well-proportioned and centered.
+* **1280px (laptop):** Same clean **2-line** headline. The longer second line now spans close to the photo's visible edges but doesn't touch or clip against the frame — reads as confidently large, not cramped.
+* **390px (mobile):** Headline is **unaffected by this change** (as expected, since `.hero-inner` was already `width:100%` here) — still wraps across 4 lines at the existing mobile font-size, exactly as it did before this fix. Confirmed this remains "balanced and readable" per the fix request's own mobile bar: natural word-boundary line breaks (no mid-word breaks), legible font size, centered, no crowding against the search field or buttons below it, no horizontal overflow.
+* **375px (mobile):** Same as 390px — unaffected, still balanced and readable, no overflow.
+
+**Why mobile wasn't also forced to 2 lines:** the fix request explicitly scoped the "2-line" requirement to desktop/laptop, asking only for "balanced and readable" on mobile. A rough check confirms why: fitting the full second sentence ("Find your next favourite place.", 32 characters) on one line within a 390px-wide phone's ~342px available content width would require shrinking the headline font to roughly a third of its current mobile size — well past legible/premium territory. Mobile's existing 4-line wrap, at its current legible size with clean word-boundary breaks and no overflow, already meets the "balanced and readable" bar the fix request set for mobile, so it was deliberately left alone rather than force-fit into 2 lines at the cost of legibility.
+
+**Horizontal overflow — directly measured, not just eyeballed:** at both 375px and 390px, `document.documentElement.scrollWidth` exactly equals `window.innerWidth` (375=375, 390=390) — confirmed zero horizontal overflow via CDP `Runtime.evaluate`, not just visual inspection.
+
+**Console/runtime errors:** checked at all four widths via real CDP `Runtime.exceptionThrown`/`Log.entryAdded` events. Only the same single, pre-existing, already-documented `initBlock12` error (`app.js:1457`, orphaned Google-Places dead code, unrelated to the hero work) appears at every width — no new error introduced by this change.
+
+---
+
+### Any issue remaining?
+
+None from the original QA defect — the 2-line desktop/laptop presentation now matches the design intent exactly, and mobile remains correct/unaffected. The two other items noted in the QA pass (a header logo/EN-FR-toggle wrap at exactly 375px, and the pre-existing `initBlock12` console error) are both **pre-existing, out-of-scope issues unrelated to the hero headline** and were explicitly not touched here, per the fix request's "keep the change limited to the hero headline/layout issue" instruction.
+
+---
+
+**No other homepage section was modified. No venue data or database was touched. No deploy happened. `main` was never touched — verified unchanged (SHA `9373c28`, same as before this session) both before starting this fix and after committing it.**
