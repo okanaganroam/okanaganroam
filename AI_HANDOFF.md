@@ -1760,3 +1760,161 @@ No production request of any kind was made this task (no `curl` against `okanaga
 ---
 
 **No venue data, database records, or production data were changed. No admin endpoint was called. No deployment happened. Nothing was merged or committed to `main`.** All changes described above are implemented and committed on `ai-handoff/2026-09-15` only, commit `5b9ad2673ba11fddf241d4017ba8905eb72cfe10`.
+
+### Homepage Holistic UX Audit — Sections 1–3 (2026-09-15)
+
+#### Claude — read-only design/UX analysis. No code, data, or production changes.
+
+* **Status: read-only research only. No application code, venue data, or database records were changed. No admin endpoint was called. No production request was made. No deployment happened. `main` was never touched.**
+* **Method:** re-read the current, live `server.js`/`db.js`/`okanagan.html`/`app.css` implementation directly (not prior plans), then rendered and screenshotted the real homepage end-to-end — including, for this pass only, temporarily mirroring the six real "Worth the Roam" venues into a **backed-up-and-fully-restored** local dev database copy so Section 3 would actually render alongside every other section for a true, complete, in-context view (the six temporary rows and their collection memberships were deleted again immediately after; nothing was left behind, nothing was committed, nothing touched production).
+
+---
+
+## 1. Current homepage flow (verified against live-rendered output, not the intended plan)
+
+```
+Header
+→ Discovery Wizard / filter-bar ("Where to? / What kind? / What matters?")   [pre-existing]
+→ Happening Soon                                                             [pre-existing]
+→ Hidden Gems (colored-band + "💎 Hidden Gem" pill-badge cards)               [pre-existing]
+→ HERO — Section 1
+→ Start Exploring — Section 2
+→ Worth the Roam — Section 3
+→ Browse by category (flat tiles)                                            [pre-existing]
+→ Explore the Okanagan / regions (flat tiles)                                [pre-existing]
+→ Weather banner (conditional, but visible for most real visitors)           [pre-existing]
+→ Spotlight banner (conditional, but visible for most real visitors)         [pre-existing]
+→ Featured this month / "Worth the Trip" (10 hardcoded venues, directory cards) [pre-existing]
+→ Results grid / "Places you'll love" (full filterable directory)            [pre-existing]
+→ List Your Venue form → App teaser → Footer                                 [pre-existing]
+```
+
+**This is the single most important finding in this audit:** the approved narrative (Hero → Start Exploring → Worth the Roam → …) is real and correctly built, but it is not what a visitor actually sees first. The wizard, Happening Soon, and the pre-existing Hidden Gems module all render **before** the hero, because `server.js`'s homepage assembly still anchors the hero to whatever immediately follows the wizard section in the static HTML, and Sections 2–3 were (correctly, per their own scope) inserted right after the hero rather than at the true top of the page. A first-time visitor's actual first impression today is a region-picker tool and two pre-existing content modules — not the brand statement the hero was built to deliver.
+
+---
+
+## 2. Section-by-section assessment
+
+**Discovery Wizard (pre-existing, pre-hero)** — Job: filter the directory by region/type/amenity. Visual/emotional role: a utility tool, not a welcome — chip pickers and a progress indicator. Action encouraged: pick filters, click Continue. Earns its space functionally (it's the site's real filtering mechanism), but its *position* — first thing on the page — is the core structural problem this audit surfaces. No content overlap with anything else, but its position dilutes the hero's job.
+
+**Happening Soon (pre-existing)** — Job: surface time-sensitive events. Visual role: plain, minimal date-cards. Earns its space (genuinely time-sensitive, useful content). Overlaps with Section 2's "What's On" card, which correctly links back to this exact section rather than duplicating it — good reuse, not a problem.
+
+**Hidden Gems, pre-existing module (pre-hero)** — Job: surface 6 curated lesser-known venues. Visual role: the most "directory badge" styling on the entire page (colored band + amber "💎 Hidden Gem" pill). Earns its content-wise; its *position*, front-loaded before the hero, means a visitor hits a specific curated pick before the broad welcome. Section 2's "Hidden Gems" card correctly reuses this exact module rather than rebuilding it — good architecture — but the practical effect is this content gets *surfaced* twice in one scroll (once here, once via Section 2's card pointing back up to it).
+
+**Hero — Section 1** — Job: state the brand promise, invite a first action. Visual/emotional role: calm, premium, full-bleed photo — this is working well and is on-brand. Action: search, or an Eat/Drink/Explore/Hidden Gems quick action. Earns its space unambiguously — but its impact as a "first impression" is undercut by not actually being first (see §1).
+
+**Start Exploring — Section 2** — Job: give visitors a mood-based entry point. Visual role: photo-forward asymmetric grid, genuinely premium, distinct from the hero (different composition, not just "hero again"). Action: Eat/Drink/Explore filter-and-reveal, or navigate to Hidden Gems/Golf/What's On. Information: six categorical destinations. Earns its space cleanly — a genuinely different job from both the hero (welcome) and Section 3 (specific picks). No problematic overlap; its links to Hidden Gems/What's On/Golf are legitimate reuse of real existing destinations, not duplicated content.
+
+**Worth the Roam — Section 3** — Job: make a small number of specific, confident, human recommendations. Visual role: editorial, typographic, no-photo — deliberately distinct from both Section 2 and the pre-existing Hidden Gems module. This is working exactly as designed in isolation. Action: read the blurb, "Explore →" to a specific venue. Earns its space *on its own merits* — but see §6: it has real, concrete overlap with two pre-existing sections further down the page, which is a genuine problem, not a Section 3 execution flaw.
+
+**Browse by category / Explore the Okanagan (pre-existing tile modules)** — Job: exhaustive, structured browsing by category/region. Visual role: plain white text tiles — functional, calm, but the flattest, least "premium" discovery modules on the page, especially arriving immediately after Worth the Roam's editorial register. Earns space functionally (real SEO and browsing utility) but is where the page's visual energy first drops.
+
+**Weather banner / Spotlight banner (pre-existing)** — Weather: a light, low-cost, genuinely novel touch (current conditions → a filter suggestion) — no overlap with anything else, fine as-is. Spotlight: one algorithmically-rotated venue with a written case for it — **this does the exact same job as Worth the Roam** (a small number of confident, reasoned picks), just algorithmically instead of editorially, and can literally select the same venue Worth the Roam already features (confirmed directly in this pass's own test render — "Checkmate Artisanal Winery" appeared as both the week's Spotlight pick *and* a Worth the Roam card simultaneously).
+
+**Featured this month / "Worth the Trip" (pre-existing, 10 hardcoded venues)** — Job, per its own eyebrow copy ("Worth the Trip") and heading ("Featured this month"): near-verbatim the same job as Worth the Roam ("Worth the Roam" / "worth the drive"). Visual role: the standard directory card — icon amenity badges plus a stack of six equally-weighted micro-actions (Get directions / Find menu / Check for online booking / phone / Add to trip / Favorite). This is the most "Yelp-like" moment on the entire page. **This is the clearest, single strongest redundancy finding in this audit** — two sections with near-identical names and identical intent, one editorial and restrained, one a directory card stack.
+
+**Results grid / "Places you'll love" (pre-existing)** — Job: the actual full, filterable directory — the site's real backbone. Same directory-card language as Featured this month. Must stay; it's the core product, not a candidate for removal. Its card design (six equally-weighted actions) is the least "premium" moment on the page by necessity — it's a working directory, not an editorial moment — worth naming but not an action item for this audit.
+
+**List Your Venue / App teaser / Footer** — Standard utility sections, outside the discovery narrative. No findings; not re-verified in depth this pass (stable, lower priority for this specific audit).
+
+---
+
+## 3. Overall narrative assessment
+
+The *intended* three-section arc — broad brand statement → mood-based choice → confident specific picks — is genuinely well-built and coherent **in isolation**. Read Hero → Start Exploring → Worth the Roam back to back (as this pass did, screenshotting them in sequence) and the progression works exactly as designed: it gets more specific, more confident, and more editorial as it goes.
+
+The problem is everything surrounding that arc. Visitors reach it only after a filter tool and two older content modules that have nothing to do with the new narrative, and shortly after leaving it, they hit a section (Featured this month) that says almost the same thing Section 3 just said, in the opposite visual language. The new work is good; the page as a whole hasn't yet been reconciled around it.
+
+---
+
+## 4. Visual rhythm assessment
+
+Photo-led: Hero (full photo), Start Exploring (photo cards).
+Editorial/typographic: Worth the Roam, Happening Soon, Browse by category, Explore regions.
+Directory-styled (icon badges + action stacks): pre-existing Hidden Gems, Featured this month, Results grid.
+
+The middle of the page — Hero → Start Exploring → Worth the Roam — has real, deliberate rhythm: photo, photo, then a register change into editorial type. That's the strongest three-beat sequence on the page. Both ends of the page don't share that discipline: the pre-hero block runs utility → plain → directory-badge with no photo-led beat at all, and the back half runs flat tiles → banners → directory → directory with no editorial beat to break it up. The rhythm the redesign established doesn't yet extend to the rest of the page.
+
+---
+
+## 5. Mobile assessment
+
+Sections 1–3 were each individually verified (in their own implementation passes) to have coherent, intentional mobile hierarchies — no horizontal overflow, first items kept prominent, genuine single-column reflows rather than shrunk desktop grids. That holds up.
+
+The structural problem in §1 is, if anything, *more* costly on mobile: the vertical scroll distance to reach the hero (past a multi-row wizard, then Happening Soon, then Hidden Gems) is proportionally much larger on a narrow phone screen than on desktop, since none of that pre-hero content was designed with the same "get to the point fast" mobile discipline the new sections were.
+
+---
+
+## 6. Redundancy / overlap findings
+
+1. **Spotlight banner vs. Worth the Roam** — same job (a small number of confident, reasoned picks), different mechanisms (algorithmic vs. hand-curated), can select the same venue. Confirmed directly this pass. Strongest *mechanism* overlap.
+2. **Featured this month ("Worth the Trip") vs. Worth the Roam** — near-identical name and identical intent, opposite execution (directory-card vs. editorial). Strongest *conceptual* overlap, and the clearest single redundancy on the page.
+3. **Pre-existing Hidden Gems module vs. Section 2's Hidden Gems card** — not truly redundant (Section 2 correctly reuses the one real module rather than rebuilding it), but the same content is *surfaced* twice in one scroll — a milder, structural repetition worth naming.
+4. **Browse by category vs. Section 2's Eat/Drink cards** — different granularity (6 exhaustive categories vs. 2 filtered actions); complementary, not redundant.
+5. **Explore the Okanagan (regions) vs. Worth the Roam's geographic spread** — complementary, not redundant, but a natural future cross-linking opportunity.
+
+---
+
+## 7. What is working particularly well
+
+* **The hero** is calm, premium, on-brand, and (after the earlier headline fix) reads as a confident two-line statement rather than a wall of text.
+* **Start Exploring** is a genuinely strong asymmetric photo grid with a clear, distinct job (mood-based entry) that doesn't compete with anything else on the page.
+* **Worth the Roam** reads exactly as intended — "a local guide's recommendation," not a directory — through restraint (no badges, no pills, a slim category accent, honest one-sentence blurbs, real whitespace). It's the best evidence on the page that the "editorial, not directory" goal is achievable within this codebase's existing tools.
+* **The Hero → Start Exploring → Worth the Roam sequence, taken together, is the strongest three-section run on the homepage** — distinct jobs, no overlap, real visual rhythm, increasing specificity. This is the part of the redesign to protect and build outward from, not the part that needs more added to it.
+
+---
+
+## 8. What should eventually change
+
+* **Resolve the pre-hero block.** The wizard, Happening Soon, and Hidden Gems module all rendering before the hero undercuts the entire new narrative's "first impression" job. Exactly how to fix this is a real design decision on its own (collapse the wizard into a compact trigger near the header; reorder so the hero genuinely leads; or something else) — not resolved here, flagged clearly as the highest-leverage structural fix available.
+* **Retire or substantially rework "Featured this month."** It is functionally superseded by Worth the Roam and is the single biggest outlier from the "editorial, not directory" brand goal left on the page.
+* **Reconcile Spotlight with Worth the Roam** — either fold Spotlight's job into a rotating slot within Worth the Roam, or keep it but exclude Worth the Roam's own venues from its algorithmic pool so the two can't collide.
+* **Lower priority, not urgent:** Browse by category and Explore regions could eventually get a lighter version of the new editorial treatment, or be consolidated into a single "browse everything" moment — noted for later, not blocking anything now.
+
+---
+
+## 9. Recommended Section 4 direction
+
+**The homepage does not need another discovery module right now — it needs the redundancy in §6 resolved before anything new is added.** Adding a fourth curated-picks-shaped section on top of a page that already has two other sections doing a version of that job (Spotlight, Featured this month) would make the repetition problem worse, not better, and would push further into "stuffed with modules" territory the brand explicitly wants to avoid.
+
+If the team wants to proceed with new content anyway rather than pause to fix the above, the strongest available direction — genuinely different from everything else on the page, not another card list, and backed by a real feasibility advantage — is **a map/discovery experience**. Reasoning:
+* Every other discovery mechanism on this homepage (wizard, category tiles, region tiles, Worth the Roam, Featured this month, Results grid) is a **list**. Nothing on the homepage currently gives a visitor any spatial sense of the valley — which is a genuinely different, useful thing for a first-time visitor deciding where to go, and directly serves the brief's own "usefulness to a first-time visitor" goal.
+* It would not be another card grid, which helps rather than hurts the "not an endless grid of cards" goal.
+* There is a real feasibility head start: a fully-built Leaflet map component already exists in the results section's own code (`initBlock2` in `app.js`) and is currently **force-hidden** by `renderHiddenElementsScript()` — a genuine, ready-to-repurpose asset already in the codebase rather than something to build from scratch.
+
+Either way — pausing to fix, or building the map — do **not** add a sixth "here are some good venues" list as Section 4.
+
+---
+
+## 10. Recommended overall homepage flow after Section 4
+
+```
+Header
+→ HERO — Section 1
+→ Start Exploring — Section 2
+→ Worth the Roam — Section 3
+→ Section 4 (map/discovery experience, if pursued — genuinely different register, not another list)
+→ Browse by category
+→ Explore the Okanagan / regions
+→ Discovery Wizard (repositioned — exact mechanism TBD, a real design decision on its own)
+→ Happening Soon
+→ Hidden Gems (or folded into a rotating Worth the Roam slot)
+→ Results grid ("Places you'll love")
+→ List Your Venue → App teaser → Footer
+```
+
+The wizard's new position above is directional, not a specification — moving load-bearing, stateful UI (sticky positioning, `#directory` anchor, `body.wizard-active` behavior) is real implementation work with its own risks, and deserves its own design pass rather than being folded into a "what comes after Section 4" note.
+
+---
+
+## 11. Sections that should eventually be removed, merged, or reordered
+
+* **Remove or substantially rework:** Featured this month / "Worth the Trip" — functionally superseded by Worth the Roam.
+* **Merge or coordinate:** Spotlight banner with Worth the Roam, to eliminate the algorithmic/curated collision risk.
+* **Reorder:** the wizard + Happening Soon + Hidden Gems block relative to the hero — the page's single highest-leverage structural fix, mechanism not yet decided.
+* **Revisit later, not urgent:** Browse by category and Explore regions could eventually share a lighter version of the new editorial visual language.
+* **Keep exactly as-is:** the Results grid (the core product), and List Your Venue / App teaser / Footer (utility sections outside this narrative).
+
+---
+
+**No application code, venue data, database records, or production data were changed. No admin endpoint was called. No deployment happened. Nothing was merged or committed to `main`.** This entire pass was source-code reading plus screenshot-based visual verification of the current live-rendered homepage; the only local-database change made during the pass (temporarily mirroring six real venues so Section 3 would render for this review) was fully reversed before finishing, confirmed by deleting the exact rows added, and was never committed or pushed anywhere.
