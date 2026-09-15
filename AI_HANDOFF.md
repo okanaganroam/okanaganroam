@@ -1519,3 +1519,153 @@ Screenshotted via the same CDP-driven tool built for the hero QA pass (true view
 ---
 
 **No production data was touched, no admin endpoint was called, no deployment happened, nothing was merged or committed to `main`.** All changes described above are implemented and committed on `ai-handoff/2026-09-15` only.
+
+### Section 3 — Worth the Roam Candidate Research (2026-09-15)
+
+#### Claude — read-only research only. No code, data, or admin endpoints touched.
+
+* **Status: read-only research only. No application code, venue data, database records, or production data was modified. No admin endpoint was called. No production write occurred — every venue lookup below was a plain `GET` against the site's own public, unauthenticated `/api/venues` endpoint (`https://okanaganroam.com/api/venues?limit=2000`, returned all 1,051 active venues in one request). `main` was never touched.**
+
+---
+
+## The single most important finding first
+
+**Zero of the 1,051 active production venues have any `image_url` value.** Confirmed directly from the live API response, not inferred: `image_url` is present as a schema field on every venue record, and it is `null` on all 1,051 of them. (For context: only 1 of 1,051 even has a non-null `website`.) This means **no venue in the actual data model currently has "existing photo availability"** in the sense the research brief's favor-criterion #1 is asking about — that signal simply doesn't exist anywhere in the live dataset today.
+
+The **only** real, venue-linked photography anywhere in this codebase is the set of 10 photos recovered from this repo's own git history last session (the pre-hero-redesign `okanagan.html`, commit `a29c96a^`) — each one tied to a *specific named venue* by that old carousel's own caption text, not by any database field. Those 10 names were cross-referenced against live production data (table below). **6 of the 10 are already used as photography in Section 1 (hero) or Section 2 (Start Exploring)** — reusing any of them again in Section 3, which sits on the same page, would be visibly repetitive. **3 of the 10 were already ruled out** in earlier sessions for visible business signage and/or clearly identifiable people in the shot. That leaves **exactly one** venue, Turtle Jack's West Kelowna, with real, unused, clean, recoverable photography ready to go.
+
+| Original photo | Matched venue (live) | ID | Status for Section 3 |
+|---|---|---|---|
+| Elephant Island Winery | Elephant Island Winery | 198 | Used — hero background (Section 1) |
+| Theo's Restaurant | Theo's Restaurant | 719 | Used — "Eat" card (Section 2) |
+| Perch Sky Lounge | Perch Sky Lounge | 496 | Used — "Drink" card (Section 2) |
+| Bliss Bakery and Bistro | Bliss Bakery and Bistro | 82 | Used — "Hidden Gems" card (Section 2) |
+| JOEY Kelowna | JOEY Kelowna | 298 | Used — "What's On" card (Section 2) |
+| Dawett Fine Indian Cuisine | Dawett Fine Indian Cuisine | 170 | Used — "Explore" card (Section 2) |
+| BNA Brewing Kelowna | BNA Brewing Kelowna | 39 | Excluded — photo shows several identifiable people bowling |
+| Frind Estate Winery | Frind Estate Winery | 228 | Excluded — prominent "FRIND" signage + identifiable people at tables |
+| Rollingdale Winery | Rollingdale Winery | 554 | Excluded — prominent "ROLLINGDALE WINERY" building signage |
+| Turtle Jack's West Kelowna | Turtle Jack's West Kelowna | 740 | **Available — unused, no people, no signage** |
+
+**Practical consequence for the design:** if Section 3 is meant to be photo-forward like Sections 1–2, only one of the 12 candidates below can actually ship with real photography today; the rest would need new photo sourcing (out of scope for this research task) before appearing as photo cards. The existing no-photo-needed alternative — the `.hidden-gem-card` "compact band" treatment already used by the current Hidden Gems homepage module (a solid color gradient keyed by venue type + a text label, no image required) — is a real, already-built, ready-today option worth considering for some or all of Section 3's cards. See Implementation Feasibility below.
+
+---
+
+## The 12 candidates
+
+All pulled fresh from the live production API this pass. All are active (`redirect_to: null`), all have complete addresses and coordinates, all confirmed not to be duplicates (checked for exact-name collisions and for any other venue redirecting into them — none found), and none match text patterns suggesting mobile/food-truck/seasonal/closed status (screened description text for "food truck," "mobile," "pop-up," "seasonal," "closed," "cart," "trailer" — none matched). None are chain restaurants (Cactus Club, Earls, Browns Socialhouse, etc. were deliberately excluded from consideration — recognizable nationally, not "distinctly Okanagan," works against the brief's "local character" and "distinctiveness" asks). None overlap with the 6 venues already used in Sections 1–2, or with the existing separate Hidden Gems homepage collection (venue IDs 128, 100, 685, 47, 816, 1038 — checked, zero overlap).
+
+**1. Turtle Jack's West Kelowna** — ID 740
+Region/town: West Kelowna. Type: pub. Address: 2569 Dobbin Rd, West Kelowna, BC V4T 2J6 (complete). Phone: none on file. Website: none. Image: **real, unused, recoverable photo available** (see above) — a clean, appetizing ribs/fries plate shot, no people, no signage. Rating: 4.5, 527 reviews. Slug: `turtle-jack-s-west-kelowna`.
+Why promising: the only candidate with ready-to-use real photography; solid rating/review signal; family-friendly pub category not otherwise represented.
+Data-quality concern: no phone on file.
+**Recommendation: YES.**
+
+**2. Miradoro Restaurant** — ID 1029
+Oliver. Restaurant (the on-site fine-dining restaurant at Tinhorn Creek Vineyards). Address: 537 Tinhorn Creek Rd, Oliver, BC V0H 1T0 (complete). Phone: +1 250-498-3742. Website: none on file. Image: none. Rating: 4.5, 932 reviews. Slug: `miradoro-restaurant-1029`.
+Why promising: genuinely distinctive — a destination restaurant with vineyard views, the strongest "worth driving out for" story in the whole pool; high review count for a South Okanagan pick.
+Data-quality concern: none beyond the site-wide absence of image/website data.
+**Recommendation: YES.**
+
+**3. Checkmate Artisanal Winery** — ID 824
+Oliver. Winery. Address: 4799 Wild Rose St, Oliver, BC V0H 1T1 (complete). Phone: +1 250-707-2299. Website: none. Image: none. Rating: 4.8 (highest of the pool), 341 reviews. Slug: `checkmate-artisanal-winery`.
+Why promising: appointment-only, upscale single-varietal focus — exactly the kind of distinctive, less-obvious-to-a-first-timer discovery the brief wants, with the strongest rating in this shortlist.
+Data-quality concern: none.
+**Recommendation: YES.**
+
+**4. Linden Gardens** — ID 368
+Kaleden. Cafe (a working botanical garden with a cafe — goats, bunnies, and chickens on-site per its own description). Address: 351 Linden Ave, Kaleden, BC V0H 1K0 (complete). Phone: +1 250-497-6600. Website: none. Image: none. Rating: 4.7, 257 reviews. Slug: `linden-gardens`.
+Why promising: the single most distinctive, personality-rich candidate in the pool — genuinely unlike anything else on this list, and Kaleden is a region with very little other homepage representation (5 active venues total).
+Data-quality concern: none.
+**Recommendation: YES.**
+
+**5. Intermezzo Restaurant and Wine Cellar** — ID 289
+Vernon. Restaurant (fine-dining Italian). Address: 3206 34th Ave, Vernon, BC V1T 7E2 (complete). Phone: +1 250-542-3853. Website: none. Image: none. Rating: 4.8, 1,187 reviews. Slug: `intermezzo-restaurant-and-wine-cellar`.
+Why promising: brings the North Okanagan into the mix (nothing else in this shortlist is north of Kelowna); strong review volume backs up the high rating; live Spanish guitar nights and serious gluten-free accommodation give it real character beyond the rating alone.
+Data-quality concern: none.
+**Recommendation: YES.**
+
+**6. Red Rooster Winery** — ID 863
+Naramata. Winery. Address: 891 Naramata Rd, Penticton, BC V2A 8T5 (complete — physically in Naramata, addressed via Penticton). Phone: +1 236-500-0441. Website: none. Image: none. Rating: 4.7, 334 reviews. Slug: `red-rooster-winery`.
+Why promising: the Naramata Bench is arguably the single most iconic Okanagan wine-touring stretch, and isn't otherwise represented in this shortlist (Elephant Island, also Naramata, is already used in the hero); well-known, view-driven winery with a genuine "worth the drive" story.
+Data-quality concern: none.
+**Recommendation: YES.**
+
+**7. Bench Market** — ID 984
+Penticton. Cafe (breakfast/brunch/market). Address: 368 Vancouver Ave, Penticton, BC V2A 1A5 (complete). Phone: +1 250-492-2222. Website: none. Image: none. Rating: 4.5, 1,001 reviews. Slug: `bench-market`.
+Why promising: very strong review volume for a cafe; dog-friendly terrace and "pitstop for the Naramata bench" framing (per its own description) give it a genuine local-detour story.
+Data-quality concern: none.
+**Recommendation: MAYBE** — strong data, but reads a little less distinctive than the top 6 above.
+
+**8. Central Kitchen + Bar** — ID 126
+Kelowna. Restaurant (gastropub). Address: 1155 Ellis St, Kelowna, BC V1Y 1Z5 (complete). Phone: +1 250-862-8820. Website: none. Image: none. Rating: 4.6, 2,143 reviews. Slug: `central-kitchen-bar`.
+Why promising: strongest review count in this shortlist; a genuine "recognizable local favourite" if the final mix wants one confident Kelowna anchor.
+Data-quality concern: none.
+**Recommendation: MAYBE** — good candidate if the mix needs a Kelowna pick, but Kelowna is already well represented elsewhere on the homepage (Section 2's Eat/Drink/What's On/Explore cards are all Kelowna-based venues).
+
+**9. Granny's Fruit Stand, Bakery, Cafe** — ID 246
+Summerland. Cafe. Address: 13810 BC-97, Summerland, BC V0H 1Z1 (complete). Phone: +1 250-494-7374. Website: none. Image: none. Rating: 4.6, 570 reviews. Slug: `granny-s-fruit-stand-bakery-cafe`.
+Why promising: genuine roadside-stand local character, "natural stop for anyone touring the wine trail" per its own description — good geographic filler for Summerland, otherwise unrepresented.
+Data-quality concern: none.
+**Recommendation: MAYBE.**
+
+**10. Ok Falls Hotel Bar & Grill** — ID 455
+Okanagan Falls. Pub. Address: 1045 Main St, Okanagan Falls, BC V0H 1R2 (complete). Phone: +1 778-515-0500. Website: none. Image: none. Rating: 4.5, 286 reviews. Slug: `ok-falls-hotel-bar-grill`.
+Why promising: small-town pub right off the KVR rail trail; good geographic filler for Okanagan Falls, otherwise unrepresented; lowest review count in the shortlist but still comfortably above the 200-review filter used to build this pool.
+Data-quality concern: review count is the thinnest of the 12, though still solid in absolute terms.
+**Recommendation: MAYBE.**
+
+**11. Chutney Cuisine of India** — ID 143
+Kelowna. Restaurant. Address: 3011 Pandosy St, Kelowna, BC V1Y 1W3 (complete). Phone: +1 250-762-9300. Website: none. Image: none. Rating: 4.6, 1,965 reviews. Slug: `chutney-cuisine-of-india`.
+Why promising: adds cuisine diversity the rest of the shortlist lacks; very strong review volume.
+Data-quality concern: a second Kelowna pick alongside Central Kitchen — only include both if the final mix can afford two Kelowna cards.
+**Recommendation: MAYBE.**
+
+**12. Wooden Nickel Cafe** — ID 790
+Lake Country. Cafe. Address: 10051 BC-97, Lake Country, BC (no postal code on file — a minor completeness gap, everything else present). Phone: +1 250-766-0777. Website: none. Image: none. Rating: 4.5, 469 reviews. Slug: `wooden-nickel-cafe`.
+Why promising: brings Lake Country into the mix, otherwise unrepresented; honest, unpretentious "no-frills breakfast stop" character.
+Data-quality concern: address is missing a postal code (everything else complete).
+**Recommendation: MAYBE.**
+
+---
+
+## Ranked recommendation
+
+If asked to narrow straight to 4–6, in priority order:
+
+1. **Turtle Jack's West Kelowna** — the only one with real, ready photography today; strong practical argument to include regardless of ranking on other merits.
+2. **Miradoro Restaurant** (Oliver) — the strongest "worth the drive" story in the pool.
+3. **Checkmate Artisanal Winery** (Oliver) — highest rating, genuinely distinctive.
+4. **Linden Gardens** (Kaleden) — the most distinctive, personality-driven pick; best answer to "gives the homepage personality."
+5. **Intermezzo Restaurant and Wine Cellar** (Vernon) — the only North Okanagan representation, strong data.
+6. **Red Rooster Winery** (Naramata) — anchors the Naramata Bench, the Okanagan's most iconic wine-touring stretch.
+
+Bench Market, Central Kitchen + Bar, Granny's Fruit Stand, Ok Falls Hotel Bar & Grill, Chutney Cuisine of India, and Wooden Nickel Cafe (candidates 7–12) are all genuinely solid backups if the above 6 need swapping for photo availability, regional balance, or category balance once the design is finalized.
+
+**Category balance across the 12:** 2 wineries, 4 restaurants, 4 cafes, 2 pubs — no type dominates.
+**Geographic spread across the 12:** West Kelowna, Oliver (×2), Naramata, Kaleden, Vernon, Penticton, Kelowna (×2), Summerland, Okanagan Falls, Lake Country — 10 distinct regions, deliberately favoring places *outside* Kelowna, since Kelowna is already heavily represented by Section 2's cards and the "worth the drive" framing implies getting out of the main hub.
+
+---
+
+## Implementation feasibility
+
+Read `server.js`'s current Section 1 (hero) and Section 2 (Start Exploring) implementation and the `db.js` schema to assess this. Nothing below was implemented or changed.
+
+**Where Section 3 should insert:** the same injection point Section 2 already uses. `server.js`'s homepage route currently does `</section>\n${startExploring}\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner"...` at the existing `heroToWeatherAnchor` replace. Section 3 would slot into that exact same template string, either right after `startExploring` (so the reading order is Hero → Start Exploring → Worth the Roam → Browse by category → Explore the Okanagan) or wherever else this same string is edited to place it — a small, well-understood, already-twice-used pattern, not a new mechanism.
+
+**What can be reused:**
+* **Markup/CSS:** two ready-made card patterns already exist and both fit the "editorial/premium" brief:
+  * `.explore-card` / `.explore-grid` (built for Section 2) — full-bleed photo, gradient scrim, single title, restrained hover lift. Needs a real photo per card; today only 1 of 12 candidates has one.
+  * `.hidden-gem-card` (already live in production, used by the existing Hidden Gems homepage module) — a solid color-gradient "compact band" keyed by venue type plus a title/meta/blurb body, **no photo required**. This is real, in production, and available today for all 12 candidates regardless of photo availability.
+* **Data mechanism:** the `collections` / `collection_items` tables (added in `db.js`, "Phase 2 Sprint 3") are a general-purpose editorial-curation mechanism, explicitly designed for exactly this reuse — the schema's own code comment says so verbatim: *"future kinds, e.g. a future Roam Picks collection, can reuse this same table without a schema change."* A "Worth the Roam" collection would be a new `kind` value plus a small idempotent seed list of `{position, venue_id, note}` rows, following the exact pattern the existing `HIDDEN_GEMS_MEMBERS` array + seeding block in `db.js` already establishes — additive, no schema migration, no new table.
+* **Image serving:** if any candidate does get a real photo (starting with Turtle Jack's, or new photography later), the existing whitelisted-filename route pattern (`/images/hero.jpg`, `/images/explore/*.jpg`) is directly reusable for a `/images/worth-the-roam/*.jpg` equivalent — same `fs.readFileSync` + `Cache-Control` pattern, no new serving mechanism needed.
+* **API completeness:** `/api/venues` already returns every field a card would need — name, region, type, address, phone, rating, reviews, price, slug, coordinates, description — except a short editorial "why this place" blurb, which the existing codebase already solves twice over without new schema: either the `collection_items.note` column (unused for display today, but present) or a `server.js`-side constant dictionary keyed by slug, exactly matching the already-live `HIDDEN_GEM_HOMEPAGE_BLURBS` pattern.
+
+**What would genuinely be new / a real blocker:**
+1. **Photography for 11 of the 12 candidates.** This is the one real gap — no amount of code reuse solves it. A decision is needed on whether Section 3 ships photo-forward (blocked on new photo sourcing, which is out of scope here) or uses the no-photo `.hidden-gem-card` treatment (available today).
+2. **Editorial copy.** The brief is explicit that descriptions must not be invented from rating alone — a short, honest, human-written blurb per selected venue (matching the existing `HIDDEN_GEM_HOMEPAGE_BLURBS`/`collection_items.note` precedent, one sentence grounded in what's already in that venue's own `description` field, not a new claim) would need to be written once the final 4–6 are chosen. Not something this research pass invents.
+3. **A new `collections` row + seed list**, and a new `renderWorthTheRoamHTML()`-style function plus one new line wiring it into the existing anchor replace — small, additive, precedented, but still real implementation work for a later task, not done here.
+
+---
+
+**No application code, venue data, database records, production data, or admin endpoints were touched. No production write occurred at any point — this entire pass was public, unauthenticated `GET` requests against `/api/venues` and local, read-only inspection of `server.js`/`db.js`. `main` was never touched.**
