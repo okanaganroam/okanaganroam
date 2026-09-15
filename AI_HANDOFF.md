@@ -968,6 +968,66 @@ The four just-unblocked canonicals from this session's merge batch. All four wer
 
 * **No production data was changed, no admin endpoint was called, no merge/retire performed, no phone corrected, no application code was changed, no manifest change, no deployment.** This entire pass was live `GET` verification plus reconciliation against research already completed this session.
 
+## Final Verification Pass — #180, #360, #426, #934, #987 (2026-09-15) — Read-Only Audit of Already-Live Data
+
+### Claude — important correction to the request's premise, then a genuine new finding on #180's phone.
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, no phone corrected, no code changed, no manifest change, no deployment. `main` untouched.**
+* **Correction, checked against live production before doing anything else:** all 5 of these venues are **already fully enriched in production**, not pending candidates — #180 and #934 and #987 were written earlier this session (see the "EXECUTED — #180, #934, #987" entry above), and #360 and #426 were written in the batch before that (see "EXECUTED — #426 and #360"). Confirmed via a fresh live pull just now: all 5 have `address`/`latitude`/`longitude` populated exactly matching what was written at the time. This pass is therefore a **post-hoc audit of already-live data against newly-raised concerns**, not pre-write research — reframing the requested "SAFE TO WRITE NOW / DO NOT WRITE YET" lists accordingly below, since nothing here is actually pending a write.
+* Despite the premise correction, the specific concerns raised (especially #180's phone) are legitimate questions about already-live data quality, and were investigated properly rather than dismissed on a technicality.
+
+---
+
+### #180 Dolci Thai Bistro — **genuine, unresolved phone conflict found. This is a real finding, not a false alarm.**
+
+* **Address/coordinates: still solid, no new concern.** Every source checked (multiple, past and present) consistently gives 8710 Main St, Osoyoos, BC V0H 1V0 — the already-written address and coordinates (49.032963, -119.467977, from geocoder.ca + restaurantguru.com, ~15m agreement) are not in question.
+* **Phone: a real conflict exists, freshly confirmed, not resolved.**
+  * **Sirved.com** independently lists **+1 250-495-6807** for Dolci Thai Bistro — this matches the currently-stored (and never-touched-by-me) phone.
+  * **Yelp, TableAgent (explicitly for reservations), and general web search aggregation** consistently and repeatedly surface **+1 250-408-8941** instead.
+  * This is the **same pattern flagged earlier this session** (back when #180 was first researched) — at that time, one ambiguous search result seemed to confirm 495-6807 and the 408-8941 number was provisionally attributed to "the booking site's own line." **That provisional judgment call does not hold up under this fresh, more thorough check** — 408-8941 now appears across multiple independent, reputable sources (not just one booking aggregator), while 495-6807's only independent confirmation is a single Sirved listing.
+  * **I cannot definitively resolve which number is currently correct with the evidence available.** Per your own stated rule ("do NOT write or recommend enrichment unless you can resolve this"), the honest answer is: **it is not resolved.**
+* **Important scope note:** the phone field was never modified by any enrichment write I performed — `guardedEnrichUpdate()` only ever touches `address`/`latitude`/`longitude`. This is a **pre-existing data-quality question** about the phone value that was already in the database before this session started, surfaced now rather than introduced by any write here.
+* **Recommendation:** flag `#180`'s phone for a future `/admin/correct-phone` investigation (once that endpoint is committed/deployed) — separate from and not requiring any change to the already-correct address/lat/lng.
+
+---
+
+### #360 Lala Ji's pizzeria — reconfirmed clean, no new concerns.
+
+Multiple independent sources (Yellowpages, Facebook, Tripadvisor, Wanderlog, Sirved, the business's own site lalajipizzeria.com, WanderBoat) consistently confirm **625 Main St, Penticton, BC V2A 5C9** and **+1 778-622-2211** together, with no competing number or address found anywhere. The already-written coordinates (49.49398, -119.589999, geocoder.ca + a Photon POI-name-exact match, 0m agreement) remain the strongest evidence in this whole audit set.
+
+---
+
+### #426 Murray's Pizza Kelowna — reconfirmed as specifically the Kelowna location, no confusion with West Kelowna.
+
+Every source checked explicitly and consistently distinguishes this Kelowna location (**107-1924 Summit Drive, Kelowna, BC V1V 3E9**, **+1 778-484-3000**) from the separate West Kelowna Murray's Pizza (103-3640 Gosset Rd, a different address and — per the chain's own site murrays.pizza — a different location page entirely). No ambiguity found. Already-written coordinates (49.901388, -119.45305) remain supported by the two independent sources found earlier this session.
+
+---
+
+### #934 14th Ave Bar & Grill — coordinate conflict remains resolved, no new contradicting evidence found.
+
+The golftraxx-sourced coordinate (50.2518398, -119.2509141) resurfaced again in this pass's search — it's the same single outlier source already identified and explained earlier this session (~359m from the InteGolf/geocoder.ca cluster, and outside OSM's own mapped course-boundary polygon). No new source contradicts the already-established resolution: **InteGolf's independently-geocoded value (50.2517967, -119.2458648) and geocoder.ca (26.5m agreement)** remain the best evidence, and no third source surfaced to challenge that conclusion. The already-written coordinates are the InteGolf/geocoder.ca cluster value, not the golftraxx outlier — confirmed correct.
+
+---
+
+### #987 China Palace — no stronger evidence than what was already used; no new weakness found either.
+
+This pass's search did not surface a third independent coordinate source, and explicitly could not provide exact GPS coordinates itself ("you would need to use a mapping service"). The already-written coordinates (49.476851, -119.583657, from geocoder.ca + restaurantguru.com, 29.6m agreement) remain the best available evidence — this pass found nothing new to either strengthen or weaken that. Address identity (1933 Main Street, Penticton, BC V2A 5H5) is consistently confirmed across every source checked, with no competing location.
+
+---
+
+### Final lists, adapted to reflect that all 5 are already live
+
+**SAFE — confirmed, already correctly enriched, no further action needed (4):**
+* #360 Lala Ji's pizzeria
+* #426 Murray's Pizza Kelowna
+* #934 14th Ave Bar & Grill
+* #987 China Palace
+
+**FLAG FOR FUTURE ATTENTION — not an address/coordinate problem, but an unresolved phone conflict on already-live data (1):**
+* **#180 Dolci Thai Bistro** — address/coordinates remain correct and require no change; the stored phone (+1 250-495-6807) has genuine, unresolved conflicting evidence against an alternate number (+1 250-408-8941) that appears more frequently across independent sources. Needs a dedicated phone-correction investigation before the phone field can be trusted, separate from the location data which is already sound.
+
+* **No production data was changed, no admin endpoint was called, no phone corrected, no application code was changed, no manifest change, no deployment.** This entire pass was live `GET` verification plus fresh public web research.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
