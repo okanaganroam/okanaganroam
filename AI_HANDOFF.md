@@ -164,6 +164,60 @@ This file is the shared coordination point for AI assistants working on this rep
 * **Missing-location count impact:** 66 → 65 active venues now missing address/lat/lng (arithmetic inference from this single write; not independently re-pulled as part of this entry).
 * **Manifest was not touched. No other venue was modified. No duplicates were merged. No application code was changed. No unrelated deploy occurred.**
 
+## Redirect Count Reconciled (2026-09-15) — Resolves a Long-Standing Gap in This File
+
+### Claude — full redirect-count verification, no admin access needed
+
+* **Status: read-only. No admin endpoint was called, no production data was changed.**
+* This file has repeatedly noted "redirect count not reverified this pass (no admin access)" since 2026-09-08's baseline of 17. That gap is now closed — **no admin token was needed**, since `GET /api/venues/:id` (single-venue lookup) does NOT filter out redirected rows the way the list endpoint does, so every id can be individually checked.
+* **Method:** pulled the full active list (1,055 ids, min 1 / max 1083), found the 28 ids missing from that contiguous range, then checked each one individually via `GET /api/venues/:id`.
+* **Result:**
+  * **26 of the 28 gaps are genuine redirects** — each has a valid `redirect_to` pointing at a real canonical venue (examples: `#38 BNA Brewing (Vernon) → #40`, `#944 Davison Farmhouse Café → #210`, `#708 The Restaurant at Poplar Grove → #1012`).
+  * **2 of the 28 (ids 1070, 1073) are simply nonexistent** — 404, never created or previously hard-deleted, not redirects.
+  * Confirmed the table doesn't extend past id 1083 (checked 1084–1090, all 404).
+* **Current redirect count: 26** (up from the stale 17 recorded on 2026-09-08 — 9 additional merges happened in production at some point without ever being logged in this file, same pattern already noted for the location-enrichment numbers).
+* **Total rows in the venues table: 1,081** (1,055 active + 26 redirected).
+* **Production deployment status:** healthy, same stable deployment (`e42326f5`, `SUCCESS`, created 2026-09-15T02:12:11Z) as after the `/admin/correct-phone` code shipped — nothing new has been deployed since; the #484 enrichment was a data write via the API, not a deploy.
+* **Recommendation:** the "Known baseline" and "Updated baseline" lines under Current Status should be refreshed to include this redirect count once ChatGPT has reviewed it, and the Open Tasks section's "17 redirects" reference is now confirmed stale.
+
+## Lat/Lng Re-Verification for #180, #360, #426, #934, #987 (2026-09-15) — Proposed, NOT Written
+
+### Claude — read-only geocoding research only. No production write, no commit to main, no deploy.
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, nothing deployed. Stopping here for approval before any write, per instruction.**
+* **Why revisit these five:** after #484 was written, these were the remaining venues from the original 6-venue READY batch. The earlier geocoding pass found only #484 reached genuine building-level confidence; these 5 were left unresolved (road-level-only OSM matches with mismatched postal codes, one wrong-POI match, and a ~4km conflict for #934). This pass specifically avoided relying on approximate street-centroid coordinates and looked for authoritative/independently-corroborated sources instead.
+* **New method that worked:** queried **geocoder.ca** (a Canada-specific geocoding service built on Canada Post/StatCan civic address data — independent of OpenStreetMap, the same independent source that confirmed #484) for all 5 addresses. All 5 returned an **exact postal-code match** to the business's own independently-confirmed postal code, with self-reported confidence scores of 0.8–1.0. This alone is meaningfully stronger than the earlier OSM road-level results, which had *mismatched* postal codes.
+* Also re-attempted OSM (Nominatim and Photon) with full postal codes included, and checked each business's own official website for an embedded Google Maps link (none had one). One additional finding materially improved #934's confidence (see below).
+
+| ID | Name | Verified address | geocoder.ca result (independent of OSM) | Cross-check | Confidence |
+|---|---|---|---|---|---|
+| 426 | Murray's Pizza Kelowna | 107-1924 Summit Drive, Kelowna, BC V1V 3E9 | lat 49.901388, lon -119.453050, postal **V1V 3E9 (exact match)**, confidence 1.0 | Agrees with the earlier OSM point (49.9013835, -119.4532433) to within **~5 meters** — the earlier "wrong POI name" (Glenmore Martial Arts) concern is now understood as OSM mistagging a shared/multi-tenant building, not a wrong location; the coordinate itself is corroborated by two independent sources | **HIGH — upgraded, ready to write** |
+| 934 | 14th Ave Bar & Grill (Hillview Golf Course) | 1101 14 Avenue, Vernon, BC V1B 2S6 | lat 50.251750, lon -119.245500, postal **V1B 2S6 (exact match)**, confidence 0.8 | Queried Nominatim by the course's **name** (not the street address) and found OSM's own mapped golf-course polygon (bounding box lat 50.2479813–50.2528625, lon -119.2460032– -119.2396377). The geocoder.ca point **falls inside** that boundary; the earlier golf-scorecard-sourced point (50.2518398, -119.2509141) **falls just outside it**, to the west. This is real corroborating evidence favoring the geocoder.ca point over the earlier one | **MODERATE-HIGH — meaningfully improved from "unresolved," but the two sources still differ by ~390m, so flagging for your judgment rather than calling it fully closed** |
+| 987 | China Palace | 1933 Main Street, Penticton, BC V2A 5H5 | lat 49.476851, lon -119.583657, postal **V2A 5H5 (exact match)**, confidence **1.0 (highest of all five)** | No second independent building-level source found despite trying OSM (Nominatim + Photon, both only road-level) and the business's own website (no embedded map) | **MODERATE-HIGH — single source, but perfect confidence score and exact postal match** |
+| 180 | Dolci Thai Bistro | 8710 Main St, Osoyoos, BC V0H 1V0 | lat 49.032963, lon -119.467977, postal **V0H 1V0 (exact match)**, confidence 0.9 | Same — no second independent building-level source found; OSM only resolves to road-level here | **MODERATE — single strong source** |
+| 360 | Lala Ji's pizzeria | 625 Main St, Penticton, BC V2A 5C9 | lat 49.493980, lon -119.589999, postal **V2A 5C9 (exact match)**, confidence 0.9 | Same — no second independent building-level source found | **MODERATE — single strong source** |
+
+* **Recommendation:** #426 is now as solid as #484 was (two independent sources agreeing within meters) — ready to write alongside or after #934 if you're comfortable with the corroboration described above. #987, #180, and #360 rest on one strong, independently-computed, exact-postal-code-matched source each, with no second source found despite genuine effort (OSM structurally can't resolve these three small-town Main Street addresses to building level) — your call on whether that single-source bar is sufficient, or whether you want a manual Google Maps check first for these three specifically.
+* **No production data was changed, no admin endpoint was called, nothing was committed to main, nothing was deployed.** This pass was public geocoding-API `GET` requests and business-website reads only.
+
+### Follow-up (2026-09-15, same session, Auto mode) — #360 upgraded; #180 and #987 confirmed at their ceiling
+
+* Found a genuine second independent source for **#360 Lala Ji's pizzeria**: querying Photon (a different OSM query engine) by business name returned an exact POI-name match — `restaurant | Lala Ji's Pizzeria | Main Street, postcode V2A 5C7` at (49.4939043, -119.590323). This lands within **~15-20 meters** of geocoder.ca's independently-computed point (49.493980, -119.589999). **#360 is upgraded to HIGH confidence, ready to write.**
+* Tried the same name-based approach (plain and location-biased) for **#180 Dolci Thai Bistro** and **#987 China Palace** — neither is tagged as a named POI in OpenStreetMap at all (Photon returned unrelated global results, including actual Chinese palaces for the "China Palace" query, once location-bias didn't restrict it to Penticton). Also re-confirmed neither business's own website has an embedded map. **These two remain at MODERATE confidence — single strong source (geocoder.ca, exact postal match), and I've now made a genuine, exhausted effort to find a second one without success.**
+
+**Updated confidence summary for the full 6-venue batch:**
+
+| ID | Name | Confidence | Status |
+|---|---|---|---|
+| 484 | Parlour Ice Cream | HIGH (2 sources) | **WRITTEN — done** |
+| 426 | Murray's Pizza Kelowna | HIGH (2 sources, ~5m agreement) | Ready, awaiting approval |
+| 360 | Lala Ji's pizzeria | HIGH (2 sources, ~15-20m agreement) | Ready, awaiting approval |
+| 934 | 14th Ave Bar & Grill | MODERATE-HIGH (corroborated by course boundary, ~390m spread) | Awaiting your judgment call |
+| 987 | China Palace | MODERATE (1 source, confidence 1.0, exhausted search for a 2nd) | Awaiting your judgment call |
+| 180 | Dolci Thai Bistro | MODERATE (1 source, confidence 0.9, exhausted search for a 2nd) | Awaiting your judgment call |
+
+* **No production data was changed, no admin endpoint was called, nothing was committed to main, nothing was deployed.**
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
