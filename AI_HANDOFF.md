@@ -295,6 +295,140 @@ This confirms numerically what was described qualitatively before: geocoder.ca a
 
 * **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, nothing was deployed.** This pass was public web research only (search + raw-HTML fetches of publicly-accessible pages).
 
+## FULL BATCH REPORT — All 63 Remaining Missing-Location Venues (2026-09-15)
+
+### Claude — read-only research, all 63 venues covered. NOT written. Awaiting approval.
+
+* **Status: read-only research only.** No admin endpoint was called, no production data was changed, no merge/retire performed, no application code changed, no deployment, no manifest change. Everything below is a recommendation for the next phase, not an executed action.
+* **Method:** combined (a) research already on record in this file from the earlier duplicate/chain-reconciliation deep-dive and the two prior geocoding passes (covers 20 of the 63 directly), with (b) three parallel research batches covering the remaining 19 previously-unresearched clean venues, using the same methodology established throughout this file (identity verification via multiple independent sources, phone cross-check where a phone is stored, geocoding via geocoder.ca / OpenStreetMap Nominatim+Photon / restaurantguru.com raw-HTML, confidence rated by source agreement), plus (c) the pre-existing internal food-truck/mobile/seasonal keyword flags and the previously-completed external verification of the original 13 internally-HIGH candidates (7 of which were downgraded with specific issues already documented earlier in this file).
+
+---
+
+### A. SAFE TO ENRICH — HIGH confidence (11)
+
+| ID | Name | Region | Type | Phone | Verified Address | Rec. Lat | Rec. Lon | Evidence/Sources | Coord. Agreement |
+|---|---|---|---|---|---|---|---|---|---|
+| 180 | Dolci Thai Bistro | osoyoos | restaurant | +1 250-495-6807 | 8710 Main St, Osoyoos, BC V0H 1V0 | 49.032963 | -119.467977 | geocoder.ca + restaurantguru.com | 0.0m |
+| 987 | China Palace | penticton | restaurant | +1 250-492-9883 | 1933 Main Street, Penticton, BC V2A 5H5 | 49.476851 | -119.583657 | geocoder.ca + restaurantguru.com | 29.6m |
+| 934 | 14th Ave Bar & Grill | vernon | restaurant | +1 250-549-4653 | 1101 14 Avenue, Vernon, BC V1B 2S6 (Hillview Golf Course) | 50.2517967 | -119.2458648 | geocoder.ca + InteGolf | 26.5m |
+| 521 | Poplar Grove Winery | penticton | winery | +1 250-493-9463 | 425 Middle Bench Rd N, Penticton, BC V2A 8S5 | 49.5124383 | -119.5738655 | co-located with already-complete #1012 (The Restaurant at Poplar Grove), same site, same phone | n/a — reused from sibling record |
+| 597 | Snowshoe Sam's | big-white | pub | +1 250-765-5959 | Big White Ski Resort, 5375 Big White Rd, Beaverdell, BC V1P 1P3 | 49.7218817 | -118.9288701 | co-located with already-complete #1054 (Sopra: Sam's Italian Kitchen), same building, same phone | n/a — reused from sibling record |
+| 1014 | Bench Patio Bistro | naramata | restaurant | +1 250-490-4965 | 1775 Naramata Rd, Penticton, BC V2A 8T8 | 49.5467438 | -119.5697538 | co-located with already-complete #65 (Bench 1775 Winery), same site, same phone | n/a — reused from sibling record |
+| 20 | Anarchy Coffee Roasters | kelowna | cafe | none | 1880 Baron Rd C, Kelowna, BC V1X 6G3 | 49.884900 | -119.424325 | geocoder.ca + Photon POI-name match | 18.7m |
+| 725 | Tickleberry's on the Beach | penticton | cafe | none | 3798 Parkview St, Penticton, BC V2A 3W4 | 49.453079 | -119.585694 | geocoder.ca + Photon POI "Tickleberries at Skaha Park" | 92.1m |
+| 768 | WINGS Restaurants & Pubs - Kelowna | kelowna | pub | none | 1-590 Highway 33 West, Kelowna, BC V1X 6A8 (Rutland) | 49.890341 | -119.397449 | geocoder.ca + Photon suburb-area cross-check; 5 independent directories agree | general-area agreement |
+| 769 | WINGS Restaurants & Pubs - Penticton | penticton | pub | none | 152 Riverside Dr, Penticton, BC V2A 5Y4 | 49.498786 | -119.612814 | geocoder.ca, confidence 1.0, unambiguous across sources checked | single source, perfect confidence |
+| 908 | Quench on the Boardwalk | kelowna | restaurant | none | 1310 Water St, Kelowna, BC V1Y 9P3 (Delta Hotels Grand Okanagan Resort) | 49.891640 | -119.496681 | geocoder.ca + Photon exact-POI match on the hotel | 73m |
+
+Notes: #521/#597/#1014 reuse coordinates from already-complete sibling records at the exact same physical site (winery/resort/vineyard shared address pattern established earlier in this file) — no fresh geocoding needed, treated as HIGH by construction. #768's geocoder.ca response labeled the city "West Kelowna" for a Rutland address — confirmed this is a postal-routing quirk, not a real location error; Rutland is genuinely part of Kelowna, and a separate, distinct "Wings West Kelowna" location was confirmed NOT to be this record.
+
+---
+
+### B. SAFE TO ENRICH — MODERATE-HIGH confidence (13)
+
+| ID | Name | Region | Type | Phone | Verified Address | Rec. Lat | Rec. Lon | Evidence/Sources | Coord. Agreement |
+|---|---|---|---|---|---|---|---|---|---|
+| 1019 | Greenside Bar & Grill | osoyoos | restaurant | +1 250-495-7003 | 12300 Golf Course Dr, Osoyoos, BC V0H 1V0 | 49.015736 | -119.491028 | geocoder.ca, confidence 0.8, single source | n/a |
+| 535 | RANGE restaurant, bar + patio | vernon | restaurant | +1 250-503-3556 | 301 Village Centre Place, Vernon, BC V1H 1T2 | 50.189133 | -119.387605 | geocoder.ca, confidence 0.9, single source | n/a |
+| 581 | Shahi Pakwan | vernon | restaurant | +1 236-426-2627 | 2810 43rd Ave, Vernon, BC V1T 3L3 | 50.274629 | -119.269786 | geocoder.ca, confidence 1.0, single source | n/a |
+| 536 | Rail Trail Cafe & Market | coldstream | cafe | none | 13904 Kalamalka Rd, Coldstream, BC V1B 1Y9 | 50.232437 | -119.268655 | geocoder.ca, confidence 0.9, single source | n/a |
+| 896 | Kelly & Carlos O'Bryans Restaurant | kelowna | restaurant | +1 250-861-1338 | 262 Bernard Ave, Kelowna, BC V1Y 6N4 | 49.886535 | -119.497750 | geocoder.ca, confidence 1.0; phone independently confirmed via official chain locations page | n/a |
+| 39 | BNA Brewing Kelowna | kelowna | brewery | +1 236-420-0025 | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | geocoder.ca, confidence 1.0; phone independently confirmed | n/a |
+| 41 | BNA Burger | kelowna | restaurant | +1 236-420-0025 | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | same building as #39, co-located sibling business | n/a |
+| 154 | Craft 42 Roasters | kelowna | cafe | none | 1178 High Road, Kelowna, BC V1Y 7B1 | 49.892941 | -119.476575 | geocoder.ca + restaurantguru.com | 83.9m |
+| 337 | King's Vegetarian Food | kelowna | restaurant | none | 1631 Dickson Ave, Kelowna, BC | 49.879876 | -119.461448 | geocoder.ca + restaurantguru.com | 68.3m |
+| 724 | Tickleberry's at the Peach | penticton | cafe | none | 185 Lakeshore Drive, Penticton, BC (city-owned "Peach" concession, Tickleberry's-operated) | 49.502472 | -119.595796 | geocoder.ca, confidence 1.0; weak secondary corroboration only | n/a |
+| 766 | Viva Mexicana Taco Bar | vernon | restaurant | none | 3414 Coldstream Ave, Vernon, BC V1T 1Y1 | 50.263247 | -119.278873 | geocoder.ca, confidence 0.9; strong multi-source identity corroboration (DoorDash x2, order.online x2, Downtown Vernon Association, own site) | n/a |
+| 1051 | Moose Lounge | big-white | restaurant | none | 5315 Big White Rd, Kelowna, BC V1P 1P3 (Happy Valley Lodge, Big White Ski Resort) | 49.721408 | -118.926566 | geocoder.ca, confidence 1.0; confirmed via Yelp, Big White's own site | n/a |
+| 1069 | Pit Stop Cafeteria | apex | restaurant | none | 100 Strayhorse Rd, Penticton, BC V1M 8L7 (Apex Mountain Resort village address — most precise available) | 49.392108 | -119.903267 | geocoder.ca, confidence 0.77 — noted MODERATE rather than MODERATE-HIGH, single source, but identity and fixed-location status are solid | n/a |
+
+Notes: #1019, #535, #581, #536 are the **canonical records of duplicate pairs** (see category E for their duplicates: #252, #965, #972, #537). Recommended workflow: merge the duplicate into the canonical first (using the existing guarded merge-and-retire mechanism), then enrich the canonical — enriching before merging risks the merge later needing to reconcile a populated field. #1069 is included here despite being only MODERATE confidence (not MODERATE-HIGH) because its identity is fully resolved and a single reasonable-confidence source exists — flagging the distinction rather than silently rounding it up.
+
+---
+
+### C. NEEDS PHONE CORRECTION (3)
+
+| ID | Name | Region | Type | Stored Phone (WRONG) | Correct Phone | Verified Address | Rec. Lat | Rec. Lon | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| 328 | Kelly O'Bryan's Restaurant and Carlos O'Bryan's Pub | west-kelowna | pub | +1 250-549-2112 (belongs to Vernon location #954) | +1 250-768-8442 | 3470 Carrington Rd, West Kelowna, BC V4T 3C1 | 49.838433 | -119.609413 | geocoder.ca confidence 1.0; phone correction confirmed via official chain locations page (kobcob.com) |
+| 185 | Dosa Crepe Cafe | osoyoos | restaurant | +1 778-753-6939 (belongs to Rutland/Kelowna branch) | 778-597-0245 | 8143 Main St, Osoyoos, BC V0H 1V0 | 49.031811 | -119.463718 | geocoder.ca confidence 0.9; phone correction confirmed via dosacrepecafe.com official site |
+| 547 | Red Tomato Pies | vernon | restaurant | +1 236-420-1515 (confirmed to belong to the Kelowna location, 401 Glenmore Rd) | **not yet determined** | 3002 41st Ave, Vernon, BC V1T 3H6 | — | — | address confirmed via multiple sources; the correct Vernon-specific phone still needs a fresh lookup before this can move to enrichment-ready |
+
+Recommended action: use the new (uncommitted, awaiting review — see the earlier `/admin/correct-phone` entry in this file) guarded phone-correction endpoint for #328 and #185 once that work is committed and deployed, combined with the guarded address enrichment. #547 needs one more research step (find Red Tomato Pies Vernon's actual phone number) before it's ready for either correction or enrichment.
+
+---
+
+### D. AMBIGUOUS / NEEDS REVIEW (11)
+
+| ID | Name | Region | Type | Phone | Issue |
+|---|---|---|---|---|---|
+| 95 | Bright Jenny Coffee | kelowna | cafe | +1 250-860-8848 | 3-4 Kelowna locations found (Lakeshore Rd, Kane Rd, Kirschner Rd, possibly Laurel Ave); phone not disambiguated to one |
+| 511 | Pizza Factory | osoyoos | restaurant | +1 250-860-4149 | Address found (8115 Main St, Osoyoos) but its published phone (250-495-2033) doesn't match the stored number — mismatch unresolved, not yet confirmed which is correct |
+| 592 | Sky High Diner | vernon | restaurant | +1 778-212-8759 | Address found (6300 Tronson Rd, near Vernon Airport) but one source explicitly labels it "Food Truck in Vernon" — fixed-vs-mobile status unresolved |
+| 702 | The Mission Creamery | kelowna | cafe | +1 250-764-6171 | Two Kelowna locations found (450 Cook Rd "AQUA Boat Club"; 4649 Lakeshore Rd); phone not disambiguated to one |
+| 806 | barBURRITO | vernon | restaurant | +1 250-717-0959 | Two Vernon locations found (Square Mall: 236-426-2626; Polson Park: 778-943-0776) — **neither** matches the stored phone; may be a third, unlisted location, or the stored number may simply be outdated |
+| 225 | Freshslice Pizza | penticton | restaurant | none | Two Penticton locations found (3094 Skaha Lake Rd; 205 Martin Street); no stored phone to disambiguate |
+| 311 | Jugo Juice | kelowna | cafe | none | Two Kelowna locations found (4075 Gordon Drive; 219 Bernard Ave); no stored phone to disambiguate |
+| 379 | MEX-KELOWNA TACOS | west-kelowna | restaurant | none | Multiple sources call it a food truck, but 4+ independent listings consistently show one fixed address (2241 Moose Rd, Westbank) — this is a **policy question** (does a food truck parked at one consistent, well-documented spot count as enrichable?) rather than a data-quality problem; flagging for a team decision instead of assuming an answer |
+| 459 | Okanagan premium fruit juice | kelowna | cafe | none | **Identity could not be confirmed at all** despite genuine search effort — no business by this exact name was located; possibly closed, renamed, or a data-entry variant of a similarly-named business |
+| 650 | Tacos del cartel | oliver | restaurant | none | **Identity could not be confirmed at all** — the only "Tacos del Cartel" found is an unrelated restaurant in Louisiana; Oliver's actual taco spots ("Tacos Del Norte", "TacoRiendo") don't match this name |
+| 1066 | Francuccino's Gelato and Fries | silverstar | cafe | none | Business identity confirmed as real and currently operating in SilverStar Village, but geocoding is weak and internally inconsistent (two geocoder.ca attempts landed ~1.3km apart, both low confidence 0.2-0.3); recommend manual verification rather than writing a low-confidence coordinate |
+
+Note the important distinction within this category: #95, #225, #311, #702, #806 are "which of several real locations" problems (identity of the business chain is solid, specific branch is not); #459 and #650 are "we cannot confirm this business exists at all" problems (a more serious data-quality flag, worth a closer look at whether these records should even remain active); #379 is a policy question, not a data problem; #511 and #592 are phone/fixed-location doubts layered on an otherwise-plausible single address; #1066 is a confirmed-real business with unreliable geocoding only.
+
+---
+
+### E. LIKELY EXCLUDE / MOBILE / DUPLICATE / OTHER (25)
+
+**Duplicates (5)** — each is the same business as an already-listed canonical record above (categories A/B), recommend merge via the existing guarded merge-and-retire mechanism rather than independent enrichment:
+
+| ID | Name | Duplicate of | Notes |
+|---|---|---|---|
+| 252 | Greenside Bar and Grill | #1019 | Same business (Osoyoos Golf Club restaurant), same phone |
+| 965 | Range Lounge & Grill | #535 | Same business, legacy name, same phone |
+| 972 | Shahi Pakwaan | #581 | Same business, spelling variant, same phone |
+| 1026 | Pappa's Firehall Bistro | #213 (already complete: 6077 Main St, Oliver BC, lat 49.1815137, lon -119.5503935) | Same business, "Pappa's" is the current branded name; same phone |
+| 537 | Rail Trail Cafe Ice Cream Parlor | #536 | Same site, ice-cream counter within the same establishment |
+
+**Confirmed mobile / food truck (19)** — no fixed street address to enrich:
+
+130 CharCo Wood Fired Sandwiches · 131 Charros Takos (also has a phone mismatch) · 156 Crepe Bistro · 158 Creperie Ooolala - Food truck · 196 El Sabor De Marina · 208 Eye Tasty Food · 260 Hammer's House of Hog · 304 Jeffer's Fryzz · 405 Mi Taqueria- Mexican Cantina (pop-up) · 450 OKF Grill · 453 Ogopogo Concessions (confirmed via fresh research: tours BC/AB during summer season, no fixed public location) · 507 Pit Stop Smokery · 531 Queen City Eats · 569 Same Same But Different Thai Food · 642 THE MAGIC FOOD TRUCK LTD · 644 TORI DORI Japanese Chicken & Grill · 652 Tak-Oh · 691 The Hot Box · 809 reggaefusionfood
+
+**Confirmed via fresh research this pass (1)** — was previously in the internally-"clean" tier, corrected here:
+
+| ID | Name | Notes |
+|---|---|---|
+| 94 | Bread & Cheese Co | Own website explicitly calls it "Summerland Food Truck"; a separate "Bread & Cheese Truck" also exists on Facebook (Delta, BC) — genuinely mobile, not a fixed-location restaurant |
+
+---
+
+### Summary
+
+* **Total researched: 63**
+* **A. SAFE TO ENRICH — HIGH: 11** (180, 987, 934, 521, 597, 1014, 20, 725, 768, 769, 908)
+* **B. SAFE TO ENRICH — MODERATE-HIGH: 13** (1019, 535, 581, 536, 896, 39, 41, 154, 337, 724, 766, 1051, 1069)
+* **C. NEEDS PHONE CORRECTION: 3** (328, 185, 547)
+* **D. AMBIGUOUS / NEEDS REVIEW: 11** (95, 511, 592, 702, 806, 225, 311, 379, 459, 650, 1066)
+* **E. LIKELY EXCLUDE / MOBILE / DUPLICATE / OTHER: 25** (252, 965, 972, 1026, 537, 130, 131, 156, 158, 196, 208, 260, 304, 405, 450, 453, 507, 531, 569, 642, 644, 652, 691, 809, 94)
+
+**Exact IDs recommended for production enrichment (A + B, 24 total):** 20, 39, 41, 154, 337, 521, 535, 536, 581, 597, 724, 725, 766, 768, 769, 896, 908, 934, 987, 1014, 1019, 1051, 1069, 180 — **with the caveat that #1019, #535, #581, #536 should be merged with their duplicates (#252, #965, #972, #537 respectively) before or as part of enrichment, not enriched independently first.**
+
+**Exact IDs requiring phone correction (3):** 328, 185, 547 (547 additionally needs the correct phone number sourced before it's ready)
+
+**Exact IDs requiring further review (11):** 95, 511, 592, 702, 806, 225, 311, 379, 459, 650, 1066
+
+**Exact IDs recommended for exclusion (25):** 252, 965, 972, 1026, 537, 130, 131, 156, 158, 196, 208, 260, 304, 405, 450, 453, 507, 531, 569, 642, 644, 652, 691, 809, 94
+
+**Particularly important findings/anomalies:**
+1. **Two venues have no confirmable identity at all** (#459 Okanagan premium fruit juice, #650 Tacos del cartel) — genuine search effort turned up nothing matching. This is a more serious data-quality flag than the usual "which location" ambiguity and may warrant checking whether these records reflect closed/renamed businesses that should be corrected or retired rather than enriched.
+2. **One food truck (#379) is consistently listed at a single fixed address across 4+ independent sources** — this is a policy question for the team (should a food truck with one well-documented, unchanging location be treated like any other fixed venue?), not something resolved unilaterally here.
+3. **One previously "clean" internal-tier venue was reclassified to EXCLUDE** on fresh research (#94 Bread & Cheese Co, confirmed mobile) — a reminder that the original internal keyword-based tiering from 2026-09-08 continues to need fresh external verification, exactly as this project's conservative process requires.
+4. **Five genuine duplicates were found within this batch** (#252, #965, #972, #1026, #537), all already known from the earlier duplicate-reconciliation research in this file — no *new* duplicates surfaced, which is a reassuring consistency check on the earlier work.
+5. **#511 Pizza Factory and #547 Red Tomato Pies both show the same "phone belongs to the wrong location" pattern already established for #328 and #185** — suggests this data-quality issue (phone numbers copied across chain locations during the original scrape) may be more widespread than the four cases found so far; worth keeping an eye out for in any future batches.
+
+* **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, no manifest change, no deployment.** This entire batch was public web research (search, geocoding APIs, raw-HTML fetches of publicly-accessible pages) only.
+
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
