@@ -24,12 +24,16 @@ var TRANSLATIONS = {
     'nav.directory': 'Directory',
     'nav.listVenue': 'List Your Venue',
     'nav.appComingSoon': 'App coming soon',
-    'hero.eyebrow': 'Enderby to Osoyoos',
-    'hero.headline': 'Find wineries, restaurants, cafes, breweries, and lounges across the Okanagan Valley.',
-    'hero.lead': 'Search by region, cuisine, and what matters to you \u2014 dog-friendly patios, vegan menus, kid-friendly spaces, and happy hour timing \u2014 across 1,000+ verified venues.',
+    'hero.headlineLine1': 'Explore the Okanagan.',
+    'hero.headlineLine2': 'Find your next favourite place.',
+    'hero.lead': 'Discover restaurants, wineries, caf\u00e9s, breweries, pubs, cocktails and things worth doing across the Okanagan.',
+    'hero.quickEat': 'Eat',
+    'hero.quickDrink': 'Drink',
+    'hero.quickExplore': 'Explore',
+    'hero.quickHiddenGems': 'Hidden Gems',
     'featured.eyebrow': 'Worth the trip',
     'featured.heading': 'Featured this month',
-    'search.placeholder': "Search a place, cuisine, or what you're craving",
+    'search.placeholder': 'What are you looking for?',
     'status.open': 'Open now',
     'status.closingSoon': 'Closing soon',
     'status.closed': 'Closed now',
@@ -177,12 +181,16 @@ var TRANSLATIONS = {
     'nav.directory': 'R\u00e9pertoire',
     'nav.listVenue': '\u00c9crivez votre \u00e9tablissement',
     'nav.appComingSoon': 'Application bient\u00f4t disponible',
-    'hero.eyebrow': "D'Enderby \u00e0 Osoyoos",
-    'hero.headline': 'D\u00e9couvrez vignobles, restaurants, caf\u00e9s, brasseries et bars-salons dans toute la vall\u00e9e de l\u2019Okanagan.',
-    'hero.lead': 'Recherchez par r\u00e9gion, cuisine et ce qui compte pour vous \u2014 terrasses acceptant les chiens, menus v\u00e9gans, espaces adapt\u00e9s aux enfants et horaires de l\u2019happy hour \u2014 parmi plus de 1 069 \u00e9tablissements v\u00e9rifi\u00e9s.',
+    'hero.headlineLine1': 'Explorez l\u2019Okanagan.',
+    'hero.headlineLine2': 'D\u00e9couvrez votre prochain coup de c\u0153ur.',
+    'hero.lead': 'D\u00e9couvrez restaurants, vignobles, caf\u00e9s, brasseries, pubs, cocktails et activit\u00e9s \u00e0 faire dans tout l\u2019Okanagan.',
+    'hero.quickEat': 'Manger',
+    'hero.quickDrink': 'Boire',
+    'hero.quickExplore': 'Explorer',
+    'hero.quickHiddenGems': 'Tr\u00e9sors cach\u00e9s',
     'featured.eyebrow': '\u00c7a vaut le d\u00e9tour',
     'featured.heading': 'En vedette ce mois-ci',
-    'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
+    'search.placeholder': 'Que recherchez-vous\u00a0?',
     'status.open': 'Ouvert',
     'status.closingSoon': 'Ferme bient\u00f4t',
     'status.closed': 'Ferm\u00e9',
@@ -1672,46 +1680,6 @@ function initBlock12(){
   };
 })();
 
-/* ---------- Hero slideshow: auto-advance plus manual prev/next arrows ---------- */
-(function(){
-  var scenes = Array.prototype.slice.call(document.querySelectorAll('.hero-scene'));
-  var prevBtn = document.getElementById('heroPrev');
-  var nextBtn = document.getElementById('heroNext');
-  if (!scenes.length) return;
-
-  var current = 0;
-  scenes.forEach(function(s, i){ if (s.classList.contains('hero-scene-active')) current = i; });
-
-  var autoAdvanceMs = 5000;
-  var timer = null;
-
-  function show(index){
-    scenes[current].classList.remove('hero-scene-active');
-    current = (index + scenes.length) % scenes.length;
-    scenes[current].classList.add('hero-scene-active');
-  }
-
-  function restartAutoAdvance(){
-    if (timer) clearInterval(timer);
-    timer = setInterval(function(){ show(current + 1); }, autoAdvanceMs);
-  }
-
-  if (prevBtn) prevBtn.addEventListener('click', function(e){
-    e.stopPropagation();
-    show(current - 1);
-    restartAutoAdvance();
-  });
-  if (nextBtn) nextBtn.addEventListener('click', function(e){
-    e.stopPropagation();
-    show(current + 1);
-    restartAutoAdvance();
-  });
-
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    restartAutoAdvance();
-  }
-})();
-
 /* ---------- Shared: scroll to a venue's card by name and briefly highlight it ---------- */
 window.__scrollToVenueCard = function(name){
   if (!name) return false;
@@ -1733,17 +1701,34 @@ window.__scrollToVenueCard = function(name){
   return true;
 };
 
-/* ---------- Hero scenes: click to jump to that venue's card in the directory ---------- */
+/* ---------- Hero quick actions: Eat / Drink / Explore press the same type
+   chips the wizard uses (same pattern the weather banner CTA already uses)
+   and reveal results; Hidden Gems is a plain #hiddenGems anchor link,
+   handled entirely by the existing global hash-link scroll interceptor. ---------- */
 (function(){
-  var heroArt = document.querySelector('.hero-art');
-  if (!heroArt) return;
+  var group = document.querySelector('.hero-quick-actions');
+  if (!group) return;
 
-  heroArt.addEventListener('click', function(e){
-    var scene = e.target.closest('.hero-scene-clickable');
-    if (!scene) return;
+  var TYPE_GROUPS = {
+    eat: ['restaurant', 'cafe'],
+    drink: ['winery', 'brewery', 'cocktail', 'pub']
+  };
 
-    var name = scene.getAttribute('data-venue-name');
-    window.__scrollToVenueCard(name);
+  function pressTypes(types){
+    types.forEach(function(type){
+      var chip = document.querySelector('.type-chip[data-type="' + type + '"]');
+      if (chip && chip.getAttribute('aria-pressed') !== 'true') chip.click();
+    });
+  }
+
+  group.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-quick]');
+    if (!btn || btn.tagName === 'A') return;
+    var action = btn.dataset.quick;
+    if (window.trackEvent) window.trackEvent('hero_quick_action', { action: action });
+    if (TYPE_GROUPS[action]) pressTypes(TYPE_GROUPS[action]);
+    document.dispatchEvent(new Event('wizard:showResults'));
+    if (window.__hideFilterBarNow) window.__hideFilterBarNow();
   });
 })();
 

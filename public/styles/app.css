@@ -88,24 +88,12 @@
   .lang-toggle:hover{ background: rgba(42,32,25,0.06); }
 
   /* ---------- hero ---------- */
-  .hero{ padding: 70px 0 40px; position:relative; overflow:hidden; }
-  .hero .wrap{ display:grid; grid-template-columns: 1fr; gap:32px; align-items:center; }
-  @media (min-width: 900px){
-    .hero .wrap{ grid-template-columns: 1fr 1fr; gap:48px; align-items:center; }
-    .hero-right{ padding-top:4px; }
-  }
   .eyebrow{
     display:inline-flex; align-items:center; gap:8px;
     font-weight:700; font-size:0.82rem; letter-spacing:0.09em; text-transform:uppercase;
     color: var(--teal); margin-bottom:16px;
   }
   .eyebrow::before{ content:""; width:20px; height:2px; background: var(--teal); display:inline-block; }
-  .hero-heading{ margin-bottom:20px; }
-  .hero-heading .eyebrow{ margin-bottom:8px; }
-  .hero-heading h2{ font-size: clamp(1.5rem, 2.6vw, 2rem); margin:0; }
-  .hero h1{ font-size: clamp(2rem, 3.6vw, 3rem); max-width:26ch; line-height:1.15; }
-  .hero h1 em{ font-style:italic; color: var(--plum); }
-  .hero p.lead{ margin:22px 0 30px; font-size:1.1rem; max-width:46ch; color: rgba(42,32,25,0.78); }
 
   .search-box{
     display:flex; gap:10px; background: var(--paper); padding:8px; border-radius:18px;
@@ -120,33 +108,6 @@
     padding: 0 22px; font-weight:700; font-size:0.92rem; cursor:pointer;
   }
 
-  .hero-art{ position: relative; border-radius:20px; overflow:hidden; box-shadow: 0 14px 30px -18px var(--shadow); aspect-ratio: 420 / 340; }
-  .hero-scene{
-    position: absolute; top:0; left:0; width:100%; height:100%; opacity:0;
-    pointer-events: none;
-    transition: opacity 0.6s ease;
-  }
-  .hero-scene-active{
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .hero-scene-img{
-    width:100%; height:100%; object-fit:cover; display:block;
-    transition: filter 0.2s ease;
-  }
-  .hero-scene-clickable{ cursor: pointer; }
-  .hero-scene-clickable:hover .hero-scene-img{ filter: brightness(0.88); }
-  .hero-scene-clickable:hover .hero-caption h3{ text-decoration: underline; }
-  .hero-nav-arrow{
-    position: absolute; top:50%; transform: translateY(-50%); z-index:10;
-    width:38px; height:38px; border-radius:50%; border:none;
-    background: rgba(0,0,0,0.35); color:#fff; cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
-    transition: background 0.15s ease;
-  }
-  .hero-nav-arrow:hover{ background: rgba(0,0,0,0.55); }
-  .hero-nav-prev{ left:14px; }
-  .hero-nav-next{ right:14px; }
   .venue-card-highlight{
     animation: venueCardHighlight 1.8s ease;
   }
@@ -155,22 +116,55 @@
     70%  { box-shadow: 0 0 0 3px var(--amber); }
     100% { box-shadow: 0 10px 22px -16px var(--shadow); }
   }
-  .hero-caption{
-    position:absolute; left:0; right:0; bottom:0; padding:18px 20px 16px;
-    background: linear-gradient(to top, rgba(20,14,10,0.82) 0%, rgba(20,14,10,0.55) 55%, transparent 100%);
-    color: var(--paper);
+
+  /* Full-bleed photo hero: a single real image file (see /images/hero.jpg)
+     replaces the old 10-image inline-base64 carousel. Text sits centered
+     over a gradient scrim for contrast, per the approved hero redesign. */
+  .hero{
+    position:relative; overflow:hidden; z-index:0;
+    display:flex; align-items:center; justify-content:center;
+    min-height:640px; padding:110px 0 64px;
   }
-  .hero-caption h3{
-    font-family:'Fraunces', serif; font-size:1.2rem; margin:0 0 3px; color: var(--paper);
+  .hero-media{ position:absolute; inset:0; z-index:0; }
+  .hero-media-img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+  .hero-scrim{
+    position:absolute; inset:0;
+    background: linear-gradient(180deg, rgba(20,14,10,0.58) 0%, rgba(20,14,10,0.32) 45%, rgba(20,14,10,0.64) 100%);
   }
-  .hero-caption-meta{ font-size:0.84rem; color: rgba(255,255,255,0.88); margin:0 0 8px; }
-  .hero-caption-rating{ color: var(--amber); font-weight:700; }
-  .hero-caption-badges{ display:flex; gap:6px; flex-wrap:wrap; }
-  .hero-badge{
+  .hero-inner{
+    position:relative; z-index:1;
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    width:100%; min-width:0; max-width:640px; margin:0 auto;
+    box-sizing:border-box; padding-left:24px; padding-right:24px;
+  }
+  .hero-title{
+    margin:0 0 18px; font-family:'Fraunces', serif; font-weight:700;
+    font-size: clamp(2.1rem, 5vw, 3.4rem); line-height:1.14;
+    color: var(--paper); text-shadow: 0 2px 20px rgba(0,0,0,0.35);
+  }
+  .hero-title span{ display:block; }
+  .hero-lead{
+    margin:0 0 30px; font-size:1.08rem; line-height:1.5; max-width:46ch;
+    color: rgba(255,252,246,0.92); text-shadow: 0 1px 12px rgba(0,0,0,0.3);
+  }
+  .hero .search-box{ width:100%; max-width:520px; margin:0 auto 20px; }
+  .hero-quick-actions{
+    display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;
+  }
+  .hero-quick-btn{
     display:inline-flex; align-items:center; justify-content:center;
-    background: rgba(255,255,255,0.16); backdrop-filter: blur(2px);
-    border-radius:999px; padding:3px 8px; font-size:0.78rem; font-weight:800;
-    color: var(--paper);
+    background: rgba(255,252,246,0.14); border:1px solid rgba(255,252,246,0.55);
+    backdrop-filter: blur(3px); color: var(--paper); border-radius:10px;
+    padding:10px 20px; font-family:'Nunito',sans-serif; font-weight:700; font-size:0.9rem;
+    text-decoration:none; cursor:pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .hero-quick-btn:hover{ background: rgba(255,252,246,0.26); border-color: rgba(255,252,246,0.85); }
+  @media (max-width: 640px){
+    .hero{ min-height:560px; padding:92px 0 48px; }
+    .hero-title{ font-size: clamp(1.7rem, 8vw, 2.2rem); }
+    .hero-lead{ font-size:0.98rem; }
+    .hero-quick-btn{ flex:1 1 calc(50% - 10px); }
   }
 
   /* ---------- featured venues ---------- */
@@ -855,7 +849,6 @@
 
   /* ---------- responsive ---------- */
   @media (max-width: 940px){
-    .hero .wrap{ grid-template-columns:1fr; }
     .venue-grid{ grid-template-columns: repeat(2,1fr); }
     .app-teaser .wrap{ grid-template-columns:1fr; }
     .nav-links{
