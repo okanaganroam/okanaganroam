@@ -1669,3 +1669,5 @@ Read `server.js`'s current Section 1 (hero) and Section 2 (Start Exploring) impl
 ---
 
 **No application code, venue data, database records, production data, or admin endpoints were touched. No production write occurred at any point — this entire pass was public, unauthenticated `GET` requests against `/api/venues` and local, read-only inspection of `server.js`/`db.js`. `main` was never touched.**
+
+**Commit SHA for this research update: `f066388af5d202eb3dce73b5f16cc4b3066e73c2`** (verified: `main`'s SHA is unchanged at `9373c28121c3bfbfad95d0ada496974392da9610`, both locally and on `origin/main`, before and after this commit).
