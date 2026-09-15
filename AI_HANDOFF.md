@@ -264,6 +264,37 @@ Neither business is tagged as a named POI in OpenStreetMap (confirmed via both P
 
 * **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, nothing was deployed.**
 
+## Google Maps / Manual Verification Attempt for #934, #987, #180 (2026-09-15) — Proposed, NOT Written
+
+### Claude — read-only research. Important tooling caveat, then real progress via a different route.
+
+* **Status: read-only. No admin endpoint was called, no production data was changed, no merge/retire performed, no code changed, nothing deployed.**
+* **Tooling caveat, stated upfront rather than glossed over:** I do not have a browser or the Google Maps/Places API. Direct fetches of `google.com/maps` URLs (both via the standard fetch tool and raw `curl` with a browser user-agent) only return Google's JavaScript application shell with an encoded session/tile-request blob — no rendered place data, no real coordinates. I cannot literally "open Google Maps and read a pin" the way a person would. I'm reporting this limitation directly rather than fabricating a Google Maps result.
+* **What I did instead:** searched for third-party pages that have already published Google-sourced (or independently computed) coordinates as plain text/structured data for these three businesses, then applied raw-HTML fetches (bypassing AI-summarization, which was missing embedded JSON) to promising candidates. This surfaced a genuinely useful new source: **restaurantguru.com**, which embeds precise `lat`/`lng` values in its raw page source for both #180 and #987.
+
+**#180 Dolci Thai Bistro** — geocoder.ca (49.032963, -119.467977) vs. restaurantguru.com (49.0329628, -119.4679765): **0.0m apart** (agree to sub-meter precision). This is close enough that I want to flag the honest caveat rather than oversell it: this could mean two independent geocoders both landed on the exact right point, or it could mean restaurantguru licenses/shares a data pipeline with a similar Canadian civic-geocoding provider. The China Palace result below argues against pure copying (see next). **Confidence: HIGH** (two sources, effectively identical). **Recommended: latitude 49.032963, longitude -119.467977.**
+
+**#987 China Palace** — geocoder.ca (49.476851, -119.583657) vs. restaurantguru.com (49.4769317, -119.5840477): **29.6m apart**. This is a real, non-trivial difference — not a copy-paste match — which is actually reassuring: it suggests restaurantguru is running its own geocoding rather than mechanically reproducing geocoder.ca's output (which in turn supports treating the near-identical #180 result above as genuine independent agreement rather than a copied value). A ~30m spread between two independently-computed geocodes for a real building is normal and comparable to the #934/#426 upgrades already recorded in this file. **Confidence: HIGH** (two sources, ~30m agreement — same tier as #426 and #360's already-approved evidence). **Recommended: latitude 49.476851, longitude -119.583657** (geocoder.ca's value, since it carries the higher self-reported confidence score of 1.0 vs. restaurantguru's unstated confidence).
+
+**#934 14th Ave Bar & Grill (Hillview Golf Course) — the ~390m discrepancy, resolved as far as available tools allow.** I could not access Google Maps directly to arbitrate this. Instead, precise distance calculations (haversine) across all three sources now on record:
+
+| Pair | Distance |
+|---|---|
+| geocoder.ca ↔ InteGolf (both from the prior research pass) | **26.5m** |
+| golftraxx (the original scorecard source) ↔ InteGolf | **359.0m** |
+
+This confirms numerically what was described qualitatively before: geocoder.ca and InteGolf — two sources independent of each other and of OSM — tightly agree, while golftraxx is the clear outlier. I was not able to bring in a fourth, Google-sourced point to further triangulate, given the tooling limitation above. **Confidence: HIGH** (two independent sources agreeing within 27m, consistent with the course-boundary-polygon corroboration already documented). **Recommended: latitude 50.2517967, longitude -119.2458648** (unchanged from the prior pass).
+
+**Summary — all three now at HIGH confidence, each backed by two independently-sourced coordinates in reasonably close agreement:**
+
+| ID | Name | Recommended lat | Recommended lon | Sources agreeing | Distance apart | Confidence |
+|---|---|---|---|---|---|---|
+| 934 | 14th Ave Bar & Grill | 50.2517967 | -119.2458648 | geocoder.ca + InteGolf | 26.5m | HIGH |
+| 987 | China Palace | 49.476851 | -119.583657 | geocoder.ca + restaurantguru.com | 29.6m | HIGH |
+| 180 | Dolci Thai Bistro | 49.032963 | -119.467977 | geocoder.ca + restaurantguru.com | 0.0m | HIGH |
+
+* **No production data was changed, no admin endpoint was called, no merge/retire performed, no application code was changed, nothing was deployed.** This pass was public web research only (search + raw-HTML fetches of publicly-accessible pages).
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
