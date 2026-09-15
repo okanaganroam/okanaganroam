@@ -745,6 +745,31 @@ Verified programmatically: **all 52 missing-location IDs appear in the classific
 
 * **Production remained completely untouched throughout this entire pass.** No admin endpoint was called, no venue was written, merged, retired, redirected, created, or deleted. No phone was corrected. No application code was modified. No manifest was modified. Nothing was deployed. `main` was not touched — this update exists only on `ai-handoff/2026-09-15`.
 
+## EXECUTED — #896, #39, #41 Production Enrichment (2026-09-15)
+
+### Claude — three-venue write, completed and verified. Strict scope, zero anomalies.
+
+* **Status: DONE.** All 3 approved IDs written successfully. No other venue was touched.
+* **Mechanism:** `POST /admin/enrich-venue` via the existing guarded `guardedEnrichUpdate()` path — no new code, no schema change, no bypass. Auth via `railway run` (already-linked Railway project); `ENRICHMENT_ADMIN_TOKEN`'s value was never printed, logged, or exposed.
+* **Pre-write verification (all 3):** live `GET /api/venues/:id` confirmed identity, region, type, and phone for every one of the 3 matched the approved research exactly, and all 3 had `address`/`latitude`/`longitude` entirely `null`. No precondition mismatches. Baseline: active count 1,055; missing-location count 52.
+
+| ID | Name | Address Written | Lat | Lon | Write Result |
+|---|---|---|---|---|---|
+| 896 | Kelly & Carlos O'Bryans Restaurant | 262 Bernard Ave, Kelowna, BC V1Y 6N4 | 49.886535 | -119.49775 | written / written / written |
+| 39 | BNA Brewing Kelowna | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | written / written / written |
+| 41 | BNA Burger | 1250 Ellis St, Kelowna, BC V1Y 1Z4 | 49.892787 | -119.493793 | written / written / written |
+
+* **Every response showed all three fields as `"written"`** (never `"skipped_not_empty"`), confirming all 3 were genuinely empty immediately before the write.
+* **Post-write verification (all 3, all passed):**
+  * `address`/`latitude`/`longitude` on all 3 live records exactly match the table above.
+  * Every other field on all 3 — `phone`, `name`, `region`, `type`, `slug`, `cuisine`, `rating`, `price`, `reviews`, `description`, `description_fr`, `hours`, `website`, `image_url`, `redirect_to` (still null on all 3), and all 12 boolean amenity flags — confirmed unchanged via direct comparison against the pre-write values. Only `updated_at` changed on each, as expected.
+  * **Active venue count: 1,055 both before and after — unchanged.**
+  * **Redirect count and redirect mappings: unchanged** — no merge/retire endpoint was called anywhere in this batch, so this is structurally guaranteed, not just inferred; all 3 records independently confirm `redirect_to: null`.
+  * **Missing-location count: 52 → 49, a decrease of exactly 3.** Verified via a precise before/after set diff (not just a count comparison): the set of IDs removed from "missing" was exactly `{896, 39, 41}` — an exact match to the approved batch — and the set of IDs newly added to "missing" was empty. No other venue's status changed in either direction.
+* **No anomalies of any kind.** No write failed, no precondition mismatch, no unexpected field change, no count drift.
+* **No merge, retire, delete, redirect, or venue creation occurred. No manifest change. No application code change. No deployment.**
+* **Remaining from the full classification pass:** Category A is now fully complete (all 3 members written). Category B (8, including the 4 duplicate-pair canonicals), Category C (13, ambiguous), Category D (3, need phone correction), Category E (5, duplicate), and Category F (20, exclude) remain entirely unwritten, awaiting separate approval.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
