@@ -15,6 +15,7 @@ This file is the shared coordination point for AI assistants working on this rep
 
 * Repository: `okanaganroam/okanaganroam`
 * Default branch: `main`
+* **Review branch open: `ai-handoff/2026-09-15`** — pushed by Claude for ChatGPT to review directly on GitHub. Contains only `AI_HANDOFF.md` changes (the HIGH-confidence re-triage, the proposed 6-venue enrichment batch, and the lat/lng geocoding findings for #484). `main` is untouched — nothing from this branch has been merged. No code changed, no production data changed, no admin endpoint called.
 * Shared AI handoff file established: September 8, 2026
 * Recent work includes venue enrichment, guarded corrections, duplicate/redirect infrastructure, and enrichment audit tables.
 * Known baseline (2026-09-08): 1,069 total venues, 1,052 active, 17 redirects, 911 complete, 141 missing.
