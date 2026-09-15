@@ -1034,3 +1034,183 @@ This pass's search did not surface a third independent coordinate source, and ex
 * 2026-09-08 — Claude confirmed the shared AI handoff workflow is ready.
 * 2026-09-08 — Claude reviewed current repository/production state and identified continued location enrichment (152 active venues missing address/lat/lng) as the highest-priority next task; added details and a suggested approach under Open Tasks.
 * 2026-09-08 — Claude executed the ready 11-venue enrichment batch (IDs 469, 841, 857, 863, 907, 918, 967, 1000, 1002, 1004, 1041). All 11 succeeded with zero anomalies. Complete-location count: 900 → 911. Missing-location count: 152 → 141. Active/redirect counts and all 17 redirects confirmed unchanged. Manifest intentionally left unchanged (separate task).
+
+## Homepage Implementation Audit (2026-09-15) — Read-Only, Pre-Redesign
+
+### Claude — full read-only audit of `okanagan.html`, `server.js`'s homepage route, `public/scripts/app.js`, and `public/styles/app.css`/`tokens.css`. No redesign proposed. No code, data, or production changes.
+
+* **Status: read-only. No file was modified, no code was changed, no admin endpoint was called, no production data was touched, no deployment happened. `main` untouched.**
+* **Scope note:** covers exactly the 14 areas requested. This is a description of current behavior only — no recommendations on what to change, beyond neutrally flagging real bugs/inconsistencies found along the way (labeled as such, not as redesign proposals).
+* **Method:** direct source read of `okanagan.html` (717 lines, 1,079,185 bytes — read via a stripped copy with the 10 giant base64 image lines replaced by placeholders, since the raw lines are up to 226,579 characters and blow normal read limits), `server.js`'s `/` route and its 6 homepage-assembly render functions, the live-served `public/scripts/app.js` (2,407 lines) in full, and `public/styles/app.css` (892 lines) + `public/styles/tokens.css` (19 lines).
+
+---
+
+### 1. Current homepage structure, section by section, in order
+
+The served page is not `okanagan.html` verbatim — `server.js`'s `GET /` handler (`server.js:2603`) reads the static file fresh on every request and does literal-string-anchor `.replace()` splicing to inject 4 server-rendered sections plus an SEO footer and 2 inline `<script>` blocks. In final rendered order:
+
+1. `<head>` — meta/SEO/JSON-LD/fonts/GA4/Leaflet CSS (see §9–10).
+2. Trip-tray widget (fixed-position, hidden until opened) — floating multi-stop trip planner.
+3. Header/nav — logo, nav links, social icons, EN/FR toggle, hamburger (mobile).
+4. **3-step Discovery Wizard** filter bar — Step 1: pick region(s); Step 2: pick venue type(s); Step 3: pick amenity/filter chip(s) → reveals results. A separate cuisine/price "refine" panel collapses after first search.
+5. Hero section — hardcoded 10-venue image carousel (auto-advancing, inline base64 images), headline, search box.
+6. Weather banner (hidden by default, JS-populated) — Open-Meteo current conditions + a "suggest filters" CTA.
+7. Weekly spotlight banner (hidden by default, JS-populated) — one algorithmically-rotated high-rated venue.
+8. **`renderHappeningSoonHTML()`** (server-injected, `server.js:1363`) — server-rendered "happening soon" module; omits itself if there's nothing to show.
+9. **`renderHiddenGemsHomepageHTML()`** (server-injected, `server.js:1408`) — server-rendered "hidden gems" module; same self-omitting pattern.
+10. "Featured this month" strip — a second hardcoded 10-venue set, slow auto-scrolling carousel.
+11. **`renderExploreByCategoryHTML()`** (server-injected, `server.js:1437`) — category tiles, queries its own data.
+12. **`renderExploreRegionsHTML()`** (server-injected, `server.js:1483`) — hardcoded region tiles.
+13. Results/directory section — map-toggle button, Leaflet map panel (collapsed by default), sort-select, data-sourcing disclaimer paragraph, empty `#venueGrid` div (populated entirely client-side, see §4–5).
+14. "List Your Venue" lead-gen form.
+15. "App coming soon" teaser section.
+16. **SEO guide-links footer** (server-injected, `renderGuideFooterHTML()`, `server.js:1604`).
+17. Footer (brand, nav columns, social, copyright).
+18. Closing scripts: Leaflet JS, `/scripts/app.js`, plus 2 server-injected inline scripts (`renderOpenNowScript()`, `renderHiddenElementsScript()`).
+
+**Architectural note (not a redesign recommendation, a constraint to know):** this splice-on-every-request approach means the homepage is not cached, not templated by a real engine, and silently breaks if the literal anchor text in `okanagan.html` ever changes — a redesign that touches those anchor strings must update `server.js` in lockstep.
+
+---
+
+### 2. What each section currently does
+
+Covered inline in §1; the two things worth calling out separately:
+* The 4 "discovery module" server-injected sections (`Happening Soon`, `Hidden Gems`, `Explore by Category`, `Explore Regions`) each independently query (or, for regions, hardcode) their own data at request time and gracefully render nothing if empty — no shared data-fetch, no caching between them.
+* The venue directory grid (`#venueGrid`) starts **completely empty** in the HTML that's served. It's filled in entirely client-side after page load (see §4–5) — there is no server-rendered venue content in the grid at all, only the hardcoded hero/featured carousels have real venue markup server-side.
+
+---
+
+### 3. Current navigation/header behavior
+
+* Logo, nav links, social icons, EN/FR language toggle, hamburger — all in `server.js`'s injected header markup within the static file (confirmed structurally in §1).
+* `initBlock3()` (`app.js:993`) wires the hamburger: toggles a `.open` class on `.nav-links`.
+* Below 940px (`app.css:857`), `.nav-links` becomes an absolutely-positioned dropdown (`display:none` until `.open`), the hamburger becomes visible, and the "app" CTA button (`.app-btn`) is hidden entirely.
+* Language toggle (`setLanguage()`, `app.js:385`) rewrites all `data-i18n`/`data-i18n-placeholder` text in place and persists the choice to `localStorage` — no page reload, no URL change.
+* Internal hash-links (e.g. `#directory`, `#list-venue`, `#app`) are intercepted globally (`app.js:2342`) and deliberately deferred/offset-corrected for the header height, specifically to work around the venue grid's async load changing page height mid-scroll (see §13).
+
+---
+
+### 4. Current hero/search/discovery experience
+
+* **Hero carousel:** 10 hardcoded venues with inline base64-encoded JPEG images (not real `<img src>` files — see §7/§14), auto-advancing via `requestAnimationFrame`-driven logic (`initBlock12`'s neighboring IIFE structure at `app.js:1536` handles the featured strip; the hero carousel's own auto-advance/tooltip/scroll logic spans roughly `app.js:1600-1810`), pausing on user interaction (wheel/touch/mouse) for a few seconds before resuming, and fully disabled under `prefers-reduced-motion`.
+* **Search box:** a single text input + button. `runSearch()` (`app.js:831`) lowercases/trims the term and matches against venue name, region, cuisine, and description text via simple `.includes()` — no fuzzy matching, no ranking, no debounce (filters re-run synchronously on every applicable event).
+* **Discovery Wizard (`initBlock8`, `app.js:1162`):** a distinct, separate UX from the search box — 3 sequential steps (Region → Type → Amenities) with a progress-dot indicator, each "Continue" button showing a live "(N selected)" count, ending in a "results" state that hides the wizard and reveals the filtered grid. Reset dispatches a custom `wizard:reset` DOM event that several other modules (search, cuisine/price refine panel) also listen for.
+* **Weather-driven discovery:** the weather banner (`app.js:2159`) fetches Open-Meteo for either the user's last-granted geolocation or a Kelowna fallback (never prompts fresh for permission on load — explicit UX decision per an in-code comment), and its CTA button pre-applies a small set of suggested filter chips (e.g. patio+view on a warm day) before jumping to results.
+* **Weekly spotlight:** deterministic weekly rotation (`Math.floor(Date.now() / 1 week) % pool.length`) over venues meeting a quality bar (rating ≥ 4.5, ≥ 100 reviews, has a description) — no manual curation, changes automatically every 7 days, same pick for all visitors within a week.
+* **All client-side filtering (search box, wizard, chips, cuisine/price, favorites-only) operates on the same in-memory venue-card set** built once by `renderVenueCards()` after the `/api/venues?limit=5000` fetch resolves (see §5) — filtering itself is instant/synchronous DOM show/hide, not further API calls.
+
+---
+
+### 5. Current venue/category/region discovery components
+
+* **Venue grid is 100% client-rendered.** `loadVenuesAndInit()` (`app.js:690`) fetches `GET /api/venues?limit=5000` on page load, and `renderVenueCards()` replaces `#venueGrid`'s `innerHTML` with cards built from `venueCardHtml()` (`app.js:593`) — a template-string function, not React (no React/JSX/Virtual DOM anywhere in the codebase; confirmed by grep — a comment inside `renderOpenNowScript()` in `server.js` claims the grid "re-renders... via React," which is **incorrect** given the actual client code; flagged as a stale/wrong comment, not a real React dependency).
+* If the `/api/venues` fetch fails, the grid shows a plain error message and never populates — but all the filter controls (wizard, search, chips) still initialize and remain interactive (explicit design choice per an in-code comment), they just have nothing to filter.
+* **Category discovery:** `renderExploreByCategoryHTML()` — a separate, independently-queried server-rendered module (not connected to the client-side grid's filtering state).
+* **Region discovery:** `renderExploreRegionsHTML()` — hardcoded region tiles, also disconnected from the live client-side filter state; clicking presumably deep-links back into the wizard/filter UI (not independently traced further, out of scope for this pass).
+* **Map view:** `initBlock2()` (`app.js:877`) lazy-initializes a Leaflet map only when the map-toggle button is first clicked, with one marker per region (not per venue) whose popup lists up to 12 currently-filter-matching venues in that region; markers dim to 40% opacity when nothing matches. **Note:** `renderHiddenElementsScript()` in `server.js` currently force-hides the map-toggle button (`.map-toggle-row`) on every page load via a 300ms polling loop (see §6/§13) — so this entire map feature, while fully implemented and wired up, is **not currently reachable by visitors** on the live homepage.
+* **Trip planner:** an independent IIFE (`app.js:1794`) maintaining up to 10 stops in `localStorage`, building a Google Maps multi-stop directions URL on demand — entirely separate from the wizard/filter state.
+* **"Near me":** `app.js:1967` — geolocation-based nearest-region lookup exposed as `window.__findNearestRegion`, consumed by the weather banner; a haversine calculation against a hardcoded region-centroid table (duplicated almost verbatim in both `initBlock2` and this module, both listing ~19-20 region coordinate pairs independently — a real duplication, not shared from one source).
+
+---
+
+### 6. Current mobile behavior and any obvious responsive problems
+
+* Only 8 `@media` blocks total across 892 lines of the live stylesheet (`app.css:93, 228, 393, 407, 558, 857, 876, 888`). The two substantive breakpoints are 940px (hero stacks to 1 column, venue grid drops from presumably-wider to 2 columns, nav collapses to hamburger, app CTA hides, filter-bar label width adjusts) and 560px (venue grid drops to 1 column, search box stacks vertically, wizard dots shrink, nav social icons hidden).
+* A `prefers-reduced-motion` block globally disables transitions/animations/smooth-scroll.
+* **Not independently verified in a live/rendered browser this pass** (this was a static code read, not a browser test) — so the following are flagged as **things to check, not confirmed problems**: whether the map panel, trip-tray panel, and wizard step panels have their own adequate small-screen sizing (no dedicated media query block was found targeting `.map-panel`, `.trip-tray-panel`, or `.wizard-step-panel` specifically — they may simply not need one if built flexibly, but this wasn't confirmed either way without rendering the page).
+* **Known, code-confirmed issue relevant to mobile equally as desktop:** the sticky filter-bar's un-sticking-on-scroll behavior required a documented JS workaround (see §13) because the CSS-only approach didn't work — this affects all viewport sizes, not mobile specifically.
+
+---
+
+### 7. Current image/visual treatment
+
+* **The hero carousel's 10 images are inline base64-encoded JPEGs embedded directly in the HTML**, not `<img src="...">` references to real files. Quantified this pass: these 10 embedded images account for **1,021,852 of the file's 1,079,185 bytes — about 95% of the entire homepage HTML payload.** (See §14 for the performance implications.)
+* The "Featured this month" strip's images were not separately traced this pass (out of the base64-count grep scope) — worth checking in a follow-up pass before redesign, since if they're also inline-base64 the true image weight could be even higher than the hero-only figure above.
+* Design tokens (`public/styles/tokens.css`) define the canonical brand palette (`--sand`, `--plum`, `--teal`, `--amber`, `--cocktail`, `--cafe`, `--pub`, `--ink`, `--paper`, plus `-deep`/`-dark` variants) — explicitly documented in the file's own header comment as "the single source of truth... used by both the SPA and the server-rendered SEO pages."
+* **Inconsistency found:** both `renderGuideFooterHTML()` and `renderOpenNowScript()` (the server-injected homepage sections) use their own hardcoded inline colors (e.g. `#0b6e4f`) instead of the documented token variables — a real, verifiable deviation from the site's own stated single-source-of-truth palette, not a matter of opinion.
+* Fonts: Fraunces (headings) + Nunito (body), loaded from Google Fonts via `<link rel="preconnect">` + a single stylesheet request listing specific weights/italics.
+
+---
+
+### 8. Current calls-to-action
+
+* Primary: the search box + 3-step wizard (get-to-results is the dominant homepage CTA).
+* Weather banner CTA — "see suggestions" style button that pre-filters and jumps to results.
+* Weekly spotlight CTA — jumps to results and scrolls directly to that one venue's card.
+* Per-card CTAs: "Add to trip" / directions link / phone link / menu link / booking link (where data exists) — built inside `venueCardHtml()`.
+* "List Your Venue" lead-gen form — posts to `formsubmit.co` (a third-party form-relay service, not the site's own backend) directly to `okanaganroam@gmail.com`, client-side only, no server-side validation or storage of submissions.
+* "App coming soon" teaser section — no functional CTA traced this pass beyond its presence (not required by the checklist to trace further).
+* Footer nav links and social icons.
+
+---
+
+### 9. SEO elements currently present on the homepage
+
+* `<title>`, meta `description`, `rel="canonical"` (self-referencing, `https://okanaganroam.com/`).
+* Full Open Graph set: `og:site_name`, `og:title`, `og:description`, `og:type=website`, `og:url`, `og:image` (+ width/height), `og:locale` (`en_CA`) + `og:locale:alternate` (`fr_CA`).
+* Twitter Card set: `summary_large_image`, `twitter:title`, `twitter:description`, `twitter:image`.
+* Server-injected **SEO guide-links footer** (`renderGuideFooterHTML()`) — real, crawlable internal links to guide pages, injected specifically (per an in-code comment) so search engines have a path to discover them from the homepage.
+* GA4 tracking via `gtag.js` (`G-J312FGJPSC`), loaded `async`, with a defensive `trackEvent()` wrapper that no-ops silently if `gtag` hasn't loaded yet (ad blockers/slow network) — used throughout `app.js` for wizard/search/filter/map/trip/spotlight interaction events.
+* **Caveat directly relevant to SEO, not previously flagged this session:** since the entire venue grid is client-rendered from a `fetch()` call (§5), any crawler that doesn't execute JavaScript (or executes it but doesn't wait for the async fetch) sees an **empty venue grid** in the raw HTML — the only venue-level content that's actually present in server-delivered markup is the 10 hardcoded hero venues and the 10 hardcoded featured-strip venues, plus whatever the 4 server-rendered discovery modules include. This is a real, structural SEO constraint to know before a redesign, not a redesign recommendation.
+
+---
+
+### 10. JSON-LD/schema currently present on the homepage
+
+Exactly 2 `<script type="application/ld+json">` blocks in the `<head>`:
+1. `@type: "WebSite"` (with the site's search/URL info).
+2. `@type: "Organization"`, containing a nested `@type: "Place"` (the business's own location/area-served info).
+
+No `ItemList`, `LocalBusiness`, or per-venue structured data on the homepage itself — consistent with the venue grid being client-rendered and not present in server-delivered HTML at all. (Whether individual venue detail pages or guide pages carry their own schema was not checked this pass — out of scope, homepage-only audit.)
+
+---
+
+### 11. Which existing components can be reused for a redesign
+
+Purely descriptive inventory of what's currently modular/self-contained enough to plausibly carry forward as-is or with light changes — not a recommendation to keep or discard anything:
+* The 4 server-rendered discovery modules (`Happening Soon`, `Hidden Gems`, `Explore by Category`, `Explore Regions`) are each self-contained functions with their own data queries and graceful self-omission — reusable as functions regardless of surrounding markup changes.
+* `venueCardHtml()` and `renderVenueCards()` — the client-side card templating is centralized in one function, not scattered.
+* The wizard's step-state machine (`showStep()`), the filter/search logic (`applyFilters()`), the trip planner, the favorites system, the weather banner, and the weekly spotlight are each self-contained modules (mostly IIFEs) with clear boundaries and `window.__*` exposure points for cross-module coordination — individually reusable/portable.
+* `public/styles/tokens.css` is a real, clean, documented single source of truth for the brand palette already — reusable directly.
+* The i18n system (`data-i18n` attributes + `applyTranslations()`/`setLanguage()`) is generic and markup-driven, not tied to specific homepage sections — reusable as-is for new markup as long as new sections use the same attribute convention.
+* GA4 event tracking (`window.trackEvent` wrapper) is generic and already used broadly — reusable.
+
+---
+
+### 12. Which parts would require new frontend work
+
+Also purely descriptive, not a proposal:
+* The hero carousel's image delivery mechanism (inline base64) would need to change to real image files/URLs for any redesign that cares about page weight or wants standard lazy-loading/responsive `srcset` behavior — current markup doesn't support that pattern at all.
+* The region-coordinate table is duplicated (near-identically) in two separate places in `app.js` (`initBlock2`'s `REGION_COORDS` and the "Near me" module's own `REGION_COORDS`) — a redesign touching either would need to either keep both in sync manually or consolidate them, since there's currently no shared source.
+* The orphaned `initBlock12` "Live search the whole Okanagan Valley (beta)" Google-Places-API code path (see §13) — its target DOM elements (`#liveSearchToggle`, `#liveSearchBody`, etc.) don't exist anywhere in the current HTML (confirmed via repo-wide grep), so this function throws on every single page load. A redesign would need to either properly reintroduce the matching markup or remove the dead function — right now it's neither.
+* The venue-grid's client-only rendering (§5/§9) would need real work (server-side rendering, a static-generation step, or equivalent) if a redesign goal includes crawlable/indexable per-venue content on the homepage itself.
+* The sticky-filter-bar CSS bug currently patched via injected JS (§13) would need an actual CSS fix if that injected-script approach is retired in a redesign.
+
+---
+
+### 13. Technical constraints to know before redesigning
+
+* **The splice-based assembly pattern (§1):** `server.js`'s `/` handler locates exact literal strings in `okanagan.html` and splices content around them. There is no templating engine, no build step, and no caching — the file is read from disk and re-spliced on every single request. A redesign that changes the anchor text this logic depends on will silently break the 4 discovery modules, the SEO footer, and both injected scripts unless `server.js` is updated in the same change.
+* **Two independent, redundant `/api/venues?limit=5000` fetches happen on every homepage load** — one from `loadVenuesAndInit()` (for the grid) and a separate one from the weekly-spotlight IIFE — each pulling the full venue dataset independently rather than sharing one fetch/cache.
+* **A documented, unresolved CSS bug:** the sticky filter-bar doesn't reliably un-stick on scroll via CSS alone — `renderOpenNowScript()` in `server.js` patches this with injected JS rather than a CSS fix, per an explicit in-code comment describing the CSS-only attempt as having failed.
+* **An aggressive re-render pattern on the venue grid that isn't fully understood/documented:** `renderHiddenElementsScript()`'s own comment history states a plain `<style>` tag *and* a `MutationObserver` were both tried to keep certain elements (the map-toggle row, the results-count text, a disclaimer paragraph) hidden/adjusted, and **both failed** — only interval-based polling (every 300ms, indefinitely, for the lifetime of the page) reliably works. This strongly implies something in the client rendering pipeline periodically rewrites or replaces these DOM nodes in a way that isn't a simple one-time `innerHTML` set — the exact mechanism was not identified this pass (would need deeper tracing of `applyOpenStatusToHeroAndFeatured()` and related re-apply logic) but is flagged as a real, non-trivial thing to understand before relying on similar hide/patch tricks in a redesign.
+* **Dead/orphaned code:** the `initBlock12` Google-Places "Live search" function (§12) throws a `TypeError` on `null.addEventListener` on every single page load, per a real code-level contradiction — a `server.js` comment claims this feature "was removed entirely from the codebase in the Google Places cleanup," but the function and its call-site (`app.js:722`) are still very much present and still execute unconditionally on every homepage load.
+* **Two root-level files, `app.css` and `app.js` (in the repo root, not under `public/`), are confirmed genuinely unused** — not referenced by `okanagan.html`, any other HTML file, or `server.js` (only a single code comment mentions them in passing). Safe to treat as legacy/dead for redesign purposes, though not deleted as part of this read-only pass.
+* **The map feature is fully built but currently unreachable** — its toggle button is force-hidden by `renderHiddenElementsScript()`'s polling loop (§5), so any redesign decision about the map should account for the fact it's "off," not "missing."
+* **The region-coordinate table is duplicated** in two places in `app.js` (§12) — a real single-source-of-truth gap for anyone building on top of region geography.
+* **The lead-gen "List Your Venue" form has no backend integration** — it posts directly to a third-party relay (`formsubmit.co`) from the client, with no server-side record of submissions in this codebase.
+
+---
+
+### 14. Homepage performance concerns
+
+* **`okanagan.html` is 1,079,185 bytes, of which 1,021,852 bytes (~95%) is inline base64 image data** for the 10-venue hero carousel — measured directly this pass via `awk`/byte counts, not estimated. Base64 encoding itself adds ~33% overhead versus the equivalent binary image files, and because the images are embedded in the HTML document itself (which is generated fresh, uncached, on every request per §13), they get none of the normal benefits of separate image files: no independent browser image cache, no CDN-ability, no lazy-loading, no responsive `srcset`, and they can't be served with long-lived cache headers independently of the HTML they're embedded in.
+* **Two full, redundant `/api/venues?limit=5000` fetches per page load** (§13) — doubles the venue-data payload transferred and doubles the backend query work for something that could be a single shared fetch.
+* **`renderHiddenElementsScript()`'s `setInterval(apply, 300)` polls and re-scans the DOM (including a `querySelectorAll('p')` full-page paragraph scan and a `querySelectorAll('.venue-desc:not([data-desc-init])')` scan) every 300ms, indefinitely, for the entire time the tab is open** — a real, continuous background cost (CPU/battery), not a one-time page-load cost, and it exists specifically because more targeted approaches (a `<style>` tag, a `MutationObserver`) didn't reliably work against whatever re-renders these elements (§13) — the underlying cause of that re-render behavior is unquantified and unexplained by this pass.
+* **The venue grid renders nothing until a network round-trip completes** (§5/§9) — meaning the homepage's main content (the directory) is not visible at all until `/api/venues` responds, on top of whatever time the ~1MB HTML document itself takes to download and parse.
+* The featured-strip auto-scroll and hero carousel auto-advance both use `requestAnimationFrame`/timers responsibly (both respect `prefers-reduced-motion`, and both pause during user interaction) — not flagged as a concern.
+* GA4's `gtag.js` loads `async` and is defensively wrapped so it never blocks other homepage functionality — not flagged as a concern.
+
+---
+
+**No file was modified, no code was changed, no production data was touched, no admin endpoint was called, no deployment happened.** This entire pass was a static, read-only source audit of `okanagan.html`, `server.js`'s homepage-related code, `public/scripts/app.js`, and `public/styles/app.css`/`tokens.css` — no redesign proposal is included, per the explicit scope of the request.
