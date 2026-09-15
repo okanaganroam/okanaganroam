@@ -218,6 +218,27 @@ This file is the shared coordination point for AI assistants working on this rep
 
 * **No production data was changed, no admin endpoint was called, nothing was committed to main, nothing was deployed.**
 
+## EXECUTED — #426 and #360 Production Enrichment (2026-09-15)
+
+### Claude — two-venue write, completed and verified. Scope strictly limited to these two IDs, per instruction.
+
+* **Status: DONE.** Only IDs 426 and 360 were touched. #934, #987, and #180 were explicitly NOT written, per instruction — they remain "awaiting your judgment call" as documented above.
+* **Mechanism:** `POST /admin/enrich-venue` via the existing guarded `guardedEnrichUpdate()` path, same as the #484 write — no new code, no schema change, no bypass. Auth via `railway run` (already-linked Railway project), so `ENRICHMENT_ADMIN_TOKEN`'s value was never printed, logged, or exposed anywhere.
+* **Pre-write verification (both):** live `GET /api/venues/{426,360}` confirmed identity — #426 "Murray's Pizza Kelowna", region `kelowna`, phone `+1 778-484-3000`; #360 "Lala Ji's pizzeria", region `penticton`, phone `+1 778-622-2211`. Both had `address`/`latitude`/`longitude` all `null`. Active count baseline: 1,055.
+* **Writes performed (the exact HIGH-confidence values documented above in this file):**
+  * `#426`: `{"address": "107-1924 Summit Drive, Kelowna, BC V1V 3E9", "latitude": 49.901388, "longitude": -119.453050}` → `{"id":426,"results":{"address":"written","latitude":"written","longitude":"written"}}`
+  * `#360`: `{"address": "625 Main St, Penticton, BC V2A 5C9", "latitude": 49.493980, "longitude": -119.589999}` → `{"id":360,"results":{"address":"written","latitude":"written","longitude":"written"}}`
+  * Both responses show all three fields as `"written"` (not `"skipped_not_empty"`), confirming both were genuinely empty beforehand.
+* **Post-write verification (all passed, both venues):**
+  * `address`, `latitude`, `longitude` on both live records now exactly match the values written.
+  * Every other field on both — `phone`, `name`, `region`, `type`, `slug`, `cuisine`, `rating`, `price`, `reviews`, `description`, `description_fr`, `hours`, `website`, `image_url`, `redirect_to` (still null on both), and all 12 boolean amenity flags — is byte-for-byte identical to each pre-write record. Only `updated_at` changed on each, as expected.
+  * Active venue count: still 1,055 (unchanged).
+  * Redirect count: structurally unchanged (same reasoning as the #484 write) — `guardedEnrichUpdate()` never touches `redirect_to`, and both records still show `redirect_to: null` directly.
+* **No anomalies found.**
+* **Missing-location count impact:** 65 → 63 active venues now missing address/lat/lng (arithmetic inference from these two writes plus the earlier #484 write; not independently re-pulled as part of this entry).
+* **Manifest was not touched. No other venue was modified. No duplicates were merged or retired. No application code was changed. No deployment occurred.**
+* **Remaining in the original 6-venue batch:** #934 (moderate-high, ~390m spread between two sources), #987 and #180 (moderate, single-source each) — **not written, awaiting separate approval as instructed.**
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
