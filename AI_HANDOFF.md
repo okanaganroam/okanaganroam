@@ -508,6 +508,18 @@ Note the important distinction within this category: #95, #225, #311, #702, #806
 * **Commit SHA for this consolidated FINAL STATUS entry:** this entry's own commit, reported in the chat response accompanying this update (a file cannot embed its own future commit hash).
 * **No production writes, code changes, merges/retirements, manifest changes, or deployments were performed as part of producing this status report.** This entry is documentation of an already-completed action, re-verified read-only.
 
+## Live Status Check — #180, #934, #987 (2026-09-15, re-confirmed)
+
+Direct, minimal re-check of live production, no writes performed:
+
+| ID | Name | address | latitude | longitude |
+|---|---|---|---|---|
+| 180 | Dolci Thai Bistro | ✅ `8710 Main St, Osoyoos, BC V0H 1V0` | ✅ `49.032963` | ✅ `-119.467977` |
+| 934 | 14th Ave Bar & Grill | ✅ `1101 14 Avenue, Vernon, BC V1B 2S6` | ✅ `50.2517967` | ✅ `-119.2458648` |
+| 987 | China Palace | ✅ `1933 Main Street, Penticton, BC V2A 5H5` | ✅ `49.476851` | ✅ `-119.583657` |
+
+All three fields are populated on all three venues, live, right now. This matches the FINAL STATUS entry immediately above and the original execution record at commit `5a480b9`. **Note for anyone not seeing this file's history: this content exists only on the `ai-handoff/2026-09-15` branch, never on `main`** — that separation was set up deliberately earlier in this session so `main` stays untouched until a human explicitly merges. If this content isn't visible, check that the branch selector is set to `ai-handoff/2026-09-15`, not `main`.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
