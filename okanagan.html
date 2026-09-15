@@ -121,6 +121,32 @@
   </nav>
 </header>
 
+<section class="hero">
+  <div class="hero-media" aria-hidden="true">
+    <img class="hero-media-img" src="/images/hero.jpg" width="679" height="452" alt="" fetchpriority="high" decoding="async">
+    <div class="hero-scrim"></div>
+  </div>
+  <div class="wrap hero-inner">
+    <h1 class="hero-title">
+      <span data-i18n="hero.headlineLine1">Explore the Okanagan.</span>
+      <span data-i18n="hero.headlineLine2">Find your next favourite place.</span>
+    </h1>
+    <p class="hero-lead" data-i18n="hero.lead">Discover restaurants, wineries, cafés, breweries, pubs, cocktails and things worth doing across the Okanagan.</p>
+
+    <div class="search-box wizard-search-box hero-search-box">
+      <input type="text" id="searchInput" data-i18n-placeholder="search.placeholder" placeholder="What are you looking for?" aria-label="Search venues">
+      <button id="searchBtn">Search</button>
+    </div>
+
+    <div class="hero-quick-actions" role="group" aria-label="Quick discovery actions">
+      <button type="button" class="hero-quick-btn" data-quick="eat" data-i18n="hero.quickEat">Eat</button>
+      <button type="button" class="hero-quick-btn" data-quick="drink" data-i18n="hero.quickDrink">Drink</button>
+      <button type="button" class="hero-quick-btn" data-quick="explore" data-i18n="hero.quickExplore">Explore</button>
+      <a href="#hiddenGems" class="hero-quick-btn" data-quick="hidden-gems" data-i18n="hero.quickHiddenGems">Hidden Gems</a>
+    </div>
+  </div>
+</section>
+
 <section class="filter-bar" id="directory">
   <div class="wrap">
 
@@ -273,32 +299,6 @@
   </div>
 </section>
 
-<section class="hero">
-  <div class="hero-media" aria-hidden="true">
-    <img class="hero-media-img" src="/images/hero.jpg" width="679" height="452" alt="" fetchpriority="high" decoding="async">
-    <div class="hero-scrim"></div>
-  </div>
-  <div class="wrap hero-inner">
-    <h1 class="hero-title">
-      <span data-i18n="hero.headlineLine1">Explore the Okanagan.</span>
-      <span data-i18n="hero.headlineLine2">Find your next favourite place.</span>
-    </h1>
-    <p class="hero-lead" data-i18n="hero.lead">Discover restaurants, wineries, cafés, breweries, pubs, cocktails and things worth doing across the Okanagan.</p>
-
-    <div class="search-box wizard-search-box hero-search-box">
-      <input type="text" id="searchInput" data-i18n-placeholder="search.placeholder" placeholder="What are you looking for?" aria-label="Search venues">
-      <button id="searchBtn">Search</button>
-    </div>
-
-    <div class="hero-quick-actions" role="group" aria-label="Quick discovery actions">
-      <button type="button" class="hero-quick-btn" data-quick="eat" data-i18n="hero.quickEat">Eat</button>
-      <button type="button" class="hero-quick-btn" data-quick="drink" data-i18n="hero.quickDrink">Drink</button>
-      <button type="button" class="hero-quick-btn" data-quick="explore" data-i18n="hero.quickExplore">Explore</button>
-      <a href="#hiddenGems" class="hero-quick-btn" data-quick="hidden-gems" data-i18n="hero.quickHiddenGems">Hidden Gems</a>
-    </div>
-  </div>
-</section>
-
 <section class="weather-banner" id="weatherBanner" style="display:none;">
   <div class="wrap weather-banner-inner">
     <div class="weather-banner-icon" id="weatherIcon">☀️</div>
@@ -307,120 +307,6 @@
       <p class="weather-banner-suggestion" id="weatherSuggestion"></p>
     </div>
     <button class="weather-banner-btn" id="weatherBannerBtn">Show me →</button>
-  </div>
-</section>
-
-<section class="spotlight-banner" id="spotlightBanner" style="display:none;">
-  <div class="wrap spotlight-inner">
-    <div class="spotlight-text">
-      <span class="eyebrow spotlight-eyebrow">This week's spotlight</span>
-      <h3 class="spotlight-name" id="spotlightName"></h3>
-      <p class="spotlight-meta" id="spotlightMeta"></p>
-      <p class="spotlight-desc" id="spotlightDesc"></p>
-      <div class="spotlight-badges" id="spotlightBadges"></div>
-    </div>
-    <button class="spotlight-btn" id="spotlightBtn">See this spot →</button>
-  </div>
-</section>
-
-<section class="featured-venues">
-  <div class="wrap">
-    <div class="featured-head">
-      <span class="eyebrow" data-i18n="featured.eyebrow">Worth the trip</span>
-      <h2 data-i18n="featured.heading">Featured this month</h2>
-    </div>
-    <div class="featured-strip">
-      <div class="featured-card" data-name="Quails' Gate Winery" data-region="west-kelowna" data-phone="+1 250-769-4451">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-winery">Winery</span>
-          <h3>Quails' Gate Winery</h3>
-          <p class="featured-meta">West Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.7</span></p>
-          <p class="featured-desc">Family-farmed since 1956, with a dog-friendly patio overlooking Okanagan Lake.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Dog-friendly" data-tooltip="Dog-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg></span><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Terrafina at Hester Creek" data-region="oliver" data-phone="+1 250-498-2229">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Terrafina at Hester Creek</h3>
-          <p class="featured-meta">Oliver &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.5</span></p>
-          <p class="featured-desc">A patio restaurant at Hester Creek Estate Winery known for its focaccia spreads and seasonal pasta.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Frankie We Salute You!" data-region="kelowna" data-phone="+1 236-420-3338">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Frankie We Salute You!</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
-          <p class="featured-desc">Trendy, industrial-feel vegan fine dining with real gluten-free items and a thoughtful lapsang mocktail.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span><span class="badge" aria-label="Gluten-free options" data-tooltip="Gluten-free options"><span class="badge-text-icon">GF</span></span><span class="badge" aria-label="Non-alcoholic options" data-tooltip="Non-alcoholic options"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="The Kal" data-region="vernon" data-phone="+1 250-549-1011">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-pub">Pub/Bar</span>
-          <h3>The Kal</h3>
-          <p class="featured-meta">Vernon &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.2</span></p>
-          <p class="featured-desc">A burger, pizza, and wing spot inside the historic Kalamalka Hotel, with a video arcade attached.</p>
-        </a>
-        <div class="badge-row"></div>
-      </div>
-      <div class="featured-card" data-name="27" data-region="kelowna" data-phone="+1 236-420-0206">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-cocktail">Cocktail Lounge</span>
-          <h3>27</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.4</span></p>
-          <p class="featured-desc">The Okanagan's first craft cocktail lounge, with a speakeasy, prohibition-era feel.</p>
-        </a>
-        <div class="badge-row"></div>
-      </div>
-      <div class="featured-card" data-name="Naked Cafe" data-region="kelowna" data-phone="+1 778-484-5640">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Naked Cafe</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.6</span></p>
-          <p class="featured-desc">A dedicated vegan cafe known for its sushi bowls and Japanese curry, a longtime local favourite.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span></div>
-      </div>
-      <div class="featured-card" data-name="Giant's Head Brewing" data-region="summerland" data-phone="+1 250-404-1123">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-brewery">Brewery</span>
-          <h3>Giant's Head Brewing</h3>
-          <p class="featured-meta">Summerland &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.5</span></p>
-          <p class="featured-desc">A cozy brewpub with a large street-side patio, wood-fired pizza, and a strong fish and chips.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Painted Rock Estate Winery" data-region="penticton" data-phone="+1 250-493-6809">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-winery">Winery</span>
-          <h3>Painted Rock Estate Winery</h3>
-          <p class="featured-meta">Penticton &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.6</span></p>
-          <p class="featured-desc">A family-friendly estate with sweeping Skaha Lake views and a deck built for lingering.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span><span class="badge" aria-label="Kid-friendly" data-tooltip="Kid-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><circle cx="10" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><path d="M8 21c-1-4 0-9 4-9s5 5 4 9"/></svg></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Angry Vegan" data-region="penticton" data-phone="+1 250-809-7610">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Angry Vegan</h3>
-          <p class="featured-meta">Penticton &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
-          <p class="featured-desc">Penticton's oldest dedicated vegan restaurant, open since 2017, a fully plant-based menu.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span></div>
-      </div>
-      <div class="featured-card" data-name="Wildling" data-region="kelowna" data-phone="+1 250-980-6919">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Wildling</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
-          <p class="featured-desc">An elevated tasting-menu restaurant praised for genuinely accommodating vegetarian diners.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span></div>
-      </div>
-    </div>
   </div>
 </section>
 
