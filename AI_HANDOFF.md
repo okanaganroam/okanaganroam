@@ -76,9 +76,45 @@ This file is the shared coordination point for AI assistants working on this rep
   * `okanagan.db` shows as modified in `git status` purely as a side effect of running `npm test` locally (it's a disposable fixture DB per the test file's own design) — not a real change, safe to ignore/not stage.
   * This is still an uncommitted, local-only diff. Nothing has been staged or committed pending this review.
 
+### Claude — Milestone 1 (scenic hero + "What are you in the mood for?") final rendered QA (2026-09-16)
+
+* **Status: QA evidence-gathering pass only. Nothing fixed. Branch: `feature/homepage-milestone-1-hero-mood`, commit `3bf5eb8`.**
+* **Setup note:** this branch's committed `okanagan.db` fixture currently crashes the server on every request (`no such column: great_groups`). Confirmed via `git diff main...feature/homepage-milestone-1-hero-mood -- okanagan.db db.js` (empty) that this is a pre-existing issue on `main` itself, unrelated to Milestone 1. QA was performed against a freshly rebuilt local dev database (same approach `tests/server.test.js` already uses) with representative fixture data; the tracked `okanagan.db` was restored to its committed state afterward and nothing was committed from that setup.
+
+**Viewport results:**
+
+| Viewport | Result |
+|---|---|
+| 1440×900 | PASS |
+| 1280×800 | PASS |
+| 390×844 | PASS |
+| 375×812 | PASS |
+
+**Detailed checks:**
+
+* **Hero visual result — PASS.** Full-bleed cinematic placeholder image, white headline/copy legible over the image (a real contrast bug from earlier implementation work — app.css's global `h1,h2,h3,.display{color:var(--ink)}` rule beating inherited white — was already fixed prior to this QA pass), compact search box clearly secondary to the headline, no clipping or overflow at any of the four widths.
+* **"What are you in the mood for?" visual result — PASS.** All six cards render with the intended two-tier hierarchy: Eat/Drink/Hidden Gems are larger, portrait (3:4), stronger type; Golf/What's On/Explore are smaller, widescreen (16:9), quieter type. Desktop: 3+3 grid. Mobile: primary cards stack single-column with a shortened aspect ratio (not "giant"); secondary row becomes a horizontal-scroll strip rather than three more full-width stacked cards.
+* **All six mood-card functional-link results — PASS.**
+  * Eat → presses the existing `restaurant`+`cafe` type-chips and reveals filtered results (verified: 3 matching fixture venues).
+  * Drink → presses `winery`+`brewery`+`cocktail`+`pub` type-chips (verified: 5 matching fixture venues).
+  * Hidden Gems → anchors to the real, existing `#hiddenGems` section.
+  * Golf → links to the real, existing golf category page (`/kelowna/golf`, verified HTTP 200).
+  * What's On → anchors to the real, existing `#happeningSoon` section.
+  * Explore → anchors to the real, existing `#exploreRegions` section.
+* **Hero search result — PASS.** Verified on a fresh page load: typing "gelato" and submitting correctly delegates to the existing `#searchInput`/`#searchBtn` search implementation and filters to the matching venue (1 result).
+* **Horizontal-overflow result — PASS, none at any of the four widths** (`document.documentElement.scrollWidth === clientWidth` confirmed at 1440, 1280, 390, 375).
+* **Unexpected page-load auto-scroll result — PASS, none** (`window.scrollY === 0` on load confirmed at all four widths).
+* **Console errors — PASS, no new errors.** Exactly one console error is present at every width, and it is a **pre-existing** error (`initBlock12`, the "Live Google Places search" toggle — `TypeError: Cannot read properties of null (reading 'addEventListener')`), confirmed unrelated to Milestone 1 since its target markup (`#liveSearchToggle`) doesn't exist anywhere on `main` either. No additional/new console errors were introduced.
+* **Duplicate Hero/Mood section check — PASS.** Exactly one `.hero-scenic` element, exactly one `#moodCards` section, and exactly six `.mood-card` elements confirmed on the rendered page.
+
+**Final PASS/FAIL summary:** all checks above are **PASS**. No functional failures found.
+
+**Readiness assessment: Claude considers Milestone 1 ready for review.** The one console error present is confirmed pre-existing and out of scope. The one blocking issue found (the committed `okanagan.db` fixture crashing the server) is also confirmed pre-existing on `main` and unrelated to this milestone's code — worth flagging separately since it currently prevents anyone else from running this branch (or `main`) locally without first rebuilding the local database.
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
 * 2026-09-08 — Claude confirmed the shared AI handoff workflow is ready.
 * 2026-09-08 — Claude reviewed current repository/production state and identified continued location enrichment (152 active venues missing address/lat/lng) as the highest-priority next task; added details and a suggested approach under Open Tasks.
 * 2026-09-08 — Claude executed the ready 11-venue enrichment batch (IDs 469, 841, 857, 863, 907, 918, 967, 1000, 1002, 1004, 1041). All 11 succeeded with zero anomalies. Complete-location count: 900 → 911. Missing-location count: 152 → 141. Active/redirect counts and all 17 redirects confirmed unchanged. Manifest intentionally left unchanged (separate task).
+* 2026-09-16 — Claude completed final rendered QA for homepage redesign Milestone 1 (scenic hero + "What are you in the mood for?", branch `feature/homepage-milestone-1-hero-mood`, commit `3bf5eb8`). All checks PASS at 1440×900/1280×800/390×844/375×812: hero and mood-card visuals, all six mood-card links, hero search, no horizontal overflow, no unexpected auto-scroll, no duplicate sections, and no new console errors (one pre-existing, unrelated `initBlock12` error confirmed present on `main` too). Milestone 1 considered ready for review. Separately flagged: the branch's (and `main`'s) committed `okanagan.db` fixture currently crashes the server (`no such column: great_groups`), unrelated to this milestone.
