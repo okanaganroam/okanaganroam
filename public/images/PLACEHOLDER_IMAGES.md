@@ -1,10 +1,10 @@
-# Homepage image placeholders (Milestone 1)
+# Homepage image placeholders (Milestone 1 + Milestone 2)
 
 Every image file in this directory is a **temporary structural placeholder**
 — a flat generated gradient PNG, not photography, not final AI-generated
-imagery, and not approved creative. They exist only so the new hero and
-"What are you in the mood for?" sections have correctly-sized, correctly-
-positioned images for layout QA.
+imagery, and not approved creative. They exist only so the hero, "What are
+you in the mood for?", and "Explore the Okanagan" sections have correctly-
+sized, correctly-positioned images for layout QA.
 
 **To replace with real imagery:** overwrite the file at the exact path
 below with a final image of the same (or larger, same-aspect-ratio)
@@ -20,6 +20,19 @@ references these exact filenames.
 | `mood/golf.png` | "Golf" mood card (secondary) | 960×540 (or larger) | 16:9 |
 | `mood/whats-on.png` | "What's On" mood card (secondary) | 960×540 (or larger) | 16:9 |
 | `mood/explore.png` | "Explore" mood card (secondary) | 960×540 (or larger) | 16:9 |
+| `regions/kelowna.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `regions/penticton.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `regions/vernon.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `regions/west-kelowna.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `regions/oliver.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `regions/osoyoos.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `regions/summerland.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `regions/naramata.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+
+Note: `regions/*.png` are destination-inspired placeholders, not photos of
+any specific business — real replacements should follow the same rule
+(destination/scenery imagery for the region, never a depiction implying a
+specific real venue).
 
 All images are served via the `/images/*` route in `server.js`
 (`object-fit: cover` is used throughout, so exact pixel dimensions can vary

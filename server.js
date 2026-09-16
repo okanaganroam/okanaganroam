@@ -889,14 +889,22 @@ function hiddenGemHomepageCardHtml(venue) {
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : '#';
   const regionLabel = REGION_LABELS[venue.region] || venue.region;
-  const meta = [regionLabel, venue.rating ? `${venue.rating}\u2605` : null].filter(Boolean).join(' &middot; ');
+  // Milestone 2 (Hidden Gems editorial redesign): the rating is
+  // deliberately no longer shown here -- the approved architecture spec
+  // calls for de-emphasizing directory-style metadata (ratings/hours) so
+  // the editorial blurb, not a number, carries the card. The region label
+  // alone is kept as light orientation, not a review-style stat line. The
+  // underlying query/data and the rating value itself are untouched --
+  // venue.rating is still used elsewhere (e.g. ORDER BY in the query
+  // above, category/venue pages) exactly as before.
+  const meta = regionLabel;
   const blurb = HIDDEN_GEM_HOMEPAGE_BLURBS[venue.slug] || (venue.description || '').split('.').slice(0, 1).join('.') + '.';
   return `<a class="hidden-gem-card" href="${href}">
     ${compactVisualBandHtml(venue.type)}
     <span class="chip hidden-gem-badge hidden-gem-card-badge">\u{1F48E} Hidden Gem</span>
     <div class="hidden-gem-card-body">
       <h3>${escapeHtml(venue.name)}</h3>
-      <div class="hidden-gem-card-meta">${meta}</div>
+      <div class="hidden-gem-card-meta">${escapeHtml(meta)}</div>
       <p>${escapeHtml(blurb)}</p>
     </div>
   </a>`;
@@ -1487,27 +1495,45 @@ function renderExploreRegionsHTML() {
   // arbitrarily. "See all regions" links back to the existing wizard's own
   // region picker via its existing #directory anchor rather than a new
   // route, since no standalone all-regions index page exists today.
+  //
+  // Milestone 2 (approved homepage redesign): promoted from a small text
+  // tile grid (still used as-is by Browse by Category, immediately above
+  // this section -- .category-tile/.category-tile-grid are untouched) to
+  // the "major visual destination section" the approved architecture spec
+  // calls for. Each card uses a new, distinct .region-card class (not
+  // .region-tile) specifically so this redesign cannot affect Browse by
+  // Category's shared .category-tile/.region-tile CSS at all. Images are
+  // temporary generated placeholders at public/images/regions/<region>.png
+  // -- see public/images/PLACEHOLDER_IMAGES.md -- not final photography;
+  // no venue-level image_url exists in this dataset to draw from instead
+  // (same constraint already documented for Milestone 1's imagery).
   const curated = ['kelowna', 'penticton', 'vernon', 'west-kelowna', 'oliver', 'osoyoos', 'summerland', 'naramata'];
-  const tiles = curated
+  const cards = curated
     .filter((region) => REGION_LABELS[region])
     .map((region) => {
       const tagline = REGION_TAGLINES[region]
-        ? `<span class="tile-tagline">${escapeHtml(REGION_TAGLINES[region])}</span>`
+        ? `<span class="region-card-tagline">${escapeHtml(REGION_TAGLINES[region])}</span>`
         : '';
-      return `<a class="region-tile" href="/${region}"><span class="tile-label">${escapeHtml(REGION_LABELS[region])}</span>${tagline}</a>`;
+      return `<a class="region-card" href="/${region}">
+      <img class="region-card-img" src="/images/regions/${region}.png" width="640" height="800" alt="" loading="lazy">
+      <span class="region-card-overlay">
+        <span class="region-card-label">${escapeHtml(REGION_LABELS[region])}</span>
+        ${tagline}
+      </span>
+    </a>`;
     })
     .join('\n');
 
-  if (!tiles) return '';
+  if (!cards) return '';
 
   return `
-<section class="discover-section" id="exploreRegions">
+<section class="discover-section explore-section" id="exploreRegions">
   <div class="wrap">
     <div class="discover-heading">
       <span class="eyebrow">Destinations</span>
       <h2>Explore the Okanagan</h2>
     </div>
-    <div class="region-tile-grid">${tiles}</div>
+    <div class="region-card-grid">${cards}</div>
     <a class="cta secondary discover-see-all" href="#directory">See all regions</a>
   </div>
 </section>`;
@@ -1627,25 +1653,53 @@ function renderHomepageDiscoveryStyles() {
      The compact band + gradient rules are generated once via
      compactBandCSSRules(), shared with SEO_PAGE_CSS's related/nearby
      cards rather than hardcoded twice. */
-  .hidden-gem-grid { flex-wrap: nowrap; }
+  /* Milestone 2 (Hidden Gems editorial redesign): moved from a
+     horizontal-scroll strip of small cards to a static, larger-format
+     grid, so the section reads as a curated feature rather than "more
+     stuff to browse sideways." Rating is intentionally not shown at all
+     (see hiddenGemHomepageCardHtml()) -- the region label is kept as a
+     small, muted kicker line above the name, and the editorial blurb is
+     given the most visual weight on the card. */
+  .hidden-gem-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex-wrap: unset;
+  }
   .hidden-gem-card {
-    position: relative; flex: 0 0 250px; display: block; text-decoration: none; color: var(--ink);
-    background: var(--paper); border-radius: 14px; overflow: hidden;
+    position: relative; display: block; text-decoration: none; color: var(--ink);
+    background: var(--paper); border-radius: 16px; overflow: hidden;
     box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
     border: 1px solid rgba(74,52,40,0.08);
     transition: transform .15s ease, box-shadow .15s ease;
   }
   .hidden-gem-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
-  .hidden-gem-card .compact-band { margin: 0; border-radius: 14px 14px 0 0; }
+  /* Pre-existing gap found during Milestone 2 QA, fixed here because it
+     directly blocks verifying this exact section: the homepage's own
+     stylesheet never defined .compact-band's base height/layout rule --
+     that only exists in the separate SEO_PAGE_CSS used by venue/category/
+     region pages, which the homepage does not load. Without it the band
+     collapsed to the label's own line-height and the badge (positioned by
+     absolute pixel offset) overlapped the venue name. Scoped narrowly to
+     .hidden-gem-card so SEO_PAGE_CSS and every page that uses it are
+     completely untouched. */
+  .hidden-gem-card .compact-band {
+    margin: 0; border-radius: 16px 16px 0 0; height: 84px;
+    display: flex; align-items: flex-end; padding: 10px 16px; box-sizing: border-box;
+  }
+  .hidden-gem-card .compact-band-label {
+    color: var(--paper); font-size: 0.72rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.92;
+  }
   ${compactBandCSSRules('compact-band')}
   .hidden-gem-card-badge {
-    position: absolute; top: 78px; left: 14px; transform: translateY(-50%);
+    position: absolute; top: 84px; left: 16px; transform: translateY(-50%);
     background: var(--amber); color: var(--plum-dark); box-shadow: 0 2px 6px rgba(74,52,40,0.25);
   }
-  .hidden-gem-card-body { padding: 20px 18px 16px; }
-  .hidden-gem-card-body h3 { font-family:'Fraunces',serif; font-size:1.1rem; margin:0 0 4px; line-height:1.25; }
-  .hidden-gem-card-meta { font-size:0.82rem; color: rgba(42,32,25,0.68); margin-bottom:8px; }
-  .hidden-gem-card-body p { font-size:0.88rem; line-height:1.5; margin:0; color: rgba(42,32,25,0.85); }
+  .hidden-gem-card-body { padding: 26px 22px 22px; }
+  .hidden-gem-card-body h3 { font-family:'Fraunces',serif; font-size:1.28rem; margin:0 0 6px; line-height:1.2; }
+  .hidden-gem-card-meta {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--teal-deep); margin-bottom: 10px;
+  }
+  .hidden-gem-card-body p { font-size: 0.98rem; line-height: 1.6; margin: 0; color: rgba(42,32,25,0.85); }
 
   .tile-label { display:block; }
   .tile-tagline {
@@ -1666,11 +1720,48 @@ function renderHomepageDiscoveryStyles() {
   .category-tile:hover, .region-tile:hover { border-color: var(--plum); transform: translateY(-2px); }
   .discover-see-all { margin-top:16px; }
 
+  /* Milestone 2 (Explore the Okanagan visual redesign): a fresh
+     .region-card family, deliberately not reusing .region-tile/
+     .category-tile, so Browse by Category's existing tiles are
+     completely unaffected. Matches Milestone 1's mood-card visual
+     language (full-bleed placeholder image, bottom gradient-scrim
+     overlay, serif label) for a consistent premium feel across both
+     sections. */
+  .region-card-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .region-card {
+    position: relative; display: block; border-radius: 16px; overflow: hidden;
+    text-decoration: none; color: #fff;
+    box-shadow: 0 10px 22px -16px rgba(74,52,40,0.4);
+    aspect-ratio: 4 / 5;
+  }
+  .region-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
+  .region-card:hover .region-card-img { transform: scale(1.045); }
+  .region-card-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 20px; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(20,14,10,0.78) 100%);
+  }
+  .region-card-label { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 700; display: block; }
+  .region-card-tagline {
+    display: block; font-family: 'Nunito', sans-serif; font-size: 0.82rem;
+    margin-top: 4px; color: rgba(255,255,255,0.9); line-height: 1.4;
+  }
+
+  @media (min-width: 640px) {
+    .region-card-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1100px) {
+    .region-card-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
   @media (max-width: 640px) {
     .discover-card { flex-basis: 200px; }
-    .hidden-gem-card { flex-basis: 210px; }
+    .hidden-gem-grid { grid-template-columns: 1fr; gap: 16px; }
+    .hidden-gem-card-body { padding: 20px 18px 18px; }
     .category-tile-grid, .region-tile-grid { grid-template-columns: repeat(2, 1fr); }
     .tile-tagline { font-size: 0.72rem; }
+  }
+  @media (min-width: 641px) and (max-width: 1099px) {
+    .hidden-gem-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* Milestone 1 (approved homepage redesign): scenic hero. Reuses the

@@ -344,6 +344,23 @@ test('a venue with stale hidden-gem membership that is also redirected never app
   assert.doesNotMatch(html, /DS4 Redirected Gem/);
 });
 
+// ==== Homepage redesign Milestone 2 (Hidden Gems editorial + Explore the
+// Okanagan visual destinations) =============================================
+
+test('Milestone 2: Hidden Gems homepage cards de-emphasize rating -- no star-rating glyph in the editorial redesign', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  assert.doesNotMatch(html, /★/, 'expected the rating star glyph to be removed from the editorial Hidden Gems cards');
+});
+
+test('Milestone 2: Hidden Gems homepage still reuses the same real query/data and approved blurbs (unchanged)', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  for (const fixture of ds4GemFixtures) {
+    assert.match(html, new RegExp(fixture.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `expected ${fixture.name} to still render`);
+  }
+  const cardCount = (html.match(/class="hidden-gem-card"/g) || []).length;
+  assert.equal(cardCount, 6, 'the editorial redesign must not change which venues render or introduce duplicates');
+});
+
 test('related/nearby venue cards include the compact visual band', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const related = app.getRelatedVenues(venue);
@@ -404,6 +421,28 @@ test('Kaleden, Coldstream, Lumby, and Baldy remain valid region links and receiv
   assert.equal(app.REGION_TAGLINES.baldy, undefined);
   // Still valid, functional region pages via the unchanged REGION_LABELS taxonomy.
   assert.equal(app.CATEGORY_SLUGS.restaurant, 'restaurants'); // sanity: taxonomy machinery itself untouched
+});
+
+const MILESTONE_2_EXPLORE_REGIONS = ['kelowna', 'penticton', 'vernon', 'west-kelowna', 'oliver', 'osoyoos', 'summerland', 'naramata'];
+
+test('Milestone 2: Explore the Okanagan homepage cards each include a real, servable placeholder image', () => {
+  const html = app.renderExploreRegionsHTML();
+  for (const region of MILESTONE_2_EXPLORE_REGIONS) {
+    assert.match(html, new RegExp(`src="/images/regions/${region}\\.png"`), `expected a placeholder destination image for ${region}`);
+  }
+});
+
+test('Milestone 2: Explore the Okanagan cards still link to their real, unchanged region pages', () => {
+  const html = app.renderExploreRegionsHTML();
+  for (const region of MILESTONE_2_EXPLORE_REGIONS) {
+    assert.match(html, new RegExp(`href="/${region}"`), `expected a working link to /${region}`);
+  }
+});
+
+test('Milestone 2: Explore the Okanagan tagline copy is unchanged by the visual redesign', () => {
+  const html = app.renderExploreRegionsHTML();
+  assert.match(html, /The valley&#39;s largest hub, with the widest spread of everything\./);
+  assert.match(html, /A quiet bench road lined with small, walkable wineries\./);
 });
 
 // ==== Phase 2 Sprint 1 (Golf) =============================================
@@ -705,6 +744,14 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(homepageBody, /class="hero-scenic"/, 'New scenic hero (Milestone 1) must render');
   assert.match(homepageBody, /id="moodCards"/, 'Mood cards section (Milestone 1) must render');
   assert.doesNotMatch(homepageBody, /class="hero">/, 'Old "Worth the Drive" hero carousel must be gone');
+
+  // Milestone 2 (Hidden Gems editorial + Explore the Okanagan visual
+  // destinations) — the redesigned Explore cards each reference a
+  // placeholder region image; confirm the /images/* route actually serves
+  // one of them (not just that the HTML references the path).
+  const exploreRegionImg = await fetch(`${base}/images/regions/kelowna.png`);
+  assert.equal(exploreRegionImg.status, 200, 'Explore the Okanagan placeholder region image must be servable');
+  assert.equal(exploreRegionImg.headers.get('content-type'), 'image/png');
 
   const eventsApi = await fetch(`${base}/api/events`);
   const collectionsApi = await fetch(`${base}/api/collections`);

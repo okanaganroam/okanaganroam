@@ -111,6 +111,45 @@ This file is the shared coordination point for AI assistants working on this rep
 
 **Readiness assessment: Claude considers Milestone 1 ready for review.** The one console error present is confirmed pre-existing and out of scope. The one blocking issue found (the committed `okanagan.db` fixture crashing the server) is also confirmed pre-existing on `main` and unrelated to this milestone's code — worth flagging separately since it currently prevents anyone else from running this branch (or `main`) locally without first rebuilding the local database.
 
+### Claude — Milestone 2 (Hidden Gems editorial + Explore the Okanagan) implementation + QA (2026-09-16)
+
+* **Status: implemented, tested, QA'd, ready for review. Branch: `feature/homepage-milestone-1-hero-mood` (redesign branch continues on this branch), built directly on top of Milestone 1 (commit `eb248e6`).**
+* **Scope:** items 3 and 4 of the approved homepage architecture only — Hidden Gems (editorial/curated presentation) and Explore the Okanagan (major photo-led visual destination section). Hero and Mood cards (Milestone 1) were not touched. Full page reordering (moving these two sections ahead of the wizard, per the final target architecture) was explicitly out of scope for this milestone and is deferred.
+* **TDD:** new/updated tests were written first in `tests/server.test.js` and confirmed to fail for the expected reason (missing implementation) before any production code changed: rating-glyph removal on Hidden Gems cards, presence of a placeholder image + working link for each of the 8 curated Explore regions, and a live HTTP check that a new region placeholder image is actually servable. All pre-existing tests were left passing throughout.
+
+**1. Hidden Gems (editorial redesign):**
+* `renderHiddenGemsHomepageHTML()`'s query and `HIDDEN_GEM_HOMEPAGE_BLURBS` (the existing, real, curated editorial-blurb dataset) are completely unchanged — no fabricated venue data, no new data source.
+* `hiddenGemHomepageCardHtml()`: the star rating is no longer shown at all (de-emphasizing directory-style metadata per the approved spec); the region label remains as a small, muted kicker line.
+* Layout moved from a horizontal-scroll strip of small cards to a static, larger 3-column (desktop) / 1-column (mobile) grid, with larger typography on the editorial blurb, so the section reads as a curated feature rather than "more to browse sideways."
+* Venue links are unchanged and still canonical (`/{region}/{category}/{slug}`), verified working (200) against real fixture venue pages.
+* **Bug found and fixed (pre-existing, not introduced by this milestone, but directly blocking this section's visual QA):** the homepage's own injected stylesheet never defined the `.compact-band`'s base height/layout rule — that rule only existed in the separate `SEO_PAGE_CSS` used by venue/category/region pages, which the homepage doesn't load. This collapsed the color band to the label's own line-height and made the "Hidden Gem" badge overlap the venue name. Fixed with a narrow rule scoped only to `.hidden-gem-card .compact-band`/`.compact-band-label` — `SEO_PAGE_CSS` and every page that uses it are untouched.
+
+**2. Explore the Okanagan (visual destination redesign):**
+* `renderExploreRegionsHTML()`'s data (the curated 8-region list, `REGION_LABELS`, `REGION_TAGLINES`) is completely unchanged.
+* Markup redesigned into large photo-led destination cards (new `.region-card` family, deliberately not reusing `.region-tile` so Browse by Category's shared tile CSS is completely unaffected): full-bleed placeholder image, bottom gradient-scrim overlay, region name + tagline — visually consistent with Milestone 1's mood-card language.
+* Desktop: 4-column grid (≥1100px), 2-column (≥640px), 1-column (mobile). Links unchanged and verified working (200) against real region pages for all 8 destinations.
+* New placeholder images at `public/images/regions/<region>.png` (8 files, 640×800, distinct gradient per region) — explicitly temporary, documented in the now-updated `public/images/PLACEHOLDER_IMAGES.md`, not final photography, not depicting any specific real business.
+
+**Test results:** 63/63 passing (58 pre-existing + 5 new/updated for this milestone), including the new live check that `/images/regions/kelowna.png` is actually servable (200, `image/png`).
+
+**Rendered QA at 1440×900, 1280×800, 390×844, 375×812 — all PASS:**
+* Hidden Gems visual result: PASS at all four widths (editorial card design, no clipping, no badge/text overlap after the fix above).
+* Explore visual result: PASS at all four widths (large photo-card grid, correct responsive column counts, no clipping).
+* Functional links: PASS — both Hidden Gems venue links (`/naramata/cafes/chabendo-gelato`, `/kelowna/breweries/buffalo-rouge-brewing-co`) and all 8 Explore region links resolve to real, working pages (200).
+* Horizontal overflow: PASS, none at any of the four widths (`scrollWidth === clientWidth`).
+* Unexpected page-load auto-scroll: PASS, none (`scrollY === 0` on load at all four widths).
+* Console errors: PASS, no new errors. Exactly one error present at every width, confirmed identical to the pre-existing `initBlock12` ("Live Google Places search") error already documented under Milestone 1's QA — not a regression.
+* Duplicate-section check: PASS — exactly one `.hero-scenic`, one `#moodCards`, one `#hiddenGems`, and one `#exploreRegions` on the page.
+* Section order: PASS — `#hiddenGems` correctly precedes `#exploreRegions` in the rendered page, matching the approved architecture's item 3-then-4 order. (Both sections' position relative to the wizard/search is unchanged from Milestone 1 and is not part of this milestone's scope.)
+* Existing deeper homepage functionality: PASS — wizard/search (`#searchInput`), trip tray (`#tripTray`), map (`#okMap`), sitemap (`/sitemap.xml`), and robots.txt all confirmed present/working, unmodified.
+
+**Known limitations:**
+* All Explore the Okanagan and Hidden-Gems-adjacent imagery referenced by this milestone (the 8 new `public/images/regions/*.png` files) are temporary generated placeholders, not final AI-generated or real photography — see `public/images/PLACEHOLDER_IMAGES.md` for exact replacement paths/dimensions.
+* The pre-existing `initBlock12` console error and the pre-existing `okanagan.db`/`great_groups` local-fixture issue (both documented under Milestone 1) remain unresolved, as neither directly blocks this milestone beyond what was already noted.
+* Full architectural reordering (Hidden Gems/Explore the Okanagan moving ahead of the wizard, Build Your Trip CTA, Weather de-emphasis, Spotlight/Featured retirement) remains for a future milestone, per `docs/HOMEPAGE_IMPLEMENTATION_PLAN.md`.
+
+**Readiness assessment: Claude considers Milestone 2 ready for review.**
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
@@ -118,3 +157,4 @@ This file is the shared coordination point for AI assistants working on this rep
 * 2026-09-08 — Claude reviewed current repository/production state and identified continued location enrichment (152 active venues missing address/lat/lng) as the highest-priority next task; added details and a suggested approach under Open Tasks.
 * 2026-09-08 — Claude executed the ready 11-venue enrichment batch (IDs 469, 841, 857, 863, 907, 918, 967, 1000, 1002, 1004, 1041). All 11 succeeded with zero anomalies. Complete-location count: 900 → 911. Missing-location count: 152 → 141. Active/redirect counts and all 17 redirects confirmed unchanged. Manifest intentionally left unchanged (separate task).
 * 2026-09-16 — Claude completed final rendered QA for homepage redesign Milestone 1 (scenic hero + "What are you in the mood for?", branch `feature/homepage-milestone-1-hero-mood`, commit `3bf5eb8`). All checks PASS at 1440×900/1280×800/390×844/375×812: hero and mood-card visuals, all six mood-card links, hero search, no horizontal overflow, no unexpected auto-scroll, no duplicate sections, and no new console errors (one pre-existing, unrelated `initBlock12` error confirmed present on `main` too). Milestone 1 considered ready for review. Separately flagged: the branch's (and `main`'s) committed `okanagan.db` fixture currently crashes the server (`no such column: great_groups`), unrelated to this milestone.
+* 2026-09-16 — Claude implemented and QA'd homepage redesign Milestone 2 (Hidden Gems editorial redesign + Explore the Okanagan visual destinations) on `feature/homepage-milestone-1-hero-mood`, built on top of Milestone 1. TDD: new tests written and confirmed failing before implementation. 63/63 tests passing. Hidden Gems: rating de-emphasized, editorial blurb given visual priority, moved to a static larger grid; same real query/data and approved blurbs reused unchanged. Explore the Okanagan: promoted to a major photo-led destination-card grid (new `.region-card` family, isolated from Browse by Category's shared tiles), same curated region data/taglines reused unchanged; 8 new placeholder images added. Found and fixed one pre-existing, milestone-blocking bug (missing `.compact-band` height rule on the homepage stylesheet, scoped fix only). All rendered QA PASS at the four standard viewports: visuals, all functional links, no horizontal overflow, no auto-scroll, no new console errors (same pre-existing `initBlock12` error only), no duplicate sections, correct Hidden-Gems-before-Explore order. Milestone 2 considered ready for review.
