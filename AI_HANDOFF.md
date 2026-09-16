@@ -150,6 +150,42 @@ This file is the shared coordination point for AI assistants working on this rep
 
 **Readiness assessment: Claude considers Milestone 2 ready for review.**
 
+### Claude — Milestone 3 (Build Your Perfect Okanagan Trip + Browse/Search repositioning) implementation + QA (2026-09-16)
+
+* **Status: implemented, tested, QA'd. Remains UNCOMMITTED on `feature/homepage-milestone-1-hero-mood` — working-tree changes only, not yet staged or committed, pending explicit authorization.**
+* **Scope:** items 5 and 6 of the approved homepage architecture — "Build Your Perfect Okanagan Trip" (a new large immersive CTA) and Browse/Search (repositioning/reframing the existing wizard), plus the associated homepage hierarchy change this requires. Hero, Mood, Hidden Gems, and Explore the Okanagan (Milestones 1-2) were not touched.
+* **Final section order (now matches the approved architecture in full):** Hero → Mood → Hidden Gems → Explore the Okanagan → Build Your Perfect Okanagan Trip → Browse/Search (`#directory`) → existing deeper directory content (Happening Soon, Browse by Category, Weather, Spotlight, Featured, Results, etc., unchanged and unmoved relative to each other).
+
+**1. Build Your Perfect Okanagan Trip:**
+* New `renderBuildTripCTAHTML()` — a large immersive section with a placeholder background image, heading, supporting copy, and two actions: "Start building your trip" and "View the interactive map."
+* Reuses the existing trip-tray (`#tripTrayToggle`/`#tripTrayPanel`, `localStorage`-backed) and Leaflet map (`#mapToggleBtn`/`#mapPanel`) exactly as they already work — no new trip data model, no new panel, no change to the existing multi-stop Google Maps route logic. The two CTA buttons are a few lines of orchestration only: they open the real, existing panels rather than reimplementing anything.
+
+**2. Browse/Search repositioning:**
+* The existing wizard (`#directory`) itself — its markup, IDs, filter/search/results logic — is completely unchanged.
+* A new "Browse & Search the Okanagan" heading (matching the visual language of every other section) was added directly above the existing search box, purely additive, to reframe the wizard as a deliberate deeper-discovery section rather than the page's dominant opening.
+* The wizard physically moved later in the page (after Build Your Trip) via the same anchor-splice technique already used for every prior reorder — no rewrite of its internal behavior.
+
+**Bug found and fixed during QA (real interaction bug, not pre-existing):** the "Start building your trip" button correctly opened the trip tray on click, but the button's own click event then continued bubbling up to a pre-existing, unrelated document-level "click outside closes the tray" listener, which immediately closed what was just opened. Fixed with a single `e.stopPropagation()` call in the Milestone 3 CTA click handler in `public/scripts/app.js` — no change to the trip tray's own logic, data model, or `localStorage` behavior. Full regression suite re-run after the fix: **65/65 passing.**
+
+**Rendered QA at 1440×900, 1280×800, 390×844, 375×812 — all PASS:**
+* Build Your Perfect Okanagan Trip: visual result and functional behavior (both buttons, verified against a freshly-cached browser profile after first misdiagnosing a stale-cache false negative) PASS at all four widths.
+* Browse/Search: visual result (new heading) and functional behavior (existing search still returns correct filtered results) PASS.
+* Trip planner and map: both confirmed to open the real, existing panels correctly; no new state introduced.
+* Horizontal overflow: PASS, none at any width.
+* Unexpected page-load auto-scroll: PASS, none.
+* Duplicate IDs/content: PASS — exactly one each of `.hero-scenic`, `#moodCards`, `#hiddenGems`, `#exploreRegions`, `#buildTrip`, `#directory`; zero duplicate element IDs page-wide.
+* Console errors: PASS, no new errors. Exactly one error present at every width, confirmed identical to the pre-existing `initBlock12` ("Live Google Places search") error already documented under Milestones 1-2 — unrelated, not changed by this milestone.
+* Links/assets: PASS — golf category page, a Hidden Gems venue page, a region page, the new region image, the new `trip-cta.png` image, `sitemap.xml`, and `robots.txt` all verified 200.
+
+**Known limitations:**
+* `public/images/trip-cta.png` is a temporary generated placeholder, not final photography — documented in `public/images/PLACEHOLDER_IMAGES.md`.
+* A pre-existing, unrelated cosmetic issue was observed (not fixed, not introduced by this milestone): the floating "Open Now" pill (a fixed-position element from earlier work) visually overlaps section eyebrow text at certain scroll positions on mobile — same category of pre-existing floating-badge behavior noted in earlier milestones.
+* The pre-existing `initBlock12` console error and the pre-existing `okanagan.db`/`great_groups` local-fixture issue (documented under Milestone 1) remain unresolved and unrelated.
+
+**No schema changes, no API changes, no changes to Hero/Mood/Hidden Gems/Explore the Okanagan. No deploy, no merge, no change to main, no Railway configuration change, no database change.**
+
+**Readiness assessment: Claude considers Milestone 3 ready for review. It remains uncommitted on `feature/homepage-milestone-1-hero-mood`, pending explicit authorization to commit and push.**
+
 ## Change Log
 
 * 2026-09-08 — Initial shared AI handoff file created to establish coordination between Claude and ChatGPT.
@@ -158,3 +194,4 @@ This file is the shared coordination point for AI assistants working on this rep
 * 2026-09-08 — Claude executed the ready 11-venue enrichment batch (IDs 469, 841, 857, 863, 907, 918, 967, 1000, 1002, 1004, 1041). All 11 succeeded with zero anomalies. Complete-location count: 900 → 911. Missing-location count: 152 → 141. Active/redirect counts and all 17 redirects confirmed unchanged. Manifest intentionally left unchanged (separate task).
 * 2026-09-16 — Claude completed final rendered QA for homepage redesign Milestone 1 (scenic hero + "What are you in the mood for?", branch `feature/homepage-milestone-1-hero-mood`, commit `3bf5eb8`). All checks PASS at 1440×900/1280×800/390×844/375×812: hero and mood-card visuals, all six mood-card links, hero search, no horizontal overflow, no unexpected auto-scroll, no duplicate sections, and no new console errors (one pre-existing, unrelated `initBlock12` error confirmed present on `main` too). Milestone 1 considered ready for review. Separately flagged: the branch's (and `main`'s) committed `okanagan.db` fixture currently crashes the server (`no such column: great_groups`), unrelated to this milestone.
 * 2026-09-16 — Claude implemented and QA'd homepage redesign Milestone 2 (Hidden Gems editorial redesign + Explore the Okanagan visual destinations) on `feature/homepage-milestone-1-hero-mood`, built on top of Milestone 1. TDD: new tests written and confirmed failing before implementation. 63/63 tests passing. Hidden Gems: rating de-emphasized, editorial blurb given visual priority, moved to a static larger grid; same real query/data and approved blurbs reused unchanged. Explore the Okanagan: promoted to a major photo-led destination-card grid (new `.region-card` family, isolated from Browse by Category's shared tiles), same curated region data/taglines reused unchanged; 8 new placeholder images added. Found and fixed one pre-existing, milestone-blocking bug (missing `.compact-band` height rule on the homepage stylesheet, scoped fix only). All rendered QA PASS at the four standard viewports: visuals, all functional links, no horizontal overflow, no auto-scroll, no new console errors (same pre-existing `initBlock12` error only), no duplicate sections, correct Hidden-Gems-before-Explore order. Milestone 2 considered ready for review.
+* 2026-09-16 — Claude implemented and QA'd homepage redesign Milestone 3 (Build Your Perfect Okanagan Trip CTA + Browse/Search repositioning) on `feature/homepage-milestone-1-hero-mood`, built on top of Milestone 2 — remains uncommitted, pending authorization. Final section order now matches the full approved architecture: Hero → Mood → Hidden Gems → Explore the Okanagan → Build Your Perfect Okanagan Trip → Browse/Search (`#directory`) → existing deeper directory content. The new CTA reuses the existing trip tray, map, `localStorage`, and Google Maps route entirely — no new trip data model. The wizard's own search/filter/results behavior is unchanged; only a new reframing heading was added above it. Found and fixed one real interaction bug during QA: the CTA's "Start building your trip" click bubbled into the existing document-level outside-click handler and immediately closed the trip tray it had just opened; fixed with a single `e.stopPropagation()` in the Milestone 3 handler in `public/scripts/app.js`. Full regression suite re-run after the fix: 65/65 passing. Rendered QA PASS at 1440×900/1280×800/390×844/375×812: no horizontal overflow, no duplicate IDs/content, all representative links/assets/sitemap/robots checks passed, no new console errors (same pre-existing `initBlock12` error only). One pre-existing, unrelated cosmetic issue observed and left unchanged: the floating "Open Now" pill overlaps section eyebrow text at some mobile scroll positions. No schema/API/database/Railway/main changes. Milestone 3 considered ready for review, still uncommitted.

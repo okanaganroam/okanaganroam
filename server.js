@@ -1557,6 +1557,37 @@ function renderExploreRegionsHTML() {
 // would 404 -- the card itself always renders; only its destination is
 // conditional, since the six cards are a fixed design, not a
 // data-driven list like Browse by Category.
+
+// Milestone 3 (approved homepage redesign): "Build Your Perfect Okanagan
+// Trip" -- a large immersive CTA, deliberately NOT a new itinerary
+// builder. Zero database queries, zero new state: both buttons drive the
+// real, already-working trip-tray (#tripTrayToggle/#tripTrayPanel,
+// localStorage-backed, unchanged) and map (#mapToggleBtn/#mapPanel,
+// Leaflet, unchanged) elements that already exist elsewhere on this page
+// -- see the "Build Your Trip CTA" block in app.js for the few lines of
+// orchestration (open the existing panel; don't reimplement it). No new
+// trip data model, no new IDs for trip/map state.
+function renderBuildTripCTAHTML() {
+  return `
+<section class="discover-section trip-cta-section" id="buildTrip">
+  <div class="wrap trip-cta-inner">
+    <div class="trip-cta-media" aria-hidden="true">
+      <img class="trip-cta-img" src="/images/trip-cta.png" width="1920" height="1080" alt="" loading="lazy">
+      <div class="trip-cta-scrim"></div>
+    </div>
+    <div class="trip-cta-content">
+      <span class="trip-cta-eyebrow">Plan your visit</span>
+      <h2 class="trip-cta-title">Build Your Perfect Okanagan Trip</h2>
+      <p class="trip-cta-lead">Save the places that catch your eye as you browse, then get one route across every stop in Google Maps -- no account, no separate planning app.</p>
+      <div class="trip-cta-actions">
+        <button type="button" class="trip-cta-btn" id="tripCtaOpenTrip">Start building your trip</button>
+        <a class="trip-cta-map-link" href="#mapPanel" id="tripCtaOpenMap">View the interactive map</a>
+      </div>
+    </div>
+  </div>
+</section>`;
+}
+
 function renderMoodCardsHTML() {
   const rows = db.prepare(`
     SELECT type, region, COUNT(*) AS n
@@ -1859,6 +1890,68 @@ function renderHomepageDiscoveryStyles() {
       display: flex; overflow-x: auto; gap: 12px; margin-top: 12px; padding-bottom: 4px;
     }
     .mood-card-secondary { flex: 0 0 62%; aspect-ratio: 4 / 3; }
+  }
+
+  /* Milestone 3: Build Your Perfect Okanagan Trip -- large immersive CTA,
+     matching the hero's full-bleed image + scrim treatment rather than
+     inventing a third visual pattern. Deliberately not a card grid: this
+     is one focal section, not a set of options. */
+  .trip-cta-section { padding: 0; }
+  .trip-cta-inner {
+    position: relative; overflow: hidden; border-radius: 20px;
+    min-height: 420px; display: flex; align-items: center; color: #fff;
+  }
+  .trip-cta-media { position: absolute; inset: 0; z-index: 0; }
+  .trip-cta-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .trip-cta-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, rgba(20,14,10,0.82) 0%, rgba(20,14,10,0.35) 65%, rgba(20,14,10,0.15) 100%);
+  }
+  .trip-cta-content { position: relative; z-index: 1; padding: 48px; max-width: 560px; }
+  .trip-cta-eyebrow {
+    display: inline-block; font-weight: 700; font-size: 0.82rem;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--amber);
+  }
+  .trip-cta-title {
+    font-family: 'Fraunces', serif; font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+    line-height: 1.15; margin: 10px 0 14px; color: #fff;
+  }
+  .trip-cta-lead {
+    font-family: 'Nunito', sans-serif; font-size: 1rem; line-height: 1.55;
+    margin: 0 0 26px; color: rgba(255,255,255,0.92);
+  }
+  .trip-cta-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+  .trip-cta-btn {
+    border: none; background: var(--plum); color: #fff; font-weight: 700;
+    font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 14px 26px;
+    border-radius: 999px; cursor: pointer; transition: background-color .15s ease;
+  }
+  .trip-cta-btn:hover { background: var(--plum-dark); }
+  .trip-cta-map-link {
+    color: #fff; font-weight: 700; font-family: 'Nunito', sans-serif; font-size: 0.92rem;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  @media (max-width: 640px) {
+    .trip-cta-inner { min-height: 360px; border-radius: 16px; }
+    .trip-cta-content { padding: 32px 24px; max-width: 100%; }
+  }
+
+  /* Milestone 3: Browse/Search de-emphasis heading. Purely additive --
+     the wizard's own markup/behavior right below this is unchanged. Same
+     discover-heading language as every other section, so this reads as a
+     natural next section rather than a distinct "command bar". */
+  .browse-search-heading { margin-bottom: 16px; }
+  .browse-search-heading .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.82rem;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--teal); margin-bottom: 8px;
+  }
+  .browse-search-heading .eyebrow::before { content: ""; width: 20px; height: 2px; background: var(--teal); display: inline-block; }
+  .browse-search-heading h2 {
+    font-family: 'Fraunces', serif; font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin: 6px 0 8px;
+  }
+  .browse-search-lead {
+    font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: rgba(42,32,25,0.72); margin: 0;
   }
 </style>`;
 }
@@ -2877,30 +2970,29 @@ const server = http.createServer(async (req, res) => {
         // injection approach as the three pieces above — computed once per
         // request, spliced into specific, uniquely-matched anchor points.
         //
-        // Milestone 1 (approved homepage redesign, hero + mood cards only):
-        // the static hero markup in okanagan.html moved from between the
-        // wizard and Weather to right after the header, ahead of the
-        // wizard, replacing the old "Worth the Drive" carousel. Mood cards
-        // are new and land immediately after the hero, ahead of the
-        // wizard. Happening Soon/Hidden Gems/Browse by category/Explore
-        // the Okanagan are unmodified by this milestone and keep the exact
-        // same relative order as before (happeningSoon, hiddenGems, then
-        // exploreByCategory, exploreRegions) — only their anchor point
-        // moved, from "before the old hero" to "after the wizard", since
-        // the hero itself is no longer physically between the wizard and
-        // Weather.
+        // Milestone 3 (approved homepage redesign — final section order):
+        // Hero -> Mood -> Hidden Gems -> Explore the Okanagan -> Build
+        // Your Trip -> Browse/Search (the wizard, id="directory") ->
+        // existing deeper directory content. Hidden Gems and Explore the
+        // Okanagan move from "after the wizard" (Milestones 1-2) to
+        // "before the wizard", alongside the new Build Your Trip CTA;
+        // Happening Soon and Browse by Category are unmodified and remain
+        // part of the existing deeper-directory content after the wizard,
+        // exactly as before — only Hidden Gems/Explore's anchor point
+        // moved, matching the approved architecture's explicit ordering.
         const discoveryStyles = renderHomepageDiscoveryStyles();
         const moodCards = renderMoodCardsHTML();
-        const happeningSoon = renderHappeningSoonHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
-        const exploreByCategory = renderExploreByCategoryHTML();
         const exploreRegions = renderExploreRegionsHTML();
+        const buildTripSection = renderBuildTripCTAHTML();
+        const happeningSoon = renderHappeningSoonHTML();
+        const exploreByCategory = renderExploreByCategoryHTML();
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${discoveryStyles}\n${moodCards}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${discoveryStyles}\n${moodCards}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
@@ -2908,7 +3000,7 @@ const server = http.createServer(async (req, res) => {
         if (html.includes(wizardToWeatherAnchor)) {
           html = html.replace(
             wizardToWeatherAnchor,
-            `</section>\n${happeningSoon}\n${hiddenGemsSection}\n${exploreByCategory}\n${exploreRegions}\n\n<section class="weather-banner" id="weatherBanner"`
+            `</section>\n${happeningSoon}\n${exploreByCategory}\n\n<section class="weather-banner" id="weatherBanner"`
           );
         }
 
@@ -3896,6 +3988,7 @@ module.exports = {
   renderHiddenGemsHomepageHTML,
   renderExploreByCategoryHTML,
   renderExploreRegionsHTML,
+  renderBuildTripCTAHTML,
   // Design Sprint 4 (Visual & Editorial Polish)
   CATEGORY_TAGLINES,
   REGION_TAGLINES,

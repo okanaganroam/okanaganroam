@@ -1780,6 +1780,42 @@ window.__scrollToVenueCard = function(name){
   });
 })();
 
+/* ---------- Milestone 3 (approved homepage redesign): "Build Your
+   Perfect Okanagan Trip" CTA. Both buttons drive the existing, unchanged
+   trip-tray (#tripTrayToggle/#tripTrayPanel, localStorage-backed) and map
+   (#mapToggleBtn/#mapPanel, Leaflet) -- no new trip data model, no new
+   panel, just opening what already exists elsewhere on the page. ---------- */
+(function(){
+  var openTripBtn = document.getElementById('tripCtaOpenTrip');
+  if (openTripBtn) {
+    openTripBtn.addEventListener('click', function(e){
+      // The trip tray's own click handling is a single document-level
+      // delegated listener that both opens it (click on the toggle) and
+      // closes it (click anywhere outside the panel). Without stopping
+      // propagation here, this button's own click keeps bubbling after
+      // toggle.click() already opens the tray, reaches that same
+      // delegated listener as an "outside click", and immediately closes
+      // what was just opened.
+      e.stopPropagation();
+      var toggle = document.getElementById('tripTrayToggle');
+      var panel = document.getElementById('tripTrayPanel');
+      if (toggle && panel && !panel.classList.contains('open')) toggle.click();
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  var openMapLink = document.getElementById('tripCtaOpenMap');
+  if (openMapLink) {
+    openMapLink.addEventListener('click', function(e){
+      e.preventDefault();
+      var toggle = document.getElementById('mapToggleBtn');
+      if (toggle && toggle.getAttribute('aria-pressed') !== 'true') toggle.click();
+      var panel = document.getElementById('mapPanel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+})();
+
 /* ---------- Floating tooltip for badges: measured live, so it can never be clipped by a card's rounded-corner overflow, and never runs off the edge of the screen ---------- */
 (function(){
   var tooltip = document.getElementById('floatingTooltip');

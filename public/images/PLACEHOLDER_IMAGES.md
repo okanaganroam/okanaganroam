@@ -28,6 +28,7 @@ references these exact filenames.
 | `regions/osoyoos.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
 | `regions/summerland.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
 | `regions/naramata.png` | "Explore the Okanagan" destination card | 640×800 (or larger) | 4:5 |
+| `trip-cta.png` | "Build Your Perfect Okanagan Trip" CTA background | 1920×1080 (or larger) | 16:9 |
 
 Note: `regions/*.png` are destination-inspired placeholders, not photos of
 any specific business — real replacements should follow the same rule

@@ -445,6 +445,28 @@ test('Milestone 2: Explore the Okanagan tagline copy is unchanged by the visual 
   assert.match(html, /A quiet bench road lined with small, walkable wineries\./);
 });
 
+// ==== Homepage redesign Milestone 3 (Build Your Perfect Okanagan Trip +
+// Browse/Search repositioning) ==============================================
+
+test('Milestone 3: Build Your Perfect Okanagan Trip section renders with the approved heading and reuses the existing trip-tray/map controls', () => {
+  const html = app.renderBuildTripCTAHTML();
+  assert.match(html, /id="buildTrip"/);
+  assert.match(html, /Build Your Perfect Okanagan Trip/);
+  // Must reuse the EXISTING trip-tray/map infrastructure -- not new IDs
+  // duplicating that state -- so this CTA drives the real, already-working
+  // #tripTrayToggle/#tripTrayPanel and #mapToggleBtn/#mapPanel elements
+  // rather than reimplementing anything.
+  assert.match(html, /id="tripCtaOpenTrip"/);
+  assert.match(html, /id="tripCtaOpenMap"/);
+});
+
+test('Milestone 3: Build Your Perfect Okanagan Trip section does not introduce a new trip data model or duplicate trip-tray IDs', () => {
+  const html = app.renderBuildTripCTAHTML();
+  assert.doesNotMatch(html, /id="tripTray"/, 'must not duplicate the real #tripTray widget');
+  assert.doesNotMatch(html, /id="tripTrayPanel"/, 'must not duplicate the real #tripTrayPanel');
+  assert.doesNotMatch(html, /id="okMap"/, 'must not duplicate the real #okMap element');
+});
+
 // ==== Phase 2 Sprint 1 (Golf) =============================================
 // Golf is added purely as a new `venues.type` value — no schema change, no
 // new route code (the existing generic category/venue routes and render
@@ -752,6 +774,30 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   const exploreRegionImg = await fetch(`${base}/images/regions/kelowna.png`);
   assert.equal(exploreRegionImg.status, 200, 'Explore the Okanagan placeholder region image must be servable');
   assert.equal(exploreRegionImg.headers.get('content-type'), 'image/png');
+
+  // Milestone 3 (Build Your Perfect Okanagan Trip + Browse/Search
+  // repositioning) — the approved architecture's final section order:
+  // Hero -> Mood -> Hidden Gems -> Explore -> Build Trip -> Browse/Search
+  // (the wizard, id="directory") -> existing deeper directory content.
+  assert.match(homepageBody, /id="buildTrip"/, 'Build Your Perfect Okanagan Trip section (Milestone 3) must render');
+  const heroPos = homepageBody.indexOf('class="hero-scenic"');
+  const moodPos = homepageBody.indexOf('id="moodCards"');
+  const gemsPos = homepageBody.indexOf('id="hiddenGems"');
+  const explorePos = homepageBody.indexOf('id="exploreRegions"');
+  const tripPos = homepageBody.indexOf('id="buildTrip"');
+  const directoryPos = homepageBody.indexOf('id="directory"');
+  assert.ok(
+    heroPos < moodPos && moodPos < gemsPos && gemsPos < explorePos && explorePos < tripPos && tripPos < directoryPos,
+    `expected Hero < Mood < Hidden Gems < Explore < Build Trip < Browse/Search in page order, got positions ${JSON.stringify({ heroPos, moodPos, gemsPos, explorePos, tripPos, directoryPos })}`
+  );
+
+  // Browse/Search (the existing wizard) is repositioned and reframed, not
+  // rewritten -- its own functional markup (#directory, search box, wizard
+  // steps) must be completely unchanged; only a new de-emphasized heading
+  // is added ahead of it.
+  assert.match(homepageBody, /Browse (&amp;|&) [Ss]earch the Okanagan/, 'Browse/Search must have a reframing heading (Milestone 3)');
+  assert.match(homepageBody, /id="searchInput"/, 'existing search input must be unchanged');
+  assert.match(homepageBody, /id="wizardStep1"/, 'existing wizard step markup must be unchanged');
 
   const eventsApi = await fetch(`${base}/api/events`);
   const collectionsApi = await fetch(`${base}/api/collections`);
