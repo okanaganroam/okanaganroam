@@ -405,12 +405,6 @@ test('category tile links/slugs remain unchanged by the new tagline copy', () =>
   assert.match(html, new RegExp(`href="/kelowna/${app.CATEGORY_SLUGS.restaurant}"`));
 });
 
-test('approved region descriptions render on the homepage region tiles', () => {
-  const html = app.renderExploreRegionsHTML();
-  assert.match(html, /The valley&#39;s largest hub, with the widest spread of everything\./);
-  assert.match(html, /A quiet bench road lined with small, walkable wineries\./);
-});
-
 test('Kaleden, Coldstream, Lumby, and Baldy remain valid region links and receive no invented placeholder copy', () => {
   assert.equal(app.REGION_TAGLINES.kaleden, undefined);
   assert.equal(app.REGION_TAGLINES.coldstream, undefined);
@@ -420,26 +414,57 @@ test('Kaleden, Coldstream, Lumby, and Baldy remain valid region links and receiv
   assert.equal(app.CATEGORY_SLUGS.restaurant, 'restaurants'); // sanity: taxonomy machinery itself untouched
 });
 
-const MILESTONE_2_EXPLORE_REGIONS = ['kelowna', 'penticton', 'vernon', 'west-kelowna', 'oliver', 'osoyoos', 'summerland', 'naramata'];
+// Reference redesign (webpage design.png, decision #2): this exact set of 6
+// replaces Milestone 2's 8-region curated list. Oliver/Osoyoos/Summerland
+// keep their own region/category pages fully intact -- they just aren't one
+// of the 6 featured homepage destinations anymore.
+const REFERENCE_EXPLORE_REGIONS = ['kelowna', 'west-kelowna', 'lake-country', 'penticton', 'naramata', 'vernon'];
 
-test('Milestone 2: Explore the Okanagan homepage cards each include a real, servable placeholder image', () => {
+test('Reference redesign: Explore the Okanagan shows exactly the 6 approved featured destinations, including Lake Country', () => {
   const html = app.renderExploreRegionsHTML();
-  for (const region of MILESTONE_2_EXPLORE_REGIONS) {
-    assert.match(html, new RegExp(`src="/images/regions/${region}\\.png"`), `expected a placeholder destination image for ${region}`);
+  const regions = Array.from(html.matchAll(/class="region-card" href="\/([a-z-]+)"/g)).map((m) => m[1]);
+  assert.deepEqual(regions, REFERENCE_EXPLORE_REGIONS);
+});
+
+test('Reference redesign: Explore the Okanagan cards each include a real, servable destination image', () => {
+  const html = app.renderExploreRegionsHTML();
+  for (const region of REFERENCE_EXPLORE_REGIONS) {
+    assert.match(html, new RegExp(`src="/images/regions/${region}\\.png"`), `expected a destination image for ${region}`);
   }
 });
 
-test('Milestone 2: Explore the Okanagan cards still link to their real, unchanged region pages', () => {
+test('Reference redesign: Explore the Okanagan cards still link to their real, unchanged region pages', () => {
   const html = app.renderExploreRegionsHTML();
-  for (const region of MILESTONE_2_EXPLORE_REGIONS) {
+  for (const region of REFERENCE_EXPLORE_REGIONS) {
     assert.match(html, new RegExp(`href="/${region}"`), `expected a working link to /${region}`);
   }
 });
 
-test('Milestone 2: Explore the Okanagan tagline copy is unchanged by the visual redesign', () => {
+test('Reference redesign: Explore the Okanagan cards no longer show the old tagline copy (landscape name+arrow treatment)', () => {
   const html = app.renderExploreRegionsHTML();
-  assert.match(html, /The valley&#39;s largest hub, with the widest spread of everything\./);
-  assert.match(html, /A quiet bench road lined with small, walkable wineries\./);
+  assert.doesNotMatch(html, /region-card-tagline/, 'the reference treatment has no tagline on these cards');
+});
+
+test('Reference redesign: Oliver, Osoyoos, and Summerland are no longer in the featured homepage set, but keep their own real region pages', () => {
+  const html = app.renderExploreRegionsHTML();
+  assert.doesNotMatch(html, /href="\/oliver"/);
+  assert.doesNotMatch(html, /href="\/osoyoos"/);
+  assert.doesNotMatch(html, /href="\/summerland"/);
+  assert.equal(app.REGION_LABELS.oliver, 'Oliver', 'Oliver remains a valid, real region elsewhere on the site');
+  assert.equal(app.REGION_LABELS.osoyoos, 'Osoyoos', 'Osoyoos remains a valid, real region elsewhere on the site');
+  assert.equal(app.REGION_LABELS.summerland, 'Summerland', 'Summerland remains a valid, real region elsewhere on the site');
+});
+
+test('Reference redesign: Explore the Okanagan has no "see all regions" link, matching webpage design.png exactly', () => {
+  const html = app.renderExploreRegionsHTML();
+  assert.doesNotMatch(html, /discover-see-all/, 'the reference has no link below the card row -- the section ends right after it');
+  assert.doesNotMatch(html, /See all regions/);
+});
+
+test('Reference redesign: Explore the Okanagan arrow icon is a plain glyph, not a circular badge (distinct from the Hidden Gems cards\' own circle treatment)', () => {
+  const html = app.renderExploreRegionsHTML();
+  const arrowCount = (html.match(/class="region-card-arrow"/g) || []).length;
+  assert.equal(arrowCount, 6, 'expected exactly one arrow icon per destination card');
 });
 
 // ==== Homepage redesign Milestone 3 (Build Your Perfect Okanagan Trip +

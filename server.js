@@ -1515,34 +1515,32 @@ function renderExploreByCategoryHTML() {
 function renderExploreRegionsHTML() {
   // Zero database queries — a curated subset of the existing, authoritative
   // REGION_LABELS taxonomy (no new destination schema, nothing invented).
-  // Curated by real relative size (largest, most-visited regions), not
-  // arbitrarily. "See all regions" links back to the existing wizard's own
-  // region picker via its existing #directory anchor rather than a new
-  // route, since no standalone all-regions index page exists today.
+  // Each card links straight to its real, existing /:region page -- no
+  // new routes, no venue/database changes.
   //
-  // Milestone 2 (approved homepage redesign): promoted from a small text
-  // tile grid (still used as-is by Browse by Category, immediately above
-  // this section -- .category-tile/.category-tile-grid are untouched) to
-  // the "major visual destination section" the approved architecture spec
-  // calls for. Each card uses a new, distinct .region-card class (not
-  // .region-tile) specifically so this redesign cannot affect Browse by
-  // Category's shared .category-tile/.region-tile CSS at all. Images are
-  // temporary generated placeholders at public/images/regions/<region>.png
-  // -- see public/images/PLACEHOLDER_IMAGES.md -- not final photography;
-  // no venue-level image_url exists in this dataset to draw from instead
-  // (same constraint already documented for Milestone 1's imagery).
-  const curated = ['kelowna', 'penticton', 'vernon', 'west-kelowna', 'oliver', 'osoyoos', 'summerland', 'naramata'];
+  // Reference redesign (webpage design.png, decision #2): this exact set
+  // of 6 -- Kelowna, West Kelowna, Lake Country, Penticton, Naramata,
+  // Vernon -- replaces the earlier 8-region curated list, matching the
+  // reference's featured destinations exactly. Oliver/Osoyoos/Summerland
+  // keep their full region pages/data untouched elsewhere -- they simply
+  // don't appear in this featured homepage section anymore. Card markup
+  // is rewritten to a landscape name+arrow treatment (no tagline) to match
+  // the reference; .region-card-tagline/REGION_TAGLINES are no longer used
+  // by this section but are left defined since nothing else references
+  // removing them. The reference has no "see all regions" link under the
+  // grid (verified directly against webpage design.png) -- the section
+  // ends right after the card row, so that link is removed rather than
+  // kept pointing at a since-removed #directory anchor.
+  const curated = ['kelowna', 'west-kelowna', 'lake-country', 'penticton', 'naramata', 'vernon'];
   const cards = curated
     .filter((region) => REGION_LABELS[region])
     .map((region) => {
-      const tagline = REGION_TAGLINES[region]
-        ? `<span class="region-card-tagline">${escapeHtml(REGION_TAGLINES[region])}</span>`
-        : '';
       return `<a class="region-card" href="/${region}">
-      <img class="region-card-img" src="/images/regions/${region}.png" width="640" height="800" alt="" loading="lazy">
+      <img class="region-card-img" src="/images/regions/${region}.png" width="640" height="250" alt="" loading="lazy">
+      <span class="region-card-scrim" aria-hidden="true"></span>
       <span class="region-card-overlay">
         <span class="region-card-label">${escapeHtml(REGION_LABELS[region])}</span>
-        ${tagline}
+        <svg class="region-card-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </span>
     </a>`;
     })
@@ -1552,13 +1550,11 @@ function renderExploreRegionsHTML() {
 
   return `
 <section class="discover-section explore-section" id="exploreRegions">
-  <div class="wrap">
+  <div class="wrap-wide">
     <div class="discover-heading">
-      <span class="eyebrow">Destinations</span>
-      <h2>Explore the Okanagan</h2>
+      <h2>Explore by Destination</h2>
     </div>
     <div class="region-card-grid">${cards}</div>
-    <a class="cta secondary discover-see-all" href="#directory">See all regions</a>
   </div>
 </section>`;
 }
@@ -1793,39 +1789,54 @@ function renderHomepageDiscoveryStyles() {
     transition: border-color .15s ease, transform .15s ease;
   }
   .category-tile:hover, .region-tile:hover { border-color: var(--plum); transform: translateY(-2px); }
-  .discover-see-all { margin-top:16px; }
 
-  /* Milestone 2 (Explore the Okanagan visual redesign): a fresh
-     .region-card family, deliberately not reusing .region-tile/
+  /* Reference redesign (decision #2): landscape name+arrow cards (no
+     tagline), replacing Milestone 2's portrait 4:5 tagline treatment.
+     .region-card-tagline is kept defined (harmless, unused by this
+     section's markup now) rather than removed, since nothing else
+     references deleting it. Deliberately not reusing .region-tile/
      .category-tile, so Browse by Category's existing tiles are
-     completely unaffected. Matches Milestone 1's mood-card visual
-     language (full-bleed placeholder image, bottom gradient-scrim
-     overlay, serif label) for a consistent premium feel across both
-     sections. */
+     completely unaffected. */
   .region-card-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
   .region-card {
-    position: relative; display: block; border-radius: 16px; overflow: hidden;
+    position: relative; display: block; border-radius: 10px; overflow: hidden;
     text-decoration: none; color: #fff;
     box-shadow: 0 10px 22px -16px rgba(74,52,40,0.4);
-    aspect-ratio: 4 / 5;
+    aspect-ratio: 2.56 / 1;
   }
   .region-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
   .region-card:hover .region-card-img { transform: scale(1.045); }
-  .region-card-overlay {
-    position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 20px; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(20,14,10,0.78) 100%);
+  .region-card-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(20,14,10,0) 45%, rgba(20,14,10,0.72) 100%);
   }
-  .region-card-label { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 700; display: block; }
+  .region-card-overlay {
+    position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 10px 12px; gap: 8px;
+  }
+  .region-card-label { font-family: 'Fraunces', serif; font-size: 0.95rem; font-weight: 700; display: block; }
   .region-card-tagline {
     display: block; font-family: 'Nunito', sans-serif; font-size: 0.82rem;
     margin-top: 4px; color: rgba(255,255,255,0.9); line-height: 1.4;
   }
-
-  @media (min-width: 640px) {
-    .region-card-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Reference redesign: the arrow is a plain white glyph with a soft drop
+     shadow for legibility over the photo, not a solid circular badge
+     (which is the Hidden Gems cards' own distinct treatment -- kept
+     separate on purpose, see .hidden-gem-card-arrow). */
+  .region-card-arrow {
+    flex-shrink: 0; width: 18px; height: 18px; color: #fff;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
   }
-  @media (min-width: 1100px) {
-    .region-card-grid { grid-template-columns: repeat(4, 1fr); }
+
+  /* Reference redesign, forensic-comparison rebuild: all 6 destination
+     cards in ONE row at desktop (measured ~2.56:1 aspect each), replacing
+     the earlier 1/2/3-column responsive grid that made each card much
+     taller than the reference's short landscape strip. */
+  @media (min-width: 480px) {
+    .region-card-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (min-width: 900px) {
+    .region-card-grid { grid-template-columns: repeat(6, 1fr); }
   }
 
   @media (max-width: 640px) {
