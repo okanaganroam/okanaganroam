@@ -52,6 +52,10 @@ const newColumns = [
   ['slug', 'TEXT'],
   ['latitude', 'REAL'],
   ['longitude', 'REAL'],
+  ['great_groups', 'INTEGER DEFAULT 0'],
+  ['happy_hour', 'INTEGER DEFAULT 0'],
+  ['hours', 'TEXT'],
+  ['description_fr', 'TEXT'],
 ];
 for (const [col, type] of newColumns) {
   if (!existingCols.includes(col)) {
