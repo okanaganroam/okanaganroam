@@ -16,4 +16,20 @@
     --pub: #4A6741;
     --ink: #4A3428;
     --paper: #FFFCF6;
+
+    /* Homepage reference redesign (webpage design.png) -- additive only.
+       These do NOT replace any value above: every existing token keeps
+       its original value, so SEO pages (region/category/venue/guide),
+       the existing wizard/filter chips, and anything else still using
+       --sand/--plum/--teal/--ink is completely unaffected. These new
+       tokens are used only by the homepage's own header/hero/card
+       styling (okanagan.html + the homepage's injected <style> block in
+       server.js), which use distinct class names not shared with any
+       other page. */
+    --ref-cream: #F5F3ED;
+    --ref-cream-deep: #EAE6D9;
+    --ref-navy: #1B2B3A;
+    --ref-navy-deep: #101B24;
+    --ref-gold: #C9A227;
+    --ref-white: #FFFFFF;
 }

@@ -302,63 +302,60 @@ test('render404Page returns a 404-flavored page for an unknown path', () => {
 
 // ==== Design Sprint 4 (Visual & Editorial Polish) ==========================
 
-test('all six approved Hidden Gems render on the homepage module, each with its approved blurb, no duplicates', () => {
+// Content-model change (2026-09-17): the Hidden Gems homepage section is
+// now 3 fixed editorial theme cards (Dog-Friendly Finds/Local Favourites/
+// Secret Spots) with dedicated photography, not 3 real venues picked live
+// by rating. The underlying hidden_gem collection/membership query and
+// per-venue card renderer (hiddenGemHomepageCardHtml) still exist and are
+// tested directly below -- they're just no longer called by
+// renderHiddenGemsHomepageHTML().
+
+test('exactly 3 Hidden Gems editorial cards render, in the approved order, each with real dedicated artwork', () => {
   const html = app.renderHiddenGemsHomepageHTML();
-  for (const fixture of ds4GemFixtures) {
-    assert.match(html, new RegExp(fixture.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `expected ${fixture.name} to render`);
-  }
-  for (const slug of Object.keys(app.HIDDEN_GEM_HOMEPAGE_BLURBS)) {
-    // escapeHtml converts apostrophes to &#39; in the rendered output, so
-    // match against a normalized (entity-encoded) copy of the approved
-    // blurb rather than the raw source string.
-    const expectedSnippet = app.HIDDEN_GEM_HOMEPAGE_BLURBS[slug]
-      .slice(0, 40)
-      .replace(/'/g, '&#39;')
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    assert.match(html, new RegExp(expectedSnippet), `expected approved blurb for ${slug} to render`);
-  }
   const cardCount = (html.match(/class="hidden-gem-card"/g) || []).length;
-  assert.equal(cardCount, 6, 'expected exactly 6 cards, no duplicates, and the redirected fixture excluded');
+  assert.equal(cardCount, 3, 'expected exactly 3 cards');
+  assert.match(html, /Dog-Friendly Finds/);
+  assert.match(html, /Local Favourites/);
+  assert.match(html, /Secret Spots/);
+  assert.match(html, /src="\/images\/hidden-gems\/dog-friendly\.png"/);
+  assert.match(html, /src="\/images\/hidden-gems\/local-favourites\.png"/);
+  assert.match(html, /src="\/images\/hidden-gems\/secret-spots\.png"/);
 });
 
-test('Hidden Gems homepage cards include the compact visual band', () => {
+test('Hidden Gems editorial cards all link to #directory (no fabricated per-theme venue list)', () => {
   const html = app.renderHiddenGemsHomepageHTML();
-  assert.match(html, /compact-band compact-band-cafe/);
-  assert.match(html, /compact-band compact-band-brewery/);
+  const hrefs = Array.from(html.matchAll(/class="hidden-gem-card" href="([^"]*)"/g)).map((m) => m[1]);
+  assert.deepEqual(hrefs, ['#directory', '#directory', '#directory']);
 });
 
-test('Hidden Gems homepage badge appears in the intended overlapping position (own dedicated class, not duplicated)', () => {
+test('Hidden Gems editorial cards have no badge/region-chip, just an inline pin before the title', () => {
   const html = app.renderHiddenGemsHomepageHTML();
-  const badgeCount = (html.match(/hidden-gem-card-badge/g) || []).length;
-  assert.equal(badgeCount, 6, 'expected exactly one badge per card, not zero and not duplicated');
+  assert.doesNotMatch(html, /hidden-gem-card-badge/);
+  const pinCount = (html.match(/class="hidden-gem-card-pin"/g) || []).length;
+  assert.equal(pinCount, 3, 'expected exactly one inline pin icon per card');
 });
 
-test('Hidden Gems homepage venue links remain canonical', () => {
+test('Hidden Gems editorial cards de-emphasize rating -- no star-rating glyph', () => {
   const html = app.renderHiddenGemsHomepageHTML();
+  assert.doesNotMatch(html, /★/);
+});
+
+test('Hidden Gems heading includes the subtitle and a "view all" link', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  assert.match(html, /Less crowds\. More Okanagan\./);
+  assert.match(html, /discover-heading-link/);
+});
+
+// The previous per-venue card renderer is unused by the homepage now, but
+// stays defined/exported and directly tested -- still real, correct
+// behavior that could back a future "view all hidden gems" page.
+test('hiddenGemHomepageCardHtml still renders a real approved venue correctly (unused by the homepage, still directly testable)', () => {
+  const gelato = app.findVenueBySlug('naramata', 'cafe', 'chabendo-gelato');
+  const html = app.hiddenGemHomepageCardHtml(gelato);
   assert.match(html, /href="\/naramata\/cafes\/chabendo-gelato"/);
-  assert.match(html, /href="\/kelowna\/breweries\/buffalo-rouge-brewing-co"/);
-});
-
-test('a venue with stale hidden-gem membership that is also redirected never appears on the homepage module', () => {
-  const html = app.renderHiddenGemsHomepageHTML();
-  assert.doesNotMatch(html, /DS4 Redirected Gem/);
-});
-
-// ==== Homepage redesign Milestone 2 (Hidden Gems editorial + Explore the
-// Okanagan visual destinations) =============================================
-
-test('Milestone 2: Hidden Gems homepage cards de-emphasize rating -- no star-rating glyph in the editorial redesign', () => {
-  const html = app.renderHiddenGemsHomepageHTML();
-  assert.doesNotMatch(html, /★/, 'expected the rating star glyph to be removed from the editorial Hidden Gems cards');
-});
-
-test('Milestone 2: Hidden Gems homepage still reuses the same real query/data and approved blurbs (unchanged)', () => {
-  const html = app.renderHiddenGemsHomepageHTML();
-  for (const fixture of ds4GemFixtures) {
-    assert.match(html, new RegExp(fixture.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `expected ${fixture.name} to still render`);
-  }
-  const cardCount = (html.match(/class="hidden-gem-card"/g) || []).length;
-  assert.equal(cardCount, 6, 'the editorial redesign must not change which venues render or introduce duplicates');
+  assert.match(html, /Chabendo Gelato/);
+  assert.match(html, /hidden-gem-card-img" src="\/images\/mood\/eat\.png"/, 'cafe type maps to the Food & Drink mood image');
+  assert.doesNotMatch(html, /★/);
 });
 
 test('related/nearby venue cards include the compact visual band', () => {

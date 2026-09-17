@@ -30,6 +30,11 @@
   button{ font-family:inherit; }
 
   .wrap{ max-width:1180px; margin:0 auto; padding:0 32px; }
+  /* Homepage reference redesign: a wider content column for full-bleed
+     discovery sections like Hidden Gems, scoped to its own class so
+     .wrap (the wizard/results/list-venue/footer) is completely
+     unaffected. */
+  .wrap-wide{ max-width:1360px; margin:0 auto; padding:0 24px; }
 
   a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
     outline: 3px solid var(--teal);

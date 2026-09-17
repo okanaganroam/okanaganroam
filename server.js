@@ -879,34 +879,59 @@ function compactVisualBandHtml(type, opts = {}) {
   return `<div class="compact-band compact-band-${type} ${sizeClass}"><span class="compact-band-label">${escapeHtml(label)}</span></div>`;
 }
 
-// Design Sprint 4: the Hidden Gems homepage card has a genuinely
-// different structure from the shared venueCardHtml() (compact band,
-// badge overlapping the band, a short blurb instead of the full
-// description) -- kept as its own function rather than adding several
-// new conditional branches to venueCardHtml(), so that function's
-// existing behavior on category/guide pages is completely unaffected.
+// Reference redesign (webpage design.png): each Hidden Gem's own
+// venue.image_url is empty for every approved gem (no per-venue
+// photography exists), and decision #8 explicitly forbids fabricating a
+// photograph of a specific business. Reusing the matching mood-category
+// image as the card's photo backdrop is real, already-approved creative
+// (not a stand-in for a fake business photo) and keeps the visual
+// treatment the reference calls for without inventing anything.
+const HIDDEN_GEM_TYPE_IMAGE = {
+  winery: '/images/mood/drink.png',
+  restaurant: '/images/mood/eat.png',
+  cafe: '/images/mood/eat.png',
+  brewery: '/images/mood/eat.png',
+  pub: '/images/mood/eat.png',
+  cocktail: '/images/mood/eat.png',
+  golf: '/images/mood/golf.png',
+};
+
+// Design Sprint 4 / reference redesign: the Hidden Gems homepage card has
+// a genuinely different structure from the shared venueCardHtml() (full-
+// bleed photo, bottom-overlay text, a short blurb instead of the full
+// description) -- kept as its own function rather than adding several new
+// conditional branches to venueCardHtml(), so that function's existing
+// behavior on category/guide pages is completely unaffected.
+// NOT currently called by the homepage (see the content-model change note
+// above hiddenGemEditorialCardHtml()) -- kept defined and exported since
+// it's still real, correct, independently-tested behavior that could
+// back a future "view all hidden gems" page.
 function hiddenGemHomepageCardHtml(venue) {
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : '#';
-  const regionLabel = REGION_LABELS[venue.region] || venue.region;
   // Milestone 2 (Hidden Gems editorial redesign): the rating is
   // deliberately no longer shown here -- the approved architecture spec
   // calls for de-emphasizing directory-style metadata (ratings/hours) so
-  // the editorial blurb, not a number, carries the card. The region label
-  // alone is kept as light orientation, not a review-style stat line. The
-  // underlying query/data and the rating value itself are untouched --
-  // venue.rating is still used elsewhere (e.g. ORDER BY in the query
-  // above, category/venue pages) exactly as before.
-  const meta = regionLabel;
+  // the editorial blurb, not a number, carries the card. The underlying
+  // query/data and the rating value itself are untouched -- venue.rating
+  // is still used elsewhere (e.g. ORDER BY in the query above,
+  // category/venue pages) exactly as before.
   const blurb = HIDDEN_GEM_HOMEPAGE_BLURBS[venue.slug] || (venue.description || '').split('.').slice(0, 1).join('.') + '.';
+  const img = HIDDEN_GEM_TYPE_IMAGE[venue.type] || '/images/mood/hidden-gems.png';
+  // Reference redesign, forensic-comparison rebuild: the reference card
+  // has no top-right region chip and no "Hidden Gem" badge at all -- just
+  // a small pin glyph directly before the venue name on one line, a
+  // one-line description below it, and the circular arrow button. The
+  // region label (previously shown as a separate chip) is dropped rather
+  // than kept unused.
   return `<a class="hidden-gem-card" href="${href}">
-    ${compactVisualBandHtml(venue.type)}
-    <span class="chip hidden-gem-badge hidden-gem-card-badge">\u{1F48E} Hidden Gem</span>
-    <div class="hidden-gem-card-body">
-      <h3>${escapeHtml(venue.name)}</h3>
-      <div class="hidden-gem-card-meta">${escapeHtml(meta)}</div>
+    <img class="hidden-gem-card-img" src="${img}" width="640" height="196" alt="" loading="lazy">
+    <span class="hidden-gem-card-scrim" aria-hidden="true"></span>
+    <span class="hidden-gem-card-body">
+      <h3><svg class="hidden-gem-card-pin" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-7.5 7-12.5A7 7 0 0 0 5 8.5C5 13.5 12 21 12 21z"/><circle cx="12" cy="8.5" r="2.4"/></svg>${escapeHtml(venue.name)}</h3>
       <p>${escapeHtml(blurb)}</p>
-    </div>
+    </span>
+    <span class="hidden-gem-card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
   </a>`;
 }
 
@@ -1413,29 +1438,63 @@ function renderHappeningSoonHTML() {
 </section>`;
 }
 
+// Content-model change (2026-09-17): the Hidden Gems homepage section
+// moved from "3 real top-rated venues, picked live by rating" to 3 fixed
+// editorial theme cards with their own dedicated photography. This is
+// deliberate -- these three are themes (Dog-Friendly Finds/Local
+// Favourites/Secret Spots), not individual venue spotlights, so they no
+// longer point at a specific venue's canonical page (there isn't one
+// venue behind a theme); all three link to #directory, the same anchor
+// "View all hidden gems" and "Explore all categories" already use
+// elsewhere on this page, so browsing is still one real, working click
+// away. The underlying hidden_gem collection/membership data, the 6
+// individually-approved gems, and their own venue pages are completely
+// untouched -- see hiddenGemHomepageCardHtml()/HIDDEN_GEM_TYPE_IMAGE/
+// HIDDEN_GEM_HOMEPAGE_BLURBS just below, kept defined and exported (still
+// directly tested) even though the homepage no longer calls them.
+const HIDDEN_GEM_EDITORIAL_CARDS = [
+  {
+    title: 'Dog-Friendly Finds',
+    blurb: 'Patios and trails where your dog belongs.',
+    img: '/images/hidden-gems/dog-friendly.png',
+  },
+  {
+    title: 'Local Favourites',
+    blurb: 'The spots locals keep coming back to.',
+    img: '/images/hidden-gems/local-favourites.png',
+  },
+  {
+    title: 'Secret Spots',
+    blurb: 'Quiet corners away from the crowds.',
+    img: '/images/hidden-gems/secret-spots.png',
+  },
+];
+
+function hiddenGemEditorialCardHtml(card) {
+  // Same markup shape as the previous per-venue card (pin + title, blurb,
+  // circular arrow, bottom scrim) so all of .hidden-gem-card's existing
+  // CSS/responsive behaviour applies unchanged -- only the content source
+  // changed, not the visual design.
+  return `<a class="hidden-gem-card" href="#directory">
+    <img class="hidden-gem-card-img" src="${card.img}" width="640" height="196" alt="" loading="lazy">
+    <span class="hidden-gem-card-scrim" aria-hidden="true"></span>
+    <span class="hidden-gem-card-body">
+      <h3><svg class="hidden-gem-card-pin" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-7.5 7-12.5A7 7 0 0 0 5 8.5C5 13.5 12 21 12 21z"/><circle cx="12" cy="8.5" r="2.4"/></svg>${escapeHtml(card.title)}</h3>
+      <p>${escapeHtml(card.blurb)}</p>
+    </span>
+    <span class="hidden-gem-card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>`;
+}
+
 function renderHiddenGemsHomepageHTML() {
-  // One bulk query — every result is already known to be a hidden gem by
-  // construction (the JOIN itself is the membership check), so no
-  // per-item isVenueHiddenGem() lookup is needed here at all.
-  const rows = db.prepare(`
-    SELECT v.* FROM venues v
-    JOIN collection_items ci ON ci.content_id = v.id AND ci.content_type = 'venue'
-    JOIN collections c ON c.id = ci.collection_id AND c.kind = 'hidden_gem'
-    WHERE v.redirect_to IS NULL
-    ORDER BY v.rating DESC
-    LIMIT 6
-  `).all().map(rowToVenue);
-
-  if (rows.length === 0) return ''; // graceful empty state: omit the whole module
-
-  const cards = rows.map(hiddenGemHomepageCardHtml).join('\n');
+  const cards = HIDDEN_GEM_EDITORIAL_CARDS.map(hiddenGemEditorialCardHtml).join('\n');
 
   return `
 <section class="discover-section" id="hiddenGems">
-  <div class="wrap">
-    <div class="discover-heading">
-      <span class="eyebrow">Editors' picks</span>
-      <h2>Hidden Gems</h2>
+  <div class="wrap-wide">
+    <div class="discover-heading discover-heading-split">
+      <h2>Hidden Gems <span class="discover-subtitle" data-i18n="gems.subtitle">Less crowds. More Okanagan.</span></h2>
+      <a class="discover-heading-link" href="#directory" data-i18n="gems.viewAll">View all hidden gems &rarr;</a>
     </div>
     <div class="discover-grid hidden-gem-grid">${cards}</div>
   </div>
@@ -1652,6 +1711,16 @@ function renderHomepageDiscoveryStyles() {
   return `
 <style>
   .discover-section { padding: 12px 0 36px; }
+  .discover-heading-split { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .discover-heading-link {
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--ref-navy);
+    text-decoration: none; white-space: nowrap;
+  }
+  .discover-heading-link:hover { color: var(--ref-gold); }
+  .discover-subtitle {
+    font-family: 'Nunito', sans-serif; font-weight: 500; font-size: 0.85rem;
+    color: rgba(42,32,25,0.6); margin-left: 10px; vertical-align: middle;
+  }
   .discover-heading { margin-bottom: 18px; }
   .discover-heading .eyebrow {
     display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:0.82rem;
@@ -1692,45 +1761,41 @@ function renderHomepageDiscoveryStyles() {
      small, muted kicker line above the name, and the editorial blurb is
      given the most visual weight on the card. */
   .hidden-gem-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex-wrap: unset;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; flex-wrap: unset;
   }
   .hidden-gem-card {
-    position: relative; display: block; text-decoration: none; color: var(--ink);
-    background: var(--paper); border-radius: 16px; overflow: hidden;
+    position: relative; display: block; text-decoration: none; color: #fff;
+    border-radius: 12px; overflow: hidden; aspect-ratio: 3.26 / 1;
     box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
-    border: 1px solid rgba(74,52,40,0.08);
     transition: transform .15s ease, box-shadow .15s ease;
   }
   .hidden-gem-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
-  /* Pre-existing gap found during Milestone 2 QA, fixed here because it
-     directly blocks verifying this exact section: the homepage's own
-     stylesheet never defined .compact-band's base height/layout rule --
-     that only exists in the separate SEO_PAGE_CSS used by venue/category/
-     region pages, which the homepage does not load. Without it the band
-     collapsed to the label's own line-height and the badge (positioned by
-     absolute pixel offset) overlapped the venue name. Scoped narrowly to
-     .hidden-gem-card so SEO_PAGE_CSS and every page that uses it are
-     completely untouched. */
-  .hidden-gem-card .compact-band {
-    margin: 0; border-radius: 16px 16px 0 0; height: 84px;
-    display: flex; align-items: flex-end; padding: 10px 16px; box-sizing: border-box;
+  .hidden-gem-card:hover .hidden-gem-card-img { transform: scale(1.045); }
+  .hidden-gem-card-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    display: block; transition: transform .25s ease;
   }
-  .hidden-gem-card .compact-band-label {
-    color: var(--paper); font-size: 0.72rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.92;
+  .hidden-gem-card-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(20,14,10,0.02) 40%, rgba(20,14,10,0.85) 100%);
   }
-  ${compactBandCSSRules('compact-band')}
-  .hidden-gem-card-badge {
-    position: absolute; top: 84px; left: 16px; transform: translateY(-50%);
-    background: var(--amber); color: var(--plum-dark); box-shadow: 0 2px 6px rgba(74,52,40,0.25);
+  .hidden-gem-card-body {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 14px 44px 14px 16px;
   }
-  .hidden-gem-card-body { padding: 26px 22px 22px; }
-  .hidden-gem-card-body h3 { font-family:'Fraunces',serif; font-size:1.28rem; margin:0 0 6px; line-height:1.2; }
-  .hidden-gem-card-meta {
-    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
-    color: var(--teal-deep); margin-bottom: 10px;
+  .hidden-gem-card-body h3 {
+    display: flex; align-items: center; gap: 6px;
+    font-family:'Fraunces',serif; font-size:1.05rem; margin:0 0 3px; line-height:1.2; color:#fff;
   }
-  .hidden-gem-card-body p { font-size: 0.98rem; line-height: 1.6; margin: 0; color: rgba(42,32,25,0.85); }
+  .hidden-gem-card-pin { flex-shrink: 0; }
+  .hidden-gem-card-body p {
+    font-size: 0.82rem; line-height: 1.4; margin: 0; color: rgba(255,255,255,0.85);
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .hidden-gem-card-arrow {
+    position: absolute; bottom: 14px; right: 14px; z-index: 1;
+    width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.92);
+    color: var(--ref-navy); display: flex; align-items: center; justify-content: center;
+  }
 
   .tile-label { display:block; }
   .tile-tagline {
@@ -1786,13 +1851,14 @@ function renderHomepageDiscoveryStyles() {
 
   @media (max-width: 640px) {
     .discover-card { flex-basis: 200px; }
-    .hidden-gem-grid { grid-template-columns: 1fr; gap: 16px; }
-    .hidden-gem-card-body { padding: 20px 18px 18px; }
+    .hidden-gem-grid { grid-template-columns: 1fr; gap: 12px; }
+    .hidden-gem-card { aspect-ratio: 2.2 / 1; }
     .category-tile-grid, .region-tile-grid { grid-template-columns: repeat(2, 1fr); }
     .tile-tagline { font-size: 0.72rem; }
   }
   @media (min-width: 641px) and (max-width: 1099px) {
     .hidden-gem-grid { grid-template-columns: repeat(2, 1fr); }
+    .hidden-gem-card { aspect-ratio: 2.4 / 1; }
   }
 
   /* Milestone 1 (approved homepage redesign): scenic hero. Reuses the
@@ -3995,4 +4061,7 @@ module.exports = {
   HIDDEN_GEM_HOMEPAGE_BLURBS,
   compactVisualBandHtml,
   hiddenGemHomepageCardHtml,
+  // Hidden Gems content-model change (2026-09-17)
+  HIDDEN_GEM_EDITORIAL_CARDS,
+  hiddenGemEditorialCardHtml,
 };
