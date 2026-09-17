@@ -467,10 +467,63 @@ test('Reference redesign: Explore the Okanagan arrow icon is a plain glyph, not 
   assert.equal(arrowCount, 6, 'expected exactly one arrow icon per destination card');
 });
 
-// ==== Homepage redesign Milestone 3 (Build Your Perfect Okanagan Trip +
-// Browse/Search repositioning) ==============================================
+// ==== "Explore All Okanagan Regions" link (2026-09-17) ======================
+// Bridges the 6 featured destinations to the site's full 20-region
+// coverage, reusing the existing /browse region picker -- no new route.
+// Layout correction (same day): two earlier attempts put this inside
+// .region-card-grid (first as its own bordered tile, then as a 7th grid
+// item pinned above Vernon via a grid-column hack) -- both misaligned
+// Vernon relative to the other 5 cards. Moved into the section's own
+// heading row instead, reusing the exact .discover-heading-split/
+// .discover-heading-link pattern "Hidden Gems"/"What are you in the mood
+// for?" already use for their own "View all hidden gems"/"Explore all
+// categories" links, so the grid at 480px+ is untouched -- just the 6
+// real destination cards, one aligned row.
+//
+// Responsive follow-up (same day): on the mobile single-column stack
+// the heading-row link sat above the whole grid, not specifically above
+// Vernon. Fixed by rendering a SECOND, CSS-toggled copy of the identical
+// link between Naramata and Vernon in the grid markup, `display:none` at
+// 480px+ so it never occupies a grid track at tablet/desktop widths --
+// the 6-card row stays exactly as before. Exactly one of the two copies
+// is meant to be visible at a given width; both exist in the HTML with
+// distinguishing modifier classes (.explore-all-link-heading /
+// .explore-all-link-mobile) that a real browser's CSS resolves.
 
-test('Milestone 3: Build Your Perfect Okanagan Trip section renders with the approved heading and reuses the existing trip-tray/map controls', () => {
+test('Explore All Okanagan Regions: renders exactly twice (heading copy + mobile-grid copy), both plain .discover-heading-link links to /browse (no new route), no bordered-tile treatment', () => {
+  const html = app.renderExploreRegionsHTML();
+  const matches = Array.from(html.matchAll(/<a class="discover-heading-link explore-all-link explore-all-link-(heading|mobile)" href="([^"]*)" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>/g));
+  assert.equal(matches.length, 2, 'expected exactly two "Explore All Okanagan Regions" links (a heading copy and a mobile-grid copy), both using the shared .discover-heading-link component');
+  const variants = matches.map((m) => m[1]).sort();
+  assert.deepEqual(variants, ['heading', 'mobile'], 'expected one heading-copy and one mobile-copy instance');
+  matches.forEach((m) => assert.equal(m[2], '/browse'));
+  assert.doesNotMatch(html, /region-card-all/, 'the old bordered-tile treatment must be fully gone');
+  const headingPos = html.indexOf('<h2 data-i18n="explore.heading">Explore by Destination</h2>');
+  assert.ok(headingPos !== -1, 'expected the section heading to be i18n-wired');
+  const headingLinkPos = html.indexOf('explore-all-link-heading');
+  const gridPos = html.indexOf('class="region-card-grid"');
+  assert.ok(headingPos < headingLinkPos && headingLinkPos < gridPos, 'expected the heading-copy link inside the heading row, before the card grid starts');
+  assert.match(html, /<div class="discover-heading discover-heading-split">\s*<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>\s*<a class="discover-heading-link explore-all-link explore-all-link-heading" href="\/browse" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>\s*<\/div>/, 'expected the same heading-row pattern used by Hidden Gems/Mood Cards');
+});
+
+test('Explore All Okanagan Regions: the destination-card grid contains the unchanged 6 real cards in their original order (still one aligned row at 480px+), plus the mobile-only copy of the link positioned AFTER Vernon (the last card)', () => {
+  const html = app.renderExploreRegionsHTML();
+  const gridMatch = html.match(/<div class="region-card-grid">([\s\S]*?)<\/div>\s*<\/div>\s*<\/section>/);
+  assert.ok(gridMatch, 'expected to find the region-card-grid container');
+  const gridHtml = gridMatch[1];
+  const regionCardHrefs = Array.from(gridHtml.matchAll(/class="region-card" href="([^"]*)"/g)).map((m) => m[1]);
+  assert.deepEqual(regionCardHrefs, ['/kelowna', '/west-kelowna', '/lake-country', '/penticton', '/naramata', '/vernon'], 'the grid must contain only the 6 real photo destination cards, unchanged, in their original order');
+  const vernonPos = gridHtml.indexOf('href="/vernon"');
+  const mobileLinkPos = gridHtml.indexOf('explore-all-link-mobile');
+  assert.ok(mobileLinkPos > -1, 'expected the mobile-only copy of the link inside the grid');
+  assert.ok(vernonPos < mobileLinkPos, 'expected the mobile-only link positioned after the Vernon card in DOM order (corrected 2026-09-17 -- was previously, incorrectly, before Vernon)');
+  assert.doesNotMatch(gridHtml, /explore-all-link-heading/, 'the heading-row copy must not be inside the card grid');
+});
+
+// ==== Reference redesign, forensic-comparison rebuild: Build Your
+// Perfect Okanagan Trip (supersedes the earlier 3-column split) ============
+
+test('Build Your Perfect Okanagan Trip section renders with the approved heading and reuses the existing trip-tray/map controls', () => {
   const html = app.renderBuildTripCTAHTML();
   assert.match(html, /id="buildTrip"/);
   assert.match(html, /Build Your Perfect Okanagan Trip/);
@@ -482,12 +535,11 @@ test('Milestone 3: Build Your Perfect Okanagan Trip section renders with the app
   assert.match(html, /id="tripCtaOpenMap"/);
 });
 
-test('Reference redesign: Build Your Perfect Okanagan Trip has a single CTA button, matching the reference (no second visible link)', () => {
+test('Build Your Perfect Okanagan Trip section does not introduce a new trip data model or duplicate trip-tray IDs', () => {
   const html = app.renderBuildTripCTAHTML();
-  const buttonCount = (html.match(/class="trip-cta-btn"/g) || []).length;
-  assert.equal(buttonCount, 1, 'expected exactly one visible CTA button');
-  assert.match(html, />Build My Trip/);
-  assert.doesNotMatch(html, /trip-cta-map-link/, 'the old separate "View the interactive map" text link must be gone');
+  assert.doesNotMatch(html, /id="tripTray"/, 'must not duplicate the real #tripTray widget');
+  assert.doesNotMatch(html, /id="tripTrayPanel"/, 'must not duplicate the real #tripTrayPanel');
+  assert.doesNotMatch(html, /id="okMap"/, 'must not duplicate the real #okMap element');
 });
 
 test('Build Your Perfect Okanagan Trip map visual uses the new map image, not the old hand-built SVG', () => {
@@ -497,11 +549,265 @@ test('Build Your Perfect Okanagan Trip map visual uses the new map image, not th
   assert.doesNotMatch(html, /tripLakeGrad|tripPinGrad|tripSoftBlur/, 'the old SVG\'s gradient/filter defs must be gone too');
 });
 
-test('Milestone 3: Build Your Perfect Okanagan Trip section does not introduce a new trip data model or duplicate trip-tray IDs', () => {
+test('Reference redesign: Build Your Perfect Okanagan Trip has a single CTA button, matching the reference (no second visible link)', () => {
   const html = app.renderBuildTripCTAHTML();
-  assert.doesNotMatch(html, /id="tripTray"/, 'must not duplicate the real #tripTray widget');
-  assert.doesNotMatch(html, /id="tripTrayPanel"/, 'must not duplicate the real #tripTrayPanel');
-  assert.doesNotMatch(html, /id="okMap"/, 'must not duplicate the real #okMap element');
+  const buttonCount = (html.match(/class="trip-cta-btn"/g) || []).length;
+  assert.equal(buttonCount, 1, 'expected exactly one visible CTA button');
+  assert.match(html, />Build My Trip/);
+});
+
+// ==== Content-change pass (2026-09-17): six mood cards ====================
+// Food & Drink/Wine/Beaches/Golf/What's On/Outdoors, in that exact order,
+// all equal visual treatment (no primary/secondary tiering). This
+// supersedes the earlier 6-card set that had Hidden Gems instead of Wine
+// -- see renderMoodCardsHTML() for the reasoning. Hidden Gems' own
+// dedicated section (separate tests further below) is untouched. Reuses
+// 100% existing filtering/anchor/category infrastructure -- no new venue
+// type, route, or schema.
+
+test('Mood cards: exactly six cards render, in the approved order', () => {
+  const html = app.renderMoodCardsHTML();
+  const keys = Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
+  assert.deepEqual(keys, ['food-drink', 'wine', 'beaches', 'golf', 'whats-on', 'outdoors']);
+});
+
+test('Mood cards: no primary/secondary tiering -- all six cards share one class', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.doesNotMatch(html, /mood-card-primary/, 'tiered primary class must be gone');
+  assert.doesNotMatch(html, /mood-card-secondary/, 'tiered secondary class must be gone');
+});
+
+test('Mood cards: What\'s On links to /events with no filter', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.match(html, /class="mood-card mood-card-whats-on" href="\/events">/);
+});
+
+test('Mood cards: no data-i18n translation key ever renders as visible card text (every titleKey resolves to real English in both languages)', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.doesNotMatch(html, />mood\.[a-zA-Z.]+</, 'a raw translation key leaked into the visible label');
+});
+
+test('Mood cards: Food & Drink filters to exactly restaurant, cafe, brewery, pub, cocktail (winery split back out to its own Wine card)', () => {
+  const html = app.renderMoodCardsHTML();
+  const cardMatch = html.match(/class="mood-card mood-card-food-drink"[^>]*data-mood-filter="([^"]*)"/);
+  assert.ok(cardMatch, 'expected the Food & Drink card to have a data-mood-filter attribute');
+  const types = cardMatch[1].split(',').sort();
+  assert.deepEqual(types, ['brewery', 'cafe', 'cocktail', 'pub', 'restaurant'].sort());
+});
+
+test('Mood cards: Wine filters to winery only', () => {
+  const html = app.renderMoodCardsHTML();
+  const cardMatch = html.match(/class="mood-card mood-card-wine"[^>]*data-mood-filter="([^"]*)"/);
+  assert.ok(cardMatch, 'expected the Wine card to have a data-mood-filter attribute');
+  assert.equal(cardMatch[1], 'winery');
+});
+
+test('Mood cards: Outdoors links to #exploreRegions with no filter', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.match(html, /class="mood-card mood-card-outdoors" href="#exploreRegions">/);
+});
+
+test('Mood cards: Beaches links to #exploreRegions with no filter and no new venue type', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.match(html, /class="mood-card mood-card-beaches" href="#exploreRegions">/);
+  assert.doesNotMatch(html, /data-type="beach"/, 'must not invent a new beach venue type');
+});
+
+test('Mood cards: Hidden Gems is no longer one of the six mood cards', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.doesNotMatch(html, /mood-card-hidden-gems/, 'Hidden Gems must not render as a mood card in this pass');
+});
+
+test('Mood cards: Golf still uses the existing dynamic bestRegionForType mechanism with a /browse fallback', () => {
+  const html = app.renderMoodCardsHTML();
+  const golfMatch = html.match(/class="mood-card mood-card-golf" href="([^"]*)"/);
+  assert.ok(golfMatch, 'expected the Golf card to have an href');
+  assert.ok(
+    golfMatch[1] === '/browse' || /^\/[a-z-]+\/golf$/.test(golfMatch[1]),
+    `Golf href must be either the /browse fallback (no golf venues exist) or a real /:region/golf category page, got: ${golfMatch[1]}`
+  );
+});
+
+test('Mood cards: Wine still uses the existing dynamic bestRegionForType mechanism with a /browse fallback', () => {
+  const html = app.renderMoodCardsHTML();
+  const wineMatch = html.match(/class="mood-card mood-card-wine" href="([^"]*)"/);
+  assert.ok(wineMatch, 'expected the Wine card to have an href');
+  assert.ok(
+    wineMatch[1] === '/browse' || /^\/[a-z-]+\/wineries$/.test(wineMatch[1]),
+    `Wine href must be either the /browse fallback (no winery venues exist) or a real /:region/wineries category page, got: ${wineMatch[1]}`
+  );
+});
+
+test('Mood cards: Food & Drink links to /browse pre-filtered by its multi-type filter (no single category page covers all five types)', () => {
+  const html = app.renderMoodCardsHTML();
+  const cardMatch = html.match(/class="mood-card mood-card-food-drink" href="([^"]*)"/);
+  assert.ok(cardMatch, 'expected the Food & Drink card to have an href');
+  assert.equal(cardMatch[1], '/browse?types=restaurant,cafe,brewery,pub,cocktail');
+});
+
+test('Mood cards: image paths are correct for all six cards, including the not-yet-supplied Beaches asset', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.match(html, /mood-card-food-drink"[^]*?src="\/images\/mood\/eat\.png"/);
+  assert.match(html, /mood-card-wine"[^]*?src="\/images\/mood\/drink\.png"/);
+  assert.match(html, /mood-card-beaches"[^]*?src="\/images\/mood\/beaches\.png"/);
+  assert.match(html, /mood-card-golf"[^]*?src="\/images\/mood\/golf\.png"/);
+  assert.match(html, /mood-card-whats-on"[^]*?src="\/images\/mood\/whats-on\.png"/);
+  assert.match(html, /mood-card-outdoors"[^]*?src="\/images\/mood\/explore\.png"/);
+});
+
+test('Mood cards: heading row includes the reference\'s "Explore all categories" link', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.match(html, /discover-heading-link/);
+});
+
+// ==== Localization fix (2026-09-17): full EN<->fr-CA i18n wiring pass ====
+// The audit found large swaths of the homepage were plain hardcoded
+// English with no data-i18n attribute at all (so the language switcher
+// had nothing to translate), plus one stale French string (hero.lead)
+// that no longer matched the current English copy. These tests lock in
+// that every previously-untranslated piece of server-rendered homepage
+// text now carries the right data-i18n/-aria/-title/-tooltip key.
+
+test('Mood cards: all six titles are now i18n-wired (Food & Drink and Beaches previously had titleKey:null)', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.match(html, /class="mood-card-title" data-i18n="mood\.foodDrink\.title">Food &amp; Drink</);
+  assert.match(html, /class="mood-card-title" data-i18n="mood\.beaches\.title">Beaches</);
+  assert.match(html, /data-i18n="mood\.wine\.title"/);
+  assert.match(html, /data-i18n="mood\.golf\.title"/);
+  assert.match(html, /data-i18n="mood\.whatsOn\.title"/);
+  assert.match(html, /data-i18n="mood\.outdoors\.title"/);
+  const titleSpanCount = (html.match(/class="mood-card-title" data-i18n=/g) || []).length;
+  assert.equal(titleSpanCount, 6, 'expected all 6 mood card titles to be i18n-wired, not 4');
+});
+
+test('Hidden Gems: section heading and all 3 editorial card titles/blurbs are i18n-wired', () => {
+  const html = app.renderHiddenGemsHomepageHTML();
+  assert.match(html, /<h2><span data-i18n="gems\.heading">Hidden Gems<\/span>/);
+  assert.match(html, /data-i18n="gems\.dogFriendly\.title">Dog-Friendly Finds</);
+  assert.match(html, /data-i18n="gems\.dogFriendly\.blurb">Patios and trails where your dog belongs\.</);
+  assert.match(html, /data-i18n="gems\.localFavourites\.title">Local Favourites</);
+  assert.match(html, /data-i18n="gems\.localFavourites\.blurb">The spots locals keep coming back to\.</);
+  assert.match(html, /data-i18n="gems\.secretSpots\.title">Secret Spots</);
+  assert.match(html, /data-i18n="gems\.secretSpots\.blurb">Quiet corners away from the crowds\.</);
+});
+
+test('Explore by Destination: section heading and both copies of "Explore All Okanagan Regions" are i18n-wired', () => {
+  const html = app.renderExploreRegionsHTML();
+  assert.match(html, /<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>/);
+  const linkMatches = html.match(/data-i18n="explore\.allRegions"/g) || [];
+  assert.equal(linkMatches.length, 2, 'expected both the heading-row and mobile-grid copies to be i18n-wired');
+});
+
+test('Build Your Perfect Okanagan Trip: entire visible/accessible section is i18n-wired', () => {
+  const html = app.renderBuildTripCTAHTML();
+  assert.match(html, /class="trip-cta-title" data-i18n="trip\.title">Build Your Perfect Okanagan Trip</);
+  assert.match(html, /class="trip-cta-lead" data-i18n="trip\.lead"/);
+  assert.match(html, /class="trip-cta-example" data-i18n="trip\.example"/);
+  assert.match(html, /data-i18n="trip\.buildMyTrip">Build My Trip</);
+  assert.match(html, /data-i18n-aria="trip\.openMap"/);
+});
+
+test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beaches, Hidden Gems, social aria-labels, Facebook tooltip, copyright, logo aria-label) are all now i18n-wired', () => {
+  const html = app.renderHomeFooterHTML();
+  assert.match(html, /class="home-footer-tagline" data-i18n="homeFooter\.taglineFull"/);
+  assert.match(html, /data-i18n="homeFooter\.foodDrinks">Food &amp; Drinks</);
+  assert.match(html, /data-i18n="mood\.beaches\.title">Beaches</);
+  assert.match(html, /data-i18n="gems\.heading">Hidden Gems</);
+  assert.match(html, /data-i18n-aria="homeFooter\.instagramAria"/);
+  assert.match(html, /data-i18n-aria="homeFooter\.tiktokAria"/);
+  assert.match(html, /data-i18n-tooltip="homeFooter\.comingSoon"/);
+  assert.match(html, /data-i18n-title="homeFooter\.comingSoon"/);
+  assert.match(html, /data-i18n-aria="homeFooter\.facebookAria"/);
+  assert.match(html, /class="home-footer-copyright" data-i18n="homeFooter\.copyright"/);
+  assert.match(html, /class="home-footer-logo" href="\/" aria-label="Okanagan Roam home" data-i18n-aria="nav\.homeAriaLabel"/);
+});
+
+// ==== Homepage footer redesign (2026-09-17, revised twice same day) ======
+// Full-width navy home-footer, homepage-only (/browse keeps the original
+// static footer -- covered by the HTTP-level tests further below). Final
+// revision: exactly FOUR equal-width columns in one row -- Explore, About,
+// Regions (all 20 real regions, compact 2x2 sub-grid of the wizard's own
+// Central/South/North/Ski resorts groups, kept INSIDE this one column
+// rather than a separate full-width band), and Social Media (renamed from
+// "Follow"). Tagline spelled out in full ("Okanagan Valley, British
+// Columbia"). The old global footer{padding} leak is also fixed here
+// (.home-footer now explicitly overrides it to padding:0).
+
+test('Home footer: Explore column has exactly the 7 approved items, in order, each with a real href (no invented routes)', () => {
+  const html = app.renderHomeFooterHTML();
+  const exploreMatch = html.match(/<h4 data-i18n="homeFooter\.explore">Explore<\/h4>\s*<ul>([\s\S]*?)<\/ul>/);
+  assert.ok(exploreMatch, 'expected to find the Explore column');
+  const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
+    .map((m) => ({ href: m[1], text: m[2] }));
+  assert.equal(items.length, 7, 'expected exactly 7 Explore links');
+  assert.equal(items[0].text, 'Food &amp; Drinks');
+  assert.equal(items[0].href, '/browse?types=restaurant,cafe,brewery,pub,cocktail');
+  assert.ok(items[1].href === '/browse' || /^\/[a-z-]+\/wineries$/.test(items[1].href), `Wine href unexpected: ${items[1].href}`);
+  assert.equal(items[2].href, '#exploreRegions');
+  assert.ok(items[3].href === '/browse' || /^\/[a-z-]+\/golf$/.test(items[3].href), `Golf href unexpected: ${items[3].href}`);
+  assert.equal(items[4].href, '/events');
+  assert.equal(items[5].href, '#exploreRegions');
+  assert.equal(items[6].href, '#hiddenGems');
+});
+
+test('Home footer: Regions column lists ALL 20 real regions (none omitted), each a real /:region link', () => {
+  const html = app.renderHomeFooterHTML();
+  const allRegionLinks = Array.from(html.matchAll(/<a href="\/([a-z-]+)">[^<]+<\/a>/g))
+    .map((m) => m[1])
+    .filter((slug) => app.REGION_LABELS[slug]);
+  const expected = Object.keys(app.REGION_LABELS).sort();
+  assert.deepEqual(Array.from(new Set(allRegionLinks)).sort(), expected, 'every REGION_LABELS region must have a footer link, and no extra/invented ones');
+});
+
+test('Home footer: Regions is grouped into exactly Central/South/North/Ski resorts, matching the wizard\'s own grouping', () => {
+  const html = app.renderHomeFooterHTML();
+  const groupLabels = Array.from(html.matchAll(/<h5 data-i18n="(wizard\.[a-zA-Z]+)">([^<]*)<\/h5>/g)).map((m) => m[2]);
+  assert.deepEqual(groupLabels, ['Central', 'South', 'North', 'Ski resorts']);
+  assert.equal(app.FOOTER_REGION_GROUPS.reduce((n, g) => n + g.regions.length, 0), 20);
+});
+
+test('Home footer: exactly FOUR columns (Explore, About, Regions, Social Media) all live inside the same .home-footer-cols row, in that DOM order -- Regions is NOT a separate full-width band', () => {
+  const html = app.renderHomeFooterHTML();
+  const colsMatch = html.match(/<div class="home-footer-cols">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="wrap-wide home-footer-bottom">/);
+  assert.ok(colsMatch, 'expected to find the single .home-footer-cols row, immediately followed by the bottom/copyright row (nothing else in between)');
+  const colsHtml = colsMatch[1];
+  const headings = Array.from(colsHtml.matchAll(/<h4[^>]*>([^<]*)<\/h4>/g)).map((m) => m[1]);
+  assert.deepEqual(headings, ['Explore', 'About', 'Regions', 'Social Media'], 'expected exactly these 4 column headings, in this order, all inside one row');
+  assert.doesNotMatch(html, /class="home-footer-regions"/, 'the old separate full-width Regions band must be gone');
+  // Regions' own region-groups grid must be nested inside the 4th column, not a sibling of .home-footer-cols.
+  const regionsColPos = colsHtml.indexOf('home-footer-col-regions');
+  const regionGroupsPos = colsHtml.indexOf('home-footer-region-groups');
+  assert.ok(regionsColPos !== -1 && regionGroupsPos > regionsColPos, 'expected the region-groups grid nested inside the Regions column');
+});
+
+test('Home footer: Social Media heading (renamed from "Follow") uses its own i18n key, distinct from the old footer.followAlong key /browse still uses', () => {
+  const html = app.renderHomeFooterHTML();
+  assert.match(html, /<h4 data-i18n="homeFooter\.socialMedia">Social Media<\/h4>/);
+  assert.doesNotMatch(html, /data-i18n="homeFooter\.follow"/, 'the old "Follow" key must no longer be used');
+  assert.doesNotMatch(html, />Follow<\/h4>/, 'the visible heading text must no longer read just "Follow"');
+});
+
+test('Home footer: logo tagline reads exactly "Okanagan Valley, British Columbia" and keeps the gold Roam accent', () => {
+  const html = app.renderHomeFooterHTML();
+  assert.match(html, /<p class="home-footer-tagline" data-i18n="homeFooter\.taglineFull">Okanagan Valley, British Columbia<\/p>/);
+  assert.match(html, /<span class="home-footer-wordmark-accent"> Roam<\/span>/);
+});
+
+test('Home footer: does not reuse or modify the header\'s shared .logo classes', () => {
+  const html = app.renderHomeFooterHTML();
+  assert.doesNotMatch(html, /class="logo"/, 'footer must use its own home-footer-logo, not the shared header .logo class');
+  assert.doesNotMatch(html, /class="logo-icon-badge"/);
+  assert.doesNotMatch(html, /class="logo-wordmark"/);
+});
+
+test('Home footer: About and Social Media (renamed from Follow) column links/icons are unchanged from the previously approved design', () => {
+  const html = app.renderHomeFooterHTML();
+  assert.match(html, /<a href="\/browse#app" data-i18n="nav\.appComingSoon">App coming soon<\/a>/);
+  assert.match(html, /<a href="\/browse#list-venue" data-i18n="footer\.listVenue">List your venue<\/a>/);
+  assert.match(html, /<a href="mailto:okanaganroam@gmail\.com" data-i18n="footer\.contact">Contact<\/a>/);
+  assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
+  assert.match(html, /icon-tiktok" href="https:\/\/www\.tiktok\.com\/@okanaganroam"/);
+  assert.match(html, /icon-facebook" data-tooltip="Coming soon"/);
 });
 
 // ==== Phase 2 Sprint 1 (Golf) =============================================
@@ -693,11 +999,6 @@ test('renderEventsIndexPage shows a graceful empty state with zero events', () =
   assert.match(html, /No upcoming events right now/);
 });
 
-test('Mood cards: What\'s On links to /events with no filter', () => {
-  const html = app.renderMoodCardsHTML();
-  assert.match(html, /class="mood-card mood-card-secondary mood-card-whats-on" href="\/events">/);
-});
-
 // ---- pageHead() backward-compatibility + noindex regression -------------
 test('pageHead is backward-compatible: existing 4-argument call sites are unaffected', () => {
   const html = app.pageHead('Title', 'Description', 'https://okanaganroam.com/kelowna', []);
@@ -821,9 +1122,26 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.equal(homepage.status, 200);
   const homepageBody = await homepage.text();
   assert.match(homepageBody, /id="hiddenGems"/);
-  assert.match(homepageBody, /id="exploreByCategory"/);
   assert.match(homepageBody, /id="exploreRegions"/);
-  assert.match(homepageBody, /id="directory"/, 'Discovery Wizard section must be untouched');
+  // Architecture change (2026-09-17): the homepage no longer renders the
+  // old directory UI at all (not CSS-hidden -- genuinely absent from the
+  // response). The wizard, its results grid/map, the "list your venue"
+  // form, and the app teaser all moved to /browse, verified separately
+  // below, without deleting any route, data, or functionality.
+  assert.doesNotMatch(homepageBody, /id="directory"/, 'the wizard must no longer render on the homepage');
+  assert.doesNotMatch(homepageBody, /class="results"/, 'the results grid/map must no longer render on the homepage');
+  assert.doesNotMatch(homepageBody, /id="mapPanel"/, 'the interactive map must no longer render on the homepage');
+  assert.doesNotMatch(homepageBody, /id="list-venue"/, 'the "list your venue" form must no longer render on the homepage');
+  assert.doesNotMatch(homepageBody, /id="app"/, 'the app teaser must no longer render on the homepage');
+  // Reference redesign (critical rule): Browse by Category, the old Weather
+  // banner, Spotlight banner, and Featured Venues strip are no longer part
+  // of the homepage at all -- they don't get stacked underneath the new
+  // design. renderExploreByCategoryHTML() itself is untouched and still
+  // independently callable/tested above; it's simply not spliced in here.
+  assert.doesNotMatch(homepageBody, /id="exploreByCategory"/, 'Browse by Category must no longer render on the homepage');
+  assert.doesNotMatch(homepageBody, /id="weatherBanner"/, 'old Weather banner must no longer render on the homepage');
+  assert.doesNotMatch(homepageBody, /id="spotlightBanner"/, 'old Spotlight banner must no longer render on the homepage');
+  assert.doesNotMatch(homepageBody, /class="featured-venues"/, 'old Featured Venues strip must no longer render on the homepage');
 
   // Milestone 1 (approved homepage redesign) — the old "Worth the Drive"
   // carousel is intentionally replaced by a scenic hero + a new "What are
@@ -831,6 +1149,39 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(homepageBody, /class="hero-scenic"/, 'New scenic hero (Milestone 1) must render');
   assert.match(homepageBody, /id="moodCards"/, 'Mood cards section (Milestone 1) must render');
   assert.doesNotMatch(homepageBody, /class="hero">/, 'Old "Worth the Drive" hero carousel must be gone');
+
+  // Elevator-pitch copy update (2026-09-17): the hero heading/layout/CSS
+  // are unchanged -- only the supporting <p class="hero-lead"> subtitle
+  // text changed, in both the static HTML and its TRANSLATIONS.en source
+  // (the i18n script overwrites data-i18n elements' textContent from that
+  // dictionary on load, so both had to change or the new copy would have
+  // been clobbered at runtime).
+  assert.match(homepageBody, /<h1 class="hero-title" data-i18n="hero\.headline">Explore the Okanagan<\/h1>/, 'hero heading must be unchanged');
+  assert.match(homepageBody, /<p class="hero-lead" data-i18n="hero\.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place\.<\/p>/, 'hero subtitle must be the new elevator pitch');
+  assert.doesNotMatch(homepageBody, /Find the places worth discovering/, 'old hero subtitle copy must be gone');
+
+  // Reference redesign: rebuilt header (decisions #4/#5) — new logo,
+  // dropdown nav, search icon, and the relocated "Build My Trip" CTA. The
+  // old circular-badge logo/"App coming soon" nav text must be gone.
+  assert.match(homepageBody, /logo-wordmark-accent/, 'new two-tone logo wordmark must render');
+  assert.match(homepageBody, /class="nav-dropdown"/, 'header dropdown nav must render');
+  assert.match(homepageBody, /id="navSearchBtn"/, 'header search icon must render');
+  assert.match(homepageBody, /id="navTripBtn"/, 'header "Build My Trip" CTA must render');
+  const headerHtml = homepageBody.slice(homepageBody.indexOf('<header'), homepageBody.indexOf('</header>'));
+  assert.doesNotMatch(headerHtml, /viewBox="0 0 40 40"/, 'old circular-badge logo SVG must be gone from the header');
+  assert.doesNotMatch(headerHtml, /App coming soon/, 'old "App coming soon" header nav CTA text must be gone (the footer keeps its own, unrelated "App coming soon" link)');
+
+  // Localization fix (2026-09-17): the entire header previously had zero
+  // data-i18n wiring. Spot-check the pieces most likely to regress.
+  assert.match(headerHtml, /data-i18n-aria="nav\.homeAriaLabel"/, 'logo aria-label must be i18n-wired');
+  assert.match(headerHtml, /<span data-i18n="nav\.discover">Discover<\/span>/, '"Discover" dropdown label must be i18n-wired');
+  assert.match(headerHtml, /<span data-i18n="nav\.thingsToDo">Things to Do<\/span>/, '"Things to Do" dropdown label must be i18n-wired');
+  assert.match(headerHtml, /<span data-i18n="mood\.foodDrink\.title">Food &amp; Drink<\/span>/, '"Food & Drink" dropdown label must reuse the mood card key');
+  assert.match(headerHtml, /data-i18n="nav\.map">Map<\/a>/, '"Map" link must be i18n-wired');
+  assert.match(headerHtml, /data-i18n-aria="search\.button"/, 'search icon aria-label must be i18n-wired');
+  assert.match(headerHtml, /data-i18n-aria="nav\.switchLanguage"/, 'language toggle aria-label must be i18n-wired');
+  assert.match(headerHtml, /<span data-i18n="trip\.buildMyTrip">Build My Trip<\/span>/, 'header "Build My Trip" CTA must reuse the shared trip.buildMyTrip key');
+  assert.match(headerHtml, /data-i18n-aria="nav\.openMenu"/, 'mobile hamburger aria-label must be i18n-wired');
 
   // Milestone 2 (Hidden Gems editorial + Explore the Okanagan visual
   // destinations) — the redesigned Explore cards each reference a
@@ -840,38 +1191,95 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.equal(exploreRegionImg.status, 200, 'Explore the Okanagan placeholder region image must be servable');
   assert.equal(exploreRegionImg.headers.get('content-type'), 'image/png');
 
-  // Milestone 3 (Build Your Perfect Okanagan Trip + Browse/Search
-  // repositioning) — the approved architecture's final section order:
-  // Hero -> Mood -> Hidden Gems -> Explore -> Build Trip -> Browse/Search
-  // (the wizard, id="directory") -> existing deeper directory content.
+  // Milestone 3 (Build Your Perfect Okanagan Trip) — the approved
+  // architecture's final homepage section order: Hero -> Mood -> Hidden
+  // Gems -> Explore -> Build Trip -> footer. The old Browse/Search wizard
+  // no longer renders on this page at all (verified above and via the
+  // dedicated /browse checks below).
   assert.match(homepageBody, /id="buildTrip"/, 'Build Your Perfect Okanagan Trip section (Milestone 3) must render');
-  const tripMapImg = await fetch(`${base}/images/trip-cta-map.png`);
-  assert.equal(tripMapImg.status, 200, 'the new Build Your Trip map image must be servable');
-  assert.equal(tripMapImg.headers.get('content-type'), 'image/png');
   const heroPos = homepageBody.indexOf('class="hero-scenic"');
   const moodPos = homepageBody.indexOf('id="moodCards"');
   const gemsPos = homepageBody.indexOf('id="hiddenGems"');
   const explorePos = homepageBody.indexOf('id="exploreRegions"');
   const tripPos = homepageBody.indexOf('id="buildTrip"');
-  const directoryPos = homepageBody.indexOf('id="directory"');
   assert.ok(
-    heroPos < moodPos && moodPos < gemsPos && gemsPos < explorePos && explorePos < tripPos && tripPos < directoryPos,
-    `expected Hero < Mood < Hidden Gems < Explore < Build Trip < Browse/Search in page order, got positions ${JSON.stringify({ heroPos, moodPos, gemsPos, explorePos, tripPos, directoryPos })}`
+    heroPos < moodPos && moodPos < gemsPos && gemsPos < explorePos && explorePos < tripPos,
+    `expected Hero < Mood < Hidden Gems < Explore < Build Trip in page order, got positions ${JSON.stringify({ heroPos, moodPos, gemsPos, explorePos, tripPos })}`
   );
+  // The homepage must end right after Build My Trip and the new
+  // home-footer (2026-09-17 redesign, class="home-footer" -- distinct
+  // from /browse's still-original plain <footer>, checked separately
+  // below) -- nothing from the old directory stack follows it.
+  const footerPos = homepageBody.indexOf('<footer class="home-footer">');
+  assert.ok(footerPos !== -1, 'expected the new home-footer to render on the homepage');
+  assert.ok(tripPos < footerPos, 'the footer must immediately follow Build My Trip, with nothing old in between');
 
-  // Browse/Search (the existing wizard) is repositioned and reframed, not
-  // rewritten -- its own functional markup (#directory, search box, wizard
-  // steps) must be completely unchanged; only a new de-emphasized heading
-  // is added ahead of it.
-  assert.match(homepageBody, /Browse (&amp;|&) [Ss]earch the Okanagan/, 'Browse/Search must have a reframing heading (Milestone 3)');
-  assert.match(homepageBody, /id="searchInput"/, 'existing search input must be unchanged');
-  assert.match(homepageBody, /id="wizardStep1"/, 'existing wizard step markup must be unchanged');
+  // "Browse Okanagan Roam by guide" SEO crawl-links block (2026-09-17
+  // visual fix): renderGuideFooterHTML() itself is untouched (still
+  // returns '' when there aren't enough venues per region/badge to meet
+  // MIN_GUIDE_VENUES -- true in this test's minimal fixture db, same as
+  // before this change, not a regression), so this checks the WRAPPER
+  // that's now unconditionally present on the homepage regardless of
+  // that content, rather than the guide text itself (which only a
+  // real/seeded db, like the actual production okanagan.db, produces).
+  assert.match(homepageBody, /<div style="display:none">/, 'the guide-links footer must be wrapped in a display:none div on the homepage (present in source, hidden visually)');
 
-  // Events index (2026-09-17) — replaces the homepage's own "Happening
-  // Soon" strip, which is removed entirely (no leftover section/anchor on
-  // the homepage). The What's On mood card links here instead.
+  // Open Now button (2026-09-17): removed from the homepage only -- the
+  // homepage has no .venue-card results to filter (only /browse does),
+  // so SHOW_OPEN_NOW_BUTTON is compiled in as false there. The rest of
+  // renderOpenNowScript() (MutationObserver, apply(), wizard-scroll
+  // handling) is still present/harmless -- only button creation is
+  // gated, checked separately below via /browse still getting `true`.
+  assert.match(homepageBody, /var SHOW_OPEN_NOW_BUTTON = false;/, 'the homepage must compile Open Now button creation off');
+
+  // Happening Soon (2026-09-17): removed from the homepage entirely, no
+  // empty gap left behind -- events now live at their own destination,
+  // /events, verified separately below.
   assert.doesNotMatch(homepageBody, /id="happeningSoon"/, 'Happening Soon must no longer render on the homepage');
-  assert.match(homepageBody, /class="mood-card mood-card-secondary mood-card-whats-on" href="\/events">/, 'What\'s On mood card must link to /events');
+  assert.doesNotMatch(homepageBody, /discover-section-compact/, 'the now-unused compact-section styling must be gone too');
+
+  // Every homepage link that used to point at the now-removed #directory
+  // wizard must instead lead into the real, existing directory at /browse
+  // (or, where a real category page already exists for that mood card's
+  // single venue type, straight to that category page -- see the Golf/
+  // Wine mood-card tests above). No dangling in-page anchors left behind.
+  assert.doesNotMatch(homepageBody, /href="#directory"/, 'no homepage link should still point at the removed #directory anchor');
+  assert.match(homepageBody, /class="hidden-gem-card" href="\/browse"/, 'Hidden Gems editorial cards must link into the real directory at /browse');
+  assert.match(homepageBody, /discover-heading-link" href="\/browse"[^>]*>View all hidden gems/, '"View all hidden gems" must link to /browse');
+  assert.match(homepageBody, /discover-heading-link" href="\/browse"[^>]*>Explore all categories/, '"Explore all categories" must link to /browse');
+  assert.match(homepageBody, /Browse &amp; Search<\/a>/, 'header dropdown "Browse & Search" label must still read the same');
+  const headerBrowseLink = homepageBody.match(/<a href="([^"]*)"[^>]*>Browse &amp; Search<\/a>/);
+  assert.ok(headerBrowseLink && headerBrowseLink[1] === '/browse', 'header "Browse & Search" link must point at /browse now that the wizard lives there');
+
+  // ---- /browse: the relocated directory (wizard + results/map + list
+  // your venue + app teaser). Same markup/IDs/data as before -- nothing
+  // deleted or duplicated, just no longer spliced under the new homepage.
+  const browsePage = await fetch(`${base}/browse`);
+  assert.equal(browsePage.status, 200, '/browse must exist and serve the relocated directory');
+  const browseBody = await browsePage.text();
+  assert.match(browseBody, /id="directory"/, 'the wizard must render on /browse');
+  assert.match(browseBody, /Browse (&amp;|&) [Ss]earch the Okanagan/, '/browse must keep the existing reframing heading');
+  assert.match(browseBody, /id="searchInput"/, 'existing search input must be unchanged on /browse');
+  assert.match(browseBody, /id="wizardStep1"/, 'existing wizard step markup must be unchanged on /browse');
+  assert.match(browseBody, /class="results"/, 'the results grid/map must render on /browse');
+  assert.match(browseBody, /id="mapPanel"/, 'the interactive map must render on /browse');
+  assert.match(browseBody, /id="list-venue"/, 'the "list your venue" form must render on /browse');
+  assert.match(browseBody, /id="app"/, 'the app teaser must render on /browse');
+  assert.doesNotMatch(browseBody, /id="moodCards"/, '/browse must not duplicate the new homepage\'s mood cards');
+  assert.doesNotMatch(browseBody, /id="hiddenGems"/, '/browse must not duplicate the new homepage\'s Hidden Gems section');
+  assert.doesNotMatch(browseBody, /id="exploreRegions"/, '/browse must not duplicate the new homepage\'s Explore section');
+  assert.doesNotMatch(browseBody, /id="buildTrip"/, '/browse must not duplicate the new homepage\'s Build My Trip section');
+  assert.match(browseBody, /new URLSearchParams\(window\.location\.search\)/, '/browse must include the prefill script so homepage links (?q=, ?types=, ?openMap=) still work once they land here');
+  // The homepage-only display:none wrapper (2026-09-17) must not leak onto
+  // /browse -- its own guide-links footer (renderGuideFooterHTML(), called
+  // directly and unwrapped in the /browse handler) stays fully visible.
+  assert.doesNotMatch(browseBody, /<div style="display:none">/, '/browse must not wrap its guide-links footer -- that fix is homepage-only');
+  assert.match(browseBody, /var SHOW_OPEN_NOW_BUTTON = true;/, '/browse must keep the real, functional Open Now button -- that removal is homepage-only');
+
+  // ---- /events: the standalone events index (2026-09-17), replacing the
+  // homepage's own removed Happening Soon strip. The What's On mood card
+  // must link here instead of the old #happeningSoon anchor.
+  assert.match(homepageBody, /class="mood-card mood-card-whats-on" href="\/events">/, 'What\'s On mood card must link to /events');
   const eventsIndexPage = await fetch(`${base}/events`);
   assert.equal(eventsIndexPage.status, 200, '/events must exist and serve the events index');
   const eventsIndexBody = await eventsIndexPage.text();
@@ -879,6 +1287,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(eventsIndexBody, /Test Future Festival/, 'an active event fixture must be listed');
   assert.doesNotMatch(eventsIndexBody, /Test Past Market/, 'an expired event fixture must not be listed');
   assert.match(eventsIndexBody, /href="\/kelowna\/events\/test-future-festival"/, 'event cards must link to the real individual event page');
+
+  // Individual event pages are completely untouched by this change.
   const eventPageStillWorks = await fetch(`${base}/kelowna/events/test-future-festival`);
   assert.equal(eventPageStillWorks.status, 200, 'individual event pages must still work after removing Happening Soon');
 

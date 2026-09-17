@@ -24,26 +24,75 @@ var TRANSLATIONS = {
     'nav.directory': 'Directory',
     'nav.listVenue': 'List Your Venue',
     'nav.appComingSoon': 'App coming soon',
-    'hero.eyebrow': 'Okanagan Valley, BC',
-    'hero.headline': 'Let\u2019s find your next favourite place in the Okanagan.',
-    'hero.lead': 'From lakeside patios to hidden wineries, discover where to eat, drink, and explore across the valley.',
+    'hero.headline': 'Explore the Okanagan',
+    'hero.lead': 'Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos — including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place.',
     'mood.heading': 'What are you in the mood for?',
     'mood.lead': 'Start with what sounds good. We\u2019ll help you find somewhere worth going.',
-    'mood.eat.title': 'Eat',
-    'mood.eat.desc': 'Find your next favourite table.',
-    'mood.drink.title': 'Drink',
-    'mood.drink.desc': 'Wineries, breweries, cocktails & more.',
-    'mood.hiddenGems.title': 'Hidden Gems',
-    'mood.hiddenGems.desc': 'The places you might drive past.',
     'mood.golf.title': 'Golf',
     'mood.golf.desc': 'Tee off somewhere beautiful.',
     'mood.whatsOn.title': 'What\u2019s On',
     'mood.whatsOn.desc': 'See what\u2019s happening around the valley.',
-    'mood.explore.title': 'Explore',
-    'mood.explore.desc': 'Let\u2019s see where the road takes you.',
-    'featured.eyebrow': 'Worth the trip',
-    'featured.heading': 'Featured this month',
+    'mood.outdoors.title': 'Outdoors',
+    'mood.wine.title': 'Wine',
+    'mood.foodDrink.title': 'Food & Drink',
+    'mood.beaches.title': 'Beaches',
+    'mood.exploreAll': 'Explore all categories \u2192',
+    'gems.heading': 'Hidden Gems',
+    'gems.subtitle': 'Less crowds. More Okanagan.',
+    'gems.viewAll': 'View all hidden gems \u2192',
+    'gems.dogFriendly.title': 'Dog-Friendly Finds',
+    'gems.dogFriendly.blurb': 'Patios and trails where your dog belongs.',
+    'gems.localFavourites.title': 'Local Favourites',
+    'gems.localFavourites.blurb': 'The spots locals keep coming back to.',
+    'gems.secretSpots.title': 'Secret Spots',
+    'gems.secretSpots.blurb': 'Quiet corners away from the crowds.',
+
+    // Homepage header/nav (2026-09-17 localization pass): the reference-
+    // redesign header (okanagan.html's <nav>) was built with plain
+    // hardcoded English and no data-i18n wiring at all -- these keys wire
+    // it up. "Hidden Gems"/"Explore the Okanagan" in the nav reuse
+    // gems.heading/explore.heading below rather than a separate key,
+    // since the text is identical to the section headings.
+    'nav.discover': 'Discover',
+    'nav.thingsToDo': 'Things to Do',
+    'nav.browseSearch': 'Browse & Search',
+    'nav.map': 'Map',
+    'nav.homeAriaLabel': 'Okanagan Roam home',
+    'nav.switchLanguage': 'Switch language',
+    'nav.openMenu': 'Open menu',
+
+    // Explore by Destination (2026-09-17 localization pass)
+    'explore.heading': 'Explore by Destination',
+    'explore.allRegions': 'Explore All Okanagan Regions \u2192',
+
+    // Build Your Perfect Okanagan Trip (2026-09-17 localization pass)
+    'trip.title': 'Build Your Perfect Okanagan Trip',
+    'trip.lead': 'Tell us what you\u2019re looking for. We\u2019ll help build your adventure.',
+    'trip.example': '\u201cI\u2019m in Kelowna for 3 days. I want golf, wineries, great food and patios, a beach, what\u2019s happening, and a few hidden gems.\u201d',
+    'trip.buildMyTrip': 'Build My Trip',
+    'trip.openMap': 'Open the interactive map',
+
+    // Homepage footer (2026-09-17 localization pass) -- footer.about/
+    // footer.regions/footer.listVenue/footer.contact/nav.appComingSoon/
+    // homeFooter.explore/homeFooter.socialMedia already existed and are
+    // reused as-is; these are the remaining pieces the audit found
+    // untranslated. homeFooter.foodDrinks is deliberately separate from
+    // mood.foodDrink.title -- the footer link's visible English text is
+    // "Food & Drinks" (plural), the mood card's is "Food & Drink"
+    // (singular); both are preserved exactly as they already render,
+    // just each given its own real translation.
+    'homeFooter.taglineFull': 'Okanagan Valley, British Columbia',
+    'homeFooter.foodDrinks': 'Food & Drinks',
+    'homeFooter.instagramAria': 'Okanagan Roam on Instagram',
+    'homeFooter.tiktokAria': 'Okanagan Roam on TikTok',
+    'homeFooter.comingSoon': 'Coming soon',
+    'homeFooter.facebookAria': 'Facebook, coming soon',
+    'homeFooter.copyright': '\u00a9 2026 Okanagan Roam. Built for the whole crew, dog included.',
+
     'search.placeholder': "Search a place, cuisine, or what you're craving",
+    'search.mainLine': 'What are you looking for?',
+    'search.subLine': 'Wineries, restaurants, hikes, beaches, hidden gems\u2026',
+    'search.button': 'Search',
     'status.open': 'Open now',
     'status.closingSoon': 'Closing soon',
     'status.closed': 'Closed now',
@@ -185,32 +234,79 @@ var TRANSLATIONS = {
     'footer.about': 'About',
     'footer.followAlong': 'Follow Along',
     'footer.listVenue': 'List your venue',
-    'footer.contact': 'Contact'
+    'footer.contact': 'Contact',
+
+    // New homepage-only footer (2026-09-17): footer.directory/
+    // footer.followAlong above are left untouched -- /browse still serves
+    // the original static footer with those exact keys/values, and this
+    // redesign must not change /browse. These two new keys are used only
+    // by the new homepage footer's renamed headings ("Explore"/"Follow"),
+    // so /browse is unaffected either way.
+    'homeFooter.explore': 'Explore',
+    'homeFooter.socialMedia': 'Social Media'
   },
   fr: {
     'nav.directory': 'R\u00e9pertoire',
     'nav.listVenue': '\u00c9crivez votre \u00e9tablissement',
     'nav.appComingSoon': 'Application bient\u00f4t disponible',
-    'hero.eyebrow': "Vall\u00e9e de l'Okanagan, C.-B.",
-    'hero.headline': 'Trouvons votre prochain endroit pr\u00e9f\u00e9r\u00e9 dans l\u2019Okanagan.',
-    'hero.lead': 'Des terrasses au bord du lac aux vignobles cach\u00e9s, d\u00e9couvrez o\u00f9 manger, boire et explorer dans toute la vall\u00e9e.',
+    'hero.headline': 'Explorez l\u2019Okanagan',
+    // Corrected 2026-09-17: this used to be a leftover translation of an
+    // older, shorter hero subtitle ("Find the places worth discovering")
+    // that no longer matches the current English hero.lead at all. Now a
+    // real Canadian French translation of the CURRENT English paragraph.
+    'hero.lead': 'Okanagan Roam est votre guide de la vall\u00e9e de l\u2019Okanagan, d\u2019Enderby \u00e0 Osoyoos \u2014 stations de ski, vignobles, gastronomie, golf, plages, \u00e9v\u00e9nements, aventures et tr\u00e9sors cach\u00e9s, le tout au m\u00eame endroit.',
     'mood.heading': "Qu'est-ce qui vous tente aujourd'hui\u00a0?",
     'mood.lead': 'Commencez par ce qui vous fait envie. On vous aide \u00e0 trouver un endroit qui en vaut la peine.',
-    'mood.eat.title': 'Manger',
-    'mood.eat.desc': 'Trouvez votre prochaine table pr\u00e9f\u00e9r\u00e9e.',
-    'mood.drink.title': 'Boire',
-    'mood.drink.desc': 'Vignobles, brasseries, cocktails et plus encore.',
-    'mood.hiddenGems.title': 'Tr\u00e9sors cach\u00e9s',
-    'mood.hiddenGems.desc': 'Les endroits que vous pourriez manquer.',
     'mood.golf.title': 'Golf',
     'mood.golf.desc': 'Jouez dans un cadre magnifique.',
-    'mood.whatsOn.title': "Quoi de neuf",
+    // Corrected 2026-09-17: "Quoi de neuf" reads as a casual "what's new
+    // with you" greeting, not an events listing. "\u00c0 l'affiche" is the
+    // standard Canadian French way to say "what's on/showing now."
+    'mood.whatsOn.title': "\u00c0 l'affiche",
     'mood.whatsOn.desc': 'D\u00e9couvrez ce qui se passe dans la vall\u00e9e.',
-    'mood.explore.title': 'Explorer',
-    'mood.explore.desc': 'Voyons o\u00f9 la route vous m\u00e8ne.',
-    'featured.eyebrow': '\u00c7a vaut le d\u00e9tour',
-    'featured.heading': 'En vedette ce mois-ci',
+    'mood.outdoors.title': 'Plein air',
+    'mood.wine.title': 'Vin',
+    'mood.foodDrink.title': 'Manger et boire',
+    'mood.beaches.title': 'Plages',
+    'mood.exploreAll': 'Voir toutes les cat\u00e9gories \u2192',
+    'gems.heading': 'Tr\u00e9sors cach\u00e9s',
+    'gems.subtitle': 'Moins de foule. Plus d\u2019Okanagan.',
+    'gems.viewAll': 'Voir tous les tr\u00e9sors cach\u00e9s \u2192',
+    'gems.dogFriendly.title': 'Chiens bienvenus',
+    'gems.dogFriendly.blurb': 'Terrasses et sentiers o\u00f9 votre chien est le bienvenu.',
+    'gems.localFavourites.title': 'Coups de c\u0153ur locaux',
+    'gems.localFavourites.blurb': 'Les adresses o\u00f9 les gens du coin reviennent toujours.',
+    'gems.secretSpots.title': 'Coins secrets',
+    'gems.secretSpots.blurb': 'Des coins tranquilles, loin de la foule.',
+
+    'nav.discover': 'D\u00e9couvrir',
+    'nav.thingsToDo': '\u00c0 faire',
+    'nav.browseSearch': 'Parcourir et rechercher',
+    'nav.map': 'Carte',
+    'nav.homeAriaLabel': 'Accueil Okanagan Roam',
+    'nav.switchLanguage': 'Changer de langue',
+    'nav.openMenu': 'Ouvrir le menu',
+
+    'explore.heading': 'Explorez par destination',
+    'explore.allRegions': 'Explorez toutes les r\u00e9gions de l\u2019Okanagan \u2192',
+
+    'trip.title': 'Planifiez votre voyage parfait dans l\u2019Okanagan',
+    'trip.lead': 'Dites-nous ce que vous recherchez. On vous aide \u00e0 planifier votre aventure.',
+    'trip.example': '\u00ab\u00a0Je suis \u00e0 Kelowna pour 3 jours. Je veux du golf, des vignobles, de bons repas et des terrasses, une plage, des \u00e9v\u00e9nements, et quelques tr\u00e9sors cach\u00e9s.\u00a0\u00bb',
+    'trip.buildMyTrip': 'Planifiez mon voyage',
+    'trip.openMap': 'Ouvrir la carte interactive',
+
+    'homeFooter.taglineFull': 'Vall\u00e9e de l\u2019Okanagan, Colombie-Britannique',
+    'homeFooter.foodDrinks': 'Restauration',
+    'homeFooter.instagramAria': 'Okanagan Roam sur Instagram',
+    'homeFooter.tiktokAria': 'Okanagan Roam sur TikTok',
+    'homeFooter.comingSoon': 'Bient\u00f4t disponible',
+    'homeFooter.facebookAria': 'Facebook, bient\u00f4t disponible',
+    'homeFooter.copyright': '\u00a9 2026 Okanagan Roam. Con\u00e7u pour toute la bande, chien inclus.',
     'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
+    'search.mainLine': 'Que recherchez-vous\u00a0?',
+    'search.subLine': 'Vignobles, restaurants, randonn\u00e9es, plages, tr\u00e9sors cach\u00e9s\u2026',
+    'search.button': 'Rechercher',
     'status.open': 'Ouvert',
     'status.closingSoon': 'Ferme bient\u00f4t',
     'status.closed': 'Ferm\u00e9',
@@ -352,7 +448,10 @@ var TRANSLATIONS = {
     'footer.about': '\u00c0 propos',
     'footer.followAlong': 'Suivez-nous',
     'footer.listVenue': 'Inscrire votre \u00e9tablissement',
-    'footer.contact': 'Contact'
+    'footer.contact': 'Contact',
+
+    'homeFooter.explore': 'Explorer',
+    'homeFooter.socialMedia': 'Réseaux sociaux'
   }
 };
 
@@ -373,6 +472,20 @@ function applyTranslations(){
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
     el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
+  });
+  // data-i18n-aria/-title/-tooltip (2026-09-17 localization pass): the
+  // i18n system previously had no way to translate aria-label/title/
+  // data-tooltip attributes at all, only textContent and placeholder --
+  // several real, user-facing accessibility strings (nav/logo/social
+  // icon aria-labels, the Facebook "coming soon" tooltip) needed this.
+  document.querySelectorAll('[data-i18n-aria]').forEach(function(el){
+    el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria')));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(function(el){
+    el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+  });
+  document.querySelectorAll('[data-i18n-tooltip]').forEach(function(el){
+    el.setAttribute('data-tooltip', t(el.getAttribute('data-i18n-tooltip')));
   });
   var toggle = document.getElementById('langToggle');
   if (toggle) toggle.textContent = lang === 'fr' ? 'FR / EN' : 'EN / FR';
@@ -751,6 +864,15 @@ async function loadVenuesAndInit(){
 }
 
 function initBlock1(){
+  // The wizard/results grid only render on /browse now (see the
+  // architecture-change comment on the / route in server.js) -- on the
+  // homepage there's nothing here to wire up. Returning early (rather than
+  // leaving the unguarded cuisineFilter/clearBtn listeners below to throw)
+  // matters beyond this function alone: initBlock1-12 run as a plain
+  // synchronous sequence in loadVenuesAndInit(), so an uncaught throw here
+  // would also silently skip every block after it, including initBlock3's
+  // mobile nav toggle, which must keep working on every page.
+  if (!document.getElementById('searchInput')) return;
   var activeTypes = new Set();
   var activeFilters = new Set();
   var activeRegions = new Set();
@@ -937,6 +1059,10 @@ function initBlock2(){
 
   var toggleBtn = document.getElementById('mapToggleBtn');
   var panel = document.getElementById('mapPanel');
+  // The interactive map only renders on /browse now -- see initBlock1's
+  // comment above on why an unguarded throw here matters beyond this
+  // function alone.
+  if (!toggleBtn || !panel) return;
   var map = null;
   var markers = {};
 
@@ -1476,6 +1602,12 @@ function initBlock12(){
   var searchBtn = document.getElementById('liveSearchBtn');
   var status = document.getElementById('liveSearchStatus');
   var resultsGrid = document.getElementById('liveResultsGrid');
+  // Pre-existing, unrelated to this change: this panel's markup was
+  // already removed from okanagan.html during an earlier Google Places
+  // cleanup, but this function was never guarded, so it has been throwing
+  // on every page load since then. Fixed here since it was found while
+  // verifying the homepage/directory split didn't introduce new breakage.
+  if (!toggle || !body) return;
 
   // Remember the API key in this browser only (never sent anywhere but Google).
   try {
@@ -1740,14 +1872,24 @@ window.__scrollToVenueCard = function(name){
 (function(){
   var form = document.getElementById('heroSearchForm');
   var heroInput = document.getElementById('heroSearchInput');
+  if (!form || !heroInput) return;
   var mainInput = document.getElementById('searchInput');
   var mainBtn = document.getElementById('searchBtn');
-  if (!form || !heroInput || !mainInput || !mainBtn) return;
 
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    mainInput.value = heroInput.value;
-    mainBtn.click();
+    if (mainInput && mainBtn) {
+      // On /browse itself, the wizard's own search box is right there --
+      // reuse it directly rather than navigating.
+      mainInput.value = heroInput.value;
+      mainBtn.click();
+    } else {
+      // On the homepage, the wizard/results this used to drive don't
+      // render on this page anymore (see the architecture-change comment
+      // on the / route in server.js) -- hand the query to /browse instead.
+      var q = heroInput.value.trim();
+      window.location.href = q ? ('/browse?q=' + encodeURIComponent(q)) : '/browse';
+    }
   });
 })();
 
@@ -1775,16 +1917,26 @@ window.__scrollToVenueCard = function(name){
   grid.addEventListener('click', function(e){
     var card = e.target.closest('[data-mood-filter]');
     if (!card) return;
+    // The wizard's .type-chip buttons only exist on /browse now (see the
+    // architecture-change comment on the / route in server.js) -- on the
+    // homepage itself there's nothing to press, so let the card's own
+    // href (a real /browse?types=... link) navigate normally instead of
+    // intercepting the click.
+    if (!document.querySelector('.type-chip')) return;
     e.preventDefault();
     setTypeFilter(card.dataset.moodFilter.split(','));
   });
 })();
 
-/* ---------- Milestone 3 (approved homepage redesign): "Build Your
-   Perfect Okanagan Trip" CTA. Both buttons drive the existing, unchanged
-   trip-tray (#tripTrayToggle/#tripTrayPanel, localStorage-backed) and map
-   (#mapToggleBtn/#mapPanel, Leaflet) -- no new trip data model, no new
-   panel, just opening what already exists elsewhere on the page. ---------- */
+/* ---------- "Build Your Perfect Okanagan Trip" CTA. Both drive the
+   existing, unchanged trip-tray (#tripTrayToggle/#tripTrayPanel,
+   localStorage-backed) and map (#mapToggleBtn/#mapPanel, Leaflet) -- no
+   new trip data model, no new panel, just opening what already exists
+   elsewhere on the page. Reference redesign, forensic-comparison rebuild:
+   #tripCtaOpenMap is now a <button> wrapping the whole map graphic
+   (matching the reference's single-CTA layout, which has no second
+   visible "view map" link) rather than a separate <a> -- this handler
+   works identically on either element type, no change needed here. ---------- */
 (function(){
   var openTripBtn = document.getElementById('tripCtaOpenTrip');
   if (openTripBtn) {
@@ -1809,9 +1961,97 @@ window.__scrollToVenueCard = function(name){
     openMapLink.addEventListener('click', function(e){
       e.preventDefault();
       var toggle = document.getElementById('mapToggleBtn');
-      if (toggle && toggle.getAttribute('aria-pressed') !== 'true') toggle.click();
       var panel = document.getElementById('mapPanel');
-      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!toggle || !panel) {
+        // The real interactive map lives inside the results section, which
+        // only renders on /browse now (see the architecture-change comment
+        // on the / route in server.js) -- send the click there instead.
+        window.location.href = '/browse?openMap=1';
+        return;
+      }
+      if (toggle.getAttribute('aria-pressed') !== 'true') toggle.click();
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+})();
+
+/* ---------- Reference-redesign header: Discover/Things to Do/Food & Drink
+   dropdowns, search icon, "Build My Trip" CTA, and "Map" nav link. All of
+   these drive existing behavior (trip tray, map panel, hero search) rather
+   than introducing anything new. ---------- */
+(function(){
+  var dropdowns = document.querySelectorAll('.nav-dropdown');
+  if (dropdowns.length) {
+    dropdowns.forEach(function(dd){
+      var trigger = dd.querySelector('.nav-link-label');
+      if (!trigger) return;
+      trigger.addEventListener('click', function(e){
+        e.stopPropagation();
+        var wasOpen = dd.classList.contains('open');
+        dropdowns.forEach(function(other){
+          other.classList.remove('open');
+          var otherTrigger = other.querySelector('.nav-link-label');
+          if (otherTrigger) otherTrigger.setAttribute('aria-expanded', 'false');
+        });
+        if (!wasOpen) {
+          dd.classList.add('open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+      });
+      trigger.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          trigger.click();
+        }
+      });
+    });
+    document.addEventListener('click', function(){
+      dropdowns.forEach(function(dd){
+        dd.classList.remove('open');
+        var trigger = dd.querySelector('.nav-link-label');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  var searchBtn = document.getElementById('navSearchBtn');
+  if (searchBtn) {
+    searchBtn.addEventListener('click', function(){
+      var hero = document.getElementById('heroScenic');
+      if (hero) hero.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var input = document.getElementById('heroSearchInput');
+      if (input) window.setTimeout(function(){ input.focus(); }, 350);
+    });
+  }
+
+  var tripBtn = document.getElementById('navTripBtn');
+  if (tripBtn) {
+    tripBtn.addEventListener('click', function(e){
+      // Same stopPropagation requirement as the trip-cta buttons above --
+      // otherwise this click bubbles to the trip tray's own document-level
+      // "click outside closes it" listener and immediately re-closes it.
+      e.stopPropagation();
+      var toggle = document.getElementById('tripTrayToggle');
+      var panel = document.getElementById('tripTrayPanel');
+      if (toggle && panel && !panel.classList.contains('open')) toggle.click();
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  var mapLink = document.getElementById('navMapLink');
+  if (mapLink) {
+    mapLink.addEventListener('click', function(e){
+      e.preventDefault();
+      var toggle = document.getElementById('mapToggleBtn');
+      var panel = document.getElementById('mapPanel');
+      if (!toggle || !panel) {
+        // Same reasoning as the trip-cta map handler above: the map only
+        // renders on /browse now.
+        window.location.href = '/browse?openMap=1';
+        return;
+      }
+      if (toggle.getAttribute('aria-pressed') !== 'true') toggle.click();
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 })();

@@ -1419,17 +1419,23 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 // directly tested) even though the homepage no longer calls them.
 const HIDDEN_GEM_EDITORIAL_CARDS = [
   {
+    titleKey: 'gems.dogFriendly.title',
     title: 'Dog-Friendly Finds',
+    blurbKey: 'gems.dogFriendly.blurb',
     blurb: 'Patios and trails where your dog belongs.',
     img: '/images/hidden-gems/dog-friendly.png',
   },
   {
+    titleKey: 'gems.localFavourites.title',
     title: 'Local Favourites',
+    blurbKey: 'gems.localFavourites.blurb',
     blurb: 'The spots locals keep coming back to.',
     img: '/images/hidden-gems/local-favourites.png',
   },
   {
+    titleKey: 'gems.secretSpots.title',
     title: 'Secret Spots',
+    blurbKey: 'gems.secretSpots.blurb',
     blurb: 'Quiet corners away from the crowds.',
     img: '/images/hidden-gems/secret-spots.png',
   },
@@ -1439,13 +1445,18 @@ function hiddenGemEditorialCardHtml(card) {
   // Same markup shape as the previous per-venue card (pin + title, blurb,
   // circular arrow, bottom scrim) so all of .hidden-gem-card's existing
   // CSS/responsive behaviour applies unchanged -- only the content source
-  // changed, not the visual design.
+  // changed, not the visual design. Localization fix (2026-09-17):
+  // title/blurb previously had no i18n key at all -- data-i18n now lives
+  // on a dedicated <span> around each, not the <h3>/<p> directly, since
+  // the <h3> also contains the (aria-hidden, non-text) pin SVG as a
+  // sibling -- textContent-based translation on the <h3> itself would
+  // have wiped that icon out.
   return `<a class="hidden-gem-card" href="#directory">
     <img class="hidden-gem-card-img" src="${card.img}" width="640" height="196" alt="" loading="lazy">
     <span class="hidden-gem-card-scrim" aria-hidden="true"></span>
     <span class="hidden-gem-card-body">
-      <h3><svg class="hidden-gem-card-pin" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-7.5 7-12.5A7 7 0 0 0 5 8.5C5 13.5 12 21 12 21z"/><circle cx="12" cy="8.5" r="2.4"/></svg>${escapeHtml(card.title)}</h3>
-      <p>${escapeHtml(card.blurb)}</p>
+      <h3><svg class="hidden-gem-card-pin" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-7.5 7-12.5A7 7 0 0 0 5 8.5C5 13.5 12 21 12 21z"/><circle cx="12" cy="8.5" r="2.4"/></svg><span data-i18n="${card.titleKey}">${escapeHtml(card.title)}</span></h3>
+      <p data-i18n="${card.blurbKey}">${escapeHtml(card.blurb)}</p>
     </span>
     <span class="hidden-gem-card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
   </a>`;
@@ -1458,7 +1469,7 @@ function renderHiddenGemsHomepageHTML() {
 <section class="discover-section" id="hiddenGems">
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
-      <h2>Hidden Gems <span class="discover-subtitle" data-i18n="gems.subtitle">Less crowds. More Okanagan.</span></h2>
+      <h2><span data-i18n="gems.heading">Hidden Gems</span> <span class="discover-subtitle" data-i18n="gems.subtitle">Less crowds. More Okanagan.</span></h2>
       <a class="discover-heading-link" href="#directory" data-i18n="gems.viewAll">View all hidden gems &rarr;</a>
     </div>
     <div class="discover-grid hidden-gem-grid">${cards}</div>
@@ -1532,7 +1543,7 @@ function renderExploreRegionsHTML() {
   // ends right after the card row, so that link is removed rather than
   // kept pointing at a since-removed #directory anchor.
   const curated = ['kelowna', 'west-kelowna', 'lake-country', 'penticton', 'naramata', 'vernon'];
-  const cards = curated
+  const cardHtml = curated
     .filter((region) => REGION_LABELS[region])
     .map((region) => {
       return `<a class="region-card" href="/${region}">
@@ -1543,16 +1554,58 @@ function renderExploreRegionsHTML() {
         <svg class="region-card-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </span>
     </a>`;
-    })
-    .join('\n');
+    });
 
-  if (!cards) return '';
+  if (cardHtml.length === 0) return '';
+
+  // "Explore All Okanagan Regions" (2026-09-17): the audit confirmed the
+  // site's real data spans 20 routable regions (Enderby to Osoyoos, plus
+  // several ski resorts), while this section deliberately only features 6
+  // matching webpage design.png. This bridges the two -- reuses /browse,
+  // the existing wizard's own region picker, which already lists all 20
+  // (no new route). Layout correction (2026-09-17): two earlier attempts
+  // put this INSIDE .region-card-grid (first as its own bordered tile,
+  // then as a 7th grid item pinned above Vernon via a grid-column hack) --
+  // both misaligned Vernon relative to the other 5 cards, since the grid
+  // had to make room for a 7th item. Moved into the section's own heading
+  // row instead, reusing the EXACT .discover-heading-split/
+  // .discover-heading-link pattern "Hidden Gems"/"What are you in the mood
+  // for?" already use for their own "View all hidden gems"/"Explore all
+  // categories" links -- not a new component, and the .region-card-grid
+  // below contains ONLY the unchanged 6 destination cards, so at 480px+
+  // (tablet 3-col and desktop 6-col) all 6, including Vernon, stay one
+  // perfectly aligned row.
+  //
+  // Responsive placement (2026-09-17, corrected same day): on the single-
+  // column mobile stack (<480px) the heading-row link sits above the
+  // whole grid, not specifically near Vernon. Rather than reintroduce a
+  // visible 7th grid item (the earlier mistake that pushed Vernon out of
+  // alignment), this renders a SECOND, mobile-only copy of the identical
+  // link inside the grid's markup, positioned AFTER Vernon (the last
+  // card) -- corrected from an earlier placement between Naramata and
+  // Vernon, which put it above Vernon instead of below it as intended.
+  // It is `display:none` at 480px+, so it is fully removed from grid
+  // layout at every breakpoint that matters for alignment (tablet/
+  // desktop) -- zero grid track is ever allocated to it there, and its
+  // position in DOM order (now last) makes no difference at those widths
+  // since it isn't rendered there at all. Below 480px, the grid is
+  // already a single column, so it simply takes its own row in DOM
+  // order, landing after Vernon. The heading-row instance is the mirror
+  // image: visible at 480px+, `display:none` below it. Exactly one of
+  // the two is ever visible/in the a11y tree at a time.
+  // Localization fix (2026-09-17): both copies of this link, and the
+  // section heading, previously had no i18n key at all.
+  const exploreAllHeadingLink = '<a class="discover-heading-link explore-all-link explore-all-link-heading" href="/browse" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
+  const exploreAllMobileLink = '<a class="discover-heading-link explore-all-link explore-all-link-mobile" href="/browse" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
+  cardHtml.push(exploreAllMobileLink);
+  const cards = cardHtml.join('\n');
 
   return `
 <section class="discover-section explore-section" id="exploreRegions">
   <div class="wrap-wide">
-    <div class="discover-heading">
-      <h2>Explore by Destination</h2>
+    <div class="discover-heading discover-heading-split">
+      <h2 data-i18n="explore.heading">Explore by Destination</h2>
+      ${exploreAllHeadingLink}
     </div>
     <div class="region-card-grid">${cards}</div>
   </div>
@@ -1589,16 +1642,34 @@ function renderExploreRegionsHTML() {
 // -- see the "Build Your Trip CTA" block in app.js for the few lines of
 // orchestration (open the existing panel; don't reimplement it). No new
 // trip data model, no new IDs for trip/map state.
-// Reference redesign, forensic-comparison rebuild (2026-09-17): ONE
-// continuous full-bleed dark navy band -- icon/heading/paragraph/single
-// CTA on the left, a photo blending into a labeled map on the right --
-// matching the reference's actual structure instead of the earlier
-// eyebrow+title+lead+two-separate-CTAs layout on a plain full-bleed
-// photo. The map itself is a real, pre-made illustrated map image
-// (installed at public/images/trip-cta-map.png); an earlier hand-built
-// inline SVG (procedurally-drawn terrain/roads/pins/labels from real
-// projected coordinates) was fully replaced, not layered underneath.
+// Visual QA pass: ONE continuous composition -- copy (bottom-left) ->
+// travel photo (public/images/trip-cta.png, the map/sunglasses/water-
+// bottle picnic shot) -> soft dissolve -> a real, labeled editorial travel
+// map (far right). Still a real, geographically-relative layout of the
+// same 6 Explore by Destination places (not an abstract decorative
+// graphic), and clicking it still opens the real interactive Leaflet
+// #mapPanel.
+//
+// Geography fix (2026-09-17, reference re-match): webpage design.png's own
+// Build Your Trip map is a real Google-Maps-style screenshot -- pale
+// green/cream terrain, a thin blue Okanagan Lake (it genuinely renders
+// that narrow at this zoomed-out scale -- the lake is ~135km long and
+// only ~3-5km wide), subtle tan roads, small circular markers, and clean
+// dark sans-serif labels with a white halo. Rebuilt from scratch to match
+// that, and this time every coordinate is a real equirectangular
+// projection of actual public lat/lon values (not eyeballed): x = (lon -
+// lon0) * cos(lat0) * SCALE + offsetX, y = (lat0 - lat) * SCALE + offsetY,
+// with lon0=-119.50, lat0=49.88, SCALE=203.1 -- the same scale for both
+// axes so real angles/proportions aren't distorted. This reproduces the
+// real relative geography (and the lake's real bend west through the
+// Peachland/Summerland stretch before curving back east into Penticton)
+// rather than an invented shape.
 function renderBuildTripCTAHTML() {
+  // Map visual replaced with a real, pre-made illustrated map image
+  // (2026-09-17) -- the previous hand-built inline SVG (real
+  // equirectangular-projected coordinates, procedurally drawn terrain/
+  // roads/pins/labels) is fully removed, not layered underneath. The new
+  // artwork itself is untouched; only this function's markup changed.
   return `
 <section class="trip-cta-section" id="buildTrip">
   <div class="wrap-wide trip-cta-inner">
@@ -1606,23 +1677,50 @@ function renderBuildTripCTAHTML() {
       <img class="trip-cta-img" src="/images/trip-cta.png" width="1600" height="656" alt="" loading="lazy">
       <div class="trip-cta-scrim"></div>
     </div>
-    <button type="button" class="trip-cta-map" id="tripCtaOpenMap" aria-label="Open the interactive map">
+    <button type="button" class="trip-cta-map" id="tripCtaOpenMap" aria-label="Open the interactive map" data-i18n-aria="trip.openMap">
       <img class="trip-cta-map-img" src="/images/trip-cta-map.png" width="1376" height="768" alt="" loading="lazy">
     </button>
     <div class="trip-cta-content">
       <span class="trip-cta-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/><circle cx="17" cy="9" r="1.4" fill="currentColor" stroke="none"/></svg></span>
-      <h2 class="trip-cta-title">Build Your Perfect Okanagan Trip</h2>
-      <p class="trip-cta-lead">Tell us what you&rsquo;re looking for. We&rsquo;ll help build your adventure.</p>
-      <p class="trip-cta-example">&ldquo;I&rsquo;m in Kelowna for 3 days. I want golf, wineries, great food and patios, a beach, what&rsquo;s happening, and a few hidden gems.&rdquo;</p>
+      <h2 class="trip-cta-title" data-i18n="trip.title">Build Your Perfect Okanagan Trip</h2>
+      <p class="trip-cta-lead" data-i18n="trip.lead">Tell us what you&rsquo;re looking for. We&rsquo;ll help build your adventure.</p>
+      <p class="trip-cta-example" data-i18n="trip.example">&ldquo;I&rsquo;m in Kelowna for 3 days. I want golf, wineries, great food and patios, a beach, what&rsquo;s happening, and a few hidden gems.&rdquo;</p>
       <div class="trip-cta-actions">
-        <button type="button" class="trip-cta-btn" id="tripCtaOpenTrip">Build My Trip <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        <button type="button" class="trip-cta-btn" id="tripCtaOpenTrip"><span data-i18n="trip.buildMyTrip">Build My Trip</span> <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
     </div>
   </div>
 </section>`;
 }
 
-function renderMoodCardsHTML() {
+// Content-change pass (2026-09-17): Food & Drink, Wine, Beaches, Golf,
+// What's On, Outdoors. Hidden Gems is REMOVED from this mood-card row
+// only -- its dedicated section (renderHiddenGemsHomepageHTML(), its own
+// #hiddenGems anchor, heading, and cards) is untouched and still renders
+// further down the homepage; nothing about the underlying Hidden Gems
+// data/route/functionality changed. Wine is split back out of Food &
+// Drink's filter into its own card (winery-only, reusing the same
+// mood/drink.png photo already used as the Hidden Gems section's
+// winery-type backdrop -- see HIDDEN_GEM_TYPE_IMAGE above).
+//   Food & Drink -> existing .type-chip filter: restaurant/cafe/brewery/
+//                   pub/cocktail (winery split back out to its own card)
+//   Wine        -> existing .type-chip winery-only filter
+//   Beaches     -> existing #exploreRegions anchor (no new "beach" venue
+//                  type -- beaches are a destination trait, not a
+//                  category in this taxonomy)
+//   Golf        -> existing dynamic bestRegionForType category-page link,
+//                  falling back to #directory (unchanged mechanism)
+//   What's On   -> /events, the standalone events index page (2026-09-17
+//                  -- previously an in-page anchor to the homepage's own
+//                  Happening Soon strip, which has been removed entirely;
+//                  event data/routes themselves are untouched)
+//   Outdoors    -> existing #exploreRegions anchor
+// Shared by renderMoodCardsHTML (Wine/Golf cards) and renderHomeFooterHTML
+// (Wine/Golf footer links, 2026-09-17) -- both need "which region has the
+// most venues of this type" to link straight to a real, populated category
+// page instead of guessing a region. Extracted rather than duplicated so
+// there's one query/definition of "best region for a type."
+function bestRegionForCategoryType() {
   const rows = db.prepare(`
     SELECT type, region, COUNT(*) AS n
     FROM venues
@@ -1634,48 +1732,193 @@ function renderMoodCardsHTML() {
   for (const row of rows) {
     if (!bestRegionForType[row.type]) bestRegionForType[row.type] = row.region;
   }
-  const golfRegion = bestRegionForType.golf;
-  const golfHref = golfRegion && CATEGORY_SLUGS.golf ? `/${golfRegion}/${CATEGORY_SLUGS.golf}` : '#directory';
+  return bestRegionForType;
+}
 
-  // Placeholder imagery (public/images/mood/*.png) pending real
-  // AI-generated photography -- see public/images/PLACEHOLDER_IMAGES.md.
+function renderMoodCardsHTML() {
+  const bestRegionForType = bestRegionForCategoryType();
+  const golfRegion = bestRegionForType.golf;
+  const golfHref = golfRegion && CATEGORY_SLUGS.golf ? `/${golfRegion}/${CATEGORY_SLUGS.golf}` : '/browse';
+  const wineRegion = bestRegionForType.winery;
+  const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
+
+  // Simple inline line icons, matching the approved reference's minimal
+  // white-icon style. No icon library/dependency -- plain inline SVG,
+  // same pattern already used for every other icon on this page (nav
+  // socials, wizard filter icons, etc.).
+  const ICONS = {
+    'food-drink': '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v7a2 2 0 0 0 4 0V3"/><path d="M9 10v11"/><path d="M17 3c-1.5 0-2 2-2 4s.5 4 2 4 2-2 2-4-.5-4-2-4z"/><path d="M17 11v10"/></svg>',
+    wine: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8l-1 7a3 3 0 0 1-6 0z"/><path d="M12 13v6"/><path d="M9 21h6"/></svg>',
+    beaches: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"/><path d="M2 21c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"/><circle cx="16" cy="7" r="3"/></svg>',
+    golf: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4l10 4-10 4"/></svg>',
+    'whats-on': '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>',
+    outdoors: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 8l4 6 2-3 4 9z"/></svg>',
+  };
+
+  // Beaches has no real image file yet (see PLACEHOLDER_IMAGES.md for why
+  // the only candidate found for it was rejected as a duplicate) --
+  // deliberately left pointing at a not-yet-created path rather than
+  // substituting another image; .mood-card's own background color (see
+  // renderHomepageDiscoveryStyles()) keeps this card looking like a clean
+  // branded placeholder rather than a broken/blank box in the meantime.
+  // Localization fix (2026-09-17): Food & Drink and Beaches previously had
+  // titleKey:null (no i18n at all, despite a since-corrected comment here
+  // claiming otherwise) -- mood.foodDrink.title/mood.beaches.title now
+  // give all six cards real TRANSLATIONS.en/.fr entries.
   const cards = [
-    { key: 'eat', tier: 'primary', href: '#directory', filter: 'restaurant,cafe', img: '/images/mood/eat.png', titleKey: 'mood.eat.title', title: 'Eat', descKey: 'mood.eat.desc', desc: 'Find your next favourite table.' },
-    { key: 'drink', tier: 'primary', href: '#directory', filter: 'winery,brewery,cocktail,pub', img: '/images/mood/drink.png', titleKey: 'mood.drink.title', title: 'Drink', descKey: 'mood.drink.desc', desc: 'Wineries, breweries, cocktails & more.' },
-    { key: 'hidden-gems', tier: 'primary', href: '#hiddenGems', filter: null, img: '/images/mood/hidden-gems.png', titleKey: 'mood.hiddenGems.title', title: 'Hidden Gems', descKey: 'mood.hiddenGems.desc', desc: 'The places you might drive past.' },
-    { key: 'golf', tier: 'secondary', href: golfHref, filter: null, img: '/images/mood/golf.png', titleKey: 'mood.golf.title', title: 'Golf', descKey: 'mood.golf.desc', desc: 'Tee off somewhere beautiful.' },
-    { key: 'whats-on', tier: 'secondary', href: '/events', filter: null, img: '/images/mood/whats-on.png', titleKey: 'mood.whatsOn.title', title: "What's On", descKey: 'mood.whatsOn.desc', desc: 'See what’s happening around the valley.' },
-    { key: 'explore', tier: 'secondary', href: '#exploreRegions', filter: null, img: '/images/mood/explore.png', titleKey: 'mood.explore.title', title: 'Explore', descKey: 'mood.explore.desc', desc: 'Let’s see where the road takes you.' },
+    { key: 'food-drink', href: '/browse?types=restaurant,cafe,brewery,pub,cocktail', filter: 'restaurant,cafe,brewery,pub,cocktail', img: '/images/mood/eat.png', titleKey: 'mood.foodDrink.title', title: 'Food & Drink' },
+    { key: 'wine', href: wineHref, filter: 'winery', img: '/images/mood/drink.png', titleKey: 'mood.wine.title', title: 'Wine' },
+    { key: 'beaches', href: '#exploreRegions', filter: null, img: '/images/mood/beaches.png', titleKey: 'mood.beaches.title', title: 'Beaches' },
+    { key: 'golf', href: golfHref, filter: null, img: '/images/mood/golf.png', titleKey: 'mood.golf.title', title: 'Golf' },
+    { key: 'whats-on', href: '/events', filter: null, img: '/images/mood/whats-on.png', titleKey: 'mood.whatsOn.title', title: "What's On" },
+    { key: 'outdoors', href: '#exploreRegions', filter: null, img: '/images/mood/explore.png', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
   ];
 
-  function cardHtmlFor(c) {
+  const cardsHtml = cards.map((c) => {
     const filterAttr = c.filter ? ` data-mood-filter="${c.filter}"` : '';
-    const dims = c.tier === 'primary' ? 'width="900" height="1200"' : 'width="960" height="540"';
-    return `<a class="mood-card mood-card-${c.tier} mood-card-${c.key}" href="${c.href}"${filterAttr}>
-      <img class="mood-card-img" src="${c.img}" ${dims} alt="" loading="lazy">
+    const i18nAttr = c.titleKey ? ` data-i18n="${c.titleKey}"` : '';
+    return `<a class="mood-card mood-card-${c.key}" href="${c.href}"${filterAttr}>
+      <img class="mood-card-img" src="${c.img}" width="640" height="403" alt="" loading="lazy">
       <span class="mood-card-overlay">
-        <span class="mood-card-title" data-i18n="${c.titleKey}">${escapeHtml(c.title)}</span>
-        <span class="mood-card-desc" data-i18n="${c.descKey}">${escapeHtml(c.desc)}</span>
+        <span class="mood-card-icon" aria-hidden="true">${ICONS[c.key]}</span>
+        <span class="mood-card-title"${i18nAttr}>${escapeHtml(c.title)}</span>
       </span>
     </a>`;
-  }
-
-  const primaryHtml = cards.filter((c) => c.tier === 'primary').map(cardHtmlFor).join('\n');
-  const secondaryHtml = cards.filter((c) => c.tier === 'secondary').map(cardHtmlFor).join('\n');
+  }).join('\n');
 
   return `
 <section class="discover-section mood-section" id="moodCards">
-  <div class="wrap">
-    <div class="discover-heading">
+  <div class="wrap-wide">
+    <div class="discover-heading discover-heading-split">
       <h2 data-i18n="mood.heading">What are you in the mood for?</h2>
-      <p class="discover-lead" data-i18n="mood.lead">Start with what sounds good. We'll help you find somewhere worth going.</p>
+      <a class="discover-heading-link" href="#directory" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>
     </div>
-    <div class="mood-card-grid">
-      <div class="mood-card-row mood-card-row-primary">${primaryHtml}</div>
-      <div class="mood-card-row mood-card-row-secondary">${secondaryHtml}</div>
-    </div>
+    <div class="mood-card-grid">${cardsHtml}</div>
   </div>
 </section>`;
+}
+
+// Authoritative region grouping for the footer's expanded Regions band
+// (2026-09-17 revision) -- NOT a new taxonomy: reuses the exact same four
+// groups/order/membership as the wizard's own Step 1 region chips
+// (okanagan.html's #wizardStep1 filter-groups: Central/South/North/Ski
+// resorts -- "Near"/"All regions" is a special chip there, not a real
+// region, so it's excluded here), and REGION_LABELS for display text, the
+// same map /:region routes are built from. All 20 real, routable regions
+// -- none omitted.
+const FOOTER_REGION_GROUPS = [
+  { labelKey: 'wizard.central', label: 'Central', regions: ['kelowna', 'west-kelowna', 'peachland', 'lake-country'] },
+  { labelKey: 'wizard.south', label: 'South', regions: ['naramata', 'penticton', 'kaleden', 'okanagan-falls', 'summerland', 'oliver', 'osoyoos'] },
+  { labelKey: 'wizard.north', label: 'North', regions: ['vernon', 'coldstream', 'lumby', 'armstrong', 'enderby'] },
+  { labelKey: 'wizard.skiResorts', label: 'Ski resorts', regions: ['big-white', 'silverstar', 'apex', 'baldy'] },
+];
+
+// Homepage footer redesign (2026-09-17, revised again same day): replaces
+// the static <footer> from okanagan.html on / ONLY -- /browse keeps
+// serving that original static footer untouched (its own code path never
+// calls this function), so this is fully scoped to the homepage per the
+// approved design. Deliberately self-contained (home-footer-* classes,
+// its own inline brand icon) rather than reusing the header's shared
+// .logo/.logo-icon-badge/.logo-wordmark classes, so nothing here can ever
+// affect the header. Every link reuses an existing, real route -- no new
+// URLs invented:
+//   Explore: the same 7 destinations the homepage's own mood cards already
+//     link to (renderMoodCardsHTML) -- Food & Drinks/Beaches/Hidden Gems
+//     have no dedicated page, so they reuse the mood cards' own targets
+//     (a filtered /browse, the #exploreRegions anchor, the #hiddenGems
+//     anchor) rather than inventing new ones. Wine/Golf reuse the exact
+//     same "best-stocked region for this type" href the mood cards
+//     compute (bestRegionForCategoryType, shared helper above). What's On
+//     -> /events, same as the mood card and the nav.
+//   About: App coming soon/List your venue -> /browse#app / /browse#list-venue
+//     (real anchors confirmed present on /browse's app-teaser/list-venue
+//     sections), Contact -> the existing mailto link
+//   Regions: ALL 20 real regions (FOOTER_REGION_GROUPS above), not a
+//     curated subset -- grouped exactly like the wizard's own region
+//     picker so a returning user recognizes the same four groups. This
+//     revision folds it back INTO the 4-column row as its own column
+//     (compact 2x2 sub-grid of the four groups) rather than a separate
+//     full-width band, per explicit direction -- .home-footer-cols is
+//     now an equal-width 4-column CSS grid specifically so Regions can't
+//     visually dominate the row the way an auto-sized flex column would.
+//   Social Media (renamed from "Follow"): Instagram/TikTok -> the
+//     existing real profile URLs, Facebook stays the existing
+//     non-clickable "coming soon" treatment.
+function renderHomeFooterHTML() {
+  const bestRegionForType = bestRegionForCategoryType();
+  const golfRegion = bestRegionForType.golf;
+  const golfHref = golfRegion && CATEGORY_SLUGS.golf ? `/${golfRegion}/${CATEGORY_SLUGS.golf}` : '/browse';
+  const wineRegion = bestRegionForType.winery;
+  const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
+
+  const regionGroupsHtml = FOOTER_REGION_GROUPS.map((group) => {
+    const links = group.regions
+      .filter((region) => REGION_LABELS[region])
+      .map((region) => `<li><a href="/${region}">${escapeHtml(REGION_LABELS[region])}</a></li>`)
+      .join('\n');
+    return `<div class="home-footer-region-group">
+            <h5 data-i18n="${group.labelKey}">${escapeHtml(group.label)}</h5>
+            <ul>${links}</ul>
+          </div>`;
+  }).join('\n');
+
+  return `
+<footer class="home-footer">
+  <div class="wrap-wide home-footer-top">
+    <div class="home-footer-brand">
+      <a class="home-footer-logo" href="/" aria-label="Okanagan Roam home" data-i18n-aria="nav.homeAriaLabel">
+        <span class="home-footer-icon" aria-hidden="true">
+          <svg viewBox="0 0 60 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20 14 6l7 8 5-5 5 5"/><path d="M26 20 38 6l7 8 5-5 5 5"/></svg>
+        </span>
+        <span class="home-footer-wordmark">Okanagan<span class="home-footer-wordmark-accent"> Roam</span></span>
+      </a>
+      <p class="home-footer-tagline" data-i18n="homeFooter.taglineFull">Okanagan Valley, British Columbia</p>
+    </div>
+    <div class="home-footer-cols">
+      <div class="home-footer-col">
+        <h4 data-i18n="homeFooter.explore">Explore</h4>
+        <ul>
+          <li><a href="/browse?types=restaurant,cafe,brewery,pub,cocktail" data-i18n="homeFooter.foodDrinks">Food &amp; Drinks</a></li>
+          <li><a href="${wineHref}" data-i18n="mood.wine.title">Wine</a></li>
+          <li><a href="#exploreRegions" data-i18n="mood.beaches.title">Beaches</a></li>
+          <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
+          <li><a href="/events" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
+          <li><a href="#exploreRegions" data-i18n="mood.outdoors.title">Outdoors</a></li>
+          <li><a href="#hiddenGems" data-i18n="gems.heading">Hidden Gems</a></li>
+        </ul>
+      </div>
+      <div class="home-footer-col">
+        <h4 data-i18n="footer.about">About</h4>
+        <ul>
+          <li><a href="/browse#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
+          <li><a href="/browse#list-venue" data-i18n="footer.listVenue">List your venue</a></li>
+          <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="home-footer-col home-footer-col-regions">
+        <h4 data-i18n="footer.regions">Regions</h4>
+        <div class="home-footer-region-groups">${regionGroupsHtml}</div>
+      </div>
+      <div class="home-footer-col">
+        <h4 data-i18n="homeFooter.socialMedia">Social Media</h4>
+        <div class="home-footer-social-row">
+          <a class="home-footer-social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram" data-i18n-aria="homeFooter.instagramAria">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
+          </a>
+          <span class="home-footer-social-icon icon-facebook" data-tooltip="Coming soon" title="Coming soon" aria-label="Facebook, coming soon" data-i18n-tooltip="homeFooter.comingSoon" data-i18n-title="homeFooter.comingSoon" data-i18n-aria="homeFooter.facebookAria">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 4h-2a4 4 0 0 0-4 4v3H6v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3z"/></svg>
+          </span>
+          <a class="home-footer-social-icon icon-tiktok" href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on TikTok" data-i18n-aria="homeFooter.tiktokAria">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c0 2.5 2 4.5 4.5 4.5"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap-wide home-footer-bottom">
+    <p class="home-footer-copyright" data-i18n="homeFooter.copyright">&copy; 2026 Okanagan Roam. Built for the whole crew, dog included.</p>
+  </div>
+</footer>`;
 }
 
 // Shared CSS for the four modules above — reuses the existing shared
@@ -1685,7 +1928,14 @@ function renderMoodCardsHTML() {
 function renderHomepageDiscoveryStyles() {
   return `
 <style>
-  .discover-section { padding: 12px 0 36px; }
+  /* Reference redesign, forensic-comparison rebuild: section vertical
+     rhythm tightened to the pixel-measured reference (each discovery
+     section's heading+cards+gap fits in ~110-215px at the reference's
+     1672px canvas width; the .wrap-wide content width here, 1312px, is
+     within 2px of the reference's measured 1314px card-row width, so
+     these pixel values translate almost directly rather than needing
+     rescaling). */
+  .discover-section { padding: 6px 0 16px; }
   .discover-heading-split { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .discover-heading-link {
     font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--ref-navy);
@@ -1696,13 +1946,13 @@ function renderHomepageDiscoveryStyles() {
     font-family: 'Nunito', sans-serif; font-weight: 500; font-size: 0.85rem;
     color: rgba(42,32,25,0.6); margin-left: 10px; vertical-align: middle;
   }
-  .discover-heading { margin-bottom: 18px; }
+  .discover-heading { margin-bottom: 10px; }
   .discover-heading .eyebrow {
     display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:0.82rem;
     letter-spacing:0.09em; text-transform:uppercase; color: var(--teal); margin-bottom:8px;
   }
   .discover-heading .eyebrow::before { content:""; width:20px; height:2px; background: var(--teal); display:inline-block; }
-  .discover-heading h2 { font-family:'Fraunces',serif; font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin:0; }
+  .discover-heading h2 { font-family:'Fraunces',serif; font-size: clamp(1.2rem, 1.8vw, 1.45rem); margin:0; }
 
   .discover-strip, .discover-grid {
     display:flex; gap:16px; overflow-x:auto; padding-bottom:8px; list-style:none; margin:0;
@@ -1735,6 +1985,15 @@ function renderHomepageDiscoveryStyles() {
      (see hiddenGemHomepageCardHtml()) -- the region label is kept as a
      small, muted kicker line above the name, and the editorial blurb is
      given the most visual weight on the card. */
+  /* Reference redesign, forensic-comparison rebuild: THREE cards in one
+     wide-landscape row (measured ~3.26:1 aspect, ~427px x 131px at the
+     reference's canvas width), replacing the earlier 6-card 3x2 portrait
+     grid. No per-venue photography exists (every venue.image_url is empty
+     for the approved gems), so each card's backdrop is its venue-type's
+     real, already-approved mood-category image (see HIDDEN_GEM_TYPE_IMAGE
+     above) -- never a fabricated photo of a specific business.
+     compactVisualBandHtml()/compactBandCSSRules() remain defined and
+     unchanged for their other caller (venue-page related/nearby cards). */
   .hidden-gem-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; flex-wrap: unset;
   }
@@ -1790,13 +2049,18 @@ function renderHomepageDiscoveryStyles() {
   }
   .category-tile:hover, .region-tile:hover { border-color: var(--plum); transform: translateY(-2px); }
 
+  /* Milestone 2 (Explore the Okanagan visual redesign): a fresh
+     .region-card family, deliberately not reusing .region-tile/
+     .category-tile, so Browse by Category's existing tiles are
+     completely unaffected. Matches Milestone 1's mood-card visual
+     language (full-bleed placeholder image, bottom gradient-scrim
+     overlay, serif label) for a consistent premium feel across both
+     sections. */
   /* Reference redesign (decision #2): landscape name+arrow cards (no
      tagline), replacing Milestone 2's portrait 4:5 tagline treatment.
      .region-card-tagline is kept defined (harmless, unused by this
      section's markup now) rather than removed, since nothing else
-     references deleting it. Deliberately not reusing .region-tile/
-     .category-tile, so Browse by Category's existing tiles are
-     completely unaffected. */
+     references deleting it. */
   .region-card-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
   .region-card {
     position: relative; display: block; border-radius: 10px; overflow: hidden;
@@ -1828,6 +2092,24 @@ function renderHomepageDiscoveryStyles() {
     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
   }
 
+  /* "Explore All Okanagan Regions" responsive placement (2026-09-17):
+     two copies of the same link exist in the markup -- one in the
+     section heading (.explore-all-link-heading), one inside the card
+     grid between Naramata and Vernon (.explore-all-link-mobile). Below
+     480px the grid is a single column, so the mobile copy is shown
+     in-flow (landing between the two cards) and the heading copy is
+     hidden. At 480px+ (tablet 3-col, desktop 6-col) it's the reverse:
+     the mobile copy is set to display:none, which removes it from grid
+     layout entirely -- no track is ever allocated to it -- so the 6
+     cards stay one untouched, perfectly aligned row exactly as before. */
+  .explore-all-link-mobile { display: block; }
+  .explore-all-link-heading { display: none; }
+  @media (min-width: 480px) {
+    .explore-all-link-mobile { display: none; }
+    .explore-all-link-heading { display: inline; }
+  }
+
+
   /* Reference redesign, forensic-comparison rebuild: all 6 destination
      cards in ONE row at desktop (measured ~2.56:1 aspect each), replacing
      the earlier 1/2/3-column responsive grid that made each card much
@@ -1851,28 +2133,26 @@ function renderHomepageDiscoveryStyles() {
     .hidden-gem-card { aspect-ratio: 2.4 / 1; }
   }
 
-  /* Milestone 1 (approved homepage redesign): scenic hero. Reuses the
-     existing --plum/--teal/--amber token palette and Fraunces/Nunito
-     font pairing already established above rather than inventing a new
-     visual language. */
+  /* Reference redesign, forensic-comparison rebuild: hero height/copy
+     measured directly off webpage design.png (263px tall at 1672px width,
+     one-line all-caps headline, one-line subhead, two-line search field)
+     -- min-height and padding cut down accordingly instead of sizing
+     around the old 4-line headline. */
   .hero-scenic {
     position: relative; overflow: hidden; color: #fff;
-    min-height: 560px; display: flex; align-items: flex-end;
+    min-height: 300px; display: flex; align-items: center;
   }
   .hero-media { position: absolute; inset: 0; z-index: 0; }
   .hero-media-img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .hero-scrim {
     position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(20,14,10,0.10) 0%, rgba(20,14,10,0.72) 100%);
+    background: linear-gradient(180deg, rgba(20,14,10,0.10) 0%, rgba(20,14,10,0.55) 100%);
   }
-  .hero-inner { position: relative; z-index: 1; padding: 72px 0 56px; max-width: 640px; }
-  .hero-eyebrow {
-    display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.82rem;
-    letter-spacing: 0.09em; text-transform: uppercase; color: var(--amber); margin-bottom: 10px;
-  }
+  .hero-inner { position: relative; z-index: 1; padding: 28px 0; max-width: 760px; }
   .hero-title {
-    font-family: 'Fraunces', serif; font-size: clamp(2rem, 5vw, 3.2rem);
-    line-height: 1.1; margin: 0 0 16px; max-width: 16ch;
+    font-family: 'Fraunces', serif; font-size: clamp(1.9rem, 3.6vw, 2.7rem);
+    font-weight: 400; line-height: 1.1; margin: 0 0 10px; max-width: 22ch;
+    text-transform: uppercase; letter-spacing: 0.01em;
     color: #fff; /* app.css's global h1,h2,h3,.display rule sets color:
                     var(--ink) directly on every h1, which otherwise wins
                     over the inherited white from .hero-scenic -- a
@@ -1880,87 +2160,141 @@ function renderHomepageDiscoveryStyles() {
                     an ancestor's inherited value regardless of the
                     ancestor's specificity. */
   }
+  /* Centered under the headline (2026-09-17): unlike the reference's
+     short one-line subhead, this real copy is a full sentence -- left-
+     aligned, it read as an unbalanced block hugging the hero column's
+     left edge with empty space to its right. text-align:center handles
+     the individual lines; margin:0 auto centers the whole block within
+     .hero-inner (which is itself already horizontally centered on the
+     page -- confirmed via direct measurement, not assumed), so the
+     paragraph's center lines up with the headline's own column center,
+     not just its left edge. max-width widened from 46ch to 54ch
+     specifically for the centered layout -- the old, narrower 46ch
+     produced a tall 4-line column that read as narrow/heavy once
+     centered; 54ch reads as a shorter, wider, more balanced block while
+     still stopping well short of the full hero-inner width (so it never
+     stretches edge-to-edge). Font, size, line-height, and color
+     untouched. */
   .hero-lead {
-    font-family: 'Nunito', sans-serif; font-size: clamp(0.95rem, 1.6vw, 1.08rem);
-    line-height: 1.5; margin: 0 0 26px; max-width: 46ch; color: rgba(255,255,255,0.92);
+    font-family: 'Nunito', sans-serif; font-size: 1.05rem;
+    line-height: 1.4; margin: 0 auto 16px; max-width: 54ch; color: rgba(255,255,255,0.92);
+    text-align: center;
   }
   .hero-search-box {
-    display: flex; align-items: center; max-width: 420px; background: rgba(255,255,255,0.97);
-    border-radius: 999px; padding: 6px; gap: 6px; box-shadow: 0 10px 26px -14px rgba(20,14,10,0.5);
+    display: flex; align-items: center; max-width: 580px; background: rgba(255,255,255,0.97);
+    border-radius: 999px; padding: 6px 6px 6px 20px; gap: 10px; box-shadow: 0 10px 26px -14px rgba(20,14,10,0.5);
   }
-  .hero-search-box input {
-    flex: 1; min-width: 0; border: none; background: transparent; padding: 10px 14px;
+  .hero-search-icon { flex-shrink: 0; color: rgba(42,32,25,0.55); }
+  .hero-search-field { position: relative; flex: 1; min-width: 0; }
+  .hero-search-field input {
+    width: 100%; border: none; background: transparent; padding: 9px 0;
     font-size: 0.95rem; color: var(--ink); outline: none; font-family: 'Nunito', sans-serif;
+    position: relative; z-index: 1;
   }
+  /* Faux two-line placeholder (bold prompt + smaller example line), CSS-
+     only: hidden once the input has real content or focus, matching the
+     reference's "What are you looking for? / Wineries, restaurants,
+     hikes, beaches, hidden gems..." search field exactly. Both lines carry
+     data-i18n like every other label on this page, so this has no i18n
+     fallback risk. */
+  .hero-search-faux {
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    z-index: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: center;
+    line-height: 1.25; width: 100%;
+  }
+  .hero-search-faux-main { font-weight: 700; font-size: 0.95rem; color: var(--ink); display: block; }
+  .hero-search-faux-sub {
+    font-weight: 400; font-size: 0.76rem; color: rgba(42,32,25,0.55); display: block;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hero-search-field input:focus ~ .hero-search-faux,
+  .hero-search-field input:not(:placeholder-shown) ~ .hero-search-faux { display: none; }
   .hero-search-box button {
-    border: none; background: var(--plum); color: #fff; border-radius: 999px;
-    width: 42px; height: 42px; flex-shrink: 0; display: flex; align-items: center;
+    border: none; background: var(--ref-navy); color: #fff; border-radius: 999px;
+    height: 42px; flex-shrink: 0; display: flex; align-items: center;
+    padding: 0 24px; font-weight: 700; font-size: 0.9rem; font-family: 'Nunito', sans-serif;
     justify-content: center; cursor: pointer; transition: background-color .15s ease;
   }
-  .hero-search-box button:hover { background: var(--plum-dark); }
+  .hero-search-box button:hover { background: var(--ref-navy-deep); }
 
   @media (max-width: 640px) {
-    .hero-scenic { min-height: 440px; }
-    .hero-inner { padding: 44px 0 32px; max-width: 100%; }
-    .hero-title { max-width: 100%; }
-    .hero-search-box { max-width: 100%; }
+    .hero-scenic { min-height: 380px; }
+    .hero-inner { padding: 36px 0; max-width: 100%; }
+    /* Mobile hero refinement (2026-09-17): the desktop clamp's floor
+       (1.9rem/30.4px) was too large for the mobile composition -- fixed
+       override here rather than adjusting the clamp itself, since the
+       clamp's floor is also relied on at in-between widths this task
+       wasn't asked to touch. 27px (line-height stays the same 1.1 ratio
+       -> 29.7px) keeps the headline clearly the dominant element while
+       giving the hero more breathing room. text-align:center here is
+       homepage-hero-specific -- .hero-title has no text-align at wider
+       widths (reads left-to-right in its own centered column instead,
+       per the desktop hero layout, untouched). */
+    .hero-title { max-width: 100%; font-size: 26px; text-align: center; margin: 0 0 12px; padding: 0 8px; }
+    /* .hero-lead already has text-align:center and margin:0 auto at every
+       width (unrelated earlier change) -- this only tightens its
+       max-width for mobile specifically, so the paragraph reads as a
+       controlled, centered block with real side margins instead of
+       wrapping edge-to-edge across the full viewport (54ch, the desktop
+       value, is wider than the mobile viewport itself and so never
+       actually constrained anything here before this). */
+    .hero-lead { max-width: 90%; }
+    .hero-search-box { max-width: 100%; padding-left: 16px; }
+    .hero-search-faux-sub { display: none; }
   }
 
-  /* Milestone 1: "What are you in the mood for?" cards. Primary three
-     (Eat/Drink/Hidden Gems) get a taller, larger-type treatment; the
-     secondary three (Golf/What's On/Explore) are deliberately quieter --
-     smaller type, shorter aspect ratio -- so all six never read as
-     identical generic buttons. */
-  .mood-section .discover-lead {
-    font-family: 'Nunito', sans-serif; font-size: 0.98rem; color: rgba(42,32,25,0.72);
-    margin: 6px 0 0; max-width: 52ch;
-  }
-  .mood-card-row-primary {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
-  }
-  .mood-card-row-secondary {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px;
+  /* Six equal-treatment landscape mood cards (~1.59:1, matching the
+     reference's measured proportions) -- Food & Drink/Beaches/Golf/
+     What's On/Outdoors/Hidden Gems, per the explicit visual-QA category
+     list (see renderMoodCardsHTML()). Desktop: one row of six. Mobile:
+     horizontal scroll-snap strip. */
+  .mood-card-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
   }
   .mood-card {
-    position: relative; display: block; border-radius: 16px; overflow: hidden;
-    text-decoration: none; color: #fff;
+    position: relative; display: block; border-radius: 10px; overflow: hidden;
+    text-decoration: none; color: #fff; aspect-ratio: 1.59 / 1;
     box-shadow: 0 10px 22px -16px rgba(74,52,40,0.4);
+    /* Fallback for a missing image (Beaches, currently) -- a clean
+       on-brand navy fill behind the icon/label rather than a blank or
+       broken-looking box. */
+    background: var(--ref-navy);
   }
-  .mood-card-primary { aspect-ratio: 3 / 4; }
-  .mood-card-secondary { aspect-ratio: 16 / 9; }
   .mood-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
   .mood-card:hover .mood-card-img { transform: scale(1.045); }
   .mood-card-overlay {
     position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 18px; background: linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(20,14,10,0.78) 100%);
+    padding: 12px; background: linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(20,14,10,0.78) 100%);
   }
-  .mood-card-primary .mood-card-title { font-family: 'Fraunces', serif; font-size: 1.3rem; font-weight: 700; }
-  .mood-card-secondary .mood-card-title { font-family: 'Fraunces', serif; font-size: 1.02rem; font-weight: 700; }
-  .mood-card-desc { font-family: 'Nunito', sans-serif; font-size: 0.85rem; opacity: 0.92; margin-top: 4px; display: block; }
-  .mood-card-secondary .mood-card-desc { font-size: 0.78rem; }
+  .mood-card-icon { color: #fff; opacity: 0.95; margin-bottom: 4px; }
+  .mood-card-icon svg { display: block; width: 18px; height: 18px; }
+  .mood-card-title { font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 700; display: block; }
+
+  @media (min-width: 720px) {
+    .mood-card-grid { grid-template-columns: repeat(6, 1fr); }
+  }
 
   @media (max-width: 640px) {
-    .mood-card-row-primary { grid-template-columns: 1fr; gap: 12px; }
-    .mood-card-primary { aspect-ratio: 16 / 10; }
-    .mood-card-row-secondary {
-      display: flex; overflow-x: auto; gap: 12px; margin-top: 12px; padding-bottom: 4px;
+    .mood-card-grid {
+      display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; padding-bottom: 4px;
     }
-    .mood-card-secondary { flex: 0 0 62%; aspect-ratio: 4 / 3; }
+    .mood-card { flex: 0 0 46%; scroll-snap-align: start; aspect-ratio: 1.59 / 1; }
   }
 
-  /* Reference redesign, forensic-comparison rebuild (2026-09-17,
-     supersedes the earlier eyebrow+title+lead+two-CTA layout on a plain
-     full-bleed photo): ONE continuous full-bleed dark navy band --
+  /* Reference redesign, forensic-comparison rebuild (supersedes the
+     earlier 3-column split): ONE continuous full-bleed dark navy band --
      icon/heading/paragraph/single CTA on the left, a photo blending into
-     a real map image on the right -- matching the reference's actual
-     structure instead of three separate boxed cards or a plain photo
-     background. .trip-cta-visual (photo) and .trip-cta-map (the map
-     image) both sit as absolutely-positioned layers filling the same
-     box; .trip-cta-content is the only normal-flow child, so
-     align-items:flex-end on the container alone puts it bottom-left
-     without needing its own absolute positioning. The map's left edge is
-     masked transparent-to-opaque so it visually dissolves out of the
-     photo rather than butting against it as a hard rectangle. */
+     a labeled schematic map (see renderBuildTripCTAHTML()) on the right --
+     matching the reference's actual structure instead of three separate
+     boxed cards on a light background. */
+  /* Visual QA pass rebuild: ONE continuous composition instead of three
+     boxed regions. .trip-cta-visual (photo) and .trip-cta-map both sit as
+     absolutely-positioned layers filling the same box; .trip-cta-content
+     is the only normal-flow child, so align-items:flex-end on the
+     container alone puts it bottom-left without needing its own absolute
+     positioning. The map's left edge is masked transparent-to-opaque so
+     it visually dissolves out of the photo rather than butting against it
+     as a hard rectangle. */
   .trip-cta-section { padding: 8px 0 36px; }
   .trip-cta-inner {
     position: relative; background: var(--ref-navy-deep); border-radius: 20px; overflow: hidden;
@@ -2012,16 +2346,20 @@ function renderHomepageDiscoveryStyles() {
   .trip-cta-btn:hover { background: var(--ref-cream); }
 
   @media (max-width: 900px) {
-    /* Side-by-side photo/text doesn't work at this width -- switch to a
-       reserved photo band up top (padding-top on the container makes
-       room for it without fighting the flex/absolute layering used at
-       desktop width) with the content block immediately below it, full
-       width, on its own solid (not gradient-faded) dark background so it
-       never visually collides with the map layer underneath. */
-    .trip-cta-inner { min-height: 0; border-radius: 16px; padding-top: 220px; }
-    .trip-cta-visual { top: 0; left: 0; right: 0; bottom: auto; height: 220px; }
-    .trip-cta-map { top: 0; bottom: auto; height: 220px; width: 58%; }
-    .trip-cta-scrim { display: none; }
+    /* Mobile-only simplification (2026-09-17): the photo band (the
+       sunglasses/table/compass travel photo, .trip-cta-visual) and the
+       schematic map graphic layered over it (.trip-cta-map) are both
+       hidden below 900px, leaving just the text/CTA content panel on a
+       clean solid background -- desktop (>900px, untouched below this
+       query) keeps the full side-by-side photo+map+content layout
+       exactly as before. padding-top:0 removes the space that used to
+       be reserved for that now-hidden photo band, so nothing empty is
+       left behind -- the content panel simply starts at the top of the
+       card. .trip-cta-inner's own base background (--ref-navy-deep,
+       unconditional, not part of this media query) shows through
+       cleanly now that the photo layer covering it is gone. */
+    .trip-cta-inner { min-height: 0; border-radius: 16px; padding-top: 0; }
+    .trip-cta-visual, .trip-cta-map { display: none; }
     .trip-cta-content { max-width: 100%; width: 100%; padding: 24px; background: rgba(16,27,36,0.94); }
   }
 
@@ -2040,6 +2378,257 @@ function renderHomepageDiscoveryStyles() {
   }
   .browse-search-lead {
     font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: rgba(42,32,25,0.72); margin: 0;
+  }
+
+  /* Homepage footer redesign (2026-09-17, revised again same day): full-
+     width navy band using the same --ref-navy/--ref-gold/--ref-cream
+     system as the header/hero, replacing the old footer's --ink/--sand
+     palette. Entirely new home-footer-* classes (see renderHomeFooterHTML()
+     above) rather than the shared .logo/.foot-* classes the old footer
+     used, and .wrap-wide (matching the rest of the redesigned homepage's
+     content width) instead of the old footer's narrower .wrap. Scoped to
+     / only -- /browse still renders the original static footer/CSS,
+     untouched.
+     The explicit padding:0 below is a deliberate fix, not a no-op: the
+     OLD footer's own unscoped "footer" element-type selector rule
+     (padding: 50px 0 36px, further down in this same stylesheet, written
+     for the original static footer) still matches any footer element by
+     tag, including this new one, since nothing here used to override it.
+     A class selector already outranks a bare element-type selector
+     regardless of source order, so this single declaration fully
+     neutralizes that leak -- every bit of this footer's real spacing
+     comes from its own child elements' padding instead
+     (.home-footer-top/.home-footer-bottom). CAUTION FOR FUTURE EDITS: this
+     whole CSS block is returned as a plain string by
+     renderHomepageDiscoveryStyles() and spliced into the page's raw HTML,
+     and the / route handler later locates the ORIGINAL static footer tag
+     by a plain substring search on that same assembled HTML. Never spell
+     that tag's opening or closing form, in angle brackets, anywhere in
+     THIS comment block (or anywhere else inside this function's returned
+     string) -- doing so once already produced a real, hard-to-spot bug:
+     the search matched the mention inside this very comment instead of
+     the real tag, and silently deleted every homepage section between
+     that point and the real one when the footer was spliced in. */
+  .home-footer { background: var(--ref-navy); color: var(--ref-cream); margin-top: 8px; padding: 0; }
+  .home-footer-top {
+    display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;
+    gap: 48px; padding: 72px 0 48px;
+  }
+  .home-footer-brand { display: flex; flex-direction: column; gap: 10px; max-width: 260px; flex-shrink: 0; }
+  .home-footer-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+  .home-footer-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 14px; flex-shrink: 0; color: var(--ref-cream); }
+  .home-footer-icon svg { width: 100%; height: 100%; }
+  .home-footer-wordmark {
+    font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.3rem;
+    letter-spacing: 0.02em; text-transform: uppercase; color: var(--ref-cream);
+  }
+  .home-footer-wordmark-accent { color: var(--ref-gold); }
+  .home-footer-tagline { font-family: 'Nunito', sans-serif; font-size: 0.85rem; color: rgba(245,243,237,0.6); margin: 0; }
+  /* Explicit request (2026-09-17 revision): Regions folded back INTO this
+     row as its own 4th column rather than a separate full-width band
+     below. Layout correction (same day, follow-up): a strict equal
+     repeat(4,1fr) plus CSS Grid's default align-items:stretch forced
+     every column to the height of the tallest one (Regions, 20 links) --
+     found via direct measurement, all four .home-footer-col boxes were
+     501px tall even though About's real content was only 155px and
+     Social Media's only 34px, leaving large dead navy gaps under both.
+     align-items:start fixes that -- each column now sizes to its own
+     content; Regions being visibly the tallest column is expected and
+     fine (it has by far the most real content) rather than a bug to hide.
+     Column widths are now mildly (not dramatically) uneven rather than a
+     strict 1fr each, giving Regions a little more room for its two-column
+     region list and taking a little back from About/Social Media, which
+     never needed a full equal share to begin with. */
+  .home-footer-cols {
+    display: grid; grid-template-columns: 1fr 0.8fr 1.2fr 0.8fr;
+    align-items: start; gap: 32px; flex: 1; min-width: 0;
+  }
+  .home-footer-col h4 {
+    font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 14px;
+  }
+  .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .home-footer-col a, .home-footer-region-group a {
+    font-family: 'Nunito', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78);
+    text-decoration: none; transition: color 0.15s;
+  }
+  .home-footer-col a:hover, .home-footer-region-group a:hover { color: var(--ref-gold); }
+
+  /* Regions column (2026-09-17 revision, corrected same day): 20 real
+     links inside one column, kept compact via the four wizard groups
+     (Central/South/North/Ski resorts -- FOOTER_REGION_GROUPS above) with
+     smaller type/tighter gaps than the other three columns, rather than
+     shrinking to illegibility or overflowing the column.
+     A rigid 2x2 CSS Grid (pairing Central with South, North with Ski
+     resorts by POSITION) was tried first and measured to be the actual
+     cause of the "messy" look reported: CSS Grid sizes a row to its
+     tallest cell, so Central (4 links) was stretched to match South's
+     height (7 links) in the same row, leaving a ~100px dead gap between
+     Central's last link and the North heading below. Replaced with a
+     CSS multi-column FLOW instead of a position-paired grid: the browser
+     distributes the four group blocks across 2 columns by actual height
+     (column-fill:balance, the default), so a short group is simply
+     followed immediately by the next group in the same column rather
+     than being stretched to match whatever tall group happened to land
+     in the same row. break-inside:avoid keeps each group's heading+list
+     together as one unit (never splits a group's links across the two
+     columns). Still reads as a compact two-column list, per the brief --
+     just without the artificial row-pairing dead space. */
+  .home-footer-region-groups { column-count: 2; column-gap: 20px; }
+  .home-footer-region-group {
+    break-inside: avoid; -webkit-column-break-inside: avoid;
+    margin-bottom: 18px;
+  }
+  .home-footer-region-group:last-child { margin-bottom: 0; }
+  .home-footer-region-group h5 {
+    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 700;
+    color: rgba(245,243,237,0.55); margin: 0 0 8px;
+  }
+  .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  .home-footer-region-group a { font-size: 0.82rem; line-height: 1.3; }
+  .home-footer-social-row { display: flex; gap: 10px; }
+  .home-footer-social-icon {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(245,243,237,0.1); color: rgba(245,243,237,0.8);
+    cursor: default; transition: background 0.15s, opacity 0.15s;
+  }
+  .home-footer-social-icon.icon-instagram {
+    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+    color: #fff; opacity: 1;
+  }
+  .home-footer-social-icon.icon-instagram:hover { opacity: 0.85; }
+  .home-footer-social-icon.icon-facebook { background: #1877F2; color: #fff; opacity: 0.5; }
+  .home-footer-social-icon.icon-tiktok { background: #010101; color: #25F4EE; opacity: 1; }
+  .home-footer-social-icon.icon-tiktok:hover { opacity: 0.85; }
+  .home-footer-social-icon::after {
+    content: attr(data-tooltip);
+    position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: var(--ref-navy-deep); color: var(--ref-cream);
+    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 700;
+    white-space: nowrap; padding: 5px 10px; border-radius: 8px;
+    opacity: 0; pointer-events: none; z-index: 20;
+    transition: opacity 0.12s, transform 0.12s;
+  }
+  .home-footer-social-icon:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 24px 0 40px; }
+  .home-footer-copyright { font-family: 'Nunito', sans-serif; font-size: 0.8rem; color: rgba(245,243,237,0.55); text-align: center; margin: 0; }
+
+  /* Trip 0 button redesign, homepage-only (2026-09-17): #tripTray/
+     #tripTrayToggle/#tripTrayCount are shared, site-wide rules defined in
+     app.css (still used as-is on /browse, untouched) -- these overrides
+     live only in this homepage-exclusive <style> block (never injected on
+     /browse), so they win on specificity/source-order there and nowhere
+     else. Direction: a small persistent "your trip" control, not a
+     primary CTA -- smaller footprint, the homepage's own navy/cream/gold
+     system instead of the old plum/paper/amber, a lighter shadow, and a
+     smaller/quieter count badge, while leaving position (fixed, bottom
+     corner, 20px from the edges -- already comfortable for tapping) and
+     every bit of the click/expand/route/clear behavior untouched -- this
+     only restyles the closed-state toggle and its count, never
+     #tripTrayPanel (the expanded trip list keeps its existing look). */
+  #tripTrayToggle {
+    background: var(--ref-navy); color: var(--ref-cream);
+    border: 1px solid rgba(245,243,237,0.16);
+    border-radius: 999px; padding: 8px 14px; gap: 6px;
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;
+    box-shadow: 0 4px 14px -6px rgba(16,27,36,0.45);
+  }
+  #tripTrayToggle:hover { background: var(--ref-navy-deep); }
+  #tripTrayCount {
+    background: var(--ref-gold); color: var(--ref-navy-deep);
+    width: 16px; height: 16px; font-size: 0.62rem; font-weight: 800;
+  }
+
+  @media (max-width: 900px) {
+    /* align-items:stretch override is required here: the base
+       .home-footer-top rule sets align-items:flex-start for the desktop
+       row layout, and that alone (even after flipping to
+       flex-direction:column here) leaves .home-footer-cols sized to its
+       own shrink-to-fit content width instead of the full row width --
+       found via direct measurement (it was rendering at roughly half the
+       viewport width instead of full width). */
+    .home-footer-top { flex-direction: column; align-items: stretch; gap: 40px; padding: 56px 0 40px; }
+    .home-footer-cols { grid-template-columns: repeat(2, 1fr); gap: 36px 32px; }
+  }
+
+  @media (max-width: 560px) {
+    /* Explicit stacking order requested (2026-09-17 revision): Explore,
+       About, Regions, Social Media, one per row -- a single column at
+       this width naturally stacks in the same DOM order the 4-column
+       grid uses above, so no reordering is needed here. */
+    .home-footer-cols { grid-template-columns: 1fr; gap: 28px; }
+
+    /* Mobile-only tightening pass (2026-09-17, follow-up): the desktop
+       spacing values (built for a 4-column row with lots of horizontal
+       room) felt oversized once stacked into one long mobile column --
+       measured at 1416px tall for the footer alone at 390px width before
+       this pass. Nothing here changes desktop (all of it lives inside
+       this max-width:560px block, and the desktop-facing base rules
+       above are untouched) and no content/typography was removed or
+       shrunk -- these are gap/margin/padding values only, still leaving
+       comfortable breathing room between Explore/About/Regions/Social
+       Media, just without the extra desktop-sized air baked into each
+       one. */
+    .home-footer-top { padding: 36px 0 28px; gap: 28px; }
+    .home-footer-col h4 { margin-bottom: 10px; }
+    .home-footer-col ul { gap: 8px; }
+    .home-footer-region-groups { column-gap: 16px; }
+    .home-footer-region-group { margin-bottom: 14px; }
+    .home-footer-region-group h5 { margin-bottom: 6px; }
+    .home-footer-region-group ul { gap: 5px; }
+
+    /* Mobile centering pass (2026-09-17): the footer's desktop layout is a
+       4-column row where every column is naturally left-aligned within
+       its own cell -- fine side-by-side, but once everything stacks into
+       one column on mobile it reads as hugging the left edge instead of
+       feeling like a deliberate, centered composition. text-align:center
+       cascades onto every heading/link/paragraph in the footer (brand
+       wordmark+tagline, all four column headings, every Explore/About/
+       Regions/Social Media link, the Regions sub-group headings too,
+       since .home-footer-region-group lives inside a .home-footer-col).
+       align-items:center on the flex/column lists shrinks each link/icon
+       row to its own content width and centers that box too, rather than
+       just centering text inside a still-full-width, left-edge-anchored
+       link. None of this touches the desktop rules above -- same pattern
+       as every other mobile-only override in this block. */
+    .home-footer-top, .home-footer-col { text-align: center; }
+    /* align-items:center alone isn't enough here: .home-footer-top keeps
+       align-items:stretch (from the 900px block above, still in effect)
+       because .home-footer-cols genuinely needs to stay full-width (see
+       that fix's own comment). Stretch also applies to .home-footer-brand
+       as a sibling flex item, which -- capped at max-width:260px -- ends
+       up exactly 260px wide but still flush against the left edge
+       (stretch sizes an item, it doesn't reposition it). margin:0 auto
+       is what actually centers that fixed-width box within the full-
+       width row; align-items:center then centers the logo+tagline inside
+       the (now-centered) box itself. */
+    .home-footer-brand { align-items: center; margin: 0 auto; }
+    .home-footer-col ul, .home-footer-region-group ul { align-items: center; }
+    .home-footer-social-row { justify-content: center; }
+
+    /* Trip 0 button, mobile: slightly smaller still and pulled in a touch
+       from the very edge, so it stays compact and never competes with
+       page content on a narrow viewport, while remaining comfortably
+       tappable (44px+ touch target maintained via padding, not shrunk
+       text alone). */
+    #tripTray { bottom: 16px; right: 16px; }
+    #tripTrayToggle { padding: 7px 12px; font-size: 0.74rem; gap: 5px; }
+    #tripTrayCount { width: 15px; height: 15px; font-size: 0.6rem; }
+
+    /* #tripTray is a site-wide fixed element pinned bottom:20px/right:20px
+       (~50px tall) -- at full scroll on narrow viewports it would
+       otherwise float directly on top of this column's last row of
+       links. Extra bottom padding keeps real clearance below the last
+       row instead, so the fixed button always lands in empty space
+       below the content, never over a link. Reduced from the earlier
+       104px: re-measured after this tightening pass and confirmed (see
+       session verification) that a smaller value still leaves the
+       fixed button clear of every link/heading/icon/copyright at the
+       real resting scroll position -- 104px had far more margin than
+       was actually needed. */
+    .home-footer-bottom { padding-bottom: 56px; }
   }
 </style>`;
 }
@@ -2902,7 +3491,7 @@ function render404Page(pathname) {
 </html>`;
 }
 
-function renderOpenNowScript() {
+function renderOpenNowScript(opts) {
   // Self-contained "Open Now" toggle. Deliberately does NOT touch the app's
   // own filter/search logic (activeFilters Set, applyFilters(), etc.) —
   // instead it piggybacks on something the app already computes for us:
@@ -2914,10 +3503,25 @@ function renderOpenNowScript() {
   // Because search/filter/pagination re-renders the .venue-grid contents
   // via React, we re-apply on every DOM mutation (rAF-debounced so it's
   // cheap) rather than trying to hook into the app's own render cycle.
+  //
+  // showButton (2026-09-17, homepage-only removal): defaults to true
+  // (unchanged behavior everywhere this was already used) -- /browse's
+  // own call site below is untouched, still gets the real, functional
+  // button, since /browse still has .venue-card results to filter. The
+  // homepage never has any .venue-card results to filter at all (the
+  // wizard/results grid lives only at /browse), so the button served no
+  // purpose there beyond visual clutter; the homepage's call site passes
+  // { showButton: false } to skip creating it, while every other piece of
+  // this script (MutationObserver, apply(), the .filter-bar scroll
+  // handling) is left completely intact and harmless either way -- this
+  // only gates ensureButton(), nothing else, keeping the change to the
+  // smallest safe surface.
+  const showButton = !(opts && opts.showButton === false);
   return `
 <script>
 (function(){
   var D = document;
+  var SHOW_OPEN_NOW_BUTTON = ${showButton};
   var active = false;
   var scheduled = false;
 
@@ -2938,6 +3542,7 @@ function renderOpenNowScript() {
   }
 
   function ensureButton(){
+    if (!SHOW_OPEN_NOW_BUTTON) return;
     if (D.querySelector('.og-open-now-btn')) return;
     var btn = D.createElement('button');
     btn.type = 'button';
@@ -3097,8 +3702,60 @@ function renderHiddenElementsScript() {
 </script>`;
 }
 
-
-
+// Lets the new homepage's links land on /browse already filtered, since
+// the homepage no longer has its own copy of the wizard/results DOM to
+// drive directly (see the architecture-change comment on the / route
+// above). Reuses the wizard's own existing controls (.type-chip clicks +
+// the wizard:showResults event, #searchInput/#searchBtn) exactly as
+// app.js's own mood-card handler already does on the homepage -- no new
+// filtering logic, just triggering the same real controls once on load.
+// Every lookup is null-guarded, so this is a harmless no-op if a param is
+// absent or a target element doesn't exist.
+function renderBrowsePrefillScript() {
+  return `
+<script>
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  var types = params.get('types');
+  var q = params.get('q');
+  var openMap = params.get('openMap');
+  function run(){
+    if (types) {
+      var wanted = types.split(',');
+      document.querySelectorAll('.type-chip').forEach(function(chip){
+        var shouldBePressed = wanted.indexOf(chip.dataset.type) !== -1;
+        var isPressed = chip.getAttribute('aria-pressed') === 'true';
+        if (shouldBePressed !== isPressed) chip.click();
+      });
+      document.dispatchEvent(new Event('wizard:showResults'));
+    }
+    if (q) {
+      var input = document.getElementById('searchInput');
+      var btn = document.getElementById('searchBtn');
+      if (input && btn) { input.value = q; btn.click(); }
+    }
+    if (openMap) {
+      var toggle = document.getElementById('mapToggleBtn');
+      if (toggle && toggle.getAttribute('aria-pressed') !== 'true') toggle.click();
+    }
+  }
+  // app.js wires up .type-chip/#searchBtn/#mapToggleBtn click handlers only
+  // once its own venue fetch resolves (window.__applyFilters is set at the
+  // end of that same init step) -- clicking these controls any earlier is a
+  // no-op since no listener exists yet. Poll briefly for that readiness
+  // signal instead of guessing a fixed delay.
+  function whenReady(fn){
+    var tries = 0;
+    (function poll(){
+      if (window.__applyFilters || tries++ > 100) fn();
+      else setTimeout(poll, 50);
+    })();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ whenReady(run); });
+  else whenReady(run);
+})();
+</script>`;
+}
 
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
@@ -3117,40 +3774,68 @@ const server = http.createServer(async (req, res) => {
   try {
     // Serve the website itself at / and /okanagan.html, so this same
     // deployment is both the API and the live site.
+    //
+    // Architecture change (2026-09-17): the homepage and the directory are
+    // now two separate presentations of the SAME underlying data/routes --
+    // no data was duplicated to make this split. `/` (and its /okanagan.html
+    // alias) render ONLY the new curated homepage (hero, mood cards, Hidden
+    // Gems, Explore the Okanagan, Happening Soon, Build My Trip) and end at
+    // the shared footer. The old "Browse & Search" wizard + results grid +
+    // interactive map + "List your venue" form + app teaser -- previously
+    // spliced into this same page below the wizard -- are unchanged in
+    // every respect (markup, IDs, app.js wiring, data source) but now live
+    // at their own URL, /browse, so they're reached via navigation instead
+    // of always rendering underneath the new homepage. See /browse below.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
         let html = fs.readFileSync(SITE_PATH, 'utf8');
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
-        // not just via the sitemap (which some crawlers deprioritize). This
-        // is plain visible HTML, not hidden/cloaked content.
-        const footer = renderGuideFooterHTML();
-        const openNowScript = renderOpenNowScript();
+        // not just via the sitemap (which some crawlers deprioritize). The
+        // markup/links themselves are untouched and identical to what
+        // /browse still renders fully visible (see the /browse handler
+        // below, which calls renderGuideFooterHTML() directly, unwrapped).
+        // Visual-only fix (2026-09-17): this block used to render as a
+        // visible "Browse Okanagan Roam by guide" section below the new
+        // home-footer, which read as a leftover/second footer to visitors.
+        // display:none removes it from layout/paint (zero visible space,
+        // can't create overflow, can't sit under the fixed Trip 0 button)
+        // while leaving it fully present in the HTML response for crawlers
+        // -- still real markup, same links, nothing removed, nothing
+        // cloaked (the content genuinely matches what a visitor would see
+        // if this div's display were toggled, it's just not shown here by
+        // design). Scoped to this one wrapper on the homepage's own
+        // `footer` variable only -- renderGuideFooterHTML() itself is
+        // untouched, so /browse's copy is completely unaffected.
+        const footer = `<div style="display:none">${renderGuideFooterHTML()}</div>`;
+        // Open Now removed from the homepage only (2026-09-17) -- see
+        // renderOpenNowScript() for why: the homepage has no .venue-card
+        // results to filter (those only exist at /browse), so the button
+        // had nothing to do there beyond floating on top of the page.
+        // /browse's own call site below this one is untouched.
+        const openNowScript = renderOpenNowScript({ showButton: false });
         const hiddenElementsScript = renderHiddenElementsScript();
 
         // Design Sprint 3: homepage discovery modules. Same server-side
         // injection approach as the three pieces above — computed once per
-        // request, spliced into specific, uniquely-matched anchor points.
+        // request, spliced into a single anchor point right after the hero.
         //
-        // Milestone 3 (approved homepage redesign — final section order):
+        // Reference redesign (webpage design.png — final section order):
         // Hero -> Mood -> Hidden Gems -> Explore the Okanagan -> Build
-        // Your Trip -> Browse/Search (the wizard, id="directory") ->
-        // existing deeper directory content. Hidden Gems and Explore the
-        // Okanagan move from "after the wizard" (Milestones 1-2) to
-        // "before the wizard", alongside the new Build Your Trip CTA;
-        // Browse by Category is unmodified and remains part of the
-        // existing deeper-directory content after the wizard, exactly as
-        // before — only Hidden Gems/Explore's anchor point moved, matching
-        // the approved architecture's explicit ordering. Happening Soon
-        // (the homepage's own inline event strip that used to render here)
-        // was removed entirely on 2026-09-17 -- events now live at their
-        // own destination, /events, linked to from the What's On mood card.
+        // Your Trip -> footer. Weather banner, Spotlight banner, Featured
+        // Venues, and Browse by Category are no longer part of the
+        // homepage at all (removed per the approved critical rule against
+        // stacking legacy sections underneath the new design) — their
+        // markup/functions are otherwise untouched and still independently
+        // testable/reusable; they're simply no longer spliced into this
+        // page. Happening Soon was removed the same way on 2026-09-17 --
+        // events now live at their own destination, /events, linked to
+        // from the What's On mood card.
         const discoveryStyles = renderHomepageDiscoveryStyles();
         const moodCards = renderMoodCardsHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
         const exploreRegions = renderExploreRegionsHTML();
         const buildTripSection = renderBuildTripCTAHTML();
-        const exploreByCategory = renderExploreByCategoryHTML();
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
         if (html.includes(heroToWizardAnchor)) {
@@ -3160,17 +3845,77 @@ const server = http.createServer(async (req, res) => {
           );
         }
 
-        const wizardToWeatherAnchor = '</section>\n\n<section class="weather-banner" id="weatherBanner"';
-        if (html.includes(wizardToWeatherAnchor)) {
-          html = html.replace(
-            wizardToWeatherAnchor,
-            `</section>\n${exploreByCategory}\n\n<section class="weather-banner" id="weatherBanner"`
-          );
+        // Remove the old directory UI from the homepage response entirely
+        // (not CSS-hidden) -- the wizard, results grid/map, "list your
+        // venue" form, and app teaser, in that order, are contiguous in the
+        // static template with nothing else between them and <footer>. The
+        // exact same markup, IDs, and app.js behavior still render fine at
+        // /browse below; only their presence on / is removed here. Slicing
+        // out the substring between these two markers is robust to
+        // whitespace/comment changes inside those sections (unlike anchoring
+        // on their multi-line closing boundaries) and self-documents which
+        // four sections are being dropped from this page.
+        const oldDirectoryStart = html.indexOf('<section class="filter-bar" id="directory">');
+        const footerStart = html.indexOf('<footer>');
+        if (oldDirectoryStart !== -1 && footerStart !== -1 && footerStart > oldDirectoryStart) {
+          html = html.slice(0, oldDirectoryStart) + html.slice(footerStart);
         }
+
+        // Homepage footer redesign (2026-09-17): swap the static footer
+        // (still the one /browse serves, untouched) for the new
+        // home-footer-* markup, with its own real hrefs already baked in
+        // (/browse, /browse#app, /browse#list-venue, /kelowna, etc.) --
+        // see renderHomeFooterHTML() above for why each link is what it is.
+        const oldFooterMatch = html.match(/<footer>[\s\S]*?<\/footer>/);
+        if (oldFooterMatch) {
+          html = html.replace(oldFooterMatch[0], renderHomeFooterHTML());
+        }
+
+        // Anything still pointing at the now-removed sections (the header's
+        // "Browse & Search" dropdown link and every homepage module's own
+        // #directory link) needs to point at /browse instead, since those
+        // in-page anchors no longer exist on this page. Done as one final
+        // pass over the fully-assembled HTML rather than in each render
+        // function, so there's a single place that defines "where the
+        // directory now lives." (The old footer's #directory/#app/
+        // #list-venue placeholders no longer apply -- the new footer above
+        // already has real hrefs.)
+        html = html
+          .replace(/href="#directory"/g, 'href="/browse"')
+          .replace(/href="#app"/g, 'href="/browse#app"')
+          .replace(/href="#list-venue"/g, 'href="/browse#list-venue"');
 
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n</body>`)
           : html + footer + openNowScript + hiddenElementsScript;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('okanagan.html not found on server');
+    }
+
+    // GET /browse — the existing "Browse & Search" wizard, results grid,
+    // interactive map, "list your venue" form, and app teaser: the exact
+    // same markup/IDs/app.js behavior that used to render directly on the
+    // homepage, now reached via navigation instead. Zero data duplication:
+    // this serves the SAME okanagan.html template and the SAME client-side
+    // rendering (app.js reads from the SAME /api/venues data the homepage's
+    // links point into), just without the new curated-homepage sections
+    // spliced in above it. Optional query params let homepage links land
+    // here pre-filtered: ?q=<text> runs a search, ?types=a,b,c presses the
+    // matching wizard type chips, ?openMap=1 opens the interactive map —
+    // see renderBrowsePrefillScript() below.
+    if (pathname === '/browse' && method === 'GET') {
+      if (fs.existsSync(SITE_PATH)) {
+        let html = fs.readFileSync(SITE_PATH, 'utf8');
+        const footer = renderGuideFooterHTML();
+        const openNowScript = renderOpenNowScript();
+        const hiddenElementsScript = renderHiddenElementsScript();
+        const prefillScript = renderBrowsePrefillScript();
+        html = html.includes('</body>')
+          ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n${prefillScript}\n</body>`)
+          : html + footer + openNowScript + hiddenElementsScript + prefillScript;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -4183,4 +4928,7 @@ module.exports = {
   // Hidden Gems content-model change (2026-09-17)
   HIDDEN_GEM_EDITORIAL_CARDS,
   hiddenGemEditorialCardHtml,
+  // Homepage footer redesign (2026-09-17)
+  renderHomeFooterHTML,
+  FOOTER_REGION_GROUPS,
 };

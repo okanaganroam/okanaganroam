@@ -86,59 +86,90 @@
   </button>
 </div>
 
+<!-- Header rebuilt to match webpage design.png (reference redesign):
+     flat mountain-icon logo (navy + gold wordmark, no tagline/badge/social
+     icons -- none appear in the reference), Discover/Things to Do/Food &
+     Drink dropdowns (real existing anchors/category pages, not invented
+     destinations), direct Hidden Gems/Golf/Map links, search icon, and a
+     relocated "Build My Trip" pill CTA. #navLinks/#navHamburger IDs kept
+     unchanged so the existing mobile-menu toggle JS keeps working as-is. -->
 <header id="top">
   <nav class="nav wrap">
     <div class="nav-brand">
-      <a href="#top" class="logo" aria-label="Okanagan Roam home">
-        <span class="logo-icon-badge">
-          <svg viewBox="0 0 40 40" fill="none" aria-hidden="true"><circle cx="26" cy="11" r="3" fill="#D9A441"/><path d="M26 4v2M31 6.5l-1.4 1.4M33.5 11h-2M26 18v-2M20.5 6.5l1.4 1.4" stroke="#D9A441" stroke-width="1.3" stroke-linecap="round"/><path d="M6 27L15 13l6 9" stroke="#1F5C5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/><path d="M10 27L20 11l10 16" stroke="#1F5C5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 27.5h30" stroke="#1F5C5C" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/></svg>
+      <a href="#top" class="logo" aria-label="Okanagan Roam home" data-i18n-aria="nav.homeAriaLabel">
+        <span class="logo-icon-badge" aria-hidden="true">
+          <svg viewBox="0 0 60 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20 14 6l7 8 5-5 5 5"/><path d="M26 20 38 6l7 8 5-5 5 5"/></svg>
         </span>
         <span class="logo-text">
-          <span class="logo-wordmark">Okanagan Roam</span>
-          <span class="logo-tagline">Okanagan Valley, BC</span>
+          <span class="logo-wordmark">Okanagan<span class="logo-wordmark-accent"> Roam</span></span>
         </span>
       </a>
-      <div class="nav-social">
-        <a class="social-icon nav-social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
-        </a>
-        <span class="social-icon nav-social-icon icon-facebook" data-tooltip="Coming soon" title="Coming soon" aria-label="Facebook, coming soon">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 4h-2a4 4 0 0 0-4 4v3H6v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3z"/></svg>
-        </span>
-        <a class="social-icon nav-social-icon icon-tiktok" href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on TikTok">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c0 2.5 2 4.5 4.5 4.5"/></svg>
-        </a>
-      </div>
     </div>
     <ul class="nav-links" id="navLinks">
-      <li><a href="#directory" data-i18n="nav.directory">Directory</a></li>
-      <li><a href="#list-venue" data-i18n="nav.listVenue">List Your Venue</a></li>
-      <li><a href="#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
+      <li class="nav-dropdown">
+        <span class="nav-link-label" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="nav.discover">Discover</span><span class="nav-link-caret">&#9662;</span></span>
+        <div class="nav-dropdown-panel">
+          <a href="#moodCards" data-i18n="mood.heading">What are you in the mood for?</a>
+          <a href="#hiddenGems" data-i18n="gems.heading">Hidden Gems</a>
+          <a href="#exploreRegions" data-i18n="explore.heading">Explore the Okanagan</a>
+          <a href="#directory" data-i18n="nav.browseSearch">Browse &amp; Search</a>
+        </div>
+      </li>
+      <li><a href="#hiddenGems" data-i18n="gems.heading">Hidden Gems</a></li>
+      <li class="nav-dropdown">
+        <span class="nav-link-label" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="nav.thingsToDo">Things to Do</span><span class="nav-link-caret">&#9662;</span></span>
+        <div class="nav-dropdown-panel">
+          <a href="#exploreRegions" data-i18n="explore.heading">Explore the Okanagan</a>
+          <a href="/events" data-i18n="mood.whatsOn.title">What's On</a>
+          <a href="/kelowna/golf" data-i18n="mood.golf.title">Golf</a>
+        </div>
+      </li>
+      <li class="nav-dropdown">
+        <span class="nav-link-label" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="mood.foodDrink.title">Food &amp; Drink</span><span class="nav-link-caret">&#9662;</span></span>
+        <div class="nav-dropdown-panel">
+          <a href="/kelowna/restaurants" data-i18n="wizard.restaurants">Restaurants</a>
+          <a href="/kelowna/wineries" data-i18n="wizard.wineries">Wineries</a>
+          <a href="/kelowna/breweries" data-i18n="wizard.breweries">Breweries</a>
+          <a href="/kelowna/cafes" data-i18n="wizard.cafes">Cafes</a>
+        </div>
+      </li>
+      <li><a href="/kelowna/golf" data-i18n="mood.golf.title">Golf</a></li>
+      <li><a href="#mapPanel" id="navMapLink" data-i18n="nav.map">Map</a></li>
     </ul>
-    <button class="lang-toggle" id="langToggle" type="button" aria-label="Switch language">EN / FR</button>
-    <button class="app-btn" data-i18n="nav.appComingSoon" onclick="document.getElementById('app').scrollIntoView({behavior:'smooth'})">App coming soon</button>
-    <button class="nav-hamburger" id="navHamburger" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <button class="nav-search-btn" id="navSearchBtn" type="button" aria-label="Search" data-i18n-aria="search.button">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+    </button>
+    <button class="lang-toggle" id="langToggle" type="button" aria-label="Switch language" data-i18n-aria="nav.switchLanguage">EN / FR</button>
+    <button class="app-btn" id="navTripBtn" type="button"><span data-i18n="trip.buildMyTrip">Build My Trip</span> <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    <button class="nav-hamburger" id="navHamburger" aria-label="Open menu" aria-expanded="false" data-i18n-aria="nav.openMenu"><span></span><span></span><span></span></button>
   </nav>
 </header>
 
-<!-- Milestone 1 (approved homepage redesign): scenic hero, replacing the
-     old "Worth the Drive" carousel as the homepage's opening section.
-     Image is a temporary placeholder (public/images/hero.png) pending
-     real AI-generated photography -- see public/images/PLACEHOLDER_IMAGES.md. -->
+<!-- Reference redesign, forensic-comparison rebuild: hero copy/structure
+     matches webpage design.png exactly now (single-line all-caps headline,
+     no eyebrow, one-line subhead, two-line search field) rather than
+     keeping the old three-part eyebrow+headline+lead copy block with only
+     a typographic treatment change -- measured reference hero is 263px
+     tall at 1672px width vs. this section's earlier 561px, almost
+     entirely because of that old, much longer copy block. -->
 <section class="hero-scenic" id="heroScenic">
   <div class="hero-media" aria-hidden="true">
-    <img class="hero-media-img" src="/images/hero.png" width="1920" height="1080" alt="" fetchpriority="high" decoding="async">
+    <img class="hero-media-img" src="/images/hero.png" width="1376" height="768" alt="" fetchpriority="high" decoding="async">
     <div class="hero-scrim"></div>
   </div>
-  <div class="wrap hero-inner">
-    <span class="hero-eyebrow" data-i18n="hero.eyebrow">Okanagan Valley, BC</span>
-    <h1 class="hero-title" data-i18n="hero.headline">Let&rsquo;s find your next favourite place in the Okanagan.</h1>
-    <p class="hero-lead" data-i18n="hero.lead">From lakeside patios to hidden wineries, discover where to eat, drink, and explore across the valley.</p>
+  <div class="wrap-wide hero-inner">
+    <h1 class="hero-title" data-i18n="hero.headline">Explore the Okanagan</h1>
+    <p class="hero-lead" data-i18n="hero.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place.</p>
     <form class="hero-search-box" id="heroSearchForm" role="search">
-      <input type="text" id="heroSearchInput" data-i18n-placeholder="search.placeholder" placeholder="Search a place, cuisine, or what you're craving" aria-label="Search venues">
-      <button type="submit" id="heroSearchBtn" aria-label="Search">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
-      </button>
+      <svg class="hero-search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      <div class="hero-search-field">
+        <input type="text" id="heroSearchInput" placeholder=" " aria-label="What are you looking for?" data-i18n-aria="search.mainLine">
+        <span class="hero-search-faux" aria-hidden="true">
+          <span class="hero-search-faux-main" data-i18n="search.mainLine">What are you looking for?</span>
+          <span class="hero-search-faux-sub" data-i18n="search.subLine">Wineries, restaurants, hikes, beaches, hidden gems&hellip;</span>
+        </span>
+      </div>
+      <button type="submit" id="heroSearchBtn" data-i18n="search.button">Search</button>
     </form>
   </div>
 </section>
@@ -307,131 +338,6 @@
       </div>
     </div>
 
-  </div>
-</section>
-
-<section class="weather-banner" id="weatherBanner" style="display:none;">
-  <div class="wrap weather-banner-inner">
-    <div class="weather-banner-icon" id="weatherIcon">☀️</div>
-    <div class="weather-banner-text">
-      <p class="weather-banner-condition" id="weatherCondition">Loading weather&hellip;</p>
-      <p class="weather-banner-suggestion" id="weatherSuggestion"></p>
-    </div>
-    <button class="weather-banner-btn" id="weatherBannerBtn">Show me →</button>
-  </div>
-</section>
-
-<section class="spotlight-banner" id="spotlightBanner" style="display:none;">
-  <div class="wrap spotlight-inner">
-    <div class="spotlight-text">
-      <span class="eyebrow spotlight-eyebrow">This week's spotlight</span>
-      <h3 class="spotlight-name" id="spotlightName"></h3>
-      <p class="spotlight-meta" id="spotlightMeta"></p>
-      <p class="spotlight-desc" id="spotlightDesc"></p>
-      <div class="spotlight-badges" id="spotlightBadges"></div>
-    </div>
-    <button class="spotlight-btn" id="spotlightBtn">See this spot →</button>
-  </div>
-</section>
-
-<section class="featured-venues">
-  <div class="wrap">
-    <div class="featured-head">
-      <span class="eyebrow" data-i18n="featured.eyebrow">Worth the trip</span>
-      <h2 data-i18n="featured.heading">Featured this month</h2>
-    </div>
-    <div class="featured-strip">
-      <div class="featured-card" data-name="Quails' Gate Winery" data-region="west-kelowna" data-phone="+1 250-769-4451">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-winery">Winery</span>
-          <h3>Quails' Gate Winery</h3>
-          <p class="featured-meta">West Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.7</span></p>
-          <p class="featured-desc">Family-farmed since 1956, with a dog-friendly patio overlooking Okanagan Lake.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Dog-friendly" data-tooltip="Dog-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="8" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="17" cy="8" r="1.6"/><circle cx="19" cy="12.5" r="1.6"/><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"/></svg></span><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Terrafina at Hester Creek" data-region="oliver" data-phone="+1 250-498-2229">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Terrafina at Hester Creek</h3>
-          <p class="featured-meta">Oliver &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.5</span></p>
-          <p class="featured-desc">A patio restaurant at Hester Creek Estate Winery known for its focaccia spreads and seasonal pasta.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Frankie We Salute You!" data-region="kelowna" data-phone="+1 236-420-3338">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Frankie We Salute You!</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
-          <p class="featured-desc">Trendy, industrial-feel vegan fine dining with real gluten-free items and a thoughtful lapsang mocktail.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span><span class="badge" aria-label="Gluten-free options" data-tooltip="Gluten-free options"><span class="badge-text-icon">GF</span></span><span class="badge" aria-label="Non-alcoholic options" data-tooltip="Non-alcoholic options"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 9z"/><path d="M12 13v6"/><path d="M8 20h8"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="The Kal" data-region="vernon" data-phone="+1 250-549-1011">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-pub">Pub/Bar</span>
-          <h3>The Kal</h3>
-          <p class="featured-meta">Vernon &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.2</span></p>
-          <p class="featured-desc">A burger, pizza, and wing spot inside the historic Kalamalka Hotel, with a video arcade attached.</p>
-        </a>
-        <div class="badge-row"></div>
-      </div>
-      <div class="featured-card" data-name="27" data-region="kelowna" data-phone="+1 236-420-0206">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-cocktail">Cocktail Lounge</span>
-          <h3>27</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.4</span></p>
-          <p class="featured-desc">The Okanagan's first craft cocktail lounge, with a speakeasy, prohibition-era feel.</p>
-        </a>
-        <div class="badge-row"></div>
-      </div>
-      <div class="featured-card" data-name="Naked Cafe" data-region="kelowna" data-phone="+1 778-484-5640">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Naked Cafe</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.6</span></p>
-          <p class="featured-desc">A dedicated vegan cafe known for its sushi bowls and Japanese curry, a longtime local favourite.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span></div>
-      </div>
-      <div class="featured-card" data-name="Giant's Head Brewing" data-region="summerland" data-phone="+1 250-404-1123">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-brewery">Brewery</span>
-          <h3>Giant's Head Brewing</h3>
-          <p class="featured-meta">Summerland &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.5</span></p>
-          <p class="featured-desc">A cozy brewpub with a large street-side patio, wood-fired pizza, and a strong fish and chips.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Painted Rock Estate Winery" data-region="penticton" data-phone="+1 250-493-6809">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-winery">Winery</span>
-          <h3>Painted Rock Estate Winery</h3>
-          <p class="featured-meta">Penticton &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.6</span></p>
-          <p class="featured-desc">A family-friendly estate with sweeping Skaha Lake views and a deck built for lingering.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Patio" data-tooltip="Patio"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M4 12a8 8 0 0 1 16 0z"/><path d="M12 12v9"/><path d="M9 21h6"/></svg></span><span class="badge" aria-label="Kid-friendly" data-tooltip="Kid-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><circle cx="10" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="0.6" fill="currentColor" stroke="none"/><path d="M8 21c-1-4 0-9 4-9s5 5 4 9"/></svg></span><span class="badge" aria-label="Lake/vineyard view" data-tooltip="Lake/vineyard view"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M3 18l6-9 4 5 2-3 6 7z"/><path d="M3 20.5h18"/></svg></span></div>
-      </div>
-      <div class="featured-card" data-name="Angry Vegan" data-region="penticton" data-phone="+1 250-809-7610">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Angry Vegan</h3>
-          <p class="featured-meta">Penticton &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
-          <p class="featured-desc">Penticton's oldest dedicated vegan restaurant, open since 2017, a fully plant-based menu.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegan-friendly" data-tooltip="Vegan-friendly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 8-6 14-14 14C4 12 10 6 18 6z"/><path d="M6 20c2-4 5-8 10-11"/></svg></span><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span></div>
-      </div>
-      <div class="featured-card" data-name="Wildling" data-region="kelowna" data-phone="+1 250-980-6919">
-        <a href="#directory" class="featured-title-link">
-          <span class="featured-type type-restaurant">Restaurant</span>
-          <h3>Wildling</h3>
-          <p class="featured-meta">Kelowna &middot; <span class="mono" style="color:var(--amber); font-weight:700;">&#9733; 4.8</span></p>
-          <p class="featured-desc">An elevated tasting-menu restaurant praised for genuinely accommodating vegetarian diners.</p>
-        </a>
-        <div class="badge-row"><span class="badge" aria-label="Vegetarian options" data-tooltip="Vegetarian options"><span class="badge-text-icon">VG</span></span></div>
-      </div>
-    </div>
   </div>
 </section>
 

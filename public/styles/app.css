@@ -30,10 +30,15 @@
   button{ font-family:inherit; }
 
   .wrap{ max-width:1180px; margin:0 auto; padding:0 32px; }
-  /* Homepage reference redesign: a wider content column for full-bleed
-     discovery sections like Hidden Gems, scoped to its own class so
-     .wrap (the wizard/results/list-venue/footer) is completely
-     unaffected. */
+  /* Reference redesign, forensic-comparison rebuild: webpage design.png's
+     header/hero/mood/hidden-gems/explore/trip sections run far closer to
+     full viewport width than the pre-existing 1180px .wrap (measured: card
+     rows span ~78.6% of a 1672px reference canvas, ~1314px of content --
+     vs. 1180px/~70.6% here). .wrap-wide is scoped to just those homepage
+     discovery sections; the wizard/results/list-venue/footer keep the
+     original .wrap untouched, per "don't let the old wizard presentation
+     dictate the new homepage design" rather than a blanket site-wide
+     change. */
   .wrap-wide{ max-width:1360px; margin:0 auto; padding:0 24px; }
 
   a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
@@ -41,56 +46,92 @@
     outline-offset:3px;
   }
 
-  /* ---------- header ---------- */
+  /* ---------- header (reference redesign: webpage design.png) ----------
+     Homepage-only -- SEO pages (region/category/venue/guide) render their
+     own, completely separate header via siteHeader() in server.js
+     (class="top"/"brand", styled by SEO_PAGE_CSS), so none of this
+     touches them. Uses the new --ref-* tokens added in tokens.css;
+     every original token keeps its original value/use elsewhere. */
   header{
     position:sticky; top:0; z-index:60;
-    background: var(--sand);
-    border-bottom: 1px solid rgba(42,32,25,0.12);
+    background: var(--ref-cream);
+    border-bottom: 1px solid rgba(27,43,58,0.1);
   }
-  .nav{ display:flex; align-items:center; justify-content:space-between; padding:16px 0; }
+  /* Header nav uses its own wider max-width (measured: reference nav
+     content runs nearly edge-to-edge, no ~180px card-row gutter) rather
+     than .wrap-wide's 1360px -- scoped via the .nav.wrap compound selector
+     so it only affects the header, not any other .wrap usage on the page. */
+  .nav.wrap{ max-width:1600px; }
+  /* padding-top/bottom only (not the padding:14px 0 shorthand) -- that
+     shorthand's implicit left/right:0 was clobbering .wrap's own
+     padding:0 32px in the cascade (.nav and .wrap have equal specificity,
+     and .nav is declared later), which is why the logo was rendering
+     flush against the viewport edge with no gutter at all. */
+  .nav{ display:flex; align-items:center; gap:36px; padding-top:14px; padding-bottom:14px; }
   .nav-brand{ display:flex; align-items:center; gap:14px; }
+  /* Reference redesign, forensic-comparison rebuild: the reference logo is
+     a stacked lockup (small double-peak mountain glyph centered ABOVE the
+     wordmark), not an icon-left-of-text row, and the wordmark is a
+     regular-weight (not bold) serif. Rebuilt to match both -- .logo itself
+     now stacks vertically; .logo-text goes back to a single row since it
+     only holds the one wordmark line. */
   .logo{
-    display:flex; align-items:center; gap:12px;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
     text-decoration:none;
   }
   .logo-icon-badge{
     display:flex; align-items:center; justify-content:center;
-    width:38px; height:38px; border-radius:50%;
-    background: linear-gradient(160deg, var(--sand-deep), var(--sand));
-    box-shadow: inset 0 0 0 1px rgba(42,32,25,0.08);
-    flex-shrink:0;
+    width:34px; height:14px; flex-shrink:0; color: var(--ref-navy);
   }
-  .logo svg{ width:24px; height:24px; }
-  .logo-text{ display:flex; flex-direction:column; line-height:1.15; }
+  .logo-icon-badge svg{ width:100%; height:100%; }
+  .logo-text{ display:flex; flex-direction:row; align-items:baseline; gap:6px; line-height:1; }
   .logo-wordmark{
-    font-family:'Fraunces', serif; font-weight:700; font-size:1.32rem;
-    letter-spacing:-0.01em;
+    font-family:'Fraunces', serif; font-weight:400; font-size:1.28rem;
+    letter-spacing:0.02em; text-transform:uppercase; color: var(--ref-navy);
   }
-  .logo-tagline{
-    font-family:'Nunito', sans-serif; font-weight:600; font-size:0.68rem;
-    letter-spacing:0.08em; text-transform:uppercase;
-    color: var(--teal); margin-top:1px;
+  .logo-wordmark .logo-wordmark-accent{ color: var(--ref-gold); }
+  .logo-tagline{ display:none; }
+  .nav-social{ display:none; }
+  .nav-links{
+    display:flex; align-items:center; gap:26px; list-style:none; margin:0 0 0 8px; padding:0;
+    font-family:'Nunito', sans-serif; font-weight:600; font-size:0.9rem; color: var(--ref-navy);
+    flex:1;
   }
-  .nav-social{ display:flex; gap:6px; }
-  .nav-social-icon{ width:26px; height:26px; }
-  .nav-social-icon::after{ font-size:0.68rem; padding:4px 8px; }
-  .nav-links{ display:flex; gap:30px; list-style:none; margin:0; padding:0; font-weight:600; font-size:0.92rem; }
-  .nav-links a{ text-decoration:none; }
-  .nav-links a:hover{ color: var(--plum); }
+  .nav-links a, .nav-links > li > span.nav-link-label{ text-decoration:none; color: inherit; cursor:pointer; }
+  .nav-links a:hover, .nav-links > li > span.nav-link-label:hover{ color: var(--ref-gold); }
+  .nav-link-caret{ display:inline-block; margin-left:4px; font-size:0.7em; opacity:0.7; }
+  .nav-dropdown{ position:relative; }
+  .nav-dropdown-panel{
+    display:none; position:absolute; top:calc(100% + 14px); left:50%; transform:translateX(-50%);
+    background: var(--ref-white); border-radius:10px; box-shadow: 0 16px 32px -18px rgba(16,27,36,0.35);
+    padding:8px; min-width:190px; z-index:70;
+  }
+  .nav-dropdown.open .nav-dropdown-panel{ display:block; }
+  .nav-dropdown-panel a{
+    display:block; padding:9px 14px; border-radius:6px; font-size:0.88rem; white-space:nowrap;
+  }
+  .nav-dropdown-panel a:hover{ background: var(--ref-cream); color: var(--ref-navy); }
+  .nav-search-btn{
+    background:none; border:none; cursor:pointer; padding:6px; color: var(--ref-navy);
+    display:flex; align-items:center; justify-content:center;
+  }
   .nav-hamburger{
     display:none; background:none; border:none; cursor:pointer; padding:8px;
     flex-direction:column; gap:5px;
   }
-  .nav-hamburger span{ width:24px; height:2.5px; background: var(--ink); border-radius:2px; }
+  .nav-hamburger span{ width:24px; height:2.5px; background: var(--ref-navy); border-radius:2px; }
   .app-btn{
-    background: var(--plum); color: var(--paper); border:none;
-    padding:10px 22px; border-radius:8px; font-weight:700; font-size:0.88rem; cursor:pointer; letter-spacing:0.01em;
+    background: var(--ref-navy); color: var(--ref-white); border:none;
+    padding:10px 20px; border-radius:999px; font-weight:700; font-size:0.86rem; cursor:pointer;
+    letter-spacing:0.01em; display:inline-flex; align-items:center; gap:6px;
+    font-family:'Nunito', sans-serif;
   }
+  .app-btn:hover{ background: var(--ref-navy-deep); }
   .lang-toggle{
-    background: transparent; color: var(--ink); border:1px solid rgba(42,32,25,0.25);
-    padding:8px 14px; border-radius:8px; font-weight:700; font-size:0.82rem; cursor:pointer; letter-spacing:0.02em;
+    background: transparent; color: var(--ref-navy); border:1px solid rgba(27,43,58,0.2);
+    padding:6px 11px; border-radius:8px; font-weight:700; font-size:0.72rem; cursor:pointer; letter-spacing:0.02em;
   }
-  .lang-toggle:hover{ background: rgba(42,32,25,0.06); }
+  .lang-toggle:hover{ background: rgba(27,43,58,0.06); }
 
   /* ---------- hero ---------- */
   .hero{ padding: 70px 0 40px; position:relative; overflow:hidden; }
@@ -284,7 +325,7 @@
   /* ---------- filter bar ---------- */
   .filter-bar{
     position: sticky; top: 65px; z-index:50;
-    background: var(--sand-deep);
+    background: var(--ref-cream-deep);
     border-top:1px solid rgba(42,32,25,0.12);
     border-bottom:1px solid rgba(42,32,25,0.12);
     padding: 10px 0;
@@ -773,7 +814,12 @@
   .map-popup-more{ font-size:0.78rem; color: rgba(42,32,25,0.68); margin-top:6px; }
 
   /* ---------- app teaser ---------- */
-  .app-teaser{ background: var(--plum-dark); color: var(--paper); padding: 90px 0; }
+  /* Reference redesign (decision #10, light footer harmonization): swapped
+     from --plum-dark to the new --ref-navy-deep token so this band reads
+     as part of the same navy/gold system as the header/hero above it,
+     without restructuring the section itself (no reference spec exists
+     for content below the fold in webpage design.png). */
+  .app-teaser{ background: var(--ref-navy-deep); color: var(--paper); padding: 90px 0; }
   .app-teaser .wrap{ display:grid; grid-template-columns: 1.05fr 0.95fr; gap:54px; align-items:center; }
   .app-teaser h2{ color: var(--paper); font-size: clamp(2rem, 3.4vw, 2.6rem); max-width: 11ch; }
   .app-teaser p{ color: rgba(255,252,246,0.75); max-width:44ch; margin: 18px 0 26px; }
@@ -823,7 +869,7 @@
   footer{ padding: 50px 0 36px; }
   .foot-row{ display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:26px; border-top:1px solid rgba(42,32,25,0.15); padding-top:32px; }
   .foot-cols{ display:flex; gap:56px; flex-wrap:wrap; }
-  .foot-col h4{ font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px; color: var(--plum); }
+  .foot-col h4{ font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px; color: var(--ref-navy); }
   .foot-col ul{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; font-size:0.9rem; }
   .foot-col a{ text-decoration:none; }
   .foot-col a:hover{ text-decoration:underline; }
@@ -865,15 +911,34 @@
     .app-teaser .wrap{ grid-template-columns:1fr; }
     .nav-links{
       display:none; position:absolute; top:100%; left:0; right:0;
-      flex-direction:column; gap:0; background: var(--sand);
-      border-bottom: 1px solid rgba(42,32,25,0.12); box-shadow: 0 14px 20px -14px var(--shadow);
+      flex-direction:column; align-items:stretch; gap:0; background: var(--ref-cream);
+      border-bottom: 1px solid rgba(27,43,58,0.12); box-shadow: 0 14px 20px -14px var(--shadow);
       z-index: 20;
     }
     .nav-links.open{ display:flex; }
-    .nav-links li{ border-top: 1px solid rgba(42,32,25,0.08); }
-    .nav-links a{ display:block; padding:16px 20px; }
+    .nav-links > li{ border-top: 1px solid rgba(27,43,58,0.08); }
+    .nav-links a, .nav-links > li > span.nav-link-label{ display:block; padding:16px 20px; }
+    /* Dropdowns become a plain, always-expanded indented sub-list on
+       mobile rather than a floating hover/click panel -- simpler and
+       reliably tappable at this width. */
+    .nav-dropdown-panel{
+      display:block; position:static; transform:none; box-shadow:none;
+      background:none; padding:0 0 8px 20px; min-width:0;
+    }
+    .nav-dropdown-panel a{ padding:10px 0; font-size:0.86rem; color: rgba(27,43,58,0.8); }
+    .nav-link-caret{ display:none; }
     .nav-hamburger{ display:flex; }
-    .nav{ position:relative; }
+    /* Found in this turn's own mobile QA: with nav-links collapsed, the
+       remaining header row (long logo wordmark + search icon + EN/FR +
+       hamburger) still overflowed a 390px viewport with the base 36px
+       gap, squeezing nav-search-btn down to ~0 width (its SVG effectively
+       invisible) rather than actually hiding it. Reusing the same
+       precedent already set for .app-btn just below -- hide the search
+       icon on mobile too, rather than have it render broken; the always-
+       visible hero search box directly below the header remains the real,
+       fully working way to search on mobile, so no functionality is lost. */
+    .nav{ position:relative; gap:14px; }
+    .nav-search-btn{ display:none; }
     .app-btn{ display:none; }
     .filter-bar{ top:0; }
     .filter-label{ min-width: auto; width:100%; margin-bottom:2px; }
