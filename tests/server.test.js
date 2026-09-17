@@ -630,6 +630,34 @@ test('renderEventPage links to the host venue when venue_id is set', () => {
   assert.match(html, new RegExp(`href="/kelowna/${app.CATEGORY_SLUGS.restaurant}/test-trattoria"`));
 });
 
+// ---- /events index (2026-09-17, replaces the homepage's Happening Soon) --
+
+test('eventCardHtml links to the real individual event page and shows its date/region', () => {
+  const event = app.findEventBySlug('kelowna', 'test-future-festival');
+  const html = app.eventCardHtml(event);
+  assert.match(html, /href="\/kelowna\/events\/test-future-festival"/);
+  assert.match(html, /Test Future Festival/);
+  assert.match(html, /Kelowna/);
+});
+
+test('renderEventsIndexPage lists every event it is given, each linking to its real page', () => {
+  const events = [app.findEventBySlug('kelowna', 'test-future-festival')];
+  const html = app.renderEventsIndexPage(events);
+  assert.match(html, /<h1>Upcoming Events in the Okanagan<\/h1>/);
+  assert.match(html, /Test Future Festival/);
+  assert.match(html, /href="\/kelowna\/events\/test-future-festival"/);
+});
+
+test('renderEventsIndexPage shows a graceful empty state with zero events', () => {
+  const html = app.renderEventsIndexPage([]);
+  assert.match(html, /No upcoming events right now/);
+});
+
+test('Mood cards: What\'s On links to /events with no filter', () => {
+  const html = app.renderMoodCardsHTML();
+  assert.match(html, /class="mood-card mood-card-secondary mood-card-whats-on" href="\/events">/);
+});
+
 // ---- pageHead() backward-compatibility + noindex regression -------------
 test('pageHead is backward-compatible: existing 4-argument call sites are unaffected', () => {
   const html = app.pageHead('Title', 'Description', 'https://okanaganroam.com/kelowna', []);
@@ -795,6 +823,21 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(homepageBody, /Browse (&amp;|&) [Ss]earch the Okanagan/, 'Browse/Search must have a reframing heading (Milestone 3)');
   assert.match(homepageBody, /id="searchInput"/, 'existing search input must be unchanged');
   assert.match(homepageBody, /id="wizardStep1"/, 'existing wizard step markup must be unchanged');
+
+  // Events index (2026-09-17) — replaces the homepage's own "Happening
+  // Soon" strip, which is removed entirely (no leftover section/anchor on
+  // the homepage). The What's On mood card links here instead.
+  assert.doesNotMatch(homepageBody, /id="happeningSoon"/, 'Happening Soon must no longer render on the homepage');
+  assert.match(homepageBody, /class="mood-card mood-card-secondary mood-card-whats-on" href="\/events">/, 'What\'s On mood card must link to /events');
+  const eventsIndexPage = await fetch(`${base}/events`);
+  assert.equal(eventsIndexPage.status, 200, '/events must exist and serve the events index');
+  const eventsIndexBody = await eventsIndexPage.text();
+  assert.match(eventsIndexBody, /<h1>Upcoming Events in the Okanagan<\/h1>/);
+  assert.match(eventsIndexBody, /Test Future Festival/, 'an active event fixture must be listed');
+  assert.doesNotMatch(eventsIndexBody, /Test Past Market/, 'an expired event fixture must not be listed');
+  assert.match(eventsIndexBody, /href="\/kelowna\/events\/test-future-festival"/, 'event cards must link to the real individual event page');
+  const eventPageStillWorks = await fetch(`${base}/kelowna/events/test-future-festival`);
+  assert.equal(eventPageStillWorks.status, 200, 'individual event pages must still work after removing Happening Soon');
 
   const eventsApi = await fetch(`${base}/api/events`);
   const collectionsApi = await fetch(`${base}/api/collections`);

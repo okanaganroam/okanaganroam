@@ -1393,50 +1393,15 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 // computed once per homepage request and spliced into the served
 // okanagan.html. No new API endpoints, no new client-side fetches.
 
-function renderHappeningSoonHTML() {
-  // One query, filtered AND limited entirely in SQL — mirrors
-  // isEventExpired()'s exact semantics (reference = end_datetime if set,
-  // else start_datetime; expired when reference < now) rather than
-  // fetching every event and filtering/slicing in JS.
-  const rows = db.prepare(`
-    SELECT * FROM events
-    WHERE (end_datetime IS NOT NULL AND end_datetime >= datetime('now'))
-       OR (end_datetime IS NULL AND start_datetime >= datetime('now'))
-    ORDER BY start_datetime ASC
-    LIMIT 6
-  `).all().map(rowToEvent);
-
-  if (rows.length === 0) return ''; // graceful empty state: omit the whole module
-
-  const cards = rows.map((e) => {
-    const regionLabel = REGION_LABELS[e.region] || e.region;
-    const href = `/${e.region}/events/${e.slug}`;
-    const dateLabel = escapeHtml(e.start_datetime.slice(0, 10));
-    const typeLabel = e.type ? `<span class="chip">${escapeHtml(e.type)}</span>` : '';
-    const imageHtml = e.image_url
-      ? `<div class="discover-card-media"><img src="${escapeHtml(e.image_url)}" alt="${escapeHtml(e.name)}" loading="lazy"></div>`
-      : '';
-    return `<a class="discover-card" href="${href}">
-      ${imageHtml}
-      <div class="discover-card-body">
-        <div class="discover-card-date">${dateLabel} &middot; ${escapeHtml(regionLabel)}</div>
-        <h3>${escapeHtml(e.name)}</h3>
-        ${typeLabel}
-      </div>
-    </a>`;
-  }).join('\n');
-
-  return `
-<section class="discover-section" id="happeningSoon">
-  <div class="wrap">
-    <div class="discover-heading">
-      <span class="eyebrow">Happening soon</span>
-      <h2>What's on in the Okanagan</h2>
-    </div>
-    <div class="discover-strip">${cards}</div>
-  </div>
-</section>`;
-}
+// Happening Soon (the homepage's own inline event strip) was removed
+// from the homepage entirely on 2026-09-17 -- events now live at their
+// own destination, /events (see renderEventsIndexPage() below), linked
+// to from the What's On mood card. This function used to render that
+// homepage-only strip; it's gone rather than kept-but-unused because it
+// had no other caller and no direct test of its own (unlike
+// hiddenGemHomepageCardHtml, which stayed for a real future use case).
+// The underlying events table, individual event pages/routes
+// (/:region/events/:slug), and event data are completely untouched.
 
 // Content-model change (2026-09-17): the Hidden Gems homepage section
 // moved from "3 real top-rated venues, picked live by rating" to 3 fixed
@@ -1603,9 +1568,11 @@ function renderExploreRegionsHTML() {
 // Eat/Drink reuse the existing wizard type-chip multi-select filter
 // exactly as-is (see the "Mood cards" block in app.js, which presses the
 // real .type-chip buttons and dispatches the existing wizard:showResults
-// event) -- no new filtering system. Hidden Gems/What's On/Explore are
-// plain anchor links into sections that already exist on this page
-// (#hiddenGems, #happeningSoon, #exploreRegions). Golf has no wizard
+// event) -- no new filtering system. Hidden Gems/Explore are plain anchor
+// links into sections that already exist on this page (#hiddenGems,
+// #exploreRegions); What's On links to the real /events page (2026-09-17
+// -- previously an in-page anchor to the now-removed Happening Soon
+// strip). Golf has no wizard
 // chip on this codebase's filter UI, so it links directly to the real,
 // existing golf category page for whichever region actually has golf
 // venues -- reusing the exact same bestRegionForType aggregate query
@@ -1669,7 +1636,7 @@ function renderMoodCardsHTML() {
     { key: 'drink', tier: 'primary', href: '#directory', filter: 'winery,brewery,cocktail,pub', img: '/images/mood/drink.png', titleKey: 'mood.drink.title', title: 'Drink', descKey: 'mood.drink.desc', desc: 'Wineries, breweries, cocktails & more.' },
     { key: 'hidden-gems', tier: 'primary', href: '#hiddenGems', filter: null, img: '/images/mood/hidden-gems.png', titleKey: 'mood.hiddenGems.title', title: 'Hidden Gems', descKey: 'mood.hiddenGems.desc', desc: 'The places you might drive past.' },
     { key: 'golf', tier: 'secondary', href: golfHref, filter: null, img: '/images/mood/golf.png', titleKey: 'mood.golf.title', title: 'Golf', descKey: 'mood.golf.desc', desc: 'Tee off somewhere beautiful.' },
-    { key: 'whats-on', tier: 'secondary', href: '#happeningSoon', filter: null, img: '/images/mood/whats-on.png', titleKey: 'mood.whatsOn.title', title: "What's On", descKey: 'mood.whatsOn.desc', desc: 'See what’s happening around the valley.' },
+    { key: 'whats-on', tier: 'secondary', href: '/events', filter: null, img: '/images/mood/whats-on.png', titleKey: 'mood.whatsOn.title', title: "What's On", descKey: 'mood.whatsOn.desc', desc: 'See what’s happening around the valley.' },
     { key: 'explore', tier: 'secondary', href: '#exploreRegions', filter: null, img: '/images/mood/explore.png', titleKey: 'mood.explore.title', title: 'Explore', descKey: 'mood.explore.desc', desc: 'Let’s see where the road takes you.' },
   ];
 
@@ -2789,6 +2756,80 @@ ${pageHead(title, description, canonical, [breadcrumb, eventSchema], { noindex: 
 </html>`;
 }
 
+// Minimal event-list card for the /events index -- reuses the existing
+// generic .venue-card/.venue-meta/.chips classes from SEO_PAGE_CSS
+// (already used by venueCardHtml() on category pages) instead of
+// inventing new CSS just for this one page.
+function eventCardHtml(event) {
+  const regionLabel = REGION_LABELS[event.region] || event.region;
+  const href = `/${event.region}/events/${event.slug}`;
+  const dateLabel = escapeHtml(event.start_datetime.slice(0, 10));
+  const typeChip = event.type ? `<p class="chips"><span class="chip">${escapeHtml(event.type)}</span></p>` : '';
+  const desc = event.description ? `<p>${escapeHtml(event.description)}</p>` : '';
+  return `
+      <li class="venue-card">
+        <h2><a href="${href}">${escapeHtml(event.name)}</a></h2>
+        <p class="venue-meta">${dateLabel} &middot; ${escapeHtml(regionLabel)}</p>
+        ${desc}
+        ${typeChip}
+      </li>`;
+}
+
+// GET /events — the standalone events index (2026-09-17). Replaces the
+// homepage's own "Happening Soon" strip, which was removed entirely; the
+// events table, individual event pages (/:region/events/:slug), and
+// every other event route/API are completely untouched. Same active-event
+// query Happening Soon used to run (mirrors isEventExpired()'s exact
+// semantics), just without the LIMIT 6 -- this page shows every upcoming
+// event, not just a homepage teaser.
+function renderEventsIndexPage(events) {
+  const title = 'Upcoming Events in the Okanagan | Okanagan Roam';
+  const description = events.length
+    ? `${events.length} upcoming event${events.length === 1 ? '' : 's'} across the Okanagan Valley — markets, festivals, tastings, and more.`
+    : 'Upcoming events across the Okanagan Valley — markets, festivals, tastings, and more.';
+  const canonical = 'https://okanaganroam.com/events';
+
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Events', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: events.map((e, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${e.region}/events/${e.slug}`,
+      item: { '@type': 'Event', name: e.name, description: e.description || undefined },
+    })),
+  };
+
+  const cards = events.map(eventCardHtml).join('\n');
+  const emptyState = events.length === 0
+    ? '<p class="subtitle">No upcoming events right now — check back soon.</p>'
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList])}
+</head>
+<body>
+  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Events' }])}
+  <h1>Upcoming Events in the Okanagan</h1>
+  <p class="subtitle">${events.length} upcoming event${events.length === 1 ? '' : 's'} across the valley.</p>
+  ${emptyState}
+  <ul class="card-grid">
+    ${cards}
+  </ul>
+  ${siteFooter()}
+</body>
+</html>`;
+}
+
 function render404Page(pathname) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -3042,16 +3083,18 @@ const server = http.createServer(async (req, res) => {
         // existing deeper directory content. Hidden Gems and Explore the
         // Okanagan move from "after the wizard" (Milestones 1-2) to
         // "before the wizard", alongside the new Build Your Trip CTA;
-        // Happening Soon and Browse by Category are unmodified and remain
-        // part of the existing deeper-directory content after the wizard,
-        // exactly as before — only Hidden Gems/Explore's anchor point
-        // moved, matching the approved architecture's explicit ordering.
+        // Browse by Category is unmodified and remains part of the
+        // existing deeper-directory content after the wizard, exactly as
+        // before — only Hidden Gems/Explore's anchor point moved, matching
+        // the approved architecture's explicit ordering. Happening Soon
+        // (the homepage's own inline event strip that used to render here)
+        // was removed entirely on 2026-09-17 -- events now live at their
+        // own destination, /events, linked to from the What's On mood card.
         const discoveryStyles = renderHomepageDiscoveryStyles();
         const moodCards = renderMoodCardsHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
         const exploreRegions = renderExploreRegionsHTML();
         const buildTripSection = renderBuildTripCTAHTML();
-        const happeningSoon = renderHappeningSoonHTML();
         const exploreByCategory = renderExploreByCategoryHTML();
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
@@ -3066,7 +3109,7 @@ const server = http.createServer(async (req, res) => {
         if (html.includes(wizardToWeatherAnchor)) {
           html = html.replace(
             wizardToWeatherAnchor,
-            `</section>\n${happeningSoon}\n${exploreByCategory}\n\n<section class="weather-banner" id="weatherBanner"`
+            `</section>\n${exploreByCategory}\n\n<section class="weather-banner" id="weatherBanner"`
           );
         }
 
@@ -3133,6 +3176,7 @@ const server = http.createServer(async (req, res) => {
 
       const urlEntries = [
         `  <url>\n    <loc>https://okanaganroam.com/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`,
+        `  <url>\n    <loc>https://okanaganroam.com/events</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`,
         ...regionCounts.map(
           ({ region }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
@@ -3848,6 +3892,23 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 201, created);
     }
 
+    // GET /events — the standalone events index (2026-09-17). A fixed,
+    // exact path, so it's registered before the generic /:region catch-all
+    // below (which would otherwise treat "events" as an unrecognized
+    // region and 404 it). Same active-event criteria the old homepage
+    // Happening Soon strip used, with no LIMIT — see renderEventsIndexPage().
+    if (pathname === '/events' && method === 'GET') {
+      const events = db.prepare(`
+        SELECT * FROM events
+        WHERE (end_datetime IS NOT NULL AND end_datetime >= datetime('now'))
+           OR (end_datetime IS NULL AND start_datetime >= datetime('now'))
+        ORDER BY start_datetime ASC
+      `).all().map(rowToEvent);
+      const html = renderEventsIndexPage(events);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(html);
+    }
+
     // GET /:region/events/:slug — Phase 1 (Events architecture gate).
     // Registered BEFORE the generic /:region/:category/:slug venue-page
     // pattern below, since that broader regex would otherwise also match
@@ -4043,6 +4104,9 @@ module.exports = {
   listEventsForSitemap,
   renderEventPage,
   pageHead,
+  // Events index (2026-09-17)
+  eventCardHtml,
+  renderEventsIndexPage,
   // Phase 2 Sprint 2 (Event Types)
   EVENT_SCHEMA_TYPE_MAP,
   // Phase 2 Sprint 3 (Hidden Gems)
@@ -4050,11 +4114,11 @@ module.exports = {
   isVenueHiddenGem,
   hiddenGemBadgeHtml,
   // Design Sprint 3 (Homepage Discovery)
-  renderHappeningSoonHTML,
   renderHiddenGemsHomepageHTML,
   renderExploreByCategoryHTML,
   renderExploreRegionsHTML,
   renderBuildTripCTAHTML,
+  renderMoodCardsHTML,
   // Design Sprint 4 (Visual & Editorial Polish)
   CATEGORY_TAGLINES,
   REGION_TAGLINES,

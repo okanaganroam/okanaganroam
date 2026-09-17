@@ -1757,8 +1757,8 @@ window.__scrollToVenueCard = function(name){
    and dispatch the existing wizard:showResults event to reveal the
    results grid -- no new filtering system. Hidden Gems/Golf/What's
    On/Explore are plain links (to #hiddenGems, a real category page,
-   #happeningSoon, and #exploreRegions respectively) and are left to
-   navigate normally. ---------- */
+   /events, and #exploreRegions respectively) and are left to navigate
+   normally. ---------- */
 (function(){
   var grid = document.querySelector('.mood-card-grid');
   if (!grid) return;
