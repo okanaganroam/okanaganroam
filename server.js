@@ -2230,7 +2230,7 @@ function renderHomepageDiscoveryStyles() {
        homepage-hero-specific -- .hero-title has no text-align at wider
        widths (reads left-to-right in its own centered column instead,
        per the desktop hero layout, untouched). */
-    .hero-title { max-width: 100%; font-size: 26px; text-align: center; margin: 0 0 12px; padding: 0 8px; }
+    .hero-title { max-width: 100%; font-size: 14.625px; text-align: center; margin: 0 0 12px; padding: 0 8px; }
     /* .hero-lead already has text-align:center and margin:0 auto at every
        width (unrelated earlier change) -- this only tightens its
        max-width for mobile specifically, so the paragraph reads as a
