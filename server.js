@@ -1593,21 +1593,33 @@ function renderExploreRegionsHTML() {
 // -- see the "Build Your Trip CTA" block in app.js for the few lines of
 // orchestration (open the existing panel; don't reimplement it). No new
 // trip data model, no new IDs for trip/map state.
+// Reference redesign, forensic-comparison rebuild (2026-09-17): ONE
+// continuous full-bleed dark navy band -- icon/heading/paragraph/single
+// CTA on the left, a photo blending into a labeled map on the right --
+// matching the reference's actual structure instead of the earlier
+// eyebrow+title+lead+two-separate-CTAs layout on a plain full-bleed
+// photo. The map itself is a real, pre-made illustrated map image
+// (installed at public/images/trip-cta-map.png); an earlier hand-built
+// inline SVG (procedurally-drawn terrain/roads/pins/labels from real
+// projected coordinates) was fully replaced, not layered underneath.
 function renderBuildTripCTAHTML() {
   return `
-<section class="discover-section trip-cta-section" id="buildTrip">
-  <div class="wrap trip-cta-inner">
-    <div class="trip-cta-media" aria-hidden="true">
-      <img class="trip-cta-img" src="/images/trip-cta.png" width="1920" height="1080" alt="" loading="lazy">
+<section class="trip-cta-section" id="buildTrip">
+  <div class="wrap-wide trip-cta-inner">
+    <div class="trip-cta-visual" aria-hidden="true">
+      <img class="trip-cta-img" src="/images/trip-cta.png" width="1600" height="656" alt="" loading="lazy">
       <div class="trip-cta-scrim"></div>
     </div>
+    <button type="button" class="trip-cta-map" id="tripCtaOpenMap" aria-label="Open the interactive map">
+      <img class="trip-cta-map-img" src="/images/trip-cta-map.png" width="1376" height="768" alt="" loading="lazy">
+    </button>
     <div class="trip-cta-content">
-      <span class="trip-cta-eyebrow">Plan your visit</span>
+      <span class="trip-cta-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/><circle cx="17" cy="9" r="1.4" fill="currentColor" stroke="none"/></svg></span>
       <h2 class="trip-cta-title">Build Your Perfect Okanagan Trip</h2>
-      <p class="trip-cta-lead">Save the places that catch your eye as you browse, then get one route across every stop in Google Maps -- no account, no separate planning app.</p>
+      <p class="trip-cta-lead">Tell us what you&rsquo;re looking for. We&rsquo;ll help build your adventure.</p>
+      <p class="trip-cta-example">&ldquo;I&rsquo;m in Kelowna for 3 days. I want golf, wineries, great food and patios, a beach, what&rsquo;s happening, and a few hidden gems.&rdquo;</p>
       <div class="trip-cta-actions">
-        <button type="button" class="trip-cta-btn" id="tripCtaOpenTrip">Start building your trip</button>
-        <a class="trip-cta-map-link" href="#mapPanel" id="tripCtaOpenMap">View the interactive map</a>
+        <button type="button" class="trip-cta-btn" id="tripCtaOpenTrip">Build My Trip <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
     </div>
   </div>
@@ -1925,49 +1937,81 @@ function renderHomepageDiscoveryStyles() {
     .mood-card-secondary { flex: 0 0 62%; aspect-ratio: 4 / 3; }
   }
 
-  /* Milestone 3: Build Your Perfect Okanagan Trip -- large immersive CTA,
-     matching the hero's full-bleed image + scrim treatment rather than
-     inventing a third visual pattern. Deliberately not a card grid: this
-     is one focal section, not a set of options. */
-  .trip-cta-section { padding: 0; }
+  /* Reference redesign, forensic-comparison rebuild (2026-09-17,
+     supersedes the earlier eyebrow+title+lead+two-CTA layout on a plain
+     full-bleed photo): ONE continuous full-bleed dark navy band --
+     icon/heading/paragraph/single CTA on the left, a photo blending into
+     a real map image on the right -- matching the reference's actual
+     structure instead of three separate boxed cards or a plain photo
+     background. .trip-cta-visual (photo) and .trip-cta-map (the map
+     image) both sit as absolutely-positioned layers filling the same
+     box; .trip-cta-content is the only normal-flow child, so
+     align-items:flex-end on the container alone puts it bottom-left
+     without needing its own absolute positioning. The map's left edge is
+     masked transparent-to-opaque so it visually dissolves out of the
+     photo rather than butting against it as a hard rectangle. */
+  .trip-cta-section { padding: 8px 0 36px; }
   .trip-cta-inner {
-    position: relative; overflow: hidden; border-radius: 20px;
-    min-height: 420px; display: flex; align-items: center; color: #fff;
+    position: relative; background: var(--ref-navy-deep); border-radius: 20px; overflow: hidden;
+    display: flex; align-items: flex-end; min-height: 400px;
   }
-  .trip-cta-media { position: absolute; inset: 0; z-index: 0; }
-  .trip-cta-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .trip-cta-visual { position: absolute; inset: 0; z-index: 0; }
+  .trip-cta-img { width: 100%; height: 100%; object-fit: cover; object-position: center 38%; display: block; }
   .trip-cta-scrim {
     position: absolute; inset: 0;
-    background: linear-gradient(115deg, rgba(20,14,10,0.82) 0%, rgba(20,14,10,0.35) 65%, rgba(20,14,10,0.15) 100%);
+    /* Dark on the left (where the copy sits) fading to fully clear by
+       ~58% width, so the photo itself reads clean through the center. */
+    background: linear-gradient(90deg, rgba(16,27,36,0.95) 0%, rgba(16,27,36,0.8) 26%, rgba(16,27,36,0.25) 48%, rgba(16,27,36,0) 60%);
   }
-  .trip-cta-content { position: relative; z-index: 1; padding: 48px; max-width: 560px; }
-  .trip-cta-eyebrow {
-    display: inline-block; font-weight: 700; font-size: 0.82rem;
-    letter-spacing: 0.09em; text-transform: uppercase; color: var(--amber);
+  .trip-cta-map {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 40%; z-index: 1;
+    border: none; padding: 0; margin: 0; cursor: pointer; overflow: hidden; display: block;
   }
+  .trip-cta-map-img {
+    width: 100%; height: 100%; display: block; object-fit: cover;
+    /* The soft dissolve: fully transparent at the map's own left edge,
+       fully opaque by 42% across it, so the photo underneath shows
+       through and the map gradually emerges rather than appearing as a
+       hard-edged box. */
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 42%);
+    mask-image: linear-gradient(90deg, transparent 0%, black 42%);
+  }
+  .trip-cta-content { position: relative; z-index: 2; max-width: 460px; padding: 40px 24px 40px 44px; color: #fff; }
+  .trip-cta-icon { display: inline-flex; color: var(--ref-gold); margin-bottom: 14px; }
   .trip-cta-title {
-    font-family: 'Fraunces', serif; font-size: clamp(1.7rem, 3.2vw, 2.4rem);
-    line-height: 1.15; margin: 10px 0 14px; color: #fff;
+    font-family: 'Fraunces', serif; font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+    line-height: 1.2; margin: 0 0 10px; color: #fff;
   }
   .trip-cta-lead {
-    font-family: 'Nunito', sans-serif; font-size: 1rem; line-height: 1.55;
-    margin: 0 0 26px; color: rgba(255,255,255,0.92);
+    font-family: 'Nunito', sans-serif; font-size: 0.95rem; line-height: 1.5;
+    margin: 0 0 14px; color: rgba(255,255,255,0.9); max-width: 38ch;
+  }
+  .trip-cta-example {
+    font-family: 'Nunito', sans-serif; font-style: italic; font-size: 0.86rem; line-height: 1.5;
+    margin: 0 0 22px; padding-left: 14px; border-left: 2px solid var(--ref-gold);
+    color: rgba(255,255,255,0.72); max-width: 40ch;
   }
   .trip-cta-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
   .trip-cta-btn {
-    border: none; background: var(--plum); color: #fff; font-weight: 700;
-    font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 14px 26px;
+    border: none; background: var(--ref-white); color: var(--ref-navy-deep); font-weight: 700;
+    font-family: 'Nunito', sans-serif; font-size: 0.9rem; padding: 13px 24px;
     border-radius: 999px; cursor: pointer; transition: background-color .15s ease;
+    display: inline-flex; align-items: center; gap: 8px;
   }
-  .trip-cta-btn:hover { background: var(--plum-dark); }
-  .trip-cta-map-link {
-    color: #fff; font-weight: 700; font-family: 'Nunito', sans-serif; font-size: 0.92rem;
-    text-decoration: underline; text-underline-offset: 3px;
-  }
+  .trip-cta-btn:hover { background: var(--ref-cream); }
 
-  @media (max-width: 640px) {
-    .trip-cta-inner { min-height: 360px; border-radius: 16px; }
-    .trip-cta-content { padding: 32px 24px; max-width: 100%; }
+  @media (max-width: 900px) {
+    /* Side-by-side photo/text doesn't work at this width -- switch to a
+       reserved photo band up top (padding-top on the container makes
+       room for it without fighting the flex/absolute layering used at
+       desktop width) with the content block immediately below it, full
+       width, on its own solid (not gradient-faded) dark background so it
+       never visually collides with the map layer underneath. */
+    .trip-cta-inner { min-height: 0; border-radius: 16px; padding-top: 220px; }
+    .trip-cta-visual { top: 0; left: 0; right: 0; bottom: auto; height: 220px; }
+    .trip-cta-map { top: 0; bottom: auto; height: 220px; width: 58%; }
+    .trip-cta-scrim { display: none; }
+    .trip-cta-content { max-width: 100%; width: 100%; padding: 24px; background: rgba(16,27,36,0.94); }
   }
 
   /* Milestone 3: Browse/Search de-emphasis heading. Purely additive --

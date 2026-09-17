@@ -457,6 +457,21 @@ test('Milestone 3: Build Your Perfect Okanagan Trip section renders with the app
   assert.match(html, /id="tripCtaOpenMap"/);
 });
 
+test('Reference redesign: Build Your Perfect Okanagan Trip has a single CTA button, matching the reference (no second visible link)', () => {
+  const html = app.renderBuildTripCTAHTML();
+  const buttonCount = (html.match(/class="trip-cta-btn"/g) || []).length;
+  assert.equal(buttonCount, 1, 'expected exactly one visible CTA button');
+  assert.match(html, />Build My Trip/);
+  assert.doesNotMatch(html, /trip-cta-map-link/, 'the old separate "View the interactive map" text link must be gone');
+});
+
+test('Build Your Perfect Okanagan Trip map visual uses the new map image, not the old hand-built SVG', () => {
+  const html = app.renderBuildTripCTAHTML();
+  assert.match(html, /<img class="trip-cta-map-img" src="\/images\/trip-cta-map\.png" width="1376" height="768"/, 'the new map image must render inside the existing #tripCtaOpenMap button');
+  assert.doesNotMatch(html, /<svg class="trip-cta-map-svg"/, 'the old hand-built SVG map must be fully removed, not layered under the new image');
+  assert.doesNotMatch(html, /tripLakeGrad|tripPinGrad|tripSoftBlur/, 'the old SVG\'s gradient/filter defs must be gone too');
+});
+
 test('Milestone 3: Build Your Perfect Okanagan Trip section does not introduce a new trip data model or duplicate trip-tray IDs', () => {
   const html = app.renderBuildTripCTAHTML();
   assert.doesNotMatch(html, /id="tripTray"/, 'must not duplicate the real #tripTray widget');
@@ -805,6 +820,9 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Hero -> Mood -> Hidden Gems -> Explore -> Build Trip -> Browse/Search
   // (the wizard, id="directory") -> existing deeper directory content.
   assert.match(homepageBody, /id="buildTrip"/, 'Build Your Perfect Okanagan Trip section (Milestone 3) must render');
+  const tripMapImg = await fetch(`${base}/images/trip-cta-map.png`);
+  assert.equal(tripMapImg.status, 200, 'the new Build Your Trip map image must be servable');
+  assert.equal(tripMapImg.headers.get('content-type'), 'image/png');
   const heroPos = homepageBody.indexOf('class="hero-scenic"');
   const moodPos = homepageBody.indexOf('id="moodCards"');
   const gemsPos = homepageBody.indexOf('id="hiddenGems"');
