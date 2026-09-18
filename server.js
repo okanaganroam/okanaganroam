@@ -4557,8 +4557,104 @@ function renderTripPlannerStyles() {
   .trip-planner-breadcrumb { font-size: 0.8rem; color: var(--ink); opacity: 0.62; margin-bottom: 18px; }
   .trip-planner-breadcrumb a { color: var(--teal-deep); text-decoration: none; }
   .trip-planner-breadcrumb a:hover { text-decoration: underline; }
-  .trip-planner-intro h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
+  .trip-planner-intro h1, .trip-planner-intro h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
   .trip-planner-intro .subtitle { color: var(--ink); opacity: 0.7; font-size: 1.02rem; margin: 0 0 28px; max-width: 640px; }
+
+  /* Conversational hero (primary /trip experience) -- same design tokens
+     as the wizard below it, so the two feel like one coherent page even
+     though the wizard is now the secondary/fallback path. */
+  .trip-conv-hero {
+    background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 20px;
+    padding: 32px 28px; margin-bottom: 28px; box-shadow: 0 10px 28px -18px rgba(74,52,40,0.4);
+  }
+  .trip-conv-hero h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2.1rem; margin: 0 0 8px; color: var(--ink); }
+  .trip-conv-subtitle { color: var(--ink); opacity: 0.72; font-size: 1.05rem; margin: 0 0 22px; max-width: 620px; }
+
+  .trip-conv-input-wrap { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; align-items: flex-start; }
+  .trip-conv-textarea {
+    width: 100%; min-height: 100px; padding: 16px 18px; border-radius: 14px; box-sizing: border-box;
+    border: 1.5px solid rgba(42,32,25,0.22); font-family: 'Nunito', sans-serif; font-size: 1.02rem;
+    background: var(--sand); color: var(--ink); resize: vertical; line-height: 1.5;
+  }
+  .trip-conv-textarea:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(31,92,92,0.15); }
+  .trip-conv-submit-btn { font-size: 0.98rem; padding: 13px 28px; }
+
+  .trip-conv-examples { margin-bottom: 18px; }
+  .trip-conv-examples-label { display: block; font-size: 0.82rem; font-weight: 700; color: var(--ink); opacity: 0.6; margin-bottom: 8px; }
+  .trip-conv-example-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .trip-conv-example-chip {
+    font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 600; padding: 8px 14px;
+    border-radius: 999px; border: 1.5px solid rgba(42,32,25,0.18); background: var(--paper);
+    color: var(--teal-deep); cursor: pointer; text-align: left;
+  }
+  .trip-conv-example-chip:hover { background: var(--sand); border-color: var(--teal); }
+
+  .trip-conv-status { font-size: 0.92rem; color: var(--ink); opacity: 0.75; margin: 0 0 8px; min-height: 1.2em; }
+  .trip-conv-status.is-error { color: #9C3B3B; opacity: 1; font-weight: 700; }
+  .trip-conv-status.is-loading::before {
+    content: ''; display: inline-block; width: 13px; height: 13px; margin-right: 8px;
+    border: 2px solid rgba(42,32,25,0.25); border-top-color: var(--teal); border-radius: 50%;
+    animation: tripSpin 0.7s linear infinite; vertical-align: -2px;
+  }
+
+  .trip-conv-understood { margin-top: 22px; padding-top: 22px; border-top: 1.5px dashed rgba(74,52,40,0.16); }
+  .trip-conv-understood h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.25rem; color: var(--ink); margin: 0 0 16px; }
+
+  .trip-conv-chips { display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; }
+  .trip-conv-field { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .trip-conv-field label, .trip-conv-field-label { font-size: 0.82rem; font-weight: 800; color: var(--teal-deep); min-width: 80px; }
+  .trip-conv-field select, .trip-conv-field input[type="number"] {
+    padding: 8px 12px; border-radius: 8px; border: 1.5px solid rgba(42,32,25,0.22);
+    font-family: 'Nunito', sans-serif; font-size: 0.92rem; background: var(--sand); color: var(--ink);
+  }
+  .trip-conv-field input[type="number"] { width: 70px; }
+
+  .trip-conv-pace-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  .trip-conv-pace-btn {
+    font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; padding: 7px 14px;
+    border-radius: 999px; border: 1.5px solid rgba(42,32,25,0.22); background: var(--sand);
+    color: var(--ink); cursor: pointer;
+  }
+  .trip-conv-pace-btn.is-active { background: var(--amber); border-color: var(--amber); }
+
+  .trip-conv-chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .trip-conv-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 8px 7px 14px; border-radius: 999px;
+    background: var(--teal); color: var(--paper); font-size: 0.86rem; font-weight: 700;
+  }
+  .trip-conv-chip-remove {
+    display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+    border-radius: 50%; border: none; background: rgba(255,255,255,0.25); color: var(--paper);
+    cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0;
+  }
+  .trip-conv-chip-remove:hover { background: rgba(255,255,255,0.4); }
+
+  .trip-conv-clarify {
+    background: #E8F3F1; border: 1px solid #B9D9D4; border-radius: 10px; padding: 12px 16px;
+    margin-bottom: 14px; font-size: 0.92rem; color: var(--ink); font-weight: 600;
+  }
+  .trip-conv-unsupported {
+    background: #FBF0DC; border: 1px solid #E3C88A; border-radius: 10px; padding: 12px 16px;
+    margin-bottom: 16px; font-size: 0.86rem; color: var(--ink);
+  }
+  .trip-conv-unsupported ul { margin: 6px 0 0; padding-left: 20px; }
+
+  .trip-conv-generate-btn { font-size: 0.95rem; padding: 13px 26px; }
+  .trip-conv-generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .trip-conv-wizard-toggle {
+    display: block; margin-top: 20px; background: none; border: none; padding: 0;
+    font-family: 'Nunito', sans-serif; font-size: 0.88rem; font-weight: 700; color: var(--teal-deep);
+    cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+  }
+  .trip-conv-wizard-toggle:hover { color: var(--teal); }
+
+  @media (max-width: 560px) {
+    .trip-conv-hero { padding: 22px 18px; }
+    .trip-conv-hero h1 { font-size: 1.7rem; }
+    .trip-conv-field { flex-direction: column; align-items: flex-start; }
+    .trip-conv-field label, .trip-conv-field-label { min-width: 0; }
+  }
 
   .trip-planner-form {
     background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 16px;
@@ -4746,47 +4842,82 @@ ${headerHtml}
 <main class="trip-planner-main wrap" id="tripPlannerMain">
   <nav class="trip-planner-breadcrumb"><a href="/">Home</a> &rsaquo; Build My Trip</nav>
 
-  <div class="trip-planner-intro">
-    <h1 data-i18n="trip.planner.title">Build My Trip</h1>
-    <p class="subtitle" data-i18n="trip.planner.subtitle">Answer a few questions and we&rsquo;ll put together a real, day-by-day Okanagan itinerary from actual venues &mdash; no invented places, no AI guesswork.</p>
+  <section class="trip-conv-hero" id="tripConvHero">
+    <h1 data-i18n="trip.title">Build Your Perfect Okanagan Trip</h1>
+    <p class="trip-conv-subtitle" data-i18n="trip.conv.subtitle">Describe the trip you want in your own words, and we&rsquo;ll turn it into a real itinerary built from actual venues.</p>
+
+    <div class="trip-conv-input-wrap">
+      <textarea id="tripConvInput" class="trip-conv-textarea" rows="3"
+        data-i18n-placeholder="trip.conv.placeholder"
+        placeholder="Plan me a relaxed 3-day trip around Kelowna with wine, dog-friendly places and hidden gems..."></textarea>
+      <button type="button" class="app-btn trip-conv-submit-btn" id="tripConvSubmitBtn" data-i18n="trip.conv.submit">Plan My Trip</button>
+    </div>
+
+    <div class="trip-conv-examples">
+      <span class="trip-conv-examples-label" data-i18n="trip.conv.examplesLabel">Or try one of these:</span>
+      <div class="trip-conv-example-chips">
+        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example1">3 relaxed days in Kelowna with wine and hidden gems</button>
+        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example2">A weekend in Penticton with food, golf and a slower pace</button>
+        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example3">2 days around Vernon with wineries and dog-friendly places</button>
+      </div>
+    </div>
+
+    <div id="tripConvStatus" class="trip-conv-status" aria-live="polite"></div>
+
+    <div id="tripConvUnderstood" class="trip-conv-understood" style="display:none;">
+      <h2 data-i18n="trip.conv.understoodHeading">Here&rsquo;s what I understood</h2>
+      <div id="tripConvClarify" class="trip-conv-clarify" style="display:none;"></div>
+      <div id="tripConvChips" class="trip-conv-chips"></div>
+      <div id="tripConvUnsupported" class="trip-conv-unsupported" style="display:none;"></div>
+      <button type="button" class="app-btn trip-conv-generate-btn" id="tripConvGenerateBtn" data-i18n="trip.conv.generate" disabled>Generate My Trip</button>
+    </div>
+
+    <button type="button" class="trip-conv-wizard-toggle" id="tripConvWizardToggle" aria-expanded="false" aria-controls="tripWizardSection" data-i18n="trip.conv.wizardToggle">Prefer to choose everything yourself? Plan it step by step &rarr;</button>
+  </section>
+
+  <div id="tripWizardSection" style="display:none;">
+    <div class="trip-planner-intro">
+      <h2 data-i18n="trip.planner.title">Build My Trip</h2>
+      <p class="subtitle" data-i18n="trip.planner.subtitle">Answer a few questions and we&rsquo;ll put together a real, day-by-day Okanagan itinerary from actual venues &mdash; no invented places, no AI guesswork.</p>
+    </div>
+
+    <form id="tripPlannerForm" class="trip-planner-form">
+      <div class="trip-planner-step">
+        <h2><span class="trip-planner-step-num">1</span> <span data-i18n="trip.planner.step1.label">Where are you going?</span></h2>
+        <select id="tripRegionSelect" name="region" required>
+          <option value="" data-i18n="trip.planner.regionPlaceholder">Choose a region&hellip;</option>
+          ${regionOptions}
+        </select>
+      </div>
+
+      <div class="trip-planner-step">
+        <h2><span class="trip-planner-step-num">2</span> <span data-i18n="trip.planner.step2.label">How long?</span></h2>
+        <div class="trip-planner-days-row">
+          <input type="number" id="tripDaysInput" name="days" min="1" max="7" value="3" required>
+          <span data-i18n="trip.planner.daysSuffix">days</span>
+        </div>
+      </div>
+
+      <div class="trip-planner-step">
+        <h2><span class="trip-planner-step-num">3</span> <span data-i18n="trip.planner.step3.label">What do you love?</span></h2>
+        <p class="trip-planner-hint" data-i18n="trip.planner.step3.hint">Pick as many as you like &mdash; leave them all unchecked to see a bit of everything.</p>
+        <div class="trip-interest-chips">
+          ${interestChips}
+        </div>
+      </div>
+
+      <div class="trip-planner-step">
+        <h2><span class="trip-planner-step-num">4</span> <span data-i18n="trip.planner.step4.label">What&rsquo;s your pace?</span></h2>
+        <div class="trip-pace-options">
+          <label class="trip-pace-option"><input type="radio" name="pace" value="relaxed"><span data-i18n="trip.planner.pace.relaxed">Relaxed</span></label>
+          <label class="trip-pace-option"><input type="radio" name="pace" value="standard" checked><span data-i18n="trip.planner.pace.standard">Standard</span></label>
+          <label class="trip-pace-option"><input type="radio" name="pace" value="packed"><span data-i18n="trip.planner.pace.packed">Packed</span></label>
+        </div>
+      </div>
+
+      <button type="submit" class="app-btn trip-planner-generate-btn" id="tripGenerateBtn" data-i18n="trip.planner.generate">Generate My Trip</button>
+    </form>
   </div>
-
-  <form id="tripPlannerForm" class="trip-planner-form">
-    <div class="trip-planner-step">
-      <h2><span class="trip-planner-step-num">1</span> <span data-i18n="trip.planner.step1.label">Where are you going?</span></h2>
-      <select id="tripRegionSelect" name="region" required>
-        <option value="" data-i18n="trip.planner.regionPlaceholder">Choose a region&hellip;</option>
-        ${regionOptions}
-      </select>
-    </div>
-
-    <div class="trip-planner-step">
-      <h2><span class="trip-planner-step-num">2</span> <span data-i18n="trip.planner.step2.label">How long?</span></h2>
-      <div class="trip-planner-days-row">
-        <input type="number" id="tripDaysInput" name="days" min="1" max="7" value="3" required>
-        <span data-i18n="trip.planner.daysSuffix">days</span>
-      </div>
-    </div>
-
-    <div class="trip-planner-step">
-      <h2><span class="trip-planner-step-num">3</span> <span data-i18n="trip.planner.step3.label">What do you love?</span></h2>
-      <p class="trip-planner-hint" data-i18n="trip.planner.step3.hint">Pick as many as you like &mdash; leave them all unchecked to see a bit of everything.</p>
-      <div class="trip-interest-chips">
-        ${interestChips}
-      </div>
-    </div>
-
-    <div class="trip-planner-step">
-      <h2><span class="trip-planner-step-num">4</span> <span data-i18n="trip.planner.step4.label">What&rsquo;s your pace?</span></h2>
-      <div class="trip-pace-options">
-        <label class="trip-pace-option"><input type="radio" name="pace" value="relaxed"><span data-i18n="trip.planner.pace.relaxed">Relaxed</span></label>
-        <label class="trip-pace-option"><input type="radio" name="pace" value="standard" checked><span data-i18n="trip.planner.pace.standard">Standard</span></label>
-        <label class="trip-pace-option"><input type="radio" name="pace" value="packed"><span data-i18n="trip.planner.pace.packed">Packed</span></label>
-      </div>
-    </div>
-
-    <button type="submit" class="app-btn trip-planner-generate-btn" id="tripGenerateBtn" data-i18n="trip.planner.generate">Generate My Trip</button>
-  </form>
 
   <div id="tripPlannerStatus" class="trip-planner-status" aria-live="polite"></div>
 

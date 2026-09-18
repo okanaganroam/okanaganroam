@@ -1076,6 +1076,126 @@ test('renderTripPlannerPage does not alter the homepage template file on disk', 
   assert.equal(before, after, 'rendering /trip must only READ okanagan.html, never write to it');
 });
 
+// ---- Build My Trip, Stage 4 (conversational /trip experience) -----------
+//
+// No browser/DOM test harness exists in this project (confirmed by the
+// Build My Trip architecture audit and every prior Stage 2/3 test in this
+// file) -- so, following the exact same established pattern already used
+// above and in the i18n regression tests below, this section verifies (a)
+// the server-rendered HTML structure via app.renderTripPlannerPage(), and
+// (b) the client module's real behavior via safe, targeted checks against
+// the actual public/scripts/app.js source (fetch endpoints, i18n keys
+// used, event wiring) -- not a fragile reimplementation of DOM behavior.
+
+function readClientAppJs() {
+  const fs = require('fs');
+  const path = require('path');
+  return fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+}
+
+test('conversational hero: input, submit button, and example prompts are present and are the page\'s primary heading', () => {
+  const html = app.renderTripPlannerPage();
+  assert.match(html, /<section class="trip-conv-hero" id="tripConvHero">/);
+  // Exactly one <h1> on the page, and it belongs to the conversational hero.
+  const h1Matches = html.match(/<h1[ >]/g) || [];
+  assert.equal(h1Matches.length, 1, 'the page must have exactly one <h1>');
+  assert.match(html, /<h1 data-i18n="trip\.title">/);
+  assert.match(html, /<textarea id="tripConvInput"/);
+  assert.match(html, /data-i18n-placeholder="trip\.conv\.placeholder"/);
+  assert.match(html, /<button type="button" class="app-btn trip-conv-submit-btn" id="tripConvSubmitBtn"/);
+  assert.match(html, /class="trip-conv-example-chip" data-i18n="trip\.conv\.example1"/);
+  assert.match(html, /class="trip-conv-example-chip" data-i18n="trip\.conv\.example2"/);
+  assert.match(html, /class="trip-conv-example-chip" data-i18n="trip\.conv\.example3"/);
+});
+
+test('conversational hero: understood panel (chips, clarify, unsupported, generate button) is present but hidden until a parse result exists', () => {
+  const html = app.renderTripPlannerPage();
+  assert.match(html, /<div id="tripConvUnderstood" class="trip-conv-understood" style="display:none;">/);
+  assert.match(html, /<div id="tripConvChips" class="trip-conv-chips">/);
+  assert.match(html, /<div id="tripConvClarify" class="trip-conv-clarify" style="display:none;">/);
+  assert.match(html, /<div id="tripConvUnsupported" class="trip-conv-unsupported" style="display:none;">/);
+  assert.match(html, /<button type="button" class="app-btn trip-conv-generate-btn" id="tripConvGenerateBtn" data-i18n="trip\.conv\.generate" disabled>/);
+});
+
+test('wizard fallback: the existing step-by-step form is still fully present, unchanged internally, just collapsed behind a toggle', () => {
+  const html = app.renderTripPlannerPage();
+  assert.match(html, /<div id="tripWizardSection" style="display:none;">/);
+  assert.match(html, /<button type="button" class="trip-conv-wizard-toggle" id="tripConvWizardToggle" aria-expanded="false" aria-controls="tripWizardSection" data-i18n="trip\.conv\.wizardToggle">/);
+  // Every original wizard element must still be present -- not deleted,
+  // only relocated inside the collapsed section.
+  assert.match(html, /<form id="tripPlannerForm" class="trip-planner-form">/);
+  assert.match(html, /id="tripRegionSelect"/);
+  assert.match(html, /id="tripDaysInput"/);
+  assert.match(html, /name="tripInterest"/);
+  assert.match(html, /name="pace" value="relaxed"/);
+  assert.match(html, /id="tripGenerateBtn"/);
+  // Confirm the wizard form is textually INSIDE #tripWizardSection, not
+  // just present somewhere else on the page.
+  const sectionStart = html.indexOf('<div id="tripWizardSection"');
+  const formStart = html.indexOf('<form id="tripPlannerForm"');
+  const sectionFormClose = html.indexOf('</form>', formStart);
+  const nextTopLevelDivAfterSection = html.indexOf('<div id="tripPlannerStatus"');
+  assert.ok(sectionStart < formStart && formStart < sectionFormClose && sectionFormClose < nextTopLevelDivAfterSection, 'the wizard form must be nested inside #tripWizardSection');
+});
+
+test('the result/itinerary rendering targets (#tripPlannerResult, map, days) are unchanged and shared by both the wizard and the conversational flow', () => {
+  const html = app.renderTripPlannerPage();
+  assert.match(html, /<div id="tripPlannerResult" class="trip-planner-result" style="display:none;">/);
+  assert.match(html, /<div id="tripPlannerMapWrap" class="trip-planner-map-wrap" style="display:none;">/);
+  assert.match(html, /<div id="tripPlannerMap">/);
+  assert.match(html, /<div id="tripPlannerDays" class="trip-planner-days">/);
+  assert.match(html, /id="tripRegenerateBtn"/);
+});
+
+test('client module: the conversational flow POSTs to /api/trip/parse, never to any OpenAI/external URL', () => {
+  const src = readClientAppJs();
+  const convModuleStart = src.indexOf('Stage 4: conversational /trip experience');
+  assert.ok(convModuleStart !== -1, 'expected to find the conversational module in app.js');
+  const nearMeStart = src.indexOf('Near me: geolocation-based distance', convModuleStart);
+  assert.ok(nearMeStart !== -1, 'expected a following module to bound the conversational module\'s source slice');
+  const convModuleSrc = src.slice(convModuleStart, nearMeStart);
+  assert.match(convModuleSrc, /fetch\('\/api\/trip\/parse'/);
+  assert.doesNotMatch(convModuleSrc, /openai/i, 'the conversational client module must never reference OpenAI');
+  assert.doesNotMatch(convModuleSrc, /https?:\/\/(?!.*okanaganroam)/i, 'the conversational client module must never call an external URL');
+});
+
+test('client module: a successful parse reaches the SAME existing generate pipeline (window.__tripGenerateFromParams), not a second implementation', () => {
+  const src = readClientAppJs();
+  assert.match(src, /window\.__tripGenerateFromParams\s*=\s*generateTrip;/, 'generateTrip must be exposed for the conversational module to reuse');
+  assert.match(src, /window\.__tripGenerateFromParams\(\{/, 'the conversational module must call the shared generate function, not fetch(\'/api/trip/generate\') a second time');
+  // The conversational module itself must never independently POST to
+  // /api/trip/generate -- only the ORIGINAL wizard code path (inside the
+  // Stage 2 IIFE, before the Stage 4 module begins) may do that.
+  const stage4Start = src.indexOf('Stage 4: conversational /trip experience');
+  const stage4Src = src.slice(stage4Start);
+  assert.doesNotMatch(stage4Src, /fetch\('\/api\/trip\/generate'/, 'the conversational module must not call /api/trip/generate directly');
+});
+
+test('client module: clarification and unsupported rendering use the real, existing i18n keys, including the required beaches-specific message', () => {
+  const src = readClientAppJs();
+  assert.match(src, /t\('trip\.conv\.clarifyRegion'\)/);
+  assert.match(src, /t\('trip\.conv\.clarifyDays'\)/);
+  assert.match(src, /t\('trip\.conv\.clarifyBoth'\)/);
+  assert.match(src, /t\('trip\.conv\.unsupportedIntro'\)/);
+  assert.match(src, /t\('trip\.conv\.unsupportedBeaches'\)/);
+  assert.match(src, /t\('trip\.conv\.unsupportedGeneric'\)/);
+  // Beach-specific handling is a real conditional in the render function,
+  // not just present as dead text somewhere in the file.
+  assert.match(src, /\/beach\/i\.test\(term\)/);
+});
+
+test('client module: example prompt chips fill the input and trigger the SAME parse function used by manual submission', () => {
+  const src = readClientAppJs();
+  assert.match(src, /exampleChips\.forEach\(function\(chip\)\{\s*chip\.addEventListener\('click', function\(\)\{\s*submitConversational\(chip\.textContent\);/);
+});
+
+test('renderTripPlannerPage: amenity and interest chip labels in the conversational panel reuse EXISTING i18n keys (badge.*, type.*, gems.heading), not a new competing set', () => {
+  const src = readClientAppJs();
+  assert.match(src, /dog_friendly: 'badge\.dogFriendly'/);
+  assert.match(src, /hidden_gem: 'gems\.heading'/);
+  assert.match(src, /t\('type\.' \+ v\)/);
+});
+
 // ---- Build My Trip i18n regression coverage -----------------------------
 //
 // Guards against exactly the class of bug reported after Stage 2 shipped:
@@ -1162,6 +1282,51 @@ test('every dynamically-set trip.planner.*/type.* key used by the /trip client m
     if (!(key in TRANSLATIONS.fr)) missing.push(`FR missing: ${key}`);
   }
   assert.deepEqual(missing, [], `every dynamically-used trip.planner.*/type.* key must exist in both locales:\n${missing.join('\n')}`);
+});
+
+test('every trip.conv.* key used by the conversational /trip module (literal AND dynamically-looked-up) resolves in BOTH locales', () => {
+  const TRANSLATIONS = loadClientTranslations();
+  const appJs = readClientAppJs();
+
+  const literalKeys = [
+    'trip.conv.errorEmpty', 'trip.conv.parsing', 'trip.conv.errorGeneric',
+    'trip.conv.fieldRegion', 'trip.conv.fieldDays',
+    'trip.conv.fieldPace', 'trip.conv.fieldInterests', 'trip.conv.fieldAmenities',
+    'trip.conv.fieldDiscovery', 'trip.conv.fieldBudget', 'trip.conv.clarifyRegion',
+    'trip.conv.clarifyDays', 'trip.conv.clarifyBoth', 'trip.conv.unsupportedIntro',
+    'trip.conv.unsupportedBeaches', 'trip.conv.unsupportedGeneric', 'trip.conv.removeChip',
+  ];
+  for (const key of literalKeys) {
+    assert.match(appJs, new RegExp(`t\\('${key.replace(/\./g, '\\.')}'\\)`), `expected app.js to still call t('${key}')`);
+  }
+
+  // Keys resolved dynamically via a lookup table (AMENITY_I18N_KEY /
+  // BUDGET_I18N_KEY / DISCOVERY_I18N_KEY), not a literal t('...') call --
+  // enumerated directly from the real, authoritative field lists rather
+  // than regex-matched, since a regex can't see through an object lookup.
+  const amenityKeys = [
+    'badge.dogFriendly', 'badge.vegan', 'badge.vegetarian', 'badge.glutenFree', 'badge.patio',
+    'badge.kidFriendly', 'badge.lakeView', 'badge.nonalcoholic', 'badge.sportsTv',
+    'badge.liveMusic', 'badge.greatGroups', 'badge.happyHour',
+  ];
+  const budgetKeys = ['trip.conv.budget.budget', 'trip.conv.budget.moderate', 'trip.conv.budget.upscale'];
+  const discoveryKeys = ['gems.heading'];
+  // Also the hero/examples/submit/generate/wizard-toggle strings, which are
+  // set via data-i18n attributes on the server-rendered page rather than a
+  // JS-side t() call -- already covered by the data-i18n sweep test above,
+  // included again here for a single one-stop completeness assertion.
+  const heroKeys = [
+    'trip.title', 'trip.conv.subtitle', 'trip.conv.placeholder', 'trip.conv.submit',
+    'trip.conv.examplesLabel', 'trip.conv.example1', 'trip.conv.example2', 'trip.conv.example3',
+    'trip.conv.generate', 'trip.conv.wizardToggle', 'trip.conv.understoodHeading',
+  ];
+
+  const missing = [];
+  for (const key of [...literalKeys, ...amenityKeys, ...budgetKeys, ...discoveryKeys, ...heroKeys]) {
+    if (!(key in TRANSLATIONS.en)) missing.push(`EN missing: ${key}`);
+    if (!(key in TRANSLATIONS.fr)) missing.push(`FR missing: ${key}`);
+  }
+  assert.deepEqual(missing, [], `every trip.conv.* (and reused) key must exist in both locales:\n${missing.join('\n')}`);
 });
 
 // ---- JSON-LD -----------------------------------------------------------

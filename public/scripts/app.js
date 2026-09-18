@@ -251,6 +251,37 @@ var TRANSLATIONS = {
     'trip.planner.errorGeneric': 'Something went wrong building your trip. Please try again.',
     'trip.planner.errorNetwork': 'Couldn\u2019t reach Okanagan Roam \u2014 check your connection and try again.',
 
+    'trip.conv.subtitle': 'Describe the trip you want in your own words, and we\u2019ll turn it into a real itinerary built from actual venues.',
+    'trip.conv.placeholder': 'Plan me a relaxed 3-day trip around Kelowna with wine, dog-friendly places and hidden gems...',
+    'trip.conv.submit': 'Plan My Trip',
+    'trip.conv.examplesLabel': 'Or try one of these:',
+    'trip.conv.example1': '3 relaxed days in Kelowna with wine and hidden gems',
+    'trip.conv.example2': 'A weekend in Penticton with food, golf and a slower pace',
+    'trip.conv.example3': '2 days around Vernon with wineries and dog-friendly places',
+    'trip.conv.parsing': 'Reading your trip\u2026',
+    'trip.conv.understoodHeading': 'Here\u2019s what I understood',
+    'trip.conv.fieldRegion': 'Region',
+    'trip.conv.fieldDays': 'Days',
+    'trip.conv.fieldPace': 'Pace',
+    'trip.conv.fieldInterests': 'Interests',
+    'trip.conv.fieldAmenities': 'Amenities',
+    'trip.conv.fieldDiscovery': 'Discovery',
+    'trip.conv.fieldBudget': 'Budget',
+    'trip.conv.budget.budget': 'Budget-friendly',
+    'trip.conv.budget.moderate': 'Moderate',
+    'trip.conv.budget.upscale': 'Upscale',
+    'trip.conv.clarifyRegion': 'I can build that trip \u2014 which Okanagan region would you like to explore?',
+    'trip.conv.clarifyDays': 'Got it \u2014 how many days would you like to spend (1\u20137)?',
+    'trip.conv.clarifyBoth': 'I can build that trip \u2014 I just need a region and a number of days first.',
+    'trip.conv.unsupportedIntro': 'A few things I can\u2019t help with yet:',
+    'trip.conv.unsupportedBeaches': 'Beaches aren\u2019t currently available as a trip-planning preference yet.',
+    'trip.conv.unsupportedGeneric': '\u201c{term}\u201d isn\u2019t a supported trip-planning filter yet.',
+    'trip.conv.generate': 'Generate My Trip',
+    'trip.conv.wizardToggle': 'Prefer to choose everything yourself? Plan it step by step \u2192',
+    'trip.conv.removeChip': 'Remove',
+    'trip.conv.errorEmpty': 'Tell us a bit about the trip you\u2019d like first.',
+    'trip.conv.errorGeneric': 'Something went wrong understanding your trip. Please try again.',
+
     'card.getDirections': '\ud83d\udccd Get directions',
     'card.findMenu': '\ud83d\udccb Find menu',
     'card.checkBooking': '\ud83d\udcc5 Check for online booking',
@@ -501,6 +532,37 @@ var TRANSLATIONS = {
     'trip.planner.errorGeneric': 'Une erreur est survenue lors de la cr\u00e9ation de votre voyage. Veuillez r\u00e9essayer.',
     'trip.planner.errorNetwork': 'Impossible de joindre Okanagan Roam \u2014 v\u00e9rifiez votre connexion et r\u00e9essayez.',
 
+    'trip.conv.subtitle': 'D\u00e9crivez le voyage que vous souhaitez dans vos propres mots, et nous en ferons un itin\u00e9raire r\u00e9el \u00e0 partir de vrais \u00e9tablissements.',
+    'trip.conv.placeholder': 'Planifiez-moi un voyage d\u00e9tendu de 3 jours autour de Kelowna avec du vin, des endroits qui acceptent les chiens et des tr\u00e9sors cach\u00e9s...',
+    'trip.conv.submit': 'Planifier mon voyage',
+    'trip.conv.examplesLabel': 'Ou essayez l\u2019un de ceux-ci\u00a0:',
+    'trip.conv.example1': '3 jours d\u00e9tendus \u00e0 Kelowna avec du vin et des tr\u00e9sors cach\u00e9s',
+    'trip.conv.example2': 'Une fin de semaine \u00e0 Penticton avec repas, golf et un rythme plus lent',
+    'trip.conv.example3': '2 jours autour de Vernon avec des vignobles et des endroits qui acceptent les chiens',
+    'trip.conv.parsing': 'Lecture de votre demande\u2026',
+    'trip.conv.understoodHeading': 'Voici ce que j\u2019ai compris',
+    'trip.conv.fieldRegion': 'R\u00e9gion',
+    'trip.conv.fieldDays': 'Jours',
+    'trip.conv.fieldPace': 'Rythme',
+    'trip.conv.fieldInterests': 'Int\u00e9r\u00eats',
+    'trip.conv.fieldAmenities': 'Commodit\u00e9s',
+    'trip.conv.fieldDiscovery': 'D\u00e9couverte',
+    'trip.conv.fieldBudget': 'Budget',
+    'trip.conv.budget.budget': '\u00c9conomique',
+    'trip.conv.budget.moderate': 'Mod\u00e9r\u00e9',
+    'trip.conv.budget.upscale': 'Haut de gamme',
+    'trip.conv.clarifyRegion': 'Je peux organiser ce voyage \u2014 quelle r\u00e9gion de l\u2019Okanagan aimeriez-vous explorer\u00a0?',
+    'trip.conv.clarifyDays': 'Compris \u2014 combien de jours aimeriez-vous y passer (1 \u00e0 7)\u00a0?',
+    'trip.conv.clarifyBoth': 'Je peux organiser ce voyage \u2014 j\u2019ai seulement besoin d\u2019une r\u00e9gion et d\u2019un nombre de jours.',
+    'trip.conv.unsupportedIntro': 'Quelques \u00e9l\u00e9ments que je ne peux pas encore prendre en charge\u00a0:',
+    'trip.conv.unsupportedBeaches': 'Les plages ne sont pas encore offertes comme pr\u00e9f\u00e9rence de planification de voyage.',
+    'trip.conv.unsupportedGeneric': '\u00ab\u00a0{term}\u00a0\u00bb n\u2019est pas encore un filtre de planification de voyage pris en charge.',
+    'trip.conv.generate': 'G\u00e9n\u00e9rer mon voyage',
+    'trip.conv.wizardToggle': 'Vous pr\u00e9f\u00e9rez tout choisir vous-m\u00eame\u00a0? Planifiez \u00e9tape par \u00e9tape \u2192',
+    'trip.conv.removeChip': 'Retirer',
+    'trip.conv.errorEmpty': 'Dites-nous d\u2019abord un peu \u00e0 propos du voyage que vous souhaitez.',
+    'trip.conv.errorGeneric': 'Une erreur est survenue lors de la compr\u00e9hension de votre voyage. Veuillez r\u00e9essayer.',
+
     'card.getDirections': '\ud83d\udccd Obtenir l\u2019itin\u00e9raire',
     'card.findMenu': '\ud83d\udccb Voir le menu',
     'card.checkBooking': '\ud83d\udcc5 V\u00e9rifier la r\u00e9servation en ligne',
@@ -659,6 +721,7 @@ function setLanguage(lang){
   if (window.__renderTripTray) window.__renderTripTray();
   if (window.__syncFavButtons) window.__syncFavButtons();
   if (window.__applyFilters) window.__applyFilters();
+  if (window.__renderTripConvUnderstood) window.__renderTripConvUnderstood();
 }
 
 (function(){
@@ -2606,8 +2669,16 @@ window.__scrollToVenueCard = function(name){
   // avoid an obviously-wasted request, sends them, and renders whatever
   // comes back. It never re-implements or second-guesses the backend's
   // picks.
-  function generateTrip() {
-    var params = collectParams();
+  //
+  // paramsOverride (conversational /trip experience, added later): when
+  // provided, used instead of reading the wizard form fields -- lets the
+  // conversational flow reuse this exact same fetch/render/error-handling
+  // pipeline (and therefore the same single call to /api/trip/generate)
+  // rather than duplicating it. The wizard's own form submit/regenerate
+  // handlers below still call generateTrip() with no arguments, so their
+  // behavior is completely unchanged.
+  function generateTrip(paramsOverride) {
+    var params = paramsOverride || collectParams();
     if (!params.region) {
       setStatus(t('trip.planner.errorNoRegion'), 'error');
       return;
@@ -2652,6 +2723,298 @@ window.__scrollToVenueCard = function(name){
   if (regenerateBtn) {
     regenerateBtn.addEventListener('click', function(){ generateTrip(); });
   }
+
+  // Exposed so the conversational /trip module (below) can generate an
+  // itinerary from its own parsed/edited params without re-implementing
+  // any of the fetch/render/error-handling logic above.
+  window.__tripGenerateFromParams = generateTrip;
+})();
+
+/* ---------- Build My Trip, Stage 4: conversational /trip experience ----------
+   The primary /trip experience: a free-text box that calls the existing,
+   free, deterministic local parser at POST /api/trip/parse, shows what was
+   understood as editable region/days/pace fields and removable interest/
+   amenity/discovery chips, surfaces anything unsupported or needing
+   clarification, and -- once region+days are known -- hands the resulting
+   structured params to the EXISTING wizard's generateTrip() (exposed just
+   above as window.__tripGenerateFromParams) to actually build the
+   itinerary. This module never selects venues, never re-implements
+   itinerary logic, and never calls anything other than the two existing
+   endpoints (/api/trip/parse, /api/trip/generate via the shared function).
+   The step-by-step wizard above remains fully intact as the fallback path,
+   toggled via #tripConvWizardToggle. ---------- */
+(function(){
+  var heroEl = document.getElementById('tripConvHero');
+  if (!heroEl) return; // not on /trip, or markup not present
+
+  var inputEl = document.getElementById('tripConvInput');
+  var submitBtn = document.getElementById('tripConvSubmitBtn');
+  var statusEl = document.getElementById('tripConvStatus');
+  var understoodEl = document.getElementById('tripConvUnderstood');
+  var chipsEl = document.getElementById('tripConvChips');
+  var clarifyEl = document.getElementById('tripConvClarify');
+  var unsupportedEl = document.getElementById('tripConvUnsupported');
+  var generateBtn = document.getElementById('tripConvGenerateBtn');
+  var wizardToggle = document.getElementById('tripConvWizardToggle');
+  var wizardSection = document.getElementById('tripWizardSection');
+  var exampleChips = document.querySelectorAll('.trip-conv-example-chip');
+  var wizardRegionSelect = document.getElementById('tripRegionSelect');
+
+  // field -> i18n key maps, reusing the SAME keys the rest of the site
+  // already uses for these exact concepts (badge chips, venue types, the
+  // Hidden Gems section) -- no new/competing translation source of truth.
+  var AMENITY_I18N_KEY = {
+    dog_friendly: 'badge.dogFriendly', vegan: 'badge.vegan', vegetarian: 'badge.vegetarian',
+    gluten_free: 'badge.glutenFree', patio: 'badge.patio', kid_friendly: 'badge.kidFriendly',
+    lake_view: 'badge.lakeView', nonalcoholic: 'badge.nonalcoholic', sports_tv: 'badge.sportsTv',
+    live_music: 'badge.liveMusic', great_groups: 'badge.greatGroups', happy_hour: 'badge.happyHour'
+  };
+  var BUDGET_I18N_KEY = { budget: 'trip.conv.budget.budget', moderate: 'trip.conv.budget.moderate', upscale: 'trip.conv.budget.upscale' };
+  var DISCOVERY_I18N_KEY = { hidden_gem: 'gems.heading' };
+
+  // The current editable parsed state (the exact shape POST /api/trip/parse
+  // returns): { region, days, interests[], amenities[], pace, budget,
+  // discovery[], unsupported[], needs_clarification[] }. Null until a
+  // parse succeeds.
+  var current = null;
+
+  function setStatus(text, mode) {
+    statusEl.textContent = text || '';
+    statusEl.className = 'trip-conv-status' + (mode ? ' is-' + mode : '');
+  }
+
+  function buildChip(labelText, onRemove) {
+    var chip = document.createElement('span');
+    chip.className = 'trip-conv-chip';
+    var text = document.createElement('span');
+    text.textContent = labelText;
+    chip.appendChild(text);
+    if (onRemove) {
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'trip-conv-chip-remove';
+      rm.setAttribute('aria-label', t('trip.conv.removeChip'));
+      rm.textContent = '×';
+      rm.addEventListener('click', onRemove);
+      chip.appendChild(rm);
+    }
+    return chip;
+  }
+
+  function buildSelectField(labelText, id, currentValue, onChange) {
+    var wrap = document.createElement('div');
+    wrap.className = 'trip-conv-field';
+    var label = document.createElement('label');
+    label.textContent = labelText;
+    label.setAttribute('for', id);
+    wrap.appendChild(label);
+    var select = document.createElement('select');
+    select.id = id;
+    // Trusted: copied verbatim from the server-rendered wizard region
+    // <select> already in this same page (never from API/user input), so
+    // this is not a new innerHTML-with-untrusted-data pattern.
+    select.innerHTML = wizardRegionSelect ? wizardRegionSelect.innerHTML : '';
+    select.value = currentValue || '';
+    select.addEventListener('change', function(){ onChange(select.value || null); });
+    wrap.appendChild(select);
+    return wrap;
+  }
+
+  function buildDaysField(currentValue, onChange) {
+    var wrap = document.createElement('div');
+    wrap.className = 'trip-conv-field';
+    var label = document.createElement('label');
+    label.textContent = t('trip.conv.fieldDays');
+    label.setAttribute('for', 'tripConvDaysInput');
+    wrap.appendChild(label);
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.max = '7';
+    input.id = 'tripConvDaysInput';
+    if (currentValue) input.value = String(currentValue);
+    input.addEventListener('change', function(){
+      var n = parseInt(input.value, 10);
+      onChange((n >= 1 && n <= 7) ? n : null);
+    });
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function buildPaceField(currentValue, onChange) {
+    var wrap = document.createElement('div');
+    wrap.className = 'trip-conv-field trip-conv-pace-field';
+    var label = document.createElement('span');
+    label.className = 'trip-conv-field-label';
+    label.textContent = t('trip.conv.fieldPace');
+    wrap.appendChild(label);
+    var group = document.createElement('div');
+    group.className = 'trip-conv-pace-buttons';
+    ['relaxed', 'standard', 'packed'].forEach(function(p){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'trip-conv-pace-btn' + (p === currentValue ? ' is-active' : '');
+      btn.textContent = t('trip.planner.pace.' + p);
+      btn.addEventListener('click', function(){ onChange(p); });
+      group.appendChild(btn);
+    });
+    wrap.appendChild(group);
+    return wrap;
+  }
+
+  function buildChipGroup(labelText, values, labelFn, onRemove) {
+    var wrap = document.createElement('div');
+    wrap.className = 'trip-conv-field';
+    var label = document.createElement('span');
+    label.className = 'trip-conv-field-label';
+    label.textContent = labelText;
+    wrap.appendChild(label);
+    var group = document.createElement('div');
+    group.className = 'trip-conv-chip-group';
+    values.forEach(function(v){
+      group.appendChild(buildChip(labelFn(v), function(){ onRemove(v); }));
+    });
+    wrap.appendChild(group);
+    return wrap;
+  }
+
+  function removeFromList(key, value) {
+    current[key] = current[key].filter(function(v){ return v !== value; });
+    renderUnderstood();
+  }
+
+  function renderUnderstood() {
+    if (!current) { understoodEl.style.display = 'none'; return; }
+    chipsEl.textContent = '';
+
+    chipsEl.appendChild(buildSelectField(t('trip.conv.fieldRegion'), 'tripConvRegionSelect', current.region, function(v){ current.region = v; renderUnderstood(); }));
+    chipsEl.appendChild(buildDaysField(current.days, function(v){ current.days = v; renderUnderstood(); }));
+    chipsEl.appendChild(buildPaceField(current.pace || 'standard', function(v){ current.pace = v; renderUnderstood(); }));
+
+    if (current.interests && current.interests.length) {
+      chipsEl.appendChild(buildChipGroup(t('trip.conv.fieldInterests'), current.interests, function(v){ return t('type.' + v); }, function(v){ removeFromList('interests', v); }));
+    }
+    if (current.amenities && current.amenities.length) {
+      chipsEl.appendChild(buildChipGroup(t('trip.conv.fieldAmenities'), current.amenities, function(v){ return t(AMENITY_I18N_KEY[v] || v); }, function(v){ removeFromList('amenities', v); }));
+    }
+    if (current.discovery && current.discovery.length) {
+      chipsEl.appendChild(buildChipGroup(t('trip.conv.fieldDiscovery'), current.discovery, function(v){ return t(DISCOVERY_I18N_KEY[v] || v); }, function(v){ removeFromList('discovery', v); }));
+    }
+    if (current.budget) {
+      chipsEl.appendChild(buildChipGroup(t('trip.conv.fieldBudget'), [current.budget], function(v){ return t(BUDGET_I18N_KEY[v] || v); }, function(){ current.budget = null; renderUnderstood(); }));
+    }
+
+    var missingRegion = !current.region;
+    var missingDays = !current.days;
+    if (missingRegion || missingDays) {
+      clarifyEl.textContent = missingRegion && missingDays
+        ? t('trip.conv.clarifyBoth')
+        : (missingRegion ? t('trip.conv.clarifyRegion') : t('trip.conv.clarifyDays'));
+      clarifyEl.style.display = '';
+    } else {
+      clarifyEl.style.display = 'none';
+    }
+
+    if (current.unsupported && current.unsupported.length) {
+      unsupportedEl.textContent = '';
+      var intro = document.createElement('strong');
+      intro.textContent = t('trip.conv.unsupportedIntro');
+      unsupportedEl.appendChild(intro);
+      var ul = document.createElement('ul');
+      current.unsupported.forEach(function(term){
+        var li = document.createElement('li');
+        li.textContent = /beach/i.test(term) ? t('trip.conv.unsupportedBeaches') : t('trip.conv.unsupportedGeneric').replace('{term}', term);
+        ul.appendChild(li);
+      });
+      unsupportedEl.appendChild(ul);
+      unsupportedEl.style.display = '';
+    } else {
+      unsupportedEl.style.display = 'none';
+    }
+
+    generateBtn.disabled = missingRegion || missingDays;
+  }
+
+  function submitConversational(text) {
+    var value = (typeof text === 'string' ? text : inputEl.value || '').trim();
+    if (!value) {
+      setStatus(t('trip.conv.errorEmpty'), 'error');
+      return;
+    }
+    inputEl.value = value;
+    submitBtn.disabled = true;
+    understoodEl.style.display = 'none';
+    setStatus(t('trip.conv.parsing'), 'loading');
+
+    fetch('/api/trip/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: value })
+    }).then(function(res){
+      return res.json().then(function(body){ return { ok: res.ok, body: body }; });
+    }).then(function(result){
+      submitBtn.disabled = false;
+      if (!result.ok) {
+        setStatus((result.body && result.body.error) || t('trip.conv.errorGeneric'), 'error');
+        return;
+      }
+      setStatus('', null);
+      current = result.body;
+      understoodEl.style.display = '';
+      renderUnderstood();
+      if (window.trackEvent) {
+        window.trackEvent('trip_conversational_parse', {
+          hasRegion: !!current.region, hasDays: !!current.days,
+          unsupportedCount: (current.unsupported || []).length
+        });
+      }
+    }).catch(function(){
+      submitBtn.disabled = false;
+      setStatus(t('trip.planner.errorNetwork'), 'error');
+    });
+  }
+
+  submitBtn.addEventListener('click', function(){ submitConversational(); });
+
+  exampleChips.forEach(function(chip){
+    chip.addEventListener('click', function(){
+      submitConversational(chip.textContent);
+    });
+  });
+
+  generateBtn.addEventListener('click', function(){
+    if (!current || !current.region || !current.days) return;
+    window.__tripGenerateFromParams({
+      region: current.region,
+      days: current.days,
+      interests: current.interests || [],
+      pace: current.pace || 'standard',
+      amenities: current.amenities || [],
+      budget: current.budget || null,
+      discovery: current.discovery || []
+    });
+    var resultEl = document.getElementById('tripPlannerResult');
+    if (resultEl) {
+      setTimeout(function(){ resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    }
+    if (window.trackEvent) window.trackEvent('trip_conversational_generate_click');
+  });
+
+  if (wizardToggle && wizardSection) {
+    wizardToggle.addEventListener('click', function(){
+      var willShow = wizardSection.style.display === 'none';
+      wizardSection.style.display = willShow ? '' : 'none';
+      wizardToggle.setAttribute('aria-expanded', String(willShow));
+      if (willShow) wizardSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  // Exposed so a language switch (applyTranslations(), above) can re-render
+  // the already-parsed understood panel in the newly active language --
+  // same pattern as window.__syncTripButtons/__renderTripTray. A no-op
+  // when nothing has been parsed yet (renderUnderstood() itself no-ops
+  // when `current` is null).
+  window.__renderTripConvUnderstood = renderUnderstood;
 })();
 
 /* ---------- Near me: geolocation-based distance to each region ---------- */
