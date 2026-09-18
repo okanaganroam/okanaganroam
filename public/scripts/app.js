@@ -97,6 +97,13 @@ var TRANSLATIONS = {
     'search.mainLine': 'What are you looking for?',
     'search.subLine': 'Wineries, restaurants, hikes, beaches, hidden gems\u2026',
     'search.button': 'Search',
+
+    // /browse redesign (2026-09-18): the "Browse & Search the Okanagan"
+    // heading had no i18n coverage at all before this pass.
+    'browse.eyebrow': 'Browse & search',
+    'browse.heading': 'Browse & Search the Okanagan',
+    'browse.lead': 'Every venue in the valley, filterable by region, category, and what matters to you.',
+
     'status.open': 'Open now',
     'status.closingSoon': 'Closing soon',
     'status.closed': 'Closed now',
@@ -312,6 +319,11 @@ var TRANSLATIONS = {
     'search.mainLine': 'Que recherchez-vous\u00a0?',
     'search.subLine': 'Vignobles, restaurants, randonn\u00e9es, plages, tr\u00e9sors cach\u00e9s\u2026',
     'search.button': 'Rechercher',
+
+    'browse.eyebrow': 'Parcourir et rechercher',
+    'browse.heading': 'Parcourez et recherchez dans l\u2019Okanagan',
+    'browse.lead': 'Chaque \u00e9tablissement de la vall\u00e9e, filtrable par r\u00e9gion, cat\u00e9gorie et ce qui compte pour vous.',
+
     'status.open': 'Ouvert',
     'status.closingSoon': 'Ferme bient\u00f4t',
     'status.closed': 'Ferm\u00e9',

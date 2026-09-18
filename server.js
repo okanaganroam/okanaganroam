@@ -1844,12 +1844,23 @@ const FOOTER_REGION_GROUPS = [
 //   Social Media (renamed from "Follow"): Instagram/TikTok -> the
 //     existing real profile URLs, Facebook stays the existing
 //     non-clickable "coming soon" treatment.
-function renderHomeFooterHTML() {
+// fromBrowse (2026-09-18, /browse redesign): this footer was written
+// assuming it only ever renders on / , where #exploreRegions/#hiddenGems
+// are real in-page anchors -- true for its original call site, but not
+// for /browse, which has no such sections in its own DOM (a bare "#..."
+// href there is simply a dead link, no scroll, no error). When rendered
+// on /browse this flag redirects just those three links back to the
+// homepage's own anchors (/#exploreRegions, /#hiddenGems) instead of
+// leaving them dangling; every other link in this footer is already an
+// absolute, context-independent URL and is unaffected either way.
+function renderHomeFooterHTML(fromBrowse) {
   const bestRegionForType = bestRegionForCategoryType();
   const golfRegion = bestRegionForType.golf;
   const golfHref = golfRegion && CATEGORY_SLUGS.golf ? `/${golfRegion}/${CATEGORY_SLUGS.golf}` : '/browse';
   const wineRegion = bestRegionForType.winery;
   const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
+  const exploreRegionsHref = fromBrowse ? '/#exploreRegions' : '#exploreRegions';
+  const hiddenGemsHref = fromBrowse ? '/#hiddenGems' : '#hiddenGems';
 
   const regionGroupsHtml = FOOTER_REGION_GROUPS.map((group) => {
     const links = group.regions
@@ -1880,11 +1891,11 @@ function renderHomeFooterHTML() {
         <ul>
           <li><a href="/browse?types=restaurant,cafe,brewery,pub,cocktail" data-i18n="homeFooter.foodDrinks">Food &amp; Drinks</a></li>
           <li><a href="${wineHref}" data-i18n="mood.wine.title">Wine</a></li>
-          <li><a href="#exploreRegions" data-i18n="mood.beaches.title">Beaches</a></li>
+          <li><a href="${exploreRegionsHref}" data-i18n="mood.beaches.title">Beaches</a></li>
           <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
           <li><a href="/events" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
-          <li><a href="#exploreRegions" data-i18n="mood.outdoors.title">Outdoors</a></li>
-          <li><a href="#hiddenGems" data-i18n="gems.heading">Hidden Gems</a></li>
+          <li><a href="${exploreRegionsHref}" data-i18n="mood.outdoors.title">Outdoors</a></li>
+          <li><a href="${hiddenGemsHref}" data-i18n="gems.heading">Hidden Gems</a></li>
         </ul>
       </div>
       <div class="home-footer-col">
@@ -2223,6 +2234,15 @@ function renderHomepageDiscoveryStyles() {
   }
   .hero-search-box button:hover { background: var(--ref-navy-deep); }
 
+  /* /browse redesign (2026-09-18): the wizard's own #searchInput/#searchBtn
+     box renders immediately below this hero on /browse (unlike /, which no
+     longer has a wizard at all) and the hero box only ever proxies into it
+     (see the heroSearchForm submit handler in app.js) -- so on /browse
+     specifically, hide this visual duplicate rather than show two search
+     boxes stacked on top of each other. body.page-browse is set only by
+     the /browse route handler; / is unaffected. */
+  body.page-browse .hero-search-box { display: none; }
+
   @media (max-width: 640px) {
     /* Mobile hero polish, pass 1 (2026-09-18): the mobile hero was reading
        as the desktop hero compressed into a phone -- taller than the
@@ -2390,18 +2410,28 @@ function renderHomepageDiscoveryStyles() {
   /* Milestone 3: Browse/Search de-emphasis heading. Purely additive --
      the wizard's own markup/behavior right below this is unchanged. Same
      discover-heading language as every other section, so this reads as a
-     natural next section rather than a distinct "command bar". */
+     natural next section rather than a distinct "command bar".
+     /browse redesign harmonization pass (2026-09-18): this whole rule
+     block was dead CSS until now -- it targets .browse-search-heading,
+     which only ever appears on /browse, but this entire <style> block
+     (renderHomepageDiscoveryStyles()) was only ever spliced into /'s own
+     response (see the bug-fix comment on the /browse route handler
+     above). Recolored from --teal to the --ref-* tokens here (not in
+     app.css, where a duplicate rule would otherwise silently lose this
+     cascade tie -- same specificity, and this inline block's source
+     position, inside <body>, is always later than app.css's <link> in
+     <head>) now that it actually reaches the page. */
   .browse-search-heading { margin-bottom: 16px; }
   .browse-search-heading .eyebrow {
     display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.82rem;
-    letter-spacing: 0.09em; text-transform: uppercase; color: var(--teal); margin-bottom: 8px;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--ref-gold); margin-bottom: 8px;
   }
-  .browse-search-heading .eyebrow::before { content: ""; width: 20px; height: 2px; background: var(--teal); display: inline-block; }
+  .browse-search-heading .eyebrow::before { content: ""; width: 20px; height: 2px; background: var(--ref-gold); display: inline-block; }
   .browse-search-heading h2 {
-    font-family: 'Fraunces', serif; font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin: 6px 0 8px;
+    font-family: 'Fraunces', serif; font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin: 6px 0 8px; color: var(--ref-navy);
   }
   .browse-search-lead {
-    font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: rgba(42,32,25,0.72); margin: 0;
+    font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: rgba(27,43,58,0.72); margin: 0;
   }
 
   /* Homepage footer redesign (2026-09-17, revised again same day): full-
@@ -2541,26 +2571,31 @@ function renderHomepageDiscoveryStyles() {
 
   /* Trip 0 button redesign, homepage-only (2026-09-17): #tripTray/
      #tripTrayToggle/#tripTrayCount are shared, site-wide rules defined in
-     app.css (still used as-is on /browse, untouched) -- these overrides
-     live only in this homepage-exclusive <style> block (never injected on
-     /browse), so they win on specificity/source-order there and nowhere
-     else. Direction: a small persistent "your trip" control, not a
-     primary CTA -- smaller footprint, the homepage's own navy/cream/gold
-     system instead of the old plum/paper/amber, a lighter shadow, and a
-     smaller/quieter count badge, while leaving position (fixed, bottom
-     corner, 20px from the edges -- already comfortable for tapping) and
-     every bit of the click/expand/route/clear behavior untouched -- this
-     only restyles the closed-state toggle and its count, never
-     #tripTrayPanel (the expanded trip list keeps its existing look). */
-  #tripTrayToggle {
+     app.css (used as-is on /browse, untouched). This block itself is no
+     longer homepage-exclusive (the /browse redesign, 2026-09-18, now
+     injects it there too, to fix .hero-scenic/.hero-title/etc. having had
+     zero CSS on /browse -- see the bug-fix comment on the /browse route
+     handler), so these three selectors are explicitly scoped to
+     body:not(.page-browse) (the marker only the /browse route sets) to
+     keep the original "homepage-only" intent intact now that the block
+     they live in is shared. Direction: a small persistent "your trip"
+     control, not a primary CTA -- smaller footprint, the homepage's own
+     navy/cream/gold system instead of the old plum/paper/amber, a lighter
+     shadow, and a smaller/quieter count badge, while leaving position
+     (fixed, bottom corner, 20px from the edges -- already comfortable for
+     tapping) and every bit of the click/expand/route/clear behavior
+     untouched -- this only restyles the closed-state toggle and its
+     count, never #tripTrayPanel (the expanded trip list keeps its
+     existing look, on both pages). */
+  body:not(.page-browse) #tripTrayToggle {
     background: var(--ref-navy); color: var(--ref-cream);
     border: 1px solid rgba(245,243,237,0.16);
     border-radius: 999px; padding: 8px 14px; gap: 6px;
     font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;
     box-shadow: 0 4px 14px -6px rgba(16,27,36,0.45);
   }
-  #tripTrayToggle:hover { background: var(--ref-navy-deep); }
-  #tripTrayCount {
+  body:not(.page-browse) #tripTrayToggle:hover { background: var(--ref-navy-deep); }
+  body:not(.page-browse) #tripTrayCount {
     background: var(--ref-gold); color: var(--ref-navy-deep);
     width: 16px; height: 16px; font-size: 0.62rem; font-weight: 800;
   }
@@ -3933,6 +3968,66 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/browse' && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
         let html = fs.readFileSync(SITE_PATH, 'utf8');
+
+        // /browse redesign harmonization pass (2026-09-18): marks this
+        // response so page-scoped CSS can tell it apart from / (same
+        // shared template/header/hero markup otherwise) -- currently used
+        // to hide the hero's own search box here, since the wizard's
+        // identical, fully-functional #searchInput/#searchBtn box already
+        // renders immediately below it on this page (the hero box on
+        // /browse has only ever been a thin proxy onto that same box --
+        // see the heroSearchForm submit handler in app.js -- so hiding it
+        // here removes a redundant, visually mismatched duplicate control
+        // without touching any actual search behavior).
+        html = html.replace('<body class="wizard-active">', '<body class="wizard-active page-browse">');
+
+        // Same broken-anchor problem as the footer fix below, found in the
+        // same audit: the shared header's "Discover"/"Things to Do" nav
+        // dropdowns link to #moodCards/#hiddenGems/#exploreRegions, which
+        // only exist in the DOM on / -- on /browse they're dead links
+        // (no scroll, no error, just nothing). #directory/#app/#list-venue
+        // are left untouched here because those anchors DO exist on this
+        // page. (On /, the mirror-image rewrite already sends #directory/
+        // #app/#list-venue to /browse, since those don't exist there.)
+        html = html
+          .replace(/href="#moodCards"/g, 'href="/#moodCards"')
+          .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
+          .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"');
+
+        // Footer harmonization: swap the old plain footer (still on the
+        // pre-redesign --sand/--plum palette, a hardcoded 4-region list,
+        // and the pre-redesign logo) for the same renderHomeFooterHTML()
+        // the homepage already uses -- it's already fully i18n-wired and
+        // lists all 20 real regions. fromBrowse=true redirects its
+        // Beaches/Outdoors/Hidden Gems links to /#exploreRegions and
+        // /#hiddenGems instead of the bare in-page anchors those sections
+        // only have on / (see renderHomeFooterHTML's own comment).
+        const oldFooterMatch = html.match(/<footer>[\s\S]*?<\/footer>/);
+        if (oldFooterMatch) {
+          html = html.replace(oldFooterMatch[0], renderHomeFooterHTML(true));
+        }
+
+        // Bug fix found during the /browse redesign audit: renderHomepage-
+        // DiscoveryStyles() -- the <style> block defining .hero-scenic/
+        // .hero-title/.hero-search-box (the hero this page shares with /,
+        // both rendering from the same static okanagan.html) -- was only
+        // ever spliced into /'s own response, never this one. /browse's
+        // hero has been rendering completely unstyled (bare h1/p/form,
+        // no background image, no layout) this whole time. The same
+        // anchor point / already uses (right after the hero's closing
+        // </section>, before the wizard) splices it in here too. This
+        // style block also defines selectors for homepage-only elements
+        // (.mood-card, .discover-section, etc.) that don't exist in this
+        // page's DOM -- those rules simply never match anything here,
+        // same as any other unused CSS rule, and are otherwise unchanged.
+        const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
+        if (html.includes(heroToWizardAnchor)) {
+          html = html.replace(
+            heroToWizardAnchor,
+            `</section>\n${renderHomepageDiscoveryStyles()}\n\n<section class="filter-bar" id="directory">`
+          );
+        }
+
         const footer = renderGuideFooterHTML();
         const openNowScript = renderOpenNowScript();
         const hiddenElementsScript = renderHiddenElementsScript();
