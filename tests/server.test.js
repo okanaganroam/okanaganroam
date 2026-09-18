@@ -422,6 +422,262 @@ test('buildTripItinerary is deterministic: identical inputs called twice produce
   assert.deepEqual(planA, planB);
 });
 
+// ---- Build My Trip, Stage 3 backward-compatibility regression ----------
+// Written FIRST, before any other Stage 3 test or code change, per the
+// approved implementation sequence. Calls pickBestTripVenue/
+// buildTripItinerary with the exact old (pre-Stage-3) argument shapes --
+// no preferences/amenities/budget/discovery -- and asserts the picks are
+// byte-identical to the pre-Stage-3 behavior already hand-verified by the
+// tests above. If a future change to the new preference-scoring tier ever
+// makes it anything other than a structural no-op when unused, this test
+// must fail.
+test('Stage 3 backward compatibility: pickBestTripVenue with no 6th argument behaves exactly as before', () => {
+  const cafe = { id: 1, type: 'cafe', rating: 4.0, latitude: 49, longitude: -119 };
+  const pub = { id: 2, type: 'pub', rating: 4.9, latitude: 49, longitude: -119 };
+  const pick = app.pickBestTripVenue([cafe, pub], new Set(), 'morning', null, 30);
+  assert.equal(pick.venue.id, 1, 'affinity tier must still decide this exactly as before Stage 3');
+});
+
+test('Stage 3 backward compatibility: pickBestTripVenue given empty/null preferences is identical to omitting them', () => {
+  const cafe = { id: 1, type: 'cafe', rating: 4.0, latitude: 49, longitude: -119 };
+  const pub = { id: 2, type: 'pub', rating: 4.9, latitude: 49, longitude: -119 };
+  const withoutPrefs = app.pickBestTripVenue([cafe, pub], new Set(), 'morning', null, 30);
+  const withEmptyPrefs = app.pickBestTripVenue([cafe, pub], new Set(), 'morning', null, 30, { amenities: [], budget: null, discoveryIds: null });
+  assert.deepEqual(withoutPrefs, withEmptyPrefs);
+});
+
+test('Stage 3 backward compatibility: buildTripItinerary with the old 4-field params shape reproduces the exact pre-Stage-3 plan', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const plan = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'standard' });
+  const day1 = plan.itinerary[0];
+  assert.equal(day1.morning.name, 'Trip Cafe Morning');
+  assert.equal(day1.afternoon.name, 'Trip Winery Afternoon');
+  assert.equal(day1.evening.name, 'Trip Pub Faraway');
+  assert.equal(plan.warnings.length, 0);
+  // The three new Stage 3 fields must default cleanly and never be
+  // silently populated from nothing.
+  assert.deepEqual(plan.amenities, []);
+  assert.equal(plan.budget, null);
+  assert.deepEqual(plan.discovery, []);
+});
+
+test('Stage 3 backward compatibility: buildTripItinerary given explicit empty/null Stage 3 fields is identical to omitting them entirely', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const oldShape = app.buildTripItinerary(venues, { region: 'osoyoos', days: 2, interests: [], pace: 'packed' });
+  const explicitEmpty = app.buildTripItinerary(venues, {
+    region: 'osoyoos', days: 2, interests: [], pace: 'packed',
+    amenities: [], budget: null, discovery: [], discoveryVenueIds: null,
+  });
+  assert.deepEqual(oldShape, explicitEmpty);
+});
+
+// ---- Build My Trip, Stage 3 (price/amenity/discovery scoring) -----------
+
+test('pickBestTripVenue: amenity preference boosts a matching venue over a higher-rated non-matching one', () => {
+  const dogFriendly = { id: 1, type: 'cafe', rating: 4.0, latitude: 49, longitude: -119, dog_friendly: true };
+  const notDogFriendly = { id: 2, type: 'cafe', rating: 4.9, latitude: 49, longitude: -119, dog_friendly: false };
+  const pick = app.pickBestTripVenue([dogFriendly, notDogFriendly], new Set(), 'morning', null, 30, { amenities: ['dog_friendly'] });
+  assert.equal(pick.venue.id, 1, 'the dog-friendly match must win the preference tier despite the lower rating');
+});
+
+test('pickBestTripVenue: a venue that matches zero requested amenities is still selectable, never excluded', () => {
+  const onlyCandidate = { id: 1, type: 'cafe', rating: 4.0, latitude: 49, longitude: -119, dog_friendly: false, vegan: false };
+  const pick = app.pickBestTripVenue([onlyCandidate], new Set(), 'morning', null, 30, { amenities: ['dog_friendly', 'vegan'] });
+  assert.ok(pick, 'a non-matching venue must still be pickable when it is the only candidate');
+  assert.equal(pick.venue.id, 1);
+});
+
+test('pickBestTripVenue: budget preference boosts a venue whose price falls in the requested band', () => {
+  const cheap = { id: 1, type: 'restaurant', rating: 4.0, latitude: 49, longitude: -119, price: 1 };
+  const pricey = { id: 2, type: 'restaurant', rating: 4.9, latitude: 49, longitude: -119, price: 4 };
+  const pick = app.pickBestTripVenue([cheap, pricey], new Set(), 'evening', null, 30, { budget: 'budget' });
+  assert.equal(pick.venue.id, 1, 'budget-band match must win the preference tier despite the lower rating');
+});
+
+test('budgetMatchesPrice: a venue with no price on file never matches any budget band', () => {
+  assert.equal(app.budgetMatchesPrice('budget', null), false);
+  assert.equal(app.budgetMatchesPrice('upscale', null), false);
+});
+
+test('pickBestTripVenue: discovery preference boosts a venue whose id is in the discoveryIds set', () => {
+  const gem = { id: 1, type: 'winery', rating: 4.0, latitude: 49, longitude: -119 };
+  const nonGem = { id: 2, type: 'winery', rating: 4.9, latitude: 49, longitude: -119 };
+  const pick = app.pickBestTripVenue([gem, nonGem], new Set(), 'afternoon', null, 30, { discoveryIds: new Set([1]) });
+  assert.equal(pick.venue.id, 1, 'discovery match must win the preference tier despite the lower rating');
+});
+
+test('pickBestTripVenue: matching more requested preferences outranks matching fewer', () => {
+  const oneMatch = { id: 1, type: 'cafe', rating: 4.0, latitude: 49, longitude: -119, dog_friendly: true, vegan: false };
+  const twoMatches = { id: 2, type: 'cafe', rating: 4.0, latitude: 49, longitude: -119, dog_friendly: true, vegan: true };
+  const pick = app.pickBestTripVenue([oneMatch, twoMatches], new Set(), 'morning', null, 30, { amenities: ['dog_friendly', 'vegan'] });
+  assert.equal(pick.venue.id, 2, 'a venue matching both requested amenities must outrank one matching only one, even at equal rating');
+});
+
+test('buildTripItinerary: amenities/budget/discovery params thread through to real fixture data and change the plan', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const faraway = venues.find((v) => v.name === 'Trip Pub Faraway');
+  // Boost the far pub via discovery so it wins its slot even at 'relaxed'
+  // pace, where the earlier backward-compat test proved it is normally
+  // excluded by the distance threshold. This proves discoveryVenueIds
+  // actually reaches pickBestTripVenue's scoring, not just the echo field.
+  const plan = app.buildTripItinerary(venues, {
+    region: 'osoyoos', days: 1, interests: [], pace: 'relaxed',
+    discovery: ['hidden_gem'], discoveryVenueIds: new Set([faraway.id]),
+  });
+  assert.deepEqual(plan.discovery, ['hidden_gem'], 'discovery is echoed back for the caller/UI, independent of the resolved id set used for scoring');
+  // The distance threshold (tier 1) still outranks the preference tier
+  // (tier 3) -- a discovery boost can win among in-range candidates, but
+  // cannot make an out-of-range venue beat an in-range one. This asserts
+  // that ordering is unchanged by Stage 3, not merely that discovery has
+  // *some* effect.
+  assert.equal(plan.itinerary[0].evening.name, 'Trip Restaurant Central', 'an out-of-range discovery match must still lose to an in-range candidate -- tier 1 (distance) still outranks tier 3 (preference)');
+});
+
+test('buildTripItinerary: amenities param is defensively filtered to real BOOL_FIELDS names', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const plan = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'standard', amenities: ['dog_friendly', 'not_a_real_field'] });
+  assert.deepEqual(plan.amenities, ['dog_friendly'], 'an unrecognized field name must be silently dropped, not passed through');
+});
+
+test('buildTripItinerary: budget param is defensively validated against TRIP_VALID_BUDGETS', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const plan = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'standard', budget: 'ultra-luxury' });
+  assert.equal(plan.budget, null, 'an unrecognized budget value must fall back to null, not be passed through');
+});
+
+// ---- Build My Trip, Stage 3 (shared field validators) -------------------
+
+test('isValidTripRegion/isValidTripDays/isValidTripInterest/isValidTripAmenity/isValidTripPace/isValidTripBudget reject the wrong values and accept the right ones', () => {
+  assert.equal(app.isValidTripRegion('osoyoos'), true);
+  assert.equal(app.isValidTripRegion('atlantis'), false);
+  assert.equal(app.isValidTripDays(3), true);
+  assert.equal(app.isValidTripDays(0), false);
+  assert.equal(app.isValidTripDays(2.5), false);
+  assert.equal(app.isValidTripInterest('winery'), true);
+  assert.equal(app.isValidTripInterest('beach'), false);
+  assert.equal(app.isValidTripAmenity('dog_friendly'), true);
+  assert.equal(app.isValidTripAmenity('wheelchair_accessible'), false, 'a real-world concept with no backing column must not validate');
+  assert.equal(app.isValidTripPace('relaxed'), true);
+  assert.equal(app.isValidTripPace('breakneck'), false);
+  assert.equal(app.isValidTripBudget('moderate'), true);
+  assert.equal(app.isValidTripBudget('ultra-luxury'), false);
+});
+
+test('isValidTripDiscoveryKind only accepts kinds that actually exist in collections', () => {
+  const knownKinds = app.getKnownDiscoveryKinds();
+  assert.ok(knownKinds.includes('hidden_gem'), 'the fixture-seeded hidden_gem collection must be visible');
+  assert.equal(app.isValidTripDiscoveryKind('hidden_gem', knownKinds), true);
+  assert.equal(app.isValidTripDiscoveryKind('local_favourite', knownKinds), false, 'a kind with no real collection must not validate');
+});
+
+test('getCollectionVenueIds returns the real hidden-gem membership and matches getHiddenGemVenueIds', () => {
+  const generic = app.getCollectionVenueIds('hidden_gem');
+  const dedicated = app.getHiddenGemVenueIds();
+  assert.deepEqual(generic, dedicated, 'the new generic lookup must agree exactly with the existing hidden-gem-specific one');
+});
+
+// ---- Build My Trip, Stage 3 (parseTripRequest -- network-free, provider mocked) ----
+//
+// Every test below injects options.providerFn, so parseTripRequest() never
+// makes a real network call and never depends on OPENAI_API_KEY being set.
+
+test('parseTripRequest: a full, valid mocked response maps cleanly to the structured schema', async () => {
+  const mockProvider = async () => ({
+    raw: {
+      region: 'kelowna', days: 3, interests: ['winery', 'restaurant'], amenities: ['dog_friendly'],
+      pace: 'relaxed', budget: 'moderate', discovery: ['hidden_gem'], unsupported_terms: [],
+    },
+    error: null,
+  });
+  const result = await app.parseTripRequest('a relaxed 3-day Kelowna wine trip', { providerFn: mockProvider });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, {
+    region: 'kelowna', days: 3, interests: ['winery', 'restaurant'], amenities: ['dog_friendly'],
+    pace: 'relaxed', budget: 'moderate', discovery: ['hidden_gem'],
+    unsupported: [], needs_clarification: [],
+  });
+});
+
+test('parseTripRequest: "beaches" and other unsupported phrases land in unsupported[], never silently mapped to a real field', async () => {
+  const mockProvider = async () => ({
+    raw: {
+      region: 'kelowna', days: 3, interests: ['winery'], amenities: ['dog_friendly'],
+      pace: 'relaxed', budget: null, discovery: ['hidden_gem'],
+      unsupported_terms: ['beaches', 'something fun Saturday night'],
+    },
+    error: null,
+  });
+  const result = await app.parseTripRequest(
+    'Plan me a relaxed 3-day Kelowna trip with wine, hidden gems, dog-friendly places, beaches and something fun Saturday night',
+    { providerFn: mockProvider }
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.unsupported, ['beaches', 'something fun Saturday night']);
+  assert.deepEqual(result.value.interests, ['winery']);
+  assert.deepEqual(result.value.discovery, ['hidden_gem']);
+  assert.deepEqual(result.value.amenities, ['dog_friendly']);
+});
+
+test('parseTripRequest: an invalid enum value from the provider is stripped into unsupported[], proving the local validator (not the model) enforces safety', async () => {
+  const mockProvider = async () => ({
+    raw: {
+      region: 'kelowna', days: 2, interests: ['museum'], amenities: ['wheelchair_accessible'],
+      pace: 'standard', budget: 'ultra-luxury', discovery: ['local_favourite'], unsupported_terms: [],
+    },
+    error: null,
+  });
+  const result = await app.parseTripRequest('a museum trip with wheelchair access', { providerFn: mockProvider });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.interests, [], 'museum is not a real CATEGORY_SLUGS value and must not pass through');
+  assert.deepEqual(result.value.amenities, [], 'wheelchair_accessible has no backing column and must not pass through');
+  assert.equal(result.value.budget, null, 'ultra-luxury is not a real budget band and must fall back to null');
+  assert.deepEqual(result.value.discovery, [], 'local_favourite is not a real collection kind and must not pass through');
+  assert.ok(result.value.unsupported.includes('museum'));
+  assert.ok(result.value.unsupported.includes('wheelchair_accessible'));
+  assert.ok(result.value.unsupported.includes('local_favourite'));
+});
+
+test('parseTripRequest: a missing region and missing days are reported via needs_clarification, not an error', async () => {
+  const mockProvider = async () => ({
+    raw: { region: null, days: null, interests: ['winery'], amenities: [], pace: 'standard', budget: null, discovery: [], unsupported_terms: [] },
+    error: null,
+  });
+  const result = await app.parseTripRequest('I want to visit some wineries', { providerFn: mockProvider });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.needs_clarification.sort(), ['days', 'region']);
+});
+
+test('parseTripRequest: malformed/garbage provider output fails safely with ok:false, never a crash or a guessed plan', async () => {
+  const notJson = async () => ({ raw: null, error: 'invalid_json' });
+  const r1 = await app.parseTripRequest('gibberish request', { providerFn: notJson });
+  assert.equal(r1.ok, false);
+  assert.equal(r1.reason, 'invalid_json');
+
+  const arrayInsteadOfObject = async () => ({ raw: ['not', 'an', 'object'], error: null });
+  const r2 = await app.parseTripRequest('gibberish request', { providerFn: arrayInsteadOfObject });
+  assert.equal(r2.ok, false);
+
+  const throwingProvider = async () => { throw new Error('boom'); };
+  const r3 = await app.parseTripRequest('gibberish request', { providerFn: throwingProvider });
+  assert.equal(r3.ok, false);
+  assert.equal(r3.reason, 'provider_error');
+});
+
+test('parseTripRequest: an unconfigured provider (no API key) fails safely rather than silently returning an empty plan', async () => {
+  const notConfigured = async () => ({ raw: null, error: 'not_configured' });
+  const result = await app.parseTripRequest('any request', { providerFn: notConfigured });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'not_configured');
+});
+
+test('parseTripRequest: empty text is rejected before the provider is ever called', async () => {
+  let called = false;
+  const spyProvider = async () => { called = true; return { raw: {}, error: null }; };
+  const result = await app.parseTripRequest('   ', { providerFn: spyProvider });
+  assert.equal(result.ok, false);
+  assert.equal(called, false, 'the provider must never be invoked for empty/whitespace-only text');
+});
+
 // ---- Build My Trip, Stage 2 (extractHtmlFragment + renderTripPlannerPage) ----
 
 test('extractHtmlFragment: includeEndMarker=false stops BEFORE the end marker (regression test for the exact bug that swallowed the whole /trip page into an unterminated HTML comment)', () => {
@@ -2090,6 +2346,114 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
         body: '{not valid json',
       });
       assert.equal(res.status, 400);
+    }
+
+    // ---- Stage 3 fields: amenities, budget, discovery ---------------------
+
+    // 400 -- amenities must be an array of known BOOL_FIELDS names.
+    {
+      const { status: s1, body: b1 } = await generateTrip({ region: 'osoyoos', days: 1, amenities: 'dog_friendly' });
+      assert.equal(s1, 400);
+      assert.match(b1.error, /amenities must be an array/);
+      const { status: s2, body: b2 } = await generateTrip({ region: 'osoyoos', days: 1, amenities: ['not_a_real_amenity'] });
+      assert.equal(s2, 400);
+      assert.match(b2.error, /Unknown amenity/);
+    }
+
+    // 400 -- invalid budget value.
+    {
+      const { status, body } = await generateTrip({ region: 'osoyoos', days: 1, budget: 'ultra-luxury' });
+      assert.equal(status, 400);
+      assert.match(body.error, /budget must be one of/);
+    }
+
+    // 400 -- discovery must reference a real collections.kind.
+    {
+      const { status: s1, body: b1 } = await generateTrip({ region: 'osoyoos', days: 1, discovery: 'hidden_gem' });
+      assert.equal(s1, 400);
+      assert.match(b1.error, /discovery must be an array/);
+      const { status: s2, body: b2 } = await generateTrip({ region: 'osoyoos', days: 1, discovery: ['local_favourite'] });
+      assert.equal(s2, 400);
+      assert.match(b2.error, /Unknown discovery kind/);
+    }
+
+    // 200 -- a valid request using all three new Stage 3 fields together;
+    // response echoes them back and the plan is unaffected in shape.
+    {
+      const { status, body } = await generateTrip({
+        region: 'osoyoos', days: 1, pace: 'standard',
+        amenities: ['dog_friendly'], budget: 'moderate', discovery: ['hidden_gem'],
+      });
+      assert.equal(status, 200);
+      assert.deepEqual(body.amenities, ['dog_friendly']);
+      assert.equal(body.budget, 'moderate');
+      assert.deepEqual(body.discovery, ['hidden_gem']);
+      assert.equal(body.itinerary.length, 1);
+    }
+
+    // Omitting the three Stage 3 fields entirely must reproduce the exact
+    // pre-Stage-3 response over real HTTP, not just at the function level.
+    {
+      const { status, body } = await generateTrip({ region: 'osoyoos', days: 1, pace: 'standard' });
+      assert.equal(status, 200);
+      assert.deepEqual(body.amenities, []);
+      assert.equal(body.budget, null);
+      assert.deepEqual(body.discovery, []);
+      assert.equal(body.itinerary[0].morning.name, 'Trip Cafe Morning');
+      assert.equal(body.itinerary[0].evening.name, 'Trip Pub Faraway');
+    }
+  }
+
+  // ---- POST /api/trip/parse (Build My Trip, Stage 3) -----------------------
+  // OPENAI_API_KEY is intentionally unset in this test environment (and in
+  // production, until explicitly provisioned) -- so this route-level suite
+  // can only exercise request validation and the honest "not configured"
+  // failure path over real HTTP. parseTripRequest()'s actual parsing/
+  // validation logic is covered exhaustively above with a mocked provider,
+  // entirely network-free.
+  {
+    async function parseTrip(bodyObj) {
+      const res = await fetch(`${base}/api/trip/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj),
+      });
+      return { status: res.status, body: await res.json() };
+    }
+
+    // 400 -- unexpected top-level key.
+    {
+      const { status, body } = await parseTrip({ text: 'a trip to kelowna', extra: 'nope' });
+      assert.equal(status, 400);
+      assert.match(body.error, /Unexpected field/);
+    }
+
+    // 400 -- missing/empty text.
+    {
+      const { status: s1 } = await parseTrip({});
+      assert.equal(s1, 400);
+      const { status: s2, body: b2 } = await parseTrip({ text: '   ' });
+      assert.equal(s2, 400);
+      assert.match(b2.error, /text is required/);
+    }
+
+    // 400 -- malformed JSON body.
+    {
+      const res = await fetch(`${base}/api/trip/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{not valid json',
+      });
+      assert.equal(res.status, 400);
+    }
+
+    // 502 -- with no OPENAI_API_KEY provisioned, a well-formed request must
+    // fail honestly (not silently return an empty/guessed plan, and not
+    // crash the server).
+    {
+      const { status, body } = await parseTrip({ text: 'a relaxed 3-day Kelowna wine trip' });
+      assert.equal(status, 502);
+      assert.equal(body.reason, 'not_configured');
     }
   }
 

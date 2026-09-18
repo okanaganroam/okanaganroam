@@ -25,6 +25,14 @@ const INDEXNOW_KEY = 'b25ba530bda42cb30e339b0dd848dadf';
 // public — this one must be kept secret and never committed to source.
 const ENRICHMENT_ADMIN_TOKEN = process.env.ENRICHMENT_ADMIN_TOKEN || null;
 
+// Build My Trip, Stage 3: the OpenAI key for the natural-language trip
+// parser (POST /api/trip/parse below). Same fail-closed pattern as
+// ENRICHMENT_ADMIN_TOKEN above -- unset locally and in production for now
+// by explicit product decision (not yet provisioned on Railway), so
+// callTripParserProvider() always returns a clean "not_configured" error
+// rather than attempting a request with no key.
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
+
 
 // ---------- helpers ----------
 
@@ -1293,6 +1301,34 @@ function isVenueHiddenGem(venueId) {
   return !!row;
 }
 
+// Build My Trip, Stage 3: a generic collection-membership lookup, used by
+// the trip engine's "discovery" preference (e.g. hidden_gem). Deliberately
+// separate from getHiddenGemVenueIds() above (used by venue-page/homepage
+// badge rendering) -- same underlying tables, but this one is parameterized
+// by any real collections.kind value instead of being hardcoded to
+// 'hidden_gem', so it stays correct if a second discovery collection kind
+// is ever added. Kept as its own function rather than generalizing
+// getHiddenGemVenueIds() itself, to avoid any risk of an unrelated
+// behavior change to existing badge rendering.
+function getCollectionVenueIds(kind) {
+  const rows = db.prepare(`
+    SELECT DISTINCT ci.content_id AS id
+    FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    JOIN venues v ON v.id = ci.content_id
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL
+  `).all(kind);
+  return new Set(rows.map((r) => r.id));
+}
+
+// The live set of collection kinds that actually exist right now (today,
+// just 'hidden_gem') -- queried fresh, not hardcoded, so trip-request
+// validation for the `discovery` field always reflects real data instead
+// of a list that could silently drift out of sync with collections.kind.
+function getKnownDiscoveryKinds() {
+  return db.prepare('SELECT DISTINCT kind FROM collections').all().map((r) => r.kind);
+}
+
 // Small, shared badge fragment — reuses the existing `.chip` styling
 // convention already used by badgeChipsHtml, so no new CSS class or
 // design-system addition is needed for this sprint's minimal scope.
@@ -1367,6 +1403,27 @@ const TRIP_TYPE_DAYPART_AFFINITY = {
 
 const TRIP_DAYPARTS = ['morning', 'afternoon', 'evening'];
 
+// Build My Trip, Stage 3: budget bands over the existing venues.price
+// column (1-4, populated on ~40% of venues -- see the Stage 3 data-model
+// audit). Deliberately loose, overlapping ranges rather than an exact
+// match: "moderate" includes $ and $$$ neighbors, not just $$, because
+// price on this data is sparse and a hard equality match would make the
+// budget preference boost almost never fire. A venue with no price on
+// file simply never matches any band (see budgetMatchesPrice below) --
+// it is never excluded, only never boosted.
+const TRIP_VALID_BUDGETS = ['budget', 'moderate', 'upscale'];
+const TRIP_BUDGET_PRICE_RANGES = {
+  budget: (price) => price <= 2,
+  moderate: (price) => price >= 2 && price <= 3,
+  upscale: (price) => price >= 3,
+};
+
+function budgetMatchesPrice(budget, price) {
+  if (price == null) return false;
+  const test = TRIP_BUDGET_PRICE_RANGES[budget];
+  return test ? test(price) : false;
+}
+
 // Haversine great-circle distance in km. A server-side port of the exact
 // same formula already used client-side in public/scripts/app.js (the
 // haversineKm() behind window.__distanceBetweenRegions) — kept as a
@@ -1398,15 +1455,29 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 //     prior slot the same day, or the last slot of the previous day), or
 //     null for the very first slot of the trip
 //   - maxHopKm: this trip's pace threshold (TRIP_PACE_MAX_HOP_KM[pace])
+//   - preferences (Stage 3, optional): { amenities, budget, discoveryIds }
+//     - amenities: array of BOOL_FIELDS names the trip should favor (default [])
+//     - budget: one of TRIP_VALID_BUDGETS, or null (default null)
+//     - discoveryIds: a Set of venue ids to favor (e.g. hidden gems), or
+//       null (default null)
+//     Omitting `preferences` entirely (every Stage 1/2 call site, and
+//     every existing test) makes every candidate score 0 on this tier --
+//     see step 3 in the comparator below.
 //
 // Returns { venue, hopKm, hopExceededThreshold, hopUnknown } or null if the
 // candidate pool is exhausted.
 //
 // Selection is fully deterministic: candidates are scored by (in priority
 // order) whether they respect the distance threshold, daypart affinity,
-// rating, then venue id as a final stable tiebreaker — never by random
-// choice or by whatever order SQLite happened to return rows in.
-function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm) {
+// preference match count, rating, then venue id as a final stable
+// tiebreaker — never by random choice or by whatever order SQLite happened
+// to return rows in.
+function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm, preferences) {
+  const prefs = preferences || {};
+  const prefAmenities = Array.isArray(prefs.amenities) ? prefs.amenities : [];
+  const prefBudget = prefs.budget || null;
+  const prefDiscoveryIds = prefs.discoveryIds instanceof Set ? prefs.discoveryIds : null;
+
   const pool = candidates.filter((v) => !usedIds.has(v.id));
   if (pool.length === 0) return null;
 
@@ -1425,7 +1496,23 @@ function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm)
     }
     const hopExceededThreshold = hopUnknown ? false : hopKm > maxHopKm;
     const affinity = (TRIP_TYPE_DAYPART_AFFINITY[venue.type] || { morning: 1, afternoon: 1, evening: 1 })[daypart];
-    return { venue, hopKm, hopUnknown, hopExceededThreshold, affinity };
+
+    // Stage 3: a soft preference-match score -- how many of the caller's
+    // requested amenities/budget/discovery this candidate satisfies. This
+    // is ALWAYS an additive boost, never a filter: a venue that matches
+    // zero preferences is still fully eligible, just without the boost.
+    // Amenity columns can never be trusted as "verified false" (see the
+    // Stage 3 data-model audit -- false and "never researched" are the
+    // same 0 in this schema today), so a non-matching venue must never be
+    // excluded outright, only fail to gain a boost here.
+    let preferenceScore = 0;
+    for (const field of prefAmenities) {
+      if (venue[field] === true) preferenceScore += 1;
+    }
+    if (prefBudget && budgetMatchesPrice(prefBudget, venue.price)) preferenceScore += 1;
+    if (prefDiscoveryIds && prefDiscoveryIds.has(venue.id)) preferenceScore += 1;
+
+    return { venue, hopKm, hopUnknown, hopExceededThreshold, affinity, preferenceScore };
   });
 
   scored.sort((a, b) => {
@@ -1437,14 +1524,20 @@ function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm)
     }
     // 2. Prefer a better fit for this part of the day.
     if (a.affinity !== b.affinity) return b.affinity - a.affinity;
-    // 3. Prefer a higher rating (unrated treated as lowest).
+    // 3. Stage 3: prefer a higher preference-match score. Both sides are
+    //    always 0 when no preferences were requested, so this line is a
+    //    structural no-op for every pre-Stage-3-shaped call, and the
+    //    comparator falls through to the exact same rating/distance/id
+    //    chain as before.
+    if (a.preferenceScore !== b.preferenceScore) return b.preferenceScore - a.preferenceScore;
+    // 4. Prefer a higher rating (unrated treated as lowest).
     const ar = a.venue.rating == null ? -1 : a.venue.rating;
     const br = b.venue.rating == null ? -1 : b.venue.rating;
     if (ar !== br) return br - ar;
-    // 4. Prefer the closer of two otherwise-tied candidates, when distance
+    // 5. Prefer the closer of two otherwise-tied candidates, when distance
     //    is actually known for both.
     if (!a.hopUnknown && !b.hopUnknown && a.hopKm !== b.hopKm) return a.hopKm - b.hopKm;
-    // 5. Final, fully deterministic tiebreaker.
+    // 6. Final, fully deterministic tiebreaker.
     return a.venue.id - b.venue.id;
   });
 
@@ -1463,15 +1556,27 @@ function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm)
 // fallback, both of which need visibility into the full pool, not just a
 // pre-filtered one) and the trip parameters, returns a day-by-day plan.
 //
-// params: { region, days, interests, pace }
+// params: { region, days, interests, pace, amenities, budget, discovery, discoveryVenueIds }
 //   - region: a valid region slug (validated by the caller)
 //   - days: integer, clamped to 1–7
 //   - interests: array of venue type strings (may be empty = no filter)
 //   - pace: one of TRIP_VALID_PACES (defaults to 'standard' if unrecognized)
+//   - amenities (Stage 3, optional): array of BOOL_FIELDS names to favor;
+//     invalid names are silently dropped (defensive -- callers should
+//     already validate, same posture as pace/interests above)
+//   - budget (Stage 3, optional): one of TRIP_VALID_BUDGETS, else null
+//   - discovery (Stage 3, optional): array of collection-kind strings
+//     (e.g. 'hidden_gem'), echoed back as-is -- this function trusts its
+//     caller to have already validated these against real collections.kind
+//     values (that requires a DB query, which this otherwise-pure function
+//     deliberately does not make)
+//   - discoveryVenueIds (Stage 3, optional): a Set of venue ids already
+//     resolved from `discovery` by the caller (e.g. via
+//     getCollectionVenueIds), used for the actual scoring boost
 //
 // Returns:
 //   {
-//     region, days, pace, interests,
+//     region, days, pace, interests, amenities, budget, discovery,
 //     itinerary: [ { day: 1, morning: venue|null, afternoon: venue|null, evening: venue|null }, ... ],
 //     warnings: [ string, ... ],
 //   }
@@ -1481,6 +1586,11 @@ function buildTripItinerary(venues, params) {
   const interests = Array.isArray(params.interests) ? params.interests.filter(Boolean) : [];
   const pace = TRIP_VALID_PACES.includes(params.pace) ? params.pace : 'standard';
   const maxHopKm = TRIP_PACE_MAX_HOP_KM[pace];
+  const amenities = Array.isArray(params.amenities) ? params.amenities.filter((f) => BOOL_FIELDS.includes(f)) : [];
+  const budget = TRIP_VALID_BUDGETS.includes(params.budget) ? params.budget : null;
+  const discovery = Array.isArray(params.discovery) ? params.discovery.filter(Boolean) : [];
+  const discoveryVenueIds = params.discoveryVenueIds instanceof Set ? params.discoveryVenueIds : null;
+  const preferences = { amenities, budget, discoveryIds: discoveryVenueIds };
 
   const warnings = [];
 
@@ -1505,7 +1615,7 @@ function buildTripItinerary(venues, params) {
   for (let day = 1; day <= days; day++) {
     const dayPlan = { day };
     for (const daypart of TRIP_DAYPARTS) {
-      const pick = pickBestTripVenue(pool, usedIds, daypart, previousStop, maxHopKm);
+      const pick = pickBestTripVenue(pool, usedIds, daypart, previousStop, maxHopKm, preferences);
       if (!pick) {
         dayPlan[daypart] = null;
         warnings.push(`Ran out of venues to fill day ${day}'s ${daypart} slot in ${region}.`);
@@ -1523,7 +1633,274 @@ function buildTripItinerary(venues, params) {
     itinerary.push(dayPlan);
   }
 
-  return { region, days, pace, interests, itinerary, warnings };
+  return { region, days, pace, interests, amenities, budget, discovery, itinerary, warnings };
+}
+
+// ---------- Build My Trip, Stage 3: shared trip-request field validators ----------
+//
+// The single source of truth for "is this a real, supported value" for
+// every Build My Trip field, used by BOTH POST /api/trip/generate (which
+// rejects a request outright with 400 on any invalid value -- a strict
+// developer/wizard contract) and POST /api/trip/parse (which instead sorts
+// an invalid/unsupported value into `unsupported[]` and still returns a
+// plan from whatever WAS understood -- because a natural-language request
+// can honestly mention things this product doesn't support yet, and that
+// is not an error, just a limit to be reported honestly). Keeping these as
+// small, pure, single-purpose predicates -- rather than one monolithic
+// validator -- lets each route apply its own policy for what an invalid
+// value means, without duplicating the definition of "invalid."
+function isValidTripRegion(region) {
+  return typeof region === 'string' && VALID_REGIONS.includes(region);
+}
+function isValidTripDays(days) {
+  return Number.isInteger(days) && days >= 1 && days <= 7;
+}
+function isValidTripInterest(type) {
+  return typeof type === 'string' && Object.prototype.hasOwnProperty.call(CATEGORY_SLUGS, type);
+}
+function isValidTripAmenity(field) {
+  return typeof field === 'string' && BOOL_FIELDS.includes(field);
+}
+function isValidTripPace(pace) {
+  return typeof pace === 'string' && TRIP_VALID_PACES.includes(pace);
+}
+function isValidTripBudget(budget) {
+  return typeof budget === 'string' && TRIP_VALID_BUDGETS.includes(budget);
+}
+function isValidTripDiscoveryKind(kind, knownKinds) {
+  return typeof kind === 'string' && knownKinds.includes(kind);
+}
+
+// ---------- Build My Trip, Stage 3: OpenAI provider adapter ----------
+//
+// The ONLY place in this codebase that knows anything about OpenAI's
+// specific request/response shape. callTripParserProvider() always
+// resolves to a plain { raw, error } value -- `raw` is either a parsed
+// JSON object or null, `error` is either null or a short machine-readable
+// reason string -- so parseTripRequest() below, and everything upstream of
+// it, never depends on an OpenAI-specific structure. Swapping providers
+// later means replacing only this one function.
+const OPENAI_PARSER_MODEL = 'gpt-4o-mini'; // cost-efficient extraction/classification model, not a reasoning model
+
+function buildTripParserSystemPrompt(knownDiscoveryKinds) {
+  return [
+    'You extract structured trip-planning requirements from a customer\'s natural-language request about visiting the Okanagan Valley, British Columbia.',
+    'Return ONLY a JSON object with these fields (every field is optional -- omit or use null for anything you cannot confidently determine):',
+    `- region: one of [${VALID_REGIONS.join(', ')}]`,
+    '- days: integer 1-7',
+    `- interests: array from [${Object.keys(CATEGORY_SLUGS).join(', ')}]`,
+    `- amenities: array from [${BOOL_FIELDS.join(', ')}]`,
+    `- pace: one of [${TRIP_VALID_PACES.join(', ')}]`,
+    `- budget: one of [${TRIP_VALID_BUDGETS.join(', ')}]`,
+    `- discovery: array from [${knownDiscoveryKinds.join(', ')}]`,
+    '- unsupported_terms: array of short exact phrases from the request that are travel-related but do NOT map to any field/value above (for example: "beaches", "hiking", "a concert Saturday night", "wheelchair accessible")',
+    '',
+    'Rules:',
+    '- NEVER invent a region, interest, amenity, budget, or discovery value outside the exact lists given above.',
+    '- If the request mentions something travel-related that is not in an allowed list, put the exact phrase in unsupported_terms -- do NOT approximate it to the closest allowed value.',
+    '- If you cannot confidently determine the region or day count, omit that field (use null) rather than guessing.',
+    '- Return ONLY the JSON object, no other text.',
+  ].join('\n');
+}
+
+async function callTripParserProvider(text) {
+  if (!OPENAI_API_KEY) {
+    return { raw: null, error: 'not_configured' };
+  }
+
+  const knownDiscoveryKinds = getKnownDiscoveryKinds();
+  const systemPrompt = buildTripParserSystemPrompt(knownDiscoveryKinds);
+
+  let httpRes;
+  try {
+    httpRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_PARSER_MODEL,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'trip_request',
+            strict: true,
+            schema: {
+              type: 'object',
+              properties: {
+                region: { type: ['string', 'null'] },
+                days: { type: ['integer', 'null'] },
+                interests: { type: 'array', items: { type: 'string' } },
+                amenities: { type: 'array', items: { type: 'string' } },
+                pace: { type: ['string', 'null'] },
+                budget: { type: ['string', 'null'] },
+                discovery: { type: 'array', items: { type: 'string' } },
+                unsupported_terms: { type: 'array', items: { type: 'string' } },
+              },
+              required: ['region', 'days', 'interests', 'amenities', 'pace', 'budget', 'discovery', 'unsupported_terms'],
+              additionalProperties: false,
+            },
+          },
+        },
+      }),
+    });
+  } catch (err) {
+    return { raw: null, error: 'network_error' };
+  }
+
+  if (!httpRes.ok) {
+    return { raw: null, error: 'provider_http_error' };
+  }
+
+  let body;
+  try {
+    body = await httpRes.json();
+  } catch (err) {
+    return { raw: null, error: 'invalid_json' };
+  }
+
+  const content = body && body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;
+  if (typeof content !== 'string') {
+    return { raw: null, error: 'invalid_response_shape' };
+  }
+
+  let parsedContent;
+  try {
+    parsedContent = JSON.parse(content);
+  } catch (err) {
+    return { raw: null, error: 'invalid_json' };
+  }
+
+  if (typeof parsedContent !== 'object' || parsedContent === null || Array.isArray(parsedContent)) {
+    return { raw: null, error: 'invalid_response_shape' };
+  }
+
+  return { raw: parsedContent, error: null };
+}
+
+// The natural-language trip-request parser. Treats the provider's response
+// as UNTRUSTED input: every field is re-validated with the exact same
+// isValidTrip*() predicates /api/trip/generate uses, never taken on faith.
+// A value that fails validation is never silently dropped and never
+// silently honored -- it is moved into `unsupported`, so the customer's
+// request is represented honestly even when part of it can't be fulfilled.
+//
+// options.providerFn lets tests inject a mock provider (no real network
+// call), while production code omits it and gets callTripParserProvider.
+//
+// Returns either:
+//   { ok: false, reason: string }  -- provider unavailable/network/malformed
+//     output that could not even be parsed as a JSON object. The route
+//     turns this into a 502; it is never presented as a valid (if empty)
+//     trip request.
+//   { ok: true, value: { region, days, interests, amenities, pace, budget,
+//     discovery, unsupported, needs_clarification } } -- always returned
+//     once the provider produced *a* JSON object, even if that object is
+//     mostly empty; missing/invalid required-ish fields (region, days) are
+//     reported via needs_clarification rather than failing the request.
+async function parseTripRequest(text, options) {
+  const opts = options || {};
+  const providerFn = opts.providerFn || callTripParserProvider;
+
+  if (typeof text !== 'string' || !text.trim()) {
+    return { ok: false, reason: 'empty_text' };
+  }
+
+  let providerResult;
+  try {
+    providerResult = await providerFn(text);
+  } catch (err) {
+    return { ok: false, reason: 'provider_error' };
+  }
+
+  if (!providerResult || providerResult.error || providerResult.raw == null) {
+    return { ok: false, reason: (providerResult && providerResult.error) || 'provider_error' };
+  }
+
+  const raw = providerResult.raw;
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, reason: 'malformed_provider_output' };
+  }
+
+  const unsupported = [];
+  if (Array.isArray(raw.unsupported_terms)) {
+    raw.unsupported_terms.forEach((term) => {
+      if (typeof term === 'string' && term.trim()) unsupported.push(term.trim());
+    });
+  }
+  const needsClarification = [];
+
+  let region = null;
+  if (raw.region != null) {
+    if (isValidTripRegion(raw.region)) {
+      region = raw.region;
+    } else {
+      unsupported.push(`region: ${String(raw.region)}`);
+      needsClarification.push('region');
+    }
+  } else {
+    needsClarification.push('region');
+  }
+
+  let days = null;
+  if (raw.days != null) {
+    if (isValidTripDays(raw.days)) {
+      days = raw.days;
+    } else {
+      needsClarification.push('days');
+    }
+  } else {
+    needsClarification.push('days');
+  }
+
+  const interests = [];
+  if (Array.isArray(raw.interests)) {
+    raw.interests.forEach((value) => {
+      if (isValidTripInterest(value)) interests.push(value);
+      else unsupported.push(String(value));
+    });
+  }
+
+  const amenities = [];
+  if (Array.isArray(raw.amenities)) {
+    raw.amenities.forEach((value) => {
+      if (isValidTripAmenity(value)) amenities.push(value);
+      else unsupported.push(String(value));
+    });
+  }
+
+  const pace = isValidTripPace(raw.pace) ? raw.pace : 'standard';
+  const budget = isValidTripBudget(raw.budget) ? raw.budget : null;
+
+  const knownDiscoveryKinds = getKnownDiscoveryKinds();
+  const discovery = [];
+  if (Array.isArray(raw.discovery)) {
+    raw.discovery.forEach((value) => {
+      if (isValidTripDiscoveryKind(value, knownDiscoveryKinds)) discovery.push(value);
+      else unsupported.push(String(value));
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      region,
+      days,
+      interests,
+      amenities,
+      pace,
+      budget,
+      discovery,
+      unsupported: Array.from(new Set(unsupported)),
+      needs_clarification: needsClarification,
+    },
+  };
 }
 
 function breadcrumbListSchema(items) {
@@ -5574,18 +5951,18 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'Malformed JSON body.' });
       }
 
-      const ALLOWED_TRIP_KEYS = ['region', 'days', 'interests', 'pace'];
+      const ALLOWED_TRIP_KEYS = ['region', 'days', 'interests', 'pace', 'amenities', 'budget', 'discovery'];
       const unexpectedTripKeys = Object.keys(body).filter((k) => !ALLOWED_TRIP_KEYS.includes(k));
       if (unexpectedTripKeys.length > 0) {
         return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedTripKeys.join(', ')}` });
       }
 
-      const { region, days, interests, pace } = body;
+      const { region, days, interests, pace, amenities, budget, discovery } = body;
 
-      if (typeof region !== 'string' || !VALID_REGIONS.includes(region)) {
+      if (!isValidTripRegion(region)) {
         return sendJSON(res, 400, { error: 'region must be one of the known region slugs.', allowed: VALID_REGIONS });
       }
-      if (!Number.isInteger(days) || days < 1 || days > 7) {
+      if (!isValidTripDays(days)) {
         return sendJSON(res, 400, { error: 'days must be an integer between 1 and 7.' });
       }
 
@@ -5594,7 +5971,7 @@ const server = http.createServer(async (req, res) => {
         if (!Array.isArray(interests) || interests.some((i) => typeof i !== 'string')) {
           return sendJSON(res, 400, { error: 'interests must be an array of strings.' });
         }
-        const unknownInterests = interests.filter((i) => !CATEGORY_SLUGS[i]);
+        const unknownInterests = interests.filter((i) => !isValidTripInterest(i));
         if (unknownInterests.length > 0) {
           return sendJSON(res, 400, {
             error: `Unknown interest(s): ${unknownInterests.join(', ')}`,
@@ -5606,11 +5983,55 @@ const server = http.createServer(async (req, res) => {
 
       let paceValue = 'standard';
       if (pace !== undefined) {
-        if (typeof pace !== 'string' || !TRIP_VALID_PACES.includes(pace)) {
+        if (!isValidTripPace(pace)) {
           return sendJSON(res, 400, { error: `pace must be one of: ${TRIP_VALID_PACES.join(', ')}` });
         }
         paceValue = pace;
       }
+
+      let amenitiesList = [];
+      if (amenities !== undefined) {
+        if (!Array.isArray(amenities) || amenities.some((a) => typeof a !== 'string')) {
+          return sendJSON(res, 400, { error: 'amenities must be an array of strings.' });
+        }
+        const unknownAmenities = amenities.filter((a) => !isValidTripAmenity(a));
+        if (unknownAmenities.length > 0) {
+          return sendJSON(res, 400, {
+            error: `Unknown amenity/amenities: ${unknownAmenities.join(', ')}`,
+            allowed: BOOL_FIELDS,
+          });
+        }
+        amenitiesList = amenities;
+      }
+
+      let budgetValue = null;
+      if (budget !== undefined && budget !== null) {
+        if (!isValidTripBudget(budget)) {
+          return sendJSON(res, 400, { error: `budget must be one of: ${TRIP_VALID_BUDGETS.join(', ')}` });
+        }
+        budgetValue = budget;
+      }
+
+      const knownDiscoveryKinds = getKnownDiscoveryKinds();
+      let discoveryList = [];
+      if (discovery !== undefined) {
+        if (!Array.isArray(discovery) || discovery.some((d) => typeof d !== 'string')) {
+          return sendJSON(res, 400, { error: 'discovery must be an array of strings.' });
+        }
+        const unknownDiscovery = discovery.filter((d) => !isValidTripDiscoveryKind(d, knownDiscoveryKinds));
+        if (unknownDiscovery.length > 0) {
+          return sendJSON(res, 400, {
+            error: `Unknown discovery kind(s): ${unknownDiscovery.join(', ')}`,
+            allowed: knownDiscoveryKinds,
+          });
+        }
+        discoveryList = discovery;
+      }
+
+      const discoveryVenueIds = new Set();
+      discoveryList.forEach((kind) => {
+        getCollectionVenueIds(kind).forEach((id) => discoveryVenueIds.add(id));
+      });
 
       const regionVenues = db
         .prepare('SELECT * FROM venues WHERE region = ? AND redirect_to IS NULL')
@@ -5622,8 +6043,53 @@ const server = http.createServer(async (req, res) => {
         days,
         interests: interestsList,
         pace: paceValue,
+        amenities: amenitiesList,
+        budget: budgetValue,
+        discovery: discoveryList,
+        discoveryVenueIds,
       });
       return sendJSON(res, 200, plan);
+    }
+
+    // POST /api/trip/parse — Build My Trip, Stage 3: natural-language trip
+    // request parsing. Turns a free-text request into the same structured
+    // shape /api/trip/generate accepts, using an LLM ONLY to interpret
+    // customer language into our own closed field set -- it never selects
+    // venues, invents events/prices/amenities, or produces any itinerary
+    // content itself (buildTripItinerary, unchanged, still does all of
+    // that deterministically). Every value the model returns is re-checked
+    // against the exact same isValidTrip*() predicates /api/trip/generate
+    // uses before it is trusted; anything that fails validation is moved to
+    // `unsupported` rather than silently dropped or silently honored.
+    if (pathname === '/api/trip/parse' && method === 'POST') {
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      const ALLOWED_PARSE_KEYS = ['text'];
+      const unexpectedParseKeys = Object.keys(body).filter((k) => !ALLOWED_PARSE_KEYS.includes(k));
+      if (unexpectedParseKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedParseKeys.join(', ')}` });
+      }
+      if (typeof body.text !== 'string' || !body.text.trim()) {
+        return sendJSON(res, 400, { error: 'text is required and must be a non-empty string.' });
+      }
+
+      let parsed;
+      try {
+        parsed = await parseTripRequest(body.text);
+      } catch (err) {
+        return sendJSON(res, 502, { error: 'Could not process that request right now.' });
+      }
+
+      if (!parsed.ok) {
+        return sendJSON(res, 502, { error: 'Could not process that request right now.', reason: parsed.reason });
+      }
+
+      return sendJSON(res, 200, parsed.value);
     }
 
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
@@ -5870,6 +6336,19 @@ module.exports = {
   getHiddenGemVenueIds,
   isVenueHiddenGem,
   hiddenGemBadgeHtml,
+  // Build My Trip, Stage 3 (price/amenity/discovery scoring + NL parser)
+  TRIP_VALID_BUDGETS,
+  budgetMatchesPrice,
+  getCollectionVenueIds,
+  getKnownDiscoveryKinds,
+  isValidTripRegion,
+  isValidTripDays,
+  isValidTripInterest,
+  isValidTripAmenity,
+  isValidTripPace,
+  isValidTripBudget,
+  isValidTripDiscoveryKind,
+  parseTripRequest,
   // Design Sprint 3 (Homepage Discovery)
   renderHiddenGemsHomepageHTML,
   renderExploreByCategoryHTML,
