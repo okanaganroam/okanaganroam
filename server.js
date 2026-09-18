@@ -4800,7 +4800,42 @@ function renderTripPlannerStyles() {
     border: 1px solid rgba(42,32,25,0.2); background: var(--sand); color: var(--ink); text-decoration: none;
   }
   .trip-slot-actions button:hover, .trip-slot-actions a.trip-slot-view-link:hover { background: rgba(42,32,25,0.08); }
+  /* Remove is the one destructive action among View venue/Add to trip/Remove
+     -- all three previously shared identical styling, making Remove no more
+     visually distinct than a neutral action. Reuses --plum/--plum-dark, the
+     same tokens the trip tray's own per-item remove control (.trip-remove)
+     and favourite toggle (.fav-btn.is-fav) already use for this exact
+     "remove/undo" meaning elsewhere in the app, so this stays inside the
+     existing design language rather than introducing a new one. Size/
+     padding/tap-target are untouched -- only color changes. */
+  .trip-slot-actions .trip-slot-remove-btn { color: var(--plum-dark); border-color: rgba(107,44,64,0.35); }
+  .trip-slot-actions .trip-slot-remove-btn:hover { background: var(--plum); border-color: var(--plum); color: var(--paper); }
   .trip-slot-card.is-removed { display: none; }
+
+  /* Footer brand-icon size fix: .home-footer-icon (the small mountain glyph
+     next to the "Okanagan Roam" wordmark in the footer) is only ever sized
+     by renderHomepageDiscoveryStyles() (display:flex, width:34px/height:
+     14px, svg 100%/100%), which /trip does not include -- so this <span>
+     stayed display:inline (its default), under which width/height simply
+     do not apply to a non-replaced inline box per the CSS spec, and its
+     raw <svg viewBox="0 0 60 24"> child rendered at the browser's
+     unconstrained default size instead (measured 1360x544px on a 1360px-
+     wide viewport). That read as a giant decorative "mountain" graphic and
+     a large awkward gap between the itinerary and the footer content below
+     it -- mistaken for an intentional section divider in an earlier read-
+     only audit, but it is not; it is the same brand icon homepage/​browse
+     already render correctly at 34x14px, just missing its sizing rules
+     here. Restoring the layout half of that rule (display/size/shrink)
+     fixes this; color is deliberately left alone rather than copied over,
+     since the homepage's own color:var(--ref-cream) on this rule assumes
+     the navy footer background renderHomepageDiscoveryStyles() also
+     supplies, which /trip does not have -- copying just the color without
+     that background would swap one bug for another (a near-invisible
+     cream-on-cream icon). Scoped to this page only (this whole stylesheet
+     is /trip-only), so homepage/​browse are untouched and the footer is
+     not otherwise redesigned. */
+  .home-footer-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 14px; flex-shrink: 0; }
+  .home-footer-icon svg { width: 100%; height: 100%; }
 
   @media (max-width: 720px) {
     .trip-day-slots { grid-template-columns: 1fr; }

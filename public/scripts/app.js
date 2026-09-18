@@ -2574,6 +2574,7 @@ window.__scrollToVenueCard = function(name){
 
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
+    removeBtn.className = 'trip-slot-remove-btn';
     removeBtn.textContent = t('trip.planner.removeStop');
     removeBtn.addEventListener('click', function(){
       card.classList.add('is-removed');
