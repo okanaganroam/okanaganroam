@@ -121,6 +121,42 @@ amenityInsert.run({
   vegan: 0, vegetarian: 1, patio: 1, gluten_free: 0, dog_friendly: 0,
 });
 
+// ---- seed fixtures for Build My Trip Stage 1 (buildTripItinerary) --------
+// A deliberately fresh region ('osoyoos') untouched by any other fixture in
+// this file, so trip-planning tests get a clean, fully-controlled pool with
+// no risk of perturbing unrelated region/type-count assertions elsewhere.
+// Coordinates are real-ish and hand-picked so the exact haversine distances
+// between them are known (verified externally): everything except
+// "Trip Pub Faraway" sits within ~1km of everything else, and Trip Pub
+// Faraway sits ~22km from the rest -- inside a 'standard' (30km) or
+// 'packed' (50km) pace's threshold, but outside a 'relaxed' (15km) one.
+// This lets tests assert the distance-threshold logic deterministically
+// without any mocking.
+const tripInsert = db.prepare(`
+  INSERT INTO venues (name, region, type, price, reviews, rating,
+    description, address, latitude, longitude, hours, slug)
+  VALUES (@name, @region, @type, @price, @reviews, @rating,
+    @description, @address, @latitude, @longitude, @hours, @slug)
+`);
+const TRIP_FIXTURE_REGION = 'osoyoos';
+[
+  { name: 'Trip Golf Course', type: 'golf', rating: 4.5, latitude: 49.030000, longitude: -119.470000, slug: 'trip-golf-course' },
+  { name: 'Trip Cafe Morning', type: 'cafe', rating: 4.6, latitude: 49.031000, longitude: -119.469000, slug: 'trip-cafe-morning' },
+  { name: 'Trip Winery Afternoon', type: 'winery', rating: 4.7, latitude: 49.033000, longitude: -119.465000, slug: 'trip-winery-afternoon' },
+  { name: 'Trip Restaurant Central', type: 'restaurant', rating: 4.8, latitude: 49.032000, longitude: -119.468000, slug: 'trip-restaurant-central' },
+  { name: 'Trip Restaurant Secondary', type: 'restaurant', rating: 4.0, latitude: 49.034500, longitude: -119.463000, slug: 'trip-restaurant-secondary' },
+  { name: 'Trip Brewery Evening', type: 'brewery', rating: 4.4, latitude: 49.034000, longitude: -119.464000, slug: 'trip-brewery-evening' },
+  { name: 'Trip Pub Faraway', type: 'pub', rating: 4.9, latitude: 49.200000, longitude: -119.300000, slug: 'trip-pub-faraway' },
+  { name: 'Trip Cocktail No Coords', type: 'cocktail', rating: 4.3, latitude: null, longitude: null, slug: 'trip-cocktail-no-coords' },
+].forEach((v) => {
+  tripInsert.run({
+    name: v.name, region: TRIP_FIXTURE_REGION, type: v.type, price: 2, reviews: 20, rating: v.rating,
+    description: 'A fixture venue used only by the Build My Trip Stage 1 test suite.',
+    address: v.latitude === null ? null : '1 Trip Fixture Way, Osoyoos, BC V0H 1V0',
+    latitude: v.latitude, longitude: v.longitude, hours: null, slug: v.slug,
+  });
+});
+
 // ---- seed the 6 approved Hidden Gems (Design Sprint 4) ------------------
 // Using their real production slugs so HIDDEN_GEM_HOMEPAGE_BLURBS' keys
 // match, directly exercising the actual approved-blurb lookup rather than
@@ -249,6 +285,141 @@ test('getStats returns a total count', () => {
   const stats = app.getStats();
   assert.ok(typeof stats.total === 'number');
   assert.ok(stats.total >= 3);
+});
+
+// ---- Build My Trip, Stage 1 (buildTripItinerary and its helpers) -------
+
+test('haversineKm returns 0 for identical points and a plausible real-world distance otherwise', () => {
+  assert.equal(app.haversineKm(49.0, -119.0, 49.0, -119.0), 0);
+  // Kelowna to Vernon is roughly 45km as the crow flies.
+  const km = app.haversineKm(49.888, -119.496, 50.267, -119.272);
+  assert.ok(km > 40 && km < 50, `expected ~45km, got ${km}`);
+});
+
+test('pickBestTripVenue returns null once the candidate pool is exhausted', () => {
+  const candidates = [{ id: 1, type: 'cafe', rating: 4.5, latitude: 49, longitude: -119 }];
+  const usedIds = new Set([1]);
+  const pick = app.pickBestTripVenue(candidates, usedIds, 'morning', null, 30);
+  assert.equal(pick, null);
+});
+
+test('pickBestTripVenue prefers higher daypart affinity over rating', () => {
+  const cafe = { id: 1, type: 'cafe', rating: 4.0, latitude: 49, longitude: -119 };
+  const pub = { id: 2, type: 'pub', rating: 4.9, latitude: 49, longitude: -119 };
+  // Morning: cafe (affinity 3) must beat pub (affinity 0) despite pub's higher rating.
+  const pick = app.pickBestTripVenue([cafe, pub], new Set(), 'morning', null, 30);
+  assert.equal(pick.venue.id, 1);
+});
+
+test('pickBestTripVenue is fully deterministic: identical inputs always produce the identical pick', () => {
+  const candidates = [
+    { id: 3, type: 'restaurant', rating: 4.5, latitude: 49, longitude: -119 },
+    { id: 1, type: 'restaurant', rating: 4.5, latitude: 49, longitude: -119 },
+    { id: 2, type: 'restaurant', rating: 4.5, latitude: 49, longitude: -119 },
+  ];
+  // All three tie on affinity and rating -- the lowest id must win, every time.
+  for (let i = 0; i < 5; i++) {
+    const pick = app.pickBestTripVenue(candidates, new Set(), 'evening', null, 30);
+    assert.equal(pick.venue.id, 1);
+  }
+});
+
+test('pickBestTripVenue flags a pick that exceeds the pace distance threshold', () => {
+  const near = { id: 1, type: 'pub', rating: 3.0, latitude: 49.0, longitude: -119.0 };
+  const far = { id: 2, type: 'pub', rating: 3.0, latitude: 50.0, longitude: -119.0 }; // ~111km away
+  const previousStop = { latitude: 49.0, longitude: -119.0 };
+  const pickNear = app.pickBestTripVenue([near], new Set(), 'evening', previousStop, 30);
+  assert.equal(pickNear.hopExceededThreshold, false);
+  const pickFar = app.pickBestTripVenue([far], new Set(), 'evening', previousStop, 30);
+  assert.equal(pickFar.hopExceededThreshold, true);
+});
+
+test('pickBestTripVenue treats an unknown distance (missing coordinates) as not exceeding the threshold', () => {
+  const noCoords = { id: 1, type: 'pub', rating: 3.0, latitude: null, longitude: null };
+  const previousStop = { latitude: 49.0, longitude: -119.0 };
+  const pick = app.pickBestTripVenue([noCoords], new Set(), 'evening', previousStop, 30);
+  assert.equal(pick.hopUnknown, true);
+  assert.equal(pick.hopExceededThreshold, false);
+});
+
+test('buildTripItinerary: real fixture data, standard pace -- deterministic day plan matching hand-verified distances/ratings', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  assert.equal(venues.length, 8, 'expected exactly the 8 Build My Trip fixtures');
+
+  const plan = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'standard' });
+  assert.equal(plan.itinerary.length, 1);
+  const day1 = plan.itinerary[0];
+  assert.equal(day1.morning.name, 'Trip Cafe Morning', 'cafe/golf tie on morning affinity; cafe wins on rating (4.6 > 4.5)');
+  assert.equal(day1.afternoon.name, 'Trip Winery Afternoon', 'winery is the only affinity-3 afternoon candidate');
+  assert.equal(day1.evening.name, 'Trip Pub Faraway', 'under standard pace (30km) the far pub is in range and wins evening on rating (4.9)');
+  assert.equal(plan.warnings.length, 0, 'no warnings expected -- every pick was reachable within the pace threshold');
+});
+
+test('buildTripItinerary: same fixtures, relaxed pace -- the far pub is now out of range and evening falls back to the next-best in-range pick', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const plan = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'relaxed' });
+  const day1 = plan.itinerary[0];
+  assert.equal(day1.morning.name, 'Trip Cafe Morning');
+  assert.equal(day1.afternoon.name, 'Trip Winery Afternoon');
+  assert.equal(day1.evening.name, 'Trip Restaurant Central', 'the far pub (~22km) exceeds relaxed pace\'s 15km threshold; Restaurant Central (4.8, ~0.25km away) is the best in-range affinity-3 pick');
+  assert.equal(plan.warnings.length, 0, 'the far pub was never picked, so no threshold warning should fire');
+});
+
+test('buildTripItinerary never repeats a venue across the whole trip, even across multiple days', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const plan = app.buildTripItinerary(venues, { region: 'osoyoos', days: 2, interests: [], pace: 'packed' });
+  const ids = [];
+  plan.itinerary.forEach((day) => {
+    app.TRIP_DAYPARTS.forEach((slot) => { if (day[slot]) ids.push(day[slot].id); });
+  });
+  assert.equal(new Set(ids).size, ids.length, 'every placed venue id must be unique across the whole itinerary');
+});
+
+test('buildTripItinerary applies an interests filter when enough matching venues exist', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const plan = app.buildTripItinerary(venues, {
+    region: 'osoyoos', days: 1, interests: ['restaurant', 'cafe', 'winery', 'golf'], pace: 'standard',
+  });
+  const day1 = plan.itinerary[0];
+  const placedTypes = app.TRIP_DAYPARTS.map((slot) => day1[slot] && day1[slot].type).filter(Boolean);
+  placedTypes.forEach((type) => {
+    assert.ok(['restaurant', 'cafe', 'winery', 'golf'].includes(type), `${type} should have been excluded by the interests filter`);
+  });
+  assert.equal(plan.warnings.length, 0, 'the pool (5 matching venues) is large enough that no fallback warning should fire');
+});
+
+test('buildTripItinerary falls back to the full region pool, with a warning, when an interests filter is too thin', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  // Only 1 golf venue exists, but a 1-day trip needs 3 stops.
+  const plan = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: ['golf'], pace: 'standard' });
+  const day1 = plan.itinerary[0];
+  assert.ok(day1.morning && day1.afternoon && day1.evening, 'all three slots should still be filled via the fallback pool');
+  assert.ok(plan.warnings.some((w) => /not enough/i.test(w)), 'a fallback warning must be present');
+});
+
+test('buildTripItinerary warns per-slot and leaves it null when a region has no venues at all', () => {
+  const plan = app.buildTripItinerary([], { region: 'baldy', days: 1, interests: [], pace: 'standard' });
+  const day1 = plan.itinerary[0];
+  assert.equal(day1.morning, null);
+  assert.equal(day1.afternoon, null);
+  assert.equal(day1.evening, null);
+  assert.equal(plan.warnings.length, 3, 'one "ran out of venues" warning per empty slot');
+});
+
+test('buildTripItinerary clamps out-of-range days and defaults an unrecognized pace to standard', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const tooMany = app.buildTripItinerary(venues, { region: 'osoyoos', days: 99, interests: [], pace: 'standard' });
+  assert.equal(tooMany.days, 7, 'days must be clamped to the 1-7 range');
+  const badPace = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'chaotic' });
+  assert.equal(badPace.pace, 'standard');
+});
+
+test('buildTripItinerary is deterministic: identical inputs called twice produce byte-identical output', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const params = { region: 'osoyoos', days: 2, interests: [], pace: 'standard' };
+  const planA = app.buildTripItinerary(venues, params);
+  const planB = app.buildTripItinerary(venues, params);
+  assert.deepEqual(planA, planB);
 });
 
 // ---- JSON-LD -----------------------------------------------------------
@@ -1673,6 +1844,91 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
       assert.equal(body.results.vegan, 'rejected_expected_mismatch', 'a stale expected_current must be rejected even though it WAS correct before the prior write');
       assert.equal(app.getVenue(amenityFixture.id).vegan, true, 'the stale caller must not have changed anything');
       assert.equal(amenityLogRows(amenityFixture.id, 'vegan').length, before, 'a rejected stale call must not write an audit-log row');
+    }
+  }
+
+  // ---- POST /api/trip/generate (Build My Trip, Stage 1) -------------------
+  // Folded into this same start/close cycle for the same reason as the
+  // /admin/correct-phone block above. Unauthenticated -- no bearer token.
+  {
+    async function generateTrip(bodyObj) {
+      const res = await fetch(`${base}/api/trip/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj),
+      });
+      return { status: res.status, body: await res.json() };
+    }
+
+    // 400 -- unexpected top-level key.
+    {
+      const { status, body } = await generateTrip({ region: 'osoyoos', days: 1, extra: 'nope' });
+      assert.equal(status, 400);
+      assert.match(body.error, /Unexpected field/);
+    }
+
+    // 400 -- invalid region.
+    {
+      const { status, body } = await generateTrip({ region: 'not-a-real-region', days: 1 });
+      assert.equal(status, 400);
+      assert.match(body.error, /region must be/);
+    }
+
+    // 400 -- invalid days (out of range and non-integer).
+    {
+      const { status: s1 } = await generateTrip({ region: 'osoyoos', days: 0 });
+      assert.equal(s1, 400);
+      const { status: s2 } = await generateTrip({ region: 'osoyoos', days: 8 });
+      assert.equal(s2, 400);
+      const { status: s3 } = await generateTrip({ region: 'osoyoos', days: 2.5 });
+      assert.equal(s3, 400);
+    }
+
+    // 400 -- interests must be an array of known type strings.
+    {
+      const { status: s1, body: b1 } = await generateTrip({ region: 'osoyoos', days: 1, interests: 'golf' });
+      assert.equal(s1, 400);
+      assert.match(b1.error, /interests must be an array/);
+      const { status: s2, body: b2 } = await generateTrip({ region: 'osoyoos', days: 1, interests: ['not-a-real-type'] });
+      assert.equal(s2, 400);
+      assert.match(b2.error, /Unknown interest/);
+    }
+
+    // 400 -- invalid pace.
+    {
+      const { status, body } = await generateTrip({ region: 'osoyoos', days: 1, pace: 'breakneck' });
+      assert.equal(status, 400);
+      assert.match(body.error, /pace must be one of/);
+    }
+
+    // 200 -- a valid request against the real fixture data, no auth required.
+    {
+      const { status, body } = await generateTrip({ region: 'osoyoos', days: 1, pace: 'standard' });
+      assert.equal(status, 200);
+      assert.equal(body.region, 'osoyoos');
+      assert.equal(body.days, 1);
+      assert.equal(body.pace, 'standard');
+      assert.equal(body.itinerary.length, 1);
+      assert.equal(body.itinerary[0].morning.name, 'Trip Cafe Morning');
+      assert.equal(body.itinerary[0].evening.name, 'Trip Pub Faraway');
+    }
+
+    // Determinism over HTTP: two identical requests must return identical itineraries.
+    {
+      const params = { region: 'osoyoos', days: 2, pace: 'packed' };
+      const first = await generateTrip(params);
+      const second = await generateTrip(params);
+      assert.deepEqual(first.body, second.body);
+    }
+
+    // 400 -- malformed JSON body.
+    {
+      const res = await fetch(`${base}/api/trip/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{not valid json',
+      });
+      assert.equal(res.status, 400);
     }
   }
 

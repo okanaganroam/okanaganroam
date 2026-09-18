@@ -1317,6 +1317,215 @@ function getNearbyVenues(venue, limit = 6) {
     .map(rowToVenue);
 }
 
+// ---------- Build My Trip, Stage 1 (backend itinerary generation) ----------
+//
+// Deliberately narrow, per the Stage 1 scope: pure, deterministic itinerary
+// generation over REAL venue data, exposed as a single JSON endpoint. No
+// frontend changes, no AI/conversational planning, no new database
+// columns/tables — everything here reads existing venues rows only.
+//
+// The generation logic (buildTripItinerary) is a PURE function: it takes an
+// already-queried pool of venues plus the trip parameters and returns a
+// plan, with no database access of its own — the same separation of
+// concerns getRelatedVenues/getNearbyVenues use elsewhere in this file, but
+// especially important here since it makes the actual planning algorithm
+// directly unit-testable against fixed fixture arrays, with no DB setup
+// required, for a feature whose main correctness requirement is
+// "deterministic, not AI."
+
+const TRIP_VALID_PACES = ['relaxed', 'standard', 'packed'];
+
+// Maximum straight-line distance (km, haversine) this pace is willing to
+// accept between one stop and the next within the same day, before a
+// candidate is treated as "too far" and only used as a last resort (with a
+// warning). This is the whole of Stage 1's "avoid obviously impossible
+// travel schedules" guard — a real drive-time API is explicitly out of
+// scope for Stage 1, so this is an honest, deterministic straight-line
+// proxy, in the same spirit as the existing "we don't have a verified X, so
+// we approximate" pattern already used elsewhere (menu/booking search
+// links, the trip tray's region-level distance display).
+const TRIP_PACE_MAX_HOP_KM = {
+  relaxed: 15,
+  standard: 30,
+  packed: 50,
+};
+
+// How well each venue TYPE fits each part of the day. Deliberately a small
+// hardcoded table, not a learned/ML weighting — Stage 1 is explicitly
+// required to be deterministic, this is easy to reason about, and it's easy
+// to extend later (e.g. once amenity-based scoring or events are folded
+// in). Keys match CATEGORY_SLUGS exactly.
+const TRIP_TYPE_DAYPART_AFFINITY = {
+  golf: { morning: 3, afternoon: 2, evening: 0 },
+  cafe: { morning: 3, afternoon: 1, evening: 0 },
+  winery: { morning: 1, afternoon: 3, evening: 1 },
+  restaurant: { morning: 1, afternoon: 2, evening: 3 },
+  brewery: { morning: 0, afternoon: 2, evening: 3 },
+  pub: { morning: 0, afternoon: 1, evening: 3 },
+  cocktail: { morning: 0, afternoon: 1, evening: 3 },
+};
+
+const TRIP_DAYPARTS = ['morning', 'afternoon', 'evening'];
+
+// Haversine great-circle distance in km. A server-side port of the exact
+// same formula already used client-side in public/scripts/app.js (the
+// haversineKm() behind window.__distanceBetweenRegions) — kept as a
+// separate implementation, not a shared module, since the two run in
+// genuinely different environments (this one is plain Node, no
+// DOM/window), but the math is intentionally identical.
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Picks the single best next venue for one slot (one day's morning/
+// afternoon/evening), given:
+//   - candidates: the full remaining pool to choose from (already filtered
+//     to the trip's region/interests by the caller)
+//   - usedIds: Set of venue ids already placed anywhere in this itinerary
+//     — no venue is ever repeated across the whole trip
+//   - daypart: 'morning' | 'afternoon' | 'evening'
+//   - previousStop: the venue placed immediately before this slot (the
+//     prior slot the same day, or the last slot of the previous day), or
+//     null for the very first slot of the trip
+//   - maxHopKm: this trip's pace threshold (TRIP_PACE_MAX_HOP_KM[pace])
+//
+// Returns { venue, hopKm, hopExceededThreshold, hopUnknown } or null if the
+// candidate pool is exhausted.
+//
+// Selection is fully deterministic: candidates are scored by (in priority
+// order) whether they respect the distance threshold, daypart affinity,
+// rating, then venue id as a final stable tiebreaker — never by random
+// choice or by whatever order SQLite happened to return rows in.
+function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm) {
+  const pool = candidates.filter((v) => !usedIds.has(v.id));
+  if (pool.length === 0) return null;
+
+  const scored = pool.map((venue) => {
+    let hopKm = null;
+    let hopUnknown = true;
+    if (
+      previousStop &&
+      previousStop.latitude != null &&
+      previousStop.longitude != null &&
+      venue.latitude != null &&
+      venue.longitude != null
+    ) {
+      hopKm = haversineKm(previousStop.latitude, previousStop.longitude, venue.latitude, venue.longitude);
+      hopUnknown = false;
+    }
+    const hopExceededThreshold = hopUnknown ? false : hopKm > maxHopKm;
+    const affinity = (TRIP_TYPE_DAYPART_AFFINITY[venue.type] || { morning: 1, afternoon: 1, evening: 1 })[daypart];
+    return { venue, hopKm, hopUnknown, hopExceededThreshold, affinity };
+  });
+
+  scored.sort((a, b) => {
+    // 1. Prefer candidates within the pace's distance threshold (or unknown
+    //    distance, since we can't penalize what we can't measure) over ones
+    //    that clearly exceed it.
+    if (a.hopExceededThreshold !== b.hopExceededThreshold) {
+      return a.hopExceededThreshold ? 1 : -1;
+    }
+    // 2. Prefer a better fit for this part of the day.
+    if (a.affinity !== b.affinity) return b.affinity - a.affinity;
+    // 3. Prefer a higher rating (unrated treated as lowest).
+    const ar = a.venue.rating == null ? -1 : a.venue.rating;
+    const br = b.venue.rating == null ? -1 : b.venue.rating;
+    if (ar !== br) return br - ar;
+    // 4. Prefer the closer of two otherwise-tied candidates, when distance
+    //    is actually known for both.
+    if (!a.hopUnknown && !b.hopUnknown && a.hopKm !== b.hopKm) return a.hopKm - b.hopKm;
+    // 5. Final, fully deterministic tiebreaker.
+    return a.venue.id - b.venue.id;
+  });
+
+  const best = scored[0];
+  return {
+    venue: best.venue,
+    hopKm: best.hopKm,
+    hopExceededThreshold: best.hopExceededThreshold,
+    hopUnknown: best.hopUnknown,
+  };
+}
+
+// The main Stage 1 planner. Pure function — takes an already-queried pool
+// of venues for the requested region (unfiltered by interest; this
+// function does its own interest filtering AND the "not enough venues"
+// fallback, both of which need visibility into the full pool, not just a
+// pre-filtered one) and the trip parameters, returns a day-by-day plan.
+//
+// params: { region, days, interests, pace }
+//   - region: a valid region slug (validated by the caller)
+//   - days: integer, clamped to 1–7
+//   - interests: array of venue type strings (may be empty = no filter)
+//   - pace: one of TRIP_VALID_PACES (defaults to 'standard' if unrecognized)
+//
+// Returns:
+//   {
+//     region, days, pace, interests,
+//     itinerary: [ { day: 1, morning: venue|null, afternoon: venue|null, evening: venue|null }, ... ],
+//     warnings: [ string, ... ],
+//   }
+function buildTripItinerary(venues, params) {
+  const region = params.region;
+  const days = Math.max(1, Math.min(7, Math.round(params.days)));
+  const interests = Array.isArray(params.interests) ? params.interests.filter(Boolean) : [];
+  const pace = TRIP_VALID_PACES.includes(params.pace) ? params.pace : 'standard';
+  const maxHopKm = TRIP_PACE_MAX_HOP_KM[pace];
+
+  const warnings = [];
+
+  let pool = venues;
+  if (interests.length > 0) {
+    const interested = venues.filter((v) => interests.includes(v.type));
+    const neededStops = days * TRIP_DAYPARTS.length;
+    if (interested.length < neededStops) {
+      warnings.push(
+        `Not enough ${interests.join('/')} venues in ${region} to fill every day -- showing other types too.`
+      );
+      pool = venues; // fall back to the full region pool
+    } else {
+      pool = interested;
+    }
+  }
+
+  const usedIds = new Set();
+  const itinerary = [];
+  let previousStop = null;
+
+  for (let day = 1; day <= days; day++) {
+    const dayPlan = { day };
+    for (const daypart of TRIP_DAYPARTS) {
+      const pick = pickBestTripVenue(pool, usedIds, daypart, previousStop, maxHopKm);
+      if (!pick) {
+        dayPlan[daypart] = null;
+        warnings.push(`Ran out of venues to fill day ${day}'s ${daypart} slot in ${region}.`);
+        continue;
+      }
+      if (pick.hopExceededThreshold) {
+        warnings.push(
+          `Day ${day} ${daypart}: ${pick.venue.name} is ~${Math.round(pick.hopKm)}km from the previous stop, further than a ${pace} pace usually covers.`
+        );
+      }
+      dayPlan[daypart] = pick.venue;
+      usedIds.add(pick.venue.id);
+      previousStop = pick.venue;
+    }
+    itinerary.push(dayPlan);
+  }
+
+  return { region, days, pace, interests, itinerary, warnings };
+}
+
 function breadcrumbListSchema(items) {
   // items: [{ name, url }, ...] in order from Home to the current page
   return {
@@ -5033,6 +5242,72 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 201, created);
     }
 
+    // POST /api/trip/generate — Build My Trip, Stage 1.
+    //
+    // Unauthenticated, like every other read-oriented endpoint in this file
+    // (it only reads venues and computes a plan; it writes nothing) — POST
+    // is used because the request has a body, not because this needs the
+    // ENRICHMENT_ADMIN_TOKEN guard the /admin/* write endpoints use.
+    if (pathname === '/api/trip/generate' && method === 'POST') {
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      const ALLOWED_TRIP_KEYS = ['region', 'days', 'interests', 'pace'];
+      const unexpectedTripKeys = Object.keys(body).filter((k) => !ALLOWED_TRIP_KEYS.includes(k));
+      if (unexpectedTripKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedTripKeys.join(', ')}` });
+      }
+
+      const { region, days, interests, pace } = body;
+
+      if (typeof region !== 'string' || !VALID_REGIONS.includes(region)) {
+        return sendJSON(res, 400, { error: 'region must be one of the known region slugs.', allowed: VALID_REGIONS });
+      }
+      if (!Number.isInteger(days) || days < 1 || days > 7) {
+        return sendJSON(res, 400, { error: 'days must be an integer between 1 and 7.' });
+      }
+
+      let interestsList = [];
+      if (interests !== undefined) {
+        if (!Array.isArray(interests) || interests.some((i) => typeof i !== 'string')) {
+          return sendJSON(res, 400, { error: 'interests must be an array of strings.' });
+        }
+        const unknownInterests = interests.filter((i) => !CATEGORY_SLUGS[i]);
+        if (unknownInterests.length > 0) {
+          return sendJSON(res, 400, {
+            error: `Unknown interest(s): ${unknownInterests.join(', ')}`,
+            allowed: Object.keys(CATEGORY_SLUGS),
+          });
+        }
+        interestsList = interests;
+      }
+
+      let paceValue = 'standard';
+      if (pace !== undefined) {
+        if (typeof pace !== 'string' || !TRIP_VALID_PACES.includes(pace)) {
+          return sendJSON(res, 400, { error: `pace must be one of: ${TRIP_VALID_PACES.join(', ')}` });
+        }
+        paceValue = pace;
+      }
+
+      const regionVenues = db
+        .prepare('SELECT * FROM venues WHERE region = ? AND redirect_to IS NULL')
+        .all(region)
+        .map(rowToVenue);
+
+      const plan = buildTripItinerary(regionVenues, {
+        region,
+        days,
+        interests: interestsList,
+        pace: paceValue,
+      });
+      return sendJSON(res, 200, plan);
+    }
+
     // GET /events — the standalone events index (2026-09-17). A fixed,
     // exact path, so it's registered before the generic /:region catch-all
     // below (which would otherwise treat "events" as an unrecognized
@@ -5227,6 +5502,14 @@ module.exports = {
   getRelatedVenues,
   getNearbyVenues,
   getRegionCategoryCounts,
+  // Build My Trip, Stage 1 (backend itinerary generation)
+  haversineKm,
+  pickBestTripVenue,
+  buildTripItinerary,
+  TRIP_VALID_PACES,
+  TRIP_PACE_MAX_HOP_KM,
+  TRIP_TYPE_DAYPART_AFFINITY,
+  TRIP_DAYPARTS,
   listGuideCombos,
   getStats,
   renderVenuePage,
