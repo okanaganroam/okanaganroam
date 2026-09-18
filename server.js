@@ -583,6 +583,120 @@ function guardedPhoneCorrectUpdate(id, expectedCurrentPhone, correctedPhone, met
   }
 }
 
+// ---------- Phase 2.9: guarded narrow amenity-flag correction ----------
+//
+// A SEPARATE, standalone code path. Does not touch guardedEnrichUpdate(),
+// guardedCorrectUpdate(), guardedRetireUpdate(), guardedRegionCorrectUpdate(),
+// guardedPhoneCorrectUpdate(), or guardedMergeAndRetireUpdate() -- including
+// its MERGEABLE_FIELDS allowlist -- in any way, and is not reachable
+// through any of their routes.
+//
+// Scoped to exactly four boolean amenity flags: vegan, vegetarian, patio,
+// gluten_free. These columns are `INTEGER DEFAULT 0` (db.js) and are never
+// NULL in practice, so there is no "empty" sentinel to guard an overwrite
+// against the way guardedMergeAndRetireUpdate()'s NULL-check does for
+// phone/price/reviews/description_fr. Instead, exactly like
+// guardedPhoneCorrectUpdate() and guardedRegionCorrectUpdate(), the caller
+// must state the value it currently believes the field holds
+// (expected_current), verified atomically against the live row in the
+// same UPDATE's WHERE clause -- not a separate check beforehand.
+//
+// A second, field-specific guard on top of that: a write that would turn
+// an existing true into false is always refused, regardless of what
+// expected_current claims. This function exists to carry verified,
+// positive amenity data forward (e.g. from a duplicate being retired) onto
+// a canonical record -- it is not a general-purpose amenity editor, and
+// must never be used to erase a true value.
+const AMENITY_GUARDED_FIELDS = ['vegan', 'vegetarian', 'patio', 'gluten_free'];
+
+// fieldValues: { [fieldName]: { expectedCurrent: boolean, corrected: boolean } }
+// -- only keys already present in AMENITY_GUARDED_FIELDS are ever written;
+// the HTTP route below additionally rejects any unexpected key before this
+// function is ever called, so this loop iterating AMENITY_GUARDED_FIELDS
+// (never Object.keys(fieldValues)) is a second, structural backstop against
+// arbitrary column names reaching the UPDATE statement.
+//
+// Each field is checked and written independently -- one field failing its
+// expected-current check, or being a true->false attempt, does not block
+// the others in the same call from being written. All writes for a call do
+// share one transaction, so a genuine unexpected error rolls every field
+// attempted in that call back together rather than leaving a partial state
+// from a crash mid-way through.
+//
+// Returns:
+//   { found: false }
+//   { found: true, results: { [field]: 'written' | 'noop_already_matches' | 'rejected_true_to_false' | 'rejected_expected_mismatch' }, venue }
+function guardedAmenityCorrectUpdate(id, fieldValues, meta) {
+  const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  if (!existing) return { found: false };
+
+  const results = {};
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+
+    for (const field of AMENITY_GUARDED_FIELDS) {
+      if (!(field in fieldValues)) continue;
+      const { expectedCurrent, corrected } = fieldValues[field];
+
+      // Never permit setting an existing true back to false via this
+      // mechanism, regardless of what expected_current claims.
+      if (corrected === false && expectedCurrent === true) {
+        results[field] = 'rejected_true_to_false';
+        continue;
+      }
+
+      if (expectedCurrent === corrected) {
+        // No-op: nothing to write, not an error -- mirrors
+        // guardedPhoneCorrectUpdate()'s / guardedCorrectUpdate()'s handling
+        // of a field where corrected === expectedCurrent.
+        results[field] = 'noop_already_matches';
+        continue;
+      }
+
+      const expectedInt = expectedCurrent ? 1 : 0;
+      const correctedInt = corrected ? 1 : 0;
+
+      // The expected-current check and the write are the same atomic
+      // UPDATE statement -- SQLite re-evaluates the WHERE clause against
+      // whatever the row's real, current state is right now, not whatever
+      // an earlier GET returned, exactly like every other guarded* function
+      // in this file.
+      const info = db
+        .prepare(`UPDATE venues SET ${field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND ${field} = ?`)
+        .run(correctedInt, id, expectedInt);
+
+      if (info.changes !== 1) {
+        results[field] = 'rejected_expected_mismatch';
+        continue;
+      }
+
+      db.prepare(
+        `INSERT INTO venue_enrichment_log
+           (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+         VALUES (?, ?, ?, ?, 'manual_correction', ?, 'high', ?, 0, ?)`
+      ).run(id, field, String(expectedInt), String(correctedInt), meta.reason, meta.batch_id, meta.reviewed_by || null);
+
+      results[field] = 'written';
+    }
+
+    db.exec('COMMIT');
+    txOpen = false;
+    return { found: true, results, venue: getVenue(id) };
+  } catch (err) {
+    if (txOpen) {
+      try {
+        db.exec('ROLLBACK');
+      } catch (_) {
+        // ROLLBACK itself failing means there's nothing left to roll back --
+        // safe to ignore, since the original error is what matters to the caller.
+      }
+    }
+    throw err;
+  }
+}
+
 function deleteVenue(id) {
   const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
 
@@ -4695,6 +4809,114 @@ const server = http.createServer(async (req, res) => {
         id,
         changed: result.changed,
         venue: { phone: result.venue.phone },
+      });
+    }
+
+    // POST /admin/correct-amenities
+    //
+    // Scoped to the Phase 2.9 need: carrying verified-true amenity flags
+    // (vegan/vegetarian/patio/gluten_free) from a duplicate onto a
+    // canonical venue, independent of a merge-and-retire call, since these
+    // four fields are outside MERGEABLE_FIELDS and cannot be written by
+    // /admin/merge-and-retire-duplicate (see guardedAmenityCorrectUpdate()'s
+    // comment for why). Reuses the exact same bearer-token check as every
+    // other admin endpoint. Does not alter /admin/merge-and-retire-duplicate,
+    // MERGEABLE_FIELDS, or any other guarded route in any way.
+    if (pathname === '/admin/correct-amenities' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Correct-amenities endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      // --- allowlist validation: reject the WHOLE request if any
+      // unexpected top-level key is present ---
+      const ALLOWED_AMENITY_KEYS = ['id', 'fields', 'reason', 'batch_id'];
+      const unexpectedTopKeys = Object.keys(body).filter((k) => !ALLOWED_AMENITY_KEYS.includes(k));
+      if (unexpectedTopKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedTopKeys.join(', ')}` });
+      }
+
+      const id = body.id;
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (typeof body.reason !== 'string' || body.reason.trim() === '') {
+        return sendJSON(res, 400, { error: 'reason is required and must be a non-empty string.' });
+      }
+      if (typeof body.batch_id !== 'string' || body.batch_id.trim() === '') {
+        return sendJSON(res, 400, { error: 'batch_id is required and must be a non-empty string.' });
+      }
+
+      const fields = body.fields;
+      if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) {
+        return sendJSON(res, 400, { error: 'fields must be an object.' });
+      }
+      const providedFieldKeys = Object.keys(fields);
+      if (providedFieldKeys.length === 0) {
+        return sendJSON(res, 400, { error: 'fields must contain at least one amenity field.' });
+      }
+      // Field NAMES are never taken from the request body beyond this
+      // allowlist check -- guardedAmenityCorrectUpdate() itself only ever
+      // iterates AMENITY_GUARDED_FIELDS, never Object.keys(fieldValues), so
+      // arbitrary-column writes are structurally impossible even if this
+      // check were somehow bypassed.
+      const unexpectedFieldKeys = providedFieldKeys.filter((k) => !AMENITY_GUARDED_FIELDS.includes(k));
+      if (unexpectedFieldKeys.length > 0) {
+        return sendJSON(res, 400, {
+          error: `Unexpected amenity field(s): ${unexpectedFieldKeys.join(', ')}`,
+          allowed: AMENITY_GUARDED_FIELDS,
+        });
+      }
+      const fieldValues = {};
+      for (const key of providedFieldKeys) {
+        const entry = fields[key];
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+          return sendJSON(res, 400, { error: `fields.${key} must be an object with expected_current and corrected.` });
+        }
+        if (typeof entry.expected_current !== 'boolean') {
+          return sendJSON(res, 400, { error: `fields.${key}.expected_current must be a boolean.` });
+        }
+        if (typeof entry.corrected !== 'boolean') {
+          return sendJSON(res, 400, { error: `fields.${key}.corrected must be a boolean.` });
+        }
+        fieldValues[key] = { expectedCurrent: entry.expected_current, corrected: entry.corrected };
+      }
+
+      let result;
+      try {
+        result = guardedAmenityCorrectUpdate(id, fieldValues, {
+          reason: body.reason,
+          batch_id: body.batch_id,
+          reviewed_by: null,
+        });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Amenity correction failed and was rolled back.', detail: String(err.message || err) });
+      }
+
+      if (!result.found) {
+        return sendJSON(res, 404, { error: 'Venue not found.' });
+      }
+
+      return sendJSON(res, 200, {
+        id,
+        results: result.results,
+        venue: {
+          vegan: result.venue.vegan,
+          vegetarian: result.venue.vegetarian,
+          patio: result.venue.patio,
+          gluten_free: result.venue.gluten_free,
+        },
       });
     }
 

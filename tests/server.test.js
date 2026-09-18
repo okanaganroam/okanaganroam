@@ -97,6 +97,30 @@ insert.run({
   slug: 'test-populated-phone-for-null-check',
 });
 
+// ---- seed fixture for /admin/correct-amenities tests ---------------------
+// vegan=false, vegetarian=true, patio=true, gluten_free=false -- a
+// deliberately mixed starting state so a single fixture can exercise all
+// four per-field outcomes (false->true, true->true no-op, true->false
+// rejection, expected-current mismatch) in one call. phone/address are
+// populated too, specifically so a test can assert they are untouched by
+// an amenities call.
+const amenityInsert = db.prepare(`
+  INSERT INTO venues (name, region, type, cuisine, phone, price, reviews, rating,
+    description, address, latitude, longitude, hours, slug,
+    vegan, vegetarian, patio, gluten_free, dog_friendly)
+  VALUES (@name, @region, @type, @cuisine, @phone, @price, @reviews, @rating,
+    @description, @address, @latitude, @longitude, @hours, @slug,
+    @vegan, @vegetarian, @patio, @gluten_free, @dog_friendly)
+`);
+amenityInsert.run({
+  name: 'Test Amenity Fixture', region: 'kelowna', type: 'restaurant', cuisine: null,
+  phone: '+1 250-555-0199', price: 2, reviews: 5, rating: 4.2,
+  description: 'A fixture venue with a deliberately mixed set of amenity flags, used only by the /admin/correct-amenities test suite.',
+  address: '789 Amenity Ave, Kelowna, BC V1Y 0C0', latitude: 49.891, longitude: -119.497, hours: null,
+  slug: 'test-amenity-fixture',
+  vegan: 0, vegetarian: 1, patio: 1, gluten_free: 0, dog_friendly: 0,
+});
+
 // ---- seed the 6 approved Hidden Gems (Design Sprint 4) ------------------
 // Using their real production slugs so HIDDEN_GEM_HOMEPAGE_BLURBS' keys
 // match, directly exercising the actual approved-blurb lookup rather than
@@ -1157,7 +1181,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // dictionary on load, so both had to change or the new copy would have
   // been clobbered at runtime).
   assert.match(homepageBody, /<h1 class="hero-title" data-i18n="hero\.headline">Explore the Okanagan<\/h1>/, 'hero heading must be unchanged');
-  assert.match(homepageBody, /<p class="hero-lead" data-i18n="hero\.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place\.<\/p>/, 'hero subtitle must be the new elevator pitch');
+  assert.match(homepageBody, /<p class="hero-lead hero-lead-full" data-i18n="hero\.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place\.<\/p>/, 'hero subtitle must be the new elevator pitch');
   assert.doesNotMatch(homepageBody, /Find the places worth discovering/, 'old hero subtitle copy must be gone');
 
   // Reference redesign: rebuilt header (decisions #4/#5) — new logo,
@@ -1187,9 +1211,9 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // destinations) — the redesigned Explore cards each reference a
   // placeholder region image; confirm the /images/* route actually serves
   // one of them (not just that the HTML references the path).
-  const exploreRegionImg = await fetch(`${base}/images/regions/kelowna.png`);
+  const exploreRegionImg = await fetch(`${base}/images/regions/kelowna.webp`);
   assert.equal(exploreRegionImg.status, 200, 'Explore the Okanagan placeholder region image must be servable');
-  assert.equal(exploreRegionImg.headers.get('content-type'), 'image/png');
+  assert.equal(exploreRegionImg.headers.get('content-type'), 'image/webp');
 
   // Milestone 3 (Build Your Perfect Okanagan Trip) — the approved
   // architecture's final homepage section order: Hero -> Mood -> Hidden
@@ -1466,6 +1490,192 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     assert.equal(venue_enrichment_log_count(phoneFixture.id), before, 'a true no-op must not write an audit-log row');
   }
 
+  // ---- /admin/correct-amenities ------------------------------------------
+  // Folded into this same start/close cycle for the same reason as the
+  // /admin/correct-phone block above.
+  {
+    const amenityFixture = app.findVenueBySlug('kelowna', 'restaurant', 'test-amenity-fixture');
+
+    async function correctAmenities(bodyObj, token = ADMIN_TOKEN) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${base}/admin/correct-amenities`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(bodyObj),
+      });
+      return { status: res.status, body: await res.json() };
+    }
+
+    function amenityLogRows(venueId, field) {
+      return db.prepare('SELECT * FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ?').all(venueId, field);
+    }
+
+    // 401 — wrong bearer token, no write attempted.
+    {
+      const { status } = await correctAmenities(
+        { id: amenityFixture.id, fields: { vegan: { expected_current: false, corrected: true } }, reason: 'test', batch_id: 'test-batch' },
+        'wrong-token'
+      );
+      assert.equal(status, 401, 'wrong bearer token must be rejected');
+      assert.equal(app.getVenue(amenityFixture.id).vegan, false, 'no write must happen on a 401');
+    }
+
+    // 400 — unexpected top-level key.
+    {
+      const { status, body } = await correctAmenities({ id: amenityFixture.id, fields: { vegan: { expected_current: false, corrected: true } }, reason: 'test', batch_id: 'test-batch', extra: 'nope' });
+      assert.equal(status, 400);
+      assert.match(body.error, /Unexpected field/);
+    }
+
+    // 400 — empty fields object.
+    {
+      const { status, body } = await correctAmenities({ id: amenityFixture.id, fields: {}, reason: 'test', batch_id: 'test-batch' });
+      assert.equal(status, 400);
+      assert.match(body.error, /at least one amenity field/);
+    }
+
+    // 400 — unapproved field name (a real column, but not one of the four
+    // approved amenity fields). Must be rejected wholesale, and must not
+    // partially apply any field in the same request.
+    {
+      const before = app.getVenue(amenityFixture.id);
+      const { status, body } = await correctAmenities({
+        id: amenityFixture.id,
+        fields: {
+          vegan: { expected_current: false, corrected: true },
+          dog_friendly: { expected_current: false, corrected: true },
+        },
+        reason: 'test', batch_id: 'test-batch',
+      });
+      assert.equal(status, 400);
+      assert.match(body.error, /Unexpected amenity field/);
+      assert.deepEqual(body.allowed, ['vegan', 'vegetarian', 'patio', 'gluten_free']);
+      const after = app.getVenue(amenityFixture.id);
+      assert.equal(after.vegan, before.vegan, 'a request containing ANY unapproved field must write NOTHING, including the valid field in the same call');
+      assert.equal(after.dog_friendly, false, 'dog_friendly must remain untouched -- it is not a writable field via this endpoint');
+    }
+
+    // 400 — an attempt to reach an arbitrary, sensitive column (redirect_to)
+    // via the fields object must be rejected the same way, never treated
+    // specially or silently ignored.
+    {
+      const { status, body } = await correctAmenities({
+        id: amenityFixture.id,
+        fields: { redirect_to: { expected_current: false, corrected: true } },
+        reason: 'test', batch_id: 'test-batch',
+      });
+      assert.equal(status, 400);
+      assert.match(body.error, /Unexpected amenity field/);
+      assert.equal(app.getVenue(amenityFixture.id).redirect_to, null, 'redirect_to must be completely unreachable via this endpoint');
+    }
+
+    // 404 — nonexistent venue id.
+    {
+      const { status } = await correctAmenities({ id: 999999999, fields: { vegan: { expected_current: false, corrected: true } }, reason: 'test', batch_id: 'test-batch' });
+      assert.equal(status, 404);
+    }
+
+    // 200 — a single call exercising three of the four per-field outcomes
+    // at once against the fixture's mixed starting state (vegan=false,
+    // vegetarian=true, patio=true, gluten_free=false). The fourth outcome
+    // (a genuine expected-current mismatch) needs live state that diverges
+    // from what the caller claims -- it's covered separately below by the
+    // stale-precondition case, after this call has already changed vegan.
+    //   - vegan:        false -> true   => written (the core "preserve a
+    //                                      verified true value" case)
+    //   - vegetarian:   true  -> true    => harmless no-op
+    //   - patio:        true  -> false   => rejected (true->false is never
+    //                                      permitted, regardless of what
+    //                                      expected_current claims)
+    //   - gluten_free:  also a true->false attempt (expected_current
+    //                   claimed true, corrected false), but against a field
+    //                   whose real live value is actually false -- proves
+    //                   the true->false guard fires unconditionally, BEFORE
+    //                   the expected-current check ever runs, even when the
+    //                   caller's own claim about the current value is wrong
+    {
+      const veganLogBefore = amenityLogRows(amenityFixture.id, 'vegan').length;
+      const patioLogBefore = amenityLogRows(amenityFixture.id, 'patio').length;
+      const glutenLogBefore = amenityLogRows(amenityFixture.id, 'gluten_free').length;
+      const vegetarianLogBefore = amenityLogRows(amenityFixture.id, 'vegetarian').length;
+
+      const { status, body } = await correctAmenities({
+        id: amenityFixture.id,
+        fields: {
+          vegan: { expected_current: false, corrected: true },
+          vegetarian: { expected_current: true, corrected: true },
+          patio: { expected_current: true, corrected: false },
+          gluten_free: { expected_current: true, corrected: false },
+        },
+        reason: 'confirmed via Intermezzo Castle Bistro verification', batch_id: 'test-batch-mixed',
+      });
+
+      assert.equal(status, 200);
+      assert.deepEqual(body.results, {
+        vegan: 'written',
+        vegetarian: 'noop_already_matches',
+        patio: 'rejected_true_to_false',
+        gluten_free: 'rejected_true_to_false',
+      });
+      assert.equal(body.venue.vegan, true, 'response must reflect the newly-written vegan value');
+      assert.equal(body.venue.vegetarian, true);
+      assert.equal(body.venue.patio, true, 'patio must remain true -- the true->false attempt must not have applied');
+      assert.equal(body.venue.gluten_free, false, 'gluten_free must remain false -- the true->false attempt must not have applied, regardless of the caller\'s (wrong) expected_current claim');
+
+      const live = app.getVenue(amenityFixture.id);
+      assert.equal(live.vegan, true);
+      assert.equal(live.vegetarian, true);
+      assert.equal(live.patio, true, 'patio must be unchanged in the database, not just in the response');
+      assert.equal(live.gluten_free, false, 'gluten_free must be unchanged in the database, not just in the response');
+
+      // Logging: exactly one new row for the field that actually wrote,
+      // zero new rows for the no-op and the two rejected fields.
+      assert.equal(amenityLogRows(amenityFixture.id, 'vegan').length, veganLogBefore + 1, 'exactly one new audit-log row for the written field');
+      assert.equal(amenityLogRows(amenityFixture.id, 'vegetarian').length, vegetarianLogBefore, 'a no-op must not write an audit-log row');
+      assert.equal(amenityLogRows(amenityFixture.id, 'patio').length, patioLogBefore, 'a rejected true->false attempt must not write an audit-log row');
+      assert.equal(amenityLogRows(amenityFixture.id, 'gluten_free').length, glutenLogBefore, 'a rejected true->false attempt must not write an audit-log row');
+
+      const veganLog = amenityLogRows(amenityFixture.id, 'vegan')[amenityLogRows(amenityFixture.id, 'vegan').length - 1];
+      assert.equal(veganLog.old_value, '0');
+      assert.equal(veganLog.new_value, '1');
+      assert.equal(veganLog.source, 'manual_correction');
+      assert.equal(veganLog.source_ref, 'confirmed via Intermezzo Castle Bistro verification');
+      assert.equal(veganLog.batch_id, 'test-batch-mixed');
+      assert.equal(veganLog.confidence, 'high');
+      assert.equal(veganLog.auto_accepted, 0);
+
+      // Unrelated fields (non-amenity, and the other 8 amenity booleans
+      // this endpoint doesn't touch) must be completely untouched.
+      assert.equal(live.phone, '+1 250-555-0199', 'phone must be unaffected by an amenities call');
+      assert.equal(live.address, '789 Amenity Ave, Kelowna, BC V1Y 0C0', 'address must be unaffected by an amenities call');
+      assert.equal(live.name, 'Test Amenity Fixture');
+      assert.equal(live.dog_friendly, false, 'a boolean field outside the four-field allowlist must be unaffected');
+      assert.equal(live.redirect_to, null, 'redirect_to must be unaffected');
+    }
+
+    // Concurrent stale-precondition race, mirroring the /admin/correct-phone
+    // test above: a second caller holding the SAME (now-stale)
+    // expected_current that was true before the successful write must be
+    // rejected, not silently overwrite the just-applied correction. This is
+    // also the dedicated genuine expected-current-mismatch case (distinct
+    // from the true->false guard, which fires first and independently
+    // whenever corrected: false -- this call uses corrected: true, so the
+    // rejection here can only come from the live-state mismatch check).
+    {
+      const before = amenityLogRows(amenityFixture.id, 'vegan').length;
+      const { status, body } = await correctAmenities({
+        id: amenityFixture.id,
+        fields: { vegan: { expected_current: false, corrected: true } }, // stale: vegan is already true now
+        reason: 'stale caller', batch_id: 'test-batch-stale',
+      });
+      assert.equal(status, 200, 'the call itself succeeds -- the rejection is per-field, not a whole-request error');
+      assert.equal(body.results.vegan, 'rejected_expected_mismatch', 'a stale expected_current must be rejected even though it WAS correct before the prior write');
+      assert.equal(app.getVenue(amenityFixture.id).vegan, true, 'the stale caller must not have changed anything');
+      assert.equal(amenityLogRows(amenityFixture.id, 'vegan').length, before, 'a rejected stale call must not write an audit-log row');
+    }
+  }
+
   // Close the listener so the test process can exit naturally instead of
   // hanging on an open server handle.
   await new Promise((resolve) => app.server.close(resolve));
@@ -1507,7 +1717,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
 //      server by the time this one runs.
 // The temp directory and child process are both torn down in `finally`,
 // so a failed assertion can't leak either.
-test('/admin/correct-phone returns 503 when ENRICHMENT_ADMIN_TOKEN is unset (isolated child process)', async () => {
+test('/admin/correct-phone and /admin/correct-amenities return 503 when ENRICHMENT_ADMIN_TOKEN is unset (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-503-isolation-test-'));
   const projectRoot = path.join(__dirname, '..');
   fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
@@ -1553,6 +1763,17 @@ test('/admin/correct-phone returns 503 when ENRICHMENT_ADMIN_TOKEN is unset (iso
     assert.equal(res.status, 503, `expected 503 with ENRICHMENT_ADMIN_TOKEN unset in the isolated process. stderr: ${stderrOutput}`);
     const body = await res.json();
     assert.match(body.error, /not configured/);
+
+    // Same fail-closed check for /admin/correct-amenities -- reuses this
+    // same isolated child rather than spinning up a second one.
+    const amenityRes = await fetch(`http://localhost:${ISOLATED_PORT}/admin/correct-amenities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 1, fields: { vegan: { expected_current: false, corrected: true } }, reason: 'x', batch_id: 'x' }),
+    });
+    assert.equal(amenityRes.status, 503, `expected 503 for /admin/correct-amenities with ENRICHMENT_ADMIN_TOKEN unset. stderr: ${stderrOutput}`);
+    const amenityBody = await amenityRes.json();
+    assert.match(amenityBody.error, /not configured/);
   } finally {
     child.kill();
     await new Promise((resolve) => child.once('exit', resolve));
