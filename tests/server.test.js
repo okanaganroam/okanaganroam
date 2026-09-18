@@ -804,6 +804,24 @@ test('deterministicTripParserProvider: days -- an out-of-range day count (e.g. 1
   assert.equal(raw.days, null, 'isValidTripDays() rejects 10 (max 7), so the parser must not emit it');
 });
 
+// Regression: the primary example prompt on /trip itself ("3 relaxed days
+// in Kelowna...") previously failed to parse a day count at all, because
+// the adjective "relaxed" sitting between "3" and "days" broke the old
+// strictly-adjacent regex -- found during live browser QA of the shipped
+// page, not just unit testing.
+test('deterministicTripParserProvider: days -- a single trip/pace adjective between the number and "day(s)" still resolves correctly', () => {
+  assert.equal(app.deterministicTripParserProvider('3 relaxed days in Kelowna with wine and hidden gems').raw.days, 3, 'the exact /trip example prompt must parse to 3 days');
+  assert.equal(app.deterministicTripParserProvider('Plan me a relaxed 3 relaxed days trip').raw.days, 3);
+  assert.equal(app.deterministicTripParserProvider('three packed days of golf').raw.days, 3);
+  assert.equal(app.deterministicTripParserProvider('2 easy days around Vernon').raw.days, 2);
+  assert.equal(app.deterministicTripParserProvider('a 5 amazing day trip').raw.days, 5);
+});
+
+test('deterministicTripParserProvider: days -- the adjective-gap allowance stays narrow and does not pick up an unrelated number near an unrelated "day"', () => {
+  assert.equal(app.deterministicTripParserProvider('my order was 3 items that day').raw.days, null, 'two unrelated words ("items that") between the number and "day" must never match');
+  assert.equal(app.deterministicTripParserProvider('I ate 3 apples that day').raw.days, null, '"apples" is not a recognized trip/pace adjective, so a single-word gap must still not match');
+});
+
 test('deterministicTripParserProvider: pace -- every alias for relaxed/standard/packed resolves to the correct enum value', () => {
   ['relaxed', 'easygoing', 'easy going', 'slow', 'leisurely', 'take it easy', 'laid back', 'chill'].forEach((phrase) => {
     assert.equal(app.deterministicTripParserProvider(`a ${phrase} trip to Kelowna`).raw.pace, 'relaxed', `"${phrase}" should map to relaxed`);
@@ -943,6 +961,22 @@ test('parseTripRequest (full pipeline, default provider): fully deterministic ac
   for (let i = 0; i < 5; i++) {
     assert.deepEqual(await app.parseTripRequest(text), first);
   }
+});
+
+// Regression: this is the LITERAL text of the /trip page's first example
+// chip (trip.conv.example1). Clicking it previously produced an
+// unexpected "how many days?" clarification instead of a clean result --
+// found via live browser QA. Full pipeline, not just the raw provider, so
+// this also proves needs_clarification correctly comes back empty.
+test('parseTripRequest (full pipeline): the live /trip example-1 chip text parses cleanly with no clarification needed', async () => {
+  const result = await app.parseTripRequest('3 relaxed days in Kelowna with wine and hidden gems');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.region, 'kelowna');
+  assert.equal(result.value.days, 3);
+  assert.equal(result.value.pace, 'relaxed');
+  assert.deepEqual(result.value.interests, ['winery']);
+  assert.deepEqual(result.value.discovery, ['hidden_gem']);
+  assert.deepEqual(result.value.needs_clarification, []);
 });
 
 // ---- Build My Trip, Stage 3: the 8 required example requests (default provider, full pipeline) ----
@@ -1092,6 +1126,42 @@ function readClientAppJs() {
   const path = require('path');
   return fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
 }
+
+function readAppCss() {
+  const fs = require('fs');
+  const path = require('path');
+  return fs.readFileSync(path.join(__dirname, '..', 'public', 'styles', 'app.css'), 'utf8');
+}
+
+// Regression: found via live browser QA of the shipped /trip page -- a
+// pre-existing sitewide mobile rule, `.app-btn{ display:none; }` inside
+// the header's `@media (max-width: 940px)` block, unintentionally hid
+// EVERY .app-btn-classed button on mobile, not just the header's own
+// #navTripBtn it was meant for. Since /trip's conversational and wizard
+// "Plan/Generate/Regenerate" buttons all reuse the same shared .app-btn
+// styling class, this made the whole feature unusable on mobile (no way
+// to submit a request or generate a trip). Fixed by scoping the rule to
+// `.nav .app-btn` -- #navTripBtn is the only .app-btn inside <nav
+// class="nav">, so this is a no-op for every other .app-btn on the site.
+test('mobile CSS: the header-only app-btn hide rule is scoped to .nav, not applied blanket sitewide', () => {
+  const css = readAppCss();
+  const mediaStart = css.indexOf('@media (max-width: 940px)');
+  assert.ok(mediaStart !== -1, 'expected to find the 940px mobile-nav media query in app.css');
+  const mediaEnd = css.indexOf('@media (max-width: 560px)', mediaStart);
+  const mediaBlock = css.slice(mediaStart, mediaEnd === -1 ? mediaStart + 4000 : mediaEnd);
+
+  assert.match(mediaBlock, /\.nav\s+\.app-btn\s*\{\s*display:\s*none;?\s*\}/, 'the header CTA hide rule must be scoped to .nav .app-btn');
+  // The old unscoped form must be gone -- specifically check no bare
+  // ".app-btn{" rule (not preceded by ".nav ") exists in this block.
+  const bareRule = /(^|[^.\w-])\.app-btn\s*\{/g;
+  let match;
+  let foundUnscoped = false;
+  while ((match = bareRule.exec(mediaBlock))) {
+    const precedingText = mediaBlock.slice(Math.max(0, match.index - 6), match.index + match[0].length);
+    if (!/\.nav\s+\.app-btn\s*\{/.test(precedingText)) foundUnscoped = true;
+  }
+  assert.equal(foundUnscoped, false, 'no bare, unscoped ".app-btn { display:none }" rule should remain in the mobile media query');
+});
 
 test('conversational hero: input, submit button, and example prompts are present and are the page\'s primary heading', () => {
   const html = app.renderTripPlannerPage();

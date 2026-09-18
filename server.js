@@ -1937,18 +1937,37 @@ const TRIP_PARSER_UNSUPPORTED_PHRASES = [
 
 const TRIP_PARSER_DAY_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
 
+// A single adjective is allowed to sit between the number and "day(s)"
+// (e.g. "3 relaxed days", "three packed days") -- a very natural, common
+// way to phrase a trip length. Deliberately a small, curated list of
+// plausible trip/pace adjectives, NOT an arbitrary `\w+` gap: an
+// unrestricted gap would risk pulling in unrelated numbers from sentences
+// like "my order was 3 items that day" (one word, "items", between "3"
+// and "day"). Restricting the gap to known trip-describing adjectives
+// keeps the match narrow while covering the realistic phrasing this app
+// actually needs to support.
+const TRIP_PARSER_DAY_ADJECTIVES = [
+  'relaxed', 'easygoing', 'easy', 'slow', 'leisurely', 'chill', 'chilled',
+  'standard', 'balanced', 'normal', 'moderate',
+  'packed', 'busy', 'full', 'quick', 'short', 'long',
+  'fun', 'great', 'amazing', 'wonderful', 'perfect', 'quiet',
+];
+const TRIP_PARSER_DAY_ADJECTIVE_GROUP = TRIP_PARSER_DAY_ADJECTIVES.join('|');
+const TRIP_PARSER_DAYS_DIGIT_RE = new RegExp(`\\b(\\d{1,2})\\s+(?:(?:${TRIP_PARSER_DAY_ADJECTIVE_GROUP})\\s+)?days?\\b`);
+const TRIP_PARSER_DAYS_WORD_RE = new RegExp(`\\b(one|two|three|four|five|six|seven)\\s+(?:(?:${TRIP_PARSER_DAY_ADJECTIVE_GROUP})\\s+)?days?\\b`);
+
 // "long weekend" is a well-defined, widely understood 3-day idiom -- safe
 // to map. A bare "weekend" alone is genuinely ambiguous (2 days? 3?) and
 // is deliberately left unmapped, matching the "never guess a day count"
 // rule: it falls through to needs_clarification instead.
 function detectTripParserDays(normalizedText) {
   if (/\blong weekend\b/.test(normalizedText)) return 3;
-  const digitMatch = normalizedText.match(/\b(\d{1,2})\s+days?\b/);
+  const digitMatch = normalizedText.match(TRIP_PARSER_DAYS_DIGIT_RE);
   if (digitMatch) {
     const n = parseInt(digitMatch[1], 10);
     return isValidTripDays(n) ? n : null;
   }
-  const wordMatch = normalizedText.match(/\b(one|two|three|four|five|six|seven)\s+days?\b/);
+  const wordMatch = normalizedText.match(TRIP_PARSER_DAYS_WORD_RE);
   if (wordMatch) {
     const n = TRIP_PARSER_DAY_WORDS[wordMatch[1]];
     return isValidTripDays(n) ? n : null;

@@ -940,7 +940,15 @@
        fully working way to search on mobile, so no functionality is lost. */
     .nav{ position:relative; gap:14px; }
     .nav-search-btn{ display:none; }
-    .app-btn{ display:none; }
+    /* Scoped to the header nav specifically (was the unscoped `.app-btn`,
+       which -- being a generic reusable button class -- also hid the
+       /trip conversational and wizard "Plan/Generate/Regenerate" buttons
+       on mobile, since they all happen to share this same base class for
+       styling. Only the header's own #navTripBtn CTA was ever meant to be
+       hidden here (it's redundant with the mobile hero's own way into
+       trip planning); every other .app-btn-classed button elsewhere on
+       the site must stay visible on mobile. */
+    .nav .app-btn{ display:none; }
     .filter-bar{ top:0; }
     .filter-label{ min-width: auto; width:100%; margin-bottom:2px; }
   }
