@@ -26,6 +26,10 @@ var TRANSLATIONS = {
     'nav.appComingSoon': 'App coming soon',
     'hero.headline': 'Explore the Okanagan',
     'hero.lead': 'Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos — including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place.',
+    // Mobile hero polish, pass 1 (2026-09-18): shorter supporting copy shown
+    // only at the mobile breakpoint -- hero.lead above is unchanged and
+    // still the only copy desktop ever shows.
+    'hero.leadMobile': 'Explore wineries, food, beaches, golf, adventures and hidden gems across the Okanagan.',
     'mood.heading': 'What are you in the mood for?',
     'mood.lead': 'Start with what sounds good. We\u2019ll help you find somewhere worth going.',
     'mood.golf.title': 'Golf',
@@ -255,6 +259,7 @@ var TRANSLATIONS = {
     // that no longer matches the current English hero.lead at all. Now a
     // real Canadian French translation of the CURRENT English paragraph.
     'hero.lead': 'Okanagan Roam est votre guide de la vall\u00e9e de l\u2019Okanagan, d\u2019Enderby \u00e0 Osoyoos \u2014 stations de ski, vignobles, gastronomie, golf, plages, \u00e9v\u00e9nements, aventures et tr\u00e9sors cach\u00e9s, le tout au m\u00eame endroit.',
+    'hero.leadMobile': 'D\u00e9couvrez vignobles, gastronomie, plages, golf, aventures et tr\u00e9sors cach\u00e9s partout dans l\u2019Okanagan.',
     'mood.heading': "Qu'est-ce qui vous tente aujourd'hui\u00a0?",
     'mood.lead': 'Commencez par ce qui vous fait envie. On vous aide \u00e0 trouver un endroit qui en vaut la peine.',
     'mood.golf.title': 'Golf',

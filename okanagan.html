@@ -159,7 +159,16 @@
   </div>
   <div class="wrap-wide hero-inner">
     <h1 class="hero-title" data-i18n="hero.headline">Explore the Okanagan</h1>
-    <p class="hero-lead" data-i18n="hero.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place.</p>
+    <p class="hero-lead hero-lead-full" data-i18n="hero.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place.</p>
+    <!-- Mobile hero polish, pass 1 (2026-09-18): shorter supporting copy for
+         mobile only -- the desktop .hero-lead-full above is completely
+         unchanged (same element, same text, same data-i18n key). This is a
+         second, separate paragraph with its own key so each has a real,
+         independent translation rather than one being a truncated runtime
+         slice of the other. Visibility is swapped between the two by
+         .hero-lead-mobile/.hero-lead-full's CSS (display:none by default,
+         flipped at the mobile breakpoint) -- see renderHomepageDiscoveryStyles(). -->
+    <p class="hero-lead hero-lead-mobile" data-i18n="hero.leadMobile">Explore wineries, food, beaches, golf, adventures and hidden gems across the Okanagan.</p>
     <form class="hero-search-box" id="heroSearchForm" role="search">
       <svg class="hero-search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
       <div class="hero-search-field">

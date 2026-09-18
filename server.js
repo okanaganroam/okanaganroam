@@ -2180,6 +2180,12 @@ function renderHomepageDiscoveryStyles() {
     line-height: 1.4; margin: 0 auto 16px; max-width: 54ch; color: rgba(255,255,255,0.92);
     text-align: center;
   }
+  /* Mobile hero polish, pass 1 (2026-09-18): .hero-lead-mobile (the short,
+     mobile-only supporting line) is hidden by default -- desktop/tablet
+     show only .hero-lead-full, completely unchanged. The mobile media
+     query below flips both, so exactly one of the two is ever visible at
+     any width. */
+  .hero-lead-mobile { display: none; }
   .hero-search-box {
     display: flex; align-items: center; max-width: 580px; background: rgba(255,255,255,0.97);
     border-radius: 999px; padding: 6px 6px 6px 20px; gap: 10px; box-shadow: 0 10px 26px -14px rgba(20,14,10,0.5);
@@ -2218,28 +2224,46 @@ function renderHomepageDiscoveryStyles() {
   .hero-search-box button:hover { background: var(--ref-navy-deep); }
 
   @media (max-width: 640px) {
-    .hero-scenic { min-height: 380px; }
-    .hero-inner { padding: 36px 0; max-width: 100%; }
-    /* Mobile hero refinement (2026-09-17): the desktop clamp's floor
-       (1.9rem/30.4px) was too large for the mobile composition -- fixed
-       override here rather than adjusting the clamp itself, since the
-       clamp's floor is also relied on at in-between widths this task
-       wasn't asked to touch. 27px (line-height stays the same 1.1 ratio
-       -> 29.7px) keeps the headline clearly the dominant element while
-       giving the hero more breathing room. text-align:center here is
-       homepage-hero-specific -- .hero-title has no text-align at wider
-       widths (reads left-to-right in its own centered column instead,
-       per the desktop hero layout, untouched). */
-    .hero-title { max-width: 100%; font-size: 14.625px; text-align: center; margin: 0 0 12px; padding: 0 8px; }
-    /* .hero-lead already has text-align:center and margin:0 auto at every
-       width (unrelated earlier change) -- this only tightens its
-       max-width for mobile specifically, so the paragraph reads as a
-       controlled, centered block with real side margins instead of
-       wrapping edge-to-edge across the full viewport (54ch, the desktop
-       value, is wider than the mobile viewport itself and so never
-       actually constrained anything here before this). */
-    .hero-lead { max-width: 90%; }
-    .hero-search-box { max-width: 100%; padding-left: 16px; }
+    /* Mobile hero polish, pass 1 (2026-09-18): the mobile hero was reading
+       as the desktop hero compressed into a phone -- taller than the
+       desktop base (380px vs. desktop's own 300px min-height) despite
+       showing less content, with generous desktop-scale padding on top.
+       Brought back in line with (not beyond) the desktop min-height, and
+       inner padding tightened, so the whole section reads as deliberately
+       sized for mobile and the handoff into "What are you in the mood
+       for?" happens sooner. */
+    .hero-scenic { min-height: 300px; }
+    .hero-inner { padding: 22px 0; max-width: 100%; }
+    /* Headline (2026-09-18): the prior 14.625px pass (two successive -25%
+       cuts from the original 26px) went smaller than legible hierarchy
+       could support -- re-evaluated per direction against a 16-18px
+       target rather than continuing to shrink it. 17px, the middle of
+       that range, is the smallest bump off 14.625px that reads as a
+       confident, intentional mobile headline size rather than a
+       compressed desktop one; margin-bottom tightened from 12px to 8px
+       to pull the lead paragraph closer underneath it (tighter vertical
+       rhythm, same request as the hero-inner padding above). text-
+       align:center here is homepage-hero-specific -- .hero-title has no
+       text-align at wider widths (reads left-to-right in its own
+       centered column instead, per the desktop hero layout, untouched). */
+    .hero-title { max-width: 100%; font-size: 17px; text-align: center; margin: 0 0 8px; padding: 0 8px; }
+    /* Mobile supporting copy (2026-09-18): swaps the long desktop
+       paragraph (.hero-lead-full, completely unchanged, hidden here) for
+       the short mobile-only one (.hero-lead-mobile, hidden everywhere
+       else -- see the base .hero-lead-mobile rule above). Sized down from
+       the desktop 1.05rem and given a tighter bottom margin, matching the
+       same "tighten vertical spacing" direction as the headline above. */
+    .hero-lead-full { display: none; }
+    .hero-lead-mobile { display: block; font-size: 0.92rem; line-height: 1.4; margin: 0 auto 14px; max-width: 90%; }
+    /* Search box (2026-09-18): slightly smaller footprint so it no longer
+       dominates the now-shorter hero -- button height 42px->38px, box
+       padding trimmed to match. 38px (plus the box's own vertical
+       padding) keeps a real ~44px+ tappable row, so this stays a "keep it
+       easy to tap" reduction, not a functional regression -- no markup,
+       search behavior, or desktop sizing changed. */
+    .hero-search-box { max-width: 100%; padding: 5px 5px 5px 16px; }
+    .hero-search-field input { padding: 7px 0; }
+    .hero-search-box button { height: 38px; padding: 0 20px; }
     .hero-search-faux-sub { display: none; }
   }
 
