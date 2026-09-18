@@ -422,6 +422,63 @@ test('buildTripItinerary is deterministic: identical inputs called twice produce
   assert.deepEqual(planA, planB);
 });
 
+// ---- Build My Trip, Stage 2 (extractHtmlFragment + renderTripPlannerPage) ----
+
+test('extractHtmlFragment: includeEndMarker=false stops BEFORE the end marker (regression test for the exact bug that swallowed the whole /trip page into an unterminated HTML comment)', () => {
+  const html = '<div id="a">keep</div>\n\n<!-- next section starts here -->rest';
+  const frag = app.extractHtmlFragment(html, '<div id="a">', '\n\n<!-- next section', false);
+  assert.equal(frag, '<div id="a">keep</div>');
+  assert.doesNotMatch(frag, /<!--/, 'the end marker text itself must never be included when includeEndMarker is false');
+});
+
+test('extractHtmlFragment: includeEndMarker=true includes the end marker itself (e.g. a real closing tag)', () => {
+  const html = '<header id="top"><nav>stuff</nav></header>\n\n<main>rest</main>';
+  const frag = app.extractHtmlFragment(html, '<header id="top">', '</header>', true);
+  assert.equal(frag, '<header id="top"><nav>stuff</nav></header>');
+});
+
+test('extractHtmlFragment returns null when either marker is not found', () => {
+  const html = '<div id="a">only this</div>';
+  assert.equal(app.extractHtmlFragment(html, '<div id="missing">', '</div>', true), null);
+  assert.equal(app.extractHtmlFragment(html, '<div id="a">', '<!-- never appears', false), null);
+});
+
+test('renderTripPlannerPage renders the full step-wizard form, all 20 regions, all 7 interest chips, and reuses the real header/trip-tray markup (not an empty/broken fragment)', () => {
+  const html = app.renderTripPlannerPage();
+  assert.match(html, /<form id="tripPlannerForm"/);
+  assert.match(html, /id="tripRegionSelect"/);
+  assert.match(html, /id="tripDaysInput"/);
+  assert.match(html, /id="tripPlannerMap"/);
+  // Every real region must appear as a real <option>, nothing invented.
+  for (const region of app.REGION_LABELS ? Object.keys(app.REGION_LABELS) : []) {
+    assert.match(html, new RegExp(`<option value="${region}">`), `missing region option for ${region}`);
+  }
+  // All 7 real venue types, using their ALREADY-EXISTING i18n keys.
+  for (const key of Object.values(app.TRIP_INTEREST_I18N_KEY)) {
+    assert.match(html, new RegExp(`data-i18n="${key.replace('.', '\\.')}"`));
+  }
+  // The real header and trip tray were actually extracted, not left empty.
+  assert.match(html, /<header id="top">/);
+  assert.match(html, /id="navTripBtn"/);
+  assert.match(html, /id="tripTrayToggle"/);
+  assert.match(html, /id="tripTrayPanel"/);
+  // No unterminated HTML comment leaking from the extraction (regression
+  // guard for the exact bug this page hit during manual QA).
+  const openComments = (html.match(/<!--/g) || []).length;
+  const closeComments = (html.match(/-->/g) || []).length;
+  assert.equal(openComments, closeComments, 'every HTML comment must be properly closed');
+});
+
+test('renderTripPlannerPage does not alter the homepage template file on disk', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const sitePath = path.join(__dirname, '..', 'okanagan.html');
+  const before = fs.readFileSync(sitePath, 'utf8');
+  app.renderTripPlannerPage();
+  const after = fs.readFileSync(sitePath, 'utf8');
+  assert.equal(before, after, 'rendering /trip must only READ okanagan.html, never write to it');
+});
+
 // ---- JSON-LD -----------------------------------------------------------
 test('breadcrumbListSchema produces valid schema.org BreadcrumbList shape', () => {
   const schema = app.breadcrumbListSchema([
@@ -1408,6 +1465,22 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   const footerPos = homepageBody.indexOf('<footer class="home-footer">');
   assert.ok(footerPos !== -1, 'expected the new home-footer to render on the homepage');
   assert.ok(tripPos < footerPos, 'the footer must immediately follow Build My Trip, with nothing old in between');
+
+  // Build My Trip, Stage 2 (2026-09-18): GET /trip serves the real planner
+  // page, and the homepage's own Build Trip CTA section (checked just
+  // above) is completely unaffected -- this route is additive.
+  {
+    const tripPageRes = await fetch(`${base}/trip`);
+    assert.equal(tripPageRes.status, 200);
+    const tripPageBody = await tripPageRes.text();
+    assert.match(tripPageBody, /<form id="tripPlannerForm"/);
+    assert.match(tripPageBody, /<header id="top">/, '/trip must reuse the real site header, not a bare one');
+    assert.match(tripPageBody, /id="tripTrayToggle"/, '/trip must include the real, working trip tray');
+    // The homepage's own CTA copy (frozen, checked above via id="buildTrip")
+    // must still say exactly what it always has -- confirms the /trip route
+    // addition didn't touch renderBuildTripCTAHTML() in any way.
+    assert.match(homepageBody, /Tell us what you&rsquo;re looking for\. We&rsquo;ll help build your adventure\./);
+  }
 
   // "Browse Okanagan Roam by guide" SEO crawl-links block (2026-09-17
   // visual fix): renderGuideFooterHTML() itself is untouched (still

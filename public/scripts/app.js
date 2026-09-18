@@ -173,6 +173,7 @@ var TRANSLATIONS = {
     'type.pub': 'Pub/Bar',
     'type.cocktail': 'Cocktail Lounge',
     'type.cafe': 'Cafe',
+    'type.golf': 'Golf',
 
     'filter.cuisine': 'Cuisine',
     'filter.price': 'Price',
@@ -220,6 +221,35 @@ var TRANSLATIONS = {
     'trip.inTrip': '\u2713 In trip',
     'trip.sameArea': 'Same area',
     'trip.kmToNextStop': 'km to next stop',
+
+    'trip.planner.title': 'Build My Trip',
+    'trip.planner.subtitle': 'Answer a few questions and we\u2019ll put together a real, day-by-day Okanagan itinerary from actual venues \u2014 no invented places, no AI guesswork.',
+    'trip.planner.step1.label': 'Where are you going?',
+    'trip.planner.regionPlaceholder': 'Choose a region\u2026',
+    'trip.planner.step2.label': 'How long?',
+    'trip.planner.daysSuffix': 'days',
+    'trip.planner.step3.label': 'What do you love?',
+    'trip.planner.step3.hint': 'Pick as many as you like \u2014 leave them all unchecked to see a bit of everything.',
+    'trip.planner.step4.label': 'What\u2019s your pace?',
+    'trip.planner.pace.relaxed': 'Relaxed',
+    'trip.planner.pace.standard': 'Standard',
+    'trip.planner.pace.packed': 'Packed',
+    'trip.planner.generate': 'Generate My Trip',
+    'trip.planner.generating': 'Building your itinerary\u2026',
+    'trip.planner.regenerate': 'Regenerate',
+    'trip.planner.yourItinerary': 'Your itinerary',
+    'trip.planner.warningsHeading': 'A few notes about this trip:',
+    'trip.planner.day': 'Day',
+    'trip.planner.morning': 'Morning',
+    'trip.planner.afternoon': 'Afternoon',
+    'trip.planner.evening': 'Evening',
+    'trip.planner.noVenue': 'No venue available for this slot.',
+    'trip.planner.viewVenue': 'View venue',
+    'trip.planner.removeStop': 'Remove',
+    'trip.planner.errorNoRegion': 'Please choose a region first.',
+    'trip.planner.errorDays': 'Number of days must be between 1 and 7.',
+    'trip.planner.errorGeneric': 'Something went wrong building your trip. Please try again.',
+    'trip.planner.errorNetwork': 'Couldn\u2019t reach Okanagan Roam \u2014 check your connection and try again.',
 
     'card.getDirections': '\ud83d\udccd Get directions',
     'card.findMenu': '\ud83d\udccb Find menu',
@@ -393,6 +423,7 @@ var TRANSLATIONS = {
     'type.pub': 'Pub/Bar',
     'type.cocktail': 'Bar \u00e0 cocktails',
     'type.cafe': 'Caf\u00e9',
+    'type.golf': 'Golf',
 
     'filter.cuisine': 'Cuisine',
     'filter.price': 'Prix',
@@ -440,6 +471,35 @@ var TRANSLATIONS = {
     'trip.inTrip': '\u2713 Dans le voyage',
     'trip.sameArea': 'M\u00eame secteur',
     'trip.kmToNextStop': 'km jusqu\u2019au prochain arr\u00eat',
+
+    'trip.planner.title': 'Planifiez mon voyage',
+    'trip.planner.subtitle': 'R\u00e9pondez \u00e0 quelques questions et nous cr\u00e9erons un itin\u00e9raire r\u00e9el, jour par jour, dans l\u2019Okanagan \u00e0 partir de vrais \u00e9tablissements \u2014 aucun lieu invent\u00e9, aucune supposition par IA.',
+    'trip.planner.step1.label': 'O\u00f9 allez-vous?',
+    'trip.planner.regionPlaceholder': 'Choisissez une r\u00e9gion\u2026',
+    'trip.planner.step2.label': 'Pendant combien de temps?',
+    'trip.planner.daysSuffix': 'jours',
+    'trip.planner.step3.label': 'Qu\u2019aimez-vous?',
+    'trip.planner.step3.hint': 'Choisissez-en autant que vous voulez \u2014 laissez tout d\u00e9coch\u00e9 pour voir un peu de tout.',
+    'trip.planner.step4.label': 'Quel est votre rythme?',
+    'trip.planner.pace.relaxed': 'D\u00e9tendu',
+    'trip.planner.pace.standard': 'Standard',
+    'trip.planner.pace.packed': 'Charg\u00e9',
+    'trip.planner.generate': 'Planifier mon voyage',
+    'trip.planner.generating': 'Cr\u00e9ation de votre itin\u00e9raire\u2026',
+    'trip.planner.regenerate': 'Recommencer',
+    'trip.planner.yourItinerary': 'Votre itin\u00e9raire',
+    'trip.planner.warningsHeading': 'Quelques notes sur ce voyage\u00a0:',
+    'trip.planner.day': 'Jour',
+    'trip.planner.morning': 'Matin',
+    'trip.planner.afternoon': 'Apr\u00e8s-midi',
+    'trip.planner.evening': 'Soir',
+    'trip.planner.noVenue': 'Aucun \u00e9tablissement disponible pour ce cr\u00e9neau.',
+    'trip.planner.viewVenue': 'Voir l\u2019\u00e9tablissement',
+    'trip.planner.removeStop': 'Retirer',
+    'trip.planner.errorNoRegion': 'Veuillez d\u2019abord choisir une r\u00e9gion.',
+    'trip.planner.errorDays': 'Le nombre de jours doit \u00eatre entre 1 et 7.',
+    'trip.planner.errorGeneric': 'Une erreur est survenue lors de la cr\u00e9ation de votre voyage. Veuillez r\u00e9essayer.',
+    'trip.planner.errorNetwork': 'Impossible de joindre Okanagan Roam \u2014 v\u00e9rifiez votre connexion et r\u00e9essayez.',
 
     'card.getDirections': '\ud83d\udccd Obtenir l\u2019itin\u00e9raire',
     'card.findMenu': '\ud83d\udccb Voir le menu',
@@ -1945,31 +2005,24 @@ window.__scrollToVenueCard = function(name){
   });
 })();
 
-/* ---------- "Build Your Perfect Okanagan Trip" CTA. Both drive the
-   existing, unchanged trip-tray (#tripTrayToggle/#tripTrayPanel,
-   localStorage-backed) and map (#mapToggleBtn/#mapPanel, Leaflet) -- no
-   new trip data model, no new panel, just opening what already exists
-   elsewhere on the page. Reference redesign, forensic-comparison rebuild:
-   #tripCtaOpenMap is now a <button> wrapping the whole map graphic
-   (matching the reference's single-CTA layout, which has no second
-   visible "view map" link) rather than a separate <a> -- this handler
-   works identically on either element type, no change needed here. ---------- */
+/* ---------- "Build Your Perfect Okanagan Trip" CTA. ----------
+   Build My Trip Stage 2 (2026-09-18): #tripCtaOpenTrip now navigates to
+   the real /trip planner page instead of just opening the (still fully
+   intact, unchanged) trip tray -- this is a behavior-only change, the
+   button's markup/styling on the homepage is completely untouched (the
+   homepage itself is frozen). #tripCtaOpenMap below is unrelated and
+   unchanged: it still opens the existing /browse map. Reference redesign,
+   forensic-comparison rebuild note (unchanged): #tripCtaOpenMap is a
+   <button> wrapping the whole map graphic (matching the reference's
+   single-CTA layout, which has no second visible "view map" link) rather
+   than a separate <a> -- this handler works identically on either element
+   type, no change needed here. ---------- */
 (function(){
   var openTripBtn = document.getElementById('tripCtaOpenTrip');
   if (openTripBtn) {
     openTripBtn.addEventListener('click', function(e){
-      // The trip tray's own click handling is a single document-level
-      // delegated listener that both opens it (click on the toggle) and
-      // closes it (click anywhere outside the panel). Without stopping
-      // propagation here, this button's own click keeps bubbling after
-      // toggle.click() already opens the tray, reaches that same
-      // delegated listener as an "outside click", and immediately closes
-      // what was just opened.
       e.stopPropagation();
-      var toggle = document.getElementById('tripTrayToggle');
-      var panel = document.getElementById('tripTrayPanel');
-      if (toggle && panel && !panel.classList.contains('open')) toggle.click();
-      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      window.location.href = '/trip';
     });
   }
 
@@ -2041,17 +2094,16 @@ window.__scrollToVenueCard = function(name){
     });
   }
 
+  // Build My Trip Stage 2 (2026-09-18): navigates to the real /trip
+  // planner instead of just opening the trip tray -- same header markup
+  // is shared by /, /browse, and /trip itself, so this no-ops if already
+  // on /trip rather than reloading it.
   var tripBtn = document.getElementById('navTripBtn');
   if (tripBtn) {
     tripBtn.addEventListener('click', function(e){
-      // Same stopPropagation requirement as the trip-cta buttons above --
-      // otherwise this click bubbles to the trip tray's own document-level
-      // "click outside closes it" listener and immediately re-closes it.
       e.stopPropagation();
-      var toggle = document.getElementById('tripTrayToggle');
-      var panel = document.getElementById('tripTrayPanel');
-      if (toggle && panel && !panel.classList.contains('open')) toggle.click();
-      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (window.location.pathname === '/trip') return;
+      window.location.href = '/trip';
     });
   }
 
@@ -2288,6 +2340,318 @@ window.__scrollToVenueCard = function(name){
   // (empty-state message, distance labels) without needing a page reload.
   window.__syncTripButtons = syncButtons;
   window.__renderTripTray = render;
+})();
+
+/* ---------- Build My Trip, Stage 2: /trip planner page ----------
+   Only present on /trip (bails out immediately everywhere else, same
+   pattern every other module in this file uses). Calls the Stage 1
+   backend (POST /api/trip/generate) for ALL itinerary selection logic --
+   this module only collects form input, renders the response, and lets
+   the user remove a rendered stop or add one to the EXISTING trip tray
+   via the same .trip-btn mechanism the venue-card enhancement code
+   already uses (initBlock11, above) -- no new trip data model, no new
+   localStorage key. Every dynamic piece of text (venue name, address,
+   warnings) is set via .textContent, never innerHTML, so nothing from
+   the API response is ever parsed as markup. ---------- */
+(function(){
+  var form = document.getElementById('tripPlannerForm');
+  if (!form) return;
+
+  var TYPE_TO_CATEGORY_SLUG = {
+    restaurant: 'restaurants', winery: 'wineries', cafe: 'cafes',
+    brewery: 'breweries', pub: 'pubs', cocktail: 'cocktail-lounges', golf: 'golf'
+  };
+  var DAYPARTS = ['morning', 'afternoon', 'evening'];
+
+  var statusEl = document.getElementById('tripPlannerStatus');
+  var resultEl = document.getElementById('tripPlannerResult');
+  var warningsEl = document.getElementById('tripPlannerWarnings');
+  var daysEl = document.getElementById('tripPlannerDays');
+  var mapWrapEl = document.getElementById('tripPlannerMapWrap');
+  var generateBtn = document.getElementById('tripGenerateBtn');
+  var regenerateBtn = document.getElementById('tripRegenerateBtn');
+
+  var map = null;
+  var mapMarkers = [];
+  var mapLine = null;
+
+  // Pre-fill the region from ?region=<slug> when present (e.g. a future
+  // "plan a trip here" link from a venue/region page) -- a small, safe
+  // nicety, not a new required flow; the step still works with no query
+  // string at all.
+  try {
+    var presetRegion = new URLSearchParams(window.location.search).get('region');
+    if (presetRegion) {
+      var regionSelect = document.getElementById('tripRegionSelect');
+      if (regionSelect && regionSelect.querySelector('option[value="' + presetRegion + '"]')) {
+        regionSelect.value = presetRegion;
+      }
+    }
+  } catch (e) { /* ignore -- purely cosmetic */ }
+
+  function setStatus(text, mode) {
+    statusEl.textContent = text || '';
+    statusEl.className = 'trip-planner-status' + (mode ? ' is-' + mode : '');
+  }
+
+  function venueUrl(venue) {
+    var catSlug = TYPE_TO_CATEGORY_SLUG[venue.type];
+    if (!catSlug || !venue.slug) return null;
+    return '/' + venue.region + '/' + catSlug + '/' + venue.slug;
+  }
+
+  function buildSlotCard(daypart, venue) {
+    var card = document.createElement('div');
+    card.className = 'trip-slot-card';
+
+    var label = document.createElement('div');
+    label.className = 'trip-slot-label';
+    label.textContent = t('trip.planner.' + daypart);
+    card.appendChild(label);
+
+    if (!venue) {
+      var empty = document.createElement('p');
+      empty.className = 'trip-slot-empty';
+      empty.textContent = t('trip.planner.noVenue');
+      card.appendChild(empty);
+      return card;
+    }
+
+    var regionLabel = (window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[venue.region]) || venue.region;
+    card.dataset.name = venue.name;
+    if (venue.latitude != null && venue.longitude != null) {
+      card.dataset.lat = venue.latitude;
+      card.dataset.lng = venue.longitude;
+    }
+
+    var h4 = document.createElement('h4');
+    var url = venueUrl(venue);
+    if (url) {
+      var link = document.createElement('a');
+      link.href = url;
+      link.textContent = venue.name;
+      h4.appendChild(link);
+    } else {
+      h4.textContent = venue.name;
+    }
+    card.appendChild(h4);
+
+    var metaParts = [];
+    var typeLabel = t('type.' + venue.type);
+    if (typeLabel && typeLabel.indexOf('type.') !== 0) metaParts.push(typeLabel);
+    if (venue.rating) metaParts.push('★ ' + venue.rating);
+    if (venue.price) metaParts.push(new Array(venue.price + 1).join('$'));
+    metaParts.push(regionLabel);
+    var meta = document.createElement('div');
+    meta.className = 'trip-slot-meta';
+    meta.textContent = metaParts.join(' · ');
+    card.appendChild(meta);
+
+    if (venue.address) {
+      var addr = document.createElement('div');
+      addr.className = 'trip-slot-address';
+      addr.textContent = venue.address;
+      card.appendChild(addr);
+    }
+
+    var actions = document.createElement('div');
+    actions.className = 'trip-slot-actions';
+
+    if (url) {
+      var viewLink = document.createElement('a');
+      // Deliberately NOT class "trip-btn" -- the existing trip tray's
+      // syncButtons() (above) selects EVERY .trip-btn element on the page
+      // and force-overwrites its textContent to "Add to trip"/"In trip"
+      // based on dataset.tripName, with no other eligibility check. Reusing
+      // that class here for styling only stomped this link's real "View
+      // venue" text the moment __syncTripButtons() ran. .trip-slot-view-link
+      // gets the identical visual treatment via CSS instead (see
+      // renderTripPlannerStyles() in server.js).
+      viewLink.className = 'trip-slot-view-link';
+      viewLink.href = url;
+      viewLink.textContent = t('trip.planner.viewVenue');
+      actions.appendChild(viewLink);
+    }
+
+    // Real "add to this saved trip" control -- identical dataset shape
+    // (tripName/tripQuery/tripRegion) to the ones venue cards already
+    // render, so the EXISTING trip-tray IIFE's own document-level click
+    // handler picks it up with no new logic. Uses the venue's real address
+    // when we have it (more accurate than the older name+region search
+    // string venue cards fall back to) for the tray's "Get route" links.
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'trip-btn';
+    addBtn.dataset.tripQuery = venue.address ? (venue.name + ', ' + venue.address) : (venue.name + ', ' + regionLabel + ', Okanagan Valley, BC');
+    addBtn.dataset.tripName = venue.name;
+    addBtn.dataset.tripRegion = venue.region;
+    addBtn.textContent = t('trip.addToTrip');
+    actions.appendChild(addBtn);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = t('trip.planner.removeStop');
+    removeBtn.addEventListener('click', function(){
+      card.classList.add('is-removed');
+      refreshMap();
+    });
+    actions.appendChild(removeBtn);
+
+    card.appendChild(actions);
+    return card;
+  }
+
+  function initMapIfNeeded() {
+    if (map || typeof L === 'undefined') return;
+    var container = document.getElementById('tripPlannerMap');
+    if (!container) return;
+    map = L.map('tripPlannerMap').setView([49.75, -119.55], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 15
+    }).addTo(map);
+  }
+
+  // Rebuilds the map's markers/route line from whatever .trip-slot-card
+  // elements are currently NOT removed -- called after every render and
+  // after every "remove stop" click, so the map always matches what's
+  // actually still shown in the day list.
+  function refreshMap() {
+    if (!map) return;
+    mapMarkers.forEach(function(m){ map.removeLayer(m); });
+    mapMarkers = [];
+    if (mapLine) { map.removeLayer(mapLine); mapLine = null; }
+
+    var points = [];
+    var order = 0;
+    daysEl.querySelectorAll('.trip-slot-card').forEach(function(card){
+      if (card.classList.contains('is-removed')) return;
+      var lat = card.dataset.lat, lng = card.dataset.lng;
+      if (!lat || !lng) return;
+      order++;
+      var latNum = parseFloat(lat), lngNum = parseFloat(lng);
+      var marker = L.marker([latNum, lngNum]).addTo(map);
+      var popupEl = document.createElement('div');
+      popupEl.textContent = order + '. ' + (card.dataset.name || '');
+      marker.bindPopup(popupEl);
+      mapMarkers.push(marker);
+      points.push([latNum, lngNum]);
+    });
+
+    if (points.length) {
+      mapLine = L.polyline(points, { color: '#2A6B67', weight: 3, opacity: 0.7 }).addTo(map);
+      mapWrapEl.style.display = '';
+      map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
+      setTimeout(function(){ map.invalidateSize(); }, 50);
+    } else {
+      mapWrapEl.style.display = 'none';
+    }
+  }
+
+  function renderItinerary(plan) {
+    daysEl.textContent = '';
+    (plan.itinerary || []).forEach(function(dayPlan){
+      var dayEl = document.createElement('div');
+      dayEl.className = 'trip-day';
+
+      var h3 = document.createElement('h3');
+      h3.textContent = t('trip.planner.day') + ' ' + dayPlan.day;
+      dayEl.appendChild(h3);
+
+      var slotsEl = document.createElement('div');
+      slotsEl.className = 'trip-day-slots';
+      DAYPARTS.forEach(function(daypart){
+        slotsEl.appendChild(buildSlotCard(daypart, dayPlan[daypart]));
+      });
+      dayEl.appendChild(slotsEl);
+      daysEl.appendChild(dayEl);
+    });
+
+    if (plan.warnings && plan.warnings.length) {
+      warningsEl.textContent = '';
+      var heading = document.createElement('strong');
+      heading.textContent = t('trip.planner.warningsHeading');
+      warningsEl.appendChild(heading);
+      var ul = document.createElement('ul');
+      plan.warnings.forEach(function(w){
+        var li = document.createElement('li');
+        li.textContent = w;
+        ul.appendChild(li);
+      });
+      warningsEl.appendChild(ul);
+      warningsEl.style.display = '';
+    } else {
+      warningsEl.style.display = 'none';
+    }
+
+    resultEl.style.display = '';
+    initMapIfNeeded();
+    refreshMap();
+
+    if (window.__syncTripButtons) window.__syncTripButtons();
+    if (window.trackEvent) window.trackEvent('generate_trip', { region: plan.region, days: plan.days, pace: plan.pace });
+  }
+
+  function collectParams() {
+    var region = document.getElementById('tripRegionSelect').value;
+    var days = parseInt(document.getElementById('tripDaysInput').value, 10);
+    var interests = Array.prototype.slice.call(form.querySelectorAll('input[name="tripInterest"]:checked')).map(function(el){ return el.value; });
+    var paceEl = form.querySelector('input[name="pace"]:checked');
+    var pace = paceEl ? paceEl.value : 'standard';
+    return { region: region, days: days, interests: interests, pace: pace };
+  }
+
+  // ALL itinerary selection/ordering logic lives server-side (Stage 1) --
+  // this function only validates the two required fields well enough to
+  // avoid an obviously-wasted request, sends them, and renders whatever
+  // comes back. It never re-implements or second-guesses the backend's
+  // picks.
+  function generateTrip() {
+    var params = collectParams();
+    if (!params.region) {
+      setStatus(t('trip.planner.errorNoRegion'), 'error');
+      return;
+    }
+    if (!params.days || params.days < 1 || params.days > 7) {
+      setStatus(t('trip.planner.errorDays'), 'error');
+      return;
+    }
+
+    generateBtn.disabled = true;
+    if (regenerateBtn) regenerateBtn.disabled = true;
+    setStatus(t('trip.planner.generating'), 'loading');
+
+    fetch('/api/trip/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    }).then(function(res){
+      return res.json().then(function(body){ return { ok: res.ok, body: body }; });
+    }).then(function(result){
+      generateBtn.disabled = false;
+      if (regenerateBtn) regenerateBtn.disabled = false;
+      if (!result.ok) {
+        setStatus((result.body && result.body.error) || t('trip.planner.errorGeneric'), 'error');
+        return;
+      }
+      setStatus('', null);
+      renderItinerary(result.body);
+      if (window.trackEvent) window.trackEvent('open_trip_planner_result');
+    }).catch(function(){
+      generateBtn.disabled = false;
+      if (regenerateBtn) regenerateBtn.disabled = false;
+      setStatus(t('trip.planner.errorNetwork'), 'error');
+    });
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    generateTrip();
+  });
+
+  if (regenerateBtn) {
+    regenerateBtn.addEventListener('click', function(){ generateTrip(); });
+  }
 })();
 
 /* ---------- Near me: geolocation-based distance to each region ---------- */

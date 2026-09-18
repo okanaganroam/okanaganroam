@@ -3856,6 +3856,324 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 </html>`;
 }
 
+// ---------- Build My Trip, Stage 2 (frontend) ----------
+//
+// This page reuses the SAME rich header + trip tray markup as / and
+// /browse (both of which serve okanagan.html directly), not the plain
+// siteHeader()/siteFooter() used by venue/category/region/guide pages --
+// this page needs the already-working trip tray and the same nav
+// (dropdowns, mobile hamburger, language toggle), which only exist in
+// okanagan.html's markup, not in the SEO-page shared components. The
+// header and trip tray fragments are extracted from the actual served
+// okanagan.html at request time, rather than duplicated by hand into a
+// second copy that could silently drift out of sync -- the same "read
+// okanagan.html, patch it" approach the /browse route handler already
+// uses, just scoped to two small, well-bounded fragments instead of the
+// whole body. Homepage-only in-page anchors (#moodCards/#hiddenGems/
+// #exploreRegions) don't exist on this page either, so the same three
+// link rewrites /browse's handler already applies are applied here too.
+//
+// Deliberately does NOT use pageHead()/SEO_PAGE_CSS -- that stylesheet
+// constrains <body> to a centered 900px column, which conflicts with the
+// full-width header/nav this page shares with / and /browse (which get
+// their layout from tokens.css + app.css instead, never SEO_PAGE_CSS).
+// This page's own <head> mirrors okanagan.html's real one (same favicon,
+// verification tags, OG defaults, fonts, tokens.css, app.css) with only
+// title/description/canonical swapped for this page.
+// includeEndMarker=true includes endMarker's own text in the result (e.g.
+// slicing up through a real closing tag like "</header>"); false stops
+// right before it (e.g. when endMarker is just a lookahead anchor -- the
+// start of the NEXT, unrelated section -- whose text must NOT be included,
+// since an unterminated fragment like a truncated HTML comment would
+// otherwise swallow everything rendered after it into that open comment).
+function extractHtmlFragment(html, startMarker, endMarker, includeEndMarker) {
+  const startIdx = html.indexOf(startMarker);
+  if (startIdx === -1) return null;
+  const endIdx = html.indexOf(endMarker, startIdx);
+  if (endIdx === -1) return null;
+  return html.slice(startIdx, includeEndMarker ? endIdx + endMarker.length : endIdx);
+}
+
+// Maps each real venue type to its ALREADY-EXISTING i18n key (the same
+// ones the header's Food & Drink dropdown and the old wizard chips use) --
+// no new type-label translations needed, so English/French stay correct
+// for these chips automatically, for free.
+const TRIP_INTEREST_I18N_KEY = {
+  restaurant: 'wizard.restaurants',
+  winery: 'wizard.wineries',
+  cafe: 'wizard.cafes',
+  brewery: 'wizard.breweries',
+  pub: 'wizard.pubsAndBars',
+  cocktail: 'wizard.cocktailLounges',
+  golf: 'mood.golf.title',
+};
+
+function renderTripPlannerStyles() {
+  return `<style>
+  /* Build My Trip, Stage 2 -- page-specific styles only. Uses the SAME
+     design tokens (--sand/--plum/--teal/--amber/--ink/--paper) already
+     used by venue cards and the old wizard chips elsewhere on the site,
+     so this page's own content reads as part of the same family as the
+     header/nav it shares with / and /browse (which style themselves via
+     the separate --ref-* token set, unaffected by anything here). */
+  .trip-planner-main { padding: 28px 20px 72px; max-width: 900px; margin: 0 auto; }
+  .trip-planner-breadcrumb { font-size: 0.8rem; color: var(--ink); opacity: 0.62; margin-bottom: 18px; }
+  .trip-planner-breadcrumb a { color: var(--teal-deep); text-decoration: none; }
+  .trip-planner-breadcrumb a:hover { text-decoration: underline; }
+  .trip-planner-intro h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
+  .trip-planner-intro .subtitle { color: var(--ink); opacity: 0.7; font-size: 1.02rem; margin: 0 0 28px; max-width: 640px; }
+
+  .trip-planner-form {
+    background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 16px;
+    padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 20px -16px rgba(74,52,40,0.35);
+  }
+  .trip-planner-step { margin-bottom: 24px; }
+  .trip-planner-step:last-of-type { margin-bottom: 20px; }
+  .trip-planner-step h2 {
+    font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1rem; color: var(--ink);
+    display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
+  }
+  .trip-planner-step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--teal); color: var(--paper);
+    font-size: 0.8rem; font-weight: 800; flex-shrink: 0;
+  }
+  .trip-planner-hint { font-size: 0.86rem; color: var(--ink); opacity: 0.62; margin: -6px 0 12px; }
+
+  #tripRegionSelect {
+    width: 100%; max-width: 360px; padding: 11px 14px; border-radius: 10px;
+    border: 1.5px solid rgba(42,32,25,0.25); font-family: 'Nunito', sans-serif; font-size: 0.98rem;
+    background: var(--sand); color: var(--ink);
+  }
+  .trip-planner-days-row { display: flex; align-items: center; gap: 10px; }
+  #tripDaysInput {
+    width: 84px; padding: 11px 14px; border-radius: 10px; border: 1.5px solid rgba(42,32,25,0.25);
+    font-family: 'Nunito', sans-serif; font-size: 0.98rem; background: var(--sand); color: var(--ink);
+  }
+
+  .trip-interest-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .trip-interest-chip {
+    display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 999px;
+    border: 1.5px solid rgba(42,32,25,0.22); background: var(--sand); cursor: pointer;
+    font-size: 0.9rem; font-weight: 700; color: var(--ink); user-select: none;
+  }
+  .trip-interest-chip input { accent-color: var(--teal); }
+  .trip-interest-chip:has(input:checked) { background: var(--teal); border-color: var(--teal); color: var(--paper); }
+
+  .trip-pace-options { display: flex; flex-wrap: wrap; gap: 10px; }
+  .trip-pace-option {
+    display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 999px;
+    border: 1.5px solid rgba(42,32,25,0.22); background: var(--sand); cursor: pointer;
+    font-size: 0.9rem; font-weight: 700; color: var(--ink); user-select: none;
+  }
+  .trip-pace-option input { accent-color: var(--amber); }
+  .trip-pace-option:has(input:checked) { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+
+  .trip-planner-generate-btn { margin-top: 6px; font-size: 0.95rem; padding: 13px 26px; }
+
+  .trip-planner-status {
+    font-size: 0.92rem; color: var(--ink); opacity: 0.75; margin: 0 0 18px; min-height: 1.2em;
+  }
+  .trip-planner-status.is-error { color: #9C3B3B; opacity: 1; font-weight: 700; }
+  .trip-planner-status.is-loading::before {
+    content: ''; display: inline-block; width: 13px; height: 13px; margin-right: 8px;
+    border: 2px solid rgba(42,32,25,0.25); border-top-color: var(--teal); border-radius: 50%;
+    animation: tripSpin 0.7s linear infinite; vertical-align: -2px;
+  }
+  @keyframes tripSpin { to { transform: rotate(360deg); } }
+
+  .trip-planner-result-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .trip-planner-result-header h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.4rem; color: var(--ink); margin: 0; }
+  .trip-planner-regen-btn { background: var(--teal); font-size: 0.82rem; padding: 9px 16px; }
+  .trip-planner-regen-btn:hover { background: var(--teal-deep); }
+
+  .trip-planner-warnings {
+    background: #FBF0DC; border: 1px solid #E3C88A; border-radius: 10px; padding: 12px 16px;
+    margin-bottom: 18px; font-size: 0.88rem; color: var(--ink);
+  }
+  .trip-planner-warnings ul { margin: 6px 0 0; padding-left: 20px; }
+
+  .trip-planner-map-wrap { margin-bottom: 22px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(74,52,40,0.14); }
+  #tripPlannerMap { height: 320px; width: 100%; }
+
+  .trip-day { margin-bottom: 28px; }
+  .trip-day h3 {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.2rem; color: var(--ink);
+    margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--amber);
+  }
+  .trip-day-slots { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); }
+
+  .trip-slot-card {
+    background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px;
+    padding: 14px 16px; box-shadow: 0 6px 16px -14px rgba(74,52,40,0.4);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .trip-slot-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--teal-deep); }
+  .trip-slot-card h4 { font-family: 'Fraunces', serif; font-size: 1.02rem; font-weight: 600; color: var(--ink); margin: 0; }
+  .trip-slot-card h4 a { color: inherit; text-decoration: none; }
+  .trip-slot-card h4 a:hover { text-decoration: underline; }
+  .trip-slot-meta { font-size: 0.84rem; color: var(--ink); opacity: 0.75; }
+  .trip-slot-address { font-size: 0.8rem; color: var(--ink); opacity: 0.62; }
+  .trip-slot-empty { font-size: 0.86rem; color: var(--ink); opacity: 0.5; font-style: italic; }
+  .trip-slot-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 8px; flex-wrap: wrap; }
+  .trip-slot-actions button, .trip-slot-actions a.trip-slot-view-link {
+    font-size: 0.76rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(42,32,25,0.2); background: var(--sand); color: var(--ink); text-decoration: none;
+  }
+  .trip-slot-actions button:hover, .trip-slot-actions a.trip-slot-view-link:hover { background: rgba(42,32,25,0.08); }
+  .trip-slot-card.is-removed { display: none; }
+
+  @media (max-width: 720px) {
+    .trip-day-slots { grid-template-columns: 1fr; }
+    .trip-planner-result-header { flex-wrap: wrap; }
+  }
+  @media (max-width: 560px) {
+    .trip-planner-main { padding: 20px 16px 60px; }
+    .trip-planner-form { padding: 18px; }
+    .trip-planner-intro h1 { font-size: 1.6rem; }
+    #tripDaysInput { width: 70px; }
+  }
+  </style>`;
+}
+
+function renderTripPlannerPage() {
+  const title = 'Build My Trip — Okanagan Roam';
+  const description = 'Plan a real, day-by-day Okanagan trip from actual venues — choose your region, number of days, interests, and pace, and get an itinerary built entirely from real wineries, restaurants, cafes, and more. No invented places.';
+  const canonical = 'https://okanaganroam.com/trip';
+
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Build My Trip', url: canonical },
+  ]);
+
+  let tripTrayHtml = '';
+  let headerHtml = '';
+  if (fs.existsSync(SITE_PATH)) {
+    const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
+    tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+    headerHtml = extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '';
+    headerHtml = headerHtml
+      .replace(/href="#moodCards"/g, 'href="/#moodCards"')
+      .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
+      .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"');
+  }
+
+  const regionOptions = VALID_REGIONS
+    .map((slug) => `<option value="${slug}">${escapeHtml(REGION_LABELS[slug])}</option>`)
+    .join('\n');
+
+  const interestChips = Object.keys(CATEGORY_SLUGS)
+    .map((type) => {
+      const key = TRIP_INTEREST_I18N_KEY[type];
+      const label = CATEGORY_LABELS[type].plural;
+      return `<label class="trip-interest-chip">
+          <input type="checkbox" name="tripInterest" value="${type}">
+          <span data-i18n="${key}">${escapeHtml(label)}</span>
+        </label>`;
+    })
+    .join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<meta name="description" content="${escapeHtml(description)}">
+<link rel="canonical" href="${canonical}">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23F5EDDD'/%3E%3Ccircle cx='26' cy='11' r='3' fill='%23D9A441'/%3E%3Cpath d='M26 4v2M31 6.5l-1.4 1.4M33.5 11h-2M26 18v-2M20.5 6.5l1.4 1.4' stroke='%23D9A441' stroke-width='1.3' stroke-linecap='round'/%3E%3Cpath d='M6 27L15 13l6 9' stroke='%231F5C5C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' opacity='0.5'/%3E%3Cpath d='M10 27L20 11l10 16' stroke='%231F5C5C' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M5 27.5h30' stroke='%231F5C5C' stroke-width='1.5' stroke-linecap='round' opacity='0.3'/%3E%3C/svg%3E">
+<meta property="og:site_name" content="Okanagan Roam">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(description)}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${canonical}">
+<meta property="og:image" content="https://okanaganroam.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escapeHtml(title)}">
+<meta name="twitter:description" content="${escapeHtml(description)}">
+<script type="application/ld+json">
+${JSON.stringify(breadcrumb)}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles/tokens.css">
+<link rel="stylesheet" href="/styles/app.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+${renderTripPlannerStyles()}
+</head>
+<body>
+${tripTrayHtml}
+<div id="floatingTooltip"></div>
+${headerHtml}
+
+<main class="trip-planner-main wrap" id="tripPlannerMain">
+  <nav class="trip-planner-breadcrumb"><a href="/">Home</a> &rsaquo; Build My Trip</nav>
+
+  <div class="trip-planner-intro">
+    <h1 data-i18n="trip.planner.title">Build My Trip</h1>
+    <p class="subtitle" data-i18n="trip.planner.subtitle">Answer a few questions and we&rsquo;ll put together a real, day-by-day Okanagan itinerary from actual venues &mdash; no invented places, no AI guesswork.</p>
+  </div>
+
+  <form id="tripPlannerForm" class="trip-planner-form">
+    <div class="trip-planner-step">
+      <h2><span class="trip-planner-step-num">1</span> <span data-i18n="trip.planner.step1.label">Where are you going?</span></h2>
+      <select id="tripRegionSelect" name="region" required>
+        <option value="" data-i18n="trip.planner.regionPlaceholder">Choose a region&hellip;</option>
+        ${regionOptions}
+      </select>
+    </div>
+
+    <div class="trip-planner-step">
+      <h2><span class="trip-planner-step-num">2</span> <span data-i18n="trip.planner.step2.label">How long?</span></h2>
+      <div class="trip-planner-days-row">
+        <input type="number" id="tripDaysInput" name="days" min="1" max="7" value="3" required>
+        <span data-i18n="trip.planner.daysSuffix">days</span>
+      </div>
+    </div>
+
+    <div class="trip-planner-step">
+      <h2><span class="trip-planner-step-num">3</span> <span data-i18n="trip.planner.step3.label">What do you love?</span></h2>
+      <p class="trip-planner-hint" data-i18n="trip.planner.step3.hint">Pick as many as you like &mdash; leave them all unchecked to see a bit of everything.</p>
+      <div class="trip-interest-chips">
+        ${interestChips}
+      </div>
+    </div>
+
+    <div class="trip-planner-step">
+      <h2><span class="trip-planner-step-num">4</span> <span data-i18n="trip.planner.step4.label">What&rsquo;s your pace?</span></h2>
+      <div class="trip-pace-options">
+        <label class="trip-pace-option"><input type="radio" name="pace" value="relaxed"><span data-i18n="trip.planner.pace.relaxed">Relaxed</span></label>
+        <label class="trip-pace-option"><input type="radio" name="pace" value="standard" checked><span data-i18n="trip.planner.pace.standard">Standard</span></label>
+        <label class="trip-pace-option"><input type="radio" name="pace" value="packed"><span data-i18n="trip.planner.pace.packed">Packed</span></label>
+      </div>
+    </div>
+
+    <button type="submit" class="app-btn trip-planner-generate-btn" id="tripGenerateBtn" data-i18n="trip.planner.generate">Generate My Trip</button>
+  </form>
+
+  <div id="tripPlannerStatus" class="trip-planner-status" aria-live="polite"></div>
+
+  <div id="tripPlannerResult" class="trip-planner-result" style="display:none;">
+    <div class="trip-planner-result-header">
+      <h2 data-i18n="trip.planner.yourItinerary">Your itinerary</h2>
+      <button type="button" class="app-btn trip-planner-regen-btn" id="tripRegenerateBtn" data-i18n="trip.planner.regenerate">Regenerate</button>
+    </div>
+    <div id="tripPlannerWarnings" class="trip-planner-warnings" style="display:none;"></div>
+    <div id="tripPlannerMapWrap" class="trip-planner-map-wrap" style="display:none;">
+      <div id="tripPlannerMap"></div>
+    </div>
+    <div id="tripPlannerDays" class="trip-planner-days"></div>
+  </div>
+</main>
+
+${renderHomeFooterHTML(true)}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/scripts/app.js"></script>
+</body>
+</html>`;
+}
+
 function render404Page(pathname) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -5308,6 +5626,17 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, plan);
     }
 
+    // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
+    // before the generic /:region catch-all below for the same reason
+    // /events is (otherwise "trip" would be treated as an unrecognized
+    // region and 404). Static markup only — the actual itinerary is
+    // generated client-side via a POST to /api/trip/generate (Stage 1).
+    if (pathname === '/trip' && method === 'GET') {
+      const html = renderTripPlannerPage();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(html);
+    }
+
     // GET /events — the standalone events index (2026-09-17). A fixed,
     // exact path, so it's registered before the generic /:region catch-all
     // below (which would otherwise treat "events" as an unrecognized
@@ -5531,6 +5860,10 @@ module.exports = {
   // Events index (2026-09-17)
   eventCardHtml,
   renderEventsIndexPage,
+  // Build My Trip, Stage 2 (frontend)
+  renderTripPlannerPage,
+  extractHtmlFragment,
+  TRIP_INTEREST_I18N_KEY,
   // Phase 2 Sprint 2 (Event Types)
   EVENT_SCHEMA_TYPE_MAP,
   // Phase 2 Sprint 3 (Hidden Gems)
