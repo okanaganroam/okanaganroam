@@ -2438,6 +2438,16 @@ window.__scrollToVenueCard = function(name){
   var mapMarkers = [];
   var mapLine = null;
 
+  // The exact params object that produced the CURRENTLY DISPLAYED
+  // itinerary, whichever flow generated it (wizard form or the
+  // conversational panel) -- set only on a successful generate (see
+  // generateTrip() below), never touched by removing a stop or by
+  // anything else, so it can't drift out of sync with what's on screen.
+  // Regenerate reuses this directly instead of re-reading the wizard
+  // form, which is what let it wrongly demand a region even when the
+  // itinerary on screen came from the conversational flow instead.
+  var lastGeneratedParams = null;
+
   // Pre-fill the region from ?region=<slug> when present (e.g. a future
   // "plan a trip here" link from a venue/region page) -- a small, safe
   // nicety, not a new required flow; the step still works with no query
@@ -2564,6 +2574,10 @@ window.__scrollToVenueCard = function(name){
     return card;
   }
 
+  // Deliberately takes no action if the map container is still hidden --
+  // see refreshMap() below for why creating a Leaflet map inside a
+  // display:none container is itself part of the root cause this fixes,
+  // not just fitBounds() timing.
   function initMapIfNeeded() {
     if (map || typeof L === 'undefined') return;
     var container = document.getElementById('tripPlannerMap');
@@ -2579,12 +2593,27 @@ window.__scrollToVenueCard = function(name){
   // elements are currently NOT removed -- called after every render and
   // after every "remove stop" click, so the map always matches what's
   // actually still shown in the day list.
+  //
+  // Markers/route line invisible bug (found via live production QA):
+  // this used to unhide mapWrapEl and immediately call fitBounds() in the
+  // same tick, with the FIRST-EVER Leaflet map also having been created
+  // earlier (in renderItinerary(), before mapWrapEl was ever shown) --
+  // i.e. inside a still-hidden, zero-size container. Leaflet's internal
+  // size cache from that hidden-container creation isn't just "stale",
+  // it stays wrong in a way a later invalidateSize() alone can't fully
+  // recover from (confirmed by isolated reproduction: reordering
+  // invalidateSize()-before-fitBounds() alone tightened the marker
+  // cluster but left it still consistently offset outside the visible
+  // container; only creating the map AFTER the container is visible
+  // resolved it completely). Fixed by computing the points first, then
+  // -- only once we know there's something to show -- unhiding the wrap
+  // and creating the map (if this is the first time) AFTER that, so
+  // Leaflet's initial size is correct from the start. The existing
+  // requestAnimationFrame + invalidateSize()-before-fitBounds() ordering
+  // is kept too, as defence in depth for the remaining case where the
+  // map already existed from an earlier generate this session. Existing
+  // Leaflet APIs only; no new library, no arbitrary pixel values.
   function refreshMap() {
-    if (!map) return;
-    mapMarkers.forEach(function(m){ map.removeLayer(m); });
-    mapMarkers = [];
-    if (mapLine) { map.removeLayer(mapLine); mapLine = null; }
-
     var points = [];
     var order = 0;
     daysEl.querySelectorAll('.trip-slot-card').forEach(function(card){
@@ -2592,23 +2621,37 @@ window.__scrollToVenueCard = function(name){
       var lat = card.dataset.lat, lng = card.dataset.lng;
       if (!lat || !lng) return;
       order++;
-      var latNum = parseFloat(lat), lngNum = parseFloat(lng);
-      var marker = L.marker([latNum, lngNum]).addTo(map);
-      var popupEl = document.createElement('div');
-      popupEl.textContent = order + '. ' + (card.dataset.name || '');
-      marker.bindPopup(popupEl);
-      mapMarkers.push(marker);
-      points.push([latNum, lngNum]);
+      points.push({ lat: parseFloat(lat), lng: parseFloat(lng), order: order, name: card.dataset.name || '' });
     });
 
-    if (points.length) {
-      mapLine = L.polyline(points, { color: '#2A6B67', weight: 3, opacity: 0.7 }).addTo(map);
-      mapWrapEl.style.display = '';
-      map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
-      setTimeout(function(){ map.invalidateSize(); }, 50);
-    } else {
+    if (!points.length) {
       mapWrapEl.style.display = 'none';
+      return;
     }
+
+    mapWrapEl.style.display = '';
+    initMapIfNeeded();
+    if (!map) return; // Leaflet didn't load; nothing more to do
+
+    mapMarkers.forEach(function(m){ map.removeLayer(m); });
+    mapMarkers = [];
+    if (mapLine) { map.removeLayer(mapLine); mapLine = null; }
+
+    var latLngs = [];
+    points.forEach(function(p){
+      var marker = L.marker([p.lat, p.lng]).addTo(map);
+      var popupEl = document.createElement('div');
+      popupEl.textContent = p.order + '. ' + p.name;
+      marker.bindPopup(popupEl);
+      mapMarkers.push(marker);
+      latLngs.push([p.lat, p.lng]);
+    });
+    mapLine = L.polyline(latLngs, { color: '#2A6B67', weight: 3, opacity: 0.7 }).addTo(map);
+
+    requestAnimationFrame(function(){
+      map.invalidateSize();
+      map.fitBounds(L.latLngBounds(latLngs), { padding: [30, 30] });
+    });
   }
 
   function renderItinerary(plan) {
@@ -2648,7 +2691,9 @@ window.__scrollToVenueCard = function(name){
     }
 
     resultEl.style.display = '';
-    initMapIfNeeded();
+    // refreshMap() itself now handles map creation (see its own comment
+    // above for why this must NOT happen earlier, while the map wrap is
+    // still hidden).
     refreshMap();
 
     if (window.__syncTripButtons) window.__syncTripButtons();
@@ -2706,6 +2751,7 @@ window.__scrollToVenueCard = function(name){
         return;
       }
       setStatus('', null);
+      lastGeneratedParams = params;
       renderItinerary(result.body);
       if (window.trackEvent) window.trackEvent('open_trip_planner_result');
     }).catch(function(){
@@ -2721,7 +2767,14 @@ window.__scrollToVenueCard = function(name){
   });
 
   if (regenerateBtn) {
-    regenerateBtn.addEventListener('click', function(){ generateTrip(); });
+    // Reuse whichever params last actually produced a result, regardless
+    // of which flow generated it -- NOT a fresh collectParams() read of
+    // the wizard form, which is empty whenever the itinerary on screen
+    // came from the conversational flow instead. Falls back to undefined
+    // (-> collectParams()) when nothing has been successfully generated
+    // yet, which preserves the original "please choose a region first"
+    // validation for that case.
+    regenerateBtn.addEventListener('click', function(){ generateTrip(lastGeneratedParams || undefined); });
   }
 
   // Exposed so the conversational /trip module (below) can generate an

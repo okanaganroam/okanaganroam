@@ -1241,6 +1241,134 @@ test('client module: a successful parse reaches the SAME existing generate pipel
   assert.doesNotMatch(stage4Src, /fetch\('\/api\/trip\/generate'/, 'the conversational module must not call /api/trip/generate directly');
 });
 
+// ---- Regenerate state bug (found via live production QA) ----------------
+//
+// Regenerate previously always called generateTrip() with no argument,
+// which falls back to collectParams() -- reading the WIZARD FORM's own
+// fields. When the on-screen itinerary came from the conversational flow
+// instead, those wizard fields were still empty, so Regenerate showed
+// "Please choose a region first." even though a valid itinerary was
+// already on screen. No DOM/browser harness exists in this project (see
+// every other client-module test in this file), so -- consistent with
+// that established pattern -- these are source-level checks of the exact
+// fix, not a simulated click/fetch cycle.
+
+test('regenerate fix: a single lastGeneratedParams variable is declared in the wizard IIFE, tracking whichever flow last succeeded', () => {
+  const src = readClientAppJs();
+  assert.match(src, /var lastGeneratedParams = null;/, 'expected a single shared state variable for the last successful generation\'s params');
+});
+
+test('regenerate fix: generateTrip() stores lastGeneratedParams only on a SUCCESSFUL generation, using whichever params object was actually used (collectParams() or the conversational override)', () => {
+  const src = readClientAppJs();
+  const genStart = src.indexOf('function generateTrip(paramsOverride)');
+  assert.ok(genStart !== -1, 'expected generateTrip(paramsOverride) to still exist with its original signature');
+  const genEnd = src.indexOf('form.addEventListener', genStart);
+  const genSrc = src.slice(genStart, genEnd === -1 ? genStart + 3000 : genEnd);
+
+  // Still reads paramsOverride first, falling back to collectParams() --
+  // the mechanism the conversational module already relies on is
+  // completely unchanged.
+  assert.match(genSrc, /var params = paramsOverride \|\| collectParams\(\);/);
+  // The two original validation checks (region, days) must still exist
+  // and still run BEFORE anything is stored, so an invalid attempt never
+  // overwrites a previously-good lastGeneratedParams.
+  assert.match(genSrc, /if \(!params\.region\) \{\s*setStatus\(t\('trip\.planner\.errorNoRegion'\), 'error'\);\s*return;/);
+  assert.match(genSrc, /if \(!params\.days \|\| params\.days < 1 \|\| params\.days > 7\) \{\s*setStatus\(t\('trip\.planner\.errorDays'\), 'error'\);\s*return;/);
+  // lastGeneratedParams is set to the SAME `params` variable that was
+  // actually used for this call (not re-derived, not a copy of the form),
+  // and only inside the success branch (after the `!result.ok` early
+  // return), so a failed/errored generate can never overwrite a
+  // previously-good stored value.
+  const resultOkIndex = genSrc.indexOf('if (!result.ok)');
+  const storeIndex = genSrc.indexOf('lastGeneratedParams = params;');
+  assert.ok(resultOkIndex !== -1 && storeIndex !== -1 && storeIndex > resultOkIndex, 'lastGeneratedParams must be set only after the !result.ok early return, i.e. only on real success');
+  assert.match(genSrc.slice(storeIndex - 30, storeIndex + 30), /setStatus\(''.*lastGeneratedParams = params;/s, 'lastGeneratedParams must be set right in the success path, before rendering');
+});
+
+test('regenerate fix: the Regenerate button reuses lastGeneratedParams (whichever flow produced it), falling back to the original collectParams() validation when nothing has succeeded yet', () => {
+  const src = readClientAppJs();
+  assert.match(src, /regenerateBtn\.addEventListener\('click', function\(\)\{ generateTrip\(lastGeneratedParams \|\| undefined\); \}\);/, 'Regenerate must pass the stored params (or undefined, to preserve the original validation) instead of always calling generateTrip() with no argument');
+});
+
+test('regenerate fix: removing a rendered stop never touches lastGeneratedParams', () => {
+  const src = readClientAppJs();
+  // The remove-stop handler lives inside buildSlotCard(); confirm its
+  // body (up to the next top-level function) only toggles the card's own
+  // class and refreshes the map -- never references lastGeneratedParams.
+  const removeStart = src.indexOf("removeBtn.addEventListener('click', function(){");
+  assert.ok(removeStart !== -1, 'expected the remove-stop click handler to still exist');
+  const removeEnd = src.indexOf('});', removeStart) + 3;
+  const removeSrc = src.slice(removeStart, removeEnd);
+  assert.doesNotMatch(removeSrc, /lastGeneratedParams/, 'removing a stop must never read or write lastGeneratedParams');
+  assert.match(removeSrc, /card\.classList\.add\('is-removed'\)/);
+  assert.match(removeSrc, /refreshMap\(\)/);
+});
+
+// ---- Map markers/route invisible bug (found via live production QA) ----
+//
+// Root cause (confirmed by an isolated Leaflet reproduction against real
+// coordinates, and again against the actual shipped code with injected
+// test coordinates -- local seed data has none): the map was CREATED
+// (initMapIfNeeded(), called from renderItinerary()) while its wrap was
+// still display:none, and fitBounds() ran immediately after unhiding, in
+// the same tick, before the browser had laid out the now-visible
+// container. Leaflet's internal size cache from a hidden-container
+// creation stays wrong in a way a later invalidateSize() alone can't
+// fully correct -- reordering invalidateSize() before fitBounds() alone
+// tightened the marker cluster but left it still consistently offset
+// outside the visible container; only ALSO deferring map creation until
+// after the wrap is shown resolved it completely. Fixed by computing the
+// slot points first, then -- only once there's something to show --
+// unhiding the wrap and calling initMapIfNeeded() (idempotent) AFTER
+// that, so the map's initial size is correct from creation, plus keeping
+// the requestAnimationFrame + invalidateSize-before-fitBounds ordering as
+// defence in depth for later calls once the map already exists.
+test('map fix: the map is created (initMapIfNeeded) only AFTER the wrap is unhidden, inside refreshMap() -- not earlier in renderItinerary()', () => {
+  const src = readClientAppJs();
+  const renderStart = src.indexOf('function renderItinerary(plan)');
+  assert.ok(renderStart !== -1, 'expected renderItinerary() to still exist');
+  const renderEnd = src.indexOf('function collectParams', renderStart);
+  const renderSrc = src.slice(renderStart, renderEnd === -1 ? renderStart + 2500 : renderEnd);
+  assert.doesNotMatch(renderSrc, /initMapIfNeeded\(\)/, 'renderItinerary() must no longer call initMapIfNeeded() directly -- that recreates the original bug by initializing the map while its wrap is still hidden');
+  assert.match(renderSrc, /refreshMap\(\);/, 'renderItinerary() must still call refreshMap()');
+
+  const refreshStart = src.indexOf('function refreshMap()');
+  assert.ok(refreshStart !== -1, 'expected refreshMap() to still exist');
+  const refreshEnd = src.indexOf('function renderItinerary', refreshStart);
+  const refreshSrc = src.slice(refreshStart, refreshEnd === -1 ? refreshStart + 2500 : refreshEnd);
+
+  const unhideIndex = refreshSrc.indexOf("mapWrapEl.style.display = '';");
+  const initIndex = refreshSrc.indexOf('initMapIfNeeded();');
+  assert.ok(unhideIndex !== -1 && initIndex !== -1 && unhideIndex < initIndex, 'refreshMap() must unhide mapWrapEl BEFORE calling initMapIfNeeded(), so the map is never created while hidden');
+
+  assert.match(refreshSrc, /requestAnimationFrame\(function\(\)\{/, 'expected the fit/invalidate work to still run inside a requestAnimationFrame callback');
+  const rafIndex = refreshSrc.indexOf('requestAnimationFrame(function(){');
+  const invalidateIndex = refreshSrc.indexOf('map.invalidateSize();', rafIndex);
+  const fitBoundsIndex = refreshSrc.indexOf('map.fitBounds(', rafIndex);
+  assert.ok(invalidateIndex !== -1 && fitBoundsIndex !== -1 && invalidateIndex < fitBoundsIndex, 'invalidateSize() must run BEFORE fitBounds(), both inside the same rAF callback, so bounds are computed against the corrected size');
+
+  // The old ordering (fitBounds immediately, invalidateSize 50ms later)
+  // must be gone.
+  assert.doesNotMatch(refreshSrc, /map\.fitBounds\([^)]*\)[^]*?setTimeout\(function\(\)\{\s*map\.invalidateSize\(\);\s*\}, 50\);/, 'the old fitBounds-then-delayed-invalidateSize ordering must not remain');
+});
+
+test('map fix: removed stops are still correctly excluded from the map (points computed from non-.is-removed cards only)', () => {
+  const src = readClientAppJs();
+  const refreshStart = src.indexOf('function refreshMap()');
+  const refreshEnd = src.indexOf('function renderItinerary', refreshStart);
+  const refreshSrc = src.slice(refreshStart, refreshEnd === -1 ? refreshStart + 2500 : refreshEnd);
+  assert.match(refreshSrc, /if \(card\.classList\.contains\('is-removed'\)\) return;/, 'removed cards must still be excluded before points are ever collected');
+});
+
+test('map fix: the unrelated /browse region map (#okMap, a separate IIFE with its own map/markers state) is untouched', () => {
+  const src = readClientAppJs();
+  assert.match(src, /map = L\.map\('okMap'\)\.setView/, 'the /browse region map must still exist, unmodified');
+  const okMapStart = src.indexOf("map = L.map('okMap')");
+  const okMapFnEnd = src.indexOf('function refreshMapMarkers()', okMapStart) + 400;
+  const okMapSrc = src.slice(Math.max(0, okMapStart - 200), okMapFnEnd);
+  assert.doesNotMatch(okMapSrc, /requestAnimationFrame/, 'the /browse map init must not have been touched by the /trip map fix');
+});
+
 test('client module: clarification and unsupported rendering use the real, existing i18n keys, including the required beaches-specific message', () => {
   const src = readClientAppJs();
   assert.match(src, /t\('trip\.conv\.clarifyRegion'\)/);
