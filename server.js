@@ -4752,6 +4752,19 @@ function renderTripPlannerStyles() {
   .trip-planner-result-header h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.4rem; color: var(--ink); margin: 0; }
   .trip-planner-regen-btn { background: var(--teal); font-size: 0.82rem; padding: 9px 16px; }
   .trip-planner-regen-btn:hover { background: var(--teal-deep); }
+  /* Regenerate loading state -- own visible indicator at the button
+     itself, not just the (distant, easily-scrolled-out-of-view)
+     #tripPlannerStatus spinner used by the initial Generate. Reuses the
+     same tripSpin keyframe/ring construction as
+     .trip-planner-status.is-loading::before, just recolored for a solid
+     teal background instead of the paper one. Toggled only around the
+     Regenerate call in generateTrip(), never during a plain Generate. */
+  .trip-planner-regen-btn.is-loading { opacity: 0.85; cursor: not-allowed; }
+  .trip-planner-regen-btn.is-loading::before {
+    content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 7px;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: var(--paper);
+    border-radius: 50%; animation: tripSpin 0.7s linear infinite; vertical-align: -1px;
+  }
 
   .trip-planner-warnings {
     background: #FBF0DC; border: 1px solid #E3C88A; border-radius: 10px; padding: 12px 16px;
@@ -4798,6 +4811,23 @@ function renderTripPlannerStyles() {
     .trip-planner-form { padding: 18px; }
     .trip-planner-intro h1 { font-size: 1.6rem; }
     #tripDaysInput { width: 70px; }
+
+    /* Mobile trip-tray clearance fix: #tripTray is a site-wide fixed
+       element (app.css, bottom:20px/right:20px) that on /trip specifically
+       never received the homepage's own smaller mobile redesign (that
+       CSS lives in renderHomepageDiscoveryStyles(), which /trip does not
+       include), so its toggle button measures ~44px tall here -- its top
+       edge sits ~64px above the viewport bottom. /trip's own footer
+       (renderHomeFooterHTML) likewise has no styling from /trip's own
+       <head> (same reason), so .home-footer-bottom -- the copyright line,
+       the true last content on the page -- had no protection against
+       resting directly under the tray at full scroll on a narrow
+       viewport, unlike the homepage's own .home-footer-bottom, which
+       already carries an equivalent fix. 80px (64px measured tray
+       footprint + a comfortable margin) reuses that same clearance
+       technique, scoped to this page only via body.page-trip so /browse
+       and / (which both already handle this themselves) are untouched. */
+    body.page-trip .home-footer-bottom { padding-bottom: 80px; }
   }
   </style>`;
 }
@@ -4867,7 +4897,7 @@ ${JSON.stringify(breadcrumb)}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 ${renderTripPlannerStyles()}
 </head>
-<body>
+<body class="page-trip">
 ${tripTrayHtml}
 <div id="floatingTooltip"></div>
 ${headerHtml}

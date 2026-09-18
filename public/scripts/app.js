@@ -2760,6 +2760,13 @@ window.__scrollToVenueCard = function(name){
 
     generateBtn.disabled = true;
     if (regenerateBtn) regenerateBtn.disabled = true;
+    // Regenerate's own visible loading indicator -- the button it's
+    // triggered from is typically scrolled well past #tripPlannerStatus
+    // (the setStatus() spinner below is still set too, for the plain
+    // Generate case and as a fallback, but a user looking at Regenerate
+    // itself needs feedback right there). Never applied for a plain
+    // Generate call, so that button's own behavior is unchanged.
+    if (isRegenerate && regenerateBtn) regenerateBtn.classList.add('is-loading');
     setStatus(t('trip.planner.generating'), 'loading');
 
     var requestBody = Object.assign({}, params, { excludeVenueIds: excludedVenueIds });
@@ -2772,7 +2779,7 @@ window.__scrollToVenueCard = function(name){
       return res.json().then(function(body){ return { ok: res.ok, body: body }; });
     }).then(function(result){
       generateBtn.disabled = false;
-      if (regenerateBtn) regenerateBtn.disabled = false;
+      if (regenerateBtn) { regenerateBtn.disabled = false; regenerateBtn.classList.remove('is-loading'); }
       if (!result.ok) {
         setStatus((result.body && result.body.error) || t('trip.planner.errorGeneric'), 'error');
         return;
@@ -2783,7 +2790,7 @@ window.__scrollToVenueCard = function(name){
       if (window.trackEvent) window.trackEvent('open_trip_planner_result');
     }).catch(function(){
       generateBtn.disabled = false;
-      if (regenerateBtn) regenerateBtn.disabled = false;
+      if (regenerateBtn) { regenerateBtn.disabled = false; regenerateBtn.classList.remove('is-loading'); }
       setStatus(t('trip.planner.errorNetwork'), 'error');
     });
   }
