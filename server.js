@@ -1682,6 +1682,18 @@ function isValidTripDiscoveryKind(kind, knownKinds) {
 // later means replacing only this one function.
 const OPENAI_PARSER_MODEL = 'gpt-4o-mini'; // cost-efficient extraction/classification model, not a reasoning model
 
+// Pure classification of a failed fetch() attempt to the OpenAI endpoint --
+// pulled out of callTripParserProvider's catch block specifically so it can
+// be unit-tested directly, without a real network call (the fetch call
+// itself is not mockable in this test suite without either a live request
+// or a process-cache hack, both of which this project's test suite
+// deliberately avoids). Behavior-only extraction: no change to what
+// callTripParserProvider does.
+function classifyTripParserFetchError(err) {
+  const isTimeout = !!err && err.name === 'AbortError';
+  return { error: isTimeout ? 'timeout' : 'network_error', isTimeout };
+}
+
 function buildTripParserSystemPrompt(knownDiscoveryKinds) {
   return [
     'You extract structured trip-planning requirements from a customer\'s natural-language request about visiting the Okanagan Valley, British Columbia.',
@@ -1711,6 +1723,15 @@ async function callTripParserProvider(text) {
   const knownDiscoveryKinds = getKnownDiscoveryKinds();
   const systemPrompt = buildTripParserSystemPrompt(knownDiscoveryKinds);
 
+  // Diagnostic hardening (2026-09-18): the outbound call previously had no
+  // timeout, so a hung connection was unobservable -- it could surface
+  // only as Railway's edge reporting "Application Failed to Respond" with
+  // zero application-level log output. A bounded abort turns any hang
+  // into a fast, explicitly logged failure instead.
+  const OPENAI_REQUEST_TIMEOUT_MS = 10000;
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), OPENAI_REQUEST_TIMEOUT_MS);
+
   let httpRes;
   try {
     httpRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1719,6 +1740,7 @@ async function callTripParserProvider(text) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
+      signal: abortController.signal,
       body: JSON.stringify({
         model: OPENAI_PARSER_MODEL,
         temperature: 0,
@@ -1751,7 +1773,20 @@ async function callTripParserProvider(text) {
       }),
     });
   } catch (err) {
-    return { raw: null, error: 'network_error' };
+    const classified = classifyTripParserFetchError(err);
+    // Logs ONLY the error's own name/message and our own timeout
+    // classification -- never the request itself. The request/headers
+    // objects (which contain OPENAI_API_KEY via the Authorization header)
+    // are never passed to console.error, here or anywhere else in this
+    // function.
+    console.error('[trip-parser] OpenAI parser request failed', {
+      errorName: err && err.name,
+      errorMessage: err && err.message,
+      timeout: classified.isTimeout,
+    });
+    return { raw: null, error: classified.error };
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!httpRes.ok) {
@@ -6349,6 +6384,8 @@ module.exports = {
   isValidTripBudget,
   isValidTripDiscoveryKind,
   parseTripRequest,
+  callTripParserProvider,
+  classifyTripParserFetchError,
   // Design Sprint 3 (Homepage Discovery)
   renderHiddenGemsHomepageHTML,
   renderExploreByCategoryHTML,

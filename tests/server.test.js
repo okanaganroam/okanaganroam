@@ -678,6 +678,61 @@ test('parseTripRequest: empty text is rejected before the provider is ever calle
   assert.equal(called, false, 'the provider must never be invoked for empty/whitespace-only text');
 });
 
+// ---- Build My Trip, Stage 3 (callTripParserProvider diagnostic hardening: timeout + safe logging) ----
+//
+// callTripParserProvider() itself always short-circuits to
+// {error:'not_configured'} in this suite (OPENAI_API_KEY is intentionally
+// unset here, and must stay that way -- see the network-free rationale
+// above), so its actual fetch/timeout/catch behavior is not directly
+// exercisable without either a real network call or a process-cache hack,
+// both of which this suite deliberately avoids. classifyTripParserFetchError()
+// was pulled out specifically so that error-classification logic -- the
+// actual new behavior this diagnostic change adds -- has real, fast,
+// network-free coverage.
+
+test('classifyTripParserFetchError: an AbortError (our own 10s timeout firing) is classified as a timeout', () => {
+  const abortErr = Object.assign(new Error('This operation was aborted'), { name: 'AbortError' });
+  const result = app.classifyTripParserFetchError(abortErr);
+  assert.deepEqual(result, { error: 'timeout', isTimeout: true });
+});
+
+test('classifyTripParserFetchError: any other fetch failure (DNS/TCP/TLS) is classified as a generic network error, not a timeout', () => {
+  const dnsErr = Object.assign(new Error('getaddrinfo ENOTFOUND api.openai.com'), { name: 'TypeError' });
+  assert.deepEqual(app.classifyTripParserFetchError(dnsErr), { error: 'network_error', isTimeout: false });
+
+  const refusedErr = Object.assign(new Error('connect ECONNREFUSED'), { name: 'Error' });
+  assert.deepEqual(app.classifyTripParserFetchError(refusedErr), { error: 'network_error', isTimeout: false });
+});
+
+test('classifyTripParserFetchError: handles a missing/malformed error object without throwing', () => {
+  assert.deepEqual(app.classifyTripParserFetchError(null), { error: 'network_error', isTimeout: false });
+  assert.deepEqual(app.classifyTripParserFetchError(undefined), { error: 'network_error', isTimeout: false });
+  assert.deepEqual(app.classifyTripParserFetchError({}), { error: 'network_error', isTimeout: false });
+});
+
+test('callTripParserProvider: still fails closed with not_configured when OPENAI_API_KEY is unset, before any timeout/fetch machinery runs', async () => {
+  const result = await app.callTripParserProvider('a relaxed 3-day Kelowna wine trip');
+  assert.deepEqual(result, { raw: null, error: 'not_configured' });
+});
+
+test('callTripParserProvider: the catch-path console.error call never references the API key, Authorization header, or the raw request/headers objects (static source check)', () => {
+  const fnSource = app.callTripParserProvider.toString();
+  const consoleErrorCallIndex = fnSource.indexOf('console.error(');
+  assert.ok(consoleErrorCallIndex !== -1, 'expected a console.error call in callTripParserProvider for the diagnostic logging added in this change');
+  // Isolate just the console.error(...) call's own argument list (up to
+  // its matching close paren) so this assertion is about what actually
+  // gets logged, not about the rest of the function merely mentioning
+  // these identifiers elsewhere (e.g. building the real Authorization
+  // header a few lines earlier is expected and fine).
+  const afterCall = fnSource.slice(consoleErrorCallIndex);
+  const callEnd = afterCall.indexOf('\n  }'); // catch block closes shortly after
+  const loggedArgs = afterCall.slice(0, callEnd === -1 ? afterCall.length : callEnd);
+  assert.doesNotMatch(loggedArgs, /OPENAI_API_KEY/, 'the console.error call must never reference OPENAI_API_KEY');
+  assert.doesNotMatch(loggedArgs, /Authorization/, 'the console.error call must never reference the Authorization header');
+  assert.doesNotMatch(loggedArgs, /\bheaders\b/, 'the console.error call must never log the request headers object');
+  assert.doesNotMatch(loggedArgs, /\bbody\b/, 'the console.error call must never log the request body');
+});
+
 // ---- Build My Trip, Stage 2 (extractHtmlFragment + renderTripPlannerPage) ----
 
 test('extractHtmlFragment: includeEndMarker=false stops BEFORE the end marker (regression test for the exact bug that swallowed the whole /trip page into an unterminated HTML comment)', () => {
