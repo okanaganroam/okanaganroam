@@ -4828,6 +4828,25 @@ function renderTripPlannerStyles() {
        technique, scoped to this page only via body.page-trip so /browse
        and / (which both already handle this themselves) are untouched. */
     body.page-trip .home-footer-bottom { padding-bottom: 80px; }
+
+    /* Mobile trip-tray/wizard-link overlap fix (audit finding, 2026-09-18):
+       on a fresh, unscrolled load, #tripTray (site-wide, position:fixed,
+       bottom:20px/right:20px, ~113px wide -- unchanged, see the clearance
+       fix above) can sit directly on top of .trip-conv-wizard-toggle, the
+       hero card's own wizard-fallback link, since that button is
+       display:block and spans nearly the full card width while the tray's
+       screen position relative to in-flow content shifts with viewport
+       height and how much content renders above it -- confirmed
+       overlapping at both 375x812 and 390x844, by different amounts at
+       each. Chasing a specific vertical offset would only hold at one
+       measured height; reserving horizontal clearance instead keeps the
+       two apart at any height or scroll position, since the tray never
+       sits further than ~133px from the right edge (20px inset + ~113px
+       width) -- capping this link's own width comfortably inside that
+       margin stops their boxes from intersecting at all. The link simply
+       wraps onto an extra line at these widths; nothing is hidden or
+       removed. */
+    .trip-conv-wizard-toggle { max-width: calc(100% - 130px); box-sizing: border-box; }
   }
   </style>`;
 }
