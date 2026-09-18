@@ -2448,6 +2448,16 @@ window.__scrollToVenueCard = function(name){
   // itinerary on screen came from the conversational flow instead.
   var lastGeneratedParams = null;
 
+  // Venue ids the user has explicitly removed from the CURRENTLY DISPLAYED
+  // itinerary, accumulated across any number of "Remove" clicks. Sent back
+  // on every subsequent Regenerate (see generateTrip() below) so the same
+  // venue is never re-selected, but reset on any genuinely new generation
+  // (fresh wizard submit or a fresh conversational parse) so it never
+  // leaks into an unrelated trip. Never touched by removing a stop's
+  // effect on lastGeneratedParams, and never persisted beyond this page
+  // load -- an in-memory list only, same posture as lastGeneratedParams.
+  var excludedVenueIds = [];
+
   // Pre-fill the region from ?region=<slug> when present (e.g. a future
   // "plan a trip here" link from a venue/region page) -- a small, safe
   // nicety, not a new required flow; the step still works with no query
@@ -2491,6 +2501,7 @@ window.__scrollToVenueCard = function(name){
     }
 
     var regionLabel = (window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[venue.region]) || venue.region;
+    card.dataset.id = venue.id;
     card.dataset.name = venue.name;
     if (venue.latitude != null && venue.longitude != null) {
       card.dataset.lat = venue.latitude;
@@ -2566,6 +2577,10 @@ window.__scrollToVenueCard = function(name){
     removeBtn.textContent = t('trip.planner.removeStop');
     removeBtn.addEventListener('click', function(){
       card.classList.add('is-removed');
+      var removedId = parseInt(card.dataset.id, 10);
+      if (!isNaN(removedId) && excludedVenueIds.indexOf(removedId) === -1) {
+        excludedVenueIds.push(removedId);
+      }
       refreshMap();
     });
     actions.appendChild(removeBtn);
@@ -2722,7 +2737,13 @@ window.__scrollToVenueCard = function(name){
   // rather than duplicating it. The wizard's own form submit/regenerate
   // handlers below still call generateTrip() with no arguments, so their
   // behavior is completely unchanged.
-  function generateTrip(paramsOverride) {
+  //
+  // isRegenerate (Regenerate-exclusion fix): true ONLY for the Regenerate
+  // button's own call site below -- every other caller (wizard submit,
+  // conversational parse-and-generate) is a genuinely NEW itinerary, so
+  // excludedVenueIds is reset right here rather than left to accumulate
+  // across unrelated trips.
+  function generateTrip(paramsOverride, isRegenerate) {
     var params = paramsOverride || collectParams();
     if (!params.region) {
       setStatus(t('trip.planner.errorNoRegion'), 'error');
@@ -2733,14 +2754,20 @@ window.__scrollToVenueCard = function(name){
       return;
     }
 
+    if (!isRegenerate) {
+      excludedVenueIds = [];
+    }
+
     generateBtn.disabled = true;
     if (regenerateBtn) regenerateBtn.disabled = true;
     setStatus(t('trip.planner.generating'), 'loading');
 
+    var requestBody = Object.assign({}, params, { excludeVenueIds: excludedVenueIds });
+
     fetch('/api/trip/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify(requestBody)
     }).then(function(res){
       return res.json().then(function(body){ return { ok: res.ok, body: body }; });
     }).then(function(result){
@@ -2774,7 +2801,7 @@ window.__scrollToVenueCard = function(name){
     // (-> collectParams()) when nothing has been successfully generated
     // yet, which preserves the original "please choose a region first"
     // validation for that case.
-    regenerateBtn.addEventListener('click', function(){ generateTrip(lastGeneratedParams || undefined); });
+    regenerateBtn.addEventListener('click', function(){ generateTrip(lastGeneratedParams || undefined, true); });
   }
 
   // Exposed so the conversational /trip module (below) can generate an

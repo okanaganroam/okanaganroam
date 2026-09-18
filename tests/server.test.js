@@ -422,6 +422,60 @@ test('buildTripItinerary is deterministic: identical inputs called twice produce
   assert.deepEqual(planA, planB);
 });
 
+// ---- Regenerate-exclusion fix (buildTripItinerary excludeVenueIds) -----
+// Reuses the exact same usedIds Set that already prevents a venue being
+// picked twice in one trip -- excludeVenueIds just seeds it before the
+// first slot is picked, instead of leaving it empty.
+
+test('buildTripItinerary: excludeVenueIds removes a specific venue that would otherwise have been picked', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const cafe = venues.find((v) => v.name === 'Trip Cafe Morning');
+  const base = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'standard' });
+  assert.equal(base.itinerary[0].morning.name, 'Trip Cafe Morning', 'sanity check: cafe is the normal morning pick');
+
+  const plan = app.buildTripItinerary(venues, {
+    region: 'osoyoos', days: 1, interests: [], pace: 'standard', excludeVenueIds: [cafe.id],
+  });
+  const day1 = plan.itinerary[0];
+  assert.notEqual(day1.morning && day1.morning.id, cafe.id, 'the excluded venue must never be selected');
+  assert.equal(day1.morning.name, 'Trip Golf Course', 'golf ties cafe on morning affinity (3) and is the next-best pick once cafe is excluded');
+});
+
+test('buildTripItinerary: excludeVenueIds referencing a venue id that does not exist in the pool is a harmless no-op', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const base = app.buildTripItinerary(venues, { region: 'osoyoos', days: 1, interests: [], pace: 'standard' });
+  const plan = app.buildTripItinerary(venues, {
+    region: 'osoyoos', days: 1, interests: [], pace: 'standard', excludeVenueIds: [999999],
+  });
+  assert.deepEqual(plan, base, 'an exclude id absent from the pool must not change the plan at all');
+});
+
+test('buildTripItinerary: excluding every venue in the pool falls through to the existing "ran out of venues" warning path', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const allIds = venues.map((v) => v.id);
+  const plan = app.buildTripItinerary(venues, {
+    region: 'osoyoos', days: 1, interests: [], pace: 'standard', excludeVenueIds: allIds,
+  });
+  const day1 = plan.itinerary[0];
+  assert.equal(day1.morning, null);
+  assert.equal(day1.afternoon, null);
+  assert.equal(day1.evening, null);
+  assert.equal(plan.warnings.length, 3, 'one "ran out of venues" warning per empty slot, same as the empty-region case');
+  assert.ok(plan.warnings.every((w) => /ran out of venues/i.test(w)));
+});
+
+test('buildTripItinerary: identical inputs including the same excludeVenueIds produce byte-identical output', () => {
+  const venues = app.listVenues({ region: 'osoyoos', limit: 50 }).venues;
+  const pub = venues.find((v) => v.name === 'Trip Pub Faraway');
+  const params = { region: 'osoyoos', days: 2, interests: [], pace: 'standard', excludeVenueIds: [pub.id] };
+  const planA = app.buildTripItinerary(venues, params);
+  const planB = app.buildTripItinerary(venues, params);
+  assert.deepEqual(planA, planB);
+  const ids = [];
+  planA.itinerary.forEach((day) => { app.TRIP_DAYPARTS.forEach((slot) => { if (day[slot]) ids.push(day[slot].id); }); });
+  assert.ok(!ids.includes(pub.id), 'the excluded venue must not appear anywhere across the whole itinerary');
+});
+
 // ---- Build My Trip, Stage 3 backward-compatibility regression ----------
 // Written FIRST, before any other Stage 3 test or code change, per the
 // approved implementation sequence. Calls pickBestTripVenue/
@@ -1260,8 +1314,8 @@ test('regenerate fix: a single lastGeneratedParams variable is declared in the w
 
 test('regenerate fix: generateTrip() stores lastGeneratedParams only on a SUCCESSFUL generation, using whichever params object was actually used (collectParams() or the conversational override)', () => {
   const src = readClientAppJs();
-  const genStart = src.indexOf('function generateTrip(paramsOverride)');
-  assert.ok(genStart !== -1, 'expected generateTrip(paramsOverride) to still exist with its original signature');
+  const genStart = src.indexOf('function generateTrip(paramsOverride, isRegenerate)');
+  assert.ok(genStart !== -1, 'expected generateTrip(paramsOverride, isRegenerate) to still exist');
   const genEnd = src.indexOf('form.addEventListener', genStart);
   const genSrc = src.slice(genStart, genEnd === -1 ? genStart + 3000 : genEnd);
 
@@ -1287,7 +1341,7 @@ test('regenerate fix: generateTrip() stores lastGeneratedParams only on a SUCCES
 
 test('regenerate fix: the Regenerate button reuses lastGeneratedParams (whichever flow produced it), falling back to the original collectParams() validation when nothing has succeeded yet', () => {
   const src = readClientAppJs();
-  assert.match(src, /regenerateBtn\.addEventListener\('click', function\(\)\{ generateTrip\(lastGeneratedParams \|\| undefined\); \}\);/, 'Regenerate must pass the stored params (or undefined, to preserve the original validation) instead of always calling generateTrip() with no argument');
+  assert.match(src, /regenerateBtn\.addEventListener\('click', function\(\)\{ generateTrip\(lastGeneratedParams \|\| undefined, true\); \}\);/, 'Regenerate must pass the stored params (or undefined, to preserve the original validation) and isRegenerate=true, instead of always calling generateTrip() with no argument');
 });
 
 test('regenerate fix: removing a rendered stop never touches lastGeneratedParams', () => {
@@ -1302,6 +1356,78 @@ test('regenerate fix: removing a rendered stop never touches lastGeneratedParams
   assert.doesNotMatch(removeSrc, /lastGeneratedParams/, 'removing a stop must never read or write lastGeneratedParams');
   assert.match(removeSrc, /card\.classList\.add\('is-removed'\)/);
   assert.match(removeSrc, /refreshMap\(\)/);
+});
+
+// ---- Regenerate-exclusion fix (removed stops stay excluded) ------------
+//
+// Regenerate previously re-ran the SAME generation params from scratch,
+// with no memory of which venues the user had already rejected via
+// "Remove" -- so a removed stop silently came back on the next
+// Regenerate. Fixed by tracking removed venue ids client-side
+// (excludedVenueIds) and sending them to /api/trip/generate on every
+// call, reusing the existing server-side usedIds seeding mechanism (see
+// the buildTripItinerary excludeVenueIds tests) rather than a second
+// selection implementation. Source-level checks only, consistent with
+// every other client-module test in this file (no DOM/browser harness).
+
+test('exclusion fix: a single excludedVenueIds array is declared in the wizard IIFE, alongside lastGeneratedParams', () => {
+  const src = readClientAppJs();
+  assert.match(src, /var excludedVenueIds = \[\];/, 'expected a single shared state array for removed-venue ids');
+});
+
+test('exclusion fix: buildSlotCard() exposes the venue id on the rendered card via dataset.id', () => {
+  const src = readClientAppJs();
+  const cardStart = src.indexOf('function buildSlotCard(daypart, venue)');
+  assert.ok(cardStart !== -1, 'expected buildSlotCard() to still exist');
+  const cardEnd = src.indexOf('function initMapIfNeeded', cardStart);
+  const cardSrc = src.slice(cardStart, cardEnd === -1 ? cardStart + 3000 : cardEnd);
+  assert.match(cardSrc, /card\.dataset\.id = venue\.id;/, 'the slot card must record the venue id so Remove can identify which venue to exclude');
+});
+
+test('exclusion fix: the remove-stop handler records the removed venue id into excludedVenueIds, deduping', () => {
+  const src = readClientAppJs();
+  const removeStart = src.indexOf("removeBtn.addEventListener('click', function(){");
+  assert.ok(removeStart !== -1, 'expected the remove-stop click handler to still exist');
+  const removeEnd = src.indexOf('});', removeStart) + 3;
+  const removeSrc = src.slice(removeStart, removeEnd);
+  assert.match(removeSrc, /parseInt\(card\.dataset\.id, 10\)/, 'the handler must read the id recorded on the card');
+  assert.match(removeSrc, /excludedVenueIds\.indexOf\(removedId\) === -1/, 'the handler must dedupe before recording');
+  assert.match(removeSrc, /excludedVenueIds\.push\(removedId\)/, 'the handler must record the removed venue id');
+});
+
+test('exclusion fix: generateTrip() includes excludeVenueIds in the /api/trip/generate request body', () => {
+  const src = readClientAppJs();
+  const genStart = src.indexOf('function generateTrip(paramsOverride, isRegenerate)');
+  assert.ok(genStart !== -1, 'expected generateTrip(paramsOverride, isRegenerate) to still exist');
+  const genEnd = src.indexOf('form.addEventListener', genStart);
+  const genSrc = src.slice(genStart, genEnd === -1 ? genStart + 3000 : genEnd);
+  assert.match(genSrc, /excludeVenueIds:\s*excludedVenueIds/, 'the request body must include the current exclusions');
+  assert.match(genSrc, /JSON\.stringify\(requestBody\)/, 'the fetch body must be the merged requestBody, not the bare params object');
+});
+
+test('exclusion fix: a genuinely new generation (isRegenerate falsy) resets excludedVenueIds before the request is built', () => {
+  const src = readClientAppJs();
+  const genStart = src.indexOf('function generateTrip(paramsOverride, isRegenerate)');
+  const genEnd = src.indexOf('form.addEventListener', genStart);
+  const genSrc = src.slice(genStart, genEnd === -1 ? genStart + 3000 : genEnd);
+  const resetMatch = genSrc.match(/if \(!isRegenerate\) \{\s*excludedVenueIds = \[\];\s*\}/);
+  assert.ok(resetMatch, 'expected an explicit reset of excludedVenueIds guarded by !isRegenerate');
+  const requestBodyIndex = genSrc.indexOf('var requestBody');
+  assert.ok(resetMatch.index < requestBodyIndex, 'the reset must happen before the request body (and therefore excludeVenueIds) is built');
+});
+
+test('exclusion fix: Regenerate passes isRegenerate=true, so its own call site never resets excludedVenueIds', () => {
+  const src = readClientAppJs();
+  assert.match(src, /regenerateBtn\.addEventListener\('click', function\(\)\{ generateTrip\(lastGeneratedParams \|\| undefined, true\); \}\);/, 'Regenerate must call generateTrip with isRegenerate=true so its exclusions survive');
+});
+
+test('exclusion fix: the conversational flow\'s generate call site never passes isRegenerate, so a fresh parse-and-generate always resets exclusions', () => {
+  const src = readClientAppJs();
+  const callIndex = src.indexOf('window.__tripGenerateFromParams({');
+  assert.ok(callIndex !== -1, 'expected the conversational generate call site to still exist');
+  const callEnd = src.indexOf('});', callIndex) + 3;
+  const callSrc = src.slice(callIndex, callEnd);
+  assert.doesNotMatch(callSrc, /,\s*true\s*\)/, 'the conversational generate call must not pass isRegenerate=true');
 });
 
 // ---- Map markers/route invisible bug (found via live production QA) ----
@@ -3103,6 +3229,42 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
       assert.deepEqual(body.amenities, []);
       assert.equal(body.budget, null);
       assert.deepEqual(body.discovery, []);
+      assert.equal(body.itinerary[0].morning.name, 'Trip Cafe Morning');
+      assert.equal(body.itinerary[0].evening.name, 'Trip Pub Faraway');
+    }
+
+    // ---- Regenerate-exclusion fix: excludeVenueIds ------------------------
+
+    // 400 -- excludeVenueIds must be an array of integers.
+    {
+      const { status: s1, body: b1 } = await generateTrip({ region: 'osoyoos', days: 1, excludeVenueIds: 'not-an-array' });
+      assert.equal(s1, 400);
+      assert.match(b1.error, /excludeVenueIds must be an array/);
+      const { status: s2, body: b2 } = await generateTrip({ region: 'osoyoos', days: 1, excludeVenueIds: ['not-a-number'] });
+      assert.equal(s2, 400);
+      assert.match(b2.error, /excludeVenueIds must be an array/);
+      const { status: s3, body: b3 } = await generateTrip({ region: 'osoyoos', days: 1, excludeVenueIds: [1.5] });
+      assert.equal(s3, 400);
+      assert.match(b3.error, /excludeVenueIds must be an array/);
+    }
+
+    // 200 -- a valid request with excludeVenueIds never returns an excluded id anywhere in the plan.
+    {
+      const { body: firstBody } = await generateTrip({ region: 'osoyoos', days: 1, pace: 'standard' });
+      const cafeId = firstBody.itinerary[0].morning.id;
+
+      const { status, body } = await generateTrip({ region: 'osoyoos', days: 1, pace: 'standard', excludeVenueIds: [cafeId] });
+      assert.equal(status, 200);
+      const placedIds = [];
+      body.itinerary.forEach((day) => { ['morning', 'afternoon', 'evening'].forEach((slot) => { if (day[slot]) placedIds.push(day[slot].id); }); });
+      assert.ok(!placedIds.includes(cafeId), 'an excluded venue id must never appear in the generated itinerary');
+    }
+
+    // Omitting excludeVenueIds entirely must reproduce the exact
+    // pre-exclusion-fix response over real HTTP.
+    {
+      const { status, body } = await generateTrip({ region: 'osoyoos', days: 1, pace: 'standard' });
+      assert.equal(status, 200);
       assert.equal(body.itinerary[0].morning.name, 'Trip Cafe Morning');
       assert.equal(body.itinerary[0].evening.name, 'Trip Pub Faraway');
     }

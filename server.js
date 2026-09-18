@@ -1556,7 +1556,7 @@ function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm,
 // fallback, both of which need visibility into the full pool, not just a
 // pre-filtered one) and the trip parameters, returns a day-by-day plan.
 //
-// params: { region, days, interests, pace, amenities, budget, discovery, discoveryVenueIds }
+// params: { region, days, interests, pace, amenities, budget, discovery, discoveryVenueIds, excludeVenueIds }
 //   - region: a valid region slug (validated by the caller)
 //   - days: integer, clamped to 1–7
 //   - interests: array of venue type strings (may be empty = no filter)
@@ -1573,6 +1573,12 @@ function pickBestTripVenue(candidates, usedIds, daypart, previousStop, maxHopKm,
 //   - discoveryVenueIds (Stage 3, optional): a Set of venue ids already
 //     resolved from `discovery` by the caller (e.g. via
 //     getCollectionVenueIds), used for the actual scoring boost
+//   - excludeVenueIds (Regenerate-exclusion fix, optional): array of venue
+//     ids to treat as already used before the first slot is even picked --
+//     the caller's "removed" stops, which must never be re-selected on a
+//     Regenerate. Reuses the exact same usedIds mechanism that already
+//     stops a venue being picked twice in one trip; no separate
+//     filtering/selection path.
 //
 // Returns:
 //   {
@@ -1591,6 +1597,7 @@ function buildTripItinerary(venues, params) {
   const discovery = Array.isArray(params.discovery) ? params.discovery.filter(Boolean) : [];
   const discoveryVenueIds = params.discoveryVenueIds instanceof Set ? params.discoveryVenueIds : null;
   const preferences = { amenities, budget, discoveryIds: discoveryVenueIds };
+  const excludeVenueIds = Array.isArray(params.excludeVenueIds) ? params.excludeVenueIds : [];
 
   const warnings = [];
 
@@ -1608,7 +1615,7 @@ function buildTripItinerary(venues, params) {
     }
   }
 
-  const usedIds = new Set();
+  const usedIds = new Set(excludeVenueIds);
   const itinerary = [];
   let previousStop = null;
 
@@ -1669,6 +1676,13 @@ function isValidTripBudget(budget) {
 }
 function isValidTripDiscoveryKind(kind, knownKinds) {
   return typeof kind === 'string' && knownKinds.includes(kind);
+}
+// Regenerate-exclusion fix: a venue id the caller has already rejected
+// (via "Remove") and never wants selected again for this itinerary, sent
+// back on every subsequent Regenerate. Same "array of the obvious
+// primitive type" validation posture as interests/amenities above.
+function isValidTripExcludeIds(value) {
+  return Array.isArray(value) && value.every((id) => Number.isInteger(id));
 }
 
 // ---------- Build My Trip, Stage 3: OpenAI provider adapter ----------
@@ -6361,13 +6375,13 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'Malformed JSON body.' });
       }
 
-      const ALLOWED_TRIP_KEYS = ['region', 'days', 'interests', 'pace', 'amenities', 'budget', 'discovery'];
+      const ALLOWED_TRIP_KEYS = ['region', 'days', 'interests', 'pace', 'amenities', 'budget', 'discovery', 'excludeVenueIds'];
       const unexpectedTripKeys = Object.keys(body).filter((k) => !ALLOWED_TRIP_KEYS.includes(k));
       if (unexpectedTripKeys.length > 0) {
         return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedTripKeys.join(', ')}` });
       }
 
-      const { region, days, interests, pace, amenities, budget, discovery } = body;
+      const { region, days, interests, pace, amenities, budget, discovery, excludeVenueIds } = body;
 
       if (!isValidTripRegion(region)) {
         return sendJSON(res, 400, { error: 'region must be one of the known region slugs.', allowed: VALID_REGIONS });
@@ -6443,6 +6457,14 @@ const server = http.createServer(async (req, res) => {
         getCollectionVenueIds(kind).forEach((id) => discoveryVenueIds.add(id));
       });
 
+      let excludeVenueIdsList = [];
+      if (excludeVenueIds !== undefined) {
+        if (!isValidTripExcludeIds(excludeVenueIds)) {
+          return sendJSON(res, 400, { error: 'excludeVenueIds must be an array of integer venue ids.' });
+        }
+        excludeVenueIdsList = excludeVenueIds;
+      }
+
       const regionVenues = db
         .prepare('SELECT * FROM venues WHERE region = ? AND redirect_to IS NULL')
         .all(region)
@@ -6457,6 +6479,7 @@ const server = http.createServer(async (req, res) => {
         budget: budgetValue,
         discovery: discoveryList,
         discoveryVenueIds,
+        excludeVenueIds: excludeVenueIdsList,
       });
       return sendJSON(res, 200, plan);
     }
