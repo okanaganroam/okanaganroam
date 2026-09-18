@@ -479,6 +479,94 @@ test('renderTripPlannerPage does not alter the homepage template file on disk', 
   assert.equal(before, after, 'rendering /trip must only READ okanagan.html, never write to it');
 });
 
+// ---- Build My Trip i18n regression coverage -----------------------------
+//
+// Guards against exactly the class of bug reported after Stage 2 shipped:
+// a data-i18n key referenced by a page but never added to one (or both) of
+// public/scripts/app.js's TRANSLATIONS.en / TRANSLATIONS.fr dictionaries,
+// which makes t() silently fall back to returning the raw key string
+// instead of real text. (The actual incident that prompted this test
+// turned out to be a stale browser cache of app.js from before the Stage 2
+// deploy, not a missing key -- every key was already present -- but this
+// test exists so a REAL missing-key regression would be caught by the
+// suite next time, rather than only by manual QA.)
+//
+// There is no browser/DOM test harness in this project (see the Build My
+// Trip architecture audit), so this reads public/scripts/app.js as plain
+// text and safely evaluates just the TRANSLATIONS object literal in an
+// isolated vm context -- no other app.js code runs, nothing touches the
+// real `window`/`document`.
+function loadClientTranslations() {
+  const fs = require('fs');
+  const path = require('path');
+  const vm = require('vm');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const start = src.indexOf('var TRANSLATIONS = {');
+  const end = src.indexOf('\n};', start) + 3;
+  if (start === -1 || end === -1) throw new Error('Could not locate the TRANSLATIONS object in app.js');
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(src.slice(start, end), sandbox);
+  return sandbox.TRANSLATIONS;
+}
+
+test('every data-i18n(-placeholder/-aria) key rendered on /trip resolves in BOTH TRANSLATIONS.en and TRANSLATIONS.fr', () => {
+  const TRANSLATIONS = loadClientTranslations();
+  const html = app.renderTripPlannerPage();
+  const attrPattern = /data-i18n(?:-placeholder|-aria|-title|-tooltip)?="([^"]+)"/g;
+  const keys = new Set();
+  let m;
+  while ((m = attrPattern.exec(html))) keys.add(m[1]);
+
+  assert.ok(keys.size > 0, 'sanity check: the page must actually contain data-i18n attributes for this test to mean anything');
+  // Specifically confirm the Stage 2 keys are among them, not just old ones.
+  assert.ok(keys.has('trip.planner.title'), 'expected trip.planner.title to be present as a data-i18n key on /trip');
+
+  const missing = [];
+  for (const key of keys) {
+    if (!(key in TRANSLATIONS.en)) missing.push(`EN missing: ${key}`);
+    if (!(key in TRANSLATIONS.fr)) missing.push(`FR missing: ${key}`);
+  }
+  assert.deepEqual(missing, [], `every data-i18n key on /trip must exist in both locales:\n${missing.join('\n')}`);
+});
+
+test('every dynamically-set trip.planner.*/type.* key used by the /trip client module resolves in BOTH locales', () => {
+  const TRANSLATIONS = loadClientTranslations();
+  const fs = require('fs');
+  const path = require('path');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+
+  // These are t() calls the /trip module makes with a literal string key --
+  // easy to check directly. The two calls built with string concatenation
+  // (daypart, venue.type) are checked separately below via their known,
+  // closed set of real values, since a regex can't enumerate a runtime
+  // variable's possible values.
+  const literalKeys = [
+    'trip.addToTrip', 'trip.inTrip', 'trip.planner.day', 'trip.planner.errorDays',
+    'trip.planner.errorGeneric', 'trip.planner.errorNetwork', 'trip.planner.errorNoRegion',
+    'trip.planner.generating', 'trip.planner.noVenue', 'trip.planner.removeStop',
+    'trip.planner.viewVenue', 'trip.planner.warningsHeading',
+  ];
+  for (const key of literalKeys) {
+    // Confirm the /trip module actually still calls t() with this literal
+    // key (guards this test itself against silently going stale if the
+    // client code is refactored to stop using one of them).
+    assert.match(appJs, new RegExp(`t\\('${key.replace(/\./g, '\\.')}'\\)`), `expected app.js to still call t('${key}')`);
+  }
+
+  // 'trip.planner.' + daypart -- the three real daypart values.
+  const daypartKeys = ['morning', 'afternoon', 'evening'].map((d) => `trip.planner.${d}`);
+  // 'type.' + venue.type -- the seven real venue types (matches CATEGORY_SLUGS).
+  const typeKeys = Object.keys(app.CATEGORY_SLUGS).map((t) => `type.${t}`);
+
+  const missing = [];
+  for (const key of [...literalKeys, ...daypartKeys, ...typeKeys]) {
+    if (!(key in TRANSLATIONS.en)) missing.push(`EN missing: ${key}`);
+    if (!(key in TRANSLATIONS.fr)) missing.push(`FR missing: ${key}`);
+  }
+  assert.deepEqual(missing, [], `every dynamically-used trip.planner.*/type.* key must exist in both locales:\n${missing.join('\n')}`);
+});
+
 // ---- JSON-LD -----------------------------------------------------------
 test('breadcrumbListSchema produces valid schema.org BreadcrumbList shape', () => {
   const schema = app.breadcrumbListSchema([
