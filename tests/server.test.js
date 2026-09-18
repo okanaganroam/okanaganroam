@@ -733,6 +733,292 @@ test('callTripParserProvider: the catch-path console.error call never references
   assert.doesNotMatch(loggedArgs, /\bbody\b/, 'the console.error call must never log the request body');
 });
 
+// ---- Build My Trip, Stage 3 (deterministicTripParserProvider -- FREE natural-language parser) ----
+//
+// This is now the DEFAULT provider parseTripRequest() uses (see the
+// providerFn default). Zero external calls, zero API cost, zero
+// dependency on OPENAI_API_KEY. Every test in this section calls either
+// deterministicTripParserProvider() directly (raw field-level assertions)
+// or parseTripRequest() with no providerFn override at all (full pipeline,
+// proving the real default is wired correctly) -- neither ever touches
+// the network.
+
+test('deterministicTripParserProvider: makes zero network calls -- global.fetch is never invoked', async () => {
+  const realFetch = global.fetch;
+  global.fetch = () => { throw new Error('fetch must never be called by the deterministic provider'); };
+  try {
+    const result = await app.parseTripRequest('Plan me a relaxed 3-day trip around Kelowna with wine.');
+    assert.equal(result.ok, true);
+    assert.equal(result.value.region, 'kelowna');
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('deterministicTripParserProvider: region -- every one of the 20 authoritative regions is recognized by its display label', () => {
+  const regionLabels = {
+    kelowna: 'Kelowna', 'west-kelowna': 'West Kelowna', peachland: 'Peachland',
+    summerland: 'Summerland', penticton: 'Penticton', naramata: 'Naramata',
+    'lake-country': 'Lake Country', 'okanagan-falls': 'Okanagan Falls',
+    oliver: 'Oliver', osoyoos: 'Osoyoos', vernon: 'Vernon', armstrong: 'Armstrong',
+    coldstream: 'Coldstream', lumby: 'Lumby', enderby: 'Enderby', kaleden: 'Kaleden',
+    apex: 'Apex', 'big-white': 'Big White', silverstar: 'SilverStar', baldy: 'Baldy',
+  };
+  Object.entries(regionLabels).forEach(([slug, label]) => {
+    const { raw } = app.deterministicTripParserProvider(`I want to plan a trip to ${label}.`);
+    assert.equal(raw.region, slug, `"${label}" should resolve to region slug "${slug}"`);
+  });
+});
+
+test('deterministicTripParserProvider: region -- natural-language wrappers (around/in/area) all resolve correctly without a special case', () => {
+  assert.equal(app.deterministicTripParserProvider('a trip around Kelowna').raw.region, 'kelowna');
+  assert.equal(app.deterministicTripParserProvider('something in Kelowna').raw.region, 'kelowna');
+  assert.equal(app.deterministicTripParserProvider('the Kelowna area').raw.region, 'kelowna');
+  assert.equal(app.deterministicTripParserProvider('Naramata please').raw.region, 'naramata');
+});
+
+test('deterministicTripParserProvider: region -- "West Kelowna" resolves to west-kelowna, never falling back to the shorter "kelowna" match', () => {
+  assert.equal(app.deterministicTripParserProvider('a trip to West Kelowna').raw.region, 'west-kelowna');
+  assert.equal(app.deterministicTripParserProvider('Lake Country please').raw.region, 'lake-country');
+  assert.equal(app.deterministicTripParserProvider('Okanagan Falls sounds nice').raw.region, 'okanagan-falls');
+  assert.equal(app.deterministicTripParserProvider('Big White for skiing').raw.region, 'big-white');
+});
+
+test('deterministicTripParserProvider: region -- no region mentioned resolves to null', () => {
+  assert.equal(app.deterministicTripParserProvider('give me three days of wine').raw.region, null);
+});
+
+test('deterministicTripParserProvider: days -- digit and word forms both resolve, "long weekend" maps to 3, bare "weekend" stays null', () => {
+  assert.equal(app.deterministicTripParserProvider('3 days in Kelowna').raw.days, 3);
+  assert.equal(app.deterministicTripParserProvider('a 3-day Kelowna trip').raw.days, 3);
+  assert.equal(app.deterministicTripParserProvider('for three days').raw.days, 3);
+  assert.equal(app.deterministicTripParserProvider('a three day trip').raw.days, 3);
+  assert.equal(app.deterministicTripParserProvider('one day in Kelowna').raw.days, 1);
+  assert.equal(app.deterministicTripParserProvider('five days in Kelowna').raw.days, 5);
+  assert.equal(app.deterministicTripParserProvider('a long weekend in Kelowna').raw.days, 3, '"long weekend" is a well-defined 3-day idiom, safe to map');
+  assert.equal(app.deterministicTripParserProvider('a weekend in Kelowna').raw.days, null, 'bare "weekend" is genuinely ambiguous and must never be guessed');
+});
+
+test('deterministicTripParserProvider: days -- an out-of-range day count (e.g. 10) is never returned, even though the number was clearly stated', () => {
+  const { raw } = app.deterministicTripParserProvider('a 10 day trip to Kelowna');
+  assert.equal(raw.days, null, 'isValidTripDays() rejects 10 (max 7), so the parser must not emit it');
+});
+
+test('deterministicTripParserProvider: pace -- every alias for relaxed/standard/packed resolves to the correct enum value', () => {
+  ['relaxed', 'easygoing', 'easy going', 'slow', 'leisurely', 'take it easy', 'laid back', 'chill'].forEach((phrase) => {
+    assert.equal(app.deterministicTripParserProvider(`a ${phrase} trip to Kelowna`).raw.pace, 'relaxed', `"${phrase}" should map to relaxed`);
+  });
+  ['moderate pace', 'moderate speed', 'balanced', 'normal pace'].forEach((phrase) => {
+    assert.equal(app.deterministicTripParserProvider(`a ${phrase} trip to Kelowna`).raw.pace, 'standard', `"${phrase}" should map to standard`);
+  });
+  ['packed', 'busy', 'full', 'see as much as possible', 'action packed'].forEach((phrase) => {
+    assert.equal(app.deterministicTripParserProvider(`a ${phrase} trip to Kelowna`).raw.pace, 'packed', `"${phrase}" should map to packed`);
+  });
+});
+
+test('deterministicTripParserProvider: budget -- every alias for budget/moderate/upscale resolves correctly, and bare "moderate" never collides with "moderate pace"', () => {
+  ['cheap', 'inexpensive', 'affordable', 'on a budget', 'low cost'].forEach((phrase) => {
+    assert.equal(app.deterministicTripParserProvider(`a ${phrase} trip to Kelowna`).raw.budget, 'budget', `"${phrase}" should map to budget`);
+  });
+  ['mid range', 'reasonable', 'reasonably priced'].forEach((phrase) => {
+    assert.equal(app.deterministicTripParserProvider(`a ${phrase} trip to Kelowna`).raw.budget, 'moderate', `"${phrase}" should map to moderate`);
+  });
+  // Bare "moderate" (unqualified) is also a budget signal...
+  assert.equal(app.deterministicTripParserProvider('a moderate trip to Kelowna').raw.budget, 'moderate');
+  // ...but "moderate pace"/"moderate speed" must NOT be misread as a budget signal --
+  // that phrase belongs to pace, not budget.
+  const paceResult = app.deterministicTripParserProvider('a moderate pace trip to Kelowna').raw;
+  assert.equal(paceResult.pace, 'standard');
+  assert.equal(paceResult.budget, null, '"moderate pace" must not also set budget=moderate');
+
+  ['upscale', 'nicer', 'higher end', 'luxury', 'splurge', 'premium', 'fancy'].forEach((phrase) => {
+    assert.equal(app.deterministicTripParserProvider(`a ${phrase} trip to Kelowna`).raw.budget, 'upscale', `"${phrase}" should map to upscale`);
+  });
+});
+
+test('deterministicTripParserProvider: interests -- every one of the 7 real CATEGORY_SLUGS types has at least one working alias', () => {
+  assert.deepEqual(app.deterministicTripParserProvider('wineries in Kelowna').raw.interests, ['winery']);
+  assert.deepEqual(app.deterministicTripParserProvider('restaurants in Kelowna').raw.interests, ['restaurant']);
+  assert.deepEqual(app.deterministicTripParserProvider('cafes in Kelowna').raw.interests, ['cafe']);
+  assert.deepEqual(app.deterministicTripParserProvider('breweries in Kelowna').raw.interests, ['brewery']);
+  assert.deepEqual(app.deterministicTripParserProvider('pubs in Kelowna').raw.interests, ['pub']);
+  assert.deepEqual(app.deterministicTripParserProvider('cocktail bars in Kelowna').raw.interests, ['cocktail']);
+  assert.deepEqual(app.deterministicTripParserProvider('golfing in Kelowna').raw.interests, ['golf']);
+});
+
+test('deterministicTripParserProvider: interests -- multiple distinct aliases for the SAME type never produce duplicate entries', () => {
+  const { raw } = app.deterministicTripParserProvider('wine and wineries and a wine tasting in Kelowna');
+  assert.deepEqual(raw.interests, ['winery'], 'three different winery aliases in one request must still yield exactly one "winery" entry');
+});
+
+test('deterministicTripParserProvider: interests -- multiple DIFFERENT types in one request are all captured', () => {
+  const { raw } = app.deterministicTripParserProvider('golf and food and cocktails in Kelowna');
+  assert.deepEqual(new Set(raw.interests), new Set(['golf', 'restaurant', 'cocktail']));
+  assert.equal(raw.interests.length, 3);
+});
+
+test('deterministicTripParserProvider: amenities -- every requested dog-friendly alias resolves to dog_friendly', () => {
+  ['dog friendly', 'dog-friendly', 'dogs', 'my dog', 'bring my dog', 'with my dog', 'pet friendly', 'pets'].forEach((phrase) => {
+    const { raw } = app.deterministicTripParserProvider(`a trip to Kelowna, ${phrase}`);
+    assert.ok(raw.amenities.includes('dog_friendly'), `"${phrase}" should map to dog_friendly`);
+  });
+});
+
+test('deterministicTripParserProvider: amenities -- other real BOOL_FIELDS amenities are also recognized', () => {
+  assert.ok(app.deterministicTripParserProvider('a family friendly trip to Kelowna').raw.amenities.includes('kid_friendly'));
+  assert.ok(app.deterministicTripParserProvider('vegan options in Kelowna').raw.amenities.includes('vegan'));
+  assert.ok(app.deterministicTripParserProvider('gluten free places in Kelowna').raw.amenities.includes('gluten_free'));
+  assert.ok(app.deterministicTripParserProvider('somewhere with a patio in Kelowna').raw.amenities.includes('patio'));
+  assert.ok(app.deterministicTripParserProvider('happy hour in Kelowna').raw.amenities.includes('happy_hour'));
+});
+
+test('deterministicTripParserProvider: amenities -- an unsupported concept like wheelchair accessibility is never mapped to a real amenity', () => {
+  const { raw } = app.deterministicTripParserProvider('a wheelchair accessible trip to Kelowna');
+  assert.deepEqual(raw.amenities, []);
+  assert.ok(raw.unsupported_terms.some((t) => /wheelchair/.test(t)));
+});
+
+test('deterministicTripParserProvider: discovery -- every hidden-gem alias resolves to the real hidden_gem collection kind', () => {
+  ['hidden gems', 'hidden gem', 'secret spots', 'off the beaten path', 'local secrets', 'lesser known places', 'hidden places'].forEach((phrase) => {
+    const { raw } = app.deterministicTripParserProvider(`a trip to Kelowna, ${phrase}`);
+    assert.deepEqual(raw.discovery, ['hidden_gem'], `"${phrase}" should map to hidden_gem`);
+  });
+});
+
+test('deterministicTripParserProvider: discovery -- only uses collection kinds that actually exist in the live database', () => {
+  const knownKinds = app.getKnownDiscoveryKinds();
+  const { raw } = app.deterministicTripParserProvider('hidden gems in Kelowna');
+  raw.discovery.forEach((kind) => assert.ok(knownKinds.includes(kind), `${kind} must be a real, live collection kind`));
+});
+
+test('deterministicTripParserProvider: unsupported -- beaches/swimming/waterfront are recognized but never treated as a real interest', () => {
+  const { raw } = app.deterministicTripParserProvider('a trip to Kelowna with beaches and swimming');
+  assert.deepEqual(raw.interests, [], 'beaches/swimming must never appear in interests -- no such CATEGORY_SLUGS value exists');
+  assert.ok(raw.unsupported_terms.includes('beaches'));
+});
+
+test('deterministicTripParserProvider: unsupported -- event language is recognized but never fabricates an event', () => {
+  ['something fun happening Saturday night', "what's on Saturday", 'live music Saturday', 'a festival this weekend'].forEach((phrase) => {
+    const { raw } = app.deterministicTripParserProvider(`a trip to Kelowna, ${phrase}`);
+    assert.ok(raw.unsupported_terms.length > 0, `"${phrase}" should produce at least one unsupported term`);
+    assert.ok(!('event' in raw), 'the raw result must never contain a fabricated "event" field');
+  });
+});
+
+test('deterministicTripParserProvider: unsupported -- overlapping phrases for the same concept collapse to the longer, more specific entry only', () => {
+  const { raw } = app.deterministicTripParserProvider('something fun happening Saturday night in Kelowna');
+  assert.ok(raw.unsupported_terms.includes('something fun happening'));
+  assert.ok(!raw.unsupported_terms.includes('something happening'), '"something happening" is fully contained in the longer matched phrase and must be dropped, not duplicated');
+});
+
+test('deterministicTripParserProvider: mixed supported + unsupported request returns the supported parts fully populated, never failing the whole request', () => {
+  const { raw } = app.deterministicTripParserProvider('3 days in Kelowna with wine and a private helicopter tour');
+  assert.equal(raw.region, 'kelowna');
+  assert.equal(raw.days, 3);
+  assert.deepEqual(raw.interests, ['winery']);
+  assert.ok(raw.unsupported_terms.includes('helicopter tour'));
+});
+
+test('deterministicTripParserProvider: malformed/empty-ish input never throws and degrades to an honest, mostly-empty result', () => {
+  assert.doesNotThrow(() => app.deterministicTripParserProvider('???'));
+  assert.doesNotThrow(() => app.deterministicTripParserProvider('   '));
+  assert.doesNotThrow(() => app.deterministicTripParserProvider('asdkjfh qwepoiu zxcvb'));
+  const { raw } = app.deterministicTripParserProvider('???');
+  assert.equal(raw.region, null);
+  assert.equal(raw.days, null);
+  assert.deepEqual(raw.interests, []);
+});
+
+test('deterministicTripParserProvider: fully deterministic -- the exact same input run 10 times produces byte-identical output every time', () => {
+  const text = 'Plan me a relaxed 3-day trip around Kelowna with wine, hidden gems, dog-friendly places, beaches and something fun happening Saturday night.';
+  const first = app.deterministicTripParserProvider(text);
+  for (let i = 0; i < 10; i++) {
+    assert.deepEqual(app.deterministicTripParserProvider(text), first);
+  }
+});
+
+test('parseTripRequest (full pipeline, default provider): fully deterministic across repeated calls, including needs_clarification', async () => {
+  const text = 'Plan something in Kelowna.';
+  const first = await app.parseTripRequest(text);
+  for (let i = 0; i < 5; i++) {
+    assert.deepEqual(await app.parseTripRequest(text), first);
+  }
+});
+
+// ---- Build My Trip, Stage 3: the 8 required example requests (default provider, full pipeline) ----
+
+test('Example 1: relaxed 3-day Kelowna wine/hidden-gems/dog-friendly/beaches/Saturday-night request', async () => {
+  const result = await app.parseTripRequest(
+    'Plan me a relaxed 3-day trip around Kelowna with wine, hidden gems, dog-friendly places, beaches and something fun happening Saturday night.'
+  );
+  assert.deepEqual(result.value, {
+    region: 'kelowna', days: 3, interests: ['winery'], amenities: ['dog_friendly'],
+    pace: 'relaxed', budget: null, discovery: ['hidden_gem'],
+    unsupported: ['something fun happening', 'saturday night', 'beaches'],
+    needs_clarification: [],
+  });
+});
+
+test('Example 2: packed 2-day Vernon golf/food request', async () => {
+  const result = await app.parseTripRequest('Give me a packed 2 day trip in Vernon with golf and food.');
+  assert.equal(result.value.region, 'vernon');
+  assert.equal(result.value.days, 2);
+  assert.equal(result.value.pace, 'packed');
+  assert.ok(result.value.interests.includes('golf'));
+  assert.ok(result.value.interests.includes('restaurant'));
+});
+
+test('Example 3: relaxed weekend Penticton wineries/beaches -- days must NOT be guessed', async () => {
+  const result = await app.parseTripRequest("I'm looking for a relaxed weekend around Penticton with wineries and beaches.");
+  assert.equal(result.value.region, 'penticton');
+  assert.equal(result.value.days, null, 'bare "weekend" must never be guessed as a day count');
+  assert.deepEqual(result.value.needs_clarification, ['days']);
+  assert.equal(result.value.pace, 'relaxed');
+  assert.ok(result.value.interests.includes('winery'));
+  assert.ok(result.value.unsupported.includes('beaches'));
+});
+
+test('Example 4: 4-day Osoyoos affordable wineries + hidden gems', async () => {
+  const result = await app.parseTripRequest('Plan 4 days around Osoyoos. I want affordable wineries and hidden gems.');
+  assert.equal(result.value.region, 'osoyoos');
+  assert.equal(result.value.days, 4);
+  assert.ok(result.value.interests.includes('winery'));
+  assert.equal(result.value.budget, 'budget');
+  assert.ok(result.value.discovery.includes('hidden_gem'));
+});
+
+test('Example 5: 3-day Lake Country, dog, leisurely pace', async () => {
+  const result = await app.parseTripRequest('Take me to Lake Country for three days. I have my dog and want a leisurely trip.');
+  assert.equal(result.value.region, 'lake-country');
+  assert.equal(result.value.days, 3);
+  assert.ok(result.value.amenities.includes('dog_friendly'));
+  assert.equal(result.value.pace, 'relaxed');
+});
+
+test('Example 6: "Plan something in Kelowna." -- days missing, needs clarification', async () => {
+  const result = await app.parseTripRequest('Plan something in Kelowna.');
+  assert.equal(result.value.region, 'kelowna');
+  assert.equal(result.value.days, null);
+  assert.deepEqual(result.value.needs_clarification, ['days']);
+});
+
+test('Example 7: "Give me three days of wine." -- region missing, needs clarification', async () => {
+  const result = await app.parseTripRequest('Give me three days of wine.');
+  assert.equal(result.value.region, null);
+  assert.equal(result.value.days, 3);
+  assert.ok(result.value.interests.includes('winery'));
+  assert.deepEqual(result.value.needs_clarification, ['region']);
+});
+
+test('Example 8: 3-day Kelowna wine + private helicopter tour -- unsupported, no fabricated venue/event', async () => {
+  const result = await app.parseTripRequest('Plan me a 3 day Kelowna trip with wine and a private helicopter tour.');
+  assert.equal(result.value.region, 'kelowna');
+  assert.equal(result.value.days, 3);
+  assert.ok(result.value.interests.includes('winery'));
+  assert.ok(result.value.unsupported.includes('helicopter tour'));
+  assert.ok(!('venue' in result.value) && !('venues' in result.value), 'the structured result must never contain a fabricated venue field');
+});
+
 // ---- Build My Trip, Stage 2 (extractHtmlFragment + renderTripPlannerPage) ----
 
 test('extractHtmlFragment: includeEndMarker=false stops BEFORE the end marker (regression test for the exact bug that swallowed the whole /trip page into an unterminated HTML comment)', () => {
@@ -2460,12 +2746,13 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   }
 
   // ---- POST /api/trip/parse (Build My Trip, Stage 3) -----------------------
-  // OPENAI_API_KEY is intentionally unset in this test environment (and in
-  // production, until explicitly provisioned) -- so this route-level suite
-  // can only exercise request validation and the honest "not configured"
-  // failure path over real HTTP. parseTripRequest()'s actual parsing/
-  // validation logic is covered exhaustively above with a mocked provider,
-  // entirely network-free.
+  // The route's default provider is now the FREE deterministic parser
+  // (deterministicTripParserProvider), not OpenAI -- so a well-formed
+  // request succeeds over real HTTP with OPENAI_API_KEY completely unset,
+  // no network call, and no cost. Deep parsing/alias-matching behavior is
+  // covered exhaustively below (deterministicTripParserProvider tests);
+  // this block confirms the route itself wires the real default provider
+  // correctly end to end.
   {
     async function parseTrip(bodyObj) {
       const res = await fetch(`${base}/api/trip/parse`, {
@@ -2502,13 +2789,62 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
       assert.equal(res.status, 400);
     }
 
-    // 502 -- with no OPENAI_API_KEY provisioned, a well-formed request must
-    // fail honestly (not silently return an empty/guessed plan, and not
-    // crash the server).
+    // 200 -- a well-formed request succeeds with NO OPENAI_API_KEY set at
+    // all, via the real (unmocked) default provider -- proving the live
+    // route no longer depends on OpenAI being configured.
     {
-      const { status, body } = await parseTrip({ text: 'a relaxed 3-day Kelowna wine trip' });
-      assert.equal(status, 502);
-      assert.equal(body.reason, 'not_configured');
+      const { status, body } = await parseTrip({
+        text: 'Plan me a relaxed 3-day trip around Kelowna with wine, hidden gems, dog-friendly places, beaches and something fun happening Saturday night.',
+      });
+      assert.equal(status, 200);
+      assert.deepEqual(body, {
+        region: 'kelowna',
+        days: 3,
+        interests: ['winery'],
+        amenities: ['dog_friendly'],
+        pace: 'relaxed',
+        budget: null,
+        discovery: ['hidden_gem'],
+        unsupported: ['something fun happening', 'saturday night', 'beaches'],
+        needs_clarification: [],
+      });
+    }
+
+    // The structured output from /api/trip/parse must be directly
+    // consumable by /api/trip/generate, unmodified -- the two endpoints'
+    // contracts are still meant to compose exactly as before.
+    {
+      const { body: parsed } = await parseTrip({ text: 'Give me three days of wine around Vernon, relaxed pace, dog friendly.' });
+      assert.equal(parsed.region, 'vernon');
+      assert.equal(parsed.days, 3);
+
+      const genRes = await fetch(`${base}/api/trip/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          region: parsed.region,
+          days: parsed.days,
+          interests: parsed.interests,
+          pace: parsed.pace,
+          amenities: parsed.amenities,
+          budget: parsed.budget,
+          discovery: parsed.discovery,
+        }),
+      });
+      assert.equal(genRes.status, 200);
+      const genBody = await genRes.json();
+      assert.equal(genBody.region, 'vernon');
+      assert.equal(genBody.days, 3);
+    }
+
+    // A request needing clarification still returns 200 (not an error) --
+    // this is a valid, honest outcome, not a failure.
+    {
+      const { status, body } = await parseTrip({ text: 'Plan something in Kelowna.' });
+      assert.equal(status, 200);
+      assert.equal(body.region, 'kelowna');
+      assert.equal(body.days, null);
+      assert.deepEqual(body.needs_clarification, ['days']);
     }
   }
 

@@ -1819,6 +1819,229 @@ async function callTripParserProvider(text) {
   return { raw: parsedContent, error: null };
 }
 
+// ---------- Build My Trip, Stage 3: FREE deterministic natural-language parser ----------
+//
+// The DEFAULT trip-request provider (see parseTripRequest()'s providerFn
+// default just below). Zero external calls, zero API cost, zero dependency
+// on OPENAI_API_KEY -- the whole thing is string matching against this
+// app's own authoritative enums. callTripParserProvider() (OpenAI) above
+// remains fully intact as an alternative provider for the future (pass it
+// explicitly via parseTripRequest(text, { providerFn: callTripParserProvider })),
+// but nothing in the live /api/trip/parse path calls it anymore.
+//
+// Design: normalize the input text once, then run one independent alias-
+// table lookup per field. Every alias table is keyed by a value that
+// already exists in this app's real data (VALID_REGIONS/REGION_LABELS,
+// CATEGORY_SLUGS, BOOL_FIELDS, TRIP_VALID_PACES, TRIP_VALID_BUDGETS, live
+// collection kinds) -- nothing here invents a new taxonomy value.
+// parseTripRequest()'s existing isValidTrip*() predicates still
+// revalidate every field exactly as they do for any other provider, so
+// this function doesn't need to be perfectly strict to stay safe; it only
+// needs to never emit an out-of-taxonomy VALUE for a supported field.
+// Concepts this app can't satisfy (beaches, events, accessibility, etc.)
+// are recognized and reported via unsupported_terms, never silently
+// dropped and never approximated into a real field.
+
+function normalizeTripParserText(text) {
+  return text
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[-–—]/g, ' ') // hyphens/dashes -> space, so "dog-friendly" and "dog friendly" match the same alias
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Region aliases are derived from the app's own authoritative
+// VALID_REGIONS/REGION_LABELS, not a separately hand-maintained list -- a
+// new region added to the data automatically gets natural-language
+// recognition here (its slug-with-spaces form and its display label) with
+// no parser change required.
+function buildTripParserRegionAliases() {
+  const aliases = {};
+  VALID_REGIONS.forEach((slug) => {
+    const fromSlug = slug.replace(/-/g, ' ');
+    const fromLabel = (REGION_LABELS[slug] || '').toLowerCase();
+    aliases[slug] = Array.from(new Set([fromSlug, fromLabel].filter(Boolean)));
+  });
+  return aliases;
+}
+
+const TRIP_PARSER_INTEREST_ALIASES = {
+  winery: ['wine', 'wines', 'wineries', 'winery', 'vineyard', 'vineyards', 'wine tasting', 'wine tastings', 'wine tour', 'wine tours'],
+  restaurant: ['restaurant', 'restaurants', 'dining', 'food', 'eat', 'eating out'],
+  cafe: ['cafe', 'cafes', 'coffee', 'coffee shop', 'coffee shops'],
+  brewery: ['brewery', 'breweries', 'beer', 'craft beer'],
+  pub: ['pub', 'pubs'],
+  cocktail: ['cocktail', 'cocktails', 'cocktail bar', 'cocktail bars', 'cocktail lounge'],
+  golf: ['golf', 'golfing', 'golf course', 'golf courses'],
+};
+
+const TRIP_PARSER_AMENITY_ALIASES = {
+  dog_friendly: ['dog friendly', 'dogs', 'my dog', 'bring my dog', 'with my dog', 'pet friendly', 'pets'],
+  kid_friendly: ['kid friendly', 'family friendly', 'with kids', 'with my kids'],
+  vegan: ['vegan', 'vegan friendly', 'vegan options'],
+  vegetarian: ['vegetarian', 'vegetarian friendly', 'vegetarian options'],
+  gluten_free: ['gluten free'],
+  patio: ['patio', 'outdoor seating'],
+  lake_view: ['lake view', 'lakeview', 'lake views'],
+  nonalcoholic: ['non alcoholic', 'nonalcoholic', 'alcohol free', 'mocktails'],
+  sports_tv: ['sports tv', 'watch the game', 'watch sports'],
+  live_music: ['live music'],
+  great_groups: ['great for groups', 'good for groups', 'large groups'],
+  happy_hour: ['happy hour'],
+};
+
+const TRIP_PARSER_PACE_ALIASES = {
+  relaxed: ['relaxed', 'easygoing', 'easy going', 'slow', 'leisurely', 'take it easy', 'laid back', 'chill', 'chilled'],
+  standard: ['standard', 'moderate pace', 'moderate speed', 'balanced', 'normal pace'],
+  packed: ['packed', 'busy', 'full', 'see as much as possible', 'action packed', 'jam packed'],
+};
+
+// Deliberately excludes the bare word "moderate" -- it collides with the
+// pace aliases "moderate pace"/"moderate speed" above. See the explicit
+// disambiguation step in deterministicTripParserProvider() below, which
+// only treats bare "moderate" as a budget signal when it is NOT part of
+// one of those pace phrases.
+const TRIP_PARSER_BUDGET_ALIASES = {
+  budget: ['cheap', 'inexpensive', 'affordable', 'on a budget', 'low cost', 'budget friendly'],
+  moderate: ['mid range', 'reasonable', 'reasonably priced'],
+  upscale: ['upscale', 'nicer', 'higher end', 'high end', 'luxury', 'splurge', 'premium', 'fancy', 'fine dining'],
+};
+
+// Keyed by real collections.kind values. Only kinds that
+// getKnownDiscoveryKinds() actually returns at parse time are used (see
+// deterministicTripParserProvider()), so this table can never surface a
+// discovery kind that doesn't really exist in the data.
+const TRIP_PARSER_DISCOVERY_ALIASES = {
+  hidden_gem: ['hidden gems', 'hidden gem', 'secret spots', 'secret spot', 'off the beaten path', 'local secrets', 'lesser known places', 'lesser known place', 'hidden places', 'hidden place'],
+};
+
+// Concepts this app is known NOT to support today (see the Stage 3 data-
+// model audits) -- recognized so the parser can report them honestly in
+// unsupported_terms instead of silently ignoring them or approximating
+// them into a real field. This list can never be exhaustive (an inherent,
+// honest limitation of a deterministic, non-LLM parser); it covers the
+// concretely known gaps -- beaches/waterfront, outdoors/hiking, events/
+// What's On, accessibility -- plus a few illustrative one-off examples.
+const TRIP_PARSER_UNSUPPORTED_PHRASES = [
+  'beach', 'beaches', 'swimming', 'lake day', 'waterfront',
+  'hiking', 'hike', 'outdoors', 'nature', 'adventure', 'explore', 'exploring',
+  "what's on", 'whats on', 'something fun happening', 'something happening',
+  'saturday night', 'sunday night', 'friday night', 'live music saturday',
+  'event', 'events', 'concert', 'festival', 'show',
+  'wheelchair accessible', 'wheelchair', 'accessibility', 'accessible',
+  'helicopter tour', 'helicopter', 'private jet', 'michelin star', 'michelin',
+];
+
+const TRIP_PARSER_DAY_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+
+// "long weekend" is a well-defined, widely understood 3-day idiom -- safe
+// to map. A bare "weekend" alone is genuinely ambiguous (2 days? 3?) and
+// is deliberately left unmapped, matching the "never guess a day count"
+// rule: it falls through to needs_clarification instead.
+function detectTripParserDays(normalizedText) {
+  if (/\blong weekend\b/.test(normalizedText)) return 3;
+  const digitMatch = normalizedText.match(/\b(\d{1,2})\s+days?\b/);
+  if (digitMatch) {
+    const n = parseInt(digitMatch[1], 10);
+    return isValidTripDays(n) ? n : null;
+  }
+  const wordMatch = normalizedText.match(/\b(one|two|three|four|five|six|seven)\s+days?\b/);
+  if (wordMatch) {
+    const n = TRIP_PARSER_DAY_WORDS[wordMatch[1]];
+    return isValidTripDays(n) ? n : null;
+  }
+  return null;
+}
+
+// Picks the single best (longest phrase, then leftmost) match across
+// every canonical value's alias list -- used for the scalar fields
+// (region, pace, budget) where only one value makes sense. Matching is
+// whole-phrase-safe: `paddedText` is the normalized text with a leading
+// and trailing space, so ` ${phrase} ` can never match inside a larger
+// unrelated word.
+function findBestTripParserAlias(paddedText, aliasTable) {
+  let best = null;
+  for (const [value, phrases] of Object.entries(aliasTable)) {
+    for (const phrase of phrases) {
+      const index = paddedText.indexOf(` ${phrase} `);
+      if (index === -1) continue;
+      if (!best || phrase.length > best.length || (phrase.length === best.length && index < best.index)) {
+        best = { value, phrase, index, length: phrase.length };
+      }
+    }
+  }
+  return best ? best.value : null;
+}
+
+// Collects every canonical value with at least one matching alias --
+// used for the array-valued fields (interests, amenities, discovery)
+// where multiple matches are all kept, deduplicated by canonical value.
+function findAllTripParserAliases(paddedText, aliasTable) {
+  const values = [];
+  for (const [value, phrases] of Object.entries(aliasTable)) {
+    if (phrases.some((phrase) => paddedText.indexOf(` ${phrase} `) !== -1)) {
+      values.push(value);
+    }
+  }
+  return values;
+}
+
+// Same matching rule as above, but for the flat unsupported-phrase list.
+// When one matched phrase fully contains a shorter matched phrase (e.g.
+// "something fun happening" contains "something happening"), only the
+// longer, more specific phrase is kept -- so overlapping aliases for the
+// same concept don't produce redundant near-duplicate entries.
+function findUnsupportedTripParserPhrases(paddedText, phrases) {
+  const matched = phrases.filter((phrase) => paddedText.indexOf(` ${phrase} `) !== -1);
+  const sortedByLengthDesc = [...matched].sort((a, b) => b.length - a.length);
+  const kept = [];
+  sortedByLengthDesc.forEach((phrase) => {
+    if (!kept.some((k) => k.includes(phrase))) kept.push(phrase);
+  });
+  return kept;
+}
+
+// The deterministic parser provider -- returns the exact same {raw, error}
+// contract every provider must (see callTripParserProvider above), so
+// parseTripRequest() needs no changes at all to use it. Synchronous (no
+// I/O beyond the same local getKnownDiscoveryKinds() SELECT every other
+// trip route already makes); awaiting a non-Promise value is a no-op, so
+// it works fine as a providerFn even though parseTripRequest() always
+// awaits it.
+function deterministicTripParserProvider(text) {
+  const normalized = normalizeTripParserText(text);
+  const padded = ` ${normalized} `;
+
+  const region = findBestTripParserAlias(padded, buildTripParserRegionAliases());
+  const days = detectTripParserDays(normalized);
+  const pace = findBestTripParserAlias(padded, TRIP_PARSER_PACE_ALIASES);
+
+  let budget = findBestTripParserAlias(padded, TRIP_PARSER_BUDGET_ALIASES);
+  if (!budget && padded.indexOf(' moderate ') !== -1 && padded.indexOf(' moderate pace ') === -1 && padded.indexOf(' moderate speed ') === -1) {
+    budget = 'moderate';
+  }
+
+  const interests = findAllTripParserAliases(padded, TRIP_PARSER_INTEREST_ALIASES);
+  const amenities = findAllTripParserAliases(padded, TRIP_PARSER_AMENITY_ALIASES);
+
+  const knownDiscoveryKinds = getKnownDiscoveryKinds();
+  const liveDiscoveryAliases = {};
+  Object.keys(TRIP_PARSER_DISCOVERY_ALIASES).forEach((kind) => {
+    if (knownDiscoveryKinds.includes(kind)) liveDiscoveryAliases[kind] = TRIP_PARSER_DISCOVERY_ALIASES[kind];
+  });
+  const discovery = findAllTripParserAliases(padded, liveDiscoveryAliases);
+
+  const unsupported_terms = findUnsupportedTripParserPhrases(padded, TRIP_PARSER_UNSUPPORTED_PHRASES);
+
+  return {
+    raw: { region, days, interests, amenities, pace, budget, discovery, unsupported_terms },
+    error: null,
+  };
+}
+
 // The natural-language trip-request parser. Treats the provider's response
 // as UNTRUSTED input: every field is re-validated with the exact same
 // isValidTrip*() predicates /api/trip/generate uses, never taken on faith.
@@ -1827,7 +2050,9 @@ async function callTripParserProvider(text) {
 // request is represented honestly even when part of it can't be fulfilled.
 //
 // options.providerFn lets tests inject a mock provider (no real network
-// call), while production code omits it and gets callTripParserProvider.
+// call). Production code omits it and gets the FREE deterministic parser
+// above (deterministicTripParserProvider) -- NOT the OpenAI provider,
+// which is now only used if a caller explicitly opts into it.
 //
 // Returns either:
 //   { ok: false, reason: string }  -- provider unavailable/network/malformed
@@ -1841,7 +2066,7 @@ async function callTripParserProvider(text) {
 //     reported via needs_clarification rather than failing the request.
 async function parseTripRequest(text, options) {
   const opts = options || {};
-  const providerFn = opts.providerFn || callTripParserProvider;
+  const providerFn = opts.providerFn || deterministicTripParserProvider;
 
   if (typeof text !== 'string' || !text.trim()) {
     return { ok: false, reason: 'empty_text' };
@@ -6386,6 +6611,8 @@ module.exports = {
   parseTripRequest,
   callTripParserProvider,
   classifyTripParserFetchError,
+  deterministicTripParserProvider,
+  normalizeTripParserText,
   // Design Sprint 3 (Homepage Discovery)
   renderHiddenGemsHomepageHTML,
   renderExploreByCategoryHTML,
