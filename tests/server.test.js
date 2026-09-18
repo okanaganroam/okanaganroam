@@ -317,9 +317,9 @@ test('exactly 3 Hidden Gems editorial cards render, in the approved order, each 
   assert.match(html, /Dog-Friendly Finds/);
   assert.match(html, /Local Favourites/);
   assert.match(html, /Secret Spots/);
-  assert.match(html, /src="\/images\/hidden-gems\/dog-friendly\.png"/);
-  assert.match(html, /src="\/images\/hidden-gems\/local-favourites\.png"/);
-  assert.match(html, /src="\/images\/hidden-gems\/secret-spots\.png"/);
+  assert.match(html, /src="\/images\/hidden-gems\/dog-friendly\.webp"/);
+  assert.match(html, /src="\/images\/hidden-gems\/local-favourites\.webp"/);
+  assert.match(html, /src="\/images\/hidden-gems\/secret-spots\.webp"/);
 });
 
 test('Hidden Gems editorial cards all link to #directory (no fabricated per-theme venue list)', () => {
@@ -354,7 +354,7 @@ test('hiddenGemHomepageCardHtml still renders a real approved venue correctly (u
   const html = app.hiddenGemHomepageCardHtml(gelato);
   assert.match(html, /href="\/naramata\/cafes\/chabendo-gelato"/);
   assert.match(html, /Chabendo Gelato/);
-  assert.match(html, /hidden-gem-card-img" src="\/images\/mood\/eat\.png"/, 'cafe type maps to the Food & Drink mood image');
+  assert.match(html, /hidden-gem-card-img" src="\/images\/mood\/eat\.webp"/, 'cafe type maps to the Food & Drink mood image');
   assert.doesNotMatch(html, /★/);
 });
 
@@ -429,7 +429,7 @@ test('Reference redesign: Explore the Okanagan shows exactly the 6 approved feat
 test('Reference redesign: Explore the Okanagan cards each include a real, servable destination image', () => {
   const html = app.renderExploreRegionsHTML();
   for (const region of REFERENCE_EXPLORE_REGIONS) {
-    assert.match(html, new RegExp(`src="/images/regions/${region}\\.png"`), `expected a destination image for ${region}`);
+    assert.match(html, new RegExp(`src="/images/regions/${region}\\.webp"`), `expected a destination image for ${region}`);
   }
 });
 
@@ -544,7 +544,7 @@ test('Build Your Perfect Okanagan Trip section does not introduce a new trip dat
 
 test('Build Your Perfect Okanagan Trip map visual uses the new map image, not the old hand-built SVG', () => {
   const html = app.renderBuildTripCTAHTML();
-  assert.match(html, /<img class="trip-cta-map-img" src="\/images\/trip-cta-map\.png" width="1376" height="768"/, 'the new map image must render inside the existing #tripCtaOpenMap button');
+  assert.match(html, /<img class="trip-cta-map-img" src="\/images\/trip-cta-map\.webp" width="1376" height="768"/, 'the new map image must render inside the existing #tripCtaOpenMap button');
   assert.doesNotMatch(html, /<svg class="trip-cta-map-svg"/, 'the old hand-built SVG map must be fully removed, not layered under the new image');
   assert.doesNotMatch(html, /tripLakeGrad|tripPinGrad|tripSoftBlur/, 'the old SVG\'s gradient/filter defs must be gone too');
 });
@@ -647,12 +647,12 @@ test('Mood cards: Food & Drink links to /browse pre-filtered by its multi-type f
 
 test('Mood cards: image paths are correct for all six cards, including the not-yet-supplied Beaches asset', () => {
   const html = app.renderMoodCardsHTML();
-  assert.match(html, /mood-card-food-drink"[^]*?src="\/images\/mood\/eat\.png"/);
-  assert.match(html, /mood-card-wine"[^]*?src="\/images\/mood\/drink\.png"/);
-  assert.match(html, /mood-card-beaches"[^]*?src="\/images\/mood\/beaches\.png"/);
-  assert.match(html, /mood-card-golf"[^]*?src="\/images\/mood\/golf\.png"/);
-  assert.match(html, /mood-card-whats-on"[^]*?src="\/images\/mood\/whats-on\.png"/);
-  assert.match(html, /mood-card-outdoors"[^]*?src="\/images\/mood\/explore\.png"/);
+  assert.match(html, /mood-card-food-drink"[^]*?src="\/images\/mood\/eat\.webp"/);
+  assert.match(html, /mood-card-wine"[^]*?src="\/images\/mood\/drink\.webp"/);
+  assert.match(html, /mood-card-beaches"[^]*?src="\/images\/mood\/beaches\.webp"/);
+  assert.match(html, /mood-card-golf"[^]*?src="\/images\/mood\/golf\.webp"/);
+  assert.match(html, /mood-card-whats-on"[^]*?src="\/images\/mood\/whats-on\.webp"/);
+  assert.match(html, /mood-card-outdoors"[^]*?src="\/images\/mood\/explore\.webp"/);
 });
 
 test('Mood cards: heading row includes the reference\'s "Explore all categories" link', () => {

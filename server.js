@@ -887,13 +887,13 @@ function compactVisualBandHtml(type, opts = {}) {
 // (not a stand-in for a fake business photo) and keeps the visual
 // treatment the reference calls for without inventing anything.
 const HIDDEN_GEM_TYPE_IMAGE = {
-  winery: '/images/mood/drink.png',
-  restaurant: '/images/mood/eat.png',
-  cafe: '/images/mood/eat.png',
-  brewery: '/images/mood/eat.png',
-  pub: '/images/mood/eat.png',
-  cocktail: '/images/mood/eat.png',
-  golf: '/images/mood/golf.png',
+  winery: '/images/mood/drink.webp',
+  restaurant: '/images/mood/eat.webp',
+  cafe: '/images/mood/eat.webp',
+  brewery: '/images/mood/eat.webp',
+  pub: '/images/mood/eat.webp',
+  cocktail: '/images/mood/eat.webp',
+  golf: '/images/mood/golf.webp',
 };
 
 // Design Sprint 4 / reference redesign: the Hidden Gems homepage card has
@@ -1423,21 +1423,21 @@ const HIDDEN_GEM_EDITORIAL_CARDS = [
     title: 'Dog-Friendly Finds',
     blurbKey: 'gems.dogFriendly.blurb',
     blurb: 'Patios and trails where your dog belongs.',
-    img: '/images/hidden-gems/dog-friendly.png',
+    img: '/images/hidden-gems/dog-friendly.webp',
   },
   {
     titleKey: 'gems.localFavourites.title',
     title: 'Local Favourites',
     blurbKey: 'gems.localFavourites.blurb',
     blurb: 'The spots locals keep coming back to.',
-    img: '/images/hidden-gems/local-favourites.png',
+    img: '/images/hidden-gems/local-favourites.webp',
   },
   {
     titleKey: 'gems.secretSpots.title',
     title: 'Secret Spots',
     blurbKey: 'gems.secretSpots.blurb',
     blurb: 'Quiet corners away from the crowds.',
-    img: '/images/hidden-gems/secret-spots.png',
+    img: '/images/hidden-gems/secret-spots.webp',
   },
 ];
 
@@ -1547,7 +1547,7 @@ function renderExploreRegionsHTML() {
     .filter((region) => REGION_LABELS[region])
     .map((region) => {
       return `<a class="region-card" href="/${region}">
-      <img class="region-card-img" src="/images/regions/${region}.png" width="640" height="250" alt="" loading="lazy">
+      <img class="region-card-img" src="/images/regions/${region}.webp" width="640" height="250" alt="" loading="lazy">
       <span class="region-card-scrim" aria-hidden="true"></span>
       <span class="region-card-overlay">
         <span class="region-card-label">${escapeHtml(REGION_LABELS[region])}</span>
@@ -1643,7 +1643,7 @@ function renderExploreRegionsHTML() {
 // orchestration (open the existing panel; don't reimplement it). No new
 // trip data model, no new IDs for trip/map state.
 // Visual QA pass: ONE continuous composition -- copy (bottom-left) ->
-// travel photo (public/images/trip-cta.png, the map/sunglasses/water-
+// travel photo (public/images/trip-cta.webp, the map/sunglasses/water-
 // bottle picnic shot) -> soft dissolve -> a real, labeled editorial travel
 // map (far right). Still a real, geographically-relative layout of the
 // same 6 Explore by Destination places (not an abstract decorative
@@ -1674,11 +1674,11 @@ function renderBuildTripCTAHTML() {
 <section class="trip-cta-section" id="buildTrip">
   <div class="wrap-wide trip-cta-inner">
     <div class="trip-cta-visual" aria-hidden="true">
-      <img class="trip-cta-img" src="/images/trip-cta.png" width="1600" height="656" alt="" loading="lazy">
+      <img class="trip-cta-img" src="/images/trip-cta.webp" width="1600" height="656" alt="" loading="lazy">
       <div class="trip-cta-scrim"></div>
     </div>
     <button type="button" class="trip-cta-map" id="tripCtaOpenMap" aria-label="Open the interactive map" data-i18n-aria="trip.openMap">
-      <img class="trip-cta-map-img" src="/images/trip-cta-map.png" width="1376" height="768" alt="" loading="lazy">
+      <img class="trip-cta-map-img" src="/images/trip-cta-map.webp" width="1376" height="768" alt="" loading="lazy">
     </button>
     <div class="trip-cta-content">
       <span class="trip-cta-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/><circle cx="17" cy="9" r="1.4" fill="currentColor" stroke="none"/></svg></span>
@@ -1766,12 +1766,12 @@ function renderMoodCardsHTML() {
   // claiming otherwise) -- mood.foodDrink.title/mood.beaches.title now
   // give all six cards real TRANSLATIONS.en/.fr entries.
   const cards = [
-    { key: 'food-drink', href: '/browse?types=restaurant,cafe,brewery,pub,cocktail', filter: 'restaurant,cafe,brewery,pub,cocktail', img: '/images/mood/eat.png', titleKey: 'mood.foodDrink.title', title: 'Food & Drink' },
-    { key: 'wine', href: wineHref, filter: 'winery', img: '/images/mood/drink.png', titleKey: 'mood.wine.title', title: 'Wine' },
-    { key: 'beaches', href: '#exploreRegions', filter: null, img: '/images/mood/beaches.png', titleKey: 'mood.beaches.title', title: 'Beaches' },
-    { key: 'golf', href: golfHref, filter: null, img: '/images/mood/golf.png', titleKey: 'mood.golf.title', title: 'Golf' },
-    { key: 'whats-on', href: '/events', filter: null, img: '/images/mood/whats-on.png', titleKey: 'mood.whatsOn.title', title: "What's On" },
-    { key: 'outdoors', href: '#exploreRegions', filter: null, img: '/images/mood/explore.png', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
+    { key: 'food-drink', href: '/browse?types=restaurant,cafe,brewery,pub,cocktail', filter: 'restaurant,cafe,brewery,pub,cocktail', img: '/images/mood/eat.webp', titleKey: 'mood.foodDrink.title', title: 'Food & Drink' },
+    { key: 'wine', href: wineHref, filter: 'winery', img: '/images/mood/drink.webp', titleKey: 'mood.wine.title', title: 'Wine' },
+    { key: 'beaches', href: '#exploreRegions', filter: null, img: '/images/mood/beaches.webp', titleKey: 'mood.beaches.title', title: 'Beaches' },
+    { key: 'golf', href: golfHref, filter: null, img: '/images/mood/golf.webp', titleKey: 'mood.golf.title', title: 'Golf' },
+    { key: 'whats-on', href: '/events', filter: null, img: '/images/mood/whats-on.webp', titleKey: 'mood.whatsOn.title', title: "What's On" },
+    { key: 'outdoors', href: '#exploreRegions', filter: null, img: '/images/mood/explore.webp', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
   ];
 
   const cardsHtml = cards.map((c) => {
