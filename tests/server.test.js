@@ -3373,6 +3373,69 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     }
   }
 
+  // ---- HEAD requests must mirror GET (SEO fix, 2026-09-19) ---------------
+  // Per RFC 7231 sec. 4.3.2, a HEAD response must carry the same
+  // status/headers as the equivalent GET, just with no body. Covers a
+  // representative page of each route shape guarded by `method === 'GET'`
+  // in server.js: the homepage, a region page, a category page, a venue
+  // page, a redirect (301), a 404, the plain-text/XML routes
+  // (robots.txt/sitemap.xml), and a sendJSON-based API route.
+  {
+    const headVsGet = async (path) => {
+      const [headRes, getRes] = await Promise.all([
+        fetch(`${base}${path}`, { method: 'HEAD' }),
+        fetch(`${base}${path}`),
+      ]);
+      const headBody = await headRes.text();
+      return { headRes, getRes, headBody };
+    };
+
+    for (const path of ['/', '/kelowna', '/kelowna/restaurants', '/kelowna/restaurants/test-trattoria', '/robots.txt', '/sitemap.xml', '/api/venues']) {
+      const { headRes, getRes, headBody } = await headVsGet(path);
+      assert.equal(headRes.status, getRes.status, `HEAD ${path} must match GET ${path}'s status`);
+      assert.equal(headRes.headers.get('content-type'), getRes.headers.get('content-type'), `HEAD ${path} content-type must match GET`);
+      assert.equal(headBody, '', `HEAD ${path} must have an empty body`);
+    }
+
+    // 404
+    {
+      const { headRes, getRes, headBody } = await headVsGet('/this-region-does-not-exist');
+      assert.equal(headRes.status, 404);
+      assert.equal(headRes.status, getRes.status);
+      assert.equal(headBody, '', 'HEAD 404 must have an empty body');
+    }
+
+    // Redirect (301) -- HEAD must carry the same Location header, no body.
+    {
+      const headRes = await fetch(`${base}/kelowna/restaurants/ds4-redirected-gem`, { method: 'HEAD', redirect: 'manual' });
+      const getRes = await fetch(`${base}/kelowna/restaurants/ds4-redirected-gem`, { redirect: 'manual' });
+      assert.equal(headRes.status, 301, 'HEAD must receive the same 301 GET does');
+      assert.equal(headRes.status, getRes.status);
+      assert.equal(headRes.headers.get('location'), getRes.headers.get('location'), 'HEAD redirect Location must match GET');
+      assert.equal(await headRes.text(), '', 'HEAD redirect must have an empty body');
+    }
+  }
+
+  // ---- sitemap <lastmod> reflects real data, not "today" (SEO fix, 2026-09-19) ----
+  {
+    const pastDate = '2020-01-02';
+    db.prepare('UPDATE venues SET updated_at = ? WHERE id = ?').run(`${pastDate} 00:00:00`, testVenue.id);
+    const freshSitemapRes = await fetch(`${base}/sitemap.xml`);
+    const freshSitemapBody = await freshSitemapRes.text();
+    const block = freshSitemapBody.match(/<url>\s*<loc>https:\/\/okanaganroam\.com\/kelowna\/restaurants\/test-trattoria<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/);
+    assert.ok(block, 'test venue must have a matching sitemap <url> block');
+    assert.equal(block[1], pastDate, "venue lastmod must reflect the venue's real updated_at, not today's date");
+
+    // This fix must not change which URLs are in the sitemap -- only the
+    // <lastmod> value -- so the total <loc> count must be unchanged from
+    // the earlier fetch in this same test (before this one row's
+    // updated_at was touched; nothing about its region/type/slug/
+    // redirect_to changed).
+    const locCountBefore = (sitemapBody.match(/<loc>/g) || []).length;
+    const locCountAfter = (freshSitemapBody.match(/<loc>/g) || []).length;
+    assert.equal(locCountAfter, locCountBefore, 'sitemap URL count must be unaffected by the lastmod fix');
+  }
+
   // Close the listener so the test process can exit naturally instead of
   // hanging on an open server handle.
   await new Promise((resolve) => app.server.close(resolve));

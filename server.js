@@ -5345,7 +5345,20 @@ function renderBrowsePrefillScript() {
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   const { pathname, query } = parsed;
-  const method = req.method;
+
+  // HEAD support (2026-09-19): per RFC 7231 sec. 4.3.2, a HEAD response must
+  // have the same status/headers as the equivalent GET, just without a body.
+  // Every route below is written as a `method === 'GET'` guard, so rather
+  // than duplicating each of those 19 guards we normalize `method` to 'GET'
+  // for route-matching purposes and strip the body at the one place all of
+  // them funnel through (res.end). Status codes, headers (including
+  // Content-Length where a route sets one), redirects, and 404s are
+  // therefore identical to GET -- only the body bytes are withheld.
+  const method = req.method === 'HEAD' ? 'GET' : req.method;
+  if (req.method === 'HEAD') {
+    const realEnd = res.end.bind(res);
+    res.end = () => realEnd();
+  }
 
   if (method === 'OPTIONS') {
     res.writeHead(204, {
@@ -5596,18 +5609,35 @@ const server = http.createServer(async (req, res) => {
     // live from the DB, so it grows automatically as more venues get badges.
     if (pathname === '/sitemap.xml' && method === 'GET') {
       const today = new Date().toISOString().slice(0, 10);
-      const combos = listGuideCombos(MIN_GUIDE_VENUES);
+      // lastmod (2026-09-19): individual/aggregate pages now report the real
+      // underlying data's updated_at instead of "today" for every URL on
+      // every request. toLastmod() takes a SQLite CURRENT_TIMESTAMP string
+      // (or the MAX() of several) and reduces it to the YYYY-MM-DD sitemap
+      // expects; the `today` fallback only applies if a row somehow has no
+      // updated_at at all (every venues/events row has one via its column
+      // DEFAULT, so this is a defensive fallback, not the normal path). The
+      // homepage and /events index aggregate many records with no single
+      // "the" modification date, so those two keep the rolling `today` value.
+      const toLastmod = (ts) => (ts ? String(ts).slice(0, 10) : today);
+      const combos = listGuideCombos(MIN_GUIDE_VENUES).map((combo) => ({
+        ...combo,
+        lastmod: toLastmod(
+          db
+            .prepare(`SELECT MAX(updated_at) AS m FROM venues WHERE region = ? AND ${combo.badge} = 1 AND redirect_to IS NULL`)
+            .get(combo.region).m
+        ),
+      }));
 
       // Region pages: one per region that has at least one venue.
       const regionCounts = db
-        .prepare('SELECT region, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY region')
+        .prepare('SELECT region, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region')
         .all()
         .filter((r) => REGION_LABELS[r.region] && r.n > 0);
 
       // Category pages: one per region+type combo that has at least one
       // venue — computed live, same pattern as the guide-page combos above.
       const categoryCombos = db
-        .prepare('SELECT region, type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY region, type')
+        .prepare('SELECT region, type, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region, type')
         .all()
         .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && r.n > 0);
 
@@ -5615,7 +5645,7 @@ const server = http.createServer(async (req, res) => {
       // all of them after the startup backfill, but this guards against any
       // edge case rather than emitting a broken sitemap entry).
       const venueRows = db
-        .prepare('SELECT region, type, slug FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
+        .prepare('SELECT region, type, slug, updated_at FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
         .all()
         .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
 
@@ -5623,20 +5653,20 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/events</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`,
         ...regionCounts.map(
-          ({ region }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
+          ({ region, lastmod }) =>
+            `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
         ),
         ...categoryCombos.map(
-          ({ region, type }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
+          ({ region, type, lastmod }) =>
+            `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
         ),
         ...combos.map(
-          ({ region, badge }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${badge}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
+          ({ region, badge, lastmod }) =>
+            `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${badge}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
         ),
         ...venueRows.map(
-          ({ region, type, slug }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>`
+          ({ region, type, slug, updated_at }) =>
+            `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>`
         ),
         // Phase 1 (Events architecture gate): only non-expired events —
         // listEventsForSitemap() already applies the same "don't advertise
@@ -5644,8 +5674,8 @@ const server = http.createServer(async (req, res) => {
         ...listEventsForSitemap()
           .filter((e) => REGION_LABELS[e.region])
           .map(
-            ({ region, slug }) =>
-              `  <url>\n    <loc>https://okanaganroam.com/${region}/events/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
+            ({ region, slug, updated_at }) =>
+              `  <url>\n    <loc>https://okanaganroam.com/${region}/events/${slug}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
           ),
       ];
       const sitemap = [
