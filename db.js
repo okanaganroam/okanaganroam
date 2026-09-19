@@ -375,4 +375,34 @@ if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(LOCAL_FAVOURITE
     .run(LOCAL_FAVOURITES_COLLECTION_SLUG, 'local_favorite', 'Local Favourites');
 }
 
+// --- Advisories collection bootstrap (2026-09-19, Beaches Phase 2) ------
+// Third collection kind, same tables and the same find-or-create-by-slug
+// discipline as the two editorial kinds above, but operational rather
+// than editorial: a member venue currently has a TEMPORARY condition (a
+// swimming advisory, a partial wildfire closure, a seasonal restriction)
+// whose official wording is carried in collection_items.note. Keeping
+// this out of `venues.description` means a venue's permanent facts never
+// have to be rewritten when a condition lifts -- membership is simply
+// removed through the audited POST /admin/collection-membership route.
+// Seeds NO members. server.js excludes this kind from trip "discovery"
+// preferences (see NON_DISCOVERY_COLLECTION_KINDS).
+const ADVISORIES_COLLECTION_SLUG = 'advisories';
+if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(ADVISORIES_COLLECTION_SLUG)) {
+  db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(ADVISORIES_COLLECTION_SLUG, 'advisory', 'Advisories');
+}
+
+// --- Dog Friendly collection bootstrap (2026-09-19, Beaches accuracy pass) --
+// Fourth collection kind, same tables and find-or-create-by-slug discipline.
+// A member venue officially allows dogs on the beach / in the water; the
+// exact restriction (designated area, on-leash, seasonal) is kept in
+// collection_items.note. Deliberately separate from the venues.dog_friendly
+// amenity boolean, whose per-region counts the frozen homepage embeds.
+// Seeds NO members; membership goes through POST /admin/collection-membership.
+const DOG_FRIENDLY_COLLECTION_SLUG = 'dog-friendly-beaches';
+if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(DOG_FRIENDLY_COLLECTION_SLUG)) {
+  db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(DOG_FRIENDLY_COLLECTION_SLUG, 'dog_friendly', 'Dog Friendly');
+}
+
 module.exports = db;

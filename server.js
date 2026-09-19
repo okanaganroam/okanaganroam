@@ -965,8 +965,38 @@ const CATEGORY_SLUGS = {
   pub: 'pubs',
   cocktail: 'cocktail-lounges',
   golf: 'golf',
+  beach: 'beaches',
 };
 const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([type, slug]) => [slug, type]));
+
+// Beaches (2026-09-19, Phase 2): the second category rendered with the
+// approved homepage design system that Golf introduced (homepage header,
+// app.css, name-as-link cards with the "View details" cue, Favorite / Add
+// to Trip, the site-wide floating Trip tray, and the five-action venue CTA
+// row). Golf's implementation is left exactly as deployed; each Golf gate
+// below simply also admits the types in this set. Nothing in this set is
+// consulted by the homepage: the homepage's mood cards, footer links and
+// injected sections never enumerate CATEGORY_SLUGS, so adding a type here
+// cannot surface a tile, count, link or markup change on '/'. Enforced by
+// the "homepage byte-identity" tests.
+const THEMED_CATEGORY_TYPES = new Set(['golf', 'beach']);
+function usesThemedCategoryLayout(type) {
+  return THEMED_CATEGORY_TYPES.has(type);
+}
+
+// Categories that exist as venue pages but are deliberately NOT offered
+// by the Build My Trip planner yet (interest chips on /trip, the
+// `interests` field of POST /api/trip/generate, the LLM/deterministic
+// parser vocabulary, and the itinerary candidate pool). Beaches launch as
+// browse/favourite/add-to-trip-tray venues only; making them a planner
+// interest is a separate, later decision. Favorite and Add to Trip on a
+// beach page still work -- those are name-keyed localStorage features of
+// the homepage module and never consult this list.
+const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach']);
+const TRIP_INTEREST_TYPES = Object.keys(CATEGORY_SLUGS).filter((t) => !TRIP_PLANNER_EXCLUDED_TYPES.has(t));
+function isTripPlannerType(type) {
+  return TRIP_INTEREST_TYPES.includes(type);
+}
 
 // Reusable category-page architecture (2026-09-19): which category types
 // currently have an Okanagan-wide "/:category" page (region-selector,
@@ -978,7 +1008,7 @@ const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([typ
 // effect of this refactor. getVenuesByCategory()/renderCategoryAllRegionsPage()
 // below are already fully generic by `type`; only the route dispatch is
 // gated by this list.
-const ALL_REGIONS_CATEGORIES = ['golf'];
+const ALL_REGIONS_CATEGORIES = ['golf', 'beach'];
 
 // Human-readable label per category, singular and plural, for titles/H1s
 const CATEGORY_LABELS = {
@@ -989,6 +1019,7 @@ const CATEGORY_LABELS = {
   pub: { singular: 'Pub', plural: 'Pubs' },
   cocktail: { singular: 'Cocktail Lounge', plural: 'Cocktail Lounges' },
   golf: { singular: 'Golf Course', plural: 'Golf Courses' },
+  beach: { singular: 'Beach', plural: 'Beaches' },
 };
 
 // Design Sprint 4: static editorial micro-copy, following the exact same
@@ -1006,6 +1037,7 @@ const CATEGORY_TAGLINES = {
   brewery: "Local beer, made close to where you're standing.",
   pub: 'Casual food and a drink, no reservation needed.',
   golf: "Courses across the Okanagan's valleys and benches.",
+  beach: 'Public beaches and swimming spots on the valley’s lakes.',
 };
 
 const REGION_TAGLINES = {
@@ -1046,6 +1078,10 @@ const TYPE_ACCENT_GRADIENTS = {
   pub: ['#6B8B5E', '#4A6741'],
   cocktail: ['#A25C93', '#7A3B6E'],
   golf: ['#4E7A5E', '#345942'],
+  // 'beach' (2026-09-19): the reference navy pair from tokens.css
+  // (--ref-navy -> --ref-navy-deep), the only token family not already
+  // claimed by another type, so no new colour enters the site.
+  beach: ['#1B2B3A', '#101B24'],
 };
 
 function compactBandCSSRules(className) {
@@ -1081,6 +1117,7 @@ const HIDDEN_GEM_TYPE_IMAGE = {
   pub: '/images/mood/eat.webp',
   cocktail: '/images/mood/eat.webp',
   golf: '/images/mood/golf.webp',
+  beach: '/images/mood/beaches.webp',
 };
 
 // Design Sprint 4 / reference redesign: the Hidden Gems homepage card has
@@ -1151,6 +1188,7 @@ const SCHEMA_TYPE_MAP = {
   pub: 'BarOrPub',
   cocktail: 'BarOrPub', // schema.org has no distinct "cocktail lounge" type; BarOrPub is the correct closest official type
   golf: 'GolfCourse',
+  beach: 'Beach', // schema.org/Beach (a CivicStructure), the exact type for a public beach
 };
 
 function slugify(name) {
@@ -1403,7 +1441,125 @@ function getCollectionVenueIds(kind) {
 // validation for the `discovery` field always reflects real data instead
 // of a list that could silently drift out of sync with collections.kind.
 function getKnownDiscoveryKinds() {
-  return db.prepare('SELECT DISTINCT kind FROM collections').all().map((r) => r.kind);
+  return db.prepare('SELECT DISTINCT kind FROM collections').all()
+    .map((r) => r.kind)
+    // Operational (non-editorial) kinds are never a trip "discovery"
+    // preference: the 'advisory' collection flags a temporary condition
+    // (a swimming advisory, a partial closure), which is the opposite of
+    // something a planner should steer a trip towards.
+    .filter((kind) => !NON_DISCOVERY_COLLECTION_KINDS.has(kind));
+}
+
+// ---------- Temporary-condition advisories (2026-09-19) ----------
+// A venue's permanent, verified facts live in its description. Temporary
+// conditions -- a swimming advisory, a partial wildfire closure, a
+// seasonal access restriction -- are deliberately kept OUT of that text
+// and are instead expressed as membership in the 'advisory' collection
+// (bootstrapped in db.js like Hidden Gems / Local Favourites; no schema
+// change), with the official wording and source in collection_items.note.
+// Membership is added and removed through the existing audited
+// POST /admin/collection-membership route, so a condition can be lifted
+// without a deploy, and every change lands in venue_enrichment_log.
+// Rendered as a small "Check before you go" note on the venue's card and
+// page; nothing renders for a venue that has no advisory, so pages for
+// venues without one are byte-identical to before this was added.
+const ADVISORY_COLLECTION_KIND = 'advisory';
+// Dog Friendly (2026-09-19, Beaches accuracy pass): a venue where dogs are
+// OFFICIALLY allowed on the beach / in the water (an off-leash beach, a
+// designated dog beach or dog swimming area, or on-leash beach access).
+// Membership lives in the 'dog_friendly' collection (bootstrapped in db.js,
+// no schema change) and the exact official restriction is carried in
+// collection_items.note, e.g. "Designated dog beach only (Sandy Beach)".
+// The badge is deliberately NOT the venues.dog_friendly amenity boolean:
+// that boolean feeds the region/badge guide-page counts that the frozen
+// homepage embeds, so flipping it would change '/'. Rendered with the
+// existing .chip style used by every other badge -- no new visual design.
+const DOG_FRIENDLY_COLLECTION_KIND = 'dog_friendly';
+const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND]);
+
+// venue id -> note text for one collection kind (the most recently added
+// note wins if several). Shared by the advisory and dog-friendly kinds.
+function getCollectionNotes(kind) {
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, ci.note AS note
+    FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    JOIN venues v ON v.id = ci.content_id
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL
+    ORDER BY ci.created_at ASC, ci.rowid ASC
+  `).all(kind);
+  const map = new Map();
+  for (const r of rows) map.set(r.id, r.note || '');
+  return map;
+}
+function getAdvisoryNotes() { return getCollectionNotes(ADVISORY_COLLECTION_KIND); }
+function getDogFriendlyNotes() { return getCollectionNotes(DOG_FRIENDLY_COLLECTION_KIND); }
+
+// Same .chip convention as the Hidden Gem / Local Favourite badges. The
+// official restriction (if any) rides in the title attribute so the label
+// stays short on cards while the exact rule is still one hover/tap away;
+// the description carries it in full.
+function dogFriendlyBadgeHtml(note) {
+  const title = note && String(note).trim() ? ` title="${escapeHtml(String(note).trim())}"` : '';
+  return `<span class="chip dog-friendly-badge"${title}>\u{1F43E} Dog Friendly</span>`;
+}
+
+// Split an advisory note into its message and (optionally) the official source it
+// cites: the first http(s) URL in the note becomes the "Official source" link and
+// is removed from the visible message. A bare domain (e.g. "kelowna.ca") is left
+// in the text as written -- nothing is fabricated into a link.
+function parseAdvisoryNote(note) {
+  const raw = note && String(note).trim() ? String(note).trim() : '';
+  const m = raw.match(/https?:\/\/[^\s)>\]]+/);
+  let url = null; let text = raw;
+  if (m) {
+    url = m[0].replace(/[.,;:]+$/, '');
+    text = raw.replace(m[0], '').replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
+  }
+  return { text, url };
+}
+
+// Restrained, informational notice (2026-09-19 redesign): a small uppercase
+// kicker in the site's eyebrow style, the advisory sentence in body type, and
+// an "Official source" link when the note carries a URL. It sits between the
+// permanent description and the CTA row and never styles itself as an alert.
+function advisoryNoticeHtml(note) {
+  const { text, url } = parseAdvisoryNote(note);
+  const message = text || 'A temporary condition currently affects this venue. Check the official source for the latest update.';
+  let host = '';
+  if (url) { try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; } }
+  const source = url
+    ? `\n  <a class="venue-advisory-source" href="${escapeHtml(url)}" rel="nofollow noopener" target="_blank">Official source${host ? `: ${escapeHtml(host)}` : ''} &#8599;</a>`
+    : '';
+  return `<aside class="venue-advisory" role="note" aria-label="Check before you go">
+  <p class="venue-advisory-kicker">Check before you go</p>
+  <p class="venue-advisory-text">${escapeHtml(message)}</p>${source}
+</aside>`;
+}
+
+// Emitted only on a page that actually contains an advisory notice, so
+// every other page's markup and inline CSS are unchanged. Values come from
+// tokens.css; the kicker mirrors the homepage's .eyebrow treatment.
+function renderAdvisoryStyles() {
+  return `<style>
+  .venue-advisory {
+    margin: 0 0 14px; padding: 12px 16px; border-radius: 10px;
+    background: var(--ref-cream-deep, #EAE6D9); border-left: 3px solid var(--ref-navy, #1B2B3A);
+    color: var(--ink); font-size: 0.92rem; line-height: 1.5;
+  }
+  .venue-advisory-kicker {
+    margin: 0 0 4px; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--ref-navy, #1B2B3A); opacity: 0.85;
+  }
+  .venue-advisory-text { margin: 0; }
+  .venue-advisory-source {
+    display: inline-block; margin-top: 6px; font-size: 0.84rem; font-weight: 700;
+    color: var(--ref-navy, #1B2B3A); text-decoration: none; border-bottom: 1px solid rgba(27,43,58,0.3);
+  }
+  .venue-advisory-source:hover { color: var(--ref-gold, #C9A227); border-bottom-color: currentColor; }
+  .venue-card .venue-advisory { margin: 8px 0 10px; padding: 10px 12px; font-size: 0.86rem; }
+  .venue-card .venue-advisory-kicker { font-size: 0.68rem; }
+</style>`;
 }
 
 // Small, shared badge fragment — reuses the existing `.chip` styling
@@ -1813,7 +1969,9 @@ function isValidTripDays(days) {
   return Number.isInteger(days) && days >= 1 && days <= 7;
 }
 function isValidTripInterest(type) {
-  return typeof type === 'string' && Object.prototype.hasOwnProperty.call(CATEGORY_SLUGS, type);
+  // Planner-eligible types only (TRIP_INTEREST_TYPES) -- a category can
+  // exist as venue pages without being a Build My Trip interest yet.
+  return typeof type === 'string' && isTripPlannerType(type);
 }
 function isValidTripAmenity(field) {
   return typeof field === 'string' && BOOL_FIELDS.includes(field);
@@ -1864,7 +2022,7 @@ function buildTripParserSystemPrompt(knownDiscoveryKinds) {
     'Return ONLY a JSON object with these fields (every field is optional -- omit or use null for anything you cannot confidently determine):',
     `- region: one of [${VALID_REGIONS.join(', ')}]`,
     '- days: integer 1-7',
-    `- interests: array from [${Object.keys(CATEGORY_SLUGS).join(', ')}]`,
+    `- interests: array from [${TRIP_INTEREST_TYPES.join(', ')}]`,
     `- amenities: array from [${BOOL_FIELDS.join(', ')}]`,
     `- pace: one of [${TRIP_VALID_PACES.join(', ')}]`,
     `- budget: one of [${TRIP_VALID_BUDGETS.join(', ')}]`,
@@ -4228,6 +4386,7 @@ const SEO_PAGE_CSS = `
   .venue-hero-pub        { background: linear-gradient(135deg, #6B8B5E, #4A6741); }
   .venue-hero-cocktail   { background: linear-gradient(135deg, #A25C93, #7A3B6E); }
   .venue-hero-golf       { background: linear-gradient(135deg, #4E7A5E, #345942); }
+  .venue-hero-beach      { background: linear-gradient(135deg, #1B2B3A, #101B24); } /* tokens: --ref-navy -> --ref-navy-deep */
 
   .venue-header { margin-bottom: 18px; }
   .venue-at-a-glance { color: var(--ink); opacity: 0.7; font-size: 0.98rem; margin: 6px 0 12px; }
@@ -4257,6 +4416,7 @@ const SEO_PAGE_CSS = `
   .related-card-pub { border-top-color: #4A6741; }
   .related-card-cocktail { border-top-color: #7A3B6E; }
   .related-card-golf { border-top-color: #345942; }
+  .related-card-beach { border-top-color: #101B24; }
 
   /* Design Sprint 4: compact visual band, shared with the homepage Hidden
      Gems cards via the same compactVisualBandHtml() helper and the same
@@ -4328,7 +4488,7 @@ function renderAnalyticsHeadHtml() {
 }
 
 function golfEngagementHeadHtml(type) {
-  return type === 'golf' ? renderAnalyticsHeadHtml() : '';
+  return usesThemedCategoryLayout(type) ? renderAnalyticsHeadHtml() : '';
 }
 
 // Shared Favorite / Add to Trip behaviour for Golf pages (2026-09-19).
@@ -4340,10 +4500,10 @@ function golfEngagementHeadHtml(type) {
 // MAX_STOPS), so the existing Trip Planner and favourites filter see
 // exactly what was chosen here. Emitted as plain JS text and wrapped by
 // the two page scripts below, which each define ctx()/track() first.
-function golfFavTripScriptBody() {
+function golfFavTripScriptBody(type = 'golf') {
   return `
   var MAX_STOPS = 10;
-  var HOLDER = '[data-venue-category="golf"]';
+  var HOLDER = '[data-venue-category="${type}"]';
   function readList(key){
     try { var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
@@ -4498,6 +4658,39 @@ function renderGolfTripTrayHtml() {
 }
 
 const GOLF_APP_SCRIPT_TAG = '<script src="/scripts/app.js"></script>';
+
+// Body class for themed pages. Golf keeps exactly its deployed
+// `class="golf-page"`; Beach pages carry the same theme class (the
+// body.golf-page rules ARE the design system these pages share) plus a
+// `beach-page` marker for beach-specific tests/styling. Non-themed pages
+// get no class attribute at all, exactly as before.
+function themedBodyClassAttr(type) {
+  if (type === 'golf') return ' class="golf-page"';
+  if (usesThemedCategoryLayout(type)) return ` class="golf-page ${type}-page"`;
+  return '';
+}
+
+// Beach variants of every Golf card/CTA rule that is keyed on the
+// data-venue-category="golf" attribute selector (in SEO_PAGE_CSS and the
+// theme block). Derived mechanically from the Golf rules at request time
+// rather than copied, so the two categories can never drift apart in
+// styling, and the Golf CSS text itself is untouched. The selector
+// regex matches a complete rule (selector list + declaration block)
+// whose selector list mentions the golf attribute.
+function deriveBeachRulesFromGolfCss(cssText) {
+  const ruleRe = /[^{}]*\[data-venue-category="golf"\][^{}]*\{[^{}]*\}/g;
+  return (cssText.match(ruleRe) || [])
+    .map((rule) => rule.replace(/\[data-venue-category="golf"\]/g, '[data-venue-category="beach"]').trim())
+    .join('\n  ');
+}
+function renderBeachThemeStyles() {
+  const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
+  return `<style>
+  /* Beach page theme (2026-09-19): the Golf rules above, re-keyed to the beach card attribute. */
+  ${deriveBeachRulesFromGolfCss(SEO_PAGE_CSS)}
+  ${deriveBeachRulesFromGolfCss(themeCss)}
+</style>`;
+}
 
 function renderGolfThemeStyles() {
   return `<style>
@@ -4672,17 +4865,17 @@ function renderGolfThemeStyles() {
 // (>=50% visible, once per card per page view) plus expand/collapse are
 // reported through window.trackEvent.
 function golfCardEngagementScriptHtml(type) {
-  if (type !== 'golf') return '';
+  if (!usesThemedCategoryLayout(type)) return '';
   return `<script>
 (function(){
-  var cards = document.querySelectorAll('.venue-card[data-venue-category="golf"]');
+  var cards = document.querySelectorAll('.venue-card[data-venue-category="${type}"]');
   if (!cards.length) return;
   function ctx(card){
     return {
       venue_id: Number(card.dataset.venueId),
       venue_name: card.dataset.venueName,
       venue_region: card.dataset.venueRegion,
-      venue_category: 'golf',
+      venue_category: '${type}',
       surface: card.dataset.surface || 'category_card',
       page_path: location.pathname
     };
@@ -4734,7 +4927,7 @@ function golfCardEngagementScriptHtml(type) {
   // array of venue names; okanaganTrip is [{name, query, region}], capped
   // at MAX_STOPS), so the existing Trip Planner and favourites filter see
   // exactly what was chosen here.
-${golfFavTripScriptBody()}
+${golfFavTripScriptBody(type)}
 })();
 </script>`;
 }
@@ -4745,12 +4938,12 @@ ${golfFavTripScriptBody()}
 // outbound_click event with link_type plus venue identity, and one
 // venue_view on load so page-level impressions carry venue_id too.
 function golfVenueEngagementScriptHtml(venue) {
-  if (venue.type !== 'golf') return '';
+  if (!usesThemedCategoryLayout(venue.type)) return '';
   const pageCtx = JSON.stringify({
     venue_id: venue.id,
     venue_name: venue.name,
     venue_region: venue.region,
-    venue_category: 'golf',
+    venue_category: venue.type,
     surface: 'venue_page',
   }).replace(/</g, '\\u003c');
   return `<script>
@@ -4766,7 +4959,7 @@ function golfVenueEngagementScriptHtml(venue) {
     params.link_type = link.getAttribute('data-track');
     track('outbound_click', params);
   });
-${golfFavTripScriptBody()}
+${golfFavTripScriptBody(venue.type)}
 })();
 </script>`;
 }
@@ -4775,7 +4968,12 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // golfTheme (2026-09-19): Golf pages also load the homepage stylesheet
   // (before the inline SEO CSS, so existing SEO rules still win ties) and
   // the body.golf-page overrides. Every other page's head is unchanged.
-  const { noindex = false, golfTheme = false } = opts;
+  // beachTheme (2026-09-19): Beach pages reuse the Golf theme unchanged and
+  // add only the beach-attribute variants of its card rules (derived from
+  // the Golf rules, see renderBeachThemeStyles) plus, when the page
+  // carries one, the advisory-notice styles. Golf pages' head is
+  // byte-identical to before.
+  const { noindex = false, golfTheme = false, beachTheme = false, advisoryStyles = false } = opts;
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
@@ -4794,7 +4992,7 @@ ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.strin
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/tokens.css">
-${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}`;
+${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}`;
 }
 
 function siteHeader(rightLinkHref, rightLinkText) {
@@ -4855,7 +5053,13 @@ function badgeChipsHtml(venue) {
 // falling back to plain text; category pages always have both). Both
 // behaviors are preserved exactly via the options below.
 function venueCardHtml(venue, opts = {}) {
-  const { showType = false, isHiddenGem = false, isLocalFavourite = false } = opts;
+  // advisoryNote (2026-09-19): the venue's current temporary-condition
+  // note from the 'advisory' collection, or undefined/null for none. When
+  // absent nothing extra is rendered, so cards without an advisory are
+  // byte-identical to before.
+  // dogFriendlyNote (2026-09-19): undefined/null = not a member; a string
+  // (possibly '') = member of the 'dog_friendly' collection, note = official restriction.
+  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -4864,7 +5068,7 @@ function venueCardHtml(venue, opts = {}) {
   // name). Styled by the golf theme; every other category's title markup
   // is unchanged.
   const nameHtml = href
-    ? (venue.type === 'golf'
+    ? (usesThemedCategoryLayout(venue.type)
       ? `<a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(venue.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a>`
       : `<a href="${href}">${escapeHtml(venue.name)}</a>`)
     : escapeHtml(venue.name);
@@ -4877,14 +5081,16 @@ function venueCardHtml(venue, opts = {}) {
   // can clamp it to ~4 lines and toggle it inline; the button ships hidden
   // and is revealed only when the text is actually truncated. Every other
   // category renders exactly what it did before.
-  const isGolf = venue.type === 'golf';
+  // `isGolf` now means "uses the themed (Golf-style) card": Golf and, since
+  // 2026-09-19, Beaches (THEMED_CATEGORY_TYPES). Golf output is unchanged.
+  const isGolf = usesThemedCategoryLayout(venue.type);
   const descId = `golf-desc-${venue.id}`;
   const desc = !venue.description ? '' : isGolf
     ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(venue.description)}</p></div>
         <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`
     : `<p>${escapeHtml(venue.description)}</p>`;
   const liAttrs = isGolf
-    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="golf" data-venue-name="${escapeHtml(venue.name)}" data-surface="category_card"`
+    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="category_card"`
     : '';
   // Golf-only (2026-09-19): the listing card's only actions are Favorite
   // and Add to Trip (golfFavTripButtonsHtml). Website / phone / directions
@@ -4903,12 +5109,16 @@ function venueCardHtml(venue, opts = {}) {
   // guarantee local to the render function itself, not just its callers.
   const showBadge = isHiddenGem && !venue.redirect_to;
   const showLocalFavourite = isLocalFavourite && !venue.redirect_to;
-  const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
+  const showDogFriendly = dogFriendlyNote !== null && dogFriendlyNote !== undefined && !venue.redirect_to;
+  const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
+  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
+    ? `\n        ${advisoryNoticeHtml(advisoryNote)}`
+    : '';
   return `
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>
-        ${desc}
+        ${desc}${advisoryHtml}
         <p class="chips">${editorialChips}${badgeChipsHtml(venue)}</p>${cardActions}
       </li>`;
 }
@@ -4978,7 +5188,7 @@ ${pageHead(title, description, canonical, [breadcrumb])}
 // Falls back to CATEGORY_LABELS.plural for any category without an
 // entry here, so it never breaks if a future category is added to
 // ALL_REGIONS_CATEGORIES without also adding a short label.
-const ALL_REGIONS_BACK_LABEL = { golf: 'Golf' };
+const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches' };
 
 // Golf's inventory deliberately includes both outdoor courses and indoor
 // golf-simulator venues under the same type='golf' (2026-09-19), so the
@@ -4999,8 +5209,8 @@ function isIndoorGolfVenue(venue) {
 // so the same helper produces "Golf Courses" and "Kelowna Golf Courses"
 // without a separate code path per page type. A subsection is omitted
 // entirely when it would be empty, rather than rendering an empty grid.
-function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, localFavouriteIds = new Set()) {
-  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id) })).join('\n');
+function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, localFavouriteIds = new Set(), advisoryNotes = new Map(), dogFriendlyNotes = new Map()) {
+  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null })).join('\n');
 
   if (type !== 'golf') {
     return `<ul class="card-grid">
@@ -5060,7 +5270,8 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   };
 
   const hiddenGemIds = getHiddenGemVenueIds();
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'));
+  const advisoryNotes = getAdvisoryNotes();
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes());
 
   // Back-link to the Okanagan-wide page, only for categories that
   // actually have one (ALL_REGIONS_CATEGORIES) -- every other category
@@ -5081,11 +5292,11 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: type === 'golf' })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${golfEngagementHeadHtml(type)}
 </head>
-<body${type === 'golf' ? ' class="golf-page"' : ''}>
-  ${type === 'golf' ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+<body${themedBodyClassAttr(type)}>
+  ${usesThemedCategoryLayout(type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${region}` },
@@ -5097,9 +5308,9 @@ ${golfEngagementHeadHtml(type)}
   ${cardsHtml}
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
-  ${type === 'golf' ? '</main>' : ''}
+  ${usesThemedCategoryLayout(type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
-  ${type === 'golf' ? GOLF_APP_SCRIPT_TAG : ''}
+  ${usesThemedCategoryLayout(type) ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfCardEngagementScriptHtml(type)}
 </body>
 </html>`;
@@ -5167,16 +5378,17 @@ function renderCategoryAllRegionsPage(type, venues) {
   };
 
   const hiddenGemIds = getHiddenGemVenueIds();
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'));
+  const advisoryNotes = getAdvisoryNotes();
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes());
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: type === 'golf' })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${golfEngagementHeadHtml(type)}
 </head>
-<body${type === 'golf' ? ' class="golf-page"' : ''}>
-  ${type === 'golf' ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+<body${themedBodyClassAttr(type)}>
+  ${usesThemedCategoryLayout(type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: label.plural },
@@ -5186,9 +5398,9 @@ ${golfEngagementHeadHtml(type)}
   ${regionSelector}
   ${cardsHtml}
   <a class="cta" href="/browse">Back to the full directory</a>
-  ${type === 'golf' ? '</main>' : ''}
+  ${usesThemedCategoryLayout(type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
-  ${type === 'golf' ? GOLF_APP_SCRIPT_TAG : ''}
+  ${usesThemedCategoryLayout(type) ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfCardEngagementScriptHtml(type)}
 </body>
 </html>`;
@@ -5239,7 +5451,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const attributeChips = badgeChipsHtml(venue);
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
-  const hiddenGemChip = (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
+  const dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
+  const hiddenGemChip = (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
 
   let hoursHtml = '';
   if (venue.hours) {
@@ -5263,7 +5476,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // Golf-only (2026-09-19): outbound links carry a data-track kind so the
   // venue-page engagement script can report them; every other category's
   // markup is unchanged.
-  const trackAttr = (kind) => (venue.type === 'golf' ? ` data-track="${kind}"` : '');
+  const trackAttr = (kind) => (usesThemedCategoryLayout(venue.type) ? ` data-track="${kind}"` : '');
 
   const detailRows = [
     ['Type', label.singular],
@@ -5319,11 +5532,16 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>Call</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
-    venue.type === 'golf' ? golfFavTripButtonsHtml(venue) : null,
+    usesThemedCategoryLayout(venue.type) ? golfFavTripButtonsHtml(venue) : null,
   ].filter(Boolean).join('\n  ');
-  const ctaRowAttrs = venue.type === 'golf'
-    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="golf" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
+  const ctaRowAttrs = usesThemedCategoryLayout(venue.type)
+    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
     : '';
+  // Temporary condition (advisory collection), rendered between the
+  // description and the CTA row; '' for the overwhelming majority of
+  // venues, which keeps their page markup byte-identical.
+  const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes().get(venue.id);
+  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${advisoryNoticeHtml(venueAdvisoryNote)}` : '';
 
   // One bulk lookup for all related+nearby cards together (reusing the
   // existing getHiddenGemVenueIds(), not a new query) -- O(1) Set lookups
@@ -5374,11 +5592,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: venue.type === 'golf' })}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', advisoryStyles: venueAdvisoryNote !== undefined })}
 ${golfEngagementHeadHtml(venue.type)}
 </head>
-<body${venue.type === 'golf' ? ' class="golf-page"' : ''}>
-  ${venue.type === 'golf' ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+<body${themedBodyClassAttr(venue.type)}>
+  ${usesThemedCategoryLayout(venue.type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${venue.region}` },
@@ -5392,7 +5610,7 @@ ${golfEngagementHeadHtml(venue.type)}
     <p class="venue-at-a-glance">${atAGlanceParts}</p>
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
-  <p class="venue-description">${escapeHtml(venue.description || '')}</p>
+  <p class="venue-description">${escapeHtml(venue.description || '')}</p>${venueAdvisoryHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}
   <div class="venue-section venue-key-info">
     <h2>Good to Know</h2>
@@ -5405,9 +5623,9 @@ ${golfEngagementHeadHtml(venue.type)}
   ${nearbyHtml}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
   <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
-  ${venue.type === 'golf' ? '</main>' : ''}
+  ${usesThemedCategoryLayout(venue.type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
-  ${venue.type === 'golf' ? GOLF_APP_SCRIPT_TAG : ''}
+  ${usesThemedCategoryLayout(venue.type) ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfVenueEngagementScriptHtml(venue)}
 </body>
 </html>`;
@@ -5936,7 +6154,7 @@ function renderTripPlannerPage() {
     .map((slug) => `<option value="${slug}">${escapeHtml(REGION_LABELS[slug])}</option>`)
     .join('\n');
 
-  const interestChips = Object.keys(CATEGORY_SLUGS)
+  const interestChips = TRIP_INTEREST_TYPES
     .map((type) => {
       const key = TRIP_INTEREST_I18N_KEY[type];
       const label = CATEGORY_LABELS[type].plural;
@@ -7638,7 +7856,7 @@ const server = http.createServer(async (req, res) => {
         if (unknownInterests.length > 0) {
           return sendJSON(res, 400, {
             error: `Unknown interest(s): ${unknownInterests.join(', ')}`,
-            allowed: Object.keys(CATEGORY_SLUGS),
+            allowed: TRIP_INTEREST_TYPES,
           });
         }
         interestsList = interests;
@@ -7704,10 +7922,15 @@ const server = http.createServer(async (req, res) => {
         excludeVenueIdsList = excludeVenueIds;
       }
 
+      // Only planner-eligible types form the candidate pool (Beaches are
+      // browsable venues but not a planner interest yet, see
+      // TRIP_PLANNER_EXCLUDED_TYPES), so an itinerary can never pick a
+      // type the interests validation above would have rejected.
       const regionVenues = db
         .prepare('SELECT * FROM venues WHERE region = ? AND redirect_to IS NULL')
         .all(region)
-        .map(rowToVenue);
+        .map(rowToVenue)
+        .filter((v) => isTripPlannerType(v.type));
 
       const plan = buildTripItinerary(regionVenues, {
         region,
@@ -8043,6 +8266,33 @@ module.exports = {
   hiddenGemBadgeHtml,
   localFavouriteBadgeHtml,
   guardedCollectionMembershipUpdate,
+  // Beaches Phase 2 (2026-09-19)
+  getVenuesByCategory,
+  SLUG_TO_TYPE,
+  CATEGORY_LABELS,
+  TYPE_ACCENT_GRADIENTS,
+  HIDDEN_GEM_TYPE_IMAGE,
+  SCHEMA_TYPE_MAP,
+  ALL_REGIONS_CATEGORIES,
+  renderGolfThemeStyles,
+  THEMED_CATEGORY_TYPES,
+  usesThemedCategoryLayout,
+  themedBodyClassAttr,
+  TRIP_PLANNER_EXCLUDED_TYPES,
+  TRIP_INTEREST_TYPES,
+  isTripPlannerType,
+  ADVISORY_COLLECTION_KIND,
+  NON_DISCOVERY_COLLECTION_KINDS,
+  getAdvisoryNotes,
+  DOG_FRIENDLY_COLLECTION_KIND,
+  getCollectionNotes,
+  getDogFriendlyNotes,
+  dogFriendlyBadgeHtml,
+  advisoryNoticeHtml,
+  parseAdvisoryNote,
+  renderAdvisoryStyles,
+  renderBeachThemeStyles,
+  deriveBeachRulesFromGolfCss,
   // Build My Trip, Stage 3 (price/amenity/discovery scoring + NL parser)
   TRIP_VALID_BUDGETS,
   budgetMatchesPrice,

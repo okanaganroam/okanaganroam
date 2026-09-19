@@ -114,6 +114,37 @@ websiteInsert.run({
   website: 'shannonlakegolf.com',
 });
 
+// ---- seed fixture beach venues (Beaches Phase 2, 2026-09-19) ------------
+// Three beaches: one fully populated (address + coordinates + website, so
+// every CTA renders), one with none of those (so the Get Directions /
+// Visit Website / Call buttons must all be absent and only Favorite /
+// Add to Trip remain), and one in a second region so the Okanagan-wide
+// /beaches region selector has two real regions to list. No rating,
+// reviews, price, hours or amenity booleans, exactly as the approved
+// Beaches data model (verified facts live in the description only).
+websiteInsert.run({
+  name: 'Test Beach Park', region: 'kelowna', type: 'beach', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'A fixture public beach with a swim area, playground and washrooms, used only by the automated test suite.',
+  address: '100 Test Lakeshore Rd, Kelowna, BC', latitude: 49.86, longitude: -119.49, hours: null,
+  slug: 'test-beach-park',
+  website: 'https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/test-beach-park',
+});
+insert.run({
+  name: 'Test Bare Beach', region: 'kelowna', type: 'beach', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'A fixture beach with no address, coordinates, website or phone, used to prove no CTA is fabricated.',
+  address: null, latitude: null, longitude: null, hours: null,
+  slug: 'test-bare-beach',
+});
+insert.run({
+  name: 'Test Vernon Beach', region: 'vernon', type: 'beach', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'A fixture beach in a second region, used by the Okanagan-wide /beaches region selector tests.',
+  address: null, latitude: 50.26, longitude: -119.35, hours: null,
+  slug: 'test-vernon-beach',
+});
+
 // ---- seed fixtures for /admin/correct-phone tests -----------------------
 insert.run({
   name: 'Test Phone Fixture', region: 'kelowna', type: 'restaurant', cuisine: null,
@@ -1645,8 +1676,15 @@ test('every dynamically-set trip.planner.*/type.* key used by the /trip client m
 
   // 'trip.planner.' + daypart -- the three real daypart values.
   const daypartKeys = ['morning', 'afternoon', 'evening'].map((d) => `trip.planner.${d}`);
-  // 'type.' + venue.type -- the seven real venue types (matches CATEGORY_SLUGS).
-  const typeKeys = Object.keys(app.CATEGORY_SLUGS).map((t) => `type.${t}`);
+  // 'type.' + venue.type -- every venue type the /trip module can actually
+  // be handed by the planner (TRIP_INTEREST_TYPES). Beaches (2026-09-19)
+  // are a real CATEGORY_SLUGS type but are deliberately excluded from the
+  // Build My Trip planner (TRIP_PLANNER_EXCLUDED_TYPES), so no itinerary
+  // stop can ever have type 'beach' and app.js -- a frozen homepage asset
+  // -- needs no 'type.beach' key. The guard below keeps this honest: if a
+  // type is ever added to the planner it must also get its i18n keys.
+  const typeKeys = app.TRIP_INTEREST_TYPES.map((t) => `type.${t}`);
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('beach'), 'beach must stay out of the planner types until app.js gains type.beach in both locales');
 
   const missing = [];
   for (const key of [...literalKeys, ...daypartKeys, ...typeKeys]) {
@@ -4249,4 +4287,448 @@ test('REGRESSION: the six seeded Hidden Gems block in db.js is unchanged', () =>
   const members = src.match(/const HIDDEN_GEMS_MEMBERS = \[([\s\S]*?)\];/)[1];
   const ids = [...members.matchAll(/venue_id: (\d+)/g)].map((m) => Number(m[1]));
   assert.deepEqual(ids, [128, 100, 685, 47, 816, 1038]);
+});
+
+// ==== Beaches Phase 2 (2026-09-19) ========================================
+// Beaches are the second category rendered with the approved homepage
+// design system that Golf introduced. Golf's deployed implementation is
+// untouched; each Golf gate simply also admits the types in
+// THEMED_CATEGORY_TYPES. These tests cover the taxonomy, both listing
+// pages, the venue page, the CTA rules (nothing fabricated), the
+// temporary-condition advisory collection, the trip-planner exclusion,
+// and -- most importantly -- that the FROZEN homepage is byte-identical
+// before and after beach data exists.
+
+const beachFixture = () => app.findVenueBySlug('kelowna', 'beach', 'test-beach-park');
+const bareBeachFixture = () => app.findVenueBySlug('kelowna', 'beach', 'test-bare-beach');
+
+test('Beaches taxonomy: type, slug, labels, tagline, gradient, image, schema type, wide page and back-label', () => {
+  assert.equal(app.CATEGORY_SLUGS.beach, 'beaches');
+  assert.equal(app.SLUG_TO_TYPE ? app.SLUG_TO_TYPE.beaches : 'beach', 'beach');
+  assert.deepEqual(app.CATEGORY_LABELS.beach, { singular: 'Beach', plural: 'Beaches' });
+  assert.equal(typeof app.CATEGORY_TAGLINES.beach, 'string');
+  assert.deepEqual(app.TYPE_ACCENT_GRADIENTS.beach, ['#1B2B3A', '#101B24'], 'beach gradient must be the tokens.css --ref-navy / --ref-navy-deep pair');
+  assert.equal(app.HIDDEN_GEM_TYPE_IMAGE.beach, '/images/mood/beaches.webp');
+  assert.equal(app.SCHEMA_TYPE_MAP.beach, 'Beach');
+  assert.ok(app.ALL_REGIONS_CATEGORIES.includes('beach'), '/beaches Okanagan-wide page must be enabled');
+  assert.ok(app.ALL_REGIONS_CATEGORIES.includes('golf'), 'enabling Beaches must not disable Golf');
+  assert.ok(app.THEMED_CATEGORY_TYPES.has('beach') && app.THEMED_CATEGORY_TYPES.has('golf'));
+  assert.equal(app.usesThemedCategoryLayout('beach'), true);
+  assert.equal(app.usesThemedCategoryLayout('restaurant'), false);
+  assert.equal(app.themedBodyClassAttr('golf'), ' class="golf-page"', 'Golf body class is exactly what was deployed');
+  assert.equal(app.themedBodyClassAttr('beach'), ' class="golf-page beach-page"');
+  assert.equal(app.themedBodyClassAttr('restaurant'), '');
+});
+
+test('Beaches: fixture rows exist and are served by the generic lookups', () => {
+  const b = beachFixture();
+  assert.ok(b && b.type === 'beach');
+  assert.equal(app.getVenuesByRegionCategory('kelowna', 'beach').length, 2);
+  assert.equal(app.getVenuesByCategory('beach').length, 3);
+  assert.equal(app.getRegionCategoryCounts('kelowna').beach, 2);
+});
+
+test('Beaches regional listing page reuses the Golf design system: theme, header, tray, cards, actions, scripts', () => {
+  const venues = app.getVenuesByRegionCategory('kelowna', 'beach');
+  const html = app.renderCategoryPage('kelowna', 'beach', venues, []);
+  assert.match(html, /<h1>Beaches in Kelowna, BC<\/h1>/);
+  assert.match(html, /<body class="golf-page beach-page">/);
+  assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
+  assert.match(html, /<div id="tripTray">/, 'site-wide floating Trip tray fragment must be present');
+  assert.match(html, /<header id="top">/, 'homepage header fragment must be reused');
+  assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+  assert.match(html, /<a class="category-back-link" href="\/beaches">← All Beaches<\/a>/);
+  // Cards
+  assert.match(html, /<li class="venue-card" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="category_card">/);
+  assert.match(html, /<a class="venue-card-link" href="\/kelowna\/beaches\/test-beach-park"><span class="venue-card-name">Test Beach Park<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a>/);
+  assert.match(html, /<div class="golf-desc" id="golf-desc-\d+"><p>A fixture public beach/, 'clamped description + Read more toggle reused');
+  assert.match(html, /<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-\d+" hidden>Read more &rarr;<\/button>/);
+  assert.match(html, /class="card-action fav-btn" data-fav-name="Test Beach Park"/);
+  assert.match(html, /class="card-action trip-btn" data-trip-name="Test Beach Park" data-trip-query="Test Beach Park, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna"/);
+  // Listing cards carry only Favorite + Add to Trip -- never website/phone/directions.
+  const cardBlock = html.slice(html.indexOf('data-venue-name="Test Beach Park"'), html.indexOf('</li>', html.indexOf('data-venue-name="Test Beach Park"')));
+  assert.doesNotMatch(cardBlock, /Visit Website|Get Directions|tel:|google\.com\/maps/);
+  // Engagement + Favorite/Trip script is keyed to the beach attribute.
+  assert.match(html, /querySelectorAll\('\.venue-card\[data-venue-category="beach"\]'\)/);
+  assert.match(html, /var HOLDER = '\[data-venue-category="beach"\]';/);
+  assert.match(html, /venue_category: 'beach',/);
+  // Beach theme styles are derived from the Golf rules and keyed to beach.
+  assert.match(html, /\.venue-card\[data-venue-category="beach"\] \.card-actions \{/);
+  assert.match(html, /body\.golf-page \.venue-card\[data-venue-category="beach"\] \.fav-btn\.is-fav,/);
+  // The Golf-only indoor/outdoor split must not apply to Beaches.
+  assert.doesNotMatch(html, /<h2 class="category-subsection-heading"/, 'no Golf Courses / Indoor Golf subsection headings on a Beaches page');
+});
+
+test('Beaches Okanagan-wide page (/beaches) lists only regions that have beaches in its region selector', () => {
+  const venues = app.getVenuesByCategory('beach');
+  const html = app.renderCategoryAllRegionsPage('beach', venues);
+  assert.match(html, /<h1>Beaches in the Okanagan<\/h1>/);
+  assert.match(html, /<body class="golf-page beach-page">/);
+  assert.match(html, /href="\/kelowna\/beaches"/);
+  assert.match(html, /href="\/vernon\/beaches"/);
+  assert.doesNotMatch(html, /href="\/osoyoos\/beaches"/, 'selector must NOT list a region with zero beach venues');
+  assert.doesNotMatch(html, /href="\/penticton\/beaches"/);
+  assert.match(html, /Test Vernon Beach/);
+});
+
+test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when phone is null), back-link, tray and scripts', () => {
+  const b = beachFixture();
+  const html = app.renderVenuePage(b, [], [], []);
+  assert.match(html, /<title>Test Beach Park — Beach in Kelowna, BC \| Okanagan Roam<\/title>/);
+  assert.match(html, /"@type":"Beach"/);
+  assert.match(html, /"geo":\{"@type":"GeoCoordinates","latitude":49\.86,"longitude":-119\.49\}/);
+  assert.match(html, /<body class="golf-page beach-page">/);
+  assert.match(html, /<div id="tripTray">/);
+  assert.match(html, /venue-hero venue-hero-fallback venue-hero-beach/);
+  assert.match(html, /<a class="category-back-link" href="\/kelowna\/beaches">← Kelowna Beaches<\/a>/);
+  const cta = html.match(/<div class="venue-cta-row"([^>]*)>([\s\S]*?)<\/div>/);
+  assert.ok(cta, 'CTA row must render');
+  assert.match(cta[1], /data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="venue_page"/);
+  const order = ['Visit Website', 'Get Directions', 'Favorite', 'Add to Trip'].map((t) => cta[2].indexOf(t));
+  assert.ok(order.every((i) => i >= 0), 'Visit Website, Get Directions, Favorite, Add to Trip all present');
+  assert.deepEqual([...order].sort((a, c) => a - c), order, 'CTA order: Visit Website, Get Directions, Favorite, Add to Trip');
+  assert.doesNotMatch(cta[2], />Call</, 'no Call button when phone is null');
+  assert.match(cta[2], /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.86,-119\.49"/, 'Get Directions uses the verified coordinates');
+  assert.match(cta[2], /data-track="website"/);
+  assert.match(html, /"venue_category":"beach","surface":"venue_page"/);
+  assert.match(html, /var HOLDER = '\[data-venue-category="beach"\]';/);
+  assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+});
+
+test('Beach venue page with no address, coordinates, website or phone: Get Directions / Visit Website / Call are all omitted, Favorite + Add to Trip remain', () => {
+  const b = bareBeachFixture();
+  const html = app.renderVenuePage(b, [], [], []);
+  const cta = html.match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/);
+  assert.ok(cta);
+  assert.doesNotMatch(cta[1], /Get Directions|Visit Website|>Call<|google\.com\/maps|tel:/);
+  assert.match(cta[1], /Favorite/);
+  assert.match(cta[1], /Add to Trip/);
+  assert.doesNotMatch(html, /"geo":/);
+  assert.doesNotMatch(html, /venue-location/);
+  // Vernon fixture: coordinates but no address -> Get Directions from coordinates only, no address row.
+  const v = app.findVenueBySlug('vernon', 'beach', 'test-vernon-beach');
+  const vh = app.renderVenuePage(v, [], [], []);
+  assert.match(vh, /Get Directions/);
+  assert.match(vh, /query=50\.26,-119\.35/);
+  assert.doesNotMatch(vh, /<p class="venue-address">/);
+});
+
+test('Advisories: the collection is bootstrapped, memberships render a "Check before you go" note on card + page, and removal restores byte-identity', () => {
+  const row = db.prepare("SELECT slug, kind, title FROM collections WHERE kind = 'advisory'").get();
+  assert.deepEqual({ ...row }, { slug: 'advisories', kind: 'advisory', title: 'Advisories' });
+  assert.equal(app.ADVISORY_COLLECTION_KIND, 'advisory');
+  const b = beachFixture();
+  const venues = app.getVenuesByRegionCategory('kelowna', 'beach');
+  const beforeCard = app.venueCardHtml(b);
+  const beforeCategory = app.renderCategoryPage('kelowna', 'beach', venues, []);
+  const beforePage = app.renderVenuePage(b, [], [], []);
+  assert.doesNotMatch(beforePage, /venue-advisory/);
+  assert.doesNotMatch(beforeCategory, /venue-advisory/);
+
+  const note = 'Swimming advisory in effect. Check the official source for the latest update. https://www.kelowna.ca/parks-recreation/parks-beaches/water-quality-beaches (checked 2026-09-19)';
+  const meta = { reason: 'test advisory', batch_id: 'test-advisories' };
+  const r = app.guardedCollectionMembershipUpdate('advisory', b.id, 'add', note, meta);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(app.getAdvisoryNotes().get(b.id), note);
+
+  const card = app.venueCardHtml(b, { advisoryNote: app.getAdvisoryNotes().get(b.id) });
+  assert.match(card, /<aside class="venue-advisory" role="note" aria-label="Check before you go">\n  <p class="venue-advisory-kicker">Check before you go<\/p>\n  <p class="venue-advisory-text">Swimming advisory in effect\. Check the official source for the latest update\. \(checked 2026-09-19\)<\/p>\n  <a class="venue-advisory-source" href="https:\/\/www\.kelowna\.ca\/parks-recreation\/parks-beaches\/water-quality-beaches" rel="nofollow noopener" target="_blank">Official source: kelowna\.ca &#8599;<\/a>\n<\/aside>/, 'restrained notice: kicker, message, official-source link; URL lifted out of the message');
+  assert.doesNotMatch(card, /<strong>|⚠|warning/i, 'no alert styling or icons');
+  assert.deepEqual(app.parseAdvisoryNote('Closed (https://example.org/x). Details.'), { text: 'Closed. Details.', url: 'https://example.org/x' });
+  assert.deepEqual(app.parseAdvisoryNote('Bare domain kelowna.ca stays text.'), { text: 'Bare domain kelowna.ca stays text.', url: null });
+  assert.doesNotMatch(app.advisoryNoticeHtml('Bare domain kelowna.ca stays text.'), /venue-advisory-source/, 'no link is fabricated from a bare domain');
+  assert.equal(app.venueCardHtml(b), beforeCard, 'without the option the card is unchanged (the option is supplied by the listing renderer)');
+
+  const category = app.renderCategoryPage('kelowna', 'beach', venues, []);
+  assert.match(category, /venue-advisory/);
+  assert.match(category, /\.venue-advisory \{/, 'advisory styles are emitted on a page that carries a notice');
+  const bareIdx = category.indexOf('data-venue-name="Test Bare Beach"');
+  assert.doesNotMatch(category.slice(bareIdx, category.indexOf('</li>', bareIdx)), /venue-advisory/, 'only the member venue gets the notice');
+
+  const page = app.renderVenuePage(b, [], [], []);
+  assert.match(page, /<\/p>\n  <aside class="venue-advisory" role="note" aria-label="Check before you go">/, 'notice sits between the description and the CTA row');
+  assert.match(page, /<\/aside>\n  <div class="venue-cta-row"/);
+  assert.match(page, /\.venue-advisory \{/);
+  // Permanent facts are untouched: the description text is identical.
+  assert.match(page, /<p class="venue-description">A fixture public beach with a swim area, playground and washrooms, used only by the automated test suite\.<\/p>/);
+
+  // Audit trail lands in venue_enrichment_log like the editorial kinds.
+  const audit = db.prepare("SELECT field_name FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'collection:advisory'").all(b.id);
+  assert.ok(audit.length >= 1);
+
+  app.guardedCollectionMembershipUpdate('advisory', b.id, 'remove', null, meta);
+  assert.equal(app.renderVenuePage(b, [], [], []), beforePage, 'lifting the advisory restores the page byte-for-byte');
+  assert.equal(app.renderCategoryPage('kelowna', 'beach', venues, []), beforeCategory);
+});
+
+test('Advisories are never a trip "discovery" preference, while editorial kinds still are', () => {
+  const kinds = app.getKnownDiscoveryKinds();
+  assert.ok(!kinds.includes('advisory'));
+  assert.ok(kinds.includes('hidden_gem'));
+  assert.ok(kinds.includes('local_favorite'));
+  assert.ok(app.NON_DISCOVERY_COLLECTION_KINDS.has('advisory'));
+});
+
+test('Beaches are excluded from the Build My Trip planner: interests, chips, parser and the itinerary candidate pool', () => {
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('beach'));
+  assert.deepEqual(app.TRIP_INTEREST_TYPES, ['restaurant', 'winery', 'cafe', 'brewery', 'pub', 'cocktail', 'golf'], 'the seven existing planner types are unchanged');
+  assert.equal(app.isValidTripInterest('beach'), false);
+  assert.equal(app.isValidTripInterest('golf'), true);
+  assert.equal(app.isTripPlannerType('beach'), false);
+  const tripPage = app.renderTripPlannerPage();
+  assert.doesNotMatch(tripPage, /name="tripInterest" value="beach"/, 'no Beaches interest chip on /trip');
+  assert.match(tripPage, /name="tripInterest" value="golf"/, 'Golf chip still present');
+  const { raw } = app.deterministicTripParserProvider('a trip to Kelowna with beaches and swimming');
+  assert.deepEqual(raw.interests, []);
+  assert.ok(raw.unsupported_terms.includes('beaches'), 'beach vocabulary stays in the unsupported list');
+});
+
+test('Golf regression: Golf listing and venue pages are unchanged by the Beaches work (class, attributes, scripts, split, no beach markup)', () => {
+  const golfVenues = app.getVenuesByRegionCategory('kelowna', 'golf');
+  const category = app.renderCategoryPage('kelowna', 'golf', golfVenues, []);
+  assert.match(category, /<body class="golf-page">/, 'Golf body class must remain exactly golf-page');
+  assert.doesNotMatch(category, /beach-page|data-venue-category="beach"|Beach page theme|Test Beach Park/);
+  assert.match(category, /data-venue-category="golf"/);
+  assert.match(category, /var HOLDER = '\[data-venue-category="golf"\]';/);
+  assert.match(category, /venue_category: 'golf',/);
+  assert.match(category, /querySelectorAll\('\.venue-card\[data-venue-category="golf"\]'\)/);
+  assert.match(category, /Indoor Golf/, 'Golf-only subsection split still applies to Golf');
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const page = app.renderVenuePage(golf, [], [], []);
+  assert.match(page, /<body class="golf-page">/);
+  assert.match(page, /"@type":"GolfCourse"/);
+  assert.match(page, /"venue_category":"golf","surface":"venue_page"/);
+  assert.match(page, /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
+  assert.doesNotMatch(page, /beach-page|data-venue-category="beach"|class="venue-hero venue-hero-fallback venue-hero-beach"|Beach page theme|<aside class="venue-advisory"/);
+  const wide = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf'));
+  assert.match(wide, /<body class="golf-page">/);
+  assert.doesNotMatch(wide, /Test Beach Park|beach-page/);
+});
+
+test('Non-themed category regression: restaurant card and pages carry no theme, beach, or advisory markup', () => {
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const card = app.venueCardHtml(trattoria);
+  assert.doesNotMatch(card, /data-venue-category|venue-card-link|venue-card-cue|card-actions|golf-desc|venue-advisory/);
+  assert.match(card, /<h2><a href="\/kelowna\/restaurants\/test-trattoria">Test Trattoria<\/a><\/h2>/);
+  const markupOnly = (html) => html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '');
+  const page = app.renderVenuePage(trattoria, [], [], []);
+  assert.match(page, /<body>/);
+  assert.doesNotMatch(page, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<script src="\/scripts\/app\.js">|Beach page theme|\.venue-advisory \{/);
+  assert.doesNotMatch(markupOnly(page), /golf-page|beach-page|venue-advisory|data-venue-category|data-track=/);
+  const category = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
+  assert.match(category, /<body>/);
+  assert.doesNotMatch(category, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<script src="\/scripts\/app\.js">|Beach page theme/);
+  assert.doesNotMatch(markupOnly(category), /golf-page|beach-page|venue-advisory|data-venue-category/);
+});
+
+test('Region hub page lists a Beaches category card once a region has beaches', () => {
+  const counts = app.getRegionCategoryCounts('kelowna');
+  const html = app.renderRegionPage('kelowna', counts, []);
+  assert.match(html, /<h2><a href="\/kelowna\/beaches">Beaches<\/a><\/h2>/);
+  assert.match(html, /2 beaches in Kelowna/);
+});
+
+test('Beach theme CSS is derived from the Golf rules: every derived rule is keyed to beach, and the Golf theme text is unchanged', () => {
+  const golfCss = app.renderGolfThemeStyles ? app.renderGolfThemeStyles() : null;
+  const beachCss = app.renderBeachThemeStyles();
+  assert.match(beachCss, /^<style>/);
+  assert.doesNotMatch(beachCss, /\[data-venue-category="golf"\]/, 'derived block must contain no golf-keyed selectors');
+  const rules = beachCss.match(/\[data-venue-category="beach"\]/g) || [];
+  assert.ok(rules.length >= 20, `expected the full set of card/CTA rules to be derived, got ${rules.length}`);
+  assert.match(beachCss, /\.venue-card\[data-venue-category="beach"\] \.card-action \{/);
+  assert.match(beachCss, /body\.golf-page \.venue-card\[data-venue-category="beach"\] \.trip-btn\.in-trip,/);
+  // Derivation is mechanical: a synthetic Golf rule maps 1:1.
+  assert.equal(app.deriveBeachRulesFromGolfCss('.x[data-venue-category="golf"] .y { color: red; }\n.z { c: d }'), '.x[data-venue-category="beach"] .y { color: red; }');
+  if (golfCss) assert.doesNotMatch(golfCss, /beach/);
+});
+
+// ---- FROZEN HOMEPAGE: byte-identity before/after beach data (isolated child) ----
+// The homepage is approved and frozen. Adding the beach type and beach
+// rows (and an advisory membership) must not change a single byte of the
+// '/' response: no tile, no count, no mood-card/footer href change, no
+// markup. Uses the same isolated child-process pattern as the 503 test
+// above (fresh temp dir -> its own empty DB, its own port), so it never
+// touches the real okanagan.db, the shared harness DB, or port 3001.
+test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an advisory exist; sitemap, /beaches routes and trip API behave (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-beaches-homepage-'));
+  const projectRoot = path.join(__dirname, '..');
+  for (const f of ['server.js', 'db.js', 'okanagan.html']) {
+    fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  }
+  const ISOLATED_PORT = '3097';
+  const TOKEN = 'beaches-homepage-test-token';
+  const childEnv = { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN };
+  const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderrOutput = '';
+  child.stderr.on('data', (chunk) => { stderrOutput += chunk.toString(); });
+  const base = `http://localhost:${ISOLATED_PORT}`;
+  const authed = { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` };
+  try {
+    const deadline = Date.now() + 10000;
+    let ready = false;
+    while (Date.now() < deadline && !ready) {
+      try { if ((await fetch(`${base}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready, `isolated child never became ready. stderr: ${stderrOutput}`);
+
+    // Seed a non-beach venue first so the homepage has "normal" data, then snapshot '/'.
+    const seedRes = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Fixture Winery', region: 'kelowna', type: 'winery', description: 'fixture', slug: 'homepage-fixture-winery' }) });
+    assert.equal(seedRes.status, 201);
+    const homeBefore = await (await fetch(`${base}/`)).text();
+    const sitemapBefore = await (await fetch(`${base}/sitemap.xml`)).text();
+    assert.equal((await fetch(`${base}/beaches`)).status, 404, 'no beaches yet -> /beaches is a 404, never an empty page');
+    assert.equal((await fetch(`${base}/kelowna/beaches`)).status, 404);
+
+    // Add beach venues through the real, authenticated creation route, then an advisory membership.
+    const b1 = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Beach One', region: 'kelowna', type: 'beach', description: 'fixture beach', slug: 'homepage-beach-one', address: '1 Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://www.kelowna.ca/example' }) });
+    assert.equal(b1.status, 201);
+    const beachOne = await b1.json();
+    const b2 = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Beach Two', region: 'vernon', type: 'beach', description: 'fixture beach two', slug: 'homepage-beach-two' }) });
+    assert.equal(b2.status, 201);
+    const adv = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'advisory', venue_id: beachOne.id, action: 'add', note: 'Partial closure (rdco.com, 2026-09-19).', reason: 'test', batch_id: 'homepage-test' }) });
+    assert.equal(adv.status, 200, await adv.text());
+    for (const kind of ['hidden_gem', 'local_favorite', 'dog_friendly']) {
+      const r = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind, venue_id: beachOne.id, action: 'add', note: kind === 'dog_friendly' ? 'Off-leash dog beach' : null, reason: 'test', batch_id: 'homepage-test' }) });
+      assert.equal(r.status, 200, `${kind}: ${await r.text()}`);
+    }
+
+    const homeAfter = await (await fetch(`${base}/`)).text();
+    assert.equal(homeAfter, homeBefore, 'FROZEN HOMEPAGE: adding the beach type, beach rows, an advisory and Hidden Gem / Local Favourite / Dog Friendly memberships must not change one byte of "/"');
+    // Explicit no-Beaches-on-homepage assertions (independent of the byte check).
+    assert.doesNotMatch(homeAfter, /href="\/beaches"|href="\/kelowna\/beaches"|category-tile-beach|data-venue-category|venue-advisory|beach-page/);
+    assert.match(homeAfter, /href="#exploreRegions" data-i18n="mood\.beaches\.title"/, 'the Beaches mood card keeps its current #exploreRegions target');
+    assert.match(homeAfter, /<li><a href="#exploreRegions" data-i18n="mood\.beaches\.title">Beaches<\/a><\/li>/, 'the footer Beaches link is untouched');
+    assert.doesNotMatch(homeAfter, /Homepage Beach One|Homepage Beach Two/);
+
+    // Routes now live: wide page, regional page, venue page; sitemap gains exactly the beach URLs.
+    const wide = await fetch(`${base}/beaches`);
+    assert.equal(wide.status, 200);
+    const wideBody = await wide.text();
+    assert.match(wideBody, /Homepage Beach One/);
+    assert.match(wideBody, /href="\/kelowna\/beaches"/);
+    assert.match(wideBody, /href="\/vernon\/beaches"/);
+    assert.doesNotMatch(wideBody, /href="\/osoyoos\/beaches"/);
+    assert.match(wideBody, /venue-advisory/, 'advisory notice renders on the listing card');
+    assert.match(wideBody, /<span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span>/u, 'Dog Friendly badge on the listing card');
+    assert.match(wideBody, /hidden-gem-badge/); assert.match(wideBody, /local-favourite-badge/);
+    const regional = await fetch(`${base}/kelowna/beaches`);
+    assert.equal(regional.status, 200);
+    const venuePage = await fetch(`${base}/kelowna/beaches/homepage-beach-one`);
+    assert.equal(venuePage.status, 200);
+    const venueBody = await venuePage.text();
+    assert.match(venueBody, /"@type":"Beach"/);
+    assert.match(venueBody, /<p class="venue-advisory-kicker">Check before you go<\/p>\n  <p class="venue-advisory-text">Partial closure \(rdco\.com, 2026-09-19\)\.<\/p>/);
+    assert.match(venueBody, /Get Directions/);
+    assert.match(venueBody, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span> <\/p>/u, 'all three badges on the venue page, existing badges unchanged');
+    const beachTwoBody = await (await fetch(`${base}/vernon/beaches/homepage-beach-two`)).text();
+    assert.match(beachTwoBody, /<div class="venue-header">[\s\S]*?<p class="chips"><\/p>/, 'non-member beach carries no badges in its own header (related cards may still show other venues\' badges)');
+    assert.doesNotMatch(beachTwoBody, /Get Directions|Visit Website|>Call</, 'no address/coords/website/phone -> no fabricated CTA');
+    assert.equal((await fetch(`${base}/kelowna/beaches/does-not-exist`)).status, 404);
+    assert.equal((await fetch(`${base}/osoyoos/beaches`)).status, 404, 'region with zero beaches is a 404');
+    const sitemapAfter = await (await fetch(`${base}/sitemap.xml`)).text();
+    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches<\/loc>/);
+    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches\/homepage-beach-one<\/loc>/);
+    assert.doesNotMatch(sitemapBefore, /beaches/);
+
+    // Region hub shows the new category card.
+    const hub = await (await fetch(`${base}/kelowna`)).text();
+    assert.match(hub, /<h2><a href="\/kelowna\/beaches">Beaches<\/a><\/h2>/);
+
+    // Trip planner: beach is not an interest, not a discovery kind, and never an itinerary stop.
+    const badInterest = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1, interests: ['beach'] }) });
+    assert.equal(badInterest.status, 400);
+    const badInterestBody = await badInterest.json();
+    assert.ok(!badInterestBody.allowed.includes('beach'));
+    const badDiscovery = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1, discovery: ['advisory'] }) });
+    assert.equal(badDiscovery.status, 400, 'advisory is not a discovery kind');
+    const badDiscovery2 = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1, discovery: ['dog_friendly'] }) });
+    assert.equal(badDiscovery2.status, 400, 'dog_friendly collection is not a discovery kind');
+    const plan = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1 }) });
+    assert.equal(plan.status, 200);
+    assert.doesNotMatch(await plan.text(), /Homepage Beach One/, 'a beach must never be picked as an itinerary stop');
+
+    // Advisory removal restores the venue page and clears the notice.
+    const rm = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'advisory', venue_id: beachOne.id, action: 'remove', reason: 'test', batch_id: 'homepage-test' }) });
+    assert.equal(rm.status, 200);
+    assert.doesNotMatch(await (await fetch(`${base}/kelowna/beaches/homepage-beach-one`)).text(), /venue-advisory/);
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise((resolve) => child.once('exit', resolve));
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
+// ==== Beaches accuracy pass (2026-09-19): Dog Friendly badge, CTA rules, badge regression ====
+
+test('Dog Friendly badge: collection bootstrapped, renders on card + venue page for members only, carries the official restriction, removal restores bytes', () => {
+  const row = db.prepare("SELECT slug, kind, title FROM collections WHERE kind = 'dog_friendly'").get();
+  assert.deepEqual({ ...row }, { slug: 'dog-friendly-beaches', kind: 'dog_friendly', title: 'Dog Friendly' });
+  assert.equal(app.DOG_FRIENDLY_COLLECTION_KIND, 'dog_friendly');
+  const b = beachFixture();
+  const bare = bareBeachFixture();
+  const venues = app.getVenuesByRegionCategory('kelowna', 'beach');
+  const beforeCategory = app.renderCategoryPage('kelowna', 'beach', venues, []);
+  const beforePage = app.renderVenuePage(b, [], [], []);
+  assert.doesNotMatch(beforeCategory, /dog-friendly-badge/);
+  const meta = { reason: 'test dog badge', batch_id: 'test-dog-friendly' };
+  const r = app.guardedCollectionMembershipUpdate('dog_friendly', b.id, 'add', 'Designated off-leash dog beach only', meta);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(app.getDogFriendlyNotes().get(b.id), 'Designated off-leash dog beach only');
+  // badge markup = existing .chip convention (same as Hidden Gem / Local Favourite), restriction in title
+  assert.equal(app.dogFriendlyBadgeHtml('On leash only'), '<span class="chip dog-friendly-badge" title="On leash only">\u{1F43E} Dog Friendly</span>');
+  assert.equal(app.dogFriendlyBadgeHtml(''), '<span class="chip dog-friendly-badge">\u{1F43E} Dog Friendly</span>');
+  const category = app.renderCategoryPage('kelowna', 'beach', venues, []);
+  const cardStart = category.indexOf('data-venue-name="Test Beach Park"');
+  const card = category.slice(cardStart, category.indexOf('</li>', cardStart));
+  assert.match(card, /<p class="chips"><span class="chip dog-friendly-badge" title="Designated off-leash dog beach only">\u{1F43E} Dog Friendly<\/span> <\/p>/u, 'listing card shows the badge in the chips row');
+  const bareStart = category.indexOf('data-venue-name="Test Bare Beach"');
+  assert.doesNotMatch(category.slice(bareStart, category.indexOf('</li>', bareStart)), /dog-friendly-badge/, 'non-member card has no badge');
+  const page = app.renderVenuePage(b, [], [], []);
+  assert.match(page, /<p class="chips"><span class="chip dog-friendly-badge" title="Designated off-leash dog beach only">\u{1F43E} Dog Friendly<\/span> <\/p>/u, 'venue page shows the badge');
+  assert.doesNotMatch(app.renderVenuePage(bare, [], [], []), /dog-friendly-badge/);
+  // The badge never touches the amenity boolean (which feeds the homepage's guide-footer counts).
+  assert.equal(db.prepare('SELECT dog_friendly FROM venues WHERE id = ?').get(b.id).dog_friendly, 0);
+  assert.equal(app.badgeChipsHtml(app.getVenue(b.id)), '', 'no amenity chip is produced');
+  // Not a trip discovery kind.
+  assert.ok(!app.getKnownDiscoveryKinds().includes('dog_friendly'));
+  // Audit trail + removal restores byte identity.
+  assert.ok(db.prepare("SELECT 1 FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'collection:dog_friendly'").get(b.id));
+  app.guardedCollectionMembershipUpdate('dog_friendly', b.id, 'remove', null, meta);
+  assert.equal(app.renderCategoryPage('kelowna', 'beach', venues, []), beforeCategory);
+  assert.equal(app.renderVenuePage(b, [], [], []), beforePage);
+});
+
+test('Dog Friendly badge coexists with the existing Hidden Gem / Local Favourite badges without changing their markup', () => {
+  const b = beachFixture();
+  const meta = { reason: 'test', batch_id: 'test-badges' };
+  for (const [kind, note] of [['hidden_gem', null], ['local_favorite', null], ['dog_friendly', 'Off-leash dog beach']]) {
+    assert.equal(app.guardedCollectionMembershipUpdate(kind, b.id, 'add', note, meta).ok, true);
+  }
+  const page = app.renderVenuePage(b, [], [], []);
+  assert.match(page, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">♥ Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span> <\/p>/u);
+  const card = app.venueCardHtml(b, { isHiddenGem: true, isLocalFavourite: true, dogFriendlyNote: 'Off-leash dog beach' });
+  assert.match(card, /<span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">♥ Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span> /u);
+  // Golf regression: golf pages unaffected by the new kind.
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  assert.doesNotMatch(app.renderVenuePage(golf, [], [], []), /dog-friendly-badge/);
+  for (const kind of ['hidden_gem', 'local_favorite', 'dog_friendly']) app.guardedCollectionMembershipUpdate(kind, b.id, 'remove', null, meta);
+});
+
+test('Beach venue CTA rules: Get Directions from coordinates OR a verified address; Visit Website / Call only when the field is verified', () => {
+  const base = { id: 999901, name: 'CTA Rule Beach', region: 'kelowna', type: 'beach', slug: 'cta-rule-beach', description: 'x', redirect_to: null };
+  const ctaOf = (v) => { const m = app.renderVenuePage(v, [], [], []).match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/); return m ? m[1] : ''; };
+  const addrOnly = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: null, longitude: null, website: null, phone: null });
+  assert.match(addrOnly, /Get Directions/);
+  assert.match(addrOnly, /query=12%20Sample%20Beach%20Rd%2C%20Kelowna%2C%20BC/, 'address-only venues get directions via the address query, same pattern as every other venue');
+  assert.doesNotMatch(addrOnly, /Visit Website|>Call</);
+  const coordsOnly = ctaOf({ ...base, address: null, latitude: 49.9, longitude: -119.5, website: null, phone: null });
+  assert.match(coordsOnly, /query=49\.9,-119\.5/);
+  const nothing = ctaOf({ ...base, address: null, latitude: null, longitude: null, website: null, phone: null });
+  assert.doesNotMatch(nothing, /Get Directions|Visit Website|>Call</);
+  assert.match(nothing, /Favorite/); assert.match(nothing, /Add to Trip/);
+  const full = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://storymaps.arcgis.com/stories/ae662360d11c44c6a8edb3bf2eb315d3', phone: '+1 250-555-0199' });
+  assert.match(full, /href="https:\/\/storymaps\.arcgis\.com\/stories\/ae662360d11c44c6a8edb3bf2eb315d3" rel="nofollow noopener" target="_blank" data-track="website">Visit Website</);
+  assert.match(full, /query=49\.9,-119\.5/, 'coordinates win over the address for directions');
+  assert.match(full, />Call</);
 });
