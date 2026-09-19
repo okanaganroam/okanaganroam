@@ -2799,6 +2799,11 @@ function renderMoodCardsHTML() {
 // region, so it's excluded here), and REGION_LABELS for display text, the
 // same map /:region routes are built from. All 20 real, routable regions
 // -- none omitted.
+// Order matches the approved FOOTER.png reference's explicit 2-subcolumn
+// pairing: Central+South stack in the footer's left Regions subcolumn,
+// North+Ski resorts stack in its right subcolumn (see renderHomeFooterHTML,
+// which slices this array [0,2)/[2,4) rather than flowing it through a
+// CSS multi-column auto-balance).
 const FOOTER_REGION_GROUPS = [
   { labelKey: 'wizard.central', label: 'Central', regions: ['kelowna', 'west-kelowna', 'peachland', 'lake-country'] },
   { labelKey: 'wizard.south', label: 'South', regions: ['naramata', 'penticton', 'kaleden', 'okanagan-falls', 'summerland', 'oliver', 'osoyoos'] },
@@ -2855,7 +2860,10 @@ function renderHomeFooterHTML(fromBrowse) {
   const exploreRegionsHref = fromBrowse ? '/#exploreRegions' : '#exploreRegions';
   const hiddenGemsHref = fromBrowse ? '/#hiddenGems' : '#hiddenGems';
 
-  const regionGroupsHtml = FOOTER_REGION_GROUPS.map((group) => {
+  // Two explicit subcolumns (FOOTER.png reference), not a CSS multi-column
+  // auto-balance: subcol 1 = Central then South stacked; subcol 2 = North
+  // then Ski resorts stacked. See the FOOTER_REGION_GROUPS comment above.
+  const renderRegionGroup = (group) => {
     const links = group.regions
       .filter((region) => REGION_LABELS[region])
       .map((region) => `<li><a href="/${region}">${escapeHtml(REGION_LABELS[region])}</a></li>`)
@@ -2864,7 +2872,9 @@ function renderHomeFooterHTML(fromBrowse) {
             <h5 data-i18n="${group.labelKey}">${escapeHtml(group.label)}</h5>
             <ul>${links}</ul>
           </div>`;
-  }).join('\n');
+  };
+  const regionSubcol1 = FOOTER_REGION_GROUPS.slice(0, 2).map(renderRegionGroup).join('\n');
+  const regionSubcol2 = FOOTER_REGION_GROUPS.slice(2, 4).map(renderRegionGroup).join('\n');
 
   return `
 <footer class="home-footer">
@@ -2901,7 +2911,10 @@ function renderHomeFooterHTML(fromBrowse) {
       </div>
       <div class="home-footer-col home-footer-col-regions">
         <h4 data-i18n="footer.regions">Regions</h4>
-        <div class="home-footer-region-groups">${regionGroupsHtml}</div>
+        <div class="home-footer-region-groups">
+          <div class="home-footer-region-subcol">${regionSubcol1}</div>
+          <div class="home-footer-region-subcol">${regionSubcol2}</div>
+        </div>
       </div>
       <div class="home-footer-col">
         <h4 data-i18n="homeFooter.socialMedia">Social Media</h4>
@@ -3457,9 +3470,14 @@ function renderHomepageDiscoveryStyles() {
      the real tag, and silently deleted every homepage section between
      that point and the real one when the footer was spliced in. */
   .home-footer { background: var(--ref-navy); color: var(--ref-cream); margin-top: 8px; padding: 0; }
+  /* Compact pass (2026-09-19, approved footer refinement): the footer
+     previously ran 72px/48px of top/bottom air around the columns plus a
+     24-40px bottom band, reading as visually stretched. Tightened across
+     desktop and both mobile breakpoints below -- gap/padding values only,
+     no content removed, same column structure/links/order throughout. */
   .home-footer-top {
     display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;
-    gap: 48px; padding: 72px 0 48px;
+    gap: 36px; padding: 40px 0 28px;
   }
   .home-footer-brand { display: flex; flex-direction: column; gap: 10px; max-width: 260px; flex-shrink: 0; }
   .home-footer-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
@@ -3487,49 +3505,62 @@ function renderHomepageDiscoveryStyles() {
      region list and taking a little back from About/Social Media, which
      never needed a full equal share to begin with. */
   .home-footer-cols {
-    display: grid; grid-template-columns: 1fr 0.8fr 1.2fr 0.8fr;
-    align-items: start; gap: 32px; flex: 1; min-width: 0;
+    display: grid; grid-template-columns: 1fr 0.9fr 2fr 1fr;
+    align-items: start; gap: 28px; flex: 1; min-width: 0;
+    /* Brand|Explore divider (FOOTER.png reference, 2026-09-19): matches the
+       same rule as the 3 inter-column dividers below, just applied to the
+       one seam that isn't between two .home-footer-col siblings (Brand is
+       its own flex item, outside this grid). */
+    border-left: 1px solid rgba(245,243,237,0.14);
+    padding-left: 20px;
+  }
+  /* Clean vertical separators between the 4 major columns (approved
+     footer refinement, 2026-09-19) -- a thin, low-opacity rule on every
+     column after the first, inset with padding rather than margin so the
+     line sits mid-gutter instead of hugging either column's text. */
+  .home-footer-col + .home-footer-col {
+    border-left: 1px solid rgba(245,243,237,0.14);
+    padding-left: 20px;
   }
   .home-footer-col h4 {
     font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 14px;
+    letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 12px; padding-bottom: 8px;
+    display: inline-block; border-bottom: 2px solid var(--ref-gold);
   }
-  .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
   .home-footer-col a, .home-footer-region-group a {
     font-family: 'Nunito', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78);
     text-decoration: none; transition: color 0.15s;
   }
   .home-footer-col a:hover, .home-footer-region-group a:hover { color: var(--ref-gold); }
 
-  /* Regions column (2026-09-17 revision, corrected same day): 20 real
-     links inside one column, kept compact via the four wizard groups
-     (Central/South/North/Ski resorts -- FOOTER_REGION_GROUPS above) with
-     smaller type/tighter gaps than the other three columns, rather than
-     shrinking to illegibility or overflowing the column.
-     A rigid 2x2 CSS Grid (pairing Central with South, North with Ski
-     resorts by POSITION) was tried first and measured to be the actual
-     cause of the "messy" look reported: CSS Grid sizes a row to its
-     tallest cell, so Central (4 links) was stretched to match South's
-     height (7 links) in the same row, leaving a ~100px dead gap between
-     Central's last link and the North heading below. Replaced with a
-     CSS multi-column FLOW instead of a position-paired grid: the browser
-     distributes the four group blocks across 2 columns by actual height
-     (column-fill:balance, the default), so a short group is simply
-     followed immediately by the next group in the same column rather
-     than being stretched to match whatever tall group happened to land
-     in the same row. break-inside:avoid keeps each group's heading+list
-     together as one unit (never splits a group's links across the two
-     columns). Still reads as a compact two-column list, per the brief --
-     just without the artificial row-pairing dead space. */
-  .home-footer-region-groups { column-count: 2; column-gap: 20px; }
-  .home-footer-region-group {
-    break-inside: avoid; -webkit-column-break-inside: avoid;
-    margin-bottom: 18px;
-  }
-  .home-footer-region-group:last-child { margin-bottom: 0; }
+  /* Regions column (rebuilt 2026-09-19 to match the approved FOOTER.png
+     reference exactly): TWO EXPLICIT subcolumns, each its own independent
+     flex column -- subcol 1 stacks Central then South, subcol 2 stacks
+     North then Ski resorts (see FOOTER_REGION_GROUPS/renderHomeFooterHTML).
+     A same-row 2x2 CSS Grid was tried previously and rejected (Grid sizes
+     a ROW to its tallest cell, so a short group got stretched to match a
+     tall one beside it, leaving dead space) -- that failure mode doesn't
+     apply here because these are two INDEPENDENT flex columns, not grid
+     cells sharing a row: each one sizes purely to its own two groups'
+     combined height, so North's longer list (5 items) simply makes
+     subcolumn 2 start "Ski resorts" a little lower than subcolumn 1's
+     "South" -- exactly the (intentional, not a bug) slight stagger visible
+     in the reference image. */
+  .home-footer-region-groups { display: flex; gap: 20px; }
+  .home-footer-region-subcol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  /* Region subsection headings (CENTRAL/NORTH/SOUTH/SKI RESORTS): gold,
+     uppercase, bold, with the same small underline treatment as the main
+     column headings (h4) so they read as clear subsection headings,
+     distinct from the town links beneath them -- previously a muted,
+     low-contrast cream at the same size as the links, which is exactly
+     what made them hard to tell apart. Kept smaller than h4 (0.78rem)
+     since these are one level down. */
   .home-footer-region-group h5 {
-    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 700;
-    color: rgba(245,243,237,0.55); margin: 0 0 8px;
+    font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ref-gold); margin: 0 0 8px; padding-bottom: 5px;
+    display: inline-block; border-bottom: 1px solid var(--ref-gold);
   }
   .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
   .home-footer-region-group a { font-size: 0.82rem; line-height: 1.3; }
@@ -3559,7 +3590,7 @@ function renderHomepageDiscoveryStyles() {
     transition: opacity 0.12s, transform 0.12s;
   }
   .home-footer-social-icon:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 24px 0 40px; }
+  .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 16px 0 24px; }
   .home-footer-copyright { font-family: 'Nunito', sans-serif; font-size: 0.8rem; color: rgba(245,243,237,0.55); text-align: center; margin: 0; }
 
   /* Trip 0 button redesign, homepage-only (2026-09-17): #tripTray/
@@ -3582,8 +3613,8 @@ function renderHomepageDiscoveryStyles() {
      existing look, on both pages). */
   body:not(.page-browse) #tripTrayToggle {
     background: var(--ref-navy); color: var(--ref-cream);
-    border: 1px solid rgba(245,243,237,0.16);
-    border-radius: 999px; padding: 8px 14px; gap: 6px;
+    border: 1px solid var(--ref-gold);
+    border-radius: 999px; padding: 9px 16px; gap: 8px;
     font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;
     box-shadow: 0 4px 14px -6px rgba(16,27,36,0.45);
   }
@@ -3591,6 +3622,20 @@ function renderHomepageDiscoveryStyles() {
   body:not(.page-browse) #tripTrayCount {
     background: var(--ref-gold); color: var(--ref-navy-deep);
     width: 16px; height: 16px; font-size: 0.62rem; font-weight: 800;
+  }
+  /* Suitcase-icon removal (approved refinement, 2026-09-19): the 🧳 emoji
+     lives in the shared #tripTrayToggle markup in okanagan.html (reused
+     as-is by /browse and /trip), wrapped in .trip-toggle-icon specifically
+     so it can be hidden here, homepage-only, without touching that shared
+     markup's actual content -- /browse's own (unscoped) styling is
+     completely unaffected and keeps showing the icon exactly as before.
+     .trip-toggle-arrow is an empty span in that same shared markup; on
+     every other page it's simply an empty, invisible inline element, and
+     only here does it get real content -- a small gold chevron, replacing
+     the suitcase as a subtle "opens something" cue rather than an icon. */
+  body:not(.page-browse) #tripTrayToggle .trip-toggle-icon { display: none; }
+  body:not(.page-browse) #tripTrayToggle .trip-toggle-arrow::after {
+    content: '\\2192'; margin-left: 1px; color: var(--ref-gold); font-weight: 800;
   }
 
   @media (max-width: 900px) {
@@ -3601,8 +3646,21 @@ function renderHomepageDiscoveryStyles() {
        own shrink-to-fit content width instead of the full row width --
        found via direct measurement (it was rendering at roughly half the
        viewport width instead of full width). */
-    .home-footer-top { flex-direction: column; align-items: stretch; gap: 40px; padding: 56px 0 40px; }
-    .home-footer-cols { grid-template-columns: repeat(2, 1fr); gap: 36px 32px; }
+    .home-footer-top { flex-direction: column; align-items: stretch; gap: 28px; padding: 32px 0 24px; }
+    .home-footer-cols {
+      grid-template-columns: repeat(2, 1fr); gap: 28px 24px;
+      border-left: none; padding-left: 0;
+    }
+    /* The desktop vertical separators (both the Brand|Explore one above,
+       via .home-footer-cols, and "every column after the first" below)
+       only make sense in a single horizontal row. Once Brand stacks above
+       a 2-per-row grid, a leftover border-left just reads as a stray
+       vertical line down the block's edge; at 2-per-row, "every column
+       after the first" would also draw a stray line on column 3 (first
+       item of row 2), which sits below column 1, not beside column 2.
+       Both removed here; the 560px single-column block below inherits
+       this same removal. */
+    .home-footer-col + .home-footer-col { border-left: none; padding-left: 0; }
   }
 
   @media (max-width: 560px) {
@@ -3623,11 +3681,11 @@ function renderHomepageDiscoveryStyles() {
        comfortable breathing room between Explore/About/Regions/Social
        Media, just without the extra desktop-sized air baked into each
        one. */
-    .home-footer-top { padding: 36px 0 28px; gap: 28px; }
+    .home-footer-top { padding: 24px 0 20px; gap: 24px; }
     .home-footer-col h4 { margin-bottom: 10px; }
     .home-footer-col ul { gap: 8px; }
-    .home-footer-region-groups { column-gap: 16px; }
-    .home-footer-region-group { margin-bottom: 14px; }
+    .home-footer-region-groups { gap: 16px; }
+    .home-footer-region-subcol { gap: 12px; }
     .home-footer-region-group h5 { margin-bottom: 6px; }
     .home-footer-region-group ul { gap: 5px; }
 

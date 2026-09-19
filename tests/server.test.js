@@ -2185,10 +2185,18 @@ test('Home footer: Regions column lists ALL 20 real regions (none omitted), each
   assert.deepEqual(Array.from(new Set(allRegionLinks)).sort(), expected, 'every REGION_LABELS region must have a footer link, and no extra/invented ones');
 });
 
-test('Home footer: Regions is grouped into exactly Central/South/North/Ski resorts, matching the wizard\'s own grouping', () => {
+test('Home footer: Regions renders as two explicit subcolumns -- Central+South, then North+Ski resorts -- matching the approved FOOTER.png reference', () => {
   const html = app.renderHomeFooterHTML();
   const groupLabels = Array.from(html.matchAll(/<h5 data-i18n="(wizard\.[a-zA-Z]+)">([^<]*)<\/h5>/g)).map((m) => m[2]);
   assert.deepEqual(groupLabels, ['Central', 'South', 'North', 'Ski resorts']);
+  const subcolMatch = html.match(/<div class="home-footer-region-groups">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="home-footer-col">/);
+  assert.ok(subcolMatch, 'expected the region-groups wrapper immediately followed by the Social Media column');
+  const subcolHtml = subcolMatch[1];
+  const subcolPositions = Array.from(subcolHtml.matchAll(/home-footer-region-subcol/g)).length;
+  assert.equal(subcolPositions, 2, 'expected exactly 2 region subcolumns');
+  assert.ok(subcolHtml.indexOf('Central') < subcolHtml.indexOf('South'), 'Central must precede South (same subcolumn)');
+  assert.ok(subcolHtml.indexOf('South') < subcolHtml.indexOf('North'), 'South (subcol 1) must precede North (subcol 2)');
+  assert.ok(subcolHtml.indexOf('North') < subcolHtml.indexOf('Ski resorts'), 'North must precede Ski resorts (same subcolumn)');
   assert.equal(app.FOOTER_REGION_GROUPS.reduce((n, g) => n + g.regions.length, 0), 20);
 });
 
