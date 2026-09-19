@@ -73,6 +73,16 @@ insert.run({
   address: '456 Fairway Dr, Kelowna, BC V1Y 0B0', latitude: 49.89, longitude: -119.49, hours: null,
   slug: 'test-golf-course',
 });
+// A second golf fixture in a DIFFERENT region, so the Okanagan-wide /golf
+// route (2026-09-19) has something real to prove it aggregates across
+// regions rather than just happening to match the single-region case.
+insert.run({
+  name: 'Test Vernon Golf Course', region: 'vernon', type: 'golf', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'A second-region fixture golf course, used only to test the Okanagan-wide /golf listing.',
+  address: null, latitude: null, longitude: null, hours: null,
+  slug: 'test-vernon-golf-course',
+});
 
 // ---- seed fixtures for /admin/correct-phone tests -----------------------
 insert.run({
@@ -2052,13 +2062,13 @@ test('Mood cards: Hidden Gems is no longer one of the six mood cards', () => {
   assert.doesNotMatch(html, /mood-card-hidden-gems/, 'Hidden Gems must not render as a mood card in this pass');
 });
 
-test('Mood cards: Golf still uses the existing dynamic bestRegionForType mechanism with a /browse fallback', () => {
+test('Mood cards: Golf links to the Okanagan-wide /golf listing (not a single region) once any golf venue exists, else falls back to /browse', () => {
   const html = app.renderMoodCardsHTML();
   const golfMatch = html.match(/class="mood-card mood-card-golf" href="([^"]*)"/);
   assert.ok(golfMatch, 'expected the Golf card to have an href');
   assert.ok(
-    golfMatch[1] === '/browse' || /^\/[a-z-]+\/golf$/.test(golfMatch[1]),
-    `Golf href must be either the /browse fallback (no golf venues exist) or a real /:region/golf category page, got: ${golfMatch[1]}`
+    golfMatch[1] === '/browse' || golfMatch[1] === '/golf',
+    `Golf href must be either the /browse fallback (no golf venues exist) or the Okanagan-wide /golf listing -- never a single-region /:region/golf page, since golf venues are deliberately spread across multiple regions. Got: ${golfMatch[1]}`
   );
 });
 
@@ -2178,7 +2188,7 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
   assert.equal(items[0].href, '/browse?types=restaurant,cafe,brewery,pub,cocktail');
   assert.ok(items[1].href === '/browse' || /^\/[a-z-]+\/wineries$/.test(items[1].href), `Wine href unexpected: ${items[1].href}`);
   assert.equal(items[2].href, '#exploreRegions');
-  assert.ok(items[3].href === '/browse' || /^\/[a-z-]+\/golf$/.test(items[3].href), `Golf href unexpected: ${items[3].href}`);
+  assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
   assert.equal(items[4].href, '/events');
   assert.equal(items[5].href, '#exploreRegions');
   assert.equal(items[6].href, '#hiddenGems');
@@ -2579,6 +2589,17 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   const golfVenuePage = await fetch(`${base}/kelowna/golf/test-golf-course`);
   assert.equal(golfVenuePage.status, 200, 'golf venue route must resolve');
   assert.match(await golfVenuePage.text(), /<h1>Test Golf Course<\/h1>/);
+
+  // Okanagan-wide /golf listing (2026-09-19): must aggregate across every
+  // region's golf venues, not just one -- the whole point of this route.
+  const golfAllRegionsPage = await fetch(`${base}/golf`);
+  assert.equal(golfAllRegionsPage.status, 200, '/golf (Okanagan-wide) route must resolve');
+  const golfAllRegionsBody = await golfAllRegionsPage.text();
+  assert.match(golfAllRegionsBody, /Test Golf Course/, '/golf must include the Kelowna fixture');
+  assert.match(golfAllRegionsBody, /Test Vernon Golf Course/, '/golf must include the Vernon fixture -- proving it is NOT region-scoped');
+  assert.match(golfAllRegionsBody, /href="\/kelowna\/golf\/test-golf-course"/, "each card must link using that venue's OWN region");
+  assert.match(golfAllRegionsBody, /href="\/vernon\/golf\/test-vernon-golf-course"/, "each card must link using that venue's OWN region");
+  assert.doesNotMatch(golfAllRegionsBody, /Test Trattoria|Test Winery/, '/golf must not include non-golf venues');
 
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');

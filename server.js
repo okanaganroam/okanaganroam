@@ -1256,6 +1256,18 @@ function getVenuesByRegionCategory(region, type) {
     .map(rowToVenue);
 }
 
+// Okanagan-wide category listing (2026-09-19), for categories whose
+// venues are deliberately spread across multiple regions rather than
+// concentrated in one -- Golf is the first and, so far, only such
+// category. Ordered by region then name so the mixed-region list still
+// reads as a coherent, grouped page rather than a shuffled one.
+function getVenuesByCategory(type) {
+  return db
+    .prepare('SELECT * FROM venues WHERE type = ? AND redirect_to IS NULL ORDER BY region ASC, name ASC')
+    .all(type)
+    .map(rowToVenue);
+}
+
 function findVenueBySlug(region, type, slug) {
   const row = db
     .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND slug = ?')
@@ -2783,8 +2795,15 @@ function bestRegionForCategoryType() {
 
 function renderMoodCardsHTML() {
   const bestRegionForType = bestRegionForCategoryType();
-  const golfRegion = bestRegionForType.golf;
-  const golfHref = golfRegion && CATEGORY_SLUGS.golf ? `/${golfRegion}/${CATEGORY_SLUGS.golf}` : '/browse';
+  // Golf-wide fix (2026-09-19): unlike every other category, Golf venues
+  // are deliberately spread across several regions (Kelowna, Vernon,
+  // Osoyoos, Lumby, Enderby, Kaleden) rather than concentrated in one, so
+  // the single-"best region" link every other mood card uses would only
+  // ever surface one region's courses. Points at the Okanagan-wide /golf
+  // listing instead (see the new bare-/:category route) whenever at least
+  // one golf venue exists; falls back to /browse exactly as before when
+  // there are none yet.
+  const golfHref = bestRegionForType.golf && CATEGORY_SLUGS.golf ? `/${CATEGORY_SLUGS.golf}` : '/browse';
   const wineRegion = bestRegionForType.winery;
   const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
 
@@ -2906,8 +2925,10 @@ const FOOTER_REGION_GROUPS = [
 // absolute, context-independent URL and is unaffected either way.
 function renderHomeFooterHTML(fromBrowse) {
   const bestRegionForType = bestRegionForCategoryType();
-  const golfRegion = bestRegionForType.golf;
-  const golfHref = golfRegion && CATEGORY_SLUGS.golf ? `/${golfRegion}/${CATEGORY_SLUGS.golf}` : '/browse';
+  // Golf-wide fix (2026-09-19): same reasoning as renderMoodCardsHTML()'s
+  // identical golfHref -- Golf venues span multiple regions, so this links
+  // to the Okanagan-wide /golf listing instead of one region's subset.
+  const golfHref = bestRegionForType.golf && CATEGORY_SLUGS.golf ? `/${CATEGORY_SLUGS.golf}` : '/browse';
   const wineRegion = bestRegionForType.winery;
   const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
   const exploreRegionsHref = fromBrowse ? '/#exploreRegions' : '#exploreRegions';
@@ -4312,6 +4333,67 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
   </ul>
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
+  ${renderHomeFooterHTML(true)}
+</body>
+</html>`;
+}
+
+// GET /:category — Okanagan-wide category listing (2026-09-19; currently
+// golf only). Mirrors renderCategoryPage() above, minus everything that
+// assumes a single region: no region breadcrumb level, no region-scoped
+// title/H1/canonical, and each card/ItemList entry links using that
+// venue's OWN region (venueCardHtml() already builds its href from
+// venue.region/venue.type/venue.slug, so the shared card markup needed no
+// changes at all to be mixed-region-safe).
+function renderCategoryAllRegionsPage(type, venues) {
+  const catSlug = CATEGORY_SLUGS[type];
+  const label = CATEGORY_LABELS[type];
+  const title = `${label.plural} in the Okanagan | Okanagan Roam`;
+  const description = `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
+  const canonical = `https://okanaganroam.com/${catSlug}`;
+
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: label.plural, url: canonical },
+  ]);
+
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: {
+        '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
+        name: v.name,
+        description: v.description || undefined,
+      },
+    })),
+  };
+
+  const hiddenGemIds = getHiddenGemVenueIds();
+  const cards = venues.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList])}
+</head>
+<body>
+  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: label.plural },
+  ])}
+  <h1>${escapeHtml(label.plural)} in the Okanagan</h1>
+  <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>
+  <ul class="card-grid">
+    ${cards}
+  </ul>
+  <a class="cta" href="/browse">Back to the full directory</a>
   ${renderHomeFooterHTML(true)}
 </body>
 </html>`;
@@ -6901,6 +6983,26 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
+    // GET /golf — Okanagan-wide Golf listing (2026-09-19). Golf venues are
+    // deliberately spread across several regions (Kelowna, Vernon, Osoyoos,
+    // Lumby, Enderby, Kaleden), so the region-scoped /:region/golf page
+    // above only ever shows one region's subset -- this is what the
+    // homepage's Golf mood card and footer link now point at instead.
+    // Exact-string match on CATEGORY_SLUGS.golf specifically, not a broad
+    // regex over every category, to keep this scoped to golf only, per the
+    // approved fix's scope; a path that isn't exactly "/golf" falls
+    // through unchanged to the region-hub-page check immediately below.
+    if (pathname === `/${CATEGORY_SLUGS.golf}` && method === 'GET') {
+      const venues = getVenuesByCategory('golf');
+      if (venues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderCategoryAllRegionsPage('golf', venues);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
