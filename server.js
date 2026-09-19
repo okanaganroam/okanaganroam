@@ -2367,6 +2367,24 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// venues.website is stored as whatever the source data gave -- often a
+// bare domain like "shannonlakegolf.com" rather than a full URL (2026-09-
+// 19 bug fix). Rendered as-is in an <a href>, a bare domain has no scheme,
+// so the browser resolves it as a RELATIVE path against the current page
+// instead of visiting the real external site (e.g. it became
+// "/west-kelowna/golf/shannonlakegolf.com"). This normalizes it into an
+// absolute https:// URL. An already-fully-qualified http(s):// URL is
+// returned completely unchanged, never upgraded/rewritten.
+function normalizeWebsiteUrl(website) {
+  if (!website) return website;
+  if (/^https?:\/\//i.test(website)) return website;
+  const withScheme = `https://${website}`;
+  // A bare domain with no path or query gets a trailing slash so it reads
+  // as a complete URL ("shannonlakegolf.com" -> "https://shannonlakegolf.com/");
+  // a domain that already has a path/query is left exactly as given.
+  return /^https:\/\/[^/?]+$/.test(withScheme) ? `${withScheme}/` : withScheme;
+}
+
 function listGuideCombos(minCount) {
   // One row per region+badge combo that clears the venue-count threshold,
   // computed live from the DB so the guide/sitemap list grows automatically
@@ -4570,7 +4588,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
     geo: (venue.latitude && venue.longitude) ? { '@type': 'GeoCoordinates', latitude: venue.latitude, longitude: venue.longitude } : undefined,
     image: venue.image_url || undefined,
-    sameAs: venue.website || undefined,
+    sameAs: normalizeWebsiteUrl(venue.website) || undefined,
     priceRange: venue.price ? '$'.repeat(venue.price) : undefined,
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
     aggregateRating: (venue.rating && venue.reviews) ? {
@@ -4610,7 +4628,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.cuisine ? ['Cuisine', escapeHtml(venue.cuisine)] : null,
     venue.address ? ['Address', escapeHtml(venue.address)] : null,
     venue.phone ? ['Phone', `<a href="tel:${escapeHtml(venue.phone)}">${escapeHtml(venue.phone)}</a>`] : null,
-    venue.website ? ['Website', `<a href="${escapeHtml(venue.website)}" rel="nofollow noopener" target="_blank">${escapeHtml(venue.website)}</a>`] : null,
+    venue.website ? ['Website', `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank">${escapeHtml(venue.website)}</a>`] : null,
     venue.price ? ['Price', '$'.repeat(venue.price)] : null,
     (venue.rating && venue.reviews) ? ['Rating', `${venue.rating}\u2605 (${venue.reviews} reviews)`] : (venue.rating ? ['Rating', `${venue.rating}\u2605`] : null),
   ].filter(Boolean)
@@ -4653,7 +4671,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // CTA buttons — only ever rendered when the underlying data already
   // exists; nothing here fabricates a website, phone number, or address.
   const ctaButtons = [
-    venue.website ? `<a class="cta" href="${escapeHtml(venue.website)}" rel="nofollow noopener" target="_blank">Visit Website</a>` : null,
+    venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank">Visit Website</a>` : null,
     mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank">Get Directions</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}">Call</a>` : null,
   ].filter(Boolean).join('\n  ');
@@ -4692,6 +4710,16 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     ? `<p class="venue-meta">Also see: ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}">${escapeHtml(BADGE_LABELS[c.badge].title)} in ${escapeHtml(regionLabel)}</a>`).join(', ')}</p>`
     : '';
 
+  // Back-link to the venue's regional category page (2026-09-19), only
+  // for categories in ALL_REGIONS_CATEGORIES (currently golf) -- those
+  // are the only categories with a full Okanagan-wide -> regional ->
+  // venue navigation hierarchy worth surfacing here. Every other
+  // category's venue page is unaffected. Built from the venue's own
+  // region field, never hardcoded to any one venue/region.
+  const venueBackLink = ALL_REGIONS_CATEGORIES.includes(venue.type)
+    ? `<a class="category-back-link" href="/${venue.region}/${catSlug}">\u2190 ${escapeHtml(regionLabel)} ${escapeHtml(ALL_REGIONS_BACK_LABEL[venue.type] || label.plural)}</a>`
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4705,6 +4733,7 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
     { name: label.plural, href: `/${venue.region}/${catSlug}` },
     { name: venue.name },
   ])}
+  ${venueBackLink}
   ${imageHtml}
   <div class="venue-header">
     <h1>${escapeHtml(venue.name)}</h1>
@@ -7238,6 +7267,7 @@ module.exports = {
   server,
   slugify,
   escapeHtml,
+  normalizeWebsiteUrl,
   breadcrumbListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,

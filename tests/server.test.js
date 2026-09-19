@@ -95,6 +95,25 @@ insert.run({
   slug: 'test-golf-simulator',
 });
 
+// A third region (west-kelowna), with a bare-domain `website` value
+// (2026-09-19 bug fix), used to test both the individual-venue back-link
+// ("← West Kelowna Golf") and normalizeWebsiteUrl() turning a bare domain
+// into a real absolute https:// URL instead of a broken relative link.
+const websiteInsert = db.prepare(`
+  INSERT INTO venues (name, region, type, cuisine, phone, price, reviews, rating,
+    description, address, latitude, longitude, hours, slug, website)
+  VALUES (@name, @region, @type, @cuisine, @phone, @price, @reviews, @rating,
+    @description, @address, @latitude, @longitude, @hours, @slug, @website)
+`);
+websiteInsert.run({
+  name: 'Test West Kelowna Golf Course', region: 'west-kelowna', type: 'golf', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'A fixture golf course with a bare-domain website, used only by the automated test suite.',
+  address: null, latitude: null, longitude: null, hours: null,
+  slug: 'test-west-kelowna-golf-course',
+  website: 'shannonlakegolf.com',
+});
+
 // ---- seed fixtures for /admin/correct-phone tests -----------------------
 insert.run({
   name: 'Test Phone Fixture', region: 'kelowna', type: 'restaurant', cuisine: null,
@@ -2284,6 +2303,41 @@ test('golf is present in CATEGORY_SLUGS with the expected slug', () => {
   assert.equal(app.CATEGORY_SLUGS.golf, 'golf');
 });
 
+// ==== Website URL normalization (2026-09-19 bug fix) ======================
+// A venue's `website` was rendered as-is in an <a href>. A bare domain like
+// "shannonlakegolf.com" has no scheme, so the browser resolves it as a
+// RELATIVE path against the current page (e.g. it became
+// "/west-kelowna/golf/shannonlakegolf.com") instead of an external link.
+test('normalizeWebsiteUrl converts a bare domain to an absolute https:// URL', () => {
+  assert.equal(app.normalizeWebsiteUrl('shannonlakegolf.com'), 'https://shannonlakegolf.com/');
+});
+
+test('normalizeWebsiteUrl converts a "www." domain to an absolute https:// URL', () => {
+  assert.equal(app.normalizeWebsiteUrl('www.example.com'), 'https://www.example.com/');
+});
+
+test('normalizeWebsiteUrl preserves a path on a bare domain, without adding a trailing slash', () => {
+  assert.equal(app.normalizeWebsiteUrl('example.com/book'), 'https://example.com/book');
+});
+
+test('normalizeWebsiteUrl preserves a query string on a bare domain', () => {
+  assert.equal(app.normalizeWebsiteUrl('example.com/book?x=1'), 'https://example.com/book?x=1');
+});
+
+test('normalizeWebsiteUrl leaves an already-fully-qualified https:// URL completely unchanged', () => {
+  assert.equal(app.normalizeWebsiteUrl('https://example.com'), 'https://example.com');
+});
+
+test('normalizeWebsiteUrl leaves an already-fully-qualified http:// URL unchanged (never upgraded to https)', () => {
+  assert.equal(app.normalizeWebsiteUrl('http://example.com'), 'http://example.com');
+});
+
+test('normalizeWebsiteUrl passes through a falsy value unchanged', () => {
+  assert.equal(app.normalizeWebsiteUrl(null), null);
+  assert.equal(app.normalizeWebsiteUrl(undefined), undefined);
+  assert.equal(app.normalizeWebsiteUrl(''), '');
+});
+
 test('renderCategoryPage renders the golf category with the correct URL and label', () => {
   // Two kelowna golf fixtures exist (an outdoor course and, added
   // 2026-09-19, an indoor simulator) so this also exercises the
@@ -2605,7 +2659,31 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
 
   const golfVenuePage = await fetch(`${base}/kelowna/golf/test-golf-course`);
   assert.equal(golfVenuePage.status, 200, 'golf venue route must resolve');
-  assert.match(await golfVenuePage.text(), /<h1>Test Golf Course<\/h1>/);
+  const golfVenueBody = await golfVenuePage.text();
+  assert.match(golfVenueBody, /<h1>Test Golf Course<\/h1>/);
+
+  // Individual-venue back-link to the venue's regional Golf page
+  // (2026-09-19 bug fix): built from the venue's own region field, must
+  // read "← Kelowna Golf" here and the equivalent for any other region.
+  assert.match(golfVenueBody, /<a class="category-back-link" href="\/kelowna\/golf">← Kelowna Golf<\/a>/, 'a golf venue page must show a back-link to its own region\'s Golf page');
+
+  const vernonGolfVenuePage = await fetch(`${base}/vernon/golf/test-vernon-golf-course`);
+  assert.equal(vernonGolfVenuePage.status, 200);
+  assert.match(await vernonGolfVenuePage.text(), /<a class="category-back-link" href="\/vernon\/golf">← Vernon Golf<\/a>/, 'the back-link label/href must be derived from the venue\'s own region, not hardcoded');
+
+  // Website URL normalization (2026-09-19 bug fix): a bare domain like
+  // "shannonlakegolf.com" must become an absolute https:// link, not a
+  // broken relative path such as "/west-kelowna/golf/shannonlakegolf.com".
+  const websiteGolfVenuePage = await fetch(`${base}/west-kelowna/golf/test-west-kelowna-golf-course`);
+  assert.equal(websiteGolfVenuePage.status, 200);
+  const websiteGolfVenueBody = await websiteGolfVenuePage.text();
+  assert.match(websiteGolfVenueBody, /<a class="category-back-link" href="\/west-kelowna\/golf">← West Kelowna Golf<\/a>/);
+  assert.match(websiteGolfVenueBody, /href="https:\/\/shannonlakegolf\.com\/" rel="nofollow noopener"/, 'a bare-domain website must render as an absolute https:// link');
+  assert.doesNotMatch(websiteGolfVenueBody, /href="shannonlakegolf\.com"/, 'the bare domain must never be used as-is as an href (it would resolve as a relative path)');
+
+  // Non-golf venue pages must not show the new back-link.
+  const trattoriaVenuePage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
+  assert.doesNotMatch(await trattoriaVenuePage.text(), /<a class="category-back-link"/, 'a non-golf venue page must not render the Golf back-link');
 
   // Okanagan-wide /golf listing (2026-09-19): must aggregate across every
   // region's golf venues, not just one -- the whole point of this route.
