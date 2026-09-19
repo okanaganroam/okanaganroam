@@ -6519,7 +6519,23 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 200, venue);
       }
 
+      // Security fix (2026-09-19): PUT/DELETE on a real venue were
+      // previously reachable by anyone, with no authentication at all --
+      // unlike every /admin/* write route, which has required the bearer
+      // token since day one. Same guard, same fail-closed-if-unconfigured
+      // behavior, same timing-safe comparison -- reusing the existing
+      // mechanism rather than inventing a second one. Read (GET) above is
+      // intentionally left untouched: this endpoint's public read behavior
+      // is unchanged.
       if (method === 'PUT') {
+        if (!ENRICHMENT_ADMIN_TOKEN) {
+          return sendJSON(res, 503, { error: 'Venue update endpoint is not configured.' });
+        }
+        const authHeader = req.headers['authorization'] || '';
+        const match = /^Bearer (.+)$/.exec(authHeader);
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+          return sendJSON(res, 401, { error: 'Unauthorized.' });
+        }
         const body = await readBody(req);
         const updated = updateVenue(id, body);
         if (!updated) return sendJSON(res, 404, { error: 'Venue not found' });
@@ -6527,6 +6543,14 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (method === 'DELETE') {
+        if (!ENRICHMENT_ADMIN_TOKEN) {
+          return sendJSON(res, 503, { error: 'Venue deletion endpoint is not configured.' });
+        }
+        const authHeader = req.headers['authorization'] || '';
+        const match = /^Bearer (.+)$/.exec(authHeader);
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+          return sendJSON(res, 401, { error: 'Unauthorized.' });
+        }
         const deleted = deleteVenue(id);
         if (!deleted) return sendJSON(res, 404, { error: 'Venue not found' });
         return sendJSON(res, 200, { success: true });
@@ -6534,7 +6558,18 @@ const server = http.createServer(async (req, res) => {
     }
 
     // POST /api/venues
+    // Security fix (2026-09-19): see the PUT/DELETE comment above -- same
+    // reasoning, same reused guard. Reads (GET /api/venues, GET /api/venues/:id)
+    // remain fully public and unchanged.
     if (pathname === '/api/venues' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Venue creation endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
       const body = await readBody(req);
       const created = createVenue(body);
       return sendJSON(res, 201, created);

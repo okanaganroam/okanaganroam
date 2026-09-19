@@ -3488,6 +3488,89 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     assert.equal(locCountAfter, locCountBefore, 'sitemap URL count must be unaffected by the lastmod fix');
   }
 
+  // ---- Security fix (2026-09-19): POST/PUT/DELETE /api/venues now require ----
+  // the same ENRICHMENT_ADMIN_TOKEN bearer auth every /admin/* route already
+  // uses -- previously these three were completely unauthenticated, letting
+  // anyone create/edit/delete a real production venue. GET remains public.
+  {
+    const authHeaders = (token) => {
+      const h = { 'Content-Type': 'application/json' };
+      if (token !== undefined) h['Authorization'] = `Bearer ${token}`;
+      return h;
+    };
+
+    // 1/2/3 -- POST /api/venues: no header / wrong token / correct token.
+    const newVenuePayload = {
+      name: 'Test Auth Fixture Venue', region: 'kelowna', type: 'restaurant',
+      description: 'Disposable fixture for the venue-mutation auth test.',
+    };
+    {
+      const res = await fetch(`${base}/api/venues`, { method: 'POST', headers: authHeaders(undefined), body: JSON.stringify(newVenuePayload) });
+      assert.equal(res.status, 401, 'POST /api/venues with no Authorization header must be rejected');
+    }
+    {
+      const res = await fetch(`${base}/api/venues`, { method: 'POST', headers: authHeaders('wrong-token'), body: JSON.stringify(newVenuePayload) });
+      assert.equal(res.status, 401, 'POST /api/venues with an invalid token must be rejected');
+    }
+    let createdVenue;
+    {
+      const res = await fetch(`${base}/api/venues`, { method: 'POST', headers: authHeaders(ADMIN_TOKEN), body: JSON.stringify(newVenuePayload) });
+      assert.equal(res.status, 201, 'POST /api/venues with a valid admin token must succeed');
+      createdVenue = await res.json();
+      assert.equal(createdVenue.name, newVenuePayload.name);
+    }
+
+    // 4/5/6 -- PUT /api/venues/:id: no header / wrong token / correct token.
+    {
+      const res = await fetch(`${base}/api/venues/${createdVenue.id}`, { method: 'PUT', headers: authHeaders(undefined), body: JSON.stringify({ description: 'should not apply' }) });
+      assert.equal(res.status, 401, 'PUT /api/venues/:id with no Authorization header must be rejected');
+    }
+    {
+      const res = await fetch(`${base}/api/venues/${createdVenue.id}`, { method: 'PUT', headers: authHeaders('wrong-token'), body: JSON.stringify({ description: 'should not apply' }) });
+      assert.equal(res.status, 401, 'PUT /api/venues/:id with an invalid token must be rejected');
+    }
+    {
+      const res = await fetch(`${base}/api/venues/${createdVenue.id}`, { method: 'PUT', headers: authHeaders(ADMIN_TOKEN), body: JSON.stringify({ description: 'updated by authenticated PUT' }) });
+      assert.equal(res.status, 200, 'PUT /api/venues/:id with a valid admin token must succeed');
+      const updated = await res.json();
+      assert.equal(updated.description, 'updated by authenticated PUT');
+    }
+
+    // 7/8/9 -- DELETE /api/venues/:id: no header / wrong token / correct token.
+    {
+      const res = await fetch(`${base}/api/venues/${createdVenue.id}`, { method: 'DELETE', headers: authHeaders(undefined) });
+      assert.equal(res.status, 401, 'DELETE /api/venues/:id with no Authorization header must be rejected');
+    }
+    {
+      const res = await fetch(`${base}/api/venues/${createdVenue.id}`, { method: 'DELETE', headers: authHeaders('wrong-token') });
+      assert.equal(res.status, 401, 'DELETE /api/venues/:id with an invalid token must be rejected');
+    }
+    {
+      // Confirm the two rejected attempts above genuinely didn't delete it.
+      const stillThere = await fetch(`${base}/api/venues/${createdVenue.id}`);
+      assert.equal(stillThere.status, 200, 'venue must still exist after the two rejected DELETE attempts');
+
+      const res = await fetch(`${base}/api/venues/${createdVenue.id}`, { method: 'DELETE', headers: authHeaders(ADMIN_TOKEN) });
+      assert.equal(res.status, 200, 'DELETE /api/venues/:id with a valid admin token must succeed');
+      const gone = await fetch(`${base}/api/venues/${createdVenue.id}`);
+      assert.equal(gone.status, 404, 'venue must actually be gone after an authenticated DELETE');
+    }
+
+    // 10 -- public GET /api/venues remains fully public, no auth required.
+    {
+      const res = await fetch(`${base}/api/venues?limit=1`);
+      assert.equal(res.status, 200, 'GET /api/venues must remain publicly readable with no Authorization header');
+    }
+
+    // 11 -- existing /admin/* auth behavior is unchanged by this fix (a
+    // representative spot-check; the full suite of /admin/* auth tests
+    // elsewhere in this file is the authoritative coverage).
+    {
+      const res = await fetch(`${base}/admin/enrich-venue`, { method: 'POST', headers: authHeaders('wrong-token'), body: JSON.stringify({ id: 1, address: 'x', latitude: 49, longitude: -119 }) });
+      assert.equal(res.status, 401, '/admin/enrich-venue auth behavior must be unaffected by the /api/venues fix');
+    }
+  }
+
   // Close the listener so the test process can exit naturally instead of
   // hanging on an open server handle.
   await new Promise((resolve) => app.server.close(resolve));
