@@ -968,6 +968,18 @@ const CATEGORY_SLUGS = {
 };
 const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([type, slug]) => [slug, type]));
 
+// Reusable category-page architecture (2026-09-19): which category types
+// currently have an Okanagan-wide "/:category" page (region-selector,
+// all-regions listing) turned on -- Golf is the first, deliberately kept
+// as a small explicit allowlist rather than "every category automatically
+// gets one" so that adding a future category's wide page later (Wine,
+// etc.) is a one-line addition here, without silently exposing a new
+// public URL for every existing category type as an unannounced side
+// effect of this refactor. getVenuesByCategory()/renderCategoryAllRegionsPage()
+// below are already fully generic by `type`; only the route dispatch is
+// gated by this list.
+const ALL_REGIONS_CATEGORIES = ['golf'];
+
 // Human-readable label per category, singular and plural, for titles/H1s
 const CATEGORY_LABELS = {
   restaurant: { singular: 'Restaurant', plural: 'Restaurants' },
@@ -3951,6 +3963,30 @@ const SEO_PAGE_CSS = `
     box-shadow: inset 0 0 0 1px rgba(74,52,40,0.12);
   }
 
+  /* Region selector for Okanagan-wide category pages (e.g. /golf) --
+     reuses the .chip pill visual language above so it reads as part of
+     the same design system rather than a bolted-on control. Shared by
+     any future category's wide page, not styled per-category. */
+  .category-region-selector {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 0 0 26px;
+  }
+  .category-region-selector a,
+  .category-region-selector-active {
+    display: inline-block; padding: 6px 15px; border-radius: 999px;
+    font-size: 0.84rem; font-weight: 700; letter-spacing: 0.01em;
+    text-decoration: none;
+  }
+  .category-region-selector-active {
+    background: var(--plum); color: var(--paper);
+  }
+  .category-region-selector a {
+    background: var(--sand-deep); color: var(--plum);
+  }
+  .category-region-selector a:hover {
+    background: var(--plum); color: var(--paper);
+  }
+
   .related-section { margin-top: 40px; }
   .related-section h2 {
     font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.25rem; margin-bottom: 14px;
@@ -4338,19 +4374,44 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 </html>`;
 }
 
+// Shared region-selector strip (2026-09-19): reusable across any future
+// category's Okanagan-wide page, not just Golf. Built from the regions
+// actually present in the already-fetched venues array -- never a
+// hardcoded region list -- so a region with zero venues of this category
+// never appears as a dead-end choice. "All Regions" is the current page
+// itself (rendered inactive, not a link); every other entry links to the
+// EXISTING single-region /:region/:category page for that region, so no
+// new region-scoped rendering path is introduced by this selector at all.
+function renderCategoryRegionSelector(catSlug, venues) {
+  const regionsPresent = [...new Set(venues.map((v) => v.region))]
+    .filter((r) => REGION_LABELS[r])
+    .sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
+  const regionLinks = regionsPresent
+    .map((r) => `<a href="/${r}/${catSlug}">${escapeHtml(REGION_LABELS[r])}</a>`)
+    .join('\n      ');
+  return `<nav class="category-region-selector" aria-label="Filter by region">
+      <span class="category-region-selector-active">All Regions</span>
+      ${regionLinks}
+    </nav>`;
+}
+
 // GET /:category — Okanagan-wide category listing (2026-09-19; currently
-// golf only). Mirrors renderCategoryPage() above, minus everything that
-// assumes a single region: no region breadcrumb level, no region-scoped
-// title/H1/canonical, and each card/ItemList entry links using that
-// venue's OWN region (venueCardHtml() already builds its href from
-// venue.region/venue.type/venue.slug, so the shared card markup needed no
-// changes at all to be mixed-region-safe).
+// golf only, see ALL_REGIONS_CATEGORIES). Mirrors renderCategoryPage()
+// above, minus everything that assumes a single region: no region
+// breadcrumb level, no region-scoped title/H1/canonical, and each card/
+// ItemList entry links using that venue's OWN region (venueCardHtml()
+// already builds its href from venue.region/venue.type/venue.slug, so the
+// shared card markup needed no changes at all to be mixed-region-safe).
+// Already fully generic by `type` -- adding a future category here is
+// just adding its slug to ALL_REGIONS_CATEGORIES, nothing in this
+// function needs to change.
 function renderCategoryAllRegionsPage(type, venues) {
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
   const title = `${label.plural} in the Okanagan | Okanagan Roam`;
   const description = `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${catSlug}`;
+  const regionSelector = renderCategoryRegionSelector(catSlug, venues);
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -4390,6 +4451,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
   ])}
   <h1>${escapeHtml(label.plural)} in the Okanagan</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>
+  ${regionSelector}
   <ul class="card-grid">
     ${cards}
   </ul>
@@ -6988,19 +7050,30 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
-    // GET /golf — Okanagan-wide Golf listing (2026-09-19). Golf venues are
-    // deliberately spread across several regions (Kelowna, Vernon, Osoyoos,
-    // Lumby, Enderby, Kaleden), so the region-scoped /:region/golf page
-    // above only ever shows one region's subset -- this is what the
-    // homepage's Golf mood card and footer link now point at instead.
-    // Exact-string match on CATEGORY_SLUGS.golf specifically, not a broad
-    // regex over every category, to keep this scoped to golf only, per the
-    // approved fix's scope; a path that isn't exactly "/golf" falls
-    // through unchanged to the region-hub-page check immediately below.
-    if (pathname === `/${CATEGORY_SLUGS.golf}` && method === 'GET') {
-      const venues = getVenuesByCategory('golf');
+    // GET /:category — Okanagan-wide category listing (2026-09-19; Golf is
+    // the first, see ALL_REGIONS_CATEGORIES). For categories whose venues
+    // are deliberately spread across several regions rather than
+    // concentrated in one, the region-scoped /:region/:category page below
+    // only ever shows one region's subset -- this is what the homepage's
+    // mood card and footer links point at instead, for any category
+    // enabled here. Generic by design (works for any category slug in
+    // ALL_REGIONS_CATEGORIES, not hardcoded to golf), but gated by that
+    // explicit allowlist rather than every known category slug, so
+    // enabling a future one is a one-line addition there, not an
+    // unannounced new public URL for every existing category the moment
+    // this route was generalized. A path that isn't exactly "/<an enabled
+    // category's slug>" falls through unchanged to the region-hub-page
+    // check immediately below.
+    const allRegionsCategorySlug = pathname.slice(1);
+    if (
+      ALL_REGIONS_CATEGORIES.includes(SLUG_TO_TYPE[allRegionsCategorySlug]) &&
+      pathname === `/${allRegionsCategorySlug}` &&
+      method === 'GET'
+    ) {
+      const type = SLUG_TO_TYPE[allRegionsCategorySlug];
+      const venues = getVenuesByCategory(type);
       if (venues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderCategoryAllRegionsPage('golf', venues);
+        const html = renderCategoryAllRegionsPage(type, venues);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }

@@ -2601,6 +2601,23 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(golfAllRegionsBody, /href="\/vernon\/golf\/test-vernon-golf-course"/, "each card must link using that venue's OWN region");
   assert.doesNotMatch(golfAllRegionsBody, /Test Trattoria|Test Winery/, '/golf must not include non-golf venues');
 
+  // Reusable region-selector (2026-09-19): built from the regions actually
+  // present, not a hardcoded list -- must show exactly Kelowna and Vernon
+  // (the two regions the golf fixtures are in), each linking to that
+  // region's EXISTING single-region page, and nothing else.
+  assert.match(golfAllRegionsBody, /class="category-region-selector"/, '/golf must render the shared region selector');
+  assert.match(golfAllRegionsBody, /<a href="\/kelowna\/golf">Kelowna<\/a>/, 'selector must link to the existing /kelowna/golf page');
+  assert.match(golfAllRegionsBody, /<a href="\/vernon\/golf">Vernon<\/a>/, 'selector must link to the existing /vernon/golf page');
+  assert.doesNotMatch(golfAllRegionsBody, /<a href="\/osoyoos\/golf">/, 'selector must NOT list a region with zero golf venues in this fixture set');
+
+  // Reusable-architecture allowlist (2026-09-19): a real, valid category
+  // slug that is NOT in ALL_REGIONS_CATEGORIES must NOT get an Okanagan-
+  // wide page just because the route was generalized -- generalizing the
+  // route must not silently expose a new public URL for every existing
+  // category.
+  const wineriesAllRegionsPage = await fetch(`${base}/wineries`);
+  assert.equal(wineriesAllRegionsPage.status, 404, '/wineries must stay 404 -- only categories explicitly listed in ALL_REGIONS_CATEGORIES get an Okanagan-wide page');
+
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');
 
