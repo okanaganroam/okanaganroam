@@ -3987,6 +3987,25 @@ const SEO_PAGE_CSS = `
     background: var(--plum); color: var(--paper);
   }
 
+  /* Back-link on a category's single-region page (e.g. /kelowna/golf)
+     to its Okanagan-wide page (e.g. /golf) -- only categories in
+     ALL_REGIONS_CATEGORIES render this, since it's the only case where
+     an Okanagan-wide page actually exists to link back to. */
+  .category-back-link {
+    display: inline-block; margin: 0 0 14px; font-size: 0.86rem;
+    font-weight: 700; color: var(--teal-deep); text-decoration: none;
+  }
+  .category-back-link:hover { text-decoration: underline; }
+
+  /* Subsection heading used to split a single category's venues into
+     groups (e.g. Golf Courses vs. Indoor Golf & Simulators) -- reuses
+     the same treatment as .related-section h2 for visual consistency. */
+  .category-subsection-heading {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem;
+    margin: 30px 0 14px;
+  }
+  .category-subsection-heading:first-of-type { margin-top: 6px; }
+
   .related-section { margin-top: 40px; }
   .related-section h2 {
     font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.25rem; margin-bottom: 14px;
@@ -4306,6 +4325,61 @@ ${pageHead(title, description, canonical, [breadcrumb])}
 </html>`;
 }
 
+// Short label for the "← All <X>" back-link on a category's single-
+// region page, distinct from CATEGORY_LABELS.plural (the full heading
+// label, e.g. "Golf Courses") since the back-link reads better short.
+// Falls back to CATEGORY_LABELS.plural for any category without an
+// entry here, so it never breaks if a future category is added to
+// ALL_REGIONS_CATEGORIES without also adding a short label.
+const ALL_REGIONS_BACK_LABEL = { golf: 'Golf' };
+
+// Golf's inventory deliberately includes both outdoor courses and indoor
+// golf-simulator venues under the same type='golf' (2026-09-19), so the
+// Golf category page can show both while everything else on the site
+// still treats them as one type. No new DB column was added: every
+// simulator venue's free-text description states "simulator" or "indoor
+// golf" (that's how each one was written at insertion time), and no
+// outdoor course description does, so the existing data already supports
+// the distinction without inventing a new schema field.
+function isIndoorGolfVenue(venue) {
+  return /simulator|indoor golf/i.test(venue.description || '');
+}
+
+// Renders a category's venues as either one flat grid (every category
+// except golf) or two labeled subsections (golf only: Golf Courses, then
+// Indoor Golf & Simulators). `headingPrefix` is the region name for a
+// single-region page (e.g. "Kelowna") or '' for the Okanagan-wide page,
+// so the same helper produces "Golf Courses" and "Kelowna Golf Courses"
+// without a separate code path per page type. A subsection is omitted
+// entirely when it would be empty, rather than rendering an empty grid.
+function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix) {
+  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
+
+  if (type !== 'golf') {
+    return `<ul class="card-grid">
+    ${cardHtml(venues)}
+  </ul>`;
+  }
+
+  const courses = venues.filter((v) => !isIndoorGolfVenue(v));
+  const indoor = venues.filter((v) => isIndoorGolfVenue(v));
+  const prefix = headingPrefix ? `${escapeHtml(headingPrefix)} ` : '';
+  let html = '';
+  if (courses.length) {
+    html += `<h2 class="category-subsection-heading">${prefix}Golf Courses</h2>
+  <ul class="card-grid">
+    ${cardHtml(courses)}
+  </ul>`;
+  }
+  if (indoor.length) {
+    html += `<h2 class="category-subsection-heading">${prefix}Indoor Golf &amp; Simulators</h2>
+  <ul class="card-grid">
+    ${cardHtml(indoor)}
+  </ul>`;
+  }
+  return html;
+}
+
 // GET /:region/:category — category page within a region
 function renderCategoryPage(region, type, venues, categoryGuidePages) {
   const regionLabel = REGION_LABELS[region];
@@ -4339,7 +4413,14 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   };
 
   const hiddenGemIds = getHiddenGemVenueIds();
-  const cards = venues.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel);
+
+  // Back-link to the Okanagan-wide page, only for categories that
+  // actually have one (ALL_REGIONS_CATEGORIES) -- every other category
+  // has no wide page to link back to, so it renders nothing for them.
+  const backLink = ALL_REGIONS_CATEGORIES.includes(type)
+    ? `<a class="category-back-link" href="/${catSlug}">\u2190 All ${escapeHtml(ALL_REGIONS_BACK_LABEL[type] || label.plural)}</a>`
+    : '';
 
   const guideLinks = categoryGuidePages.length
     ? `<div class="related-section">
@@ -4362,11 +4443,10 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
     { name: regionLabel, href: `/${region}` },
     { name: label.plural },
   ])}
+  ${backLink}
   <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}.</p>
-  <ul class="card-grid">
-    ${cards}
-  </ul>
+  ${cardsHtml}
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
   ${renderHomeFooterHTML(true)}
@@ -4436,7 +4516,7 @@ function renderCategoryAllRegionsPage(type, venues) {
   };
 
   const hiddenGemIds = getHiddenGemVenueIds();
-  const cards = venues.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -4452,9 +4532,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
   <h1>${escapeHtml(label.plural)} in the Okanagan</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>
   ${regionSelector}
-  <ul class="card-grid">
-    ${cards}
-  </ul>
+  ${cardsHtml}
   <a class="cta" href="/browse">Back to the full directory</a>
   ${renderHomeFooterHTML(true)}
 </body>

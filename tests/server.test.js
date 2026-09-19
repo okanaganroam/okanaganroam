@@ -83,6 +83,17 @@ insert.run({
   address: null, latitude: null, longitude: null, hours: null,
   slug: 'test-vernon-golf-course',
 });
+// A same-region (kelowna) indoor/simulator golf fixture (2026-09-19), so
+// tests can prove the Golf Courses / Indoor Golf & Simulators split is
+// driven by the description text alone (no new DB column), and that it
+// only ever applies to type='golf', never to any other category.
+insert.run({
+  name: 'Test Golf Simulator', region: 'kelowna', type: 'golf', cuisine: null,
+  phone: null, price: null, reviews: null, rating: null,
+  description: 'An indoor golf simulator fixture used only by the automated test suite.',
+  address: null, latitude: null, longitude: null, hours: null,
+  slug: 'test-golf-simulator',
+});
 
 // ---- seed fixtures for /admin/correct-phone tests -----------------------
 insert.run({
@@ -2274,11 +2285,16 @@ test('golf is present in CATEGORY_SLUGS with the expected slug', () => {
 });
 
 test('renderCategoryPage renders the golf category with the correct URL and label', () => {
+  // Two kelowna golf fixtures exist (an outdoor course and, added
+  // 2026-09-19, an indoor simulator) so this also exercises the
+  // Golf Courses / Indoor Golf & Simulators split -- see the dedicated
+  // split-section tests below for full coverage of that behavior.
   const rows = app.getVenuesByRegionCategory('kelowna', 'golf');
-  assert.equal(rows.length, 1);
+  assert.equal(rows.length, 2);
   const html = app.renderCategoryPage('kelowna', 'golf', rows, []);
   assert.match(html, /Golf Courses in Kelowna, BC/);
   assert.match(html, /Test Golf Course/);
+  assert.match(html, /Test Golf Simulator/);
 });
 
 test('renderVenuePage renders a golf venue with the correct URL and GolfCourse JSON-LD', () => {
@@ -2584,7 +2600,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Phase 2 Sprint 1 (Golf) — route dispatch and sitemap inclusion
   const golfCategoryPage = await fetch(`${base}/kelowna/golf`);
   assert.equal(golfCategoryPage.status, 200, 'golf category route must resolve');
-  assert.match(await golfCategoryPage.text(), /Test Golf Course/);
+  const golfCategoryBody = await golfCategoryPage.text();
+  assert.match(golfCategoryBody, /Test Golf Course/);
 
   const golfVenuePage = await fetch(`${base}/kelowna/golf/test-golf-course`);
   assert.equal(golfVenuePage.status, 200, 'golf venue route must resolve');
@@ -2609,6 +2626,34 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(golfAllRegionsBody, /<a href="\/kelowna\/golf">Kelowna<\/a>/, 'selector must link to the existing /kelowna/golf page');
   assert.match(golfAllRegionsBody, /<a href="\/vernon\/golf">Vernon<\/a>/, 'selector must link to the existing /vernon/golf page');
   assert.doesNotMatch(golfAllRegionsBody, /<a href="\/osoyoos\/golf">/, 'selector must NOT list a region with zero golf venues in this fixture set');
+
+  // Back-link to the Okanagan-wide page (2026-09-19): only categories in
+  // ALL_REGIONS_CATEGORIES render it, since it's the only case where a
+  // wide page exists to link back to.
+  assert.match(golfCategoryBody, /<a class="category-back-link" href="\/golf">← All Golf<\/a>/, '/kelowna/golf must show a back-link to /golf');
+
+  // Golf Courses vs. Indoor Golf & Simulators split (2026-09-19): driven
+  // entirely by the existing description text ("simulator"/"indoor golf"),
+  // no new DB column. Must apply on both the single-region page and the
+  // Okanagan-wide page, and must correctly bucket each fixture.
+  assert.match(golfCategoryBody, /<h2 class="category-subsection-heading">Kelowna Golf Courses<\/h2>/, '/kelowna/golf must show a region-prefixed Golf Courses heading');
+  assert.match(golfCategoryBody, /<h2 class="category-subsection-heading">Kelowna Indoor Golf &amp; Simulators<\/h2>/, '/kelowna/golf must show a region-prefixed Indoor Golf & Simulators heading');
+  assert.match(golfCategoryBody, /Test Golf Simulator/, '/kelowna/golf must include the simulator fixture');
+  const [coursesSectionBody, indoorSectionBody] = golfCategoryBody.split('Kelowna Indoor Golf &amp; Simulators');
+  assert.match(coursesSectionBody, /Test Golf Course/, 'Test Golf Course (an outdoor course) must be in the Golf Courses section');
+  assert.doesNotMatch(coursesSectionBody, /Test Golf Simulator/, 'Test Golf Simulator must NOT be in the Golf Courses section');
+  assert.match(indoorSectionBody, /Test Golf Simulator/, 'Test Golf Simulator must be in the Indoor Golf & Simulators section');
+
+  assert.match(golfAllRegionsBody, /<h2 class="category-subsection-heading">Golf Courses<\/h2>/, '/golf must show an un-prefixed Golf Courses heading');
+  assert.match(golfAllRegionsBody, /<h2 class="category-subsection-heading">Indoor Golf &amp; Simulators<\/h2>/, '/golf must show an un-prefixed Indoor Golf & Simulators heading');
+  assert.match(golfAllRegionsBody, /Test Golf Simulator/, '/golf must include the simulator fixture across regions too');
+
+  // Non-golf categories must be completely unaffected by either the
+  // back-link or the split-section rendering.
+  const wineryPage = await fetch(`${base}/kelowna/wineries`);
+  const wineryBody = await wineryPage.text();
+  assert.doesNotMatch(wineryBody, /<a class="category-back-link"/, 'non-golf category pages must not render a back-link');
+  assert.doesNotMatch(wineryBody, /<h2 class="category-subsection-heading">/, 'non-golf category pages must not render the Golf/Indoor split');
 
   // Reusable-architecture allowlist (2026-09-19): a real, valid category
   // slug that is NOT in ALL_REGIONS_CATEGORIES must NOT get an Okanagan-
