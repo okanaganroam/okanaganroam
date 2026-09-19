@@ -3571,6 +3571,74 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     }
   }
 
+  // ---- Optional explicit slug support on POST /api/venues (2026-09-19) ----
+  // createVenue() only -- deliberately not updateVenue()/PUT, per the
+  // approved proposal. Uses the same authenticated admin token throughout;
+  // this block is about slug validation/collision behavior, not auth.
+  {
+    const adminHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ADMIN_TOKEN}` };
+    const postVenue = (body) => fetch(`${base}/api/venues`, { method: 'POST', headers: adminHeaders, body: JSON.stringify(body) });
+
+    // 1 -- valid custom slug is persisted exactly.
+    let slugFixtureId;
+    {
+      const res = await postVenue({ name: 'Slug Fixture Venue', region: 'kelowna', type: 'golf', slug: 'slug-fixture-venue-custom' });
+      assert.equal(res.status, 201, 'POST with a valid custom slug must succeed');
+      const created = await res.json();
+      assert.equal(created.slug, 'slug-fixture-venue-custom', 'the exact supplied slug must be persisted, not re-derived from name');
+      slugFixtureId = created.id;
+    }
+
+    // 2 -- same (region, type, slug) collision is rejected, nothing created.
+    {
+      const beforeCount = (await (await fetch(`${base}/api/venues?limit=1`)).json()).total;
+      const res = await postVenue({ name: 'A Different Name Entirely', region: 'kelowna', type: 'golf', slug: 'slug-fixture-venue-custom' });
+      assert.equal(res.status, 409, 'a duplicate (region,type,slug) must be rejected with 409');
+      const afterCount = (await (await fetch(`${base}/api/venues?limit=1`)).json()).total;
+      assert.equal(afterCount, beforeCount, 'a rejected collision must not create a row');
+    }
+
+    // 3 -- invalid slug formats are all rejected with 400, nothing created.
+    {
+      const beforeCount = (await (await fetch(`${base}/api/venues?limit=1`)).json()).total;
+      for (const badSlug of ['Has Spaces And Caps', '-leading-hyphen', 'trailing-hyphen-', 'double--hyphen', 'punct!uation', '']) {
+        const res = await postVenue({ name: 'Bad Slug Venue', region: 'kelowna', type: 'golf', slug: badSlug });
+        assert.equal(res.status, 400, `slug "${badSlug}" must be rejected with 400`);
+      }
+      const afterCount = (await (await fetch(`${base}/api/venues?limit=1`)).json()).total;
+      assert.equal(afterCount, beforeCount, 'rejected invalid slugs must not create any row');
+    }
+
+    // 4 -- omitting slug entirely preserves existing behavior exactly
+    // (stays NULL until the next backfillSlugs() pass, same as always).
+    {
+      const res = await postVenue({ name: 'No Slug Supplied Venue', region: 'kelowna', type: 'golf' });
+      assert.equal(res.status, 201);
+      const created = await res.json();
+      assert.equal(created.slug, null, 'omitting slug must leave it NULL, unchanged from existing behavior');
+    }
+    // ...and explicit null behaves the same as omitted, not as a validation error.
+    {
+      const res = await postVenue({ name: 'Explicit Null Slug Venue', region: 'kelowna', type: 'golf', slug: null });
+      assert.equal(res.status, 201, 'an explicit null slug must be treated like omitted, not rejected');
+      const created = await res.json();
+      assert.equal(created.slug, null);
+    }
+
+    // 5 -- PUT does NOT support setting/changing slug in this change; a
+    // slug in a PUT body must be silently ignored (ALL_FIELDS-driven
+    // updateVenue() was never touched), not applied and not erroring.
+    {
+      const res = await fetch(`${base}/api/venues/${slugFixtureId}`, {
+        method: 'PUT', headers: adminHeaders,
+        body: JSON.stringify({ slug: 'attempted-slug-change-via-put' }),
+      });
+      assert.equal(res.status, 200, 'PUT with an extraneous slug field must still succeed (ignored, not rejected)');
+      const updated = await res.json();
+      assert.equal(updated.slug, 'slug-fixture-venue-custom', "PUT must NOT change the venue's slug");
+    }
+  }
+
   // Close the listener so the test process can exit naturally instead of
   // hanging on an open server handle.
   await new Promise((resolve) => app.server.close(resolve));

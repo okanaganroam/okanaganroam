@@ -153,21 +153,74 @@ function getVenue(id) {
   return row ? rowToVenue(row) : null;
 }
 
+// Optional explicit slug support (2026-09-19): `slug` is deliberately not
+// in ALL_FIELDS (so this only affects createVenue, never updateVenue via
+// its shared ALL_FIELDS-driven loop -- changing an EXISTING venue's slug
+// breaks its live URL with no redirect safety net, a materially different
+// risk than assigning one at creation time; that's a separate, not-yet-
+// approved change). `null`/omitted behaves exactly as before: the column
+// stays NULL and gets filled in by the next backfillSlugs() pass at
+// startup, same as it always has. Same character class the router already
+// accepts for a slug segment ([a-z0-9-]+), tightened to reject shapes
+// slugify() itself would never produce (leading/trailing/double hyphens),
+// so a hand-supplied slug always looks like one the system could have
+// generated itself. The pre-check mirrors backfillSlugs()'s own
+// (region, type, slug) collision query; the existing UNIQUE INDEX
+// idx_region_type_slug remains the real backstop regardless.
+const EXPLICIT_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 function createVenue(data) {
   if (!data.name || !data.region || !data.type) {
     const err = new Error('name, region, and type are required');
     err.status = 400;
     throw err;
   }
+
+  let slug;
+  if (data.slug !== undefined && data.slug !== null) {
+    if (typeof data.slug !== 'string' || !EXPLICIT_SLUG_PATTERN.test(data.slug)) {
+      const err = new Error('slug must be lowercase alphanumeric segments separated by single hyphens (e.g. "my-venue-name").');
+      err.status = 400;
+      throw err;
+    }
+    const collision = db
+      .prepare('SELECT 1 FROM venues WHERE region = ? AND type = ? AND slug = ?')
+      .get(data.region, data.type, data.slug);
+    if (collision) {
+      const err = new Error(`A venue with slug "${data.slug}" already exists for region "${data.region}" and type "${data.type}".`);
+      err.status = 409;
+      throw err;
+    }
+    slug = data.slug;
+  }
+
   const cols = ALL_FIELDS;
   const values = cols.map((f) => {
     if (BOOL_FIELDS.includes(f)) return data[f] ? 1 : 0;
     return data[f] !== undefined ? data[f] : null;
   });
   const placeholders = cols.map(() => '?').join(', ');
-  const info = db
-    .prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${placeholders})`)
-    .run(...values);
+  const insertCols = slug !== undefined ? [...cols, 'slug'] : cols;
+  const insertValues = slug !== undefined ? [...values, slug] : values;
+  const insertPlaceholders = slug !== undefined ? `${placeholders}, ?` : placeholders;
+
+  let info;
+  try {
+    info = db
+      .prepare(`INSERT INTO venues (${insertCols.join(', ')}) VALUES (${insertPlaceholders})`)
+      .run(...insertValues);
+  } catch (err) {
+    // Defense in depth only -- the pre-check above should always catch a
+    // real collision first. If the UNIQUE INDEX itself ever rejects the
+    // insert for any reason, surface it as the same clean 409 rather than
+    // an uncaught 500.
+    if (slug !== undefined) {
+      const conflictErr = new Error(`A venue with slug "${slug}" already exists for region "${data.region}" and type "${data.type}".`);
+      conflictErr.status = 409;
+      throw conflictErr;
+    }
+    throw err;
+  }
   return getVenue(info.lastInsertRowid);
 }
 
