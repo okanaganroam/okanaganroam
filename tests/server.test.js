@@ -1147,6 +1147,14 @@ test('renderTripPlannerPage renders the full step-wizard form, all 20 regions, a
   assert.match(html, /id="navTripBtn"/);
   assert.match(html, /id="tripTrayToggle"/);
   assert.match(html, /id="tripTrayPanel"/);
+  // Canonical footer consolidation (2026-09-19): /trip must render the same
+  // home-footer markup AND load the same canonical CSS as the homepage --
+  // previously it had the correct markup but only 2 stale, hand-copied
+  // patch rules, so the footer/trip button rendered unstyled.
+  assert.match(html, /<footer class="home-footer">/, '/trip must render the approved home-footer');
+  assert.match(html, /home-footer-region-subcol/, "/trip's footer must include the two Regions subcolumns");
+  assert.match(html, /\.home-footer \{[\s\S]{0,80}background: var\(--ref-navy\)/, '/trip must load the canonical footer CSS, not just the markup');
+  assert.match(html, /body:not\(\.page-browse\) #tripTrayToggle \{/, '/trip must load the canonical (gold-border, no-suitcase) trip-button CSS');
   // No unterminated HTML comment leaking from the extraction (regression
   // guard for the exact bug this page hit during manual QA).
   const openComments = (html.match(/<!--/g) || []).length;
@@ -2462,6 +2470,42 @@ test('REGRESSION: existing venue/category/region/guide pages retain unchanged ca
   const regionHtml = app.renderRegionPage('kelowna', counts, []);
   assert.match(regionHtml, /rel="canonical"/);
   assert.doesNotMatch(regionHtml, /name="robots" content="noindex"/);
+});
+
+// ---- Canonical footer consolidation (2026-09-19) -----------------------
+// Every normal public page must now render the SAME approved home-footer
+// markup (via renderHomeFooterHTML(true)) instead of the old minimal
+// siteFooter() one-liner, and must load renderCanonicalFooterStyles()'s
+// rules somewhere in its own <style>/CSS so that markup actually renders
+// styled, not just present.
+test('Canonical footer: venue/category/region/guide/event/events-index pages all render the approved home-footer, not the old siteFooter() one-liner', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const venueHtml = app.renderVenuePage(venue, [], [], []);
+
+  const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
+  const categoryHtml = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
+
+  const counts = app.getRegionCategoryCounts('kelowna');
+  const regionHtml = app.renderRegionPage('kelowna', counts, []);
+
+  const guideHtml = app.renderGuidePage('kelowna', 'dog_friendly', [venue]);
+
+  const event = { id: 99901, name: 'Canonical Footer Test Event', slug: 'canonical-footer-test-event', region: 'kelowna', description: 'x', start_datetime: '2099-01-01 00:00:00', end_datetime: null, recurrence_rule: null, venue_id: null, website: null, image_url: null };
+  const eventHtml = app.renderEventPage(event, null);
+  const eventsIndexHtml = app.renderEventsIndexPage([event]);
+
+  for (const [label, html] of [
+    ['venue', venueHtml], ['category', categoryHtml], ['region', regionHtml],
+    ['guide', guideHtml], ['event', eventHtml], ['events index', eventsIndexHtml],
+  ]) {
+    assert.match(html, /<footer class="home-footer">/, `${label} page must render the approved home-footer`);
+    assert.doesNotMatch(html, /class="site-footer"/, `${label} page must NOT render the old siteFooter() one-liner`);
+    assert.match(html, /home-footer-region-subcol/, `${label} page's footer must include the two Regions subcolumns`);
+    // The markup alone rendering isn't enough (this was exactly /trip's old
+    // bug) -- the page's own CSS must actually include the shared ruleset,
+    // not just the HTML.
+    assert.match(html, /\.home-footer \{[\s\S]{0,80}background: var\(--ref-navy\)/, `${label} page must load the canonical footer CSS, not just the markup`);
+  }
 });
 
 // ---- Full HTTP integration test (real routing dispatch table) ---------

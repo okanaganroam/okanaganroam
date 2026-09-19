@@ -2374,7 +2374,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
     ${cards}
   </ul>
   <a class="cta" href="/${region}">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
-  ${siteFooter()}
+  ${renderHomeFooterHTML(true)}
 </body>
 </html>`;
 }
@@ -2938,6 +2938,333 @@ function renderHomeFooterHTML(fromBrowse) {
 </footer>`;
 }
 
+// Canonical footer + floating Trip button styles (consolidated 2026-09-19):
+// the SINGLE shared implementation of the approved home-footer-* markup's
+// CSS and the body:not(.page-browse) trip-button restyle, used verbatim by
+// the homepage (renderHomepageDiscoveryStyles), /trip (renderTripPlannerStyles),
+// and every venue/region/category/guide/event page (SEO_PAGE_CSS/pageHead) --
+// previously /trip carried only two stale, hand-copied patch rules and the
+// SEO pages had no footer styling at all (siteFooter()'s plain one-liner).
+// A future footer change now only needs to happen here.
+function renderCanonicalFooterStyles() {
+  return `
+  /* Homepage footer redesign (2026-09-17, revised again same day): full-
+     width navy band using the same --ref-navy/--ref-gold/--ref-cream
+     system as the header/hero, replacing the old footer's --ink/--sand
+     palette. Entirely new home-footer-* classes (see renderHomeFooterHTML()
+     above) rather than the shared .logo/.foot-* classes the old footer
+     used, and .wrap-wide (matching the rest of the redesigned homepage's
+     content width) instead of the old footer's narrower .wrap. Scoped to
+     / only -- /browse still renders the original static footer/CSS,
+     untouched.
+     The explicit padding:0 below is a deliberate fix, not a no-op: the
+     OLD footer's own unscoped "footer" element-type selector rule
+     (padding: 50px 0 36px, further down in this same stylesheet, written
+     for the original static footer) still matches any footer element by
+     tag, including this new one, since nothing here used to override it.
+     A class selector already outranks a bare element-type selector
+     regardless of source order, so this single declaration fully
+     neutralizes that leak -- every bit of this footer's real spacing
+     comes from its own child elements' padding instead
+     (.home-footer-top/.home-footer-bottom). CAUTION FOR FUTURE EDITS: this
+     whole CSS block is returned as a plain string by
+     renderHomepageDiscoveryStyles() and spliced into the page's raw HTML,
+     and the / route handler later locates the ORIGINAL static footer tag
+     by a plain substring search on that same assembled HTML. Never spell
+     that tag's opening or closing form, in angle brackets, anywhere in
+     THIS comment block (or anywhere else inside this function's returned
+     string) -- doing so once already produced a real, hard-to-spot bug:
+     the search matched the mention inside this very comment instead of
+     the real tag, and silently deleted every homepage section between
+     that point and the real one when the footer was spliced in. */
+  .home-footer {
+    background: var(--ref-navy); color: var(--ref-cream); margin-top: 8px; padding: 0;
+    /* Full-bleed fix (canonical footer consolidation, 2026-09-19): venue/
+       region/category/guide/event pages set body{max-width:900px;
+       margin:0 auto} (SEO_PAGE_CSS) so their own content reads as a
+       comfortable single column -- but that same rule was also boxing in
+       the footer, rendering it as a centered navy rectangle with visible
+       page background on both sides instead of the homepage's true
+       edge-to-edge band. This is the standard, well-known "break out of a
+       max-width parent" technique: 100% of the *viewport*, recentered.
+       calc(50% - 50vw) resolves to 0 (a no-op) whenever the containing
+       block is already full viewport width -- true on / and /browse today
+       -- so this is safe there regardless, not just on the narrower pages
+       it's actually fixing. */
+    width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw);
+  }
+  /* Compact pass (2026-09-19, approved footer refinement): the footer
+     previously ran 72px/48px of top/bottom air around the columns plus a
+     24-40px bottom band, reading as visually stretched. Tightened across
+     desktop and both mobile breakpoints below -- gap/padding values only,
+     no content removed, same column structure/links/order throughout. */
+  .home-footer-top {
+    display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;
+    gap: 36px; padding: 40px 0 28px;
+  }
+  .home-footer-brand { display: flex; flex-direction: column; gap: 10px; max-width: 260px; flex-shrink: 0; }
+  .home-footer-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+  .home-footer-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 14px; flex-shrink: 0; color: var(--ref-cream); }
+  .home-footer-icon svg { width: 100%; height: 100%; }
+  .home-footer-wordmark {
+    font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.3rem;
+    letter-spacing: 0.02em; text-transform: uppercase; color: var(--ref-cream);
+  }
+  .home-footer-wordmark-accent { color: var(--ref-gold); }
+  .home-footer-tagline { font-family: 'Nunito', sans-serif; font-size: 0.85rem; color: rgba(245,243,237,0.6); margin: 0; }
+  /* Explicit request (2026-09-17 revision): Regions folded back INTO this
+     row as its own 4th column rather than a separate full-width band
+     below. Layout correction (same day, follow-up): a strict equal
+     repeat(4,1fr) plus CSS Grid's default align-items:stretch forced
+     every column to the height of the tallest one (Regions, 20 links) --
+     found via direct measurement, all four .home-footer-col boxes were
+     501px tall even though About's real content was only 155px and
+     Social Media's only 34px, leaving large dead navy gaps under both.
+     align-items:start fixes that -- each column now sizes to its own
+     content; Regions being visibly the tallest column is expected and
+     fine (it has by far the most real content) rather than a bug to hide.
+     Column widths are now mildly (not dramatically) uneven rather than a
+     strict 1fr each, giving Regions a little more room for its two-column
+     region list and taking a little back from About/Social Media, which
+     never needed a full equal share to begin with. */
+  .home-footer-cols {
+    display: grid; grid-template-columns: 1fr 0.9fr 2fr 1fr;
+    align-items: start; gap: 28px; flex: 1; min-width: 0;
+    /* Brand|Explore divider (FOOTER.png reference, 2026-09-19): matches the
+       same rule as the 3 inter-column dividers below, just applied to the
+       one seam that isn't between two .home-footer-col siblings (Brand is
+       its own flex item, outside this grid). */
+    border-left: 1px solid rgba(245,243,237,0.14);
+    padding-left: 20px;
+  }
+  /* Clean vertical separators between the 4 major columns (approved
+     footer refinement, 2026-09-19) -- a thin, low-opacity rule on every
+     column after the first, inset with padding rather than margin so the
+     line sits mid-gutter instead of hugging either column's text. */
+  .home-footer-col + .home-footer-col {
+    border-left: 1px solid rgba(245,243,237,0.14);
+    padding-left: 20px;
+  }
+  .home-footer-col h4 {
+    font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 12px; padding-bottom: 8px;
+    display: inline-block; border-bottom: 2px solid var(--ref-gold);
+  }
+  .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  .home-footer-col a, .home-footer-region-group a {
+    font-family: 'Nunito', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78);
+    text-decoration: none; transition: color 0.15s;
+  }
+  .home-footer-col a:hover, .home-footer-region-group a:hover { color: var(--ref-gold); }
+
+  /* Regions column (rebuilt 2026-09-19 to match the approved FOOTER.png
+     reference exactly): TWO EXPLICIT subcolumns, each its own independent
+     flex column -- subcol 1 stacks Central then South, subcol 2 stacks
+     North then Ski resorts (see FOOTER_REGION_GROUPS/renderHomeFooterHTML).
+     A same-row 2x2 CSS Grid was tried previously and rejected (Grid sizes
+     a ROW to its tallest cell, so a short group got stretched to match a
+     tall one beside it, leaving dead space) -- that failure mode doesn't
+     apply here because these are two INDEPENDENT flex columns, not grid
+     cells sharing a row: each one sizes purely to its own two groups'
+     combined height, so North's longer list (5 items) simply makes
+     subcolumn 2 start "Ski resorts" a little lower than subcolumn 1's
+     "South" -- exactly the (intentional, not a bug) slight stagger visible
+     in the reference image. */
+  .home-footer-region-groups { display: flex; gap: 20px; }
+  .home-footer-region-subcol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  /* Region subsection headings (CENTRAL/NORTH/SOUTH/SKI RESORTS): gold,
+     uppercase, bold, with the same small underline treatment as the main
+     column headings (h4) so they read as clear subsection headings,
+     distinct from the town links beneath them -- previously a muted,
+     low-contrast cream at the same size as the links, which is exactly
+     what made them hard to tell apart. Kept smaller than h4 (0.78rem)
+     since these are one level down. */
+  .home-footer-region-group h5 {
+    font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ref-gold); margin: 0 0 8px; padding-bottom: 5px;
+    display: inline-block; border-bottom: 1px solid var(--ref-gold);
+  }
+  .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  .home-footer-region-group a { font-size: 0.82rem; line-height: 1.3; }
+  .home-footer-social-row { display: flex; gap: 10px; }
+  .home-footer-social-icon {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(245,243,237,0.1); color: rgba(245,243,237,0.8);
+    cursor: default; transition: background 0.15s, opacity 0.15s;
+  }
+  .home-footer-social-icon.icon-instagram {
+    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+    color: #fff; opacity: 1;
+  }
+  .home-footer-social-icon.icon-instagram:hover { opacity: 0.85; }
+  .home-footer-social-icon.icon-facebook { background: #1877F2; color: #fff; opacity: 0.5; }
+  .home-footer-social-icon.icon-tiktok { background: #010101; color: #25F4EE; opacity: 1; }
+  .home-footer-social-icon.icon-tiktok:hover { opacity: 0.85; }
+  .home-footer-social-icon::after {
+    content: attr(data-tooltip);
+    position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: var(--ref-navy-deep); color: var(--ref-cream);
+    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 700;
+    white-space: nowrap; padding: 5px 10px; border-radius: 8px;
+    opacity: 0; pointer-events: none; z-index: 20;
+    transition: opacity 0.12s, transform 0.12s;
+  }
+  .home-footer-social-icon:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 16px 0 24px; }
+  .home-footer-copyright { font-family: 'Nunito', sans-serif; font-size: 0.8rem; color: rgba(245,243,237,0.55); text-align: center; margin: 0; }
+
+  /* Trip 0 button redesign, homepage-only (2026-09-17): #tripTray/
+     #tripTrayToggle/#tripTrayCount are shared, site-wide rules defined in
+     app.css (used as-is on /browse, untouched). This block itself is no
+     longer homepage-exclusive (the /browse redesign, 2026-09-18, now
+     injects it there too, to fix .hero-scenic/.hero-title/etc. having had
+     zero CSS on /browse -- see the bug-fix comment on the /browse route
+     handler), so these three selectors are explicitly scoped to
+     body:not(.page-browse) (the marker only the /browse route sets) to
+     keep the original "homepage-only" intent intact now that the block
+     they live in is shared. Direction: a small persistent "your trip"
+     control, not a primary CTA -- smaller footprint, the homepage's own
+     navy/cream/gold system instead of the old plum/paper/amber, a lighter
+     shadow, and a smaller/quieter count badge, while leaving position
+     (fixed, bottom corner, 20px from the edges -- already comfortable for
+     tapping) and every bit of the click/expand/route/clear behavior
+     untouched -- this only restyles the closed-state toggle and its
+     count, never #tripTrayPanel (the expanded trip list keeps its
+     existing look, on both pages). */
+  body:not(.page-browse) #tripTrayToggle {
+    background: var(--ref-navy); color: var(--ref-cream);
+    border: 1px solid var(--ref-gold);
+    border-radius: 999px; padding: 9px 16px; gap: 8px;
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;
+    box-shadow: 0 4px 14px -6px rgba(16,27,36,0.45);
+  }
+  body:not(.page-browse) #tripTrayToggle:hover { background: var(--ref-navy-deep); }
+  body:not(.page-browse) #tripTrayCount {
+    background: var(--ref-gold); color: var(--ref-navy-deep);
+    width: 16px; height: 16px; font-size: 0.62rem; font-weight: 800;
+  }
+  /* Suitcase-icon removal (approved refinement, 2026-09-19): the 🧳 emoji
+     lives in the shared #tripTrayToggle markup in okanagan.html (reused
+     as-is by /browse and /trip), wrapped in .trip-toggle-icon specifically
+     so it can be hidden here, homepage-only, without touching that shared
+     markup's actual content -- /browse's own (unscoped) styling is
+     completely unaffected and keeps showing the icon exactly as before.
+     .trip-toggle-arrow is an empty span in that same shared markup; on
+     every other page it's simply an empty, invisible inline element, and
+     only here does it get real content -- a small gold chevron, replacing
+     the suitcase as a subtle "opens something" cue rather than an icon. */
+  body:not(.page-browse) #tripTrayToggle .trip-toggle-icon { display: none; }
+  body:not(.page-browse) #tripTrayToggle .trip-toggle-arrow::after {
+    content: '\\2192'; margin-left: 1px; color: var(--ref-gold); font-weight: 800;
+  }
+
+  @media (max-width: 900px) {
+    /* align-items:stretch override is required here: the base
+       .home-footer-top rule sets align-items:flex-start for the desktop
+       row layout, and that alone (even after flipping to
+       flex-direction:column here) leaves .home-footer-cols sized to its
+       own shrink-to-fit content width instead of the full row width --
+       found via direct measurement (it was rendering at roughly half the
+       viewport width instead of full width). */
+    .home-footer-top { flex-direction: column; align-items: stretch; gap: 28px; padding: 32px 0 24px; }
+    .home-footer-cols {
+      grid-template-columns: repeat(2, 1fr); gap: 28px 24px;
+      border-left: none; padding-left: 0;
+    }
+    /* The desktop vertical separators (both the Brand|Explore one above,
+       via .home-footer-cols, and "every column after the first" below)
+       only make sense in a single horizontal row. Once Brand stacks above
+       a 2-per-row grid, a leftover border-left just reads as a stray
+       vertical line down the block's edge; at 2-per-row, "every column
+       after the first" would also draw a stray line on column 3 (first
+       item of row 2), which sits below column 1, not beside column 2.
+       Both removed here; the 560px single-column block below inherits
+       this same removal. */
+    .home-footer-col + .home-footer-col { border-left: none; padding-left: 0; }
+  }
+
+  @media (max-width: 560px) {
+    /* Explicit stacking order requested (2026-09-17 revision): Explore,
+       About, Regions, Social Media, one per row -- a single column at
+       this width naturally stacks in the same DOM order the 4-column
+       grid uses above, so no reordering is needed here. */
+    .home-footer-cols { grid-template-columns: 1fr; gap: 28px; }
+
+    /* Mobile-only tightening pass (2026-09-17, follow-up): the desktop
+       spacing values (built for a 4-column row with lots of horizontal
+       room) felt oversized once stacked into one long mobile column --
+       measured at 1416px tall for the footer alone at 390px width before
+       this pass. Nothing here changes desktop (all of it lives inside
+       this max-width:560px block, and the desktop-facing base rules
+       above are untouched) and no content/typography was removed or
+       shrunk -- these are gap/margin/padding values only, still leaving
+       comfortable breathing room between Explore/About/Regions/Social
+       Media, just without the extra desktop-sized air baked into each
+       one. */
+    .home-footer-top { padding: 24px 0 20px; gap: 24px; }
+    .home-footer-col h4 { margin-bottom: 10px; }
+    .home-footer-col ul { gap: 8px; }
+    .home-footer-region-groups { gap: 16px; }
+    .home-footer-region-subcol { gap: 12px; }
+    .home-footer-region-group h5 { margin-bottom: 6px; }
+    .home-footer-region-group ul { gap: 5px; }
+
+    /* Mobile centering pass (2026-09-17): the footer's desktop layout is a
+       4-column row where every column is naturally left-aligned within
+       its own cell -- fine side-by-side, but once everything stacks into
+       one column on mobile it reads as hugging the left edge instead of
+       feeling like a deliberate, centered composition. text-align:center
+       cascades onto every heading/link/paragraph in the footer (brand
+       wordmark+tagline, all four column headings, every Explore/About/
+       Regions/Social Media link, the Regions sub-group headings too,
+       since .home-footer-region-group lives inside a .home-footer-col).
+       align-items:center on the flex/column lists shrinks each link/icon
+       row to its own content width and centers that box too, rather than
+       just centering text inside a still-full-width, left-edge-anchored
+       link. None of this touches the desktop rules above -- same pattern
+       as every other mobile-only override in this block. */
+    .home-footer-top, .home-footer-col { text-align: center; }
+    /* align-items:center alone isn't enough here: .home-footer-top keeps
+       align-items:stretch (from the 900px block above, still in effect)
+       because .home-footer-cols genuinely needs to stay full-width (see
+       that fix's own comment). Stretch also applies to .home-footer-brand
+       as a sibling flex item, which -- capped at max-width:260px -- ends
+       up exactly 260px wide but still flush against the left edge
+       (stretch sizes an item, it doesn't reposition it). margin:0 auto
+       is what actually centers that fixed-width box within the full-
+       width row; align-items:center then centers the logo+tagline inside
+       the (now-centered) box itself. */
+    .home-footer-brand { align-items: center; margin: 0 auto; }
+    .home-footer-col ul, .home-footer-region-group ul { align-items: center; }
+    .home-footer-social-row { justify-content: center; }
+
+    /* Trip 0 button, mobile: slightly smaller still and pulled in a touch
+       from the very edge, so it stays compact and never competes with
+       page content on a narrow viewport, while remaining comfortably
+       tappable (44px+ touch target maintained via padding, not shrunk
+       text alone). */
+    #tripTray { bottom: 16px; right: 16px; }
+    #tripTrayToggle { padding: 7px 12px; font-size: 0.74rem; gap: 5px; }
+    #tripTrayCount { width: 15px; height: 15px; font-size: 0.6rem; }
+
+    /* #tripTray is a site-wide fixed element pinned bottom:20px/right:20px
+       (~50px tall) -- at full scroll on narrow viewports it would
+       otherwise float directly on top of this column's last row of
+       links. Extra bottom padding keeps real clearance below the last
+       row instead, so the fixed button always lands in empty space
+       below the content, never over a link. Reduced from the earlier
+       104px: re-measured after this tightening pass and confirmed (see
+       session verification) that a smaller value still leaves the
+       fixed button clear of every link/heading/icon/copyright at the
+       real resting scroll position -- 104px had far more margin than
+       was actually needed. */
+    .home-footer-bottom { padding-bottom: 56px; }
+  }`;
+}
+
 // Shared CSS for the four modules above — reuses the existing shared
 // design tokens (/styles/tokens.css, already loaded by okanagan.html)
 // rather than inventing a new palette. Injected once via a single <style>
@@ -3439,307 +3766,7 @@ function renderHomepageDiscoveryStyles() {
   .browse-search-lead {
     font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: rgba(27,43,58,0.72); margin: 0;
   }
-
-  /* Homepage footer redesign (2026-09-17, revised again same day): full-
-     width navy band using the same --ref-navy/--ref-gold/--ref-cream
-     system as the header/hero, replacing the old footer's --ink/--sand
-     palette. Entirely new home-footer-* classes (see renderHomeFooterHTML()
-     above) rather than the shared .logo/.foot-* classes the old footer
-     used, and .wrap-wide (matching the rest of the redesigned homepage's
-     content width) instead of the old footer's narrower .wrap. Scoped to
-     / only -- /browse still renders the original static footer/CSS,
-     untouched.
-     The explicit padding:0 below is a deliberate fix, not a no-op: the
-     OLD footer's own unscoped "footer" element-type selector rule
-     (padding: 50px 0 36px, further down in this same stylesheet, written
-     for the original static footer) still matches any footer element by
-     tag, including this new one, since nothing here used to override it.
-     A class selector already outranks a bare element-type selector
-     regardless of source order, so this single declaration fully
-     neutralizes that leak -- every bit of this footer's real spacing
-     comes from its own child elements' padding instead
-     (.home-footer-top/.home-footer-bottom). CAUTION FOR FUTURE EDITS: this
-     whole CSS block is returned as a plain string by
-     renderHomepageDiscoveryStyles() and spliced into the page's raw HTML,
-     and the / route handler later locates the ORIGINAL static footer tag
-     by a plain substring search on that same assembled HTML. Never spell
-     that tag's opening or closing form, in angle brackets, anywhere in
-     THIS comment block (or anywhere else inside this function's returned
-     string) -- doing so once already produced a real, hard-to-spot bug:
-     the search matched the mention inside this very comment instead of
-     the real tag, and silently deleted every homepage section between
-     that point and the real one when the footer was spliced in. */
-  .home-footer { background: var(--ref-navy); color: var(--ref-cream); margin-top: 8px; padding: 0; }
-  /* Compact pass (2026-09-19, approved footer refinement): the footer
-     previously ran 72px/48px of top/bottom air around the columns plus a
-     24-40px bottom band, reading as visually stretched. Tightened across
-     desktop and both mobile breakpoints below -- gap/padding values only,
-     no content removed, same column structure/links/order throughout. */
-  .home-footer-top {
-    display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;
-    gap: 36px; padding: 40px 0 28px;
-  }
-  .home-footer-brand { display: flex; flex-direction: column; gap: 10px; max-width: 260px; flex-shrink: 0; }
-  .home-footer-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
-  .home-footer-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 14px; flex-shrink: 0; color: var(--ref-cream); }
-  .home-footer-icon svg { width: 100%; height: 100%; }
-  .home-footer-wordmark {
-    font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.3rem;
-    letter-spacing: 0.02em; text-transform: uppercase; color: var(--ref-cream);
-  }
-  .home-footer-wordmark-accent { color: var(--ref-gold); }
-  .home-footer-tagline { font-family: 'Nunito', sans-serif; font-size: 0.85rem; color: rgba(245,243,237,0.6); margin: 0; }
-  /* Explicit request (2026-09-17 revision): Regions folded back INTO this
-     row as its own 4th column rather than a separate full-width band
-     below. Layout correction (same day, follow-up): a strict equal
-     repeat(4,1fr) plus CSS Grid's default align-items:stretch forced
-     every column to the height of the tallest one (Regions, 20 links) --
-     found via direct measurement, all four .home-footer-col boxes were
-     501px tall even though About's real content was only 155px and
-     Social Media's only 34px, leaving large dead navy gaps under both.
-     align-items:start fixes that -- each column now sizes to its own
-     content; Regions being visibly the tallest column is expected and
-     fine (it has by far the most real content) rather than a bug to hide.
-     Column widths are now mildly (not dramatically) uneven rather than a
-     strict 1fr each, giving Regions a little more room for its two-column
-     region list and taking a little back from About/Social Media, which
-     never needed a full equal share to begin with. */
-  .home-footer-cols {
-    display: grid; grid-template-columns: 1fr 0.9fr 2fr 1fr;
-    align-items: start; gap: 28px; flex: 1; min-width: 0;
-    /* Brand|Explore divider (FOOTER.png reference, 2026-09-19): matches the
-       same rule as the 3 inter-column dividers below, just applied to the
-       one seam that isn't between two .home-footer-col siblings (Brand is
-       its own flex item, outside this grid). */
-    border-left: 1px solid rgba(245,243,237,0.14);
-    padding-left: 20px;
-  }
-  /* Clean vertical separators between the 4 major columns (approved
-     footer refinement, 2026-09-19) -- a thin, low-opacity rule on every
-     column after the first, inset with padding rather than margin so the
-     line sits mid-gutter instead of hugging either column's text. */
-  .home-footer-col + .home-footer-col {
-    border-left: 1px solid rgba(245,243,237,0.14);
-    padding-left: 20px;
-  }
-  .home-footer-col h4 {
-    font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 12px; padding-bottom: 8px;
-    display: inline-block; border-bottom: 2px solid var(--ref-gold);
-  }
-  .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-  .home-footer-col a, .home-footer-region-group a {
-    font-family: 'Nunito', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78);
-    text-decoration: none; transition: color 0.15s;
-  }
-  .home-footer-col a:hover, .home-footer-region-group a:hover { color: var(--ref-gold); }
-
-  /* Regions column (rebuilt 2026-09-19 to match the approved FOOTER.png
-     reference exactly): TWO EXPLICIT subcolumns, each its own independent
-     flex column -- subcol 1 stacks Central then South, subcol 2 stacks
-     North then Ski resorts (see FOOTER_REGION_GROUPS/renderHomeFooterHTML).
-     A same-row 2x2 CSS Grid was tried previously and rejected (Grid sizes
-     a ROW to its tallest cell, so a short group got stretched to match a
-     tall one beside it, leaving dead space) -- that failure mode doesn't
-     apply here because these are two INDEPENDENT flex columns, not grid
-     cells sharing a row: each one sizes purely to its own two groups'
-     combined height, so North's longer list (5 items) simply makes
-     subcolumn 2 start "Ski resorts" a little lower than subcolumn 1's
-     "South" -- exactly the (intentional, not a bug) slight stagger visible
-     in the reference image. */
-  .home-footer-region-groups { display: flex; gap: 20px; }
-  .home-footer-region-subcol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-  /* Region subsection headings (CENTRAL/NORTH/SOUTH/SKI RESORTS): gold,
-     uppercase, bold, with the same small underline treatment as the main
-     column headings (h4) so they read as clear subsection headings,
-     distinct from the town links beneath them -- previously a muted,
-     low-contrast cream at the same size as the links, which is exactly
-     what made them hard to tell apart. Kept smaller than h4 (0.78rem)
-     since these are one level down. */
-  .home-footer-region-group h5 {
-    font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--ref-gold); margin: 0 0 8px; padding-bottom: 5px;
-    display: inline-block; border-bottom: 1px solid var(--ref-gold);
-  }
-  .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-  .home-footer-region-group a { font-size: 0.82rem; line-height: 1.3; }
-  .home-footer-social-row { display: flex; gap: 10px; }
-  .home-footer-social-icon {
-    position: relative; display: flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; border-radius: 50%;
-    background: rgba(245,243,237,0.1); color: rgba(245,243,237,0.8);
-    cursor: default; transition: background 0.15s, opacity 0.15s;
-  }
-  .home-footer-social-icon.icon-instagram {
-    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
-    color: #fff; opacity: 1;
-  }
-  .home-footer-social-icon.icon-instagram:hover { opacity: 0.85; }
-  .home-footer-social-icon.icon-facebook { background: #1877F2; color: #fff; opacity: 0.5; }
-  .home-footer-social-icon.icon-tiktok { background: #010101; color: #25F4EE; opacity: 1; }
-  .home-footer-social-icon.icon-tiktok:hover { opacity: 0.85; }
-  .home-footer-social-icon::after {
-    content: attr(data-tooltip);
-    position: absolute; bottom: calc(100% + 8px); left: 50%;
-    transform: translateX(-50%) translateY(4px);
-    background: var(--ref-navy-deep); color: var(--ref-cream);
-    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 700;
-    white-space: nowrap; padding: 5px 10px; border-radius: 8px;
-    opacity: 0; pointer-events: none; z-index: 20;
-    transition: opacity 0.12s, transform 0.12s;
-  }
-  .home-footer-social-icon:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 16px 0 24px; }
-  .home-footer-copyright { font-family: 'Nunito', sans-serif; font-size: 0.8rem; color: rgba(245,243,237,0.55); text-align: center; margin: 0; }
-
-  /* Trip 0 button redesign, homepage-only (2026-09-17): #tripTray/
-     #tripTrayToggle/#tripTrayCount are shared, site-wide rules defined in
-     app.css (used as-is on /browse, untouched). This block itself is no
-     longer homepage-exclusive (the /browse redesign, 2026-09-18, now
-     injects it there too, to fix .hero-scenic/.hero-title/etc. having had
-     zero CSS on /browse -- see the bug-fix comment on the /browse route
-     handler), so these three selectors are explicitly scoped to
-     body:not(.page-browse) (the marker only the /browse route sets) to
-     keep the original "homepage-only" intent intact now that the block
-     they live in is shared. Direction: a small persistent "your trip"
-     control, not a primary CTA -- smaller footprint, the homepage's own
-     navy/cream/gold system instead of the old plum/paper/amber, a lighter
-     shadow, and a smaller/quieter count badge, while leaving position
-     (fixed, bottom corner, 20px from the edges -- already comfortable for
-     tapping) and every bit of the click/expand/route/clear behavior
-     untouched -- this only restyles the closed-state toggle and its
-     count, never #tripTrayPanel (the expanded trip list keeps its
-     existing look, on both pages). */
-  body:not(.page-browse) #tripTrayToggle {
-    background: var(--ref-navy); color: var(--ref-cream);
-    border: 1px solid var(--ref-gold);
-    border-radius: 999px; padding: 9px 16px; gap: 8px;
-    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;
-    box-shadow: 0 4px 14px -6px rgba(16,27,36,0.45);
-  }
-  body:not(.page-browse) #tripTrayToggle:hover { background: var(--ref-navy-deep); }
-  body:not(.page-browse) #tripTrayCount {
-    background: var(--ref-gold); color: var(--ref-navy-deep);
-    width: 16px; height: 16px; font-size: 0.62rem; font-weight: 800;
-  }
-  /* Suitcase-icon removal (approved refinement, 2026-09-19): the 🧳 emoji
-     lives in the shared #tripTrayToggle markup in okanagan.html (reused
-     as-is by /browse and /trip), wrapped in .trip-toggle-icon specifically
-     so it can be hidden here, homepage-only, without touching that shared
-     markup's actual content -- /browse's own (unscoped) styling is
-     completely unaffected and keeps showing the icon exactly as before.
-     .trip-toggle-arrow is an empty span in that same shared markup; on
-     every other page it's simply an empty, invisible inline element, and
-     only here does it get real content -- a small gold chevron, replacing
-     the suitcase as a subtle "opens something" cue rather than an icon. */
-  body:not(.page-browse) #tripTrayToggle .trip-toggle-icon { display: none; }
-  body:not(.page-browse) #tripTrayToggle .trip-toggle-arrow::after {
-    content: '\\2192'; margin-left: 1px; color: var(--ref-gold); font-weight: 800;
-  }
-
-  @media (max-width: 900px) {
-    /* align-items:stretch override is required here: the base
-       .home-footer-top rule sets align-items:flex-start for the desktop
-       row layout, and that alone (even after flipping to
-       flex-direction:column here) leaves .home-footer-cols sized to its
-       own shrink-to-fit content width instead of the full row width --
-       found via direct measurement (it was rendering at roughly half the
-       viewport width instead of full width). */
-    .home-footer-top { flex-direction: column; align-items: stretch; gap: 28px; padding: 32px 0 24px; }
-    .home-footer-cols {
-      grid-template-columns: repeat(2, 1fr); gap: 28px 24px;
-      border-left: none; padding-left: 0;
-    }
-    /* The desktop vertical separators (both the Brand|Explore one above,
-       via .home-footer-cols, and "every column after the first" below)
-       only make sense in a single horizontal row. Once Brand stacks above
-       a 2-per-row grid, a leftover border-left just reads as a stray
-       vertical line down the block's edge; at 2-per-row, "every column
-       after the first" would also draw a stray line on column 3 (first
-       item of row 2), which sits below column 1, not beside column 2.
-       Both removed here; the 560px single-column block below inherits
-       this same removal. */
-    .home-footer-col + .home-footer-col { border-left: none; padding-left: 0; }
-  }
-
-  @media (max-width: 560px) {
-    /* Explicit stacking order requested (2026-09-17 revision): Explore,
-       About, Regions, Social Media, one per row -- a single column at
-       this width naturally stacks in the same DOM order the 4-column
-       grid uses above, so no reordering is needed here. */
-    .home-footer-cols { grid-template-columns: 1fr; gap: 28px; }
-
-    /* Mobile-only tightening pass (2026-09-17, follow-up): the desktop
-       spacing values (built for a 4-column row with lots of horizontal
-       room) felt oversized once stacked into one long mobile column --
-       measured at 1416px tall for the footer alone at 390px width before
-       this pass. Nothing here changes desktop (all of it lives inside
-       this max-width:560px block, and the desktop-facing base rules
-       above are untouched) and no content/typography was removed or
-       shrunk -- these are gap/margin/padding values only, still leaving
-       comfortable breathing room between Explore/About/Regions/Social
-       Media, just without the extra desktop-sized air baked into each
-       one. */
-    .home-footer-top { padding: 24px 0 20px; gap: 24px; }
-    .home-footer-col h4 { margin-bottom: 10px; }
-    .home-footer-col ul { gap: 8px; }
-    .home-footer-region-groups { gap: 16px; }
-    .home-footer-region-subcol { gap: 12px; }
-    .home-footer-region-group h5 { margin-bottom: 6px; }
-    .home-footer-region-group ul { gap: 5px; }
-
-    /* Mobile centering pass (2026-09-17): the footer's desktop layout is a
-       4-column row where every column is naturally left-aligned within
-       its own cell -- fine side-by-side, but once everything stacks into
-       one column on mobile it reads as hugging the left edge instead of
-       feeling like a deliberate, centered composition. text-align:center
-       cascades onto every heading/link/paragraph in the footer (brand
-       wordmark+tagline, all four column headings, every Explore/About/
-       Regions/Social Media link, the Regions sub-group headings too,
-       since .home-footer-region-group lives inside a .home-footer-col).
-       align-items:center on the flex/column lists shrinks each link/icon
-       row to its own content width and centers that box too, rather than
-       just centering text inside a still-full-width, left-edge-anchored
-       link. None of this touches the desktop rules above -- same pattern
-       as every other mobile-only override in this block. */
-    .home-footer-top, .home-footer-col { text-align: center; }
-    /* align-items:center alone isn't enough here: .home-footer-top keeps
-       align-items:stretch (from the 900px block above, still in effect)
-       because .home-footer-cols genuinely needs to stay full-width (see
-       that fix's own comment). Stretch also applies to .home-footer-brand
-       as a sibling flex item, which -- capped at max-width:260px -- ends
-       up exactly 260px wide but still flush against the left edge
-       (stretch sizes an item, it doesn't reposition it). margin:0 auto
-       is what actually centers that fixed-width box within the full-
-       width row; align-items:center then centers the logo+tagline inside
-       the (now-centered) box itself. */
-    .home-footer-brand { align-items: center; margin: 0 auto; }
-    .home-footer-col ul, .home-footer-region-group ul { align-items: center; }
-    .home-footer-social-row { justify-content: center; }
-
-    /* Trip 0 button, mobile: slightly smaller still and pulled in a touch
-       from the very edge, so it stays compact and never competes with
-       page content on a narrow viewport, while remaining comfortably
-       tappable (44px+ touch target maintained via padding, not shrunk
-       text alone). */
-    #tripTray { bottom: 16px; right: 16px; }
-    #tripTrayToggle { padding: 7px 12px; font-size: 0.74rem; gap: 5px; }
-    #tripTrayCount { width: 15px; height: 15px; font-size: 0.6rem; }
-
-    /* #tripTray is a site-wide fixed element pinned bottom:20px/right:20px
-       (~50px tall) -- at full scroll on narrow viewports it would
-       otherwise float directly on top of this column's last row of
-       links. Extra bottom padding keeps real clearance below the last
-       row instead, so the fixed button always lands in empty space
-       below the content, never over a link. Reduced from the earlier
-       104px: re-measured after this tightening pass and confirmed (see
-       session verification) that a smaller value still leaves the
-       fixed button clear of every link/heading/icon/copyright at the
-       real resting scroll position -- 104px had far more margin than
-       was actually needed. */
-    .home-footer-bottom { padding-bottom: 56px; }
-  }
+${renderCanonicalFooterStyles()}
 </style>`;
 }
 
@@ -3993,6 +4020,8 @@ const SEO_PAGE_CSS = `
     .venue-cta-row .cta { width: 100%; }
     .compact-band-sm { height: 48px; }
   }
+
+  ${renderCanonicalFooterStyles()}
 `;
 
 // Phase 1 (Events): `opts.noindex` is a new, optional, backward-compatible
@@ -4031,6 +4060,12 @@ function siteHeader(rightLinkHref, rightLinkText) {
   </header>`;
 }
 
+// No longer called anywhere (footer canonicalization, 2026-09-19): every
+// page that used to render this minimal one-liner now renders the same
+// renderHomeFooterHTML(true) as the homepage instead. Left defined,
+// unused, rather than deleted, to keep this change strictly additive/
+// substitutive -- the matching `footer.site-footer` CSS rule in
+// SEO_PAGE_CSS is similarly harmless now that nothing emits that class.
 function siteFooter() {
   return `<footer class="site-footer">Okanagan Roam &middot; <a href="https://okanaganroam.com/">okanaganroam.com</a></footer>`;
 }
@@ -4156,7 +4191,7 @@ ${pageHead(title, description, canonical, [breadcrumb])}
   </ul>
   ${guideLinks}
   <a class="cta" href="https://okanaganroam.com/">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
-  ${siteFooter()}
+  ${renderHomeFooterHTML(true)}
 </body>
 </html>`;
 }
@@ -4224,7 +4259,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
   </ul>
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
-  ${siteFooter()}
+  ${renderHomeFooterHTML(true)}
 </body>
 </html>`;
 }
@@ -4414,7 +4449,7 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
   ${nearbyHtml}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
   <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
-  ${siteFooter()}
+  ${renderHomeFooterHTML(true)}
 </body>
 </html>`;
 }
@@ -4505,7 +4540,7 @@ ${pageHead(title, description, canonical, [breadcrumb, eventSchema], { noindex: 
   <p>${escapeHtml(event.description || '')}</p>
   ${detailRows}
   <a class="cta" href="/${event.region}">Explore all of ${escapeHtml(regionLabel)}</a>
-  ${siteFooter()}
+  ${renderHomeFooterHTML(true)}
 </body>
 </html>`;
 }
@@ -4579,7 +4614,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
   <ul class="card-grid">
     ${cards}
   </ul>
-  ${siteFooter()}
+  ${renderHomeFooterHTML(true)}
 </body>
 </html>`;
 }
@@ -4588,8 +4623,8 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
 //
 // This page reuses the SAME rich header + trip tray markup as / and
 // /browse (both of which serve okanagan.html directly), not the plain
-// siteHeader()/siteFooter() used by venue/category/region/guide pages --
-// this page needs the already-working trip tray and the same nav
+// siteHeader() used by venue/category/region/guide pages -- this page
+// needs the already-working trip tray and the same nav
 // (dropdowns, mobile hamburger, language toggle), which only exist in
 // okanagan.html's markup, not in the SEO-page shared components. The
 // header and trip tray fragments are extracted from the actual served
@@ -4638,6 +4673,7 @@ const TRIP_INTEREST_I18N_KEY = {
 
 function renderTripPlannerStyles() {
   return `<style>
+  ${renderCanonicalFooterStyles()}
   /* Build My Trip, Stage 2 -- page-specific styles only. Uses the SAME
      design tokens (--sand/--plum/--teal/--amber/--ink/--paper) already
      used by venue cards and the old wizard chips elsewhere on the site,
@@ -4870,31 +4906,6 @@ function renderTripPlannerStyles() {
   .trip-slot-actions .trip-slot-remove-btn:hover { background: var(--plum); border-color: var(--plum); color: var(--paper); }
   .trip-slot-card.is-removed { display: none; }
 
-  /* Footer brand-icon size fix: .home-footer-icon (the small mountain glyph
-     next to the "Okanagan Roam" wordmark in the footer) is only ever sized
-     by renderHomepageDiscoveryStyles() (display:flex, width:34px/height:
-     14px, svg 100%/100%), which /trip does not include -- so this <span>
-     stayed display:inline (its default), under which width/height simply
-     do not apply to a non-replaced inline box per the CSS spec, and its
-     raw <svg viewBox="0 0 60 24"> child rendered at the browser's
-     unconstrained default size instead (measured 1360x544px on a 1360px-
-     wide viewport). That read as a giant decorative "mountain" graphic and
-     a large awkward gap between the itinerary and the footer content below
-     it -- mistaken for an intentional section divider in an earlier read-
-     only audit, but it is not; it is the same brand icon homepage/​browse
-     already render correctly at 34x14px, just missing its sizing rules
-     here. Restoring the layout half of that rule (display/size/shrink)
-     fixes this; color is deliberately left alone rather than copied over,
-     since the homepage's own color:var(--ref-cream) on this rule assumes
-     the navy footer background renderHomepageDiscoveryStyles() also
-     supplies, which /trip does not have -- copying just the color without
-     that background would swap one bug for another (a near-invisible
-     cream-on-cream icon). Scoped to this page only (this whole stylesheet
-     is /trip-only), so homepage/​browse are untouched and the footer is
-     not otherwise redesigned. */
-  .home-footer-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 14px; flex-shrink: 0; }
-  .home-footer-icon svg { width: 100%; height: 100%; }
-
   @media (max-width: 720px) {
     .trip-day-slots { grid-template-columns: 1fr; }
     .trip-planner-result-header { flex-wrap: wrap; }
@@ -4905,21 +4916,17 @@ function renderTripPlannerStyles() {
     .trip-planner-intro h1 { font-size: 1.6rem; }
     #tripDaysInput { width: 70px; }
 
-    /* Mobile trip-tray clearance fix: #tripTray is a site-wide fixed
-       element (app.css, bottom:20px/right:20px) that on /trip specifically
-       never received the homepage's own smaller mobile redesign (that
-       CSS lives in renderHomepageDiscoveryStyles(), which /trip does not
-       include), so its toggle button measures ~44px tall here -- its top
-       edge sits ~64px above the viewport bottom. /trip's own footer
-       (renderHomeFooterHTML) likewise has no styling from /trip's own
-       <head> (same reason), so .home-footer-bottom -- the copyright line,
-       the true last content on the page -- had no protection against
-       resting directly under the tray at full scroll on a narrow
-       viewport, unlike the homepage's own .home-footer-bottom, which
-       already carries an equivalent fix. 80px (64px measured tray
-       footprint + a comfortable margin) reuses that same clearance
-       technique, scoped to this page only via body.page-trip so /browse
-       and / (which both already handle this themselves) are untouched. */
+    /* Mobile trip-tray clearance, /trip-specific top-up (2026-09-19): now
+       that renderCanonicalFooterStyles() is shared onto this page (see the
+       top of this stylesheet), #tripTrayToggle/.home-footer-bottom already
+       get the same real mobile sizing/clearance the homepage and /browse
+       do (the shared block's own padding-bottom:56px on .home-footer-bottom
+       at this breakpoint). This override simply keeps a slightly larger,
+       previously-verified safety margin on /trip specifically, since this
+       page's own longer, variable-height itinerary content sits directly
+       above the footer -- harmless extra whitespace if 56px alone would
+       have been enough, scoped via body.page-trip so /browse and / are
+       unaffected either way. */
     body.page-trip .home-footer-bottom { padding-bottom: 80px; }
 
     /* Mobile trip-tray/wizard-link overlap fix (audit finding, 2026-09-18):
