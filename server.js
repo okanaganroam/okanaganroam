@@ -1413,6 +1413,79 @@ function hiddenGemBadgeHtml() {
   return '<span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem</span>';
 }
 
+// Second editorial badge (2026-09-19), same chip convention. Membership is
+// the 'local_favorite' collection kind, read via getCollectionVenueIds().
+function localFavouriteBadgeHtml() {
+  return '<span class="chip local-favourite-badge">♥ Local Favourite</span>';
+}
+
+// ---------- Editorial collection membership (2026-09-19) ----------
+//
+// The one write path for badge membership (Hidden Gem, Local Favourite,
+// and any future collections.kind). Same guarantees as the other guarded
+// updates: the collection kind must already exist in `collections` (kinds
+// are bootstrapped in db.js, never created from a request), the venue must
+// exist and not be redirected, add/remove are idempotent-safe (409 on a
+// duplicate add or a remove of a non-member), the membership change and its
+// venue_enrichment_log audit row commit in one transaction, and no column
+// or table name ever comes from the request body.
+//
+// Returns one of:
+//   { ok: false, reason: 'unknown_kind' | 'venue_not_found' | 'venue_redirected' | 'already_member' | 'not_member' }
+//   { ok: true, kind, venue_id, action, members: <count now in that collection> }
+function guardedCollectionMembershipUpdate(kind, venueId, action, note, meta) {
+  const collection = db.prepare('SELECT id FROM collections WHERE kind = ?').get(kind);
+  if (!collection) return { ok: false, reason: 'unknown_kind' };
+  const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(venueId);
+  if (!venue) return { ok: false, reason: 'venue_not_found' };
+  if (venue.redirect_to !== null) return { ok: false, reason: 'venue_redirected' };
+
+  const existing = db
+    .prepare("SELECT 1 FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
+    .get(collection.id, venueId);
+  if (action === 'add' && existing) return { ok: false, reason: 'already_member' };
+  if (action === 'remove' && !existing) return { ok: false, reason: 'not_member' };
+
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    if (action === 'add') {
+      const next = db
+        .prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM collection_items WHERE collection_id = ?')
+        .get(collection.id).p;
+      db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, position) VALUES (?, 'venue', ?, ?, ?)`)
+        .run(collection.id, venueId, note, next);
+    } else {
+      db.prepare("DELETE FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
+        .run(collection.id, venueId);
+    }
+    db.prepare(
+      `INSERT INTO venue_enrichment_log
+         (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+       VALUES (?, ?, ?, ?, 'editorial_collection', ?, 'high', ?, 0, ?)`
+    ).run(
+      venueId,
+      `collection:${kind}`,
+      action === 'add' ? 'absent' : 'member',
+      action === 'add' ? 'member' : 'absent',
+      meta.reason,
+      meta.batch_id,
+      meta.reviewed_by || null
+    );
+    db.exec('COMMIT');
+    txOpen = false;
+  } catch (err) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw err;
+  }
+
+  const members = db
+    .prepare("SELECT COUNT(*) AS n FROM collection_items WHERE collection_id = ? AND content_type = 'venue'")
+    .get(collection.id).n;
+  return { ok: true, kind, venue_id: venueId, action, members };
+}
+
 function getRelatedVenues(venue, limit = 6) {
   // Same region + same category, excluding itself
   return db
@@ -2429,7 +2502,8 @@ function renderGuidePage(region, badge, venues) {
     : '';
 
   const hiddenGemIds = getHiddenGemVenueIds();
-  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
+  const localFavouriteIds = getCollectionVenueIds('local_favorite');
+  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id) })).join('\n');
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -3966,6 +4040,51 @@ const SEO_PAGE_CSS = `
   .venue-card h2 a:hover, .category-card h2 a:hover { color: var(--plum); text-decoration: underline; }
   .venue-meta { color: var(--ink); opacity: 0.62; font-size: 0.86rem; margin: 0 0 10px; }
   .venue-card p, .category-card p { margin: 0 0 10px; font-size: 0.95rem; color: var(--ink); opacity: 0.85; }
+  /* Golf-only (2026-09-19): collapsed description + Read more toggle. The
+     clamp class is added by the page script, so without JS the full text
+     shows and the button stays hidden. Line-clamp is line-based, so the
+     "about four lines" holds at every viewport width. */
+  .golf-desc p { margin: 0 0 6px; }
+  .golf-desc.is-clamped p {
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+    overflow: hidden; max-height: calc(4 * 1.55em);
+  }
+  .desc-toggle {
+    background: none; border: 0; padding: 0; margin: 0 0 10px; cursor: pointer;
+    font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--plum);
+  }
+  .desc-toggle:hover { text-decoration: underline; }
+  .desc-toggle:focus-visible { outline: 2px solid var(--plum); outline-offset: 3px; border-radius: 4px; }
+  .desc-toggle[hidden] { display: none; }
+  /* Golf-only: one action row (Website, Call, Favorite, Add to Trip)
+     directly under the badge chips, divided from the description by a
+     hairline so chips + actions read as the card's single "info & actions"
+     block. Pill styling mirrors the homepage's .trip-btn/.fav-btn
+     (public/styles/app.css) so the controls read as the same feature. */
+  .venue-card[data-venue-category="golf"] .chips:empty { display: none; }
+  .venue-card[data-venue-category="golf"] .chips:not(:empty) {
+    margin: 10px 0 0; padding-top: 10px; border-top: 1px solid rgba(74,52,40,0.10);
+  }
+  .venue-card[data-venue-category="golf"] .card-actions {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(74,52,40,0.10);
+  }
+  .venue-card[data-venue-category="golf"] .chips:not(:empty) + .card-actions {
+    margin-top: 8px; padding-top: 0; border-top: 0;
+  }
+  .venue-card[data-venue-category="golf"] .card-action {
+    display: inline-flex; align-items: center; gap: 5px; margin: 0;
+    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    color: var(--ink); background: var(--sand-deep); border: none; text-decoration: none;
+    border-radius: 999px; padding: 5px 12px; cursor: pointer; width: fit-content;
+    transition: background 0.15s;
+  }
+  .venue-card[data-venue-category="golf"] .card-action:hover { background: rgba(224,169,78,0.35); color: var(--ink); text-decoration: none; }
+  .venue-card[data-venue-category="golf"] .card-action:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
+  .venue-card[data-venue-category="golf"] .trip-btn.in-trip { background: var(--teal, #2F6F73); color: var(--paper); }
+  .venue-card[data-venue-category="golf"] .fav-btn.is-fav { background: var(--plum); color: var(--paper); }
+  .venue-card[data-venue-category="golf"] .trip-notice { margin: 8px 0 0; font-size: 0.85rem; color: var(--plum); }
+  .venue-card[data-venue-category="golf"] .trip-notice:empty { display: none; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 7px; }
   .chip {
@@ -3978,6 +4097,10 @@ const SEO_PAGE_CSS = `
      curation rather than a factual attribute. */
   .chip.hidden-gem-badge {
     background: var(--amber); color: var(--plum-dark);
+    box-shadow: inset 0 0 0 1px rgba(74,52,40,0.12);
+  }
+  .chip.local-favourite-badge {
+    background: var(--teal, #2A6B67); color: var(--paper);
     box-shadow: inset 0 0 0 1px rgba(74,52,40,0.12);
   }
 
@@ -4177,6 +4300,224 @@ const SEO_PAGE_CSS = `
 // `opts.noindex` is `undefined` (falsy) for all of them — their output is
 // byte-for-byte unchanged. Only a caller that explicitly passes
 // `{ noindex: true }` (expired events) gets the extra robots meta tag.
+// ---------- Golf engagement analytics (2026-09-19, Golf only) ----------
+//
+// The site's only analytics system is GA4 (measurement ID below), wired
+// on the homepage SPA (okanagan.html) through a small window.trackEvent()
+// wrapper that never throws. Server-rendered pages had no analytics at
+// all. This reuses that exact mechanism -- same property, same wrapper,
+// same event-naming conventions (e.g. outbound_click + link_type) -- on
+// Golf category and Golf venue pages only, so venue-level engagement
+// (impressions, description expansions, website/phone/directions clicks)
+// lands in the existing GA4 property rather than a second system.
+const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
+
+function renderAnalyticsHeadHtml() {
+  return `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  gtag('js', new Date());
+  gtag('config', '${GA4_MEASUREMENT_ID}');
+  window.trackEvent = function(name, params){
+    try {
+      if (typeof gtag === 'function') gtag('event', name, params || {});
+    } catch (e) { /* analytics must never break the site */ }
+  };
+</script>`;
+}
+
+function golfEngagementHeadHtml(type) {
+  return type === 'golf' ? renderAnalyticsHeadHtml() : '';
+}
+
+// Category-page behaviour for Golf cards: the clamp class is applied only
+// once JS runs (so no-JS readers always see the full text), the Read more
+// control is revealed only when the text is actually truncated, the
+// toggle is inline with aria-expanded/aria-controls, and impressions
+// (>=50% visible, once per card per page view) plus expand/collapse are
+// reported through window.trackEvent.
+function golfCardEngagementScriptHtml(type) {
+  if (type !== 'golf') return '';
+  return `<script>
+(function(){
+  var cards = document.querySelectorAll('.venue-card[data-venue-category="golf"]');
+  if (!cards.length) return;
+  function ctx(card){
+    return {
+      venue_id: Number(card.dataset.venueId),
+      venue_name: card.dataset.venueName,
+      venue_region: card.dataset.venueRegion,
+      venue_category: 'golf',
+      surface: 'category_card',
+      page_path: location.pathname
+    };
+  }
+  function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
+  var MORE = 'Read more \\u2192', LESS = 'Read less \\u2191';
+  function isTruncated(p){ return p.scrollHeight > p.clientHeight + 1; }
+  function setup(card){
+    var desc = card.querySelector('.golf-desc');
+    var btn = card.querySelector('.desc-toggle');
+    if (!desc || !btn) return;
+    var p = desc.querySelector('p');
+    if (!p) return;
+    desc.classList.add('is-clamped');
+    btn.hidden = !isTruncated(p);
+    btn.addEventListener('click', function(){
+      var expanded = btn.getAttribute('aria-expanded') === 'true';
+      desc.classList.toggle('is-clamped', expanded);
+      btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      btn.textContent = expanded ? MORE : LESS;
+      track(expanded ? 'description_collapse' : 'description_expand', ctx(card));
+    });
+    card._golfRecheck = function(){
+      if (btn.getAttribute('aria-expanded') === 'true') return;
+      btn.hidden = !isTruncated(p);
+    };
+  }
+  cards.forEach(setup);
+  var resizeTimer;
+  window.addEventListener('resize', function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function(){
+      cards.forEach(function(c){ if (c._golfRecheck) c._golfRecheck(); });
+    }, 150);
+  });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (!en.isIntersecting || en.intersectionRatio < 0.5) return;
+        io.unobserve(en.target);
+        track('venue_impression', ctx(en.target));
+      });
+    }, { threshold: 0.5 });
+    cards.forEach(function(c){ io.observe(c); });
+  }
+
+  // ---- Favorite + Add to Trip: same localStorage keys, item shape and
+  // name-keyed de-duplication as the homepage app (okanaganFavorites is an
+  // array of venue names; okanaganTrip is [{name, query, region}], capped
+  // at MAX_STOPS), so the existing Trip Planner and favourites filter see
+  // exactly what was chosen here.
+  var MAX_STOPS = 10;
+  function readList(key){
+    try { var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function writeList(key, list){ try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) {} }
+  function syncFav(btn){
+    var on = readList('okanaganFavorites').indexOf(btn.dataset.favName) !== -1;
+    btn.classList.toggle('is-fav', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.textContent = on ? '\\u2665 Favorited' : '\\u2661 Favorite';
+  }
+  function syncTrip(btn){
+    var on = readList('okanaganTrip').some(function(t){ return t && t.name === btn.dataset.tripName; });
+    btn.classList.toggle('in-trip', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.textContent = on ? '\\u2713 In trip' : '\\uFF0B Add to Trip';
+  }
+  function syncAll(){
+    document.querySelectorAll('.venue-card[data-venue-category="golf"] .fav-btn').forEach(syncFav);
+    document.querySelectorAll('.venue-card[data-venue-category="golf"] .trip-btn').forEach(syncTrip);
+  }
+  function notice(card, text){
+    var el = card.querySelector('.trip-notice');
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'trip-notice';
+      el.setAttribute('role', 'status');
+      card.querySelector('.card-actions').insertAdjacentElement('afterend', el);
+    }
+    el.textContent = text;
+    clearTimeout(el._t);
+    el._t = setTimeout(function(){ el.textContent = ''; }, 4000);
+  }
+  syncAll();
+  // Website / Call links in the card action row: same outbound_click
+  // event and link_type values as the venue page, with the card context.
+  document.addEventListener('click', function(e){
+    var link = e.target.closest('.venue-card[data-venue-category="golf"] a[data-track]');
+    if (!link) return;
+    var params = ctx(link.closest('.venue-card'));
+    params.link_type = link.getAttribute('data-track');
+    track('outbound_click', params);
+  });
+  // If the homepage app (app.js) is ever loaded alongside this page, its
+  // own delegated .fav-btn/.trip-btn handlers take over; don't double-fire.
+  if (!window.__syncTripButtons && !window.__syncFavButtons) {
+    document.addEventListener('click', function(e){
+      var fav = e.target.closest('.venue-card[data-venue-category="golf"] .fav-btn');
+      if (fav) {
+        var name = fav.dataset.favName, list = readList('okanaganFavorites'), i = list.indexOf(name);
+        if (i === -1) list.push(name); else list.splice(i, 1);
+        writeList('okanaganFavorites', list);
+        syncAll();
+        track(i === -1 ? 'venue_favorite' : 'venue_unfavorite', ctx(fav.closest('.venue-card')));
+        return;
+      }
+      var tb = e.target.closest('.venue-card[data-venue-category="golf"] .trip-btn');
+      if (!tb) return;
+      var tcard = tb.closest('.venue-card'), tname = tb.dataset.tripName, trip = readList('okanaganTrip');
+      var params = ctx(tcard);
+      params.region = params.venue_region;
+      if (trip.some(function(t){ return t && t.name === tname; })) {
+        trip = trip.filter(function(t){ return !(t && t.name === tname); });
+        writeList('okanaganTrip', trip);
+        syncAll();
+        params.trip_size = trip.length;
+        track('remove_from_trip', params);
+        return;
+      }
+      if (trip.length >= MAX_STOPS) {
+        notice(tcard, 'Trips are capped at ' + MAX_STOPS + ' stops so the route stays manageable. Remove a stop to add another.');
+        return;
+      }
+      trip.push({ name: tname, query: tb.dataset.tripQuery, region: tb.dataset.tripRegion || null });
+      writeList('okanaganTrip', trip);
+      syncAll();
+      params.trip_size = trip.length;
+      track('add_to_trip', params);
+    });
+    window.addEventListener('storage', function(ev){
+      if (ev.key === 'okanaganFavorites' || ev.key === 'okanaganTrip') syncAll();
+    });
+  }
+})();
+</script>`;
+}
+
+// Venue-page behaviour for a Golf venue: one delegated click listener on
+// the existing Visit Website / Get Directions / Call links (and the
+// matching Good-to-Know and map links), reporting the established
+// outbound_click event with link_type plus venue identity, and one
+// venue_view on load so page-level impressions carry venue_id too.
+function golfVenueEngagementScriptHtml(venue) {
+  if (venue.type !== 'golf') return '';
+  const ctx = JSON.stringify({
+    venue_id: venue.id,
+    venue_name: venue.name,
+    venue_region: venue.region,
+    venue_category: 'golf',
+    surface: 'venue_page',
+  }).replace(/</g, '\\u003c');
+  return `<script>
+(function(){
+  var ctx = ${ctx};
+  function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
+  track('venue_view', ctx);
+  document.addEventListener('click', function(e){
+    var link = e.target.closest('a[data-track]');
+    if (!link) return;
+    var params = {};
+    for (var k in ctx) params[k] = ctx[k];
+    params.link_type = link.getAttribute('data-track');
+    track('outbound_click', params);
+  });
+})();
+</script>`;
+}
+
 function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   const { noindex = false } = opts;
   return `<meta charset="UTF-8">
@@ -4258,7 +4599,7 @@ function badgeChipsHtml(venue) {
 // falling back to plain text; category pages always have both). Both
 // behaviors are preserved exactly via the options below.
 function venueCardHtml(venue, opts = {}) {
-  const { showType = false, isHiddenGem = false } = opts;
+  const { showType = false, isHiddenGem = false, isLocalFavourite = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   const nameHtml = href
@@ -4269,18 +4610,52 @@ function venueCardHtml(venue, opts = {}) {
     venue.cuisine ? escapeHtml(venue.cuisine) : null,
     venue.rating ? `${venue.rating}\u2605` : null,
   ].filter(Boolean).join(' &middot; ');
-  const desc = venue.description ? `<p>${escapeHtml(venue.description)}</p>` : '';
+  // Golf-only (2026-09-19): the description is wrapped so the page script
+  // can clamp it to ~4 lines and toggle it inline; the button ships hidden
+  // and is revealed only when the text is actually truncated. Every other
+  // category renders exactly what it did before.
+  const isGolf = venue.type === 'golf';
+  const descId = `golf-desc-${venue.id}`;
+  const desc = !venue.description ? '' : isGolf
+    ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(venue.description)}</p></div>
+        <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`
+    : `<p>${escapeHtml(venue.description)}</p>`;
+  const liAttrs = isGolf
+    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="golf" data-venue-name="${escapeHtml(venue.name)}"`
+    : '';
+  // Golf-only (2026-09-19): Favorite + Add to Trip. Same class names, data
+  // attributes, storage keys and item shape as the homepage's fav-btn /
+  // trip-btn (public/scripts/app.js), so a favourite or trip stop made
+  // here shows up in the existing Trip Planner and favourites filter.
+  // Website and Call sit in the same action row so the four actions read
+  // as one unit under the badge chips; they carry data-track so the card
+  // engagement script can report outbound_click like the venue page does.
+  const tripQuery = `${venue.name}, ${REGION_LABELS[venue.region] || venue.region}, Okanagan Valley, BC`;
+  const websiteUrl = isGolf && venue.website ? normalizeWebsiteUrl(venue.website) : null;
+  // (Rendered inline after the chips line, so non-Golf cards stay
+  // byte-identical to their pre-feature markup -- no stray blank line.)
+  const cardActions = isGolf
+    ? `
+        <div class="card-actions">
+          ${websiteUrl ? `<a class="card-action" href="${escapeHtml(websiteUrl)}" rel="nofollow noopener" target="_blank" data-track="website">Website &nearr;</a>` : ''}
+          ${venue.phone ? `<a class="card-action" href="tel:${escapeHtml(venue.phone)}" data-track="phone">Call ${escapeHtml(venue.phone)}</a>` : ''}
+          <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(venue.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(venue.name)}">&#9825; Favorite</button>
+          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(venue.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(venue.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(venue.name)} to trip">&#65291; Add to Trip</button>
+        </div>`
+    : '';
   // Defensive: never show the badge for a retired/redirected venue, even
   // if a caller ever passed isHiddenGem=true for one by mistake — the
   // bulk/targeted lookups already exclude these, but this keeps the
   // guarantee local to the render function itself, not just its callers.
   const showBadge = isHiddenGem && !venue.redirect_to;
+  const showLocalFavourite = isLocalFavourite && !venue.redirect_to;
+  const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
   return `
-      <li class="venue-card">
+      <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>
         ${desc}
-        <p class="chips">${showBadge ? hiddenGemBadgeHtml() + ' ' : ''}${badgeChipsHtml(venue)}</p>
+        <p class="chips">${editorialChips}${badgeChipsHtml(venue)}</p>${cardActions}
       </li>`;
 }
 
@@ -4370,8 +4745,8 @@ function isIndoorGolfVenue(venue) {
 // so the same helper produces "Golf Courses" and "Kelowna Golf Courses"
 // without a separate code path per page type. A subsection is omitted
 // entirely when it would be empty, rather than rendering an empty grid.
-function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix) {
-  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id) })).join('\n');
+function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, localFavouriteIds = new Set()) {
+  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id) })).join('\n');
 
   if (type !== 'golf') {
     return `<ul class="card-grid">
@@ -4431,7 +4806,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   };
 
   const hiddenGemIds = getHiddenGemVenueIds();
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel);
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'));
 
   // Back-link to the Okanagan-wide page, only for categories that
   // actually have one (ALL_REGIONS_CATEGORIES) -- every other category
@@ -4453,6 +4828,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList])}
+${golfEngagementHeadHtml(type)}
 </head>
 <body>
   ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
@@ -4468,6 +4844,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
   ${renderHomeFooterHTML(true)}
+  ${golfCardEngagementScriptHtml(type)}
 </body>
 </html>`;
 }
@@ -4534,12 +4911,13 @@ function renderCategoryAllRegionsPage(type, venues) {
   };
 
   const hiddenGemIds = getHiddenGemVenueIds();
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '');
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'));
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList])}
+${golfEngagementHeadHtml(type)}
 </head>
 <body>
   ${siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
@@ -4553,6 +4931,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
   ${cardsHtml}
   <a class="cta" href="/browse">Back to the full directory</a>
   ${renderHomeFooterHTML(true)}
+  ${golfCardEngagementScriptHtml(type)}
 </body>
 </html>`;
 }
@@ -4601,7 +4980,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
 
   const attributeChips = badgeChipsHtml(venue);
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
-  const hiddenGemChip = isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '';
+  const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
+  const hiddenGemChip = (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
 
   let hoursHtml = '';
   if (venue.hours) {
@@ -4622,13 +5002,18 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     }
   }
 
+  // Golf-only (2026-09-19): outbound links carry a data-track kind so the
+  // venue-page engagement script can report them; every other category's
+  // markup is unchanged.
+  const trackAttr = (kind) => (venue.type === 'golf' ? ` data-track="${kind}"` : '');
+
   const detailRows = [
     ['Type', label.singular],
     ['Region', `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`],
     venue.cuisine ? ['Cuisine', escapeHtml(venue.cuisine)] : null,
     venue.address ? ['Address', escapeHtml(venue.address)] : null,
-    venue.phone ? ['Phone', `<a href="tel:${escapeHtml(venue.phone)}">${escapeHtml(venue.phone)}</a>`] : null,
-    venue.website ? ['Website', `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank">${escapeHtml(venue.website)}</a>`] : null,
+    venue.phone ? ['Phone', `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
+    venue.website ? ['Website', `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
     venue.price ? ['Price', '$'.repeat(venue.price)] : null,
     (venue.rating && venue.reviews) ? ['Rating', `${venue.rating}\u2605 (${venue.reviews} reviews)`] : (venue.rating ? ['Rating', `${venue.rating}\u2605`] : null),
   ].filter(Boolean)
@@ -4664,16 +5049,16 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     ? `<div class="venue-section venue-location">
         <h2>Location</h2>
         ${venue.address ? `<p class="venue-address">${escapeHtml(venue.address)}</p>` : ''}
-        ${mapsUrl ? `<a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank">View on map \u2197</a>` : ''}
+        ${mapsUrl ? `<a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>View on map \u2197</a>` : ''}
       </div>`
     : '';
 
   // CTA buttons — only ever rendered when the underlying data already
   // exists; nothing here fabricates a website, phone number, or address.
   const ctaButtons = [
-    venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank">Visit Website</a>` : null,
-    mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank">Get Directions</a>` : null,
-    venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}">Call</a>` : null,
+    venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>Visit Website</a>` : null,
+    mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>Get Directions</a>` : null,
+    venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>Call</a>` : null,
   ].filter(Boolean).join('\n  ');
 
   // One bulk lookup for all related+nearby cards together (reusing the
@@ -4681,10 +5066,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // per card below, not a per-card query, so this stays N+1-safe no
   // matter how many related/nearby venues render.
   const relatedNearbyHiddenGemIds = (relatedVenues.length || nearbyVenues.length) ? getHiddenGemVenueIds() : new Set();
+  const relatedNearbyLocalFavouriteIds = (relatedVenues.length || nearbyVenues.length) ? getCollectionVenueIds('local_favorite') : new Set();
 
   function relatedCard(v) {
     const meta = [v.cuisine, v.rating ? `${v.rating}\u2605` : null].filter(Boolean).join(' \u00b7 ');
-    const badge = (relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '';
+    const badge = ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
+      + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
     return `<div class="related-card related-card-${v.type}">
       ${compactVisualBandHtml(v.type, { size: 'small' })}
       <a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>
@@ -4724,6 +5111,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
+${golfEngagementHeadHtml(venue.type)}
 </head>
 <body>
   ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
@@ -4754,6 +5142,7 @@ ${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
   <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
   ${renderHomeFooterHTML(true)}
+  ${golfVenueEngagementScriptHtml(venue)}
 </body>
 </html>`;
 }
@@ -6546,6 +6935,72 @@ const server = http.createServer(async (req, res) => {
     // /admin/retire-duplicate, or /admin/merge-and-retire-duplicate in any
     // way. Reuses the exact same bearer-token check as every other admin
     // endpoint.
+    // POST /admin/collection-membership
+    //
+    // Adds or removes one venue from one editorial collection (Hidden Gem,
+    // Local Favourite, ...) with an audit row -- the only write path for
+    // badge membership, so badges never need a code edit again. Same
+    // bearer-token check and strict key allowlist as every admin route.
+    if (pathname === '/admin/collection-membership' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Collection-membership endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      const ALLOWED_MEMBERSHIP_KEYS = ['kind', 'venue_id', 'action', 'note', 'reason', 'batch_id'];
+      const unexpectedMembershipKeys = Object.keys(body).filter((k) => !ALLOWED_MEMBERSHIP_KEYS.includes(k));
+      if (unexpectedMembershipKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedMembershipKeys.join(', ')}` });
+      }
+      if (typeof body.kind !== 'string' || !/^[a-z_]+$/.test(body.kind)) {
+        return sendJSON(res, 400, { error: 'kind is required and must be a lowercase collection kind (e.g. hidden_gem, local_favorite).' });
+      }
+      if (!Number.isInteger(body.venue_id) || body.venue_id <= 0) {
+        return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
+      }
+      if (body.action !== 'add' && body.action !== 'remove') {
+        return sendJSON(res, 400, { error: "action must be 'add' or 'remove'." });
+      }
+      if (body.note !== undefined && body.note !== null && typeof body.note !== 'string') {
+        return sendJSON(res, 400, { error: 'note must be a string when provided.' });
+      }
+      if (typeof body.reason !== 'string' || body.reason.trim() === '') {
+        return sendJSON(res, 400, { error: 'reason is required and must be a non-empty string.' });
+      }
+      if (typeof body.batch_id !== 'string' || body.batch_id.trim() === '') {
+        return sendJSON(res, 400, { error: 'batch_id is required and must be a non-empty string.' });
+      }
+
+      let result;
+      try {
+        result = guardedCollectionMembershipUpdate(
+          body.kind,
+          body.venue_id,
+          body.action,
+          typeof body.note === 'string' && body.note.trim() !== '' ? body.note.trim() : null,
+          { reason: body.reason.trim(), batch_id: body.batch_id.trim(), reviewed_by: null }
+        );
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Membership change failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { unknown_kind: 400, venue_not_found: 404, venue_redirected: 409, already_member: 409, not_member: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason });
+      }
+      return sendJSON(res, 200, result);
+    }
+
     if (pathname === '/admin/correct-phone' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Correct-phone endpoint is not configured.' });
@@ -7292,6 +7747,7 @@ module.exports = {
   getStats,
   renderVenuePage,
   renderCategoryPage,
+  renderCategoryAllRegionsPage,
   renderRegionPage,
   renderGuidePage,
   render404Page,
@@ -7319,6 +7775,8 @@ module.exports = {
   getHiddenGemVenueIds,
   isVenueHiddenGem,
   hiddenGemBadgeHtml,
+  localFavouriteBadgeHtml,
+  guardedCollectionMembershipUpdate,
   // Build My Trip, Stage 3 (price/amenity/discovery scoring + NL parser)
   TRIP_VALID_BUDGETS,
   budgetMatchesPrice,

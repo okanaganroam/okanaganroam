@@ -362,4 +362,17 @@ for (const member of HIDDEN_GEMS_MEMBERS) {
   `).run(hiddenGemsCollection.id, member.venue_id, member.note, member.position);
 }
 
+// --- Local Favourites collection bootstrap (2026-09-19) ------------------
+// Second editorial collection kind, reusing the exact same tables and the
+// same find-or-create-by-slug discipline as Hidden Gems above. Deliberately
+// seeds NO members: membership for both kinds is now managed through the
+// audited POST /admin/collection-membership route in server.js, so adding
+// or removing a badge never requires editing application code again. The
+// HIDDEN_GEMS_MEMBERS seed above is left exactly as it was.
+const LOCAL_FAVOURITES_COLLECTION_SLUG = 'local-favourites';
+if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(LOCAL_FAVOURITES_COLLECTION_SLUG)) {
+  db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(LOCAL_FAVOURITES_COLLECTION_SLUG, 'local_favorite', 'Local Favourites');
+}
+
 module.exports = db;

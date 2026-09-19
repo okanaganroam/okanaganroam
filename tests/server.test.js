@@ -2955,6 +2955,55 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   const trattoriaPage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
   assert.equal(trattoriaPage.status, 200, 'existing venue route must still work');
 
+  // ---- /admin/collection-membership (2026-09-19) -------------------------
+  // Same single start/close cycle as every other admin route below.
+  {
+    const TOKEN = process.env.ENRICHMENT_ADMIN_TOKEN;
+    const cmUrl = `${base}/admin/collection-membership`;
+    const cmGolf = app.findVenueBySlug('vernon', 'golf', 'test-vernon-golf-course');
+    const post = (body, token = TOKEN) => fetch(cmUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body),
+    });
+    const good = { kind: 'local_favorite', venue_id: cmGolf.id, action: 'add', note: 'HTTP test note', reason: 'http test', batch_id: 'http-cm-batch' };
+
+    assert.equal((await post(good, null)).status, 401, 'missing bearer token must be 401');
+    assert.equal((await post(good, 'wrong-token')).status, 401, 'wrong bearer token must be 401');
+    assert.equal((await post({ ...good, extra: 1 })).status, 400, 'unexpected key must be 400');
+    assert.equal((await post({ ...good, kind: 'Hidden Gem' })).status, 400, 'malformed kind must be 400');
+    assert.equal((await post({ ...good, venue_id: '12' })).status, 400, 'non-integer venue_id must be 400');
+    assert.equal((await post({ ...good, action: 'toggle' })).status, 400, 'bad action must be 400');
+    assert.equal((await post({ ...good, reason: '' })).status, 400, 'empty reason must be 400');
+    assert.equal((await post({ ...good, batch_id: '' })).status, 400, 'empty batch_id must be 400');
+    assert.equal((await post({ ...good, kind: 'roam_picks' })).status, 400, 'unknown collection kind must be 400');
+    assert.equal((await post({ ...good, venue_id: 999999 })).status, 404, 'unknown venue must be 404');
+    assert.equal((await post({ ...good, action: 'remove' })).status, 409, 'removing a non-member must be 409');
+
+    const addRes = await post(good);
+    assert.equal(addRes.status, 200, 'valid add must be 200');
+    const addBody = await addRes.json();
+    assert.deepEqual({ ok: addBody.ok, kind: addBody.kind, venue_id: addBody.venue_id, action: addBody.action }, { ok: true, kind: 'local_favorite', venue_id: cmGolf.id, action: 'add' });
+    assert.equal(addBody.members, 1);
+    assert.equal((await post(good)).status, 409, 'duplicate add must be 409');
+    assert.ok(app.getCollectionVenueIds('local_favorite').has(cmGolf.id), 'membership visible through getCollectionVenueIds');
+
+    const vernonGolfHttp = await (await fetch(`${base}/vernon/golf`)).text();
+    assert.match(vernonGolfHttp, /<span class="chip local-favourite-badge">\u2665 Local Favourite<\/span>/, 'badge must render on the live /vernon/golf page');
+    const venuePageHttp = await (await fetch(`${base}/vernon/golf/test-vernon-golf-course`)).text();
+    assert.match(venuePageHttp, /local-favourite-badge/, 'badge must render on the live venue page');
+
+    const rmRes = await post({ ...good, action: 'remove' });
+    assert.equal(rmRes.status, 200, 'valid remove must be 200');
+    assert.equal((await rmRes.json()).members, 0);
+    assert.ok(!app.getCollectionVenueIds('local_favorite').has(cmGolf.id));
+    const logRows = db.prepare("SELECT field_name, old_value, new_value, source, source_ref, batch_id FROM venue_enrichment_log WHERE venue_id = ? AND batch_id = 'http-cm-batch' ORDER BY id").all(cmGolf.id);
+    assert.deepEqual(logRows, [
+      { field_name: 'collection:local_favorite', old_value: 'absent', new_value: 'member', source: 'editorial_collection', source_ref: 'http test', batch_id: 'http-cm-batch' },
+      { field_name: 'collection:local_favorite', old_value: 'member', new_value: 'absent', source: 'editorial_collection', source_ref: 'http test', batch_id: 'http-cm-batch' },
+    ]);
+  }
+
   // ---- /admin/correct-phone ---------------------------------------------
   // Folded into this same start/close cycle for the same reason as the
   // Design Sprint 4 block above: a second app.startServer()/server.close()
@@ -3903,4 +3952,241 @@ test('/admin/correct-phone and /admin/correct-amenities return 503 when ENRICHME
     await new Promise((resolve) => child.once('exit', resolve));
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+// ==== Golf venue-card engagement (2026-09-19, Golf only) ==================
+//
+// Read-more/Read-less description toggle on Golf cards plus GA4-backed
+// engagement events (venue_impression, description_expand/collapse,
+// venue_view, outbound_click with link_type) reusing the homepage's
+// existing window.trackEvent() convention. Every other category must
+// render byte-for-byte what it did before.
+
+test('Golf venue card wraps the description for the inline toggle, with accessible button semantics', () => {
+  const venue = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const html = app.venueCardHtml(venue);
+  assert.match(html, /<li class="venue-card" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="golf" data-venue-name="Test Golf Course">/);
+  const descId = `golf-desc-${venue.id}`;
+  assert.match(html, new RegExp(`<div class="golf-desc" id="${descId}"><p>A fixture golf course used only by the automated test suite\\.</p></div>`));
+  assert.match(html, new RegExp(`<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`));
+  // The description text itself is untouched -- only wrapped.
+  assert.ok(html.includes(`<p>${venue.description}</p>`));
+});
+
+test('REGRESSION: non-Golf venue cards are unchanged by the Golf engagement feature', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const html = app.venueCardHtml(venue);
+  assert.match(html, /<li class="venue-card">/);
+  assert.doesNotMatch(html, /golf-desc|desc-toggle|data-venue-category|data-venue-id/);
+  assert.ok(html.includes(`<p>${venue.description}</p>`));
+});
+
+test('Golf category pages (region + Okanagan-wide) carry the GA4 snippet, trackEvent wrapper, and card engagement script', () => {
+  const kelownaGolf = app.getVenuesByRegionCategory('kelowna', 'golf');
+  const regionHtml = app.renderCategoryPage('kelowna', 'golf', kelownaGolf, []);
+  const allHtml = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory ? app.getVenuesByCategory('golf') : kelownaGolf);
+  for (const html of [regionHtml, allHtml]) {
+    assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
+    assert.match(html, /gtag\('config', 'G-J312FGJPSC'\)/);
+    assert.match(html, /window\.trackEvent = function\(name, params\)/);
+    assert.match(html, /\.venue-card\[data-venue-category="golf"\]/);
+    assert.match(html, /'description_expand'/);
+    assert.match(html, /'venue_impression'/);
+    assert.match(html, /IntersectionObserver/);
+  }
+  // Existing Courses / Indoor split still rendered the same way.
+  assert.match(regionHtml, /<h2 class="category-subsection-heading">Kelowna Golf Courses<\/h2>/);
+  assert.match(regionHtml, /<h2 class="category-subsection-heading">Kelowna Indoor Golf &amp; Simulators<\/h2>/);
+});
+
+test('REGRESSION: non-Golf category pages get no analytics snippet or engagement script', () => {
+  const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
+  const html = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
+  assert.doesNotMatch(html, /googletagmanager|window\.trackEvent|description_expand|venue_impression|data-venue-category="golf" data-venue-name/);
+});
+
+test('Golf venue page tags website/directions/phone links with data-track and ships the venue engagement script', () => {
+  // kelowna fixture: address + coordinates -> Get Directions + map link, no website/phone
+  const kelownaGolf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const html = app.renderVenuePage(kelownaGolf, [], [], []);
+  assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
+  assert.match(html, /<a class="cta secondary" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>/);
+  assert.match(html, /class="map-link"[^>]*data-track="directions"/);
+  assert.match(html, new RegExp(`"venue_id":${kelownaGolf.id},"venue_name":"Test Golf Course","venue_region":"kelowna","venue_category":"golf","surface":"venue_page"`));
+  assert.match(html, /track\('venue_view', ctx\)/);
+  assert.match(html, /'outbound_click'/);
+  assert.match(html, /a\[data-track\]/);
+  // Description on the venue page is untouched (no clamp/toggle there --
+  // the .desc-toggle CSS rule is inlined on every page, so check for the
+  // button element specifically).
+  assert.ok(html.includes(`<p class="venue-description">${kelownaGolf.description}</p>`));
+  assert.doesNotMatch(html, /<button[^>]*desc-toggle/);
+
+  // west-kelowna fixture has a website -> Visit Website + Good-to-Know link are tagged
+  const wk = app.getVenuesByRegionCategory('west-kelowna', 'golf')[0];
+  const wkHtml = app.renderVenuePage(wk, [], [], []);
+  assert.match(wkHtml, /<a class="cta" href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">Visit Website<\/a>/);
+  assert.match(wkHtml, /<a href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">/);
+});
+
+test('REGRESSION: non-Golf venue pages carry no data-track attributes, analytics snippet, or engagement script', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'); // has phone, address, coords
+  const html = app.renderVenuePage(venue, [], [], []);
+  assert.doesNotMatch(html, /data-track=|googletagmanager|window\.trackEvent|venue_view|outbound_click/);
+  assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>/);
+});
+
+// ==== Golf card Favorite + Add to Trip (2026-09-19, Golf only) ===========
+//
+// Reuses the homepage's fav-btn / trip-btn conventions and localStorage
+// keys (okanaganFavorites, okanaganTrip) so the existing Trip Planner and
+// favourites filter see what is chosen on Golf cards.
+
+test('Golf venue card renders a single action row: Website, Call (when a phone exists), Favorite, Add to Trip', () => {
+  // west-kelowna fixture has a website; kelowna fixture has neither website nor phone.
+  const wk = app.getVenuesByRegionCategory('west-kelowna', 'golf')[0];
+  const wkHtml = app.venueCardHtml(wk);
+  assert.match(wkHtml, /<div class="card-actions">/);
+  assert.match(wkHtml, /<a class="card-action" href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">Website &nearr;<\/a>/);
+  assert.doesNotMatch(wkHtml, /data-track="phone"/, 'no Call link when the venue has no phone');
+  const escapedName = wk.name.replace(/&/g, '&amp;');
+  assert.ok(wkHtml.includes(`<button type="button" class="card-action fav-btn" data-fav-name="${escapedName}" aria-pressed="false" aria-label="Favorite ${escapedName}">&#9825; Favorite</button>`));
+  assert.ok(wkHtml.includes(`<button type="button" class="card-action trip-btn" data-trip-name="${escapedName}" data-trip-query="${escapedName}, West Kelowna, Okanagan Valley, BC" data-trip-region="west-kelowna" aria-pressed="false" aria-label="Add ${escapedName} to trip">&#65291; Add to Trip</button>`));
+  // Actions come after the chips (badge area), as one block.
+  assert.ok(wkHtml.indexOf('<p class="chips">') < wkHtml.indexOf('<div class="card-actions">'));
+
+  const kelowna = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const kHtml = app.venueCardHtml(kelowna);
+  assert.doesNotMatch(kHtml, /data-track="website"|data-track="phone"/);
+  assert.match(kHtml, /class="card-action fav-btn"/);
+  assert.match(kHtml, /class="card-action trip-btn"/);
+  // Description text still untouched.
+  assert.ok(kHtml.includes(`<p>${kelowna.description}</p>`));
+});
+
+test('Golf venue card shows a Call link when the venue has a phone number', () => {
+  const kelowna = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const html = app.venueCardHtml(Object.assign({}, kelowna, { phone: '+1 250-555-0199' }));
+  assert.match(html, /<a class="card-action" href="tel:\+1 250-555-0199" data-track="phone">Call \+1 250-555-0199<\/a>/);
+});
+
+test('REGRESSION: non-Golf venue cards have no Favorite / Add to Trip row', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const html = app.venueCardHtml(venue);
+  assert.doesNotMatch(html, /card-actions|card-action|fav-btn|trip-btn|data-track=/);
+});
+
+test('Golf category page script reuses the homepage storage keys and reports the four engagement events', () => {
+  const rows = app.getVenuesByRegionCategory('kelowna', 'golf');
+  const html = app.renderCategoryPage('kelowna', 'golf', rows, []);
+  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'venue_unfavorite'", "'add_to_trip'", "'remove_from_trip'", 'MAX_STOPS = 10', "window.__syncTripButtons", '.venue-card[data-venue-category="golf"] a[data-track]']) {
+    assert.ok(html.includes(needle), `expected ${needle} in golf category page script`);
+  }
+  const restaurantHtml = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
+  assert.doesNotMatch(restaurantHtml, /okanaganFavorites|okanaganTrip|<div class="card-actions">/);
+});
+
+
+// ==== Editorial collection membership: Hidden Gem + Local Favourite (2026-09-19) ====
+//
+// Membership for both badge kinds is written through one guarded function
+// (HTTP coverage lives inside the single 'HTTP routes' test above). These
+// run without the HTTP server so they always execute, even where port
+// 3001 is occupied.
+
+test('db bootstrap creates the local-favourites collection once, with no members, and leaves hidden-gems alone', () => {
+  const rows = JSON.parse(JSON.stringify(db.prepare("SELECT slug, kind, title FROM collections WHERE slug IN ('hidden-gems','local-favourites') ORDER BY kind").all()));
+  assert.deepEqual(rows, [
+    { slug: 'hidden-gems', kind: 'hidden_gem', title: 'Hidden Gems' },
+    { slug: 'local-favourites', kind: 'local_favorite', title: 'Local Favourites' },
+  ]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM collections WHERE slug = 'local-favourites'").get().n, 1);
+  assert.equal(app.getCollectionVenueIds('local_favorite').size, 0, 'no Local Favourite members are seeded');
+  assert.ok(app.getKnownDiscoveryKinds().includes('local_favorite'));
+});
+
+test('guardedCollectionMembershipUpdate: add + remove for both kinds, with one audit row per change', () => {
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const meta = { reason: 'unit test', batch_id: 'unit-cm-batch' };
+  const before = db.prepare('SELECT COUNT(*) AS n FROM venue_enrichment_log').get().n;
+
+  for (const kind of ['hidden_gem', 'local_favorite']) {
+    const added = app.guardedCollectionMembershipUpdate(kind, golf.id, 'add', `note for ${kind}`, meta);
+    assert.deepEqual({ ok: added.ok, kind: added.kind, venue_id: added.venue_id, action: added.action }, { ok: true, kind, venue_id: golf.id, action: 'add' });
+    assert.ok(app.getCollectionVenueIds(kind).has(golf.id));
+    const item = db.prepare(`SELECT ci.note, ci.position FROM collection_items ci JOIN collections c ON c.id = ci.collection_id WHERE c.kind = ? AND ci.content_id = ?`).get(kind, golf.id);
+    assert.equal(item.note, `note for ${kind}`);
+    assert.ok(Number.isInteger(item.position) && item.position >= 1, 'position is appended, not null');
+    assert.deepEqual(app.guardedCollectionMembershipUpdate(kind, golf.id, 'add', null, meta), { ok: false, reason: 'already_member' });
+  }
+  assert.ok(app.getHiddenGemVenueIds().has(golf.id), 'hidden_gem membership also flows through the existing hidden-gem lookup');
+
+  for (const kind of ['hidden_gem', 'local_favorite']) {
+    const removed = app.guardedCollectionMembershipUpdate(kind, golf.id, 'remove', null, meta);
+    assert.equal(removed.ok, true);
+    assert.ok(!app.getCollectionVenueIds(kind).has(golf.id));
+    assert.deepEqual(app.guardedCollectionMembershipUpdate(kind, golf.id, 'remove', null, meta), { ok: false, reason: 'not_member' });
+  }
+  const after = db.prepare('SELECT COUNT(*) AS n FROM venue_enrichment_log').get().n;
+  assert.equal(after - before, 4, 'exactly one audit row per successful change (2 adds + 2 removes)');
+  const kinds = db.prepare("SELECT field_name FROM venue_enrichment_log WHERE batch_id = 'unit-cm-batch' ORDER BY id").all().map((r) => r.field_name);
+  assert.deepEqual(kinds, ['collection:hidden_gem', 'collection:local_favorite', 'collection:hidden_gem', 'collection:local_favorite']);
+});
+
+test('guardedCollectionMembershipUpdate rejects unknown kinds, unknown venues, and redirected venues without writing', () => {
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const redirected = db.prepare("SELECT id FROM venues WHERE slug = 'ds4-redirected-gem'").get();
+  const meta = { reason: 'unit test', batch_id: 'unit-cm-reject' };
+  assert.deepEqual(app.guardedCollectionMembershipUpdate('roam_picks', golf.id, 'add', null, meta), { ok: false, reason: 'unknown_kind' });
+  assert.deepEqual(app.guardedCollectionMembershipUpdate('local_favorite', 999999, 'add', null, meta), { ok: false, reason: 'venue_not_found' });
+  assert.deepEqual(app.guardedCollectionMembershipUpdate('local_favorite', redirected.id, 'add', null, meta), { ok: false, reason: 'venue_redirected' });
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM venue_enrichment_log WHERE batch_id = 'unit-cm-reject'").get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM collections WHERE kind = 'roam_picks'").get().n, 0, 'a request can never create a collection kind');
+});
+
+test('Local Favourite and Hidden Gem badges render on cards, the venue page, and related cards; non-members are byte-identical', () => {
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const other = app.findVenueBySlug('vernon', 'golf', 'test-vernon-golf-course');
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const meta = { reason: 'render test', batch_id: 'unit-cm-render' };
+
+  const plainCard = app.venueCardHtml(golf);
+  const plainTrattoria = app.venueCardHtml(trattoria);
+  const plainCategory = app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []);
+  const plainRestaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
+
+  app.guardedCollectionMembershipUpdate('local_favorite', golf.id, 'add', null, meta);
+  app.guardedCollectionMembershipUpdate('hidden_gem', golf.id, 'add', null, meta);
+
+  const cardOpt = app.venueCardHtml(golf, { isHiddenGem: true, isLocalFavourite: true });
+  assert.match(cardOpt, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span> <\/p>/u);
+  assert.equal(app.venueCardHtml(golf), plainCard, 'without the option flags the card is unchanged');
+
+  const category = app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []);
+  assert.match(category, /local-favourite-badge">\u2665 Local Favourite/);
+  assert.match(category, /hidden-gem-badge">\u{1F48E} Hidden Gem/u);
+  assert.notEqual(category, plainCategory);
+  const all = app.renderCategoryAllRegionsPage('golf', app.getVenuesByRegionCategory('kelowna', 'golf'));
+  assert.match(all, /local-favourite-badge/);
+
+  const venuePage = app.renderVenuePage(golf, [], [], []);
+  assert.match(venuePage, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span> <\/p>/u);
+  const otherPage = app.renderVenuePage(other, [golf], [golf], []);
+  assert.match(otherPage, /related-meta">[^<]*<span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span>/u);
+
+  // Non-member regression: another golf card and a restaurant page are byte-identical.
+  assert.equal(app.venueCardHtml(trattoria), plainTrattoria);
+  assert.equal(app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []), plainRestaurants);
+  assert.doesNotMatch(app.venueCardHtml(other), /local-favourite-badge|hidden-gem-badge/);
+
+  app.guardedCollectionMembershipUpdate('local_favorite', golf.id, 'remove', null, meta);
+  app.guardedCollectionMembershipUpdate('hidden_gem', golf.id, 'remove', null, meta);
+  assert.equal(app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []), plainCategory, 'removal restores the page byte-for-byte');
+});
+
+test('REGRESSION: the six seeded Hidden Gems block in db.js is unchanged', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'db.js'), 'utf8');
+  const members = src.match(/const HIDDEN_GEMS_MEMBERS = \[([\s\S]*?)\];/)[1];
+  const ids = [...members.matchAll(/venue_id: (\d+)/g)].map((m) => Number(m[1]));
+  assert.deepEqual(ids, [128, 100, 685, 47, 816, 1038]);
 });
