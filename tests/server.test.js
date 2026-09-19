@@ -2119,10 +2119,17 @@ test('Mood cards: Outdoors links to #exploreRegions with no filter', () => {
   assert.match(html, /class="mood-card mood-card-outdoors" href="#exploreRegions">/);
 });
 
-test('Mood cards: Beaches links to #exploreRegions with no filter and no new venue type', () => {
+test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach venues exist (2026-09-20 fix), with no filter', () => {
   const html = app.renderMoodCardsHTML();
-  assert.match(html, /class="mood-card mood-card-beaches" href="#exploreRegions">/);
-  assert.doesNotMatch(html, /data-type="beach"/, 'must not invent a new beach venue type');
+  assert.match(html, /class="mood-card mood-card-beaches" href="\/beaches">/, 'the whole <a class="mood-card"> is the clickable area and must target /beaches');
+  assert.doesNotMatch(html, /mood-card-beaches" href="#exploreRegions"/);
+  assert.doesNotMatch(html, /mood-card-beaches"[^>]*data-mood-filter/, 'no filter: the card is a plain link like Golf');
+  // The other cards keep their existing destinations.
+  assert.match(html, /class="mood-card mood-card-outdoors" href="#exploreRegions">/);
+  assert.match(html, /class="mood-card mood-card-whats-on" href="\/events">/);
+  assert.match(html, /class="mood-card mood-card-food-drink" href="\/browse\?types=restaurant,cafe,brewery,pub,cocktail" data-mood-filter="restaurant,cafe,brewery,pub,cocktail">/);
+  assert.match(html, /class="mood-card mood-card-golf" href="\/golf">/);
+  assert.match(html, /class="mood-card mood-card-wine" href="\/[a-z-]+\/wineries" data-mood-filter="winery">/);
 });
 
 test('Mood cards: Hidden Gems is no longer one of the six mood cards', () => {
@@ -4574,7 +4581,8 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     // Seed a non-beach venue first so the homepage has "normal" data, then snapshot '/'.
     const seedRes = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Fixture Winery', region: 'kelowna', type: 'winery', description: 'fixture', slug: 'homepage-fixture-winery' }) });
     assert.equal(seedRes.status, 201);
-    const homeBefore = await (await fetch(`${base}/`)).text();
+    const homeNoBeaches = await (await fetch(`${base}/`)).text();
+    assert.match(homeNoBeaches, /class="mood-card mood-card-beaches" href="#exploreRegions">/, 'with no beach data the card keeps its previous in-page target');
     const sitemapBefore = await (await fetch(`${base}/sitemap.xml`)).text();
     assert.equal((await fetch(`${base}/beaches`)).status, 404, 'no beaches yet -> /beaches is a 404, never an empty page');
     assert.equal((await fetch(`${base}/kelowna/beaches`)).status, 404);
@@ -4583,6 +4591,10 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     const b1 = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Beach One', region: 'kelowna', type: 'beach', description: 'fixture beach', slug: 'homepage-beach-one', address: '1 Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://www.kelowna.ca/example' }) });
     assert.equal(b1.status, 201);
     const beachOne = await b1.json();
+    // The ONLY homepage byte change beach data may cause is the approved Beaches mood-card href (2026-09-20).
+    const homeBefore = await (await fetch(`${base}/`)).text();
+    assert.match(homeBefore, /class="mood-card mood-card-beaches" href="\/beaches">/);
+    assert.equal(homeBefore, homeNoBeaches.replace('class="mood-card mood-card-beaches" href="#exploreRegions">', 'class="mood-card mood-card-beaches" href="/beaches">'), 'beach data changes exactly one attribute on "/": the Beaches mood-card href');
     const b2 = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Beach Two', region: 'vernon', type: 'beach', description: 'fixture beach two', slug: 'homepage-beach-two' }) });
     assert.equal(b2.status, 201);
     const adv = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'advisory', venue_id: beachOne.id, action: 'add', note: 'Partial closure (rdco.com, 2026-09-19).', reason: 'test', batch_id: 'homepage-test' }) });
@@ -4593,10 +4605,10 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     }
 
     const homeAfter = await (await fetch(`${base}/`)).text();
-    assert.equal(homeAfter, homeBefore, 'FROZEN HOMEPAGE: adding the beach type, beach rows, an advisory and Hidden Gem / Local Favourite / Dog Friendly memberships must not change one byte of "/"');
+    assert.equal(homeAfter, homeBefore, 'FROZEN HOMEPAGE: further beach rows, an advisory and Hidden Gem / Local Favourite / Dog Friendly memberships must not change one byte of "/"');
     // Explicit no-Beaches-on-homepage assertions (independent of the byte check).
-    assert.doesNotMatch(homeAfter, /href="\/beaches"|href="\/kelowna\/beaches"|category-tile-beach|data-venue-category|venue-advisory|beach-page/);
-    assert.match(homeAfter, /href="#exploreRegions" data-i18n="mood\.beaches\.title"/, 'the Beaches mood card keeps its current #exploreRegions target');
+    assert.doesNotMatch(homeAfter, /href="\/kelowna\/beaches"|category-tile-beach|data-venue-category|venue-advisory|beach-page/);
+    assert.equal((homeAfter.match(/href="\/beaches"/g) || []).length, 1, 'exactly one /beaches link on the homepage: the mood card');
     assert.match(homeAfter, /<li><a href="#exploreRegions" data-i18n="mood\.beaches\.title">Beaches<\/a><\/li>/, 'the footer Beaches link is untouched');
     assert.doesNotMatch(homeAfter, /Homepage Beach One|Homepage Beach Two/);
 

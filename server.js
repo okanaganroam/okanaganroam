@@ -3068,6 +3068,12 @@ function renderMoodCardsHTML() {
   const golfHref = bestRegionForType.golf && CATEGORY_SLUGS.golf ? `/${CATEGORY_SLUGS.golf}` : '/browse';
   const wineRegion = bestRegionForType.winery;
   const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
+  // Beaches (2026-09-20): same pattern as Golf. Now that the Okanagan-wide
+  // /beaches listing is live, the Beaches mood card points at it whenever
+  // at least one beach venue exists; with no beach data it keeps its
+  // previous in-page #exploreRegions target. Only the href changes -- the
+  // card's markup, image, icon, title and position are untouched.
+  const beachesHref = bestRegionForType.beach && CATEGORY_SLUGS.beach ? `/${CATEGORY_SLUGS.beach}` : '#exploreRegions';
 
   // Simple inline line icons, matching the approved reference's minimal
   // white-icon style. No icon library/dependency -- plain inline SVG,
@@ -3095,7 +3101,7 @@ function renderMoodCardsHTML() {
   const cards = [
     { key: 'food-drink', href: '/browse?types=restaurant,cafe,brewery,pub,cocktail', filter: 'restaurant,cafe,brewery,pub,cocktail', img: '/images/mood/eat.webp', titleKey: 'mood.foodDrink.title', title: 'Food & Drink' },
     { key: 'wine', href: wineHref, filter: 'winery', img: '/images/mood/drink.webp', titleKey: 'mood.wine.title', title: 'Wine' },
-    { key: 'beaches', href: '#exploreRegions', filter: null, img: '/images/mood/beaches.webp', titleKey: 'mood.beaches.title', title: 'Beaches' },
+    { key: 'beaches', href: beachesHref, filter: null, img: '/images/mood/beaches.webp', titleKey: 'mood.beaches.title', title: 'Beaches' },
     { key: 'golf', href: golfHref, filter: null, img: '/images/mood/golf.webp', titleKey: 'mood.golf.title', title: 'Golf' },
     { key: 'whats-on', href: '/events', filter: null, img: '/images/mood/whats-on.webp', titleKey: 'mood.whatsOn.title', title: "What's On" },
     { key: 'outdoors', href: '#exploreRegions', filter: null, img: '/images/mood/explore.webp', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
