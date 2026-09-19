@@ -4331,6 +4331,320 @@ function golfEngagementHeadHtml(type) {
   return type === 'golf' ? renderAnalyticsHeadHtml() : '';
 }
 
+// Shared Favorite / Add to Trip behaviour for Golf pages (2026-09-19).
+// Operates on any element carrying data-venue-category="golf" (a listing
+// card <li>, or the venue page's CTA row), so one module serves both
+// surfaces. Same localStorage keys, item shape and name-keyed
+// de-duplication as the homepage app (okanaganFavorites is an array of
+// venue names; okanaganTrip is [{name, query, region}], capped at
+// MAX_STOPS), so the existing Trip Planner and favourites filter see
+// exactly what was chosen here. Emitted as plain JS text and wrapped by
+// the two page scripts below, which each define ctx()/track() first.
+function golfFavTripScriptBody() {
+  return `
+  var MAX_STOPS = 10;
+  var HOLDER = '[data-venue-category="golf"]';
+  function readList(key){
+    try { var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function writeList(key, list){ try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) {} }
+  function syncFav(btn){
+    var on = readList('okanaganFavorites').indexOf(btn.dataset.favName) !== -1;
+    btn.classList.toggle('is-fav', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.textContent = on ? '\\u2665 Favorited' : '\\u2661 Favorite';
+  }
+  function syncTrip(btn){
+    var on = readList('okanaganTrip').some(function(t){ return t && t.name === btn.dataset.tripName; });
+    btn.classList.toggle('in-trip', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.textContent = on ? '\\u2713 In trip' : '\\uFF0B Add to Trip';
+  }
+  function syncAll(){
+    document.querySelectorAll(HOLDER + ' .fav-btn').forEach(syncFav);
+    document.querySelectorAll(HOLDER + ' .trip-btn').forEach(syncTrip);
+  }
+  function notice(holder, text){
+    var row = holder.querySelector('.card-actions, .venue-cta-row') || holder;
+    var el = holder.querySelector('.trip-notice');
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'trip-notice';
+      el.setAttribute('role', 'status');
+      row.insertAdjacentElement('afterend', el);
+    }
+    el.textContent = text;
+    clearTimeout(el._t);
+    el._t = setTimeout(function(){ el.textContent = ''; }, 4000);
+  }
+  // When the homepage app (app.js) is on the page -- it is on every Golf
+  // page, for the site-wide trip tray -- its own modules own the state,
+  // labels and events of every .fav-btn/.trip-btn. This module then only
+  // (a) mirrors the class-driven state into aria-pressed, which app.js does
+  // not manage, and (b) reports venue-level favourite events with the
+  // venue id/context; add_to_trip / remove_from_trip already come from
+  // app.js itself, so they are not re-emitted here.
+  if (window.__syncTripButtons || window.__syncFavButtons) {
+    function mirrorPressed(btn){
+      var on = btn.classList.contains('is-fav') || btn.classList.contains('in-trip');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    var pressedObserver = new MutationObserver(function(muts){ muts.forEach(function(m){ mirrorPressed(m.target); }); });
+    document.querySelectorAll(HOLDER + ' .fav-btn, ' + HOLDER + ' .trip-btn').forEach(function(btn){
+      mirrorPressed(btn);
+      pressedObserver.observe(btn, { attributes: true, attributeFilter: ['class'] });
+    });
+    document.addEventListener('click', function(e){
+      var fav = e.target.closest(HOLDER + ' .fav-btn');
+      if (!fav) return;
+      // app.js's delegated handler (registered earlier) has already toggled the class.
+      track(fav.classList.contains('is-fav') ? 'venue_favorite' : 'venue_unfavorite', ctx(fav.closest(HOLDER)));
+    });
+    return;
+  }
+  syncAll();
+  {
+    document.addEventListener('click', function(e){
+      var fav = e.target.closest(HOLDER + ' .fav-btn');
+      if (fav) {
+        var name = fav.dataset.favName, list = readList('okanaganFavorites'), i = list.indexOf(name);
+        if (i === -1) list.push(name); else list.splice(i, 1);
+        writeList('okanaganFavorites', list);
+        syncAll();
+        track(i === -1 ? 'venue_favorite' : 'venue_unfavorite', ctx(fav.closest(HOLDER)));
+        return;
+      }
+      var tb = e.target.closest(HOLDER + ' .trip-btn');
+      if (!tb) return;
+      var holder = tb.closest(HOLDER), tname = tb.dataset.tripName, trip = readList('okanaganTrip');
+      var params = ctx(holder);
+      params.region = params.venue_region;
+      if (trip.some(function(t){ return t && t.name === tname; })) {
+        trip = trip.filter(function(t){ return !(t && t.name === tname); });
+        writeList('okanaganTrip', trip);
+        syncAll();
+        params.trip_size = trip.length;
+        track('remove_from_trip', params);
+        return;
+      }
+      if (trip.length >= MAX_STOPS) {
+        notice(holder, 'Trips are capped at ' + MAX_STOPS + ' stops so the route stays manageable. Remove a stop to add another.');
+        return;
+      }
+      trip.push({ name: tname, query: tb.dataset.tripQuery, region: tb.dataset.tripRegion || null });
+      writeList('okanaganTrip', trip);
+      syncAll();
+      params.trip_size = trip.length;
+      track('add_to_trip', params);
+    });
+    window.addEventListener('storage', function(ev){
+      if (ev.key === 'okanaganFavorites' || ev.key === 'okanaganTrip') syncAll();
+    });
+  }`;
+}
+
+// The Favorite / Add to Trip buttons themselves, shared by the listing
+// card (surface "category_card") and the venue page CTA row ("venue_page").
+function golfFavTripButtonsHtml(venue) {
+  const tripQuery = `${venue.name}, ${REGION_LABELS[venue.region] || venue.region}, Okanagan Valley, BC`;
+  return `<button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(venue.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(venue.name)}">&#9825; Favorite</button>
+          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(venue.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(venue.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(venue.name)} to trip">&#65291; Add to Trip</button>`;
+}
+
+// ---------- Golf page theme (2026-09-19, Golf pages only) ----------
+//
+// Golf category and venue pages adopt the approved homepage's visual
+// language instead of the generic SEO-page look. Nothing here is a new
+// palette: the pages load the homepage's own stylesheet (public/styles/
+// app.css, unchanged) for the header/nav/button system, reuse the same
+// header markup okanagan.html ships (exactly as /trip already does), and
+// the overrides below only use tokens.css values and measurements lifted
+// from app.css / the homepage's discovery styles. Every rule is scoped to
+// body.golf-page, so no other page is affected.
+function renderGolfHeaderHtml() {
+  if (!fs.existsSync(SITE_PATH)) {
+    return siteHeader('https://okanaganroam.com/', 'Explore the full directory →');
+  }
+  const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
+  let headerHtml = extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '';
+  if (!headerHtml) {
+    return siteHeader('https://okanaganroam.com/', 'Explore the full directory →');
+  }
+  return headerHtml
+    .replace(/href="#moodCards"/g, 'href="/#moodCards"')
+    .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
+    .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
+    .replace(/href="#directory"/g, 'href="/#directory"')
+    .replace(/href="#mapPanel"/g, 'href="/#mapPanel"')
+    .replace(/href="#top"/g, 'href="/"')
+    .replace(/href="\/browse" data-i18n="mood\.golf\.title"/g, 'href="/golf" data-i18n="mood.golf.title"')
+    // No i18n/search runtime on these pages: drop the two controls that
+    // need app.js and turn the trip button into a real link to /trip.
+    .replace(/<button class="nav-search-btn"[\s\S]*?<\/button>\s*/, '')
+    .replace(/<button class="lang-toggle"[\s\S]*?<\/button>\s*/, '')
+    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>');
+}
+
+// The site-wide floating "Trip" control: the same #tripTray fragment
+// okanagan.html ships (and /trip already reuses), driven by the same
+// trip-tray module in public/scripts/app.js. Golf pages load app.js just
+// like /trip does, so the tray, its count, the header dropdowns/hamburger,
+// and the .fav-btn/.trip-btn behaviour are the homepage's own code -- not
+// a Golf copy. Returns '' if the fragment can't be read.
+function renderGolfTripTrayHtml() {
+  if (!fs.existsSync(SITE_PATH)) return '';
+  const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
+  return extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+}
+
+const GOLF_APP_SCRIPT_TAG = '<script src="/scripts/app.js"></script>';
+
+function renderGolfThemeStyles() {
+  return `<style>
+  /* Golf page theme: values come from tokens.css and app.css (homepage). */
+  body.golf-page {
+    max-width: none; margin: 0; padding: 0;
+    background: var(--ref-cream); color: var(--ink);
+    font-family: 'Nunito', sans-serif; font-size: 17px; line-height: 1.65;
+  }
+  body.golf-page .golf-main { max-width: 1360px; margin: 0 auto; padding: 26px 24px 72px; }
+  /* app.js's initBlock11 appends a .card-links row (directions / menu /
+     booking / phone links plus its own Trip/Favorite buttons) to every
+     .venue-card it finds. Golf cards deliberately show only Favorite and
+     Add to Trip (rendered server-side above), so that injected row is
+     suppressed here; the homepage module still drives the server-rendered
+     buttons because they share the .trip-btn/.fav-btn contract. */
+  body.golf-page .venue-card .card-links { display: none; }
+  body.golf-page a { color: var(--ref-navy); }
+  body.golf-page a:hover { color: var(--ref-gold); }
+  body.golf-page a.app-btn, body.golf-page a.app-btn:hover { color: var(--ref-white); text-decoration: none; }
+  body.golf-page nav.breadcrumb { font-size: 0.8rem; color: rgba(42,32,25,0.62); margin-bottom: 18px; }
+  body.golf-page nav.breadcrumb a { color: var(--ref-navy); }
+  body.golf-page .category-back-link, body.golf-page .venue-back-link {
+    display: inline-block; font-weight: 700; font-size: 0.86rem; color: var(--ref-navy);
+    text-decoration: none; margin-bottom: 14px;
+  }
+  body.golf-page .category-back-link:hover, body.golf-page .venue-back-link:hover { color: var(--ref-gold); }
+  body.golf-page h1 {
+    font-family: 'Fraunces', serif; font-weight: 600; line-height: 1.15;
+    font-size: clamp(1.7rem, 3vw, 2.2rem); margin: 0 0 6px; color: var(--ink);
+  }
+  body.golf-page .subtitle { font-size: 0.95rem; color: rgba(42,32,25,0.65); margin: 0 0 22px; }
+
+  /* Region selector: homepage redesign pills -- resting/hover from
+     .lang-toggle, active from .region-chip[aria-pressed="true"] (app.css). */
+  body.golf-page .category-region-selector { margin: 0 0 22px; }
+  body.golf-page .category-region-selector a,
+  body.golf-page .category-region-selector-active {
+    background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2);
+    border-radius: 999px; padding: 5px 12px; font-weight: 700; font-size: 0.8rem; text-decoration: none;
+    transition: all .15s ease;
+  }
+  body.golf-page .category-region-selector a:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.golf-page .category-region-selector-active { background: var(--ref-navy); color: var(--paper); border-color: var(--ref-navy); }
+
+  /* Section headings: the homepage's .discover-heading h2 + eyebrow bar. */
+  body.golf-page .category-subsection-heading {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(1.2rem, 1.8vw, 1.45rem);
+    color: var(--ink); margin: 26px 0 12px; padding: 0; border: 0;
+  }
+  body.golf-page .category-subsection-heading::before {
+    content: ""; display: block; width: 20px; height: 2px; background: var(--teal); margin-bottom: 8px;
+  }
+  body.golf-page .category-subsection-heading:first-of-type { margin-top: 6px; }
+
+  /* Listing cards: the homepage card system (paper, 14px radius, soft
+     shadow, hover lift), two-up on wide screens like the discovery rows. */
+  body.golf-page .card-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 0 0 26px; }
+  @media (min-width: 900px) { body.golf-page .card-grid { grid-template-columns: repeat(2, 1fr); } }
+  body.golf-page .venue-card {
+    margin: 0; background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
+    padding: 18px 20px; box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
+    transition: transform .15s ease, box-shadow .15s ease; display: flex; flex-direction: column;
+  }
+  body.golf-page .venue-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
+  body.golf-page .venue-card h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px; line-height: 1.25; }
+  body.golf-page .venue-card h2 a { color: var(--ink); text-decoration: none; }
+  body.golf-page .venue-card h2 a:hover { color: var(--ref-navy); }
+  body.golf-page .venue-card p { font-size: 0.92rem; color: rgba(42,32,25,0.75); line-height: 1.45; opacity: 1; }
+  body.golf-page .venue-meta { font-size: 0.85rem; color: rgba(42,32,25,0.68); opacity: 1; }
+  body.golf-page .golf-desc.is-clamped p { max-height: calc(4 * 1.45em); }
+  body.golf-page .desc-toggle { color: var(--ref-navy); font-size: 0.86rem; align-self: flex-start; }
+  body.golf-page .desc-toggle:hover { color: var(--ref-gold); text-decoration: none; }
+  body.golf-page .venue-card[data-venue-category="golf"] .chips:not(:empty),
+  body.golf-page .venue-card[data-venue-category="golf"] .card-actions { border-top-color: rgba(27,43,58,0.1); }
+  body.golf-page .venue-card[data-venue-category="golf"] .card-actions { margin-top: auto; padding-top: 12px; }
+  /* Favorite / Add to Trip pills use the homepage REDESIGN button rules
+     (app.css), not the pre-redesign wizard .fav-btn/.trip-btn tan pill:
+       resting  = .lang-toggle        (transparent, 1px rgba(27,43,58,0.2), --ref-navy text)
+       hover    = .lang-toggle:hover  (rgba(27,43,58,0.06))
+       favorited= .region-chip[aria-pressed="true"] (--ref-navy on --paper)
+       in trip  = .trip-btn.in-trip   (--teal on --paper)
+       focus    = global a/button:focus-visible (3px --teal)
+     Specificity is deliberately higher than app.css's .fav-btn/.trip-btn
+     and the golf rules in SEO_PAGE_CSS. */
+  body.golf-page .venue-card[data-venue-category="golf"] .card-action,
+  body.golf-page .venue-cta-row .card-action {
+    background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2);
+  }
+  body.golf-page .venue-card[data-venue-category="golf"] .card-action:hover,
+  body.golf-page .venue-cta-row .card-action:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.golf-page .venue-card[data-venue-category="golf"] .fav-btn.is-fav,
+  body.golf-page .venue-cta-row .fav-btn.is-fav { background: var(--ref-navy); color: var(--paper); border-color: var(--ref-navy); }
+  body.golf-page .venue-card[data-venue-category="golf"] .fav-btn.is-fav:hover,
+  body.golf-page .venue-cta-row .fav-btn.is-fav:hover { background: var(--ref-navy-deep); color: var(--paper); }
+  body.golf-page .venue-card[data-venue-category="golf"] .trip-btn.in-trip,
+  body.golf-page .venue-cta-row .trip-btn.in-trip { background: var(--teal); color: var(--paper); border-color: var(--teal); }
+  body.golf-page .venue-card[data-venue-category="golf"] .trip-btn.in-trip:hover,
+  body.golf-page .venue-cta-row .trip-btn.in-trip:hover { background: var(--teal-deep); color: var(--paper); }
+  body.golf-page .venue-card[data-venue-category="golf"] .card-action:focus-visible,
+  body.golf-page .venue-cta-row .card-action:focus-visible,
+  body.golf-page .desc-toggle:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+
+  /* Venue page: CTAs use the homepage button system (.app-btn navy pill,
+     outline secondary), with Favorite / Add to Trip alongside. */
+  body.golf-page .venue-hero { border-radius: 14px; }
+  body.golf-page .venue-header { margin-bottom: 16px; }
+  body.golf-page .venue-description { font-size: 1rem; line-height: 1.65; color: var(--ink); max-width: 80ch; }
+  body.golf-page .venue-cta-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 26px; }
+  body.golf-page .venue-cta-row .cta {
+    margin: 0; display: inline-flex; align-items: center; gap: 6px;
+    background: var(--ref-navy); color: var(--ref-white); border: 1px solid var(--ref-navy);
+    padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 0.86rem; letter-spacing: 0.01em;
+    font-family: 'Nunito', sans-serif; text-decoration: none; transition: background .15s ease;
+  }
+  body.golf-page .venue-cta-row .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
+  body.golf-page .venue-cta-row .cta.secondary { background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); }
+  body.golf-page .venue-cta-row .cta.secondary:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.golf-page .venue-cta-row .card-action {
+    display: inline-flex; align-items: center; gap: 5px; margin: 0;
+    font-size: 0.86rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    text-decoration: none; border-radius: 999px; padding: 10px 16px; cursor: pointer; transition: background 0.15s;
+  }
+  body.golf-page .trip-notice { margin: 8px 0 0; font-size: 0.85rem; color: var(--ref-navy); }
+  body.golf-page .trip-notice:empty { display: none; }
+  body.golf-page .venue-section, body.golf-page .related-card {
+    background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
+    box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
+  }
+  body.golf-page .venue-section { padding: 18px 20px; margin-bottom: 18px; }
+  body.golf-page .venue-section h2, body.golf-page .related-section h2 {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(1.1rem, 1.6vw, 1.3rem); margin: 0 0 10px; color: var(--ink);
+  }
+  body.golf-page .related-card a:hover { color: var(--ref-navy); }
+  body.golf-page .golf-main > a.cta {
+    display: inline-flex; align-items: center; margin: 10px 10px 0 0;
+    background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2);
+    padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 0.86rem; text-decoration: none;
+  }
+  body.golf-page .golf-main > a.cta:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  @media (max-width: 640px) {
+    body.golf-page .golf-main { padding: 20px 16px 56px; }
+    body.golf-page .venue-cta-row .cta, body.golf-page .venue-cta-row .card-action { width: 100%; justify-content: center; }
+  }
+</style>`;
+}
+
 // Category-page behaviour for Golf cards: the clamp class is applied only
 // once JS runs (so no-JS readers always see the full text), the Read more
 // control is revealed only when the text is actually truncated, the
@@ -4349,7 +4663,7 @@ function golfCardEngagementScriptHtml(type) {
       venue_name: card.dataset.venueName,
       venue_region: card.dataset.venueRegion,
       venue_category: 'golf',
-      surface: 'category_card',
+      surface: card.dataset.surface || 'category_card',
       page_path: location.pathname
     };
   }
@@ -4400,89 +4714,7 @@ function golfCardEngagementScriptHtml(type) {
   // array of venue names; okanaganTrip is [{name, query, region}], capped
   // at MAX_STOPS), so the existing Trip Planner and favourites filter see
   // exactly what was chosen here.
-  var MAX_STOPS = 10;
-  function readList(key){
-    try { var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
-  }
-  function writeList(key, list){ try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) {} }
-  function syncFav(btn){
-    var on = readList('okanaganFavorites').indexOf(btn.dataset.favName) !== -1;
-    btn.classList.toggle('is-fav', on);
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.textContent = on ? '\\u2665 Favorited' : '\\u2661 Favorite';
-  }
-  function syncTrip(btn){
-    var on = readList('okanaganTrip').some(function(t){ return t && t.name === btn.dataset.tripName; });
-    btn.classList.toggle('in-trip', on);
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.textContent = on ? '\\u2713 In trip' : '\\uFF0B Add to Trip';
-  }
-  function syncAll(){
-    document.querySelectorAll('.venue-card[data-venue-category="golf"] .fav-btn').forEach(syncFav);
-    document.querySelectorAll('.venue-card[data-venue-category="golf"] .trip-btn').forEach(syncTrip);
-  }
-  function notice(card, text){
-    var el = card.querySelector('.trip-notice');
-    if (!el) {
-      el = document.createElement('p');
-      el.className = 'trip-notice';
-      el.setAttribute('role', 'status');
-      card.querySelector('.card-actions').insertAdjacentElement('afterend', el);
-    }
-    el.textContent = text;
-    clearTimeout(el._t);
-    el._t = setTimeout(function(){ el.textContent = ''; }, 4000);
-  }
-  syncAll();
-  // Website / Call links in the card action row: same outbound_click
-  // event and link_type values as the venue page, with the card context.
-  document.addEventListener('click', function(e){
-    var link = e.target.closest('.venue-card[data-venue-category="golf"] a[data-track]');
-    if (!link) return;
-    var params = ctx(link.closest('.venue-card'));
-    params.link_type = link.getAttribute('data-track');
-    track('outbound_click', params);
-  });
-  // If the homepage app (app.js) is ever loaded alongside this page, its
-  // own delegated .fav-btn/.trip-btn handlers take over; don't double-fire.
-  if (!window.__syncTripButtons && !window.__syncFavButtons) {
-    document.addEventListener('click', function(e){
-      var fav = e.target.closest('.venue-card[data-venue-category="golf"] .fav-btn');
-      if (fav) {
-        var name = fav.dataset.favName, list = readList('okanaganFavorites'), i = list.indexOf(name);
-        if (i === -1) list.push(name); else list.splice(i, 1);
-        writeList('okanaganFavorites', list);
-        syncAll();
-        track(i === -1 ? 'venue_favorite' : 'venue_unfavorite', ctx(fav.closest('.venue-card')));
-        return;
-      }
-      var tb = e.target.closest('.venue-card[data-venue-category="golf"] .trip-btn');
-      if (!tb) return;
-      var tcard = tb.closest('.venue-card'), tname = tb.dataset.tripName, trip = readList('okanaganTrip');
-      var params = ctx(tcard);
-      params.region = params.venue_region;
-      if (trip.some(function(t){ return t && t.name === tname; })) {
-        trip = trip.filter(function(t){ return !(t && t.name === tname); });
-        writeList('okanaganTrip', trip);
-        syncAll();
-        params.trip_size = trip.length;
-        track('remove_from_trip', params);
-        return;
-      }
-      if (trip.length >= MAX_STOPS) {
-        notice(tcard, 'Trips are capped at ' + MAX_STOPS + ' stops so the route stays manageable. Remove a stop to add another.');
-        return;
-      }
-      trip.push({ name: tname, query: tb.dataset.tripQuery, region: tb.dataset.tripRegion || null });
-      writeList('okanaganTrip', trip);
-      syncAll();
-      params.trip_size = trip.length;
-      track('add_to_trip', params);
-    });
-    window.addEventListener('storage', function(ev){
-      if (ev.key === 'okanaganFavorites' || ev.key === 'okanaganTrip') syncAll();
-    });
-  }
+${golfFavTripScriptBody()}
 })();
 </script>`;
 }
@@ -4494,7 +4726,7 @@ function golfCardEngagementScriptHtml(type) {
 // venue_view on load so page-level impressions carry venue_id too.
 function golfVenueEngagementScriptHtml(venue) {
   if (venue.type !== 'golf') return '';
-  const ctx = JSON.stringify({
+  const pageCtx = JSON.stringify({
     venue_id: venue.id,
     venue_name: venue.name,
     venue_region: venue.region,
@@ -4503,23 +4735,27 @@ function golfVenueEngagementScriptHtml(venue) {
   }).replace(/</g, '\\u003c');
   return `<script>
 (function(){
-  var ctx = ${ctx};
+  var pageCtx = ${pageCtx};
+  function ctx(){ var c = {}; for (var k in pageCtx) c[k] = pageCtx[k]; return c; }
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
-  track('venue_view', ctx);
+  track('venue_view', ctx());
   document.addEventListener('click', function(e){
     var link = e.target.closest('a[data-track]');
     if (!link) return;
-    var params = {};
-    for (var k in ctx) params[k] = ctx[k];
+    var params = ctx();
     params.link_type = link.getAttribute('data-track');
     track('outbound_click', params);
   });
+${golfFavTripScriptBody()}
 })();
 </script>`;
 }
 
 function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
-  const { noindex = false } = opts;
+  // golfTheme (2026-09-19): Golf pages also load the homepage stylesheet
+  // (before the inline SEO CSS, so existing SEO rules still win ties) and
+  // the body.golf-page overrides. Every other page's head is unchanged.
+  const { noindex = false, golfTheme = false } = opts;
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
@@ -4538,7 +4774,7 @@ ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.strin
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/tokens.css">
-<style>${SEO_PAGE_CSS}</style>`;
+${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}`;
 }
 
 function siteHeader(rightLinkHref, rightLinkText) {
@@ -4621,26 +4857,17 @@ function venueCardHtml(venue, opts = {}) {
         <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`
     : `<p>${escapeHtml(venue.description)}</p>`;
   const liAttrs = isGolf
-    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="golf" data-venue-name="${escapeHtml(venue.name)}"`
+    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="golf" data-venue-name="${escapeHtml(venue.name)}" data-surface="category_card"`
     : '';
-  // Golf-only (2026-09-19): Favorite + Add to Trip. Same class names, data
-  // attributes, storage keys and item shape as the homepage's fav-btn /
-  // trip-btn (public/scripts/app.js), so a favourite or trip stop made
-  // here shows up in the existing Trip Planner and favourites filter.
-  // Website and Call sit in the same action row so the four actions read
-  // as one unit under the badge chips; they carry data-track so the card
-  // engagement script can report outbound_click like the venue page does.
-  const tripQuery = `${venue.name}, ${REGION_LABELS[venue.region] || venue.region}, Okanagan Valley, BC`;
-  const websiteUrl = isGolf && venue.website ? normalizeWebsiteUrl(venue.website) : null;
-  // (Rendered inline after the chips line, so non-Golf cards stay
-  // byte-identical to their pre-feature markup -- no stray blank line.)
+  // Golf-only (2026-09-19): the listing card's only actions are Favorite
+  // and Add to Trip (golfFavTripButtonsHtml). Website / phone / directions
+  // live on the venue page instead -- the data is untouched, only where it
+  // is shown. Rendered inline after the chips line, so non-Golf cards stay
+  // byte-identical to their pre-feature markup (no stray blank line).
   const cardActions = isGolf
     ? `
         <div class="card-actions">
-          ${websiteUrl ? `<a class="card-action" href="${escapeHtml(websiteUrl)}" rel="nofollow noopener" target="_blank" data-track="website">Website &nearr;</a>` : ''}
-          ${venue.phone ? `<a class="card-action" href="tel:${escapeHtml(venue.phone)}" data-track="phone">Call ${escapeHtml(venue.phone)}</a>` : ''}
-          <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(venue.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(venue.name)}">&#9825; Favorite</button>
-          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(venue.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(venue.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(venue.name)} to trip">&#65291; Add to Trip</button>
+          ${golfFavTripButtonsHtml(venue)}
         </div>`
     : '';
   // Defensive: never show the badge for a retired/redirected venue, even
@@ -4827,11 +5054,11 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList])}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: type === 'golf' })}
 ${golfEngagementHeadHtml(type)}
 </head>
-<body>
-  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+<body${type === 'golf' ? ' class="golf-page"' : ''}>
+  ${type === 'golf' ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${region}` },
@@ -4843,7 +5070,9 @@ ${golfEngagementHeadHtml(type)}
   ${cardsHtml}
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
+  ${type === 'golf' ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
+  ${type === 'golf' ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfCardEngagementScriptHtml(type)}
 </body>
 </html>`;
@@ -4916,11 +5145,11 @@ function renderCategoryAllRegionsPage(type, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList])}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: type === 'golf' })}
 ${golfEngagementHeadHtml(type)}
 </head>
-<body>
-  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+<body${type === 'golf' ? ' class="golf-page"' : ''}>
+  ${type === 'golf' ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: label.plural },
@@ -4930,7 +5159,9 @@ ${golfEngagementHeadHtml(type)}
   ${regionSelector}
   ${cardsHtml}
   <a class="cta" href="/browse">Back to the full directory</a>
+  ${type === 'golf' ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
+  ${type === 'golf' ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfCardEngagementScriptHtml(type)}
 </body>
 </html>`;
@@ -5059,7 +5290,13 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>Visit Website</a>` : null,
     mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>Get Directions</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>Call</a>` : null,
+    // Golf-only: Favorite + Add to Trip sit with the contact actions on
+    // the venue page (they were moved off the listing card).
+    venue.type === 'golf' ? golfFavTripButtonsHtml(venue) : null,
   ].filter(Boolean).join('\n  ');
+  const ctaRowAttrs = venue.type === 'golf'
+    ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="golf" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
+    : '';
 
   // One bulk lookup for all related+nearby cards together (reusing the
   // existing getHiddenGemVenueIds(), not a new query) -- O(1) Set lookups
@@ -5110,11 +5347,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness])}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: venue.type === 'golf' })}
 ${golfEngagementHeadHtml(venue.type)}
 </head>
-<body>
-  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+<body${venue.type === 'golf' ? ' class="golf-page"' : ''}>
+  ${venue.type === 'golf' ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${venue.region}` },
@@ -5129,7 +5366,7 @@ ${golfEngagementHeadHtml(venue.type)}
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
   <p class="venue-description">${escapeHtml(venue.description || '')}</p>
-  ${ctaButtons ? `<div class="venue-cta-row">\n  ${ctaButtons}\n</div>` : ''}
+  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}
   <div class="venue-section venue-key-info">
     <h2>Good to Know</h2>
     ${detailRows}
@@ -5141,7 +5378,9 @@ ${golfEngagementHeadHtml(venue.type)}
   ${nearbyHtml}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
   <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
+  ${venue.type === 'golf' ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
+  ${venue.type === 'golf' ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfVenueEngagementScriptHtml(venue)}
 </body>
 </html>`;

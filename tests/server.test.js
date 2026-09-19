@@ -3965,7 +3965,7 @@ test('/admin/correct-phone and /admin/correct-amenities return 503 when ENRICHME
 test('Golf venue card wraps the description for the inline toggle, with accessible button semantics', () => {
   const venue = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
   const html = app.venueCardHtml(venue);
-  assert.match(html, /<li class="venue-card" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="golf" data-venue-name="Test Golf Course">/);
+  assert.match(html, /<li class="venue-card" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="category_card">/);
   const descId = `golf-desc-${venue.id}`;
   assert.match(html, new RegExp(`<div class="golf-desc" id="${descId}"><p>A fixture golf course used only by the automated test suite\\.</p></div>`));
   assert.match(html, new RegExp(`<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`));
@@ -4013,7 +4013,7 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   assert.match(html, /<a class="cta secondary" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>/);
   assert.match(html, /class="map-link"[^>]*data-track="directions"/);
   assert.match(html, new RegExp(`"venue_id":${kelownaGolf.id},"venue_name":"Test Golf Course","venue_region":"kelowna","venue_category":"golf","surface":"venue_page"`));
-  assert.match(html, /track\('venue_view', ctx\)/);
+  assert.match(html, /track\('venue_view', ctx\(\)\)/);
   assert.match(html, /'outbound_click'/);
   assert.match(html, /a\[data-track\]/);
   // Description on the venue page is untouched (no clamp/toggle there --
@@ -4029,6 +4029,61 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   assert.match(wkHtml, /<a href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">/);
 });
 
+test('Golf venue page shows all five actions: Website, Get Directions, Call, Favorite, Add to Trip', () => {
+  const base = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'); // has coords
+  const venue = Object.assign({}, base, { website: 'https://example-golf.test/', phone: '+1 250-555-0100' });
+  const html = app.renderVenuePage(venue, [], [], []);
+  const row = html.match(/<div class="venue-cta-row"([^>]*)>([\s\S]*?)<\/div>/);
+  assert.ok(row, 'cta row present');
+  assert.match(row[1], /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
+  const body = row[2];
+  assert.match(body, /class="cta" href="https:\/\/example-golf\.test\/"[^>]*data-track="website">Visit Website</);
+  assert.match(body, /class="cta secondary" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions</);
+  assert.match(body, /class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call</);
+  assert.match(body, /class="card-action fav-btn" data-fav-name="Test Golf Course" aria-pressed="false"/);
+  assert.match(body, /class="card-action trip-btn" data-trip-name="Test Golf Course" data-trip-query="Test Golf Course, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" aria-pressed="false"/);
+  assert.equal((body.match(/<(a|button)\b/g) || []).length, 5, 'exactly five actions');
+  // The venue script carries the shared fav/trip module.
+  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'add_to_trip'", "track('venue_view'"]) {
+    assert.ok(html.includes(needle), `expected ${needle} in golf venue page script`);
+  }
+});
+
+test('Golf pages use the homepage visual system (app.css + reused header + golf-page theme); non-Golf pages do not', () => {
+  const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
+  const golfCategory = app.renderCategoryPage('kelowna', 'golf', golfRows, []);
+  const golfAll = app.renderCategoryAllRegionsPage('golf', golfRows);
+  const golfVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
+  for (const html of [golfCategory, golfAll, golfVenue]) {
+    assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
+    assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), 'app.css loads before the inline SEO CSS so SEO rules win ties');
+    assert.match(html, /body\.golf-page \{/);
+    assert.match(html, /<body class="golf-page">/);
+    assert.match(html, /<header id="top">/, 'homepage header markup reused');
+    assert.match(html, /class="logo-wordmark">Okanagan<span class="logo-wordmark-accent"> Roam<\/span>/);
+    assert.match(html, /<a class="app-btn" id="navTripBtn" href="\/trip">/);
+    assert.doesNotMatch(html, /<button class="nav-search-btn"|<button class="lang-toggle"|<header class="top">/);
+    assert.match(html, /href="\/#hiddenGems"/);
+    assert.match(html, /<main class="wrap-wide golf-main">[\s\S]*<\/main>/);
+    // Site-wide floating Trip control: the homepage's own #tripTray fragment,
+    // driven by the homepage's app.js (same as /trip) -- not a Golf copy.
+    assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">[\s\S]*<span id="tripTrayCount">0<\/span>/);
+    assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), 'tray precedes the header, as on / and /trip');
+    assert.match(html, /<div id="floatingTooltip"><\/div>/);
+    assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+    assert.ok(html.indexOf('<script src="/scripts/app.js">') < html.lastIndexOf('<script>'), 'app.js loads before the Golf engagement script');
+    assert.match(html, /body\.golf-page \.venue-card \.card-links \{ display: none; \}/);
+    assert.doesNotMatch(html, /getElementById\('navHamburger'\)/, 'no duplicate nav handlers alongside app.js');
+  }
+  const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
+  const restaurantVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  for (const html of [restaurants, restaurantVenue]) {
+    assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js"><\/script>/);
+    assert.match(html, /<header class="top">/);
+    assert.match(html, /<body>/);
+  }
+});
+
 test('REGRESSION: non-Golf venue pages carry no data-track attributes, analytics snippet, or engagement script', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'); // has phone, address, coords
   const html = app.renderVenuePage(venue, [], [], []);
@@ -4042,32 +4097,21 @@ test('REGRESSION: non-Golf venue pages carry no data-track attributes, analytics
 // keys (okanaganFavorites, okanaganTrip) so the existing Trip Planner and
 // favourites filter see what is chosen on Golf cards.
 
-test('Golf venue card renders a single action row: Website, Call (when a phone exists), Favorite, Add to Trip', () => {
-  // west-kelowna fixture has a website; kelowna fixture has neither website nor phone.
-  const wk = app.getVenuesByRegionCategory('west-kelowna', 'golf')[0];
-  const wkHtml = app.venueCardHtml(wk);
-  assert.match(wkHtml, /<div class="card-actions">/);
-  assert.match(wkHtml, /<a class="card-action" href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">Website &nearr;<\/a>/);
-  assert.doesNotMatch(wkHtml, /data-track="phone"/, 'no Call link when the venue has no phone');
+test('Golf listing card actions are ONLY Favorite and Add to Trip (no website / phone / directions on the card)', () => {
+  // west-kelowna fixture has a website; add a phone + coords to prove none of them leak onto the card.
+  const wk = Object.assign({}, app.getVenuesByRegionCategory('west-kelowna', 'golf')[0], { phone: '+1 250-555-0199', latitude: 49.83, longitude: -119.63 });
+  const html = app.venueCardHtml(wk);
+  assert.match(html, /<li class="venue-card" data-venue-id="\d+" data-venue-region="west-kelowna" data-venue-category="golf" data-venue-name="[^"]+" data-surface="category_card">/);
+  assert.match(html, /<div class="card-actions">/);
   const escapedName = wk.name.replace(/&/g, '&amp;');
-  assert.ok(wkHtml.includes(`<button type="button" class="card-action fav-btn" data-fav-name="${escapedName}" aria-pressed="false" aria-label="Favorite ${escapedName}">&#9825; Favorite</button>`));
-  assert.ok(wkHtml.includes(`<button type="button" class="card-action trip-btn" data-trip-name="${escapedName}" data-trip-query="${escapedName}, West Kelowna, Okanagan Valley, BC" data-trip-region="west-kelowna" aria-pressed="false" aria-label="Add ${escapedName} to trip">&#65291; Add to Trip</button>`));
-  // Actions come after the chips (badge area), as one block.
-  assert.ok(wkHtml.indexOf('<p class="chips">') < wkHtml.indexOf('<div class="card-actions">'));
-
-  const kelowna = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
-  const kHtml = app.venueCardHtml(kelowna);
-  assert.doesNotMatch(kHtml, /data-track="website"|data-track="phone"/);
-  assert.match(kHtml, /class="card-action fav-btn"/);
-  assert.match(kHtml, /class="card-action trip-btn"/);
-  // Description text still untouched.
-  assert.ok(kHtml.includes(`<p>${kelowna.description}</p>`));
-});
-
-test('Golf venue card shows a Call link when the venue has a phone number', () => {
-  const kelowna = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
-  const html = app.venueCardHtml(Object.assign({}, kelowna, { phone: '+1 250-555-0199' }));
-  assert.match(html, /<a class="card-action" href="tel:\+1 250-555-0199" data-track="phone">Call \+1 250-555-0199<\/a>/);
+  assert.ok(html.includes(`<button type="button" class="card-action fav-btn" data-fav-name="${escapedName}" aria-pressed="false" aria-label="Favorite ${escapedName}">&#9825; Favorite</button>`));
+  assert.ok(html.includes(`<button type="button" class="card-action trip-btn" data-trip-name="${escapedName}" data-trip-query="${escapedName}, West Kelowna, Okanagan Valley, BC" data-trip-region="west-kelowna" aria-pressed="false" aria-label="Add ${escapedName} to trip">&#65291; Add to Trip</button>`));
+  assert.doesNotMatch(html, /data-track=|href="https?:|href="tel:|google\.com\/maps|Website|Call |Directions/);
+  const actions = html.match(/<div class="card-actions">([\s\S]*?)<\/div>/)[1];
+  assert.equal((actions.match(/<(a|button)\b/g) || []).length, 2, 'exactly two actions on the card');
+  // Actions come after the chips (badge area); description untouched.
+  assert.ok(html.indexOf('<p class="chips">') < html.indexOf('<div class="card-actions">'));
+  assert.ok(html.includes(`<p>${wk.description}</p>`));
 });
 
 test('REGRESSION: non-Golf venue cards have no Favorite / Add to Trip row', () => {
@@ -4079,7 +4123,7 @@ test('REGRESSION: non-Golf venue cards have no Favorite / Add to Trip row', () =
 test('Golf category page script reuses the homepage storage keys and reports the four engagement events', () => {
   const rows = app.getVenuesByRegionCategory('kelowna', 'golf');
   const html = app.renderCategoryPage('kelowna', 'golf', rows, []);
-  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'venue_unfavorite'", "'add_to_trip'", "'remove_from_trip'", 'MAX_STOPS = 10', "window.__syncTripButtons", '.venue-card[data-venue-category="golf"] a[data-track]']) {
+  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'venue_unfavorite'", "'add_to_trip'", "'remove_from_trip'", 'MAX_STOPS = 10', "window.__syncTripButtons", "'[data-venue-category=\"golf\"]'"]) {
     assert.ok(html.includes(needle), `expected ${needle} in golf category page script`);
   }
   const restaurantHtml = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
