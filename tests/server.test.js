@@ -4114,6 +4114,22 @@ test('Golf listing card actions are ONLY Favorite and Add to Trip (no website / 
   assert.ok(html.includes(`<p>${wk.description}</p>`));
 });
 
+test('Golf listing card: the venue name is the single link to the detail page, with an aria-hidden View details cue', () => {
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  const html = app.venueCardHtml(golf);
+  assert.match(html, /<h2><a class="venue-card-link" href="\/kelowna\/golf\/test-golf-course"><span class="venue-card-name">Test Golf Course<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a><\/h2>/);
+  const links = html.match(/<a\b[^>]*href="[^"]*"/g) || [];
+  assert.equal(links.length, 1, 'exactly one navigation link on the card (the name)');
+  assert.equal((html.match(/href="\/kelowna\/golf\/test-golf-course"/g) || []).length, 1, 'no duplicate link to the same destination');
+  // Actions are still only Favorite + Add to Trip.
+  const actions = html.match(/<div class="card-actions">([\s\S]*?)<\/div>/)[1];
+  assert.equal((actions.match(/<(a|button)\b/g) || []).length, 2);
+  // Non-Golf title markup unchanged.
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  assert.match(app.venueCardHtml(trattoria), /<h2><a href="\/kelowna\/restaurants\/test-trattoria">Test Trattoria<\/a><\/h2>/);
+  assert.doesNotMatch(app.venueCardHtml(trattoria), /venue-card-link|venue-card-cue/);
+});
+
 test('REGRESSION: non-Golf venue cards have no Favorite / Add to Trip row', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.venueCardHtml(venue);

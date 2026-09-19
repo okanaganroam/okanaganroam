@@ -4564,8 +4564,28 @@ function renderGolfThemeStyles() {
   }
   body.golf-page .venue-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
   body.golf-page .venue-card h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px; line-height: 1.25; }
-  body.golf-page .venue-card h2 a { color: var(--ink); text-decoration: none; }
-  body.golf-page .venue-card h2 a:hover { color: var(--ref-navy); }
+  /* Venue name = the one link to the detail page. Rendered navy (the
+     redesign's link colour, as the header nav / .discover-heading-link),
+     underlined on hover/focus, with a small "View details" cue inside the
+     same anchor styled like .discover-heading-link (navy, gold on hover).
+     display:block + padding makes the whole name+cue a comfortable tap
+     target on mobile; the focus ring is app.css's global teal rule. */
+  body.golf-page .venue-card h2 a.venue-card-link {
+    display: block; padding: 2px 0 4px; color: var(--ref-navy); text-decoration: none; border-radius: 4px;
+  }
+  body.golf-page .venue-card h2 a.venue-card-link .venue-card-name {
+    display: inline; text-decoration: none; text-underline-offset: 3px; text-decoration-thickness: 2px;
+  }
+  body.golf-page .venue-card h2 a.venue-card-link:hover .venue-card-name,
+  body.golf-page .venue-card h2 a.venue-card-link:focus-visible .venue-card-name { text-decoration: underline; }
+  body.golf-page .venue-card h2 a.venue-card-link:hover { color: var(--ref-navy-deep); }
+  body.golf-page .venue-card h2 a.venue-card-link .venue-card-cue {
+    display: block; margin-top: 3px;
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.8rem; line-height: 1.3; letter-spacing: 0.01em;
+    color: var(--ref-navy); white-space: nowrap;
+  }
+  body.golf-page .venue-card h2 a.venue-card-link:hover .venue-card-cue { color: var(--ref-gold); }
+  body.golf-page .venue-card h2 a.venue-card-link:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
   body.golf-page .venue-card p { font-size: 0.92rem; color: rgba(42,32,25,0.75); line-height: 1.45; opacity: 1; }
   body.golf-page .venue-meta { font-size: 0.85rem; color: rgba(42,32,25,0.68); opacity: 1; }
   body.golf-page .golf-desc.is-clamped p { max-height: calc(4 * 1.45em); }
@@ -4838,8 +4858,15 @@ function venueCardHtml(venue, opts = {}) {
   const { showType = false, isHiddenGem = false, isLocalFavourite = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
+  // Golf-only: the name stays the single link to the venue page, but it
+  // becomes a block-level tap target carrying a small "View details"
+  // cue (aria-hidden, so the accessible link name is still just the venue
+  // name). Styled by the golf theme; every other category's title markup
+  // is unchanged.
   const nameHtml = href
-    ? `<a href="${href}">${escapeHtml(venue.name)}</a>`
+    ? (venue.type === 'golf'
+      ? `<a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(venue.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a>`
+      : `<a href="${href}">${escapeHtml(venue.name)}</a>`)
     : escapeHtml(venue.name);
   const meta = [
     showType && venue.type ? escapeHtml(venue.type) : null,
