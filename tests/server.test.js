@@ -4212,6 +4212,32 @@ test('Beach venue page: hero carries the <h1>, header opens with "Beach · Regio
   assert.match(beach, /"@type":"Beach"/);
 });
 
+// Okanagan-wide listing cards (2026-09-20): the meta line leads with the
+// venue's community (REGION_LABELS[venue.region]) so identically named
+// venues in different communities are distinguishable; regional listings
+// and every other card surface are unchanged.
+test('All-regions category cards show their community; regional category cards do not', () => {
+  const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf').concat(app.getVenuesByRegionCategory('vernon', 'golf'));
+  const beachRows = app.getVenuesByRegionCategory('kelowna', 'beach').concat(app.getVenuesByRegionCategory('vernon', 'beach'));
+  const allGolf = app.renderCategoryAllRegionsPage('golf', golfRows);
+  const allBeach = app.renderCategoryAllRegionsPage('beach', beachRows);
+  assert.match(allGolf, /Test Golf Course<\/span><span class="venue-card-cue"[^<]*<\/span><\/a><\/h2>\s*<p class="venue-meta">Kelowna<\/p>/);
+  assert.match(allGolf, /<p class="venue-meta">Vernon<\/p>/, 'a Vernon golf fixture card names Vernon');
+  assert.match(allBeach, /Test Beach Park<\/span><span class="venue-card-cue"[^<]*<\/span><\/a><\/h2>\s*<p class="venue-meta">Kelowna<\/p>/);
+  assert.match(allBeach, /<p class="venue-meta">Vernon<\/p>/);
+  // The card keeps its name link, badges line and Favorite / Add to Trip actions.
+  assert.match(allBeach, /<p class="venue-meta">Kelowna<\/p>[\s\S]*?<p class="chips">[\s\S]*?<div class="card-actions">/);
+  // Regional listings are unchanged: empty meta line for the same fixtures.
+  const regionalGolf = app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []);
+  const regionalBeach = app.renderCategoryPage('kelowna', 'beach', app.getVenuesByRegionCategory('kelowna', 'beach'), []);
+  assert.match(regionalGolf, /Test Golf Course<\/span><span class="venue-card-cue"[^<]*<\/span><\/a><\/h2>\s*<p class="venue-meta"><\/p>/);
+  assert.match(regionalBeach, /Test Beach Park<\/span><span class="venue-card-cue"[^<]*<\/span><\/a><\/h2>\s*<p class="venue-meta"><\/p>/);
+  assert.doesNotMatch(regionalGolf, /<p class="venue-meta">Kelowna<\/p>/);
+  // Non-themed cards (restaurant) are unchanged too.
+  const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
+  assert.doesNotMatch(restaurants, /<p class="venue-meta">Kelowna(?: &middot;|<)/);
+});
+
 test('REGRESSION: themed venue polish is confined to golf and beach venue pages (restaurant pages and listings unchanged)', () => {
   const restaurantVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
   assert.doesNotMatch(restaurantVenue, /golf-glance|At a glance|Hero: same per-type gradient|overflow-wrap: anywhere|venue-hero-type">Indoor Golf</);

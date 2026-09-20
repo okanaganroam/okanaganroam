@@ -5516,7 +5516,13 @@ function venueCardHtml(venue, opts = {}) {
   // byte-identical to before.
   // dogFriendlyNote (2026-09-19): undefined/null = not a member; a string
   // (possibly '') = member of the 'dog_friendly' collection, note = official restriction.
-  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null } = opts;
+  // showRegion (2026-09-20): on the Okanagan-wide category listing the card
+  // leads its meta line with the venue's own community (REGION_LABELS of
+  // venue.region -- the same canonical value the venue page, breadcrumb
+  // and URL use), so identically named venues in different communities
+  // are distinguishable without opening them. Off by default, so every
+  // other surface's card markup is unchanged.
+  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, showRegion = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -5530,6 +5536,7 @@ function venueCardHtml(venue, opts = {}) {
       : `<a href="${href}">${escapeHtml(venue.name)}</a>`)
     : escapeHtml(venue.name);
   const meta = [
+    showRegion && REGION_LABELS[venue.region] ? escapeHtml(REGION_LABELS[venue.region]) : null,
     showType && venue.type ? escapeHtml(venue.type) : null,
     venue.cuisine ? escapeHtml(venue.cuisine) : null,
     venue.rating ? `${venue.rating}\u2605` : null,
@@ -5666,8 +5673,8 @@ function isIndoorGolfVenue(venue) {
 // so the same helper produces "Golf Courses" and "Kelowna Golf Courses"
 // without a separate code path per page type. A subsection is omitted
 // entirely when it would be empty, rather than rendering an empty grid.
-function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, localFavouriteIds = new Set(), advisoryNotes = new Map(), dogFriendlyNotes = new Map()) {
-  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null })).join('\n');
+function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, localFavouriteIds = new Set(), advisoryNotes = new Map(), dogFriendlyNotes = new Map(), cardOpts = {}) {
+  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null })).join('\n');
 
   if (type !== 'golf') {
     return `<ul class="card-grid">
@@ -5836,7 +5843,9 @@ function renderCategoryAllRegionsPage(type, venues) {
 
   const hiddenGemIds = getHiddenGemVenueIds();
   const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes());
+  // Okanagan-wide listing: cards carry their community so same-named
+  // venues in different communities can be told apart.
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true });
 
   return `<!DOCTYPE html>
 <html lang="en">
