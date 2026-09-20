@@ -4820,10 +4820,57 @@ function renderOutdoorThemeStyles() {
      pills with a small count) and the featured grid. Outdoor pages only. */
   body.outdoor-page .outdoor-intro { font-size: 1.04rem; line-height: 1.65; max-width: 68ch; color: var(--ink); opacity: 0.85; margin: -8px 0 22px; }
   body.outdoor-page .outdoor-activity-selector { margin-bottom: 8px; }
+  /* Step 1 (Choose a Region): the primary choice, so its pills are a
+     touch larger than the activity pills; same pill treatment otherwise. */
+  body.outdoor-page .outdoor-region-choice { margin-bottom: 8px; }
+  body.outdoor-page .outdoor-region-choice a { padding: 8px 17px; font-size: 0.9rem; }
+  /* Multi-select filter chips (2026-09-20): the same pill as the region
+     selector, as toggle buttons; pressed = the selector's active (navy)
+     treatment with a check mark. */
+  body.outdoor-page .outdoor-filter-group { margin: 0 0 14px; }
+  body.outdoor-page .outdoor-filter-chip {
+    display: inline-block; padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18);
+    background: var(--paper); color: var(--ink); font: inherit; font-size: 0.86rem; font-weight: 700; letter-spacing: 0.01em;
+    cursor: pointer; line-height: 1.3; transition: background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  body.outdoor-page .outdoor-filter-chip:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.outdoor-page .outdoor-filter-chip[aria-pressed="true"] { background: var(--ref-navy); color: var(--paper); border-color: var(--ref-navy); }
+  body.outdoor-page .outdoor-filter-chip[aria-pressed="true"]::before { content: "\\2713"; margin-right: 6px; font-size: 0.78em; }
+  body.outdoor-page .outdoor-filter-chip[aria-pressed="true"] .outdoor-activity-count { opacity: 0.8; }
+  body.outdoor-page .outdoor-filter-chip:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.outdoor-page .outdoor-filter-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 4px; }
+  body.outdoor-page .outdoor-filter-actions .cta {
+    margin: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    background: var(--ref-navy); color: var(--ref-white); border: 1px solid var(--ref-navy);
+    padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 0.86rem; letter-spacing: 0.01em;
+    font-family: 'Nunito', sans-serif; text-decoration: none; transition: background .15s ease;
+  }
+  body.outdoor-page .outdoor-filter-actions .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
+  body.outdoor-page .outdoor-filter-actions .cta.secondary { background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); }
+  body.outdoor-page .outdoor-filter-actions .cta.secondary:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.outdoor-page .outdoor-filter-actions .cta[hidden] { display: none; }
+  body.outdoor-page .outdoor-results-summary { font-size: 0.95rem; color: var(--ink); opacity: 0.75; margin: -6px 0 16px; }
+  body.outdoor-page .outdoor-no-results { background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px; padding: 16px 18px; margin: 0 0 26px; }
+  body.outdoor-page #outdoorResults > .venue-card[hidden] { display: none; }
+
   body.outdoor-page .outdoor-activity-count { display: inline-block; margin-left: 7px; font-size: 0.72rem; font-weight: 700; opacity: 0.6; }
   body.outdoor-page .outdoor-featured-grid { margin: 0 0 8px; }
   @media (min-width: 900px) { body.outdoor-page .outdoor-featured-grid { grid-template-columns: repeat(3, 1fr); } }
   body.outdoor-page .related-card .related-meta { font-size: 0.82rem; color: var(--ink); opacity: 0.7; margin-top: 4px; }
+  /* Mobile: four featured cards, not six stacked (the last two are still
+     in the markup for larger screens). */
+  @media (max-width: 899px) { body.outdoor-page .outdoor-featured-grid .related-card:nth-child(n+5) { display: none; } }
+  /* Region-grouped index on the landing page: compact name + activities
+     cards under a community heading; no description, no actions. */
+  body.outdoor-page .outdoor-region-group { margin: 0 0 22px; }
+  body.outdoor-page .outdoor-region-heading {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem; color: var(--ink); opacity: 0.8; margin: 0 0 10px;
+  }
+  body.outdoor-page .outdoor-region-count { display: inline-block; margin-left: 8px; font-family: inherit; font-size: 0.78rem; font-weight: 700; opacity: 0.55; vertical-align: 2px; }
+  body.outdoor-page .outdoor-index-card { padding: 11px 14px 10px; }
+  body.outdoor-page .outdoor-index-card a { font-weight: 700; color: var(--ink); text-decoration: none; }
+  body.outdoor-page .outdoor-index-card a:hover { color: var(--ref-navy); text-decoration: underline; }
+  @media (min-width: 900px) { body.outdoor-page .outdoor-index-grid { grid-template-columns: repeat(3, 1fr); } }
 </style>`;
 }
 
@@ -5939,13 +5986,160 @@ function renderCategoryRegionSelector(catSlug, venues) {
 function renderOutdoorActivitySelector(currentSlug = null) {
   const live = listLiveOutdoorActivities();
   if (!live.length) return '';
+  // Counts are shown only on the landing page (where they signal depth);
+  // on an activity page the H1's own count line already says it.
+  const showCounts = currentSlug === null;
   const chips = live.map((a) => (a.slug === currentSlug
     ? `<span class="category-region-selector-active">${escapeHtml(a.label)}</span>`
-    : `<a href="/outdoors/${a.slug}">${escapeHtml(a.label)}<span class="outdoor-activity-count">${a.count}</span></a>`)).join('\n      ');
+    : `<a href="/outdoors/${a.slug}">${escapeHtml(a.label)}${showCounts ? `<span class="outdoor-activity-count">${a.count}</span>` : ''}</a>`)).join('\n      ');
   const allLink = currentSlug ? `<a href="/outdoors">All Outdoors</a>\n      ` : '';
   return `<nav class="category-region-selector outdoor-activity-selector" aria-label="Choose an activity">
       ${allLink}${chips}
     </nav>`;
+}
+
+// Outdoors landing, step 1 -- "Choose a Region": the same region set,
+// labels, alphabetical order and pill treatment as the shared region
+// selector (renderCategoryRegionSelector), but rendered as a primary
+// choice: every community is a link to its /{region}/outdoors page with
+// its destination count, and there is no static "All Regions" pill
+// because the visitor is already on the all-regions page.
+function renderOutdoorRegionChoice(venues) {
+  const counts = new Map();
+  for (const v of venues) if (REGION_LABELS[v.region]) counts.set(v.region, (counts.get(v.region) || 0) + 1);
+  const regions = [...counts.keys()].sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
+  if (!regions.length) return '';
+  const links = regions.map((r) => `<a href="/${r}/${CATEGORY_SLUGS.outdoor}">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${counts.get(r)}</span></a>`).join('\n      ');
+  return `<nav class="category-region-selector outdoor-region-choice" aria-label="Choose a region">
+      ${links}
+    </nav>`;
+}
+
+// Outdoors landing filter (2026-09-20): /outdoors is a multi-select
+// directory. Regions and activities are toggle chips; the same page
+// filters its own results in the browser (progressive enhancement: with
+// scripting off every destination is simply listed). Semantics, shared by
+// the server-side predicate below and the inline client script:
+//   selected regions combine with OR, selected activities with OR, and
+//   the two groups combine with AND; an empty group imposes no constraint.
+function outdoorFilterMatches(selectedRegions, selectedActivities, venueRegion, venueActivities) {
+  const regionOk = !selectedRegions.length || selectedRegions.includes(venueRegion);
+  const activityOk = !selectedActivities.length || selectedActivities.some((a) => venueActivities.includes(a));
+  return regionOk && activityOk;
+}
+function filterOutdoorVenues(venues, selectedRegions, selectedActivities, activitySlugsByVenueId) {
+  return venues.filter((v) => outdoorFilterMatches(selectedRegions, selectedActivities, v.region, activitySlugsByVenueId.get(v.id) || []));
+}
+// venue id -> [activity slugs] (live activities only, so the chips and the
+// per-venue data can never disagree).
+function getOutdoorActivitySlugsByVenue(venues) {
+  const live = listLiveOutdoorActivities();
+  const kindToSlug = Object.fromEntries(live.map((a) => [a.kind, a.slug]));
+  const map = new Map();
+  if (!venues.length || !live.length) return map;
+  const placeholders = venues.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, c.kind AS kind FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue' AND ci.content_id IN (${placeholders})
+  `).all(...venues.map((v) => v.id));
+  for (const r of rows) {
+    const slug = kindToSlug[r.kind];
+    if (!slug) continue;
+    if (!map.has(r.id)) map.set(r.id, []);
+    if (!map.get(r.id).includes(slug)) map.get(r.id).push(slug);
+  }
+  return map;
+}
+// Region chips: every community with outdoor destinations, alphabetical
+// (same set/labels/order as the shared region selector), with counts.
+function renderOutdoorRegionFilterChips(venues) {
+  const counts = new Map();
+  for (const v of venues) if (REGION_LABELS[v.region]) counts.set(v.region, (counts.get(v.region) || 0) + 1);
+  const regions = [...counts.keys()].sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
+  if (!regions.length) return '';
+  const chips = regions.map((r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="false">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${counts.get(r)}</span></button>`).join('\n      ');
+  return `<div class="category-region-selector outdoor-filter-group" role="group" aria-label="Choose regions" data-filter="region">
+      ${chips}
+    </div>`;
+}
+// Activity chips: the live activities (>= MIN_ACTIVITY_VENUES) with counts.
+function renderOutdoorActivityFilterChips() {
+  const live = listLiveOutdoorActivities();
+  if (!live.length) return '';
+  const chips = live.map((a) => `<button type="button" class="outdoor-filter-chip" data-activity="${a.slug}" aria-pressed="false">${escapeHtml(a.label)}<span class="outdoor-activity-count">${a.count}</span></button>`).join('\n      ');
+  return `<div class="category-region-selector outdoor-filter-group" role="group" aria-label="Choose activities" data-filter="activity">
+      ${chips}
+    </div>`;
+}
+// The inline script: toggles chips, filters the already-rendered cards,
+// updates the count/summary, keeps the selection in the URL query
+// (?regions=a,b&activities=x) so a filtered view can be reloaded or
+// shared, and offers Clear. No network, no framework, no new page. The
+// `matches` function inside is the client twin of outdoorFilterMatches()
+// above (exported as OUTDOOR_FILTER_CLIENT_PREDICATE_SRC for the tests).
+const OUTDOOR_FILTER_CLIENT_PREDICATE_SRC = `function matches(regions, activities, venueRegion, venueActivities){
+    var regionOk = !regions.length || regions.indexOf(venueRegion) !== -1;
+    var activityOk = !activities.length;
+    for (var i = 0; i < activities.length && !activityOk; i++) { if (venueActivities.indexOf(activities[i]) !== -1) activityOk = true; }
+    return regionOk && activityOk;
+  }`;
+function renderOutdoorFilterScriptHtml() {
+  const labels = { regions: { ...REGION_LABELS }, activities: Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a.label])) };
+  return `<script>
+(function(){
+  var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  var mapEl = document.getElementById('outdoorActivityMap');
+  var activityMap = mapEl ? JSON.parse(mapEl.textContent || '{}') : {};
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip'));
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#outdoorResults > .venue-card'));
+  var summary = document.getElementById('outdoorResultsSummary');
+  var showBtn = document.getElementById('outdoorShowResults');
+  var clearBtn = document.getElementById('outdoorClearFilters');
+  var empty = document.getElementById('outdoorNoResults');
+  var results = document.getElementById('outdoorResults');
+  if (!chips.length || !cards.length) return;
+  ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
+  function selected(kind){ return chips.filter(function(c){ return c.getAttribute('data-' + kind) && c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute('data-' + kind); }); }
+  function label(kind, list){ return list.map(function(v){ return LABELS[kind][v] || v; }).join(', '); }
+  function apply(){
+    var regions = selected('region'), activities = selected('activity');
+    var shown = 0;
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-venue-id');
+      var ok = matches(regions, activities, card.getAttribute('data-venue-region'), activityMap[id] || []);
+      card.hidden = !ok; if (ok) shown++;
+    });
+    var total = cards.length, filtered = regions.length || activities.length;
+    var text = filtered ? (shown + ' of ' + total + ' outdoor destinations') : (total + ' outdoor destinations');
+    var parts = [];
+    if (regions.length) parts.push(label('regions', regions));
+    if (activities.length) parts.push(label('activities', activities));
+    if (parts.length) text += ' \\u00b7 ' + parts.join(' \\u00b7 ');
+    if (summary) summary.textContent = text;
+    if (showBtn) showBtn.textContent = filtered ? ('Show ' + shown + ' result' + (shown === 1 ? '' : 's')) : 'Show all results';
+    if (clearBtn) clearBtn.hidden = !filtered;
+    if (empty) empty.hidden = shown !== 0;
+    if (results) results.hidden = shown === 0;
+    var q = [];
+    if (regions.length) q.push('regions=' + regions.join(','));
+    if (activities.length) q.push('activities=' + activities.join(','));
+    if (window.history && window.history.replaceState) window.history.replaceState(null, '', window.location.pathname + (q.length ? '?' + q.join('&') : '') + window.location.hash);
+  }
+  chips.forEach(function(chip){ chip.addEventListener('click', function(){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply(); }); });
+  function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply(); }
+  if (clearBtn) clearBtn.addEventListener('click', clearAll);
+  var emptyClear = document.getElementById('outdoorNoResultsClear');
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  if (showBtn) showBtn.addEventListener('click', function(){ var t = document.getElementById('outdoorResultsTop'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var pre = { region: (params.get('regions') || '').split(',').filter(Boolean), activity: (params.get('activities') || '').split(',').filter(Boolean) };
+    chips.forEach(function(c){ ['region', 'activity'].forEach(function(k){ var v = c.getAttribute('data-' + k); if (v && pre[k].indexOf(v) !== -1) c.setAttribute('aria-pressed', 'true'); }); });
+  } catch (e) {}
+  apply();
+})();
+</script>`;
 }
 
 // Featured outdoor experiences: the editorial OUTDOOR_FEATURED_KEYS set,
@@ -5962,8 +6156,36 @@ function renderOutdoorFeaturedHtml(venues) {
       <a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>
       <div class="related-meta">${escapeHtml((labels.get(v.id) || []).join(' \u00b7 '))}</div>
     </div>`).join('');
-  return `<h2 class="category-subsection-heading">Featured outdoor experiences</h2>
+  return `<h2 class="category-subsection-heading">Featured Outdoor Experiences</h2>
   <div class="related-grid outdoor-featured-grid">${cards}</div>`;
+}
+
+// The landing page's directory: every outdoor destination once, as a
+// compact card (name + the activities it belongs to) grouped under its
+// community, instead of 28 full listing cards. Descriptions live on the
+// activity, regional and venue pages, where the visitor has already made
+// a choice. Groups are ordered by community label, matching the region
+// selector above it.
+function renderOutdoorRegionIndexHtml(venues) {
+  if (!venues.length) return '';
+  const labels = getOutdoorActivityLabelsByVenue(venues.map((v) => v.id));
+  const groups = new Map();
+  for (const v of venues) { if (!groups.has(v.region)) groups.set(v.region, []); groups.get(v.region).push(v); }
+  const regions = [...groups.keys()].filter((r) => REGION_LABELS[r]).sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
+  const sections = regions.map((r) => {
+    const list = groups.get(r).slice().sort((a, b) => a.name.localeCompare(b.name));
+    const cards = list.map((v) => `<div class="related-card related-card-outdoor outdoor-index-card">
+        <a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>
+        <div class="related-meta">${escapeHtml((labels.get(v.id) || []).join(' \u00b7 '))}</div>
+      </div>`).join('');
+    return `<section class="outdoor-region-group">
+      <h3 class="outdoor-region-heading">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-region-count">${list.length}</span></h3>
+      <div class="related-grid outdoor-index-grid">${cards}</div>
+    </section>`;
+  }).join('\n    ');
+  return `<div class="outdoor-region-index">
+    ${sections}
+  </div>`;
 }
 
 // GET /outdoors/:activity — one activity's outdoor destinations across
@@ -6051,14 +6273,29 @@ function renderCategoryAllRegionsPage(type, venues) {
     : `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${catSlug}`;
   const regionSelector = renderCategoryRegionSelector(catSlug, venues);
+  // Landing (2026-09-20): a multi-select directory -- Choose Region(s) ->
+  // Choose Activity(s) -> Show Results -> the filtered outdoor cards.
+  // Regions OR, activities OR, the two groups AND; nothing selected lists
+  // every destination. Filtering happens in the browser over the cards
+  // rendered below (renderOutdoorFilterScriptHtml); no per-combination pages.
+  const outdoorActivityMap = isOutdoorLanding ? getOutdoorActivitySlugsByVenue(venues) : new Map();
   const outdoorIntroHtml = isOutdoorLanding
-    ? `<p class="outdoor-intro">Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs \u2014 the Okanagan\u2019s outdoors run the length of the valley. Start with what you want to do, or explore by community.</p>
-  <h2 class="category-subsection-heading">Choose an activity</h2>
-  ${renderOutdoorActivitySelector(null)}
-  ${renderOutdoorFeaturedHtml(venues)}
-  <h2 class="category-subsection-heading">Explore by region</h2>`
+    ? `<p class="outdoor-intro">Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs \u2014 the Okanagan\u2019s outdoors run the length of the valley. Pick the communities you want to visit and the things you want to do; leave both empty to browse everything.</p>
+  <h2 class="category-subsection-heading">Choose Region(s)</h2>
+  ${renderOutdoorRegionFilterChips(venues)}
+  <h2 class="category-subsection-heading">Choose Activity(s)</h2>
+  ${renderOutdoorActivityFilterChips()}
+  <div class="outdoor-filter-actions">
+    <button type="button" class="cta outdoor-show-results" id="outdoorShowResults">Show all results</button>
+    <button type="button" class="cta secondary outdoor-clear-filters" id="outdoorClearFilters" hidden>Clear filters</button>
+  </div>
+  <h2 class="category-subsection-heading" id="outdoorResultsTop">Results</h2>
+  <p class="outdoor-results-summary" id="outdoorResultsSummary" aria-live="polite">${venues.length} outdoor destinations</p>
+  <p class="outdoor-no-results" id="outdoorNoResults" hidden>No outdoor destinations match that combination yet. <a href="/outdoors" id="outdoorNoResultsClear">Clear the filters</a> to see everything.</p>
+  <script type="application/json" id="outdoorActivityMap">${JSON.stringify(Object.fromEntries([...outdoorActivityMap].map(([id, slugs]) => [String(id), slugs]))).replace(/</g, '\\u003c')}</script>`
     : '';
-  const outdoorDirectoryHeading = isOutdoorLanding ? `<h2 class="category-subsection-heading">All outdoor destinations</h2>\n  ` : '';
+  const outdoorDirectoryHeading = '';
+
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -6085,8 +6322,11 @@ function renderCategoryAllRegionsPage(type, venues) {
   const hiddenGemIds = getHiddenGemVenueIds();
   const advisoryNotes = getAdvisoryNotes();
   // Okanagan-wide listing: cards carry their community so same-named
-  // venues in different communities can be told apart.
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true });
+  // venues in different communities can be told apart. The Outdoors
+  // landing instead renders the compact region-grouped index.
+  const cardsHtml = isOutdoorLanding
+    ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true }).replace('<ul class="card-grid">', '<ul class="card-grid" id="outdoorResults">')
+    : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -6101,14 +6341,13 @@ ${golfEngagementHeadHtml(type)}
     { name: label.plural },
   ])}
   <h1>${escapeHtml(heading)}</h1>
-  <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>
-  ${outdoorIntroHtml}${regionSelector}
+  ${isOutdoorLanding ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
   ${outdoorDirectoryHeading}${cardsHtml}
-  <a class="cta" href="/browse">Back to the full directory</a>
+  ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
   ${usesThemedCategoryLayout(type) ? GOLF_APP_SCRIPT_TAG : ''}
-  ${golfCardEngagementScriptHtml(type)}
+  ${golfCardEngagementScriptHtml(type)}${isOutdoorLanding ? '\n  ' + renderOutdoorFilterScriptHtml() : ''}
 </body>
 </html>`;
 }
@@ -9056,6 +9295,15 @@ module.exports = {
   listLiveOutdoorActivities,
   renderOutdoorActivitySelector,
   renderOutdoorFeaturedHtml,
+  renderOutdoorRegionChoice,
+  renderOutdoorRegionIndexHtml,
+  outdoorFilterMatches,
+  filterOutdoorVenues,
+  getOutdoorActivitySlugsByVenue,
+  renderOutdoorRegionFilterChips,
+  renderOutdoorActivityFilterChips,
+  renderOutdoorFilterScriptHtml,
+  OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,
   renderOutdoorActivityPage,
   // Golf venue page polish (2026-09-20)
   renderGolfVenuePolishStyles,
