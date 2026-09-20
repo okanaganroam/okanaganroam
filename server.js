@@ -4863,6 +4863,34 @@ function renderOutdoorThemeStyles() {
   body.outdoor-page .outdoor-results-summary { font-size: 0.95rem; color: var(--ink); opacity: 0.75; margin: -6px 0 16px; }
   body.outdoor-page .outdoor-no-results { background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px; padding: 16px 18px; margin: 0 0 26px; }
   body.outdoor-page #outdoorResults > .venue-card[hidden] { display: none; }
+  /* Grouped region selector: headers are compact secondary controls; on
+     desktop they are hidden and the four blocks flow as one chip row. */
+  body.outdoor-page .outdoor-region-groups { display: block; }
+  body.outdoor-page .outdoor-region-group-block { margin: 0 0 8px; }
+  body.outdoor-page .outdoor-region-group-toggle {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer;
+    background: transparent; border: 0; border-bottom: 1px solid rgba(74,52,40,0.12); border-radius: 0;
+    padding: 9px 2px; margin: 0 0 8px; font: inherit; color: var(--ink);
+  }
+  body.outdoor-page .outdoor-region-group-toggle:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.outdoor-page .outdoor-region-group-name { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.01em; }
+  body.outdoor-page .outdoor-region-group-meta, body.outdoor-page .outdoor-region-group-selected { font-size: 0.82rem; opacity: 0.65; }
+  body.outdoor-page .outdoor-region-group-selected { opacity: 1; color: var(--ref-navy); font-weight: 700; }
+  body.outdoor-page .outdoor-region-group-selected[hidden] { display: none; }
+  body.outdoor-page .outdoor-region-group-chevron { margin-left: auto; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: 0.55; transition: transform .15s ease; }
+  body.outdoor-page .outdoor-region-group-toggle[aria-expanded="false"] .outdoor-region-group-chevron { transform: rotate(-45deg); }
+  body.outdoor-page .outdoor-region-group-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; }
+  body.outdoor-page .outdoor-region-group-chips[hidden] { display: none; }
+  /* No JavaScript: headers stay hidden and every chip is visible. */
+  body.outdoor-page .outdoor-region-groups:not(.js) .outdoor-region-group-toggle { display: none; }
+  body.outdoor-page .outdoor-region-groups:not(.js) .outdoor-region-group-chips[hidden] { display: flex; }
+  /* Desktop: unchanged 20-chip presentation -- no headers, blocks flow as one row. */
+  @media (min-width: 900px) {
+    body.outdoor-page .outdoor-region-groups { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    body.outdoor-page .outdoor-region-group-block { display: contents; }
+    body.outdoor-page .outdoor-region-group-toggle { display: none !important; }
+    body.outdoor-page .outdoor-region-group-chips, body.outdoor-page .outdoor-region-group-chips[hidden] { display: contents; }
+  }
 
   body.outdoor-page .outdoor-activity-count { display: inline-block; margin-left: 7px; font-size: 0.72rem; font-weight: 700; opacity: 0.6; }
   body.outdoor-page .outdoor-featured-grid { margin: 0 0 8px; }
@@ -6076,15 +6104,47 @@ function canonicalOutdoorRegionOrder() {
   for (const r of Object.keys(REGION_LABELS)) if (!ordered.includes(r)) ordered.push(r);
   return ordered;
 }
+// Mobile grouping (2026-09-20): the 20 chips are wrapped in the same four
+// FOOTER_REGION_GROUPS groups (Central / South / North / Ski resorts) so
+// that below 900px each group is a collapsible block behind a compact
+// header (a real <button> with aria-expanded / aria-controls), Central
+// open and the rest closed by default. The headers are presentation only
+// -- the chips inside stay the very same multi-select toggle buttons and
+// keep their state whether the group is open or closed. Desktop hides
+// the headers and shows every chip (the blocks are display:contents), so
+// the 20-chip presentation there is unchanged. Without JavaScript the
+// headers stay hidden and every chip is visible (see the :not(.js) CSS).
+const OUTDOOR_REGION_GROUP_DEFAULT_OPEN = 'central';
+function outdoorRegionGroupSlug(label) { return slugify(label); }
 function renderOutdoorRegionFilterChips(venues) {
   const counts = new Map();
   for (const v of venues) if (REGION_LABELS[v.region]) counts.set(v.region, (counts.get(v.region) || 0) + 1);
-  const regions = canonicalOutdoorRegionOrder();
-  const chips = regions.map((r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="false">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${counts.get(r) || 0}</span></button>`).join('\n      ');
-  return `<div class="category-region-selector outdoor-filter-group" role="group" aria-label="Choose regions" data-filter="region">
-      ${chips}
+  const chip = (r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="false">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${counts.get(r) || 0}</span></button>`;
+  const placed = new Set();
+  const groups = FOOTER_REGION_GROUPS.map((g) => ({ label: g.label, slug: outdoorRegionGroupSlug(g.label), regions: g.regions.filter((r) => REGION_LABELS[r]) }));
+  groups.forEach((g) => g.regions.forEach((r) => placed.add(r)));
+  const leftover = canonicalOutdoorRegionOrder().filter((r) => !placed.has(r));
+  if (leftover.length) groups.push({ label: 'Other', slug: 'other', regions: leftover });
+  const blocks = groups.map((g) => {
+    const open = g.slug === OUTDOOR_REGION_GROUP_DEFAULT_OPEN;
+    const listId = `outdoorRegionGroup-${g.slug}`;
+    return `<div class="outdoor-region-group-block" data-region-group="${g.slug}">
+      <button type="button" class="outdoor-region-group-toggle" id="${listId}-toggle" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${listId}"><span class="outdoor-region-group-name">${escapeHtml(g.label)}</span><span class="outdoor-region-group-meta">${g.regions.length} region${g.regions.length === 1 ? '' : 's'}</span><span class="outdoor-region-group-selected" hidden></span><span class="outdoor-region-group-chevron" aria-hidden="true"></span></button>
+      <div class="outdoor-region-group-chips" id="${listId}" role="group" aria-label="${escapeHtml(g.label)} regions"${open ? '' : ' hidden'}>
+        ${g.regions.map(chip).join('\n        ')}
+      </div>
+    </div>`;
+  }).join('\n      ');
+  return `<div class="category-region-selector outdoor-filter-group outdoor-region-groups" role="group" aria-label="Choose regions" data-filter="region">
+      ${blocks}
     </div>`;
 }
+// Client-side helpers for the grouped region selector, shipped inside the
+// inline script and exported for the tests: a group is open on load if it
+// is the default-open group or holds a selected region; the header meta
+// is "N regions" plus "· N selected" only when something inside is chosen.
+const OUTDOOR_REGION_GROUP_CLIENT_SRC = `function groupShouldOpen(isDefaultOpen, selectedCount){ return !!isDefaultOpen || selectedCount > 0; }
+  function groupSelectedText(selectedCount){ return selectedCount > 0 ? ('\\u00b7 ' + selectedCount + ' selected') : ''; }`;
 // Activity chips: the live activities (>= MIN_ACTIVITY_VENUES) with counts.
 function renderOutdoorActivityFilterChips() {
   const live = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities());
@@ -6122,6 +6182,21 @@ function renderOutdoorFilterScriptHtml() {
   var results = document.getElementById('outdoorResults');
   if (!chips.length || !cards.length) return;
   ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
+  ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
+  var groupsRoot = document.querySelector('.outdoor-region-groups');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.outdoor-region-group-block'));
+  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 899px)') : null;
+  function setGroupOpen(block, open){ var t = block.querySelector('.outdoor-region-group-toggle'), l = block.querySelector('.outdoor-region-group-chips'); if (!t || !l) return; t.setAttribute('aria-expanded', open ? 'true' : 'false'); l.hidden = !open; }
+  function updateGroupHeaders(){
+    groups.forEach(function(block){
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      var sel = block.querySelector('.outdoor-region-group-selected');
+      if (sel) { sel.textContent = groupSelectedText(n); sel.hidden = n === 0; }
+      block.classList.toggle('has-selection', n > 0);
+    });
+  }
+  if (groupsRoot) groupsRoot.classList.add('js');
+  groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
   function selected(kind){ return chips.filter(function(c){ return c.getAttribute('data-' + kind) && c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute('data-' + kind); }); }
   function label(kind, list){ return list.map(function(v){ return LABELS[kind][v] || v; }).join(', '); }
   function apply(){
@@ -6139,6 +6214,7 @@ function renderOutdoorFilterScriptHtml() {
     if (activities.length) parts.push(label('activities', activities));
     if (parts.length) text += ' \\u00b7 ' + parts.join(' \\u00b7 ');
     if (summary) summary.textContent = text;
+    updateGroupHeaders();
     if (showBtn) showBtn.textContent = filtered ? ('Show ' + shown + ' result' + (shown === 1 ? '' : 's')) : 'Show all results';
     if (clearBtn) clearBtn.hidden = !filtered;
     if (empty) empty.hidden = shown !== 0;
@@ -6159,6 +6235,14 @@ function renderOutdoorFilterScriptHtml() {
     var pre = { region: (params.get('regions') || '').split(',').filter(Boolean), activity: (params.get('activities') || '').split(',').filter(Boolean) };
     chips.forEach(function(c){ ['region', 'activity'].forEach(function(k){ var v = c.getAttribute('data-' + k); if (v && pre[k].indexOf(v) !== -1) c.setAttribute('aria-pressed', 'true'); }); });
   } catch (e) {}
+  // Initial group state: on small screens Central stays open and any group
+  // holding a URL-selected region is opened so the selection is visible;
+  // on desktop every group is open (the headers are hidden by CSS anyway).
+  groups.forEach(function(block){
+    var isDefault = block.getAttribute('data-region-group') === '${OUTDOOR_REGION_GROUP_DEFAULT_OPEN}';
+    var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+    setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
+  });
   apply();
 })();
 </script>`;
@@ -9326,6 +9410,9 @@ module.exports = {
   getOutdoorActivitySlugsByVenue,
   renderOutdoorRegionFilterChips,
   canonicalOutdoorRegionOrder,
+  OUTDOOR_REGION_GROUP_DEFAULT_OPEN,
+  OUTDOOR_REGION_GROUP_CLIENT_SRC,
+  outdoorRegionGroupSlug,
   renderOutdoorActivityFilterChips,
   renderOutdoorFilterScriptHtml,
   OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,

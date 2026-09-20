@@ -5252,7 +5252,7 @@ test('Activity page + landing sections render once an activity reaches the thres
     assert.doesNotMatch(outdoorMarkupOnly(html), /outdoor-activity-count/, 'no chip counts on activity pages');
     assert.doesNotMatch(landing, /Featured Outdoor Experiences/, 'the landing directory has no featured section');
     assert.doesNotMatch(outdoorMarkupOnly(landing), /aria-label="Filter by region"|category-region-selector-active">All Regions/, 'the shared All-Regions selector is not rendered on the landing');
-    const chipRegions = [...outdoorMarkupOnly(landing).match(/data-filter="region"[\s\S]*?<\/div>/)[0].matchAll(/data-region="([a-z-]+)"/g)].map((m) => m[1]);
+    const chipRegions = [...outdoorMarkupOnly(landing).match(/data-filter="region"[\s\S]*?Choose Activity/)[0].matchAll(/data-region="([a-z-]+)"/g)].map((m) => m[1]);
     assert.deepEqual(chipRegions, app.canonicalOutdoorRegionOrder(), 'region chips: the complete canonical region list in the site order');
     assert.equal(app.renderOutdoorFeaturedHtml(all), '');
     // Featured section, when a key resolves, captions cards with their activities and never duplicates the venue.
@@ -5512,4 +5512,71 @@ test('Outdoor region chips use the complete canonical region list (REGION_LABELS
   assert.equal((landing.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
   assert.ok(landing.indexOf('Choose Region(s)</h2>') < landing.indexOf('Choose Activity(s)</h2>'));
   assert.match(landing, /id="outdoorClearFilters"/); assert.match(landing, /id="outdoorNoResults" hidden>/);
+});
+
+
+// ==== Outdoors region selector: grouped/collapsible on mobile (2026-09-20) ==
+
+test('Grouped region selector: four FOOTER_REGION_GROUPS blocks in order, all 20 canonical chips inside, accessible toggle buttons, Central open / others closed by default, no-JS and desktop fallbacks in CSS', () => {
+  const rows = app.getVenuesByCategory('outdoor');
+  const html = app.renderOutdoorRegionFilterChips(rows);
+  // Groups: exactly FOOTER_REGION_GROUPS, same order and membership -- no second source of truth.
+  const blocks = [...html.matchAll(/<div class="outdoor-region-group-block" data-region-group="([a-z-]+)">([\s\S]*?)<\/div>\s*<\/div>/g)];
+  assert.equal(blocks.length, app.FOOTER_REGION_GROUPS.length);
+  assert.deepEqual(blocks.map((b) => b[1]), app.FOOTER_REGION_GROUPS.map((g) => app.outdoorRegionGroupSlug(g.label)));
+  const allChips = [];
+  blocks.forEach((b, i) => {
+    const group = app.FOOTER_REGION_GROUPS[i];
+    const chipsIn = [...b[2].matchAll(/data-region="([a-z-]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(chipsIn, group.regions, `${group.label} holds exactly its FOOTER_REGION_GROUPS regions in order`);
+    allChips.push(...chipsIn);
+    // Header: a real <button> with aria-expanded/aria-controls, label text, "N regions" (never a venue total), hidden selection slot.
+    const slug = b[1];
+    assert.match(b[2], new RegExp(`<button type="button" class="outdoor-region-group-toggle" id="outdoorRegionGroup-${slug}-toggle" aria-expanded="(true|false)" aria-controls="outdoorRegionGroup-${slug}"><span class="outdoor-region-group-name">${group.label.replace(/&/g, '&amp;')}</span><span class="outdoor-region-group-meta">${group.regions.length} regions</span><span class="outdoor-region-group-selected" hidden></span>`));
+    assert.match(b[2], new RegExp(`<div class="outdoor-region-group-chips" id="outdoorRegionGroup-${slug}" role="group" aria-label="${group.label.replace(/&/g, '&amp;')} regions"`));
+    const expanded = /aria-expanded="true"/.test(b[2]);
+    assert.equal(expanded, slug === app.OUTDOOR_REGION_GROUP_DEFAULT_OPEN, `${slug} initially ${slug === 'central' ? 'expanded' : 'collapsed'}`);
+    assert.equal(/aria-label="[^"]*regions" hidden>/.test(b[2]), !expanded, `${slug} chip list hidden iff collapsed`);
+  });
+  assert.deepEqual(allChips, app.canonicalOutdoorRegionOrder(), 'all 20 canonical regions, canonical order, none invented');
+  assert.equal(app.OUTDOOR_REGION_GROUP_DEFAULT_OPEN, 'central');
+  // Chips themselves unchanged: same toggle buttons, counts (0 shown) intact.
+  for (const r of app.canonicalOutdoorRegionOrder()) {
+    const count = rows.filter((v) => v.region === r).length;
+    assert.match(html, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">${app.REGION_LABELS[r].replace(/&/g, '&amp;')}<span class="outdoor-activity-count">${count}</span></button>`));
+  }
+  assert.ok(html.includes('data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0</span>'), 'zero-count region present and selectable');
+  // CSS: desktop shows every chip without expansion (headers hidden, blocks flow), no-JS shows every chip.
+  const css = app.renderOutdoorThemeStyles();
+  assert.match(css, /@media \(min-width: 900px\) \{\s*body\.outdoor-page \.outdoor-region-groups \{ display: flex;[\s\S]*?\.outdoor-region-group-toggle \{ display: none !important; \}[\s\S]*?\.outdoor-region-group-chips\[hidden\] \{ display: contents; \}/);
+  assert.match(css, /\.outdoor-region-groups:not\(\.js\) \.outdoor-region-group-toggle \{ display: none; \}/);
+  assert.match(css, /\.outdoor-region-groups:not\(\.js\) \.outdoor-region-group-chips\[hidden\] \{ display: flex; \}/);
+  assert.match(css, /\.outdoor-region-group-toggle:focus-visible \{ outline: 2px solid/);
+  // Client helpers: open-on-load rule and the selection text.
+  const helpers = new Function(`${app.OUTDOOR_REGION_GROUP_CLIENT_SRC}; return { groupShouldOpen, groupSelectedText };`)();
+  assert.equal(helpers.groupShouldOpen(true, 0), true, 'default group opens');
+  assert.equal(helpers.groupShouldOpen(false, 0), false, 'other groups closed');
+  assert.equal(helpers.groupShouldOpen(false, 2), true, 'a group holding a URL-selected region opens');
+  assert.equal(helpers.groupSelectedText(0), '');
+  assert.equal(helpers.groupSelectedText(1), '· 1 selected');
+  // The script wires the headers, updates them on every apply, and never treats a header as a filter.
+  const script = app.renderOutdoorFilterScriptHtml();
+  for (const needle of ['outdoor-region-group-toggle', 'aria-expanded', 'updateGroupHeaders()', "classList.add('js')", 'groupShouldOpen(isDefault, n)', "matchMedia('(max-width: 899px)')"]) assert.ok(script.includes(needle), needle);
+  assert.match(script, /var chips = Array\.prototype\.slice\.call\(document\.querySelectorAll\('\.outdoor-filter-chip'\)\);/, 'only the chips are filters');
+});
+
+test('Grouped region selector: filtering semantics untouched -- regions from different groups (incl. zero-count) combine with OR, AND with activities, clear resets (server predicate)', () => {
+  const rows = app.getVenuesByCategory('outdoor');
+  const map = app.getOutdoorActivitySlugsByVenue(rows);
+  const byRegion = (r) => rows.filter((v) => v.region === r).length;
+  const central = 'kelowna', south = 'penticton', north = 'vernon', zero = 'naramata';
+  assert.equal(app.filterOutdoorVenues(rows, [central, south, north], [], map).length, byRegion(central) + byRegion(south) + byRegion(north), 'three groups selected together = OR');
+  assert.equal(app.filterOutdoorVenues(rows, [central, zero], [], map).length, byRegion(central), 'zero-count region in a collapsed group contributes nothing');
+  assert.deepEqual(app.filterOutdoorVenues(rows, [zero], [], map), [], 'zero-count region alone = no results');
+  assert.equal(app.filterOutdoorVenues(rows, [], [], map).length, rows.length, 'clear = everything');
+  const landing = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', rows));
+  assert.ok(landing.indexOf('Choose Region(s)</h2>') < landing.indexOf('Choose Activity(s)</h2>') && landing.indexOf('Choose Activity(s)</h2>') < landing.indexOf('id="outdoorShowResults"') && landing.indexOf('id="outdoorShowResults"') < landing.indexOf('Results</h2>'), 'overall structure unchanged');
+  assert.equal((landing.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
+  assert.equal((landing.match(/class="outdoor-filter-chip" data-activity="/g) || []).length, app.listLiveOutdoorActivities().length, 'activity chips unchanged');
+  assert.match(landing, /id="outdoorClearFilters" hidden>Clear filters</); assert.match(landing, /id="outdoorNoResults" hidden>/);
 });
