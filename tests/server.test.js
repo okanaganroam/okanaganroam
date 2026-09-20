@@ -5426,6 +5426,163 @@ test('filterOutdoorVenues over real memberships: region-only, activity-only, com
 });
 
 
+// ==== Outdoor discovery refinement (2026-09-20): server-applied URL state,
+// contextual counts, selected-filter tags, history push/pop ===============
+
+test('parseOutdoorFilterQuery: existing ?regions=a,b&activities=x,y convention; unknown regions and non-live activities dropped; duplicates collapse', () => {
+  // No activity is live in the plain fixture DB here, so every activity
+  // value must be dropped; the live path is exercised by the render test
+  // below once hiking/winter have enough fixture members.
+  const q = app.parseOutdoorFilterQuery({ regions: 'kelowna,vernon,kelowna,not-a-region, ', activities: 'hiking,bogus,hiking' });
+  assert.deepEqual(q.regions, ['kelowna', 'vernon']);
+  assert.deepEqual(q.activities, [], 'an activity that is not live is not a usable filter');
+  assert.deepEqual(app.parseOutdoorFilterQuery({}), { regions: [], activities: [] });
+  assert.deepEqual(app.parseOutdoorFilterQuery(undefined), { regions: [], activities: [] });
+  assert.deepEqual(app.parseOutdoorFilterQuery({ regions: ['kelowna', 'apex'] }), { regions: ['kelowna', 'apex'], activities: [] }, 'repeated query keys are accepted too');
+});
+
+test('outdoorSummaryText and the shipped client twin produce identical wording for every state', () => {
+  const client = new Function(`${app.OUTDOOR_SUMMARY_CLIENT_SRC}; return summaryText;`)();
+  const cases = [[62, 62, [], []], [20, 62, ['Kelowna', 'Vernon'], ['Hiking & Trails', 'Viewpoints']], [0, 62, ['Baldy'], []], [3, 62, [], ['Winter']]];
+  for (const [shown, total, r, a] of cases) {
+    const text = app.outdoorSummaryText(shown, total, r, a);
+    assert.equal(client(shown, total, r, a), text);
+  }
+  assert.equal(app.outdoorSummaryText(62, 62, [], []), '62 outdoor destinations');
+  assert.equal(app.outdoorSummaryText(20, 62, ['Kelowna', 'Vernon'], ['Hiking & Trails', 'Viewpoints']), '20 of 62 outdoor destinations · Kelowna, Vernon · Hiking & Trails, Viewpoints');
+  assert.equal(app.outdoorSummaryText(0, 62, ['Baldy'], []), '0 of 62 outdoor destinations · Baldy');
+});
+
+test('/outdoors with a filter query renders pre-filtered: pressed chips, contextual counts, hidden cards, summary, Show N / Clear, selected tags, empty state; no query = unchanged landing', () => {
+  const meta = { reason: 'test', batch_id: 'outdoors-prefilter-test', reviewed_by: null };
+  const ids = []; const added = [];
+  const mk = (name, region, slug) => { const info = insert.run({ name, region, type: 'outdoor', cuisine: null, phone: null, price: null, reviews: null, rating: null, description: `${name} fixture.`, address: null, latitude: null, longitude: null, hours: null, slug }); ids.push(Number(info.lastInsertRowid)); return Number(info.lastInsertRowid); };
+  const add = (kind, id) => { const r = app.guardedCollectionMembershipUpdate(kind, id, 'add', null, meta); assert.equal(r.ok, true, JSON.stringify(r)); added.push([kind, id]); };
+  try {
+    const kelA = mk('Prefilter Kelowna Trail', 'kelowna', 'prefilter-kelowna-trail');
+    const kelB = mk('Prefilter Kelowna Peak', 'kelowna', 'prefilter-kelowna-peak');
+    const verA = mk('Prefilter Vernon Falls', 'vernon', 'prefilter-vernon-falls');
+    const apxA = mk('Prefilter Apex Resort', 'apex', 'prefilter-apex-resort');
+    const canyon = app.findVenueBySlug('kelowna', 'outdoor', 'test-canyon-regional-park');
+    const nordic = app.findVenueBySlug('vernon', 'outdoor', 'test-nordic-centre');
+    // hiking: kelA, kelB, verA, canyon (4) -- live; winter: kelB, apxA, nordic (3) -- live
+    add('activity_hiking', kelA); add('activity_hiking', kelB); add('activity_hiking', verA); add('activity_hiking', canyon.id);
+    add('activity_winter', kelB); add('activity_winter', apxA); add('activity_winter', nordic.id);
+    const all = app.getVenuesByCategory('outdoor');
+    const map = app.getOutdoorActivitySlugsByVenue(all);
+    assert.deepEqual(app.parseOutdoorFilterQuery({ regions: 'vernon,kelowna', activities: 'winter,bogus,hiking,winter' }), { regions: ['vernon', 'kelowna'], activities: ['winter', 'hiking'] }, 'live activities parse, order kept, duplicates and unknowns dropped');
+
+    // Contextual counts: region counts respect the activity selection and vice versa; nothing selected = plain totals.
+    const plain = app.outdoorChipCounts(all, map, [], []);
+    assert.equal(plain.regions.kelowna, all.filter((v) => v.region === 'kelowna').length);
+    assert.equal(plain.activities.hiking, 4);
+    const ctx = app.outdoorChipCounts(all, map, ['vernon'], ['winter']);
+    assert.equal(ctx.regions.kelowna, 1, 'Kelowna count = Kelowna venues with winter (kelB) -- ignores the region selection (OR within group)');
+    assert.equal(ctx.regions.apex, 1);
+    assert.equal(ctx.activities.hiking, 1, 'hiking count = hiking venues in Vernon (verA)');
+    assert.equal(ctx.activities.winter, 1, 'winter count = winter venues in Vernon (nordic)');
+
+    // Filtered render: kelowna + vernon, hiking + winter.
+    const filtered = app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['kelowna', 'vernon'], activities: ['hiking', 'winter'] });
+    const markup = outdoorMarkupOnly(filtered);
+    const expected = app.filterOutdoorVenues(all, ['kelowna', 'vernon'], ['hiking', 'winter'], map);
+    assert.match(markup, /data-region="kelowna" aria-pressed="true">/); assert.match(markup, /data-region="vernon" aria-pressed="true">/); assert.match(markup, /data-region="apex" aria-pressed="false">/);
+    assert.match(markup, /data-activity="hiking" aria-pressed="true">/); assert.match(markup, /data-activity="winter" aria-pressed="true">/);
+    const hiddenCards = (markup.match(/<li class="venue-card" data-venue-id="\d+"[^>]*? hidden>/g) || []).length;
+    const totalCards = (markup.match(/<li class="venue-card" data-venue-id="\d+"/g) || []).length;
+    assert.equal(totalCards, all.length, 'every destination is still in the markup for the script to toggle');
+    assert.equal(totalCards - hiddenCards, expected.length, 'exactly the matching cards are visible');
+    for (const v of expected) assert.match(markup, new RegExp(`<li class="venue-card" data-venue-id="${v.id}"(?![^>]* hidden)[^>]*>`), `${v.name} visible`);
+    assert.match(markup, new RegExp(`id="outdoorResultsSummary" aria-live="polite">${expected.length} of ${all.length} outdoor destinations · Kelowna, Vernon · Hiking &amp; Trails, Winter</p>`));
+    assert.match(markup, new RegExp(`id="outdoorShowResults">Show ${expected.length} results</button>`));
+    assert.match(markup, /id="outdoorClearFilters">Clear filters</); assert.doesNotMatch(markup, /id="outdoorClearFilters" hidden/);
+    assert.match(markup, /<div class="outdoor-selected" id="outdoorSelected"><span class="outdoor-selected-label">Showing:<\/span> <button type="button" class="outdoor-selected-tag" data-remove-region="kelowna" aria-label="Remove Kelowna">Kelowna<span class="outdoor-selected-x" aria-hidden="true">×<\/span><\/button> <button type="button" class="outdoor-selected-tag" data-remove-region="vernon"[^>]*>Vernon/);
+    assert.match(markup, /data-remove-activity="hiking"[^>]*>Hiking &amp; Trails</); assert.match(markup, /id="outdoorSelectedClear">Clear all<\/button>/);
+    assert.match(markup, /id="outdoorNoResults" hidden>/); assert.match(markup, /<ul class="card-grid" id="outdoorResults">/);
+    // Group holding a selection is open with its meta; the rest keep their default state.
+    assert.match(markup, /data-region-group="north">\s*<button[^>]*aria-expanded="true"[^>]*><span class="outdoor-region-group-name">North<\/span><span class="outdoor-region-group-meta">\d+ regions<\/span><span class="outdoor-region-group-selected">· 1 selected<\/span>/);
+    assert.match(markup, /data-region-group="ski-resorts">\s*<button[^>]*aria-expanded="false"/);
+    // Contextual counts are what the chips carry in the filtered render.
+    assert.match(markup, new RegExp(`data-activity="hiking" aria-pressed="true">Hiking &amp; Trails<span class="outdoor-activity-count">${app.outdoorChipCounts(all, map, ['kelowna', 'vernon'], ['hiking', 'winter']).activities.hiking}</span>`));
+    // Canonical stays the bare landing; the filter never becomes a route.
+    assert.match(filtered, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors"/);
+
+    // Empty result: Baldy + winter (no Baldy fixture) -> no cards visible, list hidden, empty state shown, tags still present.
+    const empty = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['baldy'], activities: ['winter'] }));
+    assert.match(empty, /<ul class="card-grid" id="outdoorResults" hidden>/);
+    assert.match(empty, /id="outdoorNoResults">No outdoor destinations match that combination yet\./);
+    assert.match(empty, new RegExp(`aria-live="polite">0 of ${all.length} outdoor destinations · Baldy · Winter</p>`));
+    assert.match(empty, /id="outdoorShowResults">Show 0 results</);
+    assert.equal((empty.match(/<li class="venue-card" data-venue-id="\d+"(?![^>]* hidden)[^>]*>/g) || []).length, 0);
+
+    // Unknown values are ignored (parse step) and an empty filter renders the untouched landing.
+    const plainHtml = app.renderCategoryAllRegionsPage('outdoor', all);
+    assert.equal(app.renderCategoryAllRegionsPage('outdoor', all, { regions: [], activities: [] }), plainHtml, 'empty filter = default landing byte-for-byte');
+    assert.equal(app.renderCategoryAllRegionsPage('outdoor', all, null), plainHtml);
+    const pm = outdoorMarkupOnly(plainHtml);
+    assert.doesNotMatch(pm, /aria-pressed="true"|data-venue-id="\d+"[^>]* hidden>/);
+    assert.match(pm, /id="outdoorSelected" hidden><span class="outdoor-selected-label">Showing:<\/span> <\/div>/);
+    assert.match(pm, /id="outdoorClearFilters" hidden>/); assert.match(pm, /id="outdoorShowResults">Show all results</);
+    // Other categories ignore the filter argument entirely.
+    const golfRows = app.getVenuesByCategory('golf');
+    if (golfRows.length) assert.equal(app.renderCategoryAllRegionsPage('golf', golfRows, { regions: ['kelowna'], activities: ['hiking'] }), app.renderCategoryAllRegionsPage('golf', golfRows));
+  } finally {
+    for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('Outdoor filter script: pushes history on visitor changes, restores on popstate, recomputes contextual counts, renders removable tags; summary twin shipped', () => {
+  const script = app.renderOutdoorFilterScriptHtml();
+  for (const needle of ['pushState', 'popstate', "apply('push')", "apply('replace')", "apply('none')", 'updateChipCounts', 'renderSelected', 'data-remove-region', 'data-remove-activity', 'outdoorSelectedClear', 'function summaryText', 'function matches', 'readUrlIntoChips', 'regions=', 'activities=']) {
+    assert.ok(script.includes(needle), `script contains ${needle}`);
+  }
+  assert.ok(script.includes(app.OUTDOOR_SUMMARY_CLIENT_SRC) && script.includes(app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC) && script.includes(app.OUTDOOR_REGION_GROUP_CLIENT_SRC));
+});
+
+test('/outdoors?regions=..&activities=.. over HTTP renders pre-filtered; the bare /outdoors and the region page are unaffected (isolated child process)', async () => {
+  const childEnv = { ...process.env };
+  const ISOLATED_PORT = '3096';
+  childEnv.PORT = ISOLATED_PORT;
+  childEnv.ENRICHMENT_ADMIN_TOKEN = 'prefilter-http-test-token';
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-prefilter-'));
+  for (const f of ['server.js', 'db.js']) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
+  try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
+  const child = spawn(process.execPath, ['--no-warnings', path.join(dir, 'server.js')], { cwd: dir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderrOutput = '';
+  child.stderr.on('data', (d) => { stderrOutput += d.toString(); });
+  try {
+    const base = `http://localhost:${ISOLATED_PORT}`;
+    const deadline = Date.now() + 15000; let ready = false;
+    while (Date.now() < deadline && !ready) { try { if ((await fetch(`${base}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); } }
+    assert.ok(ready, `isolated child never became ready. stderr: ${stderrOutput}`);
+    const authed = { 'Content-Type': 'application/json', Authorization: `Bearer ${childEnv.ENRICHMENT_ADMIN_TOKEN}` };
+    const post = async (body) => { const r = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify(body) }); const t = await r.text(); assert.equal(r.status, 201, t); return JSON.parse(t); };
+    const made = [];
+    for (const [name, region, slug] of [['Fx Kelowna Trail', 'kelowna', 'fx-kelowna-trail'], ['Fx Kelowna Ridge', 'kelowna', 'fx-kelowna-ridge'], ['Fx Vernon Falls', 'vernon', 'fx-vernon-falls'], ['Fx Apex Peak', 'apex', 'fx-apex-peak']]) made.push(await post({ name, region, type: 'outdoor', description: `${name} fixture`, slug }));
+    for (const v of made.slice(0, 3)) { const r = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'activity_hiking', venue_id: v.id, action: 'add', reason: 'test', batch_id: 'prefilter-http' }) }); assert.equal(r.status, 200, await r.text()); }
+    const plain = await (await fetch(`${base}/outdoors`)).text();
+    const filtered = await (await fetch(`${base}/outdoors?regions=kelowna&activities=hiking`)).text();
+    assert.notEqual(plain, filtered);
+    const fm = outdoorMarkupOnly(filtered);
+    assert.match(fm, /data-region="kelowna" aria-pressed="true">/); assert.match(fm, /data-activity="hiking" aria-pressed="true">/);
+    assert.match(fm, /aria-live="polite">2 of 4 outdoor destinations · Kelowna · Hiking &amp; Trails</);
+    assert.equal((fm.match(/<li class="venue-card" data-venue-id="\d+"(?![^>]* hidden)[^>]*>/g) || []).length, 2);
+    assert.match(fm, /data-remove-region="kelowna"/);
+    assert.match(filtered, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors"/);
+    // Junk / unknown values degrade to the plain landing; the region page ignores the query.
+    assert.equal(await (await fetch(`${base}/outdoors?regions=nowhere&activities=none`)).text(), plain);
+    const regionPlain = await (await fetch(`${base}/kelowna/outdoors`)).text();
+    assert.equal(await (await fetch(`${base}/kelowna/outdoors?regions=vernon&activities=hiking`)).text(), regionPlain);
+    // Back/forward + share: the same URL always renders the same filtered state.
+    assert.equal(await (await fetch(`${base}/outdoors?regions=kelowna&activities=hiking`)).text(), filtered);
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise((r) => child.once('exit', r));
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
 // ==== I.3 (2026-09-20): finalized Outdoor activity order and labels ========
 
 test('I.3: finalized activity display order and labels; slugs unchanged; Camping/Water stay defined but not live', () => {
