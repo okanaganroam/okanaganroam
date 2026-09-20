@@ -1494,6 +1494,94 @@ const DOG_FRIENDLY_COLLECTION_KIND = 'dog_friendly';
 const ACTIVITY_COLLECTION_KINDS = ['activity_hiking', 'activity_cycling', 'activity_viewpoints', 'activity_nature', 'activity_winter', 'activity_camping', 'activity_water', 'activity_adventure'];
 const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS]);
 
+// Outdoor activity discovery (2026-09-20, Outdoors Phase 2). One outdoor
+// destination keeps ONE canonical venue record and page; what a visitor
+// can do there is expressed as membership in one or more of the activity
+// collections above (many-to-many), never as a second venue record or a
+// second venue type. This list is the single source of truth for the
+// visitor-facing label, URL slug and one-line blurb of each activity; the
+// collection rows in db.js carry the kind. Order here is the display
+// order of the activity selector.
+const OUTDOOR_ACTIVITIES = [
+  { slug: 'hiking', kind: 'activity_hiking', label: 'Hiking & Trails', blurb: 'Creek-side greenways, canyon stairs, waterfall walks and summit climbs \u2014 from a flat hour to a full day on your feet.' },
+  { slug: 'cycling', kind: 'activity_cycling', label: 'Cycling & Biking', blurb: 'Rail trails, paved lakeside pathways and mountain-bike terrain, on the valley floor and up at the resorts.' },
+  { slug: 'winter', kind: 'activity_winter', label: 'Winter', blurb: 'Ski resorts, Nordic centres and snowshoe trails, plus the parks that stay open for winter walks.' },
+  { slug: 'camping', kind: 'activity_camping', label: 'Camping', blurb: 'Provincial and regional parks where an outdoor day can turn into a night under the stars.' },
+  { slug: 'nature', kind: 'activity_nature', label: 'Nature & Wildlife', blurb: 'Nature conservancies, creek corridors, desert habitat and the places to watch kokanee, birds and bighorn sheep.' },
+  { slug: 'water', kind: 'activity_water', label: 'Water & Boating', blurb: 'Outdoor destinations with paddling, boating or lake access built in.' },
+  { slug: 'viewpoints', kind: 'activity_viewpoints', label: 'Viewpoints', blurb: 'Lookouts, ridgelines and summits with the lake and valley spread out below.' },
+  { slug: 'adventure', kind: 'activity_adventure', label: 'Adventure', blurb: 'Rock climbing, bike parks, tubing and skating loops \u2014 the bigger, louder days out.' },
+];
+const OUTDOOR_ACTIVITY_BY_SLUG = Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a]));
+// An activity page only exists once it has enough real destinations to be
+// worth a visit; below this the activity is simply not offered in the
+// selector and its URL is a 404 (never an empty or one-card page). Same
+// "don't advertise thin pages" discipline as MIN_CATEGORY_VENUES, with a
+// higher bar because an activity page is a destination guide, not a
+// region listing.
+const MIN_ACTIVITY_VENUES = 3;
+// Featured outdoor experiences on the /outdoors landing page: a short,
+// editorially chosen set (region/slug keys, like GOLF_AT_A_GLANCE_FACTS)
+// spread across the valley and across activities. Unknown or missing
+// keys are skipped, so the section can never show a fabricated card.
+const OUTDOOR_FEATURED_KEYS = [
+  'kelowna/myra-canyon-myra-bellevue-provincial-park',
+  'penticton/skaha-bluffs-provincial-park',
+  'enderby/tplaqin-enderby-cliffs-provincial-park',
+  'vernon/bx-creek-trail-bx-falls',
+  'summerland/giants-head-mountain-park',
+  'big-white/big-white-ski-resort',
+];
+
+// Outdoor venues (canonical records only) that belong to one activity
+// collection, in the same name order the category pages use.
+function getOutdoorActivityVenues(activity) {
+  return db.prepare(`
+    SELECT v.* FROM venues v
+    JOIN collection_items ci ON ci.content_type = 'venue' AND ci.content_id = v.id
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE c.kind = ? AND v.type = 'outdoor' AND v.redirect_to IS NULL
+    GROUP BY v.id
+    ORDER BY v.name ASC
+  `).all(activity.kind).map(rowToVenue);
+}
+// { slug -> count } for every activity, one small query.
+function getOutdoorActivityCounts() {
+  const rows = db.prepare(`
+    SELECT c.kind AS kind, COUNT(DISTINCT v.id) AS n FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    JOIN venues v ON v.id = ci.content_id AND v.type = 'outdoor' AND v.redirect_to IS NULL
+    WHERE ci.content_type = 'venue'
+    GROUP BY c.kind
+  `).all();
+  const byKind = Object.fromEntries(rows.map((r) => [r.kind, r.n]));
+  return Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, byKind[a.kind] || 0]));
+}
+// venue id -> [activity labels] for a set of outdoor venues (one query),
+// used to caption featured cards with what you can do there.
+function getOutdoorActivityLabelsByVenue(venueIds) {
+  if (!venueIds.length) return new Map();
+  const placeholders = venueIds.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, c.kind AS kind FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue' AND ci.content_id IN (${placeholders})
+  `).all(...venueIds);
+  const map = new Map();
+  for (const a of OUTDOOR_ACTIVITIES) {
+    for (const r of rows) {
+      if (r.kind !== a.kind) continue;
+      if (!map.has(r.id)) map.set(r.id, []);
+      map.get(r.id).push(a.label);
+    }
+  }
+  return map;
+}
+// Only activities that have enough destinations to be a real page.
+function listLiveOutdoorActivities() {
+  const counts = getOutdoorActivityCounts();
+  return OUTDOOR_ACTIVITIES.filter((a) => counts[a.slug] >= MIN_ACTIVITY_VENUES).map((a) => ({ ...a, count: counts[a.slug] }));
+}
 
 // venue id -> note text for one collection kind (the most recently added
 // note wins if several). Shared by the advisory and dog-friendly kinds.
@@ -4728,6 +4816,14 @@ function renderOutdoorThemeStyles() {
   /* Outdoor page theme (2026-09-20): the Golf rules above, re-keyed to the outdoor card attribute. */
   ${deriveBeachRulesFromGolfCss(SEO_PAGE_CSS, 'outdoor')}
   ${deriveBeachRulesFromGolfCss(themeCss, 'outdoor')}
+  /* Outdoors discovery (Phase 2): intro line, activity chips (region-chip
+     pills with a small count) and the featured grid. Outdoor pages only. */
+  body.outdoor-page .outdoor-intro { font-size: 1.04rem; line-height: 1.65; max-width: 68ch; color: var(--ink); opacity: 0.85; margin: -8px 0 22px; }
+  body.outdoor-page .outdoor-activity-selector { margin-bottom: 8px; }
+  body.outdoor-page .outdoor-activity-count { display: inline-block; margin-left: 7px; font-size: 0.72rem; font-weight: 700; opacity: 0.6; }
+  body.outdoor-page .outdoor-featured-grid { margin: 0 0 8px; }
+  @media (min-width: 900px) { body.outdoor-page .outdoor-featured-grid { grid-template-columns: repeat(3, 1fr); } }
+  body.outdoor-page .related-card .related-meta { font-size: 0.82rem; color: var(--ink); opacity: 0.7; margin-top: 4px; }
 </style>`;
 }
 
@@ -5835,6 +5931,101 @@ function renderCategoryRegionSelector(catSlug, venues) {
     </nav>`;
 }
 
+// Outdoors Phase 2: the activity selector, a compact chip row that reuses
+// the region selector's pill styling (one design system, no new control).
+// `currentSlug` is null on the landing page (no active chip, every live
+// activity links out) and the activity's slug on its own page (that chip
+// is the static "active" pill and an "All Outdoors" link leads back).
+function renderOutdoorActivitySelector(currentSlug = null) {
+  const live = listLiveOutdoorActivities();
+  if (!live.length) return '';
+  const chips = live.map((a) => (a.slug === currentSlug
+    ? `<span class="category-region-selector-active">${escapeHtml(a.label)}</span>`
+    : `<a href="/outdoors/${a.slug}">${escapeHtml(a.label)}<span class="outdoor-activity-count">${a.count}</span></a>`)).join('\n      ');
+  const allLink = currentSlug ? `<a href="/outdoors">All Outdoors</a>\n      ` : '';
+  return `<nav class="category-region-selector outdoor-activity-selector" aria-label="Choose an activity">
+      ${allLink}${chips}
+    </nav>`;
+}
+
+// Featured outdoor experiences: the editorial OUTDOOR_FEATURED_KEYS set,
+// rendered as the existing compact related-card (band + name), with the
+// band carrying the community and the caption listing the activities the
+// destination belongs to. Renders nothing if no key resolves.
+function renderOutdoorFeaturedHtml(venues) {
+  const byKey = new Map(venues.map((v) => [`${v.region}/${v.slug}`, v]));
+  const featured = OUTDOOR_FEATURED_KEYS.map((k) => byKey.get(k)).filter(Boolean);
+  if (!featured.length) return '';
+  const labels = getOutdoorActivityLabelsByVenue(featured.map((v) => v.id));
+  const cards = featured.map((v) => `<div class="related-card related-card-outdoor">
+      <div class="compact-band compact-band-outdoor compact-band-sm"><span class="compact-band-label">${escapeHtml(REGION_LABELS[v.region] || v.region)}</span></div>
+      <a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>
+      <div class="related-meta">${escapeHtml((labels.get(v.id) || []).join(' \u00b7 '))}</div>
+    </div>`).join('');
+  return `<h2 class="category-subsection-heading">Featured outdoor experiences</h2>
+  <div class="related-grid outdoor-featured-grid">${cards}</div>`;
+}
+
+// GET /outdoors/:activity — one activity's outdoor destinations across
+// the whole valley. Mirrors renderCategoryAllRegionsPage(): same themed
+// shell, same cards (with the community line), its own H1/canonical/
+// JSON-LD, plus the activity selector with this activity active.
+function renderOutdoorActivityPage(activity, venues) {
+  const label = CATEGORY_LABELS.outdoor;
+  const title = `${activity.label} in the Okanagan | Okanagan Roam`;
+  const description = `${venues.length} outdoor destinations for ${activity.label.toLowerCase()} across the Okanagan Valley \u2014 ${activity.blurb}`;
+  const canonical = `https://okanaganroam.com/outdoors/${activity.slug}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Outdoors', url: 'https://okanaganroam.com/outdoors' },
+    { name: activity.label, url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+    })),
+  };
+  const hiddenGemIds = getHiddenGemVenueIds();
+  const advisoryNotes = getAdvisoryNotes();
+  const cardsHtml = renderCategoryCardsHtml('outdoor', venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true });
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, outdoorTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${golfEngagementHeadHtml('outdoor')}
+</head>
+<body${themedBodyClassAttr('outdoor')}>
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Outdoors', href: '/outdoors' },
+    { name: activity.label },
+  ])}
+  <a class="category-back-link" href="/outdoors">\u2190 All Outdoors</a>
+  <h1>${escapeHtml(activity.label)} in the Okanagan</h1>
+  <p class="subtitle">${venues.length} ${escapeHtml(label.plural.toLowerCase())} for ${escapeHtml(activity.label.toLowerCase())} across the Okanagan Valley.</p>
+  <p class="outdoor-intro">${escapeHtml(activity.blurb)}</p>
+  ${renderOutdoorActivitySelector(activity.slug)}
+  ${cardsHtml}
+  <a class="cta" href="/outdoors">Back to Outdoors</a>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('outdoor')}
+</body>
+</html>`;
+}
+
 // GET /:category — Okanagan-wide category listing (2026-09-19; currently
 // golf only, see ALL_REGIONS_CATEGORIES). Mirrors renderCategoryPage()
 // above, minus everything that assumes a single region: no region
@@ -5848,10 +6039,26 @@ function renderCategoryRegionSelector(catSlug, venues) {
 function renderCategoryAllRegionsPage(type, venues) {
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
-  const title = `${label.plural} in the Okanagan | Okanagan Roam`;
-  const description = `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
+  // Outdoors Phase 2: /outdoors is a discovery landing page ("Outdoors in
+  // the Okanagan": intro, activity selector, featured experiences, region
+  // chips, then the full directory) rather than a bare listing. Every
+  // other category keeps its heading, copy and section order untouched.
+  const isOutdoorLanding = type === 'outdoor';
+  const heading = isOutdoorLanding ? 'Outdoors in the Okanagan' : `${label.plural} in the Okanagan`;
+  const title = `${heading} | Okanagan Roam`;
+  const description = isOutdoorLanding
+    ? `${venues.length} verified outdoor destinations across the Okanagan Valley — hiking, cycling, winter, nature, viewpoints and more, from Enderby to Osoyoos and the ski resorts.`
+    : `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${catSlug}`;
   const regionSelector = renderCategoryRegionSelector(catSlug, venues);
+  const outdoorIntroHtml = isOutdoorLanding
+    ? `<p class="outdoor-intro">Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs \u2014 the Okanagan\u2019s outdoors run the length of the valley. Start with what you want to do, or explore by community.</p>
+  <h2 class="category-subsection-heading">Choose an activity</h2>
+  ${renderOutdoorActivitySelector(null)}
+  ${renderOutdoorFeaturedHtml(venues)}
+  <h2 class="category-subsection-heading">Explore by region</h2>`
+    : '';
+  const outdoorDirectoryHeading = isOutdoorLanding ? `<h2 class="category-subsection-heading">All outdoor destinations</h2>\n  ` : '';
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -5893,10 +6100,10 @@ ${golfEngagementHeadHtml(type)}
     { name: 'Home', href: '/' },
     { name: label.plural },
   ])}
-  <h1>${escapeHtml(label.plural)} in the Okanagan</h1>
+  <h1>${escapeHtml(heading)}</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>
-  ${regionSelector}
-  ${cardsHtml}
+  ${outdoorIntroHtml}${regionSelector}
+  ${outdoorDirectoryHeading}${cardsHtml}
   <a class="cta" href="/browse">Back to the full directory</a>
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
@@ -7425,6 +7632,12 @@ const server = http.createServer(async (req, res) => {
           ({ region, badge, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${badge}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
         ),
+        // Outdoors Phase 2: activity pages, only those that actually render
+        // (same MIN_ACTIVITY_VENUES gate as the route).
+        ...listLiveOutdoorActivities().map(
+          ({ slug }) =>
+            `  <url>\n    <loc>https://okanaganroam.com/outdoors/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
+        ),
         ...venueRows.map(
           ({ region, type, slug, updated_at }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>`
@@ -8564,6 +8777,26 @@ const server = http.createServer(async (req, res) => {
     // anything that doesn't match a real region, category, or venue falls
     // through to the plain 404 at the bottom of this function.
 
+    // GET /outdoors/:activity — Outdoors Phase 2 activity page. Matched
+    // before the generic /:region/:category routes below (which would
+    // otherwise try "outdoors" as a region and 404). Only an activity
+    // with at least MIN_ACTIVITY_VENUES canonical outdoor destinations
+    // renders; anything else is the plain 404.
+    const outdoorActivityMatch = pathname.match(/^\/outdoors\/([a-z-]+)\/?$/);
+    if (outdoorActivityMatch && method === 'GET') {
+      const activity = OUTDOOR_ACTIVITY_BY_SLUG[outdoorActivityMatch[1]];
+      if (activity) {
+        const venues = getOutdoorActivityVenues(activity);
+        if (venues.length >= MIN_ACTIVITY_VENUES) {
+          const html = renderOutdoorActivityPage(activity, venues);
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // GET /:region/:category/:slug — individual venue page
     const venuePageMatch = pathname.match(/^\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/);
     if (venuePageMatch && method === 'GET') {
@@ -8814,6 +9047,16 @@ module.exports = {
   deriveBeachRulesFromGolfCss,
   renderOutdoorThemeStyles,
   ACTIVITY_COLLECTION_KINDS,
+  OUTDOOR_ACTIVITIES,
+  OUTDOOR_ACTIVITY_BY_SLUG,
+  MIN_ACTIVITY_VENUES,
+  OUTDOOR_FEATURED_KEYS,
+  getOutdoorActivityVenues,
+  getOutdoorActivityCounts,
+  listLiveOutdoorActivities,
+  renderOutdoorActivitySelector,
+  renderOutdoorFeaturedHtml,
+  renderOutdoorActivityPage,
   // Golf venue page polish (2026-09-20)
   renderGolfVenuePolishStyles,
   GOLF_AT_A_GLANCE_FACTS,

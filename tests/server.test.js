@@ -4953,10 +4953,10 @@ test('/outdoors (Okanagan-wide) renders the themed listing: one H1, canonical, c
   assert.ok(rows.length >= 2);
   const html = app.renderCategoryAllRegionsPage('outdoor', rows);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
-  assert.match(html, /<h1>Outdoor Destinations in the Okanagan<\/h1>/);
-  assert.match(html, /<title>Outdoor Destinations in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /<h1>Outdoors in the Okanagan<\/h1>/);
+  assert.match(html, /<title>Outdoors in the Okanagan \| Okanagan Roam<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors"/);
-  assert.match(html, /<meta property="og:title" content="Outdoor Destinations in the Okanagan \| Okanagan Roam">/);
+  assert.match(html, /<meta property="og:title" content="Outdoors in the Okanagan \| Okanagan Roam">/);
   assert.match(html, /<body class="golf-page outdoor-page">/);
   assert.match(html, /Outdoor page theme \(2026-09-20\)/);
   assert.match(html, /href="\/kelowna\/outdoors"/); assert.match(html, /href="\/vernon\/outdoors"/);
@@ -5112,6 +5112,10 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.doesNotMatch(sitemapBefore, /outdoors/);
     const hub = await (await fetch(`${base}/kelowna`)).text();
     assert.match(hub, /<h2><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h2>/, 'region hub gains the category card, exactly as Beaches did');
+    // Phase 2: an activity page appears only once the activity has MIN_ACTIVITY_VENUES destinations.
+    assert.equal((await fetch(`${base}/outdoors/hiking`)).status, 404, 'one member is below the activity threshold -> 404, never a thin page');
+    assert.equal((await fetch(`${base}/outdoors/not-an-activity`)).status, 404);
+    assert.doesNotMatch(await (await fetch(`${base}/sitemap.xml`)).text(), /\/outdoors\/hiking/);
 
     // Trip planner: outdoor is not an interest, activity kinds are not discovery kinds, and outdoor venues are never itinerary stops.
     const badInterest = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1, interests: ['outdoor'] }) });
@@ -5122,6 +5126,197 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     const plan = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1 }) });
     assert.equal(plan.status, 200);
     assert.doesNotMatch(await plan.text(), /Fixture Canyon Park/, 'an outdoor venue must never be picked as an itinerary stop');
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise((resolve) => child.once('exit', resolve));
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
+// ==== Outdoors Phase 2 (2026-09-20): activity discovery =====================
+//
+// One canonical venue record per destination; activities are many-to-many
+// memberships in the activity collections. /outdoors becomes a discovery
+// landing page and /outdoors/:activity lists one activity's destinations.
+
+test('Outdoor activity definitions: eight activities map 1:1 onto the bootstrapped collection kinds with clean slugs and labels', () => {
+  assert.equal(app.OUTDOOR_ACTIVITIES.length, 8);
+  assert.deepEqual([...app.OUTDOOR_ACTIVITIES.map((a) => a.kind)].sort(), [...app.ACTIVITY_COLLECTION_KINDS].sort());
+  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.slug), ['hiking', 'cycling', 'winter', 'camping', 'nature', 'water', 'viewpoints', 'adventure']);
+  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.label), ['Hiking & Trails', 'Cycling & Biking', 'Winter', 'Camping', 'Nature & Wildlife', 'Water & Boating', 'Viewpoints', 'Adventure']);
+  for (const a of app.OUTDOOR_ACTIVITIES) { assert.match(a.slug, /^[a-z]+$/); assert.ok(a.blurb.length > 40); assert.equal(app.OUTDOOR_ACTIVITY_BY_SLUG[a.slug], a); }
+  assert.equal(app.MIN_ACTIVITY_VENUES, 3);
+  assert.ok(app.OUTDOOR_FEATURED_KEYS.every((k) => /^[a-z-]+\/[a-z0-9-]+$/.test(k)));
+});
+
+test('Outdoor activity membership is many-to-many on ONE canonical record: a venue in several activities, no duplicate rows, counts and gating', () => {
+  const canyon = app.findVenueBySlug('kelowna', 'outdoor', 'test-canyon-regional-park');
+  const nordic = app.findVenueBySlug('vernon', 'outdoor', 'test-nordic-centre');
+  const meta = { reason: 'test', batch_id: 'outdoors-phase2-test', reviewed_by: null };
+  const added = [];
+  const add = (kind, id) => { const r = app.guardedCollectionMembershipUpdate(kind, id, 'add', null, meta); assert.equal(r.ok, true, JSON.stringify(r)); added.push([kind, id]); };
+  try {
+    add('activity_hiking', canyon.id); add('activity_viewpoints', canyon.id); add('activity_nature', canyon.id);
+    add('activity_winter', nordic.id);
+    const hiking = app.OUTDOOR_ACTIVITY_BY_SLUG.hiking;
+    const rows = app.getOutdoorActivityVenues(hiking);
+    assert.deepEqual(rows.map((v) => v.id), [canyon.id], 'the canyon is listed once under hiking');
+    assert.equal(app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.winter).map((v) => v.id).join(), String(nordic.id));
+    // Still exactly one venue row per destination.
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM venues WHERE type = 'outdoor' AND slug = 'test-canyon-regional-park'").get().n, 1);
+    const counts = app.getOutdoorActivityCounts();
+    assert.equal(counts.hiking, 1); assert.equal(counts.viewpoints, 1); assert.equal(counts.nature, 1); assert.equal(counts.winter, 1); assert.equal(counts.camping, 0);
+    // Below MIN_ACTIVITY_VENUES nothing is "live": no selector chips, and the activity page would not render.
+    assert.deepEqual(app.listLiveOutdoorActivities(), []);
+    assert.equal(app.renderOutdoorActivitySelector(null), '');
+    // A second add of the same membership is rejected, not duplicated.
+    assert.equal(app.guardedCollectionMembershipUpdate('activity_hiking', canyon.id, 'add', null, meta).reason, 'already_member');
+    // Activity collections never enter trip discovery even while populated.
+    for (const k of app.ACTIVITY_COLLECTION_KINDS) assert.ok(!app.getKnownDiscoveryKinds().includes(k));
+  } finally {
+    for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
+  }
+  assert.equal(app.getOutdoorActivityCounts().hiking, 0);
+});
+
+test('Activity page + landing sections render once an activity reaches the threshold: one H1, canonical, SEO/OG, ItemList, community line, active chip, featured cards (fixture-only, cleaned up)', () => {
+  // Three more outdoor fixtures so "hiking" reaches MIN_ACTIVITY_VENUES; all removed at the end.
+  const ids = [];
+  const meta = { reason: 'test', batch_id: 'outdoors-phase2-test', reviewed_by: null };
+  const added = [];
+  try {
+    for (const [name, region, slug] of [['Test Ridge Trail', 'penticton', 'test-ridge-trail'], ['Test Falls Park', 'vernon', 'test-falls-park'], ['Test Bluff Lookout', 'summerland', 'test-bluff-lookout']]) {
+      const info = insert.run({ name, region, type: 'outdoor', cuisine: null, phone: null, price: null, reviews: null, rating: null, description: `${name} is a fixture outdoor destination used only by the automated test suite.`, address: null, latitude: null, longitude: null, hours: null, slug });
+      ids.push(Number(info.lastInsertRowid));
+    }
+    const canyon = app.findVenueBySlug('kelowna', 'outdoor', 'test-canyon-regional-park');
+    for (const id of [canyon.id, ...ids]) { const r = app.guardedCollectionMembershipUpdate('activity_hiking', id, 'add', null, meta); assert.equal(r.ok, true, JSON.stringify(r)); added.push(['activity_hiking', id]); }
+    { const r = app.guardedCollectionMembershipUpdate('activity_viewpoints', canyon.id, 'add', null, meta); assert.equal(r.ok, true); added.push(['activity_viewpoints', canyon.id]); }
+
+    const live = app.listLiveOutdoorActivities();
+    assert.deepEqual(live.map((a) => [a.slug, a.count]), [['hiking', 4]], 'only hiking is live; viewpoints (1) stays below the threshold');
+    const hiking = app.OUTDOOR_ACTIVITY_BY_SLUG.hiking;
+    const venues = app.getOutdoorActivityVenues(hiking);
+    assert.equal(venues.length, 4);
+    assert.equal(new Set(venues.map((v) => v.id)).size, 4, 'no duplicate venue rows');
+    const html = app.renderOutdoorActivityPage(hiking, venues);
+    assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
+    assert.match(html, /<h1>Hiking &amp; Trails in the Okanagan<\/h1>/);
+    assert.match(html, /<title>Hiking &amp; Trails in the Okanagan \| Okanagan Roam<\/title>/);
+    assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors\/hiking"/);
+    assert.equal((html.match(/rel="canonical"/g) || []).length, 1, 'exactly one canonical');
+    assert.match(html, /<meta property="og:title" content="Hiking &amp; Trails in the Okanagan \| Okanagan Roam">/);
+    assert.match(html, /<meta name="description" content="4 outdoor destinations for hiking &amp; trails across the Okanagan Valley/);
+    assert.match(html, /"@type":"ItemList"/); assert.match(html, /"@type":"BreadcrumbList"/); assert.match(html, /"@type":"TouristAttraction"/);
+    assert.match(html, /<body class="golf-page outdoor-page">/);
+    assert.match(html, /<a class="category-back-link" href="\/outdoors">← All Outdoors<\/a>/);
+    assert.match(html, /<nav class="category-region-selector outdoor-activity-selector" aria-label="Choose an activity">\s*<a href="\/outdoors">All Outdoors<\/a>\s*<span class="category-region-selector-active">Hiking &amp; Trails<\/span>\s*<\/nav>/, 'active chip is static; sub-threshold activities are not offered');
+    assert.match(html, /<p class="subtitle">4 outdoor destinations for hiking &amp; trails across the Okanagan Valley\.<\/p>/, 'activity pages keep the count line');
+    assert.match(html, /<p class="outdoor-intro">/);
+    assert.match(html, /Test Canyon Regional Park<\/span><span class="venue-card-cue"[^<]*<\/span><\/a><\/h2>\s*<p class="venue-meta">Kelowna<\/p>/, 'community line on activity cards');
+    const cards = html.match(/<li class="venue-card" data-venue-id="\d+" data-venue-region="[a-z-]+" data-venue-category="outdoor"/g) || [];
+    assert.equal(cards.length, 4);
+    assert.doesNotMatch(html, /Test Nordic Centre/, 'a venue outside the activity is not listed');
+    assert.match(html, /<footer class="home-footer"/);
+    assert.doesNotMatch(html, /Outdoor page theme \(2026-09-20\)[\s\S]*Outdoor page theme \(2026-09-20\)/, 'theme block emitted once');
+
+    // Landing page: discovery sections in order, featured limited to resolvable keys (none of the fixtures), chips with counts.
+    const all = app.getVenuesByCategory('outdoor');
+    const landing = app.renderCategoryAllRegionsPage('outdoor', all);
+    assert.equal((landing.match(/<h1[\s>]/g) || []).length, 1);
+    assert.match(landing, /<h1>Outdoors in the Okanagan<\/h1>/);
+    const order = ['<p class="outdoor-intro">', 'Choose an activity</h2>', 'outdoor-activity-selector', 'Explore by region</h2>', 'category-region-selector" aria-label="Filter by region"', 'All outdoor destinations</h2>', '<ul class="card-grid">'];
+    const landingMarkup = outdoorMarkupOnly(landing);
+    let pos = -1; for (const marker of order) { const i = landingMarkup.indexOf(marker); assert.ok(i > pos, `landing section order: ${marker}`); pos = i; }
+    assert.match(landing, /<a href="\/outdoors\/hiking">Hiking &amp; Trails<span class="outdoor-activity-count">4<\/span><\/a>/);
+    assert.doesNotMatch(landing, /href="\/outdoors\/viewpoints"|href="\/outdoors\/camping"/, 'sub-threshold activities are not linked');
+    assert.doesNotMatch(landing, /Featured outdoor experiences/, 'no featured section when no featured key resolves (nothing fabricated)');
+    assert.equal(app.renderOutdoorFeaturedHtml(all), '');
+    // Featured section, when a key resolves, captions cards with their activities and never duplicates the venue.
+    const featuredHtml = app.renderOutdoorFeaturedHtml([{ ...canyon, region: 'kelowna', slug: 'myra-canyon-myra-bellevue-provincial-park' }]);
+    assert.match(featuredHtml, /Featured outdoor experiences/);
+    assert.match(featuredHtml, /compact-band-label">Kelowna<\/span>/);
+    assert.match(featuredHtml, /<div class="related-meta">Hiking &amp; Trails · Viewpoints<\/div>/);
+    assert.equal((featuredHtml.match(/related-card related-card-outdoor/g) || []).length, 1);
+  } finally {
+    for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('REGRESSION (Outdoors Phase 2): Golf/Beach wide pages keep their heading and carry no discovery sections; restaurant/region pages untouched', () => {
+  const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
+  const beachRows = app.getVenuesByRegionCategory('kelowna', 'beach');
+  const golf = app.renderCategoryAllRegionsPage('golf', golfRows);
+  const beach = app.renderCategoryAllRegionsPage('beach', beachRows);
+  assert.match(golf, /<h1>Golf Courses in the Okanagan<\/h1>/);
+  assert.match(beach, /<h1>Beaches in the Okanagan<\/h1>/);
+  for (const html of [golf, beach, app.renderCategoryPage('kelowna', 'beach', beachRows, []), app.renderCategoryPage('kelowna', 'outdoor', app.getVenuesByRegionCategory('kelowna', 'outdoor'), [])]) {
+    assert.doesNotMatch(outdoorMarkupOnly(html), /outdoor-intro|outdoor-activity-selector|Choose an activity|Featured outdoor experiences|All outdoor destinations|Explore by region<\/h2>/);
+  }
+  assert.doesNotMatch(golf, /outdoor-page|Outdoor page theme/);
+  assert.doesNotMatch(beach, /outdoor-page|Outdoor page theme/);
+  const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  assert.doesNotMatch(restaurant, /outdoor-activity|outdoor-intro|\/outdoors\//);
+});
+
+test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a live activity page change nothing on "/", /beaches, /golf, /browse, /trip; activity route, sitemap and 404s behave (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-outdoors-activity-'));
+  const projectRoot = path.join(__dirname, '..');
+  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  const ISOLATED_PORT = '3095';
+  const TOKEN = 'outdoors-activity-test-token';
+  const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderrOutput = '';
+  child.stderr.on('data', (chunk) => { stderrOutput += chunk.toString(); });
+  const base = `http://localhost:${ISOLATED_PORT}`;
+  const authed = { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` };
+  const footerOf = (html) => html.slice(html.indexOf('<footer class="home-footer"'), html.indexOf('</footer>') + 9);
+  try {
+    const deadline = Date.now() + 10000; let ready = false;
+    while (Date.now() < deadline && !ready) { try { if ((await fetch(`${base}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); } }
+    assert.ok(ready, `isolated child never became ready. stderr: ${stderrOutput}`);
+    const post = async (body) => { const r = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify(body) }); const t = await r.text(); assert.equal(r.status, 201, t); return JSON.parse(t); };
+    await post({ name: 'Fixture Winery', region: 'kelowna', type: 'winery', description: 'fixture', slug: 'fixture-winery' });
+    await post({ name: 'Fixture Beach', region: 'kelowna', type: 'beach', description: 'fixture beach', slug: 'fixture-beach' });
+    await post({ name: 'Fixture Golf Course', region: 'kelowna', type: 'golf', description: 'An 18-hole fixture course.', slug: 'fixture-golf-course' });
+    const outdoor = [];
+    for (const [name, region, slug] of [['Fixture Canyon Park', 'kelowna', 'fixture-canyon-park'], ['Fixture Ridge Trail', 'penticton', 'fixture-ridge-trail'], ['Fixture Falls Park', 'vernon', 'fixture-falls-park']]) {
+      outdoor.push(await post({ name, region, type: 'outdoor', description: `${name} fixture`, slug }));
+    }
+    const snap = async () => Object.fromEntries(await Promise.all(['/', '/beaches', '/golf', '/browse', '/trip'].map(async (p) => [p, await (await fetch(`${base}${p}`)).text()])));
+    const before = await snap();
+    assert.equal((await fetch(`${base}/outdoors/hiking`)).status, 404, 'no memberships yet -> 404');
+    for (const v of outdoor) {
+      const r = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'activity_hiking', venue_id: v.id, action: 'add', reason: 'test', batch_id: 'phase2-test' }) });
+      assert.equal(r.status, 200, await r.text());
+    }
+    const r2 = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'activity_viewpoints', venue_id: outdoor[0].id, action: 'add', reason: 'test', batch_id: 'phase2-test' }) });
+    assert.equal(r2.status, 200);
+    const after = await snap();
+    for (const p of Object.keys(before)) assert.equal(after[p], before[p], `${p} must be byte-identical after activity memberships exist`);
+    assert.match(after['/'], /class="mood-card mood-card-outdoors" href="#exploreRegions">/);
+    assert.match(after['/'], /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/);
+    assert.doesNotMatch(after['/'], /\/outdoors\/hiking|outdoor-activity/);
+
+    const act = await fetch(`${base}/outdoors/hiking`);
+    assert.equal(act.status, 200);
+    const actBody = await act.text();
+    assert.equal((actBody.match(/<h1[\s>]/g) || []).length, 1);
+    assert.match(actBody, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors\/hiking"/);
+    assert.equal((actBody.match(/<li class="venue-card" /g) || []).length, 3, 'three cards, one per member');
+    assert.equal(footerOf(actBody), footerOf(before['/beaches']), 'activity page footer == /beaches footer');
+    assert.equal((await fetch(`${base}/outdoors/viewpoints`)).status, 404, 'one member -> still 404');
+    assert.equal((await fetch(`${base}/outdoors/hiking/`)).status, 200, 'trailing slash tolerated like other routes');
+    const landing = await (await fetch(`${base}/outdoors`)).text();
+    assert.match(landing, /<a href="\/outdoors\/hiking">Hiking &amp; Trails<span class="outdoor-activity-count">3<\/span><\/a>/);
+    assert.equal((landing.match(/<li class="venue-card" /g) || []).length, 3, 'directory lists each venue once');
+    const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+    assert.match(sitemap, /<loc>https:\/\/okanaganroam\.com\/outdoors\/hiking<\/loc>/);
+    assert.doesNotMatch(sitemap, /\/outdoors\/viewpoints/);
+    const plan = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1, discovery: ['activity_hiking'] }) });
+    assert.equal(plan.status, 400, 'activity kinds are never trip discovery kinds');
   } finally {
     child.kill('SIGTERM');
     await new Promise((resolve) => child.once('exit', resolve));
