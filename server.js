@@ -6062,14 +6062,25 @@ function getOutdoorActivitySlugsByVenue(venues) {
   }
   return map;
 }
-// Region chips: every community with outdoor destinations, alphabetical
-// (same set/labels/order as the shared region selector), with counts.
+// Region chips (2026-09-20 correction): the site's COMPLETE canonical
+// region list -- the 20 routable regions of REGION_LABELS, in the
+// established Okanagan order of FOOTER_REGION_GROUPS (Central, South,
+// North, Ski resorts; the same order as the wizard's Step 1 chips and
+// the footer's Regions band) -- never just the communities that happen
+// to have outdoor destinations today. A region with none still gets a
+// chip, showing 0, and selecting it simply contributes no results.
+function canonicalOutdoorRegionOrder() {
+  const ordered = FOOTER_REGION_GROUPS.flatMap((g) => g.regions).filter((r) => REGION_LABELS[r]);
+  // Defensive: any routable region missing from the groups is appended so
+  // the selector can never silently drop a canonical region.
+  for (const r of Object.keys(REGION_LABELS)) if (!ordered.includes(r)) ordered.push(r);
+  return ordered;
+}
 function renderOutdoorRegionFilterChips(venues) {
   const counts = new Map();
   for (const v of venues) if (REGION_LABELS[v.region]) counts.set(v.region, (counts.get(v.region) || 0) + 1);
-  const regions = [...counts.keys()].sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
-  if (!regions.length) return '';
-  const chips = regions.map((r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="false">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${counts.get(r)}</span></button>`).join('\n      ');
+  const regions = canonicalOutdoorRegionOrder();
+  const chips = regions.map((r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="false">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${counts.get(r) || 0}</span></button>`).join('\n      ');
   return `<div class="category-region-selector outdoor-filter-group" role="group" aria-label="Choose regions" data-filter="region">
       ${chips}
     </div>`;
@@ -9314,6 +9325,7 @@ module.exports = {
   filterOutdoorVenues,
   getOutdoorActivitySlugsByVenue,
   renderOutdoorRegionFilterChips,
+  canonicalOutdoorRegionOrder,
   renderOutdoorActivityFilterChips,
   renderOutdoorFilterScriptHtml,
   OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,

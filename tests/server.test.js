@@ -4971,7 +4971,7 @@ test('/outdoors (Okanagan-wide) renders the discovery landing: one H1, canonical
   // Hierarchy: Choose Region(s) -> Choose Activity(s) -> Show results -> Results.
   const iRegion = markup.indexOf('Choose Region(s)</h2>'), iActivity = markup.indexOf('Choose Activity(s)</h2>'), iShow = markup.indexOf('id="outdoorShowResults"'), iResults = markup.indexOf('id="outdoorResultsTop">Results</h2>');
   assert.ok(iRegion > 0 && iActivity > iRegion && iShow > iActivity && iResults > iShow, 'Region -> Activity -> Show results -> Results');
-  for (const r of new Set(rows.map((v) => v.region))) assert.match(markup, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">`), `region chip for ${r}`);
+  for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">`), `canonical region chip for ${r}`);
   assert.match(markup, /<p class="outdoor-results-summary" id="outdoorResultsSummary" aria-live="polite">\d+ outdoor destinations<\/p>/);
   assert.match(markup, /id="outdoorNoResults" hidden>/);
   assert.match(html, /<script type="application\/json" id="outdoorActivityMap">\{[\s\S]*?\}<\/script>/);
@@ -5104,7 +5104,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.match(wideBody, /Fixture Canyon Park/); assert.match(wideBody, /Fixture Nordic Centre/);
     assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">1<\/span>/);
     assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon/);
-    assert.doesNotMatch(wideBody, /data-region="osoyoos"/, 'a region with no outdoor venues gets no chip');
+    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/, 'a canonical region with no outdoor venues still gets a chip, showing 0');
     assert.equal((wideBody.match(/<h1[\s>]/g) || []).length, 1);
     assert.equal(footerOf(wideBody), footerOf(beachesBefore), 'the shared footer on /outdoors is byte-identical to the /beaches footer');
     assert.match(wideBody.replace(/<style>[\s\S]*?<\/style>/g, ''), /<ul class="card-grid" id="outdoorResults">[\s\S]*Fixture Canyon Park[\s\S]*Fixture Nordic Centre/, 'landing results list carries every destination');
@@ -5253,7 +5253,7 @@ test('Activity page + landing sections render once an activity reaches the thres
     assert.doesNotMatch(landing, /Featured Outdoor Experiences/, 'the landing directory has no featured section');
     assert.doesNotMatch(outdoorMarkupOnly(landing), /aria-label="Filter by region"|category-region-selector-active">All Regions/, 'the shared All-Regions selector is not rendered on the landing');
     const chipRegions = [...outdoorMarkupOnly(landing).match(/data-filter="region"[\s\S]*?<\/div>/)[0].matchAll(/data-region="([a-z-]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(chipRegions, [...new Set(all.map((v) => v.region))].sort((x, y) => app.REGION_LABELS[x].localeCompare(app.REGION_LABELS[y])), 'region chips: every community with outdoor venues, alphabetical');
+    assert.deepEqual(chipRegions, app.canonicalOutdoorRegionOrder(), 'region chips: the complete canonical region list in the site order');
     assert.equal(app.renderOutdoorFeaturedHtml(all), '');
     // Featured section, when a key resolves, captions cards with their activities and never duplicates the venue.
     const featuredHtml = app.renderOutdoorFeaturedHtml([{ ...canyon, region: 'kelowna', slug: 'myra-canyon-myra-bellevue-provincial-park' }]);
@@ -5478,4 +5478,38 @@ test('I.3: the landing filter chips and the activity-page chips present the six 
     for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
     for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
+});
+
+
+// ==== Outdoors region selector = canonical region list (2026-09-20) ========
+
+test('Outdoor region chips use the complete canonical region list (REGION_LABELS, in FOOTER_REGION_GROUPS order): every region present, zero-count regions show 0, counts accurate, no invented regions', () => {
+  const canonical = app.canonicalOutdoorRegionOrder();
+  // Source of truth: exactly the 20 routable regions, ordered by the footer/wizard grouping.
+  assert.deepEqual([...canonical].sort(), Object.keys(app.REGION_LABELS).sort(), 'exactly the canonical regions, none missing, none invented');
+  assert.deepEqual(canonical, app.FOOTER_REGION_GROUPS.flatMap((g) => g.regions), 'site order: Central, South, North, Ski resorts');
+  assert.equal(canonical.length, 20);
+  assert.deepEqual(canonical.slice(0, 4), ['kelowna', 'west-kelowna', 'peachland', 'lake-country']);
+  assert.deepEqual(canonical.slice(-4), ['big-white', 'silverstar', 'apex', 'baldy']);
+  const rows = app.getVenuesByCategory('outdoor');
+  const chips = app.renderOutdoorRegionFilterChips(rows);
+  const rendered = [...chips.matchAll(/data-region="([a-z-]+)" aria-pressed="false">([^<]+)<span class="outdoor-activity-count">(\d+)<\/span>/g)].map((m) => [m[1], m[2], Number(m[3])]);
+  assert.deepEqual(rendered.map((r) => r[0]), canonical, 'chips rendered for every canonical region in site order');
+  for (const [slug, label, count] of rendered) {
+    assert.equal(label, app.REGION_LABELS[slug].replace(/&/g, '&amp;'), `label for ${slug} comes from REGION_LABELS`);
+    assert.equal(count, rows.filter((v) => v.region === slug).length, `count for ${slug} is the real outdoor count`);
+  }
+  assert.ok(rendered.some((r) => r[2] === 0), 'at least one canonical region has no outdoor fixtures and shows 0');
+  assert.ok(rendered.some((r) => r[2] > 0));
+  // Selecting a zero-count region yields no results; OR/AND semantics unchanged.
+  const map = app.getOutdoorActivitySlugsByVenue(rows);
+  const zeroRegion = rendered.find((r) => r[2] === 0)[0];
+  assert.deepEqual(app.filterOutdoorVenues(rows, [zeroRegion], [], map), [], 'zero-count region -> no results (not hidden, not manufactured)');
+  assert.equal(app.filterOutdoorVenues(rows, [zeroRegion, 'kelowna'], [], map).length, rows.filter((v) => v.region === 'kelowna').length, 'zero-count region contributes nothing under OR');
+  assert.equal(app.filterOutdoorVenues(rows, [], [], map).length, rows.length, 'no filters = everything');
+  // Full page still carries the multi-select experience.
+  const landing = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', rows));
+  assert.equal((landing.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
+  assert.ok(landing.indexOf('Choose Region(s)</h2>') < landing.indexOf('Choose Activity(s)</h2>'));
+  assert.match(landing, /id="outdoorClearFilters"/); assert.match(landing, /id="outdoorNoResults" hidden>/);
 });
