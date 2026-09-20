@@ -5423,3 +5423,59 @@ test('filterOutdoorVenues over real memberships: region-only, activity-only, com
     for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
 });
+
+
+// ==== I.3 (2026-09-20): finalized Outdoor activity order and labels ========
+
+test('I.3: finalized activity display order and labels; slugs unchanged; Camping/Water stay defined but not live', () => {
+  assert.deepEqual(app.OUTDOOR_ACTIVITY_DISPLAY_ORDER.slice(0, 6), ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure']);
+  const sorted = app.sortOutdoorActivitiesForDisplay(app.OUTDOOR_ACTIVITIES);
+  assert.deepEqual(sorted.slice(0, 6).map((a) => a.label), ['Hiking & Trails', 'Viewpoints', 'Nature & Wildlife', 'Cycling & Biking', 'Winter', 'Adventure']);
+  assert.deepEqual(sorted.slice(0, 6).map((a) => a.slug), ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure']);
+  assert.deepEqual(sorted.slice(6).map((a) => a.slug).sort(), ['camping', 'water'], 'Camping and Water remain defined, after the six');
+  for (const slug of ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure', 'camping', 'water']) assert.ok(app.OUTDOOR_ACTIVITY_BY_SLUG[slug], `slug ${slug} unchanged`);
+  assert.equal(app.OUTDOOR_ACTIVITIES.length, 8, 'no new categories');
+});
+
+test('I.3: the landing filter chips and the activity-page chips present the six live activities in the finalized order (counts on the landing only); Camping/Water not offered; filtering untouched (fixture-only, cleaned up)', () => {
+  const meta = { reason: 'test', batch_id: 'outdoors-i3-test', reviewed_by: null };
+  const ids = []; const added = [];
+  const mk = (name, region, slug) => { const info = insert.run({ name, region, type: 'outdoor', cuisine: null, phone: null, price: null, reviews: null, rating: null, description: `${name} fixture.`, address: null, latitude: null, longitude: null, hours: null, slug }); const id = Number(info.lastInsertRowid); ids.push(id); return id; };
+  const add = (kind, id) => { const r = app.guardedCollectionMembershipUpdate(kind, id, 'add', null, meta); assert.equal(r.ok, true, JSON.stringify(r)); added.push([kind, id]); };
+  try {
+    // Three fixtures in every one of the six activities (in a deliberately scrambled definition order), none in camping/water.
+    const a = mk('Order Fixture A', 'kelowna', 'order-fixture-a'), b = mk('Order Fixture B', 'vernon', 'order-fixture-b'), c = mk('Order Fixture C', 'penticton', 'order-fixture-c');
+    for (const kind of ['activity_adventure', 'activity_winter', 'activity_cycling', 'activity_nature', 'activity_viewpoints', 'activity_hiking']) for (const id of [a, b, c]) add(kind, id);
+    const expectedLabels = ['Hiking & Trails', 'Viewpoints', 'Nature & Wildlife', 'Cycling & Biking', 'Winter', 'Adventure'];
+    const expectedSlugs = ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure'];
+    // Landing chips (multi-select buttons with counts), in order.
+    const chips = app.renderOutdoorActivityFilterChips();
+    assert.deepEqual([...chips.matchAll(/data-activity="([a-z]+)"/g)].map((m) => m[1]), expectedSlugs);
+    assert.deepEqual([...chips.matchAll(/aria-pressed="false">([^<]+)<span class="outdoor-activity-count">(\d+)<\/span>/g)].map((m) => m[1].replace(/&amp;/g, '&')), expectedLabels);
+    assert.ok(!chips.includes('data-activity="camping"') && !chips.includes('data-activity="water"'));
+    // Activity-page selector (links + active pill), same order, no counts.
+    const nav = app.renderOutdoorActivitySelector('nature');
+    const navSlugs = [...nav.matchAll(/href="\/outdoors\/([a-z]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(navSlugs, ['hiking', 'viewpoints', 'cycling', 'winter', 'adventure'], 'links in order with the active one (nature) rendered as the static pill in its slot');
+    assert.match(nav, /Viewpoints<\/a>\s*<span class="category-region-selector-active">Nature &amp; Wildlife<\/span>\s*<a href="\/outdoors\/cycling">/);
+    assert.doesNotMatch(nav, /outdoor-activity-count/, 'no counts on activity pages');
+    // Full pages: landing keeps the multi-select experience; activity page keeps its layout.
+    const all = app.getVenuesByCategory('outdoor');
+    const landing = app.renderCategoryAllRegionsPage('outdoor', all);
+    const lm = outdoorMarkupOnly(landing);
+    assert.deepEqual([...lm.match(/data-filter="activity"[\s\S]*?<\/div>/)[0].matchAll(/data-activity="([a-z]+)"/g)].map((m) => m[1]), expectedSlugs);
+    assert.ok(lm.indexOf('Choose Region(s)</h2>') < lm.indexOf('Choose Activity(s)</h2>') && lm.indexOf('Choose Activity(s)</h2>') < lm.indexOf('id="outdoorShowResults"') && lm.indexOf('id="outdoorShowResults"') < lm.indexOf('Results</h2>'));
+    assert.match(lm, /<button type="button" class="outdoor-filter-chip" data-region="kelowna" aria-pressed="false">/, 'region controls are still toggle buttons');
+    assert.match(landing, /replaceState|URLSearchParams/, 'URL query persistence still shipped');
+    const winter = app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.winter, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.winter));
+    assert.deepEqual([...outdoorMarkupOnly(winter).match(/outdoor-activity-selector[\s\S]*?<\/nav>/)[0].matchAll(/(?:href="\/outdoors\/([a-z]+)"|category-region-selector-active">([^<]+)<)/g)].map((m) => m[1] || 'ACTIVE:' + m[2]), ['hiking', 'viewpoints', 'nature', 'cycling', 'ACTIVE:Winter', 'adventure']);
+    assert.match(winter, /<h1>Winter in the Okanagan<\/h1>/); assert.match(winter, /<li class="venue-card" /);
+    // Filtering semantics untouched.
+    const map = app.getOutdoorActivitySlugsByVenue(all.filter((v) => ids.includes(v.id)));
+    assert.equal(app.filterOutdoorVenues(all.filter((v) => ids.includes(v.id)), ['kelowna', 'vernon'], ['winter', 'adventure'], map).length, 2);
+    assert.equal(app.filterOutdoorVenues(all.filter((v) => ids.includes(v.id)), ['osoyoos'], ['winter'], map).length, 0);
+  } finally {
+    for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});

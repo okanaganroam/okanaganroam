@@ -1513,6 +1513,17 @@ const OUTDOOR_ACTIVITIES = [
   { slug: 'adventure', kind: 'activity_adventure', label: 'Adventure', blurb: 'Rock climbing, bike parks, tubing and skating loops \u2014 the bigger, louder days out.' },
 ];
 const OUTDOOR_ACTIVITY_BY_SLUG = Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a]));
+// Finalized visitor-facing display order (I.3, 2026-09-20) for every
+// Outdoor activity selector/chip row: most-common summer intents first,
+// seasonal and specialist last. Slugs, labels and URLs are unchanged;
+// OUTDOOR_ACTIVITIES above keeps its definition order for non-display
+// uses (data maps, sitemap), so only presentation moves. Camping and
+// Water stay defined but are not live until MIN_ACTIVITY_VENUES is met.
+const OUTDOOR_ACTIVITY_DISPLAY_ORDER = ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure', 'camping', 'water'];
+function sortOutdoorActivitiesForDisplay(list) {
+  const rank = (slug) => { const i = OUTDOOR_ACTIVITY_DISPLAY_ORDER.indexOf(slug); return i === -1 ? OUTDOOR_ACTIVITY_DISPLAY_ORDER.length : i; };
+  return list.slice().sort((a, b) => rank(a.slug) - rank(b.slug));
+}
 // An activity page only exists once it has enough real destinations to be
 // worth a visit; below this the activity is simply not offered in the
 // selector and its URL is a 404 (never an empty or one-card page). Same
@@ -5984,7 +5995,7 @@ function renderCategoryRegionSelector(catSlug, venues) {
 // activity links out) and the activity's slug on its own page (that chip
 // is the static "active" pill and an "All Outdoors" link leads back).
 function renderOutdoorActivitySelector(currentSlug = null) {
-  const live = listLiveOutdoorActivities();
+  const live = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities());
   if (!live.length) return '';
   // Counts are shown only on the landing page (where they signal depth);
   // on an activity page the H1's own count line already says it.
@@ -6065,7 +6076,7 @@ function renderOutdoorRegionFilterChips(venues) {
 }
 // Activity chips: the live activities (>= MIN_ACTIVITY_VENUES) with counts.
 function renderOutdoorActivityFilterChips() {
-  const live = listLiveOutdoorActivities();
+  const live = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities());
   if (!live.length) return '';
   const chips = live.map((a) => `<button type="button" class="outdoor-filter-chip" data-activity="${a.slug}" aria-pressed="false">${escapeHtml(a.label)}<span class="outdoor-activity-count">${a.count}</span></button>`).join('\n      ');
   return `<div class="category-region-selector outdoor-filter-group" role="group" aria-label="Choose activities" data-filter="activity">
@@ -9288,6 +9299,8 @@ module.exports = {
   ACTIVITY_COLLECTION_KINDS,
   OUTDOOR_ACTIVITIES,
   OUTDOOR_ACTIVITY_BY_SLUG,
+  OUTDOOR_ACTIVITY_DISPLAY_ORDER,
+  sortOutdoorActivitiesForDisplay,
   MIN_ACTIVITY_VENUES,
   OUTDOOR_FEATURED_KEYS,
   getOutdoorActivityVenues,
