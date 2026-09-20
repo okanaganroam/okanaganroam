@@ -3324,6 +3324,11 @@ function renderHomeFooterHTML(fromBrowse) {
   const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
   const exploreRegionsHref = fromBrowse ? '/#exploreRegions' : '#exploreRegions';
   const hiddenGemsHref = fromBrowse ? '/#hiddenGems' : '#hiddenGems';
+  // Outdoors (2026-09-20): the same gated destination as the homepage's
+  // Outdoors mood card -- the Okanagan-wide /outdoors listing once outdoor
+  // venues exist, otherwise the in-page anchor as before. Only this one
+  // link's href changes; the footer's markup and every other link are untouched.
+  const outdoorsHref = bestRegionForType.outdoor && CATEGORY_SLUGS.outdoor ? `/${CATEGORY_SLUGS.outdoor}` : exploreRegionsHref;
 
   // Two explicit subcolumns (FOOTER.png reference), not a CSS multi-column
   // auto-balance: subcol 1 = Central then South stacked; subcol 2 = North
@@ -3362,7 +3367,7 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="${exploreRegionsHref}" data-i18n="mood.beaches.title">Beaches</a></li>
           <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
           <li><a href="/events" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
-          <li><a href="${exploreRegionsHref}" data-i18n="mood.outdoors.title">Outdoors</a></li>
+          <li><a href="${outdoorsHref}" data-i18n="mood.outdoors.title">Outdoors</a></li>
           <li><a href="${hiddenGemsHref}" data-i18n="gems.heading">Hidden Gems</a></li>
         </ul>
       </div>

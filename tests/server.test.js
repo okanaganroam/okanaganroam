@@ -2288,7 +2288,7 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
   assert.equal(items[2].href, '#exploreRegions');
   assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
   assert.equal(items[4].href, '/events');
-  assert.equal(items[5].href, '#exploreRegions');
+  assert.equal(items[5].href, '/outdoors', 'footer Outdoors link matches the Outdoors mood card once outdoor venues exist (2026-09-20)');
   assert.equal(items[6].href, '#hiddenGems');
 });
 
@@ -5089,14 +5089,17 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.equal(tag.status, 200, await tag.text());
 
     const homeAfter = await (await fetch(`${base}/`)).text();
-    assert.equal(homeAfter, homeBefore.replace('class="mood-card mood-card-outdoors" href="#exploreRegions">', 'class="mood-card mood-card-outdoors" href="/outdoors">'), 'outdoor data changes exactly one attribute on "/": the Outdoors mood-card href (2026-09-20 fix, same pattern as Beaches)');
+    assert.equal(homeAfter, homeBefore.replace('class="mood-card mood-card-outdoors" href="#exploreRegions">', 'class="mood-card mood-card-outdoors" href="/outdoors">').replace('<li><a href="#exploreRegions" data-i18n="mood.outdoors.title">Outdoors</a></li>', '<li><a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a></li>'), 'outdoor data changes exactly two hrefs on "/": the Outdoors mood card and the footer Outdoors link (2026-09-20, same pattern as Beaches)');
     assert.match(homeAfter, /class="mood-card mood-card-outdoors" href="\/outdoors">/, 'the Outdoors mood card now points at the Okanagan-wide /outdoors listing');
-    assert.match(homeAfter, /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'the footer Outdoors link is untouched');
+    assert.match(homeAfter, /<li><a href="\/outdoors" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'the footer Outdoors link now points at /outdoors like the mood card');
+    assert.match(homeBefore, /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'with no outdoor data the footer link keeps its in-page anchor');
     assert.doesNotMatch(homeAfter, /href="\/kelowna\/outdoors"|Fixture Canyon Park|outdoor-page/);
-    assert.equal(await (await fetch(`${base}/beaches`)).text(), beachesBefore, '/beaches is byte-identical');
-    assert.equal(await (await fetch(`${base}/golf`)).text(), golfBefore, '/golf is byte-identical');
-    assert.equal(await (await fetch(`${base}/browse`)).text(), browseBefore, '/browse is byte-identical');
-    assert.equal(await (await fetch(`${base}/trip`)).text(), tripBefore, '/trip is byte-identical');
+    // The shared footer is on these pages too, so its Outdoors link (and only that) may change with outdoor data.
+    const withFooterOutdoors = (html) => html.replace(/<li><a href="\/?#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, '<li><a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a></li>');
+    assert.equal(await (await fetch(`${base}/beaches`)).text(), withFooterOutdoors(beachesBefore), '/beaches is byte-identical apart from the footer Outdoors link');
+    assert.equal(await (await fetch(`${base}/golf`)).text(), withFooterOutdoors(golfBefore), '/golf is byte-identical apart from the footer Outdoors link');
+    assert.equal(await (await fetch(`${base}/browse`)).text(), withFooterOutdoors(browseBefore), '/browse is byte-identical apart from the footer Outdoors link');
+    assert.equal(await (await fetch(`${base}/trip`)).text(), withFooterOutdoors(tripBefore), '/trip is byte-identical apart from the footer Outdoors link');
 
     // Routes now live.
     const wide = await fetch(`${base}/outdoors`);
@@ -5107,7 +5110,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon/);
     assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/, 'a canonical region with no outdoor venues still gets a chip, showing 0');
     assert.equal((wideBody.match(/<h1[\s>]/g) || []).length, 1);
-    assert.equal(footerOf(wideBody), footerOf(beachesBefore), 'the shared footer on /outdoors is byte-identical to the /beaches footer');
+    assert.equal(footerOf(wideBody), footerOf(withFooterOutdoors(beachesBefore)), 'the shared footer on /outdoors is byte-identical to the /beaches footer (with its Outdoors link now /outdoors)');
     assert.match(wideBody.replace(/<style>[\s\S]*?<\/style>/g, ''), /<ul class="card-grid" id="outdoorResults">[\s\S]*Fixture Canyon Park[\s\S]*Fixture Nordic Centre/, 'landing results list carries every destination');
     assert.match(await (await fetch(`${base}/kelowna/outdoors`)).text(), /<li class="venue-card" /, 'regional page keeps full listing cards');
     const regional = await fetch(`${base}/kelowna/outdoors`);
@@ -5320,7 +5323,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     const after = await snap();
     for (const p of Object.keys(before)) assert.equal(after[p], before[p], `${p} must be byte-identical after activity memberships exist`);
     assert.match(after['/'], /class="mood-card mood-card-outdoors" href="\/outdoors">/);
-    assert.match(after['/'], /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/);
+    assert.match(after['/'], /<li><a href="\/outdoors" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/);
     assert.doesNotMatch(after['/'], /\/outdoors\/hiking|outdoor-activity/);
 
     const act = await fetch(`${base}/outdoors/hiking`);
