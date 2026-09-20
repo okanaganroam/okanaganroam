@@ -4716,6 +4716,12 @@ function renderGolfThemeStyles() {
   body.golf-page .venue-card .card-links { display: none; }
   body.golf-page a { color: var(--ref-navy); }
   body.golf-page a:hover { color: var(--ref-gold); }
+  /* Footer links (2026-09-20 fix): the rule above outranks the footer's own
+     .home-footer-col a colour, which painted its links navy-on-navy on
+     every golf-themed page. Restates the footer's own values; no markup
+     or layout change. */
+  body.golf-page .home-footer-col a, body.golf-page .home-footer-region-group a { color: rgba(245,243,237,0.78); }
+  body.golf-page .home-footer-col a:hover, body.golf-page .home-footer-region-group a:hover { color: var(--ref-gold); }
   body.golf-page a.app-btn, body.golf-page a.app-btn:hover { color: var(--ref-white); text-decoration: none; }
   body.golf-page nav.breadcrumb { font-size: 0.8rem; color: rgba(42,32,25,0.62); margin-bottom: 18px; }
   body.golf-page nav.breadcrumb a { color: var(--ref-navy); }
@@ -4862,6 +4868,451 @@ function renderGolfThemeStyles() {
     body.golf-page .venue-cta-row .cta, body.golf-page .venue-cta-row .card-action { width: 100%; justify-content: center; }
   }
 </style>`;
+}
+
+// Themed venue page polish (golf 2026-09-20; beach the same day for
+// consistency): the hero is the page's single title treatment (it carries
+// the <h1>), the block under it opens with the category/region meta line,
+// and, for golf, an "At a glance" card summarises the course. These styles
+// are emitted only on golf and beach venue pages (see renderVenuePage);
+// every other page is byte-identical to before. Each type keeps its own
+// SEO_PAGE_CSS hero gradient (green for golf, navy for beach).
+function renderGolfVenuePolishStyles() {
+  return `<style>
+  /* Hero: same per-type gradient, a touch taller and with a soft light
+     sweep so the flat panel reads as intentional; the page heading lives
+     here. */
+  body.golf-page .venue-hero-fallback {
+    position: relative; min-height: 280px; padding: 34px 36px; border-radius: 14px;
+  }
+  body.golf-page .venue-hero-fallback.venue-hero-golf { box-shadow: 0 18px 34px -22px rgba(52,89,66,0.7); }
+  body.golf-page .venue-hero-fallback.venue-hero-beach { box-shadow: 0 18px 34px -22px rgba(16,27,36,0.75); }
+  body.golf-page .venue-hero-fallback::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(255,255,255,0.14), rgba(255,255,255,0) 55%),
+      linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(16,32,22,0.28) 100%);
+  }
+  body.golf-page .venue-hero-fallback::after {
+    content: ""; position: absolute; inset: 10px; pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+  }
+  body.golf-page .venue-hero-fallback .venue-hero-type,
+  body.golf-page .venue-hero-fallback h1 { position: relative; z-index: 1; }
+  body.golf-page .venue-hero-fallback .venue-hero-type {
+    font-family: 'Nunito', sans-serif; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.12em;
+    text-transform: uppercase; color: rgba(255,255,255,0.82); margin-bottom: 10px;
+  }
+  body.golf-page .venue-hero-fallback h1 {
+    font-family: 'Fraunces', serif; font-weight: 600; line-height: 1.1;
+    font-size: clamp(1.9rem, 3.6vw, 2.75rem); margin: 0; color: var(--ref-white); max-width: 22ch;
+    text-shadow: 0 1px 2px rgba(16,32,22,0.25);
+  }
+  /* Under the hero: category/region meta first (no repeated title), then
+     any badges, then the description. */
+  body.golf-page .venue-header { margin: 0 0 14px; }
+  body.golf-page .venue-header .venue-at-a-glance {
+    margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; letter-spacing: 0.02em;
+    color: rgba(42,32,25,0.62); opacity: 1;
+  }
+  body.golf-page .venue-header .venue-at-a-glance a { color: var(--ref-navy); }
+  body.golf-page .venue-header .venue-at-a-glance a:hover { color: var(--ref-gold); text-decoration: none; }
+  body.golf-page .venue-header .chips:empty { display: none; }
+  body.golf-page .venue-description { font-size: 1.06rem; line-height: 1.7; max-width: 72ch; margin: 0 0 22px; }
+  /* Good to Know: let an unbreakable website URL (e.g. a StoryMaps hash)
+     wrap instead of forcing a sideways scroll on phones; ordinary links
+     are unaffected because they never overflow. */
+  body.golf-page .venue-key-info .detail-row a { overflow-wrap: anywhere; }
+  /* At a glance: the paper card system, with a compact label/value grid. */
+  body.golf-page .venue-section.golf-glance { padding: 20px 22px 8px; }
+  body.golf-page .golf-glance h2 { margin-bottom: 14px; }
+  body.golf-page .golf-glance dl {
+    display: grid; grid-template-columns: 1fr; gap: 0 28px; margin: 0;
+  }
+  @media (min-width: 640px) { body.golf-page .golf-glance dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1000px) { body.golf-page .golf-glance dl { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  body.golf-page .golf-glance .golf-glance-item {
+    padding: 10px 0 12px; border-top: 1px solid rgba(27,43,58,0.1);
+  }
+  body.golf-page .golf-glance dt {
+    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; color: rgba(42,32,25,0.55); margin: 0 0 3px;
+  }
+  body.golf-page .golf-glance dd { margin: 0; font-size: 0.95rem; line-height: 1.45; color: var(--ink); }
+  @media (max-width: 640px) {
+    body.golf-page .venue-hero-fallback { min-height: 200px; padding: 22px 20px; }
+    body.golf-page .venue-hero-fallback::after { inset: 8px; }
+    body.golf-page .venue-hero-fallback h1 { font-size: 1.6rem; }
+    body.golf-page .venue-section.golf-glance { padding: 16px 16px 4px; }
+  }
+</style>`;
+}
+
+// "At a glance" facts for golf venues. Every value is restated from the
+// venue's owner-approved description (the 2026-09-19 Golf content pass,
+// which only stated practice facilities confirmed by official-tier
+// sources); nothing here comes from any other source, and a venue with
+// no entry simply renders no card. Keyed by region/slug (stable across
+// environments, unlike ids). Confirmed absences (e.g. no driving range)
+// are kept because they are useful to golfers.
+const GOLF_AT_A_GLANCE_FACTS = {
+  'kelowna/gallaghers-canyon-canyon-course': [
+    ['Course', '18 holes · par 72'],
+    ['Access', 'Semi-private'],
+    ['Driving range', '300-plus-yard, double-ended grass range'],
+    ['Putting', 'Two putting greens'],
+    ['Short game', 'Two chipping greens with bunkers'],
+    ['Lessons', 'GBC Golf Academy'],
+  ],
+  'kelowna/gallaghers-canyon-pinnacle-course': [
+    ['Course', '9 holes · par 32'],
+    ['Access', 'Semi-private'],
+    ['Driving range', '300-plus-yard, double-ended grass range (shared)'],
+    ['Putting', 'Two putting greens'],
+    ['Short game', 'Two bunkered chipping greens'],
+    ['Lessons', 'GBC Golf Academy'],
+  ],
+  'kelowna/kelowna-golf-country-club': [
+    ['Course', '18 holes · par 72 · parkland'],
+    ['Established', '1920 (A.V. Macan)'],
+    ['Access', 'Private, members only'],
+    ['Driving range', 'Practice range with TopTracer'],
+    ['Short game', 'Dedicated short-game area'],
+    ['Lessons', 'PGA professionals'],
+  ],
+  'kelowna/tower-ranch-golf-country-club': [
+    ['Designer', 'Thomas McBroom'],
+    ['Access', 'Public'],
+    ['Driving range', 'None — nets on site; partner range at World Beat Family Golf'],
+    ['Clubhouse', 'Carrington’s Restaurant & Patio; fitness; events'],
+  ],
+  'kelowna/michaelbrook-golf-course': [
+    ['Course', '18 holes · flat and walkable'],
+    ['Pace', 'About 3 h 10 min for 18'],
+    ['Ownership', 'City of Kelowna (since 2025), run by Monaghan Golf'],
+    ['Clubhouse', 'Brookside Grill, dog-friendly patio'],
+  ],
+  'kelowna/black-mountain-golf-club': [
+    ['Course', 'Par 71 · 6,400 yards'],
+    ['Tees', 'Four sets'],
+    ['Access', 'Public'],
+    ['Lessons', 'PGA of Canada professionals'],
+    ['Clubhouse', 'The Grill, valley-view patio'],
+  ],
+  'kelowna/sunset-ranch-golf-country-club': [
+    ['Course', '18 holes · par 72 · 6,500 yards'],
+    ['Access', 'Semi-private'],
+    ['Driving range', 'None — hitting nets only'],
+    ['Putting', 'Putting green'],
+    ['Short game', 'Chipping green'],
+    ['Lessons', 'Golf Academy'],
+  ],
+  'kelowna/okanagan-golf-club-bear-course': [
+    ['Course', '18 holes · par 72 · 6,852 yards'],
+    ['Designer', 'Jack Nicklaus'],
+    ['Access', 'Semi-private (GolfBC)'],
+    ['Driving range', 'Double-ended grass range'],
+    ['Short game', 'Dedicated chipping and putting areas'],
+    ['Lessons', 'GBC Golf Academy'],
+  ],
+  'kelowna/okanagan-golf-club-quail-course': [
+    ['Course', '18 holes · par 71 · 6,576 yards'],
+    ['Designer', 'Les Furber (1994)'],
+    ['Access', 'Semi-private (GolfBC)'],
+    ['Driving range', 'Double-ended grass range (shared)'],
+    ['Short game', 'Dedicated chipping and putting greens'],
+    ['Lessons', 'GBC Golf Academy'],
+  ],
+  'kelowna/mission-creek-golf-club': [
+    ['Course', '18 holes · par 61 · under 3,900 yards'],
+    ['Pace', 'Rounds typically inside three hours'],
+    ['Putting', 'Large putting green'],
+    ['Lessons', 'Golf instructor available'],
+    ['Clubhouse', 'On-site restaurant'],
+  ],
+  'kelowna/shadow-ridge-golf-club': [
+    ['Course', 'Par 71 · flat and walkable'],
+    ['Putting', 'Putting practice area'],
+    ['Rentals', 'Clubs and carts'],
+    ['Pro shop', 'Well-stocked golf shop'],
+    ['Clubhouse', 'Full-service restaurant'],
+  ],
+  'kelowna/kelowna-springs-golf-club': [
+    ['Course', '9 holes · play twice for 18'],
+    ['Designer', 'Les Furber (opened 1990)'],
+    ['Practice', 'Warm-up areas on site'],
+  ],
+  'lumby/coldstream-golf-course': [
+    ['Course', '9 holes · par 36 · 2,715 yards'],
+    ['Driving range', 'Yes, with rental buckets'],
+    ['Pro shop', 'Honesty cash box rather than a full shop'],
+    ['Extras', 'Dry RV camping on site'],
+  ],
+  'enderby/mabel-lake-golf-country-club': [
+    ['Course', '9 holes · par 36 (18-hole round, par 72)'],
+    ['Designer', 'Les Furber'],
+    ['Driving range', 'Yes'],
+    ['Putting', 'Putting green'],
+    ['Clubhouse', 'Restaurant overlooking the 9th green'],
+    ['Extras', 'Marina, sandy beach, RV lots, cabins, grass airstrip'],
+  ],
+  'vernon/predator-ridge-predator-course': [
+    ['Course', '18 holes · par 71 · 7,034 yards'],
+    ['Designer', 'Les Furber (1991)'],
+    ['Access', 'Alternates daily: members / public and resort guests'],
+    ['Driving range', 'Grass tees with TopTracer'],
+    ['Short game', 'Target greens and short-game area'],
+    ['Lessons', 'Golf academy'],
+  ],
+  'vernon/predator-ridge-ridge-course': [
+    ['Course', '18 holes · par 72 · 7,128 yards'],
+    ['Designer', 'Doug Carrick (2010)'],
+    ['Access', 'Alternates daily: members / public and resort guests'],
+    ['Driving range', 'TopTracer range'],
+    ['Short game', 'Target greens and short-game area'],
+    ['Lessons', 'Golf academy'],
+  ],
+  'osoyoos/osoyoos-golf-club-park-meadows': [
+    ['Course', '18 holes · par 72 · walker-friendly'],
+    ['Driving range', '14-stall, full-length (shared with Desert Gold)'],
+    ['Putting', 'Large putting green'],
+    ['Short game', '80-yard area with target greens and a bunker'],
+    ['Lessons', 'Golf Academy, PGA of Canada professionals'],
+    ['Clubhouse', 'Greenside Bar & Grill, lake-view patio'],
+  ],
+  'osoyoos/osoyoos-golf-club-desert-gold': [
+    ['Course', 'Links-style desert layout'],
+    ['Driving range', '14-stall range (shared with Park Meadows)'],
+    ['Putting', 'Large putting green'],
+    ['Short game', '80-yard area with two target greens and a bunker'],
+    ['Lessons', 'Golf Academy, PGA of Canada professionals'],
+    ['Clubhouse', 'Greenside Bar & Grill, lakeview patio'],
+  ],
+  'kaleden/twin-lakes-golf-course': [
+    ['Course', '18 holes · regulation length'],
+    ['Driving range', 'Yes'],
+    ['Putting', 'Putting green'],
+    ['Short game', 'Chipping green'],
+    ['Lessons', 'Twin Lakes Academy'],
+    ['Pro shop', 'Yes'],
+  ],
+  'kelowna/harvest-golf-club': [
+    ['Course', '18 holes · par 72'],
+    ['Access', 'Semi-private'],
+    ['Driving range', 'Grass and synthetic tees, target greens; open to non-members'],
+    ['Putting', 'Big putting green'],
+    ['Short game', 'Two chipping greens with sand bunkers'],
+    ['Lessons', 'Harvest Golf Academy, PGA of Canada professionals'],
+  ],
+  'kelowna/orchard-greens-golf-club': [
+    ['Course', '9 holes · par 32 · mid-length'],
+    ['Night golf', 'Stadium-lit on Wednesday, Friday and Saturday evenings'],
+    ['Rentals', 'Available'],
+    ['Clubhouse', 'Miss Pat’s Kitchen'],
+  ],
+  'west-kelowna/shannon-lake-golf-club': [
+    ['Course', '18 holes · par 70 · 6,294 yards'],
+    ['Access', 'Semi-private with public tee times'],
+    ['Driving range', 'None — on-site hitting cage'],
+    ['Putting', 'Practice putting green'],
+    ['Clubhouse', 'Wraparound deck over the lake; happy hour'],
+  ],
+  'west-kelowna/two-eagles-golf-course-academy': [
+    ['Course', 'Par 65 · just over 5,000 yards'],
+    ['Designer', 'Les Furber'],
+    ['Access', 'Public'],
+    ['Driving range', 'Private grass tees; heated hitting bays (year-round)'],
+    ['Putting', '15,000-square-foot putting green'],
+    ['Lessons', 'Full golf academy with coaching programs'],
+  ],
+  'penticton/penticton-golf-country-club': [
+    ['Course', 'Par 70 · just over 6,100 yards · est. 1922'],
+    ['Access', 'Public, municipal (City of Penticton)'],
+    ['Driving range', 'Full range'],
+    ['Putting', 'Several putting greens'],
+    ['Short game', 'Dedicated short-game practice'],
+    ['Lessons', 'PGA of Canada pros; junior, adult, corporate programs'],
+  ],
+  'penticton/skaha-meadows-golf-course': [
+    ['Course', '9 holes · par 35 · 2,435 yards'],
+    ['Access', 'Public tee times; memberships available'],
+    ['Putting', 'Practice putting green'],
+    ['Clubhouse', 'Patio and grill'],
+    ['Extras', 'Ladies’ Night Wednesdays, Men’s Night Thursdays'],
+  ],
+  'penticton/pine-hills-golf-club': [
+    ['Course', '9 holes · par 27 executive · just over 1,000 yards'],
+    ['Rentals', 'Clubs and carts'],
+    ['Pricing', 'Pay per round or annual pass'],
+  ],
+  'penticton/wow-golf-club': [
+    ['Course', '9 holes · par 34'],
+    ['Driving range', 'Large mat range, covered and uncovered'],
+    ['Short game', 'Combined chipping and putting area'],
+  ],
+  'summerland/summerland-golf-country-club': [
+    ['Course', '18 holes · flats front nine, canyon back nine'],
+    ['Access', 'Semi-private with public tee times'],
+    ['Driving range', '300-plus-yard range'],
+    ['Putting', 'Two putting greens'],
+    ['Short game', 'Chipping green and practice bunkers'],
+    ['Lessons', 'PGA of Canada'],
+  ],
+  'summerland/sumac-ridge-golf-country-club': [
+    ['Course', '9 holes · par 28 executive'],
+    ['Access', 'Public, no membership needed'],
+    ['Rentals', 'Equipment rentals on site'],
+  ],
+  'kaleden/st-andrews-by-the-lake-golf-resort': [
+    ['Course', '9 holes · par 32'],
+    ['Pro shop', 'Golf shop'],
+    ['Clubhouse', 'Painted Turtle Bistro, lakeside deck'],
+  ],
+  'oliver/fairview-mountain-golf-club': [
+    ['Course', '18 holes · par 72 · past 7,000 yards'],
+    ['Driving range', 'Full range'],
+    ['Putting', 'Expansive putting green'],
+    ['Short game', 'Chipping area and bunker practice'],
+    ['Lessons', 'PGA of Canada instruction; indoor fitting bay'],
+    ['Clubhouse', 'Restaurant patio over the first tee'],
+  ],
+  'oliver/nkmip-canyon-desert-golf-course': [
+    ['Course', 'Desert terrain · long par 4s and target-golf holes'],
+    ['Ownership', 'Osoyoos Indian Band'],
+    ['Driving range', '15-stall range'],
+    ['Putting', 'Large putting green'],
+    ['Short game', 'Chipping green with bunker; three practice holes'],
+    ['Lessons', 'River Club Golf & Learning Center'],
+  ],
+  'osoyoos/sonora-dunes-golf-course': [
+    ['Course', '9 holes · par 35'],
+    ['Driving range', 'Yes'],
+    ['Short game', 'Putting and chipping green'],
+    ['Clubhouse', 'Renovated patio'],
+  ],
+  'vernon/rise-golf-course': [
+    ['Course', '18 holes · par 72 · roughly 6,600 yards'],
+    ['Designer', 'Fred Couples Signature with Gene Bates (2008)'],
+    ['Tees', 'Six sets'],
+    ['Access', 'Public tee times'],
+    ['Clubhouse', 'The Edge Restaurant, 360-degree views'],
+  ],
+  'vernon/vernon-golf-country-club': [
+    ['Course', 'Par 72 · roughly 6,600 yards · parkland'],
+    ['Established', '1913'],
+    ['Access', 'Semi-private with public tee times'],
+    ['Driving range', 'Full range'],
+    ['Putting', 'Putting greens'],
+    ['Short game', 'Dedicated short-game area'],
+  ],
+  'armstrong/overlander-golf-event-centre': [
+    ['Course', '9 holes · par 29 executive'],
+    ['Putting', '11-hole natural-grass putting course, walk-on'],
+    ['Extras', 'Glow-in-the-dark golf nights; social leagues'],
+    ['Clubhouse', 'Clubhouse kitchen; event lawn'],
+  ],
+  'vernon/spallumcheen-golf-country-club-championship-course': [
+    ['Course', '18 holes · par 71 · 6,423 yards'],
+    ['Access', 'Semi-private, public play welcome'],
+    ['Driving range', 'Full-length, targets from 50 to 260 yards'],
+    ['Putting', 'Putting green'],
+    ['Short game', 'Two chipping greens'],
+    ['Lessons', 'PGA of Canada'],
+  ],
+  'vernon/spallumcheen-golf-country-club-executive-course': [
+    ['Course', '9 holes · three par 5s'],
+    ['Driving range', 'Full-length, targets out to 260 yards (shared)'],
+    ['Putting', 'Putting green'],
+    ['Short game', 'Two chipping greens'],
+    ['Pro shop', 'Fully stocked (shared)'],
+    ['Clubhouse', 'Clubhouse dining (shared)'],
+  ],
+  'vernon/hillview-golf-course': [
+    ['Course', '18 holes · par 56 executive · 3,300-plus yards'],
+    ['Driving range', 'Vernon’s longest'],
+    ['Lessons', 'PGA professional, every level'],
+    ['Pro shop', 'Stocks the major brands'],
+  ],
+  'kelowna/golf-evolution': [
+    ['Technology', 'GC Hawk simulators'],
+    ['Lessons', 'Certified PGA professional; club fitting, maintenance'],
+    ['Access', 'Credit-based Evo Packs, good for a year'],
+    ['Hours', 'Daily into the evening; coaching and fitting mornings'],
+    ['Lounge', 'Food and drinks'],
+  ],
+  'kelowna/simplex-sportszone': [
+    ['Technology', 'Trackman 4 and Full Swing'],
+    ['Virtual courses', 'More than 400'],
+    ['Lessons', 'In-house PGA golf coaches'],
+    ['Extras', 'Multi-sport simulators, racing zone, licensed bar'],
+    ['Events', 'Groups of up to 40'],
+  ],
+  'kelowna/anytime-sim-golf': [
+    ['Bays', 'Private bays with Foresight Sports launch monitors'],
+    ['Hours', '24/7, 365 days a year'],
+    ['Booking', 'Online; CloudKey door entry, no front desk'],
+  ],
+  'kelowna/okanagan-virtual-golf': [
+    ['Bays', 'Four'],
+    ['Technology', 'Uneekor EYE XO2 on GSPro'],
+    ['Virtual courses', 'Roughly 2,000'],
+    ['Lounge', 'Fully licensed bar, big-screen seating'],
+    ['Extras', 'Organized leagues; summer outdoor mini-putt'],
+  ],
+  'kelowna/jsquared-golf': [
+    ['Technology', 'GCQUAD launch monitor'],
+    ['Lessons', 'PGA of Canada professionals, all levels'],
+    ['Hours', 'Daily, 8 a.m. to 10 p.m.'],
+    ['Location', 'Gallagher’s Canyon property; Canyon Bar & Grill steps away'],
+  ],
+  'kelowna/fringe-indoor-golf': [
+    ['Bays', 'Four Trackman iO bays (three open, one private room)'],
+    ['Virtual courses', 'More than 300'],
+    ['Hours', '24/7, staffless; secure mobile access'],
+    ['Pricing', 'Hourly, with membership discounts'],
+  ],
+  'west-kelowna/golfbox': [
+    ['Bays', 'Three private bays'],
+    ['Technology', 'Trackman iO'],
+    ['Hours', 'Open 24/7'],
+    ['Extras', 'Upstairs boardroom for meetings'],
+  ],
+  'vernon/predator-ridge-sim-lounge': [
+    ['Technology', 'Foresight Sports GCHawk and GCQuad'],
+    ['Virtual courses', 'More than 90'],
+    ['Booking', 'By phone only; one-hour blocks for up to four'],
+    ['Season', 'Reopens each fall, runs through winter'],
+    ['Lessons', 'PGA of Canada professional'],
+  ],
+  'vernon/back-nine-indoor-golf': [
+    ['Bays', 'Three private bays'],
+    ['Technology', 'Full Swing'],
+    ['Hours', '24-hour access for members'],
+    ['Booking', 'No membership required'],
+    ['Extras', 'Junior and adult camps and clinics; leagues'],
+  ],
+  'penticton/okanagan-virtual-golf': [
+    ['Bays', 'Three, plus a four-camera training bay'],
+    ['Virtual courses', 'More than 400'],
+    ['Lessons', 'Instructors connected to Summerland Golf Club'],
+    ['Hours', 'Into the evening most days'],
+    ['Extras', 'Winter scramble leagues'],
+  ],
+};
+
+function golfAtAGlanceHtml(venue) {
+  if (venue.type !== 'golf' || venue.redirect_to) return '';
+  const facts = GOLF_AT_A_GLANCE_FACTS[`${venue.region}/${venue.slug}`];
+  if (!facts || !facts.length) return '';
+  const items = facts
+    .map(([lbl, val]) => `<div class="golf-glance-item"><dt>${escapeHtml(lbl)}</dt><dd>${escapeHtml(val)}</dd></div>`)
+    .join('\n      ');
+  return `<div class="venue-section golf-glance">
+    <h2>At a glance</h2>
+    <dl>
+      ${items}
+    </dl>
+  </div>`;
 }
 
 // Category-page behaviour for Golf cards: the clamp class is applied only
@@ -5484,8 +5935,14 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // markup is unchanged.
   const trackAttr = (kind) => (usesThemedCategoryLayout(venue.type) ? ` data-track="${kind}"` : '');
 
+  // Golf pages label simulator venues "Indoor Golf" (hero eyebrow, meta
+  // line and the Good to Know Type row), using the same isIndoorGolfVenue()
+  // split the /golf directory already uses; the JSON-LD @type stays
+  // GolfCourse and every other category keeps label.singular.
+  const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? 'Indoor Golf' : label.singular;
+
   const detailRows = [
-    ['Type', label.singular],
+    ['Type', venue.type === 'golf' ? golfKindLabel : label.singular],
     ['Region', `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`],
     venue.cuisine ? ['Cuisine', escapeHtml(venue.cuisine)] : null,
     venue.address ? ['Address', escapeHtml(venue.address)] : null,
@@ -5497,9 +5954,20 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
 
+  // Themed venue pages (golf 2026-09-20, beach same day for consistency):
+  // the hero is the page's one title treatment, so its name is the <h1>
+  // and the header below no longer repeats it. No golf or beach venue has
+  // an image_url today; if one ever does, the photo hero renders and the
+  // <h1> falls back into the header.
+  const themedHeroTitle = usesThemedCategoryLayout(venue.type) && !venue.image_url;
   const imageHtml = venue.image_url
     ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>`
-    : `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}">
+    : themedHeroTitle
+      ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}">
+        <span class="venue-hero-type">${escapeHtml(golfKindLabel)}</span>
+        <h1>${escapeHtml(venue.name)}</h1>
+      </div>`
+      : `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}">
         <span class="venue-hero-type">${escapeHtml(label.singular)}</span>
         <span class="venue-hero-name">${escapeHtml(venue.name)}</span>
       </div>`;
@@ -5509,7 +5977,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // page by adding this; it's a second, higher-visibility presentation of
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
-    label.singular,
+    venue.type === 'golf' ? golfKindLabel : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venue.price ? '$'.repeat(venue.price) : null,
     venue.rating ? `${venue.rating}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -5548,6 +6016,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // venues, which keeps their page markup byte-identical.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes().get(venue.id);
   const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${advisoryNoticeHtml(venueAdvisoryNote)}` : '';
+  // Golf-only "At a glance" card ('' for every other category, and for a
+  // golf venue with no curated facts, so their markup is unchanged).
+  const golfGlanceHtml = golfAtAGlanceHtml(venue);
 
   // One bulk lookup for all related+nearby cards together (reusing the
   // existing getHiddenGemVenueIds(), not a new query) -- O(1) Set lookups
@@ -5598,7 +6069,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', advisoryStyles: venueAdvisoryNote !== undefined })}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', advisoryStyles: venueAdvisoryNote !== undefined })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}
 ${golfEngagementHeadHtml(venue.type)}
 </head>
 <body${themedBodyClassAttr(venue.type)}>
@@ -5612,12 +6083,11 @@ ${golfEngagementHeadHtml(venue.type)}
   ${venueBackLink}
   ${imageHtml}
   <div class="venue-header">
-    <h1>${escapeHtml(venue.name)}</h1>
-    <p class="venue-at-a-glance">${atAGlanceParts}</p>
+    ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
   <p class="venue-description">${escapeHtml(venue.description || '')}</p>${venueAdvisoryHtml}
-  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}
+  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}
   <div class="venue-section venue-key-info">
     <h2>Good to Know</h2>
     ${detailRows}
@@ -8299,6 +8769,10 @@ module.exports = {
   renderAdvisoryStyles,
   renderBeachThemeStyles,
   deriveBeachRulesFromGolfCss,
+  // Golf venue page polish (2026-09-20)
+  renderGolfVenuePolishStyles,
+  GOLF_AT_A_GLANCE_FACTS,
+  golfAtAGlanceHtml,
   // Build My Trip, Stage 3 (price/amenity/discovery scoring + NL parser)
   TRIP_VALID_BUDGETS,
   budgetMatchesPrice,

@@ -4129,6 +4129,101 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
   }
 });
 
+// Golf venue page polish (2026-09-20): the hero carries the page's single
+// <h1>; the block below opens with the meta line (no repeated title); an
+// "At a glance" card renders only from the curated, description-derived
+// facts; the polish styles ship only on golf venue pages.
+test('Golf venue page: hero is the title treatment, header does not repeat it, indoor venues read "Indoor Golf"', () => {
+  const course = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
+  assert.match(course, /<div class="venue-hero venue-hero-fallback venue-hero-golf">\s*<span class="venue-hero-type">Golf Course<\/span>\s*<h1>Test Golf Course<\/h1>\s*<\/div>/);
+  assert.equal((course.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1> on the page');
+  assert.match(course, /<div class="venue-header">\s*<p class="venue-at-a-glance">Golf Course &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/, 'header opens with the meta line, not a second title');
+  assert.doesNotMatch(course, /<span class="venue-hero-name">/, 'hero name span replaced by the <h1> on golf pages');
+  assert.match(course, /<style>\s*\/\* Hero: same per-type gradient/, 'themed polish styles present');
+  assert.match(course, /body\.golf-page \.venue-hero-fallback h1 \{/);
+  assert.match(course, /body\.golf-page \.venue-hero-fallback\.venue-hero-golf \{ box-shadow/);
+  // Fixture has no curated facts -> no card (the CSS still names the class).
+  assert.doesNotMatch(course, /<div class="venue-section golf-glance">|<h2>At a glance<\/h2>/);
+
+  const sim = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-simulator'), [], [], []);
+  assert.match(sim, /<span class="venue-hero-type">Indoor Golf<\/span>\s*<h1>Test Golf Simulator<\/h1>/);
+  assert.match(sim, /<p class="venue-at-a-glance">Indoor Golf &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/);
+  assert.match(sim, /<div class="detail-row"><span class="label">Type<\/span><span>Indoor Golf<\/span>/, 'Good to Know Type matches the hero for simulator venues');
+  assert.match(sim, /"@type":"GolfCourse"/, 'JSON-LD type unchanged');
+  assert.match(course, /<div class="detail-row"><span class="label">Type<\/span><span>Golf Course<\/span>/);
+});
+
+test('Golf theme keeps the shared footer links visible (golf and beach pages)', () => {
+  const golf = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
+  const beach = app.renderVenuePage(app.findVenueBySlug('kelowna', 'beach', 'test-beach-park'), [], [], []);
+  const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  const rule = /body\.golf-page \.home-footer-col a, body\.golf-page \.home-footer-region-group a \{ color: rgba\(245,243,237,0\.78\); \}/;
+  for (const html of [golf, beach]) {
+    assert.match(html, /body\.golf-page a \{ color: var\(--ref-navy\); \}/);
+    assert.match(html, rule, 'footer link colour restated inside the golf theme');
+    assert.match(html, /<footer class="home-footer">/);
+  }
+  assert.doesNotMatch(restaurant, rule);
+});
+
+test('Golf "At a glance" card renders only curated facts, escaped, in a dl grid; empty for other categories', () => {
+  const keys = Object.keys(app.GOLF_AT_A_GLANCE_FACTS);
+  assert.ok(keys.length >= 40, 'curated facts cover the production golf inventory');
+  for (const key of keys) {
+    assert.match(key, /^[a-z-]+\/[a-z0-9-]+$/, `key ${key} is region/slug`);
+    const facts = app.GOLF_AT_A_GLANCE_FACTS[key];
+    assert.ok(Array.isArray(facts) && facts.length > 0 && facts.length <= 8, `${key}: 1-8 facts`);
+    for (const [lbl, val] of facts) {
+      assert.ok(typeof lbl === 'string' && lbl.length && typeof val === 'string' && val.length, `${key}: label/value strings`);
+    }
+  }
+  const [sampleKey] = keys;
+  const [region, slug] = sampleKey.split('/');
+  const fake = { id: 999999, type: 'golf', region, slug, name: 'Sample & Co', description: '', redirect_to: null };
+  const html = app.golfAtAGlanceHtml(fake);
+  assert.match(html, /^<div class="venue-section golf-glance">\s*<h2>At a glance<\/h2>\s*<dl>/);
+  assert.equal((html.match(/<div class="golf-glance-item"><dt>/g) || []).length, app.GOLF_AT_A_GLANCE_FACTS[sampleKey].length);
+  assert.equal(app.golfAtAGlanceHtml({ ...fake, type: 'beach' }), '', 'not for beaches');
+  assert.equal(app.golfAtAGlanceHtml({ ...fake, redirect_to: 1 }), '', 'not for redirected rows');
+  assert.equal(app.golfAtAGlanceHtml({ ...fake, slug: 'no-such-course' }), '', 'no entry -> no card');
+  // A curated value containing markup-significant characters is escaped.
+  const escaped = app.golfAtAGlanceHtml({ ...fake, slug: 'tower-ranch-golf-country-club', region: 'kelowna' });
+  assert.doesNotMatch(escaped, /<[^\/dhl]/, 'only dl/dt/dd/div/h2 tags are emitted');
+  assert.match(escaped, /<dd>Carrington’s Restaurant &amp; Patio; fitness; events<\/dd>/, 'ampersand escaped, typographic apostrophe intact');
+  for (const facts of Object.values(app.GOLF_AT_A_GLANCE_FACTS)) {
+    assert.ok(facts.length <= 6, 'cards are capped at six items');
+    for (const [, val] of facts) assert.ok(val.length <= 60, `value kept scannable: ${val}`);
+  }
+});
+
+// Beach venue pages (2026-09-20) get the same hero/<h1> hierarchy and the
+// URL-wrap rule, but never the golf At-a-glance card or "Indoor Golf".
+test('Beach venue page: hero carries the <h1>, header opens with "Beach · Region", no golf card', () => {
+  const beach = app.renderVenuePage(app.findVenueBySlug('kelowna', 'beach', 'test-beach-park'), [], [], []);
+  assert.match(beach, /<div class="venue-hero venue-hero-fallback venue-hero-beach">\s*<span class="venue-hero-type">Beach<\/span>\s*<h1>Test Beach Park<\/h1>\s*<\/div>/);
+  assert.equal((beach.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1> on the page');
+  assert.match(beach, /<div class="venue-header">\s*<p class="venue-at-a-glance">Beach &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/);
+  assert.doesNotMatch(beach, /<span class="venue-hero-name">/);
+  assert.match(beach, /<style>\s*\/\* Hero: same per-type gradient/, 'themed polish styles present on beach pages');
+  assert.match(beach, /body\.golf-page \.venue-hero-fallback\.venue-hero-beach \{ box-shadow/);
+  assert.match(beach, /body\.golf-page \.venue-key-info \.detail-row a \{ overflow-wrap: anywhere; \}/, 'long official URLs wrap on phones');
+  assert.doesNotMatch(beach, /<div class="venue-section golf-glance">|<h2>At a glance<\/h2>|venue-hero-type">Indoor Golf</);
+  assert.match(beach, /<div class="detail-row"><span class="label">Type<\/span><span>Beach<\/span>/);
+  assert.match(beach, /"@type":"Beach"/);
+});
+
+test('REGRESSION: themed venue polish is confined to golf and beach venue pages (restaurant pages and listings unchanged)', () => {
+  const restaurantVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  assert.doesNotMatch(restaurantVenue, /golf-glance|At a glance|Hero: same per-type gradient|overflow-wrap: anywhere|venue-hero-type">Indoor Golf</);
+  assert.match(restaurantVenue, /<div class="venue-header">\s*<h1>Test /, 'non-themed pages keep the <h1> in the header');
+  assert.match(restaurantVenue, /<span class="venue-hero-name">/);
+  const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
+  const beachRows = app.getVenuesByRegionCategory('kelowna', 'beach');
+  for (const html of [app.renderCategoryPage('kelowna', 'golf', golfRows, []), app.renderCategoryAllRegionsPage('golf', golfRows), app.renderCategoryPage('kelowna', 'beach', beachRows, []), app.renderCategoryAllRegionsPage('beach', beachRows)]) {
+    assert.doesNotMatch(html, /<div class="venue-section golf-glance">|Hero: same per-type gradient/);
+  }
+});
+
 test('REGRESSION: non-Golf venue pages carry no data-track attributes, analytics snippet, or engagement script', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'); // has phone, address, coords
   const html = app.renderVenuePage(venue, [], [], []);
