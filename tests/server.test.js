@@ -2136,9 +2136,10 @@ test('Mood cards: Wine filters to winery only', () => {
   assert.equal(cardMatch[1], 'winery');
 });
 
-test('Mood cards: Outdoors links to #exploreRegions with no filter', () => {
+test('Mood cards: Outdoors links to the Okanagan-wide /outdoors listing once outdoor venues exist (2026-09-20 fix), with no filter', () => {
   const html = app.renderMoodCardsHTML();
-  assert.match(html, /class="mood-card mood-card-outdoors" href="#exploreRegions">/);
+  assert.match(html, /class="mood-card mood-card-outdoors" href="\/outdoors">/);
+  assert.doesNotMatch(html, /mood-card-outdoors"[^>]*data-mood-filter/, 'no filter: the card is a plain link like Golf and Beaches');
 });
 
 test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach venues exist (2026-09-20 fix), with no filter', () => {
@@ -2147,7 +2148,7 @@ test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach
   assert.doesNotMatch(html, /mood-card-beaches" href="#exploreRegions"/);
   assert.doesNotMatch(html, /mood-card-beaches"[^>]*data-mood-filter/, 'no filter: the card is a plain link like Golf');
   // The other cards keep their existing destinations.
-  assert.match(html, /class="mood-card mood-card-outdoors" href="#exploreRegions">/);
+  assert.match(html, /class="mood-card mood-card-outdoors" href="\/outdoors">/);
   assert.match(html, /class="mood-card mood-card-whats-on" href="\/events">/);
   assert.match(html, /class="mood-card mood-card-food-drink" href="\/browse\?types=restaurant,cafe,brewery,pub,cocktail" data-mood-filter="restaurant,cafe,brewery,pub,cocktail">/);
   assert.match(html, /class="mood-card mood-card-golf" href="\/golf">/);
@@ -5088,10 +5089,10 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.equal(tag.status, 200, await tag.text());
 
     const homeAfter = await (await fetch(`${base}/`)).text();
-    assert.equal(homeAfter, homeBefore, 'FROZEN HOMEPAGE: outdoor venues and an activity membership must not change one byte of "/"');
-    assert.match(homeAfter, /class="mood-card mood-card-outdoors" href="#exploreRegions">/, 'the Outdoors mood card still points at its in-page anchor (not repointed)');
+    assert.equal(homeAfter, homeBefore.replace('class="mood-card mood-card-outdoors" href="#exploreRegions">', 'class="mood-card mood-card-outdoors" href="/outdoors">'), 'outdoor data changes exactly one attribute on "/": the Outdoors mood-card href (2026-09-20 fix, same pattern as Beaches)');
+    assert.match(homeAfter, /class="mood-card mood-card-outdoors" href="\/outdoors">/, 'the Outdoors mood card now points at the Okanagan-wide /outdoors listing');
     assert.match(homeAfter, /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'the footer Outdoors link is untouched');
-    assert.doesNotMatch(homeAfter, /href="\/outdoors"|href="\/kelowna\/outdoors"|Fixture Canyon Park|outdoor-page/);
+    assert.doesNotMatch(homeAfter, /href="\/kelowna\/outdoors"|Fixture Canyon Park|outdoor-page/);
     assert.equal(await (await fetch(`${base}/beaches`)).text(), beachesBefore, '/beaches is byte-identical');
     assert.equal(await (await fetch(`${base}/golf`)).text(), golfBefore, '/golf is byte-identical');
     assert.equal(await (await fetch(`${base}/browse`)).text(), browseBefore, '/browse is byte-identical');
@@ -5318,7 +5319,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     assert.equal(r2.status, 200);
     const after = await snap();
     for (const p of Object.keys(before)) assert.equal(after[p], before[p], `${p} must be byte-identical after activity memberships exist`);
-    assert.match(after['/'], /class="mood-card mood-card-outdoors" href="#exploreRegions">/);
+    assert.match(after['/'], /class="mood-card mood-card-outdoors" href="\/outdoors">/);
     assert.match(after['/'], /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/);
     assert.doesNotMatch(after['/'], /\/outdoors\/hiking|outdoor-activity/);
 

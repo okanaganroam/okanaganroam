@@ -3151,7 +3151,8 @@ function renderBuildTripCTAHTML() {
 //                  -- previously an in-page anchor to the homepage's own
 //                  Happening Soon strip, which has been removed entirely;
 //                  event data/routes themselves are untouched)
-//   Outdoors    -> existing #exploreRegions anchor
+//   Outdoors    -> Okanagan-wide /outdoors listing once outdoor venues
+//                  exist (2026-09-20), else the #exploreRegions anchor
 // Shared by renderMoodCardsHTML (Wine/Golf cards) and renderHomeFooterHTML
 // (Wine/Golf footer links, 2026-09-17) -- both need "which region has the
 // most venues of this type" to link straight to a real, populated category
@@ -3191,6 +3192,11 @@ function renderMoodCardsHTML() {
   // previous in-page #exploreRegions target. Only the href changes -- the
   // card's markup, image, icon, title and position are untouched.
   const beachesHref = bestRegionForType.beach && CATEGORY_SLUGS.beach ? `/${CATEGORY_SLUGS.beach}` : '#exploreRegions';
+  // Outdoors (2026-09-20): same pattern again. The card used to be a plain
+  // in-page #exploreRegions anchor (a click just scrolled the homepage), so
+  // once the Okanagan-wide /outdoors landing has inventory it links there;
+  // with no outdoor venues it keeps the anchor. Only the href changes.
+  const outdoorsHref = bestRegionForType.outdoor && CATEGORY_SLUGS.outdoor ? `/${CATEGORY_SLUGS.outdoor}` : '#exploreRegions';
 
   // Simple inline line icons, matching the approved reference's minimal
   // white-icon style. No icon library/dependency -- plain inline SVG,
@@ -3221,7 +3227,7 @@ function renderMoodCardsHTML() {
     { key: 'beaches', href: beachesHref, filter: null, img: '/images/mood/beaches.webp', titleKey: 'mood.beaches.title', title: 'Beaches' },
     { key: 'golf', href: golfHref, filter: null, img: '/images/mood/golf.webp', titleKey: 'mood.golf.title', title: 'Golf' },
     { key: 'whats-on', href: '/events', filter: null, img: '/images/mood/whats-on.webp', titleKey: 'mood.whatsOn.title', title: "What's On" },
-    { key: 'outdoors', href: '#exploreRegions', filter: null, img: '/images/mood/explore.webp', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
+    { key: 'outdoors', href: outdoorsHref, filter: null, img: '/images/mood/explore.webp', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
   ];
 
   const cardsHtml = cards.map((c) => {
