@@ -966,6 +966,11 @@ const CATEGORY_SLUGS = {
   cocktail: 'cocktail-lounges',
   golf: 'golf',
   beach: 'beaches',
+  // Outdoors (2026-09-20, Phase 1 seed): parks, trails, viewpoints,
+  // nature centres, ski resorts and Nordic centres. Same reusable
+  // category architecture as Golf/Beaches; see THEMED_CATEGORY_TYPES and
+  // ALL_REGIONS_CATEGORIES below.
+  outdoor: 'outdoors',
 };
 const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([type, slug]) => [slug, type]));
 
@@ -979,7 +984,7 @@ const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([typ
 // injected sections never enumerate CATEGORY_SLUGS, so adding a type here
 // cannot surface a tile, count, link or markup change on '/'. Enforced by
 // the "homepage byte-identity" tests.
-const THEMED_CATEGORY_TYPES = new Set(['golf', 'beach']);
+const THEMED_CATEGORY_TYPES = new Set(['golf', 'beach', 'outdoor']);
 function usesThemedCategoryLayout(type) {
   return THEMED_CATEGORY_TYPES.has(type);
 }
@@ -992,7 +997,7 @@ function usesThemedCategoryLayout(type) {
 // interest is a separate, later decision. Favorite and Add to Trip on a
 // beach page still work -- those are name-keyed localStorage features of
 // the homepage module and never consult this list.
-const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach']);
+const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach', 'outdoor']);
 const TRIP_INTEREST_TYPES = Object.keys(CATEGORY_SLUGS).filter((t) => !TRIP_PLANNER_EXCLUDED_TYPES.has(t));
 function isTripPlannerType(type) {
   return TRIP_INTEREST_TYPES.includes(type);
@@ -1008,7 +1013,7 @@ function isTripPlannerType(type) {
 // effect of this refactor. getVenuesByCategory()/renderCategoryAllRegionsPage()
 // below are already fully generic by `type`; only the route dispatch is
 // gated by this list.
-const ALL_REGIONS_CATEGORIES = ['golf', 'beach'];
+const ALL_REGIONS_CATEGORIES = ['golf', 'beach', 'outdoor'];
 
 // Human-readable label per category, singular and plural, for titles/H1s
 const CATEGORY_LABELS = {
@@ -1020,6 +1025,7 @@ const CATEGORY_LABELS = {
   cocktail: { singular: 'Cocktail Lounge', plural: 'Cocktail Lounges' },
   golf: { singular: 'Golf Course', plural: 'Golf Courses' },
   beach: { singular: 'Beach', plural: 'Beaches' },
+  outdoor: { singular: 'Outdoor Destination', plural: 'Outdoor Destinations' },
 };
 
 // Design Sprint 4: static editorial micro-copy, following the exact same
@@ -1082,6 +1088,10 @@ const TYPE_ACCENT_GRADIENTS = {
   // (--ref-navy -> --ref-navy-deep), the only token family not already
   // claimed by another type, so no new colour enters the site.
   beach: ['#1B2B3A', '#101B24'],
+  // 'outdoor' (2026-09-20): the site's --ink earth tone (#4A3428) as the
+  // first stop, deepened to a darker second stop the same way every other
+  // type's gradient deepens its base hue; no new hue family enters the site.
+  outdoor: ['#4A3428', '#2F2118'],
 };
 
 function compactBandCSSRules(className) {
@@ -1189,6 +1199,7 @@ const SCHEMA_TYPE_MAP = {
   cocktail: 'BarOrPub', // schema.org has no distinct "cocktail lounge" type; BarOrPub is the correct closest official type
   golf: 'GolfCourse',
   beach: 'Beach', // schema.org/Beach (a CivicStructure), the exact type for a public beach
+  outdoor: 'TouristAttraction', // parks, trails, viewpoints, nature centres and ski/Nordic areas are all Places a visitor seeks out; no single narrower schema.org type fits every seed record
 };
 
 function slugify(name) {
@@ -1475,7 +1486,14 @@ const ADVISORY_COLLECTION_KIND = 'advisory';
 // homepage embeds, so flipping it would change '/'. Rendered with the
 // existing .chip style used by every other badge -- no new visual design.
 const DOG_FRIENDLY_COLLECTION_KIND = 'dog_friendly';
-const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND]);
+// Outdoor activity tags (2026-09-20): eight collection kinds bootstrapped
+// in db.js (activity_hiking ... activity_adventure) that classify an
+// outdoor destination by what a visitor can do there. Like the two
+// operational kinds above they are NOT trip "discovery" preferences, so
+// the Build My Trip parser/API vocabulary is unchanged by their existence.
+const ACTIVITY_COLLECTION_KINDS = ['activity_hiking', 'activity_cycling', 'activity_viewpoints', 'activity_nature', 'activity_winter', 'activity_camping', 'activity_water', 'activity_adventure'];
+const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS]);
+
 
 // venue id -> note text for one collection kind (the most recently added
 // note wins if several). Shared by the advisory and dog-friendly kinds.
@@ -4393,6 +4411,7 @@ const SEO_PAGE_CSS = `
   .venue-hero-cocktail   { background: linear-gradient(135deg, #A25C93, #7A3B6E); }
   .venue-hero-golf       { background: linear-gradient(135deg, #4E7A5E, #345942); }
   .venue-hero-beach      { background: linear-gradient(135deg, #1B2B3A, #101B24); } /* tokens: --ref-navy -> --ref-navy-deep */
+  .venue-hero-outdoor    { background: linear-gradient(135deg, #4A3428, #2F2118); } /* token: --ink, deepened */
 
   .venue-header { margin-bottom: 18px; }
   .venue-at-a-glance { color: var(--ink); opacity: 0.7; font-size: 0.98rem; margin: 6px 0 12px; }
@@ -4423,6 +4442,7 @@ const SEO_PAGE_CSS = `
   .related-card-cocktail { border-top-color: #7A3B6E; }
   .related-card-golf { border-top-color: #345942; }
   .related-card-beach { border-top-color: #101B24; }
+  .related-card-outdoor { border-top-color: #2F2118; }
 
   /* Design Sprint 4: compact visual band, shared with the homepage Hidden
      Gems cards via the same compactVisualBandHtml() helper and the same
@@ -4683,10 +4703,10 @@ function themedBodyClassAttr(type) {
 // styling, and the Golf CSS text itself is untouched. The selector
 // regex matches a complete rule (selector list + declaration block)
 // whose selector list mentions the golf attribute.
-function deriveBeachRulesFromGolfCss(cssText) {
+function deriveBeachRulesFromGolfCss(cssText, type = 'beach') {
   const ruleRe = /[^{}]*\[data-venue-category="golf"\][^{}]*\{[^{}]*\}/g;
   return (cssText.match(ruleRe) || [])
-    .map((rule) => rule.replace(/\[data-venue-category="golf"\]/g, '[data-venue-category="beach"]').trim())
+    .map((rule) => rule.replace(/\[data-venue-category="golf"\]/g, `[data-venue-category="${type}"]`).trim())
     .join('\n  ');
 }
 function renderBeachThemeStyles() {
@@ -4695,6 +4715,19 @@ function renderBeachThemeStyles() {
   /* Beach page theme (2026-09-19): the Golf rules above, re-keyed to the beach card attribute. */
   ${deriveBeachRulesFromGolfCss(SEO_PAGE_CSS)}
   ${deriveBeachRulesFromGolfCss(themeCss)}
+</style>`;
+}
+// Outdoor (2026-09-20): the third themed category. Exactly the Beach
+// mechanism -- the Golf rules re-keyed to the outdoor card attribute at
+// request time -- so Outdoor pages can never drift from the shared design
+// system either. Emitted only on outdoor pages (see pageHead's outdoorTheme),
+// so Golf and Beach output is byte-identical to before this was added.
+function renderOutdoorThemeStyles() {
+  const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
+  return `<style>
+  /* Outdoor page theme (2026-09-20): the Golf rules above, re-keyed to the outdoor card attribute. */
+  ${deriveBeachRulesFromGolfCss(SEO_PAGE_CSS, 'outdoor')}
+  ${deriveBeachRulesFromGolfCss(themeCss, 'outdoor')}
 </style>`;
 }
 
@@ -4887,6 +4920,7 @@ function renderGolfVenuePolishStyles() {
   }
   body.golf-page .venue-hero-fallback.venue-hero-golf { box-shadow: 0 18px 34px -22px rgba(52,89,66,0.7); }
   body.golf-page .venue-hero-fallback.venue-hero-beach { box-shadow: 0 18px 34px -22px rgba(16,27,36,0.75); }
+  body.golf-page .venue-hero-fallback.venue-hero-outdoor { box-shadow: 0 18px 34px -22px rgba(47,33,24,0.75); }
   body.golf-page .venue-hero-fallback::before {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     background:
@@ -5430,7 +5464,7 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // the Golf rules, see renderBeachThemeStyles) plus, when the page
   // carries one, the advisory-notice styles. Golf pages' head is
   // byte-identical to before.
-  const { noindex = false, golfTheme = false, beachTheme = false, advisoryStyles = false } = opts;
+  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false } = opts;
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
@@ -5449,7 +5483,7 @@ ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.strin
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/tokens.css">
-${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}`;
+${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${outdoorTheme ? '\n' + renderOutdoorThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}`;
 }
 
 function siteHeader(rightLinkHref, rightLinkText) {
@@ -5652,7 +5686,7 @@ ${pageHead(title, description, canonical, [breadcrumb])}
 // Falls back to CATEGORY_LABELS.plural for any category without an
 // entry here, so it never breaks if a future category is added to
 // ALL_REGIONS_CATEGORIES without also adding a short label.
-const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches' };
+const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches', outdoor: 'Outdoors' };
 
 // Golf's inventory deliberately includes both outdoor courses and indoor
 // golf-simulator venues under the same type='golf' (2026-09-19), so the
@@ -5756,7 +5790,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${golfEngagementHeadHtml(type)}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -5850,7 +5884,7 @@ function renderCategoryAllRegionsPage(type, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${golfEngagementHeadHtml(type)}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -6078,7 +6112,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', advisoryStyles: venueAdvisoryNote !== undefined })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}
 ${golfEngagementHeadHtml(venue.type)}
 </head>
 <body${themedBodyClassAttr(venue.type)}>
@@ -8778,6 +8812,8 @@ module.exports = {
   renderAdvisoryStyles,
   renderBeachThemeStyles,
   deriveBeachRulesFromGolfCss,
+  renderOutdoorThemeStyles,
+  ACTIVITY_COLLECTION_KINDS,
   // Golf venue page polish (2026-09-20)
   renderGolfVenuePolishStyles,
   GOLF_AT_A_GLANCE_FACTS,

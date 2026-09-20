@@ -405,4 +405,30 @@ if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(DOG_FRIENDLY_CO
     .run(DOG_FRIENDLY_COLLECTION_SLUG, 'dog_friendly', 'Dog Friendly');
 }
 
+// --- Outdoor activity collections bootstrap (2026-09-20, Outdoors Phase 1) --
+// Eight activity kinds that classify an `outdoor` venue (and, later, any
+// existing venue such as a beach/park) by what a visitor can do there:
+// hiking & trails, cycling, viewpoints, nature, winter, camping, water &
+// boating, adventure. Same tables and the same find-or-create-by-slug
+// discipline as the four kinds above; seeds NO members -- membership goes
+// through the audited POST /admin/collection-membership route, so an
+// existing venue can be cross-listed into an activity without touching
+// its own record. server.js keeps these out of trip "discovery"
+// preferences (NON_DISCOVERY_COLLECTION_KINDS).
+const ACTIVITY_COLLECTIONS = [
+  ['activity-hiking', 'activity_hiking', 'Hiking & Trails'],
+  ['activity-cycling', 'activity_cycling', 'Cycling'],
+  ['activity-viewpoints', 'activity_viewpoints', 'Viewpoints'],
+  ['activity-nature', 'activity_nature', 'Nature'],
+  ['activity-winter', 'activity_winter', 'Winter'],
+  ['activity-camping', 'activity_camping', 'Camping'],
+  ['activity-water', 'activity_water', 'Water & Boating'],
+  ['activity-adventure', 'activity_adventure', 'Adventure'],
+];
+for (const [slug, kind, title] of ACTIVITY_COLLECTIONS) {
+  if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(slug)) {
+    db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)').run(slug, kind, title);
+  }
+}
+
 module.exports = db;
