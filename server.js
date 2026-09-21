@@ -1491,7 +1491,7 @@ const DOG_FRIENDLY_COLLECTION_KIND = 'dog_friendly';
 // outdoor destination by what a visitor can do there. Like the two
 // operational kinds above they are NOT trip "discovery" preferences, so
 // the Build My Trip parser/API vocabulary is unchanged by their existence.
-const ACTIVITY_COLLECTION_KINDS = ['activity_hiking', 'activity_cycling', 'activity_viewpoints', 'activity_nature', 'activity_winter', 'activity_camping', 'activity_water', 'activity_adventure'];
+const ACTIVITY_COLLECTION_KINDS = ['activity_hiking', 'activity_cycling', 'activity_viewpoints', 'activity_nature', 'activity_winter', 'activity_camping', 'activity_water', 'activity_adventure', 'activity_fishing'];
 const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS]);
 
 // Outdoor activity discovery (2026-09-20, Outdoors Phase 2). One outdoor
@@ -1511,6 +1511,7 @@ const OUTDOOR_ACTIVITIES = [
   { slug: 'water', kind: 'activity_water', label: 'Water Activities', blurb: 'Outdoor destinations with paddling, boating or lake access built in.' },
   { slug: 'viewpoints', kind: 'activity_viewpoints', label: 'Viewpoints', blurb: 'Lookouts, ridgelines and summits with the lake and valley spread out below.' },
   { slug: 'adventure', kind: 'activity_adventure', label: 'Adventure', blurb: 'Rock climbing, bike parks, tubing and skating loops \u2014 the bigger, louder days out.' },
+  { slug: 'fishing', kind: 'activity_fishing', label: 'Fishing', blurb: 'Trout-fishing lodges, public fishing docks and guided charters on the valley\u2019s lakes \u2014 licence required.' },
 ];
 const OUTDOOR_ACTIVITY_BY_SLUG = Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a]));
 // Finalized visitor-facing display order (I.3, 2026-09-20) for every
@@ -1519,7 +1520,7 @@ const OUTDOOR_ACTIVITY_BY_SLUG = Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) =
 // OUTDOOR_ACTIVITIES above keeps its definition order for non-display
 // uses (data maps, sitemap), so only presentation moves. Camping and
 // Water stay defined but are not live until MIN_ACTIVITY_VENUES is met.
-const OUTDOOR_ACTIVITY_DISPLAY_ORDER = ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure', 'camping', 'water'];
+const OUTDOOR_ACTIVITY_DISPLAY_ORDER = ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure', 'fishing', 'camping', 'water'];
 function sortOutdoorActivitiesForDisplay(list) {
   const rank = (slug) => { const i = OUTDOOR_ACTIVITY_DISPLAY_ORDER.indexOf(slug); return i === -1 ? OUTDOOR_ACTIVITY_DISPLAY_ORDER.length : i; };
   return list.slice().sort((a, b) => rank(a.slug) - rank(b.slug));
@@ -6469,7 +6470,7 @@ const OUTDOOR_ACTIVITY_CARDS = [
   { key: 'cycling', title: 'Cycling & Bike Trails', slug: 'cycling', featured: true },
   { key: 'water', title: 'Water Activities', slug: 'water', featured: true },
   { key: 'adventure', title: 'Adventure', slug: 'adventure', featured: true },
-  { key: 'fishing', title: 'Fishing', slug: null, featured: true },
+  { key: 'fishing', title: 'Fishing', slug: 'fishing', featured: true },
   { key: 'winter', title: 'Winter', slug: 'winter', featured: true },
   { key: 'nature', title: 'Nature & Wildlife', slug: 'nature', featured: false },
   { key: 'viewpoints', title: 'Viewpoints & Lookouts', slug: 'viewpoints', featured: false },

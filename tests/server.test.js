@@ -4924,12 +4924,13 @@ test('Outdoor category wiring: slug, themed layout, all-regions page, labels, sc
   assert.equal(css.split('[data-venue-category="outdoor"]').length, app.renderBeachThemeStyles().split('[data-venue-category="beach"]').length, 'outdoor and beach derive the same number of golf rules');
 });
 
-test('Outdoor activity collections: eight kinds bootstrapped with no members, excluded from trip discovery, usable through the audited membership route', () => {
+test('Outdoor activity collections: nine kinds bootstrapped with no members, excluded from trip discovery, usable through the audited membership route', () => {
   const expected = [
     ['activity-hiking', 'activity_hiking', 'Hiking & Trails'], ['activity-cycling', 'activity_cycling', 'Cycling'],
     ['activity-viewpoints', 'activity_viewpoints', 'Viewpoints'], ['activity-nature', 'activity_nature', 'Nature'],
     ['activity-winter', 'activity_winter', 'Winter'], ['activity-camping', 'activity_camping', 'Camping'],
     ['activity-water', 'activity_water', 'Water Activities'], ['activity-adventure', 'activity_adventure', 'Adventure'],
+    ['activity-fishing', 'activity_fishing', 'Fishing'],
   ];
   assert.deepEqual(app.ACTIVITY_COLLECTION_KINDS, expected.map((e) => e[1]));
   for (const [slug, kind, title] of expected) {
@@ -5159,11 +5160,11 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
 // memberships in the activity collections. /outdoors becomes a discovery
 // landing page and /outdoors/:activity lists one activity's destinations.
 
-test('Outdoor activity definitions: eight activities map 1:1 onto the bootstrapped collection kinds with clean slugs and labels', () => {
-  assert.equal(app.OUTDOOR_ACTIVITIES.length, 8);
+test('Outdoor activity definitions: nine activities map 1:1 onto the bootstrapped collection kinds with clean slugs and labels', () => {
+  assert.equal(app.OUTDOOR_ACTIVITIES.length, 9);
   assert.deepEqual([...app.OUTDOOR_ACTIVITIES.map((a) => a.kind)].sort(), [...app.ACTIVITY_COLLECTION_KINDS].sort());
-  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.slug), ['hiking', 'cycling', 'winter', 'camping', 'nature', 'water', 'viewpoints', 'adventure']);
-  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.label), ['Hiking & Trails', 'Cycling & Biking', 'Winter', 'Camping', 'Nature & Wildlife', 'Water Activities', 'Viewpoints', 'Adventure']);
+  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.slug), ['hiking', 'cycling', 'winter', 'camping', 'nature', 'water', 'viewpoints', 'adventure', 'fishing']);
+  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.label), ['Hiking & Trails', 'Cycling & Biking', 'Winter', 'Camping', 'Nature & Wildlife', 'Water Activities', 'Viewpoints', 'Adventure', 'Fishing']);
   for (const a of app.OUTDOOR_ACTIVITIES) { assert.match(a.slug, /^[a-z]+$/); assert.ok(a.blurb.length > 40); assert.equal(app.OUTDOOR_ACTIVITY_BY_SLUG[a.slug], a); }
   assert.equal(app.MIN_ACTIVITY_VENUES, 3);
   assert.ok(app.OUTDOOR_FEATURED_KEYS.every((k) => /^[a-z-]+\/[a-z0-9-]+$/.test(k)));
@@ -5596,8 +5597,8 @@ test('Outdoor activity showcase: six featured cards in the approved order, five 
   assert.deepEqual(cards.filter((c) => c.featured).map((c) => c.title), ['Hiking & Trails', 'Cycling & Bike Trails', 'Water Activities', 'Adventure', 'Fishing', 'Winter']);
   assert.deepEqual(cards.filter((c) => !c.featured).map((c) => c.title), ['Nature & Wildlife', 'Viewpoints & Lookouts', 'Camping', 'Boating & Marinas', 'Climbing']);
   for (const c of cards) if (c.slug) assert.ok(app.OUTDOOR_ACTIVITY_BY_SLUG[c.slug], `${c.title} maps onto an existing activity slug (${c.slug})`);
-  assert.deepEqual(cards.filter((c) => !c.slug).map((c) => c.key), ['fishing', 'boating', 'climbing'], 'the three activities with no data model entry carry no slug');
-  assert.equal(app.OUTDOOR_ACTIVITIES.length, 8, 'no activity was added to the data model');
+  assert.deepEqual(cards.filter((c) => !c.slug).map((c) => c.key), ['boating', 'climbing'], 'the two activities with no data model entry carry no slug');
+  assert.equal(app.OUTDOOR_ACTIVITIES.length, 9, 'Fishing is the only activity added to the data model');
 
   const meta = { reason: 'test', batch_id: 'outdoors-showcase-test', reviewed_by: null };
   const ids = []; const added = [];
@@ -5615,7 +5616,7 @@ test('Outdoor activity showcase: six featured cards in the approved order, five 
     assert.match(html, /<h2 class="category-subsection-heading" id="outdoorActivitiesHeading">Explore by Activity<\/h2>/);
     assert.match(html, /<a class="outdoor-activity-card outdoor-activity-card-hiking" href="\/outdoors\/hiking">[\s\S]*?Hiking &amp; Trails<\/span>\s*<span class="outdoor-activity-card-count">3 destinations<\/span>/);
     assert.equal((html.match(/<a class="outdoor-activity-card/g) || []).length, 1, 'only the live activity is a link');
-    assert.match(html, /<div class="outdoor-activity-card outdoor-activity-card-fishing outdoor-activity-card-pending" aria-disabled="true">[\s\S]*?Fishing<\/span>\s*<span class="outdoor-activity-card-soon">Coming soon<\/span>/);
+    assert.match(html, /<div class="outdoor-activity-card outdoor-activity-card-fishing outdoor-activity-card-pending" aria-disabled="true">[\s\S]*?Fishing<\/span>\s*<span class="outdoor-activity-card-soon">Coming soon<\/span>/, 'Fishing exists in the data model but has no members in the fixture, so it is a Coming soon tile');
     assert.match(html, /<div class="outdoor-activity-card outdoor-activity-card-water outdoor-activity-card-pending" aria-disabled="true">/, 'an existing activity below the gate is a Coming soon tile too');
     assert.doesNotMatch(html, /href="\/outdoors\/(fishing|boating|climbing|water|camping)"/, 'no dead or invented activity links');
     // Order: featured grid before the details block; the five secondary inside it.
@@ -5657,9 +5658,9 @@ test('I.3: finalized activity display order and labels; slugs unchanged; Camping
   const sorted = app.sortOutdoorActivitiesForDisplay(app.OUTDOOR_ACTIVITIES);
   assert.deepEqual(sorted.slice(0, 6).map((a) => a.label), ['Hiking & Trails', 'Viewpoints', 'Nature & Wildlife', 'Cycling & Biking', 'Winter', 'Adventure']);
   assert.deepEqual(sorted.slice(0, 6).map((a) => a.slug), ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure']);
-  assert.deepEqual(sorted.slice(6).map((a) => a.slug).sort(), ['camping', 'water'], 'Camping and Water remain defined, after the six');
-  for (const slug of ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure', 'camping', 'water']) assert.ok(app.OUTDOOR_ACTIVITY_BY_SLUG[slug], `slug ${slug} unchanged`);
-  assert.equal(app.OUTDOOR_ACTIVITIES.length, 8, 'no new categories');
+  assert.deepEqual(sorted.slice(6).map((a) => a.slug), ['fishing', 'camping', 'water'], 'Fishing (2026-09-21), Camping and Water remain defined, after the six');
+  for (const slug of ['hiking', 'viewpoints', 'nature', 'cycling', 'winter', 'adventure', 'fishing', 'camping', 'water']) assert.ok(app.OUTDOOR_ACTIVITY_BY_SLUG[slug], `slug ${slug} unchanged`);
+  assert.equal(app.OUTDOOR_ACTIVITIES.length, 9, 'Fishing is the only category added since I.3');
 });
 
 test('I.3: the landing filter chips and the activity-page chips present the six live activities in the finalized order (counts on the landing only); Camping/Water not offered; filtering untouched (fixture-only, cleaned up)', () => {

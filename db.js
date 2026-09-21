@@ -424,6 +424,7 @@ const ACTIVITY_COLLECTIONS = [
   ['activity-camping', 'activity_camping', 'Camping'],
   ['activity-water', 'activity_water', 'Water Activities'],
   ['activity-adventure', 'activity_adventure', 'Adventure'],
+  ['activity-fishing', 'activity_fishing', 'Fishing'],
 ];
 for (const [slug, kind, title] of ACTIVITY_COLLECTIONS) {
   if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(slug)) {
