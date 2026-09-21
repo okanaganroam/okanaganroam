@@ -1508,7 +1508,7 @@ const OUTDOOR_ACTIVITIES = [
   { slug: 'winter', kind: 'activity_winter', label: 'Winter', blurb: 'Ski resorts, Nordic centres and snowshoe trails, plus the parks that stay open for winter walks.' },
   { slug: 'camping', kind: 'activity_camping', label: 'Camping', blurb: 'Provincial and regional parks where an outdoor day can turn into a night under the stars.' },
   { slug: 'nature', kind: 'activity_nature', label: 'Nature & Wildlife', blurb: 'Nature conservancies, creek corridors, desert habitat and the places to watch kokanee, birds and bighorn sheep.' },
-  { slug: 'water', kind: 'activity_water', label: 'Water & Boating', blurb: 'Outdoor destinations with paddling, boating or lake access built in.' },
+  { slug: 'water', kind: 'activity_water', label: 'Water Activities', blurb: 'Outdoor destinations with paddling, boating or lake access built in.' },
   { slug: 'viewpoints', kind: 'activity_viewpoints', label: 'Viewpoints', blurb: 'Lookouts, ridgelines and summits with the lake and valley spread out below.' },
   { slug: 'adventure', kind: 'activity_adventure', label: 'Adventure', blurb: 'Rock climbing, bike parks, tubing and skating loops \u2014 the bigger, louder days out.' },
 ];

@@ -422,7 +422,7 @@ const ACTIVITY_COLLECTIONS = [
   ['activity-nature', 'activity_nature', 'Nature'],
   ['activity-winter', 'activity_winter', 'Winter'],
   ['activity-camping', 'activity_camping', 'Camping'],
-  ['activity-water', 'activity_water', 'Water & Boating'],
+  ['activity-water', 'activity_water', 'Water Activities'],
   ['activity-adventure', 'activity_adventure', 'Adventure'],
 ];
 for (const [slug, kind, title] of ACTIVITY_COLLECTIONS) {

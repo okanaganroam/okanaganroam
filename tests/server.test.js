@@ -4929,7 +4929,7 @@ test('Outdoor activity collections: eight kinds bootstrapped with no members, ex
     ['activity-hiking', 'activity_hiking', 'Hiking & Trails'], ['activity-cycling', 'activity_cycling', 'Cycling'],
     ['activity-viewpoints', 'activity_viewpoints', 'Viewpoints'], ['activity-nature', 'activity_nature', 'Nature'],
     ['activity-winter', 'activity_winter', 'Winter'], ['activity-camping', 'activity_camping', 'Camping'],
-    ['activity-water', 'activity_water', 'Water & Boating'], ['activity-adventure', 'activity_adventure', 'Adventure'],
+    ['activity-water', 'activity_water', 'Water Activities'], ['activity-adventure', 'activity_adventure', 'Adventure'],
   ];
   assert.deepEqual(app.ACTIVITY_COLLECTION_KINDS, expected.map((e) => e[1]));
   for (const [slug, kind, title] of expected) {
@@ -5163,7 +5163,7 @@ test('Outdoor activity definitions: eight activities map 1:1 onto the bootstrapp
   assert.equal(app.OUTDOOR_ACTIVITIES.length, 8);
   assert.deepEqual([...app.OUTDOOR_ACTIVITIES.map((a) => a.kind)].sort(), [...app.ACTIVITY_COLLECTION_KINDS].sort());
   assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.slug), ['hiking', 'cycling', 'winter', 'camping', 'nature', 'water', 'viewpoints', 'adventure']);
-  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.label), ['Hiking & Trails', 'Cycling & Biking', 'Winter', 'Camping', 'Nature & Wildlife', 'Water & Boating', 'Viewpoints', 'Adventure']);
+  assert.deepEqual(app.OUTDOOR_ACTIVITIES.map((a) => a.label), ['Hiking & Trails', 'Cycling & Biking', 'Winter', 'Camping', 'Nature & Wildlife', 'Water Activities', 'Viewpoints', 'Adventure']);
   for (const a of app.OUTDOOR_ACTIVITIES) { assert.match(a.slug, /^[a-z]+$/); assert.ok(a.blurb.length > 40); assert.equal(app.OUTDOOR_ACTIVITY_BY_SLUG[a.slug], a); }
   assert.equal(app.MIN_ACTIVITY_VENUES, 3);
   assert.ok(app.OUTDOOR_FEATURED_KEYS.every((k) => /^[a-z-]+\/[a-z0-9-]+$/.test(k)));
