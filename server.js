@@ -1532,6 +1532,18 @@ function sortOutdoorActivitiesForDisplay(list) {
 // higher bar because an activity page is a destination guide, not a
 // region listing.
 const MIN_ACTIVITY_VENUES = 3;
+// Venue types an activity page may list (2026-09-21). Membership in the
+// activity collection is the source of truth for WHICH destinations
+// belong to an activity; this allowlist only says which underlying
+// category records are eligible at all. Provincial parks catalogued as
+// Beaches (Ellison, Fintry, Kekuli Bay, Mabel Lake, Vaseux Lake, sw̓iw̓s)
+// carry hiking/nature/fishing memberships that were silently dropped by
+// the former `v.type = 'outdoor'` gate. Golf is deliberately NOT here:
+// whether a golf-and-RV-park record belongs in an activity is a separate
+// editorial decision. Cards, hrefs and JSON-LD already key off each
+// venue's own type, so a beach row renders as a beach.
+const OUTDOOR_ACTIVITY_VENUE_TYPES = ['outdoor', 'beach'];
+const OUTDOOR_ACTIVITY_TYPE_SQL = OUTDOOR_ACTIVITY_VENUE_TYPES.map(() => '?').join(', ');
 // Featured outdoor experiences on the /outdoors landing page: a short,
 // editorially chosen set (region/slug keys, like GOLF_AT_A_GLANCE_FACTS)
 // spread across the valley and across activities. Unknown or missing
@@ -1545,27 +1557,27 @@ const OUTDOOR_FEATURED_KEYS = [
   'big-white/big-white-ski-resort',
 ];
 
-// Outdoor venues (canonical records only) that belong to one activity
-// collection, in the same name order the category pages use.
+// Canonical venue records (OUTDOOR_ACTIVITY_VENUE_TYPES only) that belong
+// to one activity collection, in the same name order the category pages use.
 function getOutdoorActivityVenues(activity) {
   return db.prepare(`
     SELECT v.* FROM venues v
     JOIN collection_items ci ON ci.content_type = 'venue' AND ci.content_id = v.id
     JOIN collections c ON c.id = ci.collection_id
-    WHERE c.kind = ? AND v.type = 'outdoor' AND v.redirect_to IS NULL
+    WHERE c.kind = ? AND v.type IN (${OUTDOOR_ACTIVITY_TYPE_SQL}) AND v.redirect_to IS NULL
     GROUP BY v.id
     ORDER BY v.name ASC
-  `).all(activity.kind).map(rowToVenue);
+  `).all(activity.kind, ...OUTDOOR_ACTIVITY_VENUE_TYPES).map(rowToVenue);
 }
 // { slug -> count } for every activity, one small query.
 function getOutdoorActivityCounts() {
   const rows = db.prepare(`
     SELECT c.kind AS kind, COUNT(DISTINCT v.id) AS n FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
-    JOIN venues v ON v.id = ci.content_id AND v.type = 'outdoor' AND v.redirect_to IS NULL
+    JOIN venues v ON v.id = ci.content_id AND v.type IN (${OUTDOOR_ACTIVITY_TYPE_SQL}) AND v.redirect_to IS NULL
     WHERE ci.content_type = 'venue'
     GROUP BY c.kind
-  `).all();
+  `).all(...OUTDOOR_ACTIVITY_VENUE_TYPES);
   const byKind = Object.fromEntries(rows.map((r) => [r.kind, r.n]));
   return Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, byKind[a.kind] || 0]));
 }
@@ -9716,6 +9728,7 @@ module.exports = {
   sortOutdoorActivitiesForDisplay,
   MIN_ACTIVITY_VENUES,
   OUTDOOR_FEATURED_KEYS,
+  OUTDOOR_ACTIVITY_VENUE_TYPES,
   getOutdoorActivityVenues,
   getOutdoorActivityCounts,
   listLiveOutdoorActivities,

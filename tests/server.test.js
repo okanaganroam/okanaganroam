@@ -5274,6 +5274,51 @@ test('Activity page + landing sections render once an activity reaches the thres
   }
 });
 
+// Activity pages list by membership across the allowlisted venue types
+// (2026-09-21): a provincial park catalogued as a Beach that holds an
+// activity membership renders on that activity page, counts toward its
+// threshold, and keeps its own type on the card (href under /beaches,
+// data-venue-category="beach"). A membership on a non-allowlisted type
+// (winery) is ignored by both the listing and the counts, and golf is
+// deliberately outside the allowlist.
+test('Outdoor activity pages list beach-type members (membership + type allowlist), never non-allowlisted types (fixture-only, cleaned up)', () => {
+  assert.deepEqual(app.OUTDOOR_ACTIVITY_VENUE_TYPES, ['outdoor', 'beach']);
+  const meta = { reason: 'test', batch_id: 'outdoors-type-allowlist-test', reviewed_by: null };
+  const ids = [];
+  const added = [];
+  try {
+    for (const [name, region, slug] of [['Test Ridge Trail', 'penticton', 'test-ridge-trail'], ['Test Falls Park', 'vernon', 'test-falls-park']]) {
+      const info = insert.run({ name, region, type: 'outdoor', cuisine: null, phone: null, price: null, reviews: null, rating: null, description: `${name} is a fixture outdoor destination used only by the automated test suite.`, address: null, latitude: null, longitude: null, hours: null, slug });
+      ids.push(Number(info.lastInsertRowid));
+    }
+    const beach = app.findVenueBySlug('kelowna', 'beach', 'test-beach-park');
+    const winery = app.findVenueBySlug('kelowna', 'winery', 'test-winery');
+    const golf = app.findVenueBySlug('west-kelowna', 'golf', 'test-west-kelowna-golf-course');
+    assert.ok(beach && winery && golf, 'fixtures present');
+    for (const id of [...ids, beach.id, winery.id, golf.id]) { const r = app.guardedCollectionMembershipUpdate('activity_camping', id, 'add', null, meta); assert.equal(r.ok, true, JSON.stringify(r)); added.push(['activity_camping', id]); }
+
+    // Counts: two outdoor + one beach = 3 (the threshold); winery and golf memberships do not count.
+    assert.equal(app.getOutdoorActivityCounts().camping, 3);
+    assert.deepEqual(app.listLiveOutdoorActivities().map((a) => [a.slug, a.count]), [['camping', 3]], 'the beach member lifts camping to live');
+    const camping = app.OUTDOOR_ACTIVITY_BY_SLUG.camping;
+    const venues = app.getOutdoorActivityVenues(camping);
+    assert.deepEqual(venues.map((v) => v.id).sort((a, b) => a - b), [...ids, beach.id].sort((a, b) => a - b), 'beach member listed; winery and golf members are not');
+    assert.deepEqual(venues.map((v) => v.name), ['Test Beach Park', 'Test Falls Park', 'Test Ridge Trail'], 'name order across types');
+
+    const html = app.renderOutdoorActivityPage(camping, venues);
+    assert.match(html, /<p class="subtitle">3 outdoor destinations for camping across the Okanagan Valley\.<\/p>/);
+    assert.match(html, /<li class="venue-card" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="beach" data-venue-name="Test Beach Park"/, 'the beach card keeps its own type');
+    assert.match(html, /<a class="venue-card-link" href="\/kelowna\/beaches\/test-beach-park">/, 'the beach card links to its beach venue page');
+    assert.equal((html.match(/<li class="venue-card" data-venue-id="\d+" data-venue-region="[a-z-]+" data-venue-category="outdoor"/g) || []).length, 2);
+    assert.match(html, /"url":"https:\/\/okanaganroam\.com\/kelowna\/beaches\/test-beach-park"/, 'JSON-LD ItemList uses the beach URL');
+    assert.doesNotMatch(html, /Test Winery|Test West Kelowna Golf Course/, 'non-allowlisted members never render');
+  } finally {
+    for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+  assert.equal(app.getOutdoorActivityCounts().camping, 0);
+});
+
 test('REGRESSION (Outdoors Phase 2): Golf/Beach wide pages keep their heading and carry no discovery sections; restaurant/region pages untouched', () => {
   const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
   const beachRows = app.getVenuesByRegionCategory('kelowna', 'beach');
