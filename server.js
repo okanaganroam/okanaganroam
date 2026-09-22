@@ -4192,7 +4192,7 @@ function renderMoodCardsHTML() {
     { key: 'wine', href: wineHref, filter: 'winery', img: '/images/mood/drink.webp', titleKey: 'mood.wine.title', title: 'Wine' },
     { key: 'beaches', href: beachesHref, filter: null, img: '/images/mood/beaches.webp', titleKey: 'mood.beaches.title', title: 'Beaches' },
     { key: 'golf', href: golfHref, filter: null, img: '/images/mood/golf.webp', titleKey: 'mood.golf.title', title: 'Golf' },
-    { key: 'whats-on', href: '/events', filter: null, img: '/images/mood/whats-on.webp', titleKey: 'mood.whatsOn.title', title: "What's On" },
+    { key: 'whats-on', href: '/whats-on', filter: null, img: '/images/mood/whats-on.webp', titleKey: 'mood.whatsOn.title', title: "What's On" },
     { key: 'outdoors', href: outdoorsHref, filter: null, img: '/images/mood/explore.webp', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
   ];
 
@@ -4332,7 +4332,7 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="${wineHref}" data-i18n="mood.wine.title">Wine</a></li>
           <li><a href="${exploreRegionsHref}" data-i18n="mood.beaches.title">Beaches</a></li>
           <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
-          <li><a href="/events" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
+          <li><a href="/whats-on" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
           <li><a href="${outdoorsHref}" data-i18n="mood.outdoors.title">Outdoors</a></li>
           <li><a href="${hiddenGemsHref}" data-i18n="gems.heading">Hidden Gems</a></li>
         </ul>
@@ -9960,7 +9960,6 @@ const server = http.createServer(async (req, res) => {
 
       const urlEntries = [
         `  <url>\n    <loc>https://okanaganroam.com/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com/events</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`,
         ...regionCounts.map(
           ({ region, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
@@ -11193,18 +11192,13 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
 
-    if (pathname === '/events' && method === 'GET') {
-      // What's On Step 2: "upcoming" is decided on the Okanagan local date
-      // (see isEventExpired / ACTIVE_EVENT_DATE_SQL), not on SQLite's UTC
-      // datetime('now'), so an event stays listed through its last local day.
-      const events = db.prepare(`
-        SELECT * FROM events
-        WHERE ${ACTIVE_EVENT_DATE_SQL}
-        ORDER BY start_datetime ASC
-      `).all(todayLocal()).map(rowToEvent);
-      const html = renderEventsIndexPage(events);
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(html);
+    // GET /events -- the pre-What's-On index (renderEventsIndexPage) is no
+    // longer the public destination (2026-09-22): permanent redirect to
+    // /whats-on so old bookmarks and links keep working. Individual
+    // /:region/events/:slug pages are untouched (route below).
+    if ((pathname === '/events' || pathname === '/events/') && method === 'GET') {
+      res.writeHead(301, { Location: '/whats-on' });
+      return res.end();
     }
 
     // GET /:region/events/:slug — Phase 1 (Events architecture gate).

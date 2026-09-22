@@ -2129,9 +2129,9 @@ test('Mood cards: no primary/secondary tiering -- all six cards share one class'
   assert.doesNotMatch(html, /mood-card-secondary/, 'tiered secondary class must be gone');
 });
 
-test('Mood cards: What\'s On links to /events with no filter', () => {
+test('Mood cards: What\'s On links to /whats-on with no filter', () => {
   const html = app.renderMoodCardsHTML();
-  assert.match(html, /class="mood-card mood-card-whats-on" href="\/events">/);
+  assert.match(html, /class="mood-card mood-card-whats-on" href="\/whats-on">/);
 });
 
 test('Mood cards: no data-i18n translation key ever renders as visible card text (every titleKey resolves to real English in both languages)', () => {
@@ -2167,7 +2167,7 @@ test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach
   assert.doesNotMatch(html, /mood-card-beaches"[^>]*data-mood-filter/, 'no filter: the card is a plain link like Golf');
   // The other cards keep their existing destinations.
   assert.match(html, /class="mood-card mood-card-outdoors" href="\/outdoors">/);
-  assert.match(html, /class="mood-card mood-card-whats-on" href="\/events">/);
+  assert.match(html, /class="mood-card mood-card-whats-on" href="\/whats-on">/);
   assert.match(html, /class="mood-card mood-card-food-drink" href="\/browse\?types=restaurant,cafe,brewery,pub,cocktail" data-mood-filter="restaurant,cafe,brewery,pub,cocktail">/);
   assert.match(html, /class="mood-card mood-card-golf" href="\/golf">/);
   assert.match(html, /class="mood-card mood-card-wine" href="\/[a-z-]+\/wineries" data-mood-filter="winery">/);
@@ -2305,7 +2305,7 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
   assert.ok(items[1].href === '/browse' || /^\/[a-z-]+\/wineries$/.test(items[1].href), `Wine href unexpected: ${items[1].href}`);
   assert.equal(items[2].href, '#exploreRegions');
   assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
-  assert.equal(items[4].href, '/events');
+  assert.equal(items[4].href, '/whats-on');
   assert.equal(items[5].href, '/outdoors', 'footer Outdoors link matches the Outdoors mood card once outdoor venues exist (2026-09-20)');
   assert.equal(items[6].href, '#hiddenGems');
 });
@@ -2703,7 +2703,7 @@ test('isEventExpired uses the Okanagan local day, so an event stays live through
   assert.equal(app.isEventExpired(nov1, new Date('2026-11-02T08:30:00Z')), true, 'clearly Nov 2 local under either rule -> expired');
 });
 
-test('listEventsForSitemap and GET /events decide "active" on the Okanagan local date, not UTC', async () => {
+test('listEventsForSitemap decides "active" on the Okanagan local date, not UTC; GET /events redirects to /whats-on', async () => {
   // Insert an event that ends TODAY (Okanagan) at 11:00 pm local. Under the
   // old UTC comparison this row would already look expired for most of the
   // evening; under the local-date rule it must be listed all day.
@@ -2726,14 +2726,14 @@ test('listEventsForSitemap and GET /events decide "active" on the Okanagan local
       const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
       tmp.listen(0, '127.0.0.1', async () => {
         try {
-          const res = await fetch(`http://127.0.0.1:${tmp.address().port}/events`);
-          assert.equal(res.status, 200);
+          const res = await fetch(`http://127.0.0.1:${tmp.address().port}/events`, { redirect: 'manual' });
+          assert.equal(res.status, 301, 'GET /events permanently redirects to the What\'s On page');
+          assert.equal(res.headers.get('location'), '/whats-on');
           resolve(await res.text());
         } catch (err) { reject(err); } finally { tmp.close(); }
       });
     });
-    assert.match(html, /href="\/kelowna\/events\/step2-today-event"/, 'GET /events lists an event that ends later today (Okanagan time)');
-    assert.doesNotMatch(html, /test-past-market/);
+    assert.equal(html, '', 'the redirect carries no body');
   } finally {
     db.prepare("DELETE FROM event_occurrences WHERE event_id IN (SELECT id FROM events WHERE slug = 'step2-today-event')").run();
     db.prepare("DELETE FROM events WHERE slug = 'step2-today-event'").run();
@@ -3530,7 +3530,8 @@ test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, u
   assert.ok(!after.includes('https://okanaganroam.com/kelowna/events/s5-gallery-night'), 'no scheduled occurrence -> excluded');
   assert.ok(after.includes('https://okanaganroam.com/kelowna/events/s5-open-studio'));
   assert.deepEqual(nonEvent(after), nonEvent(before), 'every non-event URL unchanged, in the same order');
-  assert.deepEqual(after.slice(0, 2), ['https://okanaganroam.com/', 'https://okanaganroam.com/events'], 'homepage and /events index lead the file');
+  assert.equal(after[0], 'https://okanaganroam.com/', 'homepage leads the file');
+  assert.ok(!after.includes('https://okanaganroam.com/events'), 'the retired /events index is no longer listed (it redirects to /whats-on)');
   assert.deepEqual(app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`), app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`).slice().sort(), 'deterministic region/slug order');
 });
 
@@ -3552,7 +3553,8 @@ test('S5 #24: with zero events the sitemap carries no event URLs and is unaffect
     const first = await (await fetch(`http://localhost:${ISOLATED_PORT}/sitemap.xml`)).text();
     const urls = [...first.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
     assert.equal(urls.filter((u) => /\/events\/[a-z0-9-]+$/.test(u)).length, 0, 'no event detail URLs');
-    assert.deepEqual(urls.slice(0, 2), ['https://okanaganroam.com/', 'https://okanaganroam.com/events']);
+    assert.equal(urls[0], 'https://okanaganroam.com/');
+    assert.ok(!urls.includes('https://okanaganroam.com/events'), 'the retired /events index is not listed');
     const second = await (await fetch(`http://localhost:${ISOLATED_PORT}/sitemap.xml`)).text();
     assert.equal(second, first, 'byte-identical across requests with zero events');
     assert.equal((await fetch(`http://localhost:${ISOLATED_PORT}/kelowna/events/anything`)).status, 404);
