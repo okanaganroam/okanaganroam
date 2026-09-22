@@ -5687,8 +5687,9 @@ test('Outdoor activity cards (2026-09-22 explorer): nine data-model activities i
       if (p) assert.match(html, new RegExp(`<img class="outdoor-activity-card-img" src="${p.replace(/\//g, '\\/')}" width="1376" height="768" alt="" loading="lazy">`));
       else assert.doesNotMatch(html, new RegExp(`/images/outdoors/${cd.key}\\.webp`));
     }
-    for (const k of ['hiking', 'cycling', 'water', 'adventure', 'fishing', 'winter']) assert.equal(app.outdoorActivityImagePath(k), `/images/outdoors/${k}.webp`, `approved image wired for ${k}`);
-    for (const k of ['nature', 'viewpoints', 'camping']) assert.equal(app.outdoorActivityImagePath(k), null, `no art yet for ${k}`);
+    // All nine cards carry approved art (nature / viewpoints / camping added 2026-09-22), 1376x768 WebP under public/images/outdoors.
+    for (const k of ['hiking', 'cycling', 'water', 'adventure', 'fishing', 'winter', 'nature', 'viewpoints', 'camping']) assert.equal(app.outdoorActivityImagePath(k), `/images/outdoors/${k}.webp`, `approved image wired for ${k}`);
+    assert.equal(app.outdoorActivityImagePath('boating'), null, 'a key with no file gets no <img>');
     // Placement on the landing: intro -> Choose Region(s) -> Choose Activity(s) -> Show all results -> Results; region filter markup unchanged.
     const landing = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor')));
     const iIntro = landing.indexOf('<p class="outdoor-intro">'), iRegion = landing.indexOf('Choose Region(s)</h2>'), iShow = landing.indexOf('outdoor-activity-showcase'), iBtn = landing.indexOf('id="outdoorShowResults"'), iRes = landing.indexOf('id="outdoorResultsTop">Results</h2>');
