@@ -255,6 +255,107 @@ for (const [col, colType] of newEventColumns) {
   }
 }
 
+// --- What's On, Step 1 (2026-09-22): frozen event schema (additive only) ---
+// Implements exactly the schema frozen in the What's On technical design
+// (scratchpad/whatson-research/WHATSON_TECHNICAL_DESIGN.md, "DESIGN
+// FROZEN — 2026-09-22"). Same guarded ADD COLUMN pattern as above; every
+// statement is idempotent, so re-running on a database that already has
+// some or all of this is a no-op. Nothing here reads, writes or backfills
+// any row: production has 0 events, and the occurrence/category/log
+// tables start empty. No application code uses these yet (Step 1 = schema
+// only); the What's On page keeps rendering from its empty data source.
+//
+// Model summary (see the design for the reasoning):
+//   - One `events` row per event OR series -- the unit that gets a card and
+//     a /:region/events/:slug URL. Its existing start_datetime/end_datetime
+//     become the DERIVED local-date-bearing ISO span of all its occurrences
+//     (written by the future data layer, never by hand); their first ten
+//     characters are the America/Vancouver calendar dates, which is what
+//     the expression index below serves for expiry/sitemap checks.
+//   - `event_occurrences`: every concrete date the site can filter on, as
+//     America/Vancouver civil dates/times (YYYY-MM-DD / HH:MM). This is the
+//     ONLY table date-window queries read; no RRULE, no runtime expansion.
+//   - `event_categories`: 1-3 stable keys per event (the twelve
+//     WHATSON_CATEGORIES keys in server.js), position 0 = primary. The
+//     CHECK + UNIQUE make "max three" physically true; the key allowlist
+//     itself stays application-enforced, per the no-CHECK taxonomy
+//     discipline used for venues.type / events.type / collections.kind.
+//   - `event_enrichment_log`: the venue audit log's exact shape keyed by
+//     event_id (venue_enrichment_log.venue_id is NOT NULL and is not
+//     altered), so the same executor/verification pattern applies.
+// Status vocabulary (application-enforced, like every other taxonomy here):
+// scheduled | postponed | cancelled ('date_tbc' reserved, rejected in v1).
+// A scheduled event must have >= 1 scheduled occurrence -- enforced by the
+// future writers, not by the schema (SQLite cannot express it declaratively).
+const whatsOnEventCols = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+const whatsOnEventColumns = [
+  ['status', "TEXT NOT NULL DEFAULT 'scheduled'"],
+  ['event_confidence', "TEXT NOT NULL DEFAULT 'medium'"],
+  ['source_type', 'TEXT'],
+  ['source_name', 'TEXT'],
+  ['source_url', 'TEXT'],
+  ['source_checked_at', 'TEXT'],
+  ['venue_name_text', 'TEXT'],
+  ['valley_wide', 'INTEGER NOT NULL DEFAULT 0'],
+];
+for (const [col, colType] of whatsOnEventColumns) {
+  if (!whatsOnEventCols.includes(col)) {
+    db.exec(`ALTER TABLE events ADD COLUMN ${col} ${colType}`);
+  }
+}
+
+db.exec(`
+CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+CREATE INDEX IF NOT EXISTS idx_events_end_local ON events(substr(end_datetime, 1, 10));
+
+CREATE TABLE IF NOT EXISTS event_occurrences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  start_time TEXT,
+  end_time TEXT,
+  ends_next_day INTEGER NOT NULL DEFAULT 0,
+  all_day INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'scheduled',
+  label TEXT,
+  source_ref TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  CHECK (end_date >= start_date)
+);
+CREATE INDEX IF NOT EXISTS idx_occ_dates ON event_occurrences(end_date, start_date);
+CREATE INDEX IF NOT EXISTS idx_occ_event_start ON event_occurrences(event_id, start_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_occ_unique ON event_occurrences(event_id, start_date, COALESCE(start_time, ''));
+
+CREATE TABLE IF NOT EXISTS event_categories (
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  category_key TEXT NOT NULL,
+  position INTEGER NOT NULL CHECK (position IN (0, 1, 2)),
+  PRIMARY KEY (event_id, category_key),
+  UNIQUE (event_id, position)
+);
+CREATE INDEX IF NOT EXISTS idx_event_categories_key ON event_categories(category_key, event_id);
+
+CREATE TABLE IF NOT EXISTS event_enrichment_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  occurrence_id INTEGER REFERENCES event_occurrences(id),
+  field_name TEXT NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  source TEXT NOT NULL,
+  source_ref TEXT,
+  confidence TEXT NOT NULL,
+  batch_id TEXT,
+  auto_accepted INTEGER NOT NULL DEFAULT 0,
+  reviewed_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_event_enrichment_log_event ON event_enrichment_log(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_enrichment_log_batch ON event_enrichment_log(batch_id);
+`);
+
 // --- Phase 2 Sprint 3 (Hidden Gems): collections + collection_items ------
 // (additive only)
 //

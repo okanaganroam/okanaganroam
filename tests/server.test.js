@@ -329,6 +329,24 @@ insertEvent.run({
   recurrence_rule: null, venue_id: null, website: null, image_url: null,
 });
 
+// What's On Step 5: the frozen model says every scheduled event carries at
+// least one materialised occurrence, so the four Phase 1 fixtures get the
+// occurrence rows their stored spans describe (same dates, local times).
+// Nothing about the fixtures' names/slugs/regions/spans changes.
+const insertFixtureOccurrence = db.prepare(`
+  INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time)
+  VALUES (@event_id, @start_date, @end_date, @start_time, @end_time)
+`);
+for (const [region, slug, rows] of [
+  ['kelowna', 'test-future-festival', [['2099-06-01', '2099-06-01', '10:00', '18:00']]],
+  ['kelowna', 'test-past-market', [['2000-01-01', '2000-01-01', '10:00', '14:00']]],
+  ['kelowna', 'test-weekly-market', [['2099-01-03', '2099-01-03', '09:00', '13:00'], ['2099-01-10', '2099-01-10', '09:00', '13:00']]],
+  ['vernon', 'test-future-festival', [['2099-07-01', '2099-07-01', '10:00', '18:00']]],
+]) {
+  const ev = db.prepare('SELECT id FROM events WHERE region = ? AND slug = ?').get(region, slug);
+  for (const [start_date, end_date, start_time, end_time] of rows) insertFixtureOccurrence.run({ event_id: ev.id, start_date, end_date, start_time, end_time });
+}
+
 // ---- Slugs -----------------------------------------------------------
 test('slugify produces a URL-safe, lowercase, hyphenated slug', () => {
   assert.equal(app.slugify("Domino's Pizza Oliver"), 'domino-s-pizza-oliver');
@@ -2530,6 +2548,1237 @@ test('listEventsForSitemap includes active events and excludes expired ones', ()
   assert.ok(slugs.includes('kelowna/test-future-festival'), 'active event must be included');
   assert.ok(slugs.includes('kelowna/test-weekly-market'), 'active recurring event must be included');
   assert.ok(!slugs.includes('kelowna/test-past-market'), 'expired event must be excluded');
+});
+
+// ---- What's On Step 2: Okanagan local-date helpers + expiry ----------------
+// The process runs with TZ=UTC in production; every assertion below injects
+// an explicit UTC instant and expects America/Vancouver civil-date results.
+// DST expectations are pinned only for dates every tzdata release agrees on
+// (2025-2026 spring/fall transitions); later offsets are cross-checked
+// against Intl itself, because tzdata 2026c (bundled with Node 24) and
+// 2026a (production Node 22) disagree about BC's clock after 2026-11-01.
+test("todayLocal reports the Okanagan calendar date, not the UTC date", () => {
+  assert.equal(app.todayLocal(new Date('2026-09-23T06:30:00Z')), '2026-09-22', '11:30 pm PDT on Sep 22 is still Sep 22');
+  assert.equal(app.todayLocal(new Date('2026-09-23T07:30:00Z')), '2026-09-23', '12:30 am PDT on Sep 23 is Sep 23');
+  assert.equal(app.todayLocal(new Date('2026-09-22T19:00:00Z')), '2026-09-22', 'normal daytime');
+  assert.equal(app.todayLocal(new Date('2026-01-15T07:30:00Z')), '2026-01-14', '11:30 pm PST on Jan 14 (UTC already Jan 15)');
+  assert.equal(app.todayLocal(new Date('2026-01-15T08:30:00Z')), '2026-01-15', '12:30 am PST on Jan 15');
+  assert.equal(app.OKANAGAN_TIME_ZONE, 'America/Vancouver');
+});
+
+test('todayLocal across the 2026-03-08 spring-forward transition', () => {
+  assert.equal(app.todayLocal(new Date('2026-03-08T07:59:00Z')), '2026-03-07', '11:59 pm PST Mar 7');
+  assert.equal(app.todayLocal(new Date('2026-03-08T08:00:00Z')), '2026-03-08', 'midnight PST Mar 8');
+  assert.equal(app.todayLocal(new Date('2026-03-08T09:59:00Z')), '2026-03-08', '1:59 am PST, just before the jump');
+  assert.equal(app.todayLocal(new Date('2026-03-08T10:00:00Z')), '2026-03-08', '3:00 am PDT, just after the jump');
+  assert.equal(app.todayLocal(new Date('2026-03-09T06:59:00Z')), '2026-03-08', '11:59 pm PDT Mar 8 (UTC already Mar 9)');
+});
+
+test('parseLocalDate accepts only real YYYY-MM-DD calendar dates', () => {
+  assert.equal(app.parseLocalDate('2026-09-22'), '2026-09-22');
+  assert.equal(app.parseLocalDate('2028-02-29'), '2028-02-29', 'leap day in a leap year');
+  assert.equal(app.parseLocalDate('2027-02-29'), null, 'no leap day in 2027');
+  assert.equal(app.parseLocalDate('2026-13-01'), null);
+  assert.equal(app.parseLocalDate('2026-09-31'), null);
+  assert.equal(app.parseLocalDate('2026-9-2'), null, 'must be zero-padded');
+  assert.equal(app.parseLocalDate('2026-09-22T00:00'), null);
+  assert.equal(app.parseLocalDate(''), null);
+  assert.equal(app.parseLocalDate(undefined), null);
+});
+
+test('local-date arithmetic is timezone-free calendar math', () => {
+  assert.equal(app.addLocalDays('2026-09-22', 5), '2026-09-27');
+  assert.equal(app.addLocalDays('2026-12-31', 1), '2027-01-01');
+  assert.equal(app.addLocalDays('2026-03-08', 1), '2026-03-09', 'spring-forward day is still one day long');
+  assert.equal(app.addLocalDays('2026-11-01', -1), '2026-10-31');
+  assert.equal(app.localDaysBetween('2026-09-22', '2027-09-22'), 365);
+  assert.equal(app.localWeekday('2026-09-22'), 2, 'Sep 22 2026 is a Tuesday');
+  assert.equal(app.localWeekday('2026-09-27'), 0, 'Sep 27 2026 is a Sunday');
+});
+
+test('This Weekend = Friday-Sunday: coming weekend from Mon-Thu, today-through-Sunday from Fri-Sun', () => {
+  assert.deepEqual(app.dateWindowForPreset('this-weekend', '2026-09-21'), { from: '2026-09-25', to: '2026-09-27' }, 'Monday');
+  assert.deepEqual(app.dateWindowForPreset('this-weekend', '2026-09-22'), { from: '2026-09-25', to: '2026-09-27' }, 'Tuesday');
+  assert.deepEqual(app.dateWindowForPreset('this-weekend', '2026-09-24'), { from: '2026-09-25', to: '2026-09-27' }, 'Thursday');
+  assert.deepEqual(app.dateWindowForPreset('this-weekend', '2026-09-25'), { from: '2026-09-25', to: '2026-09-27' }, 'Friday');
+  assert.deepEqual(app.dateWindowForPreset('this-weekend', '2026-09-26'), { from: '2026-09-26', to: '2026-09-27' }, 'Saturday');
+  assert.deepEqual(app.dateWindowForPreset('this-weekend', '2026-09-27'), { from: '2026-09-27', to: '2026-09-27' }, 'Sunday');
+});
+
+test('Today, This Week (Mon-Sun) and This Month (local calendar month) windows', () => {
+  assert.deepEqual(app.dateWindowForPreset('today', '2026-09-22'), { from: '2026-09-22', to: '2026-09-22' });
+  assert.deepEqual(app.dateWindowForPreset('this-week', '2026-09-22'), { from: '2026-09-21', to: '2026-09-27' }, 'Tuesday');
+  assert.deepEqual(app.dateWindowForPreset('this-week', '2026-09-21'), { from: '2026-09-21', to: '2026-09-27' }, 'Monday');
+  assert.deepEqual(app.dateWindowForPreset('this-week', '2026-09-27'), { from: '2026-09-21', to: '2026-09-27' }, 'Sunday belongs to the week that started the previous Monday');
+  assert.deepEqual(app.dateWindowForPreset('this-week', '2027-01-01'), { from: '2026-12-28', to: '2027-01-03' }, 'week spanning a year boundary');
+  assert.deepEqual(app.dateWindowForPreset('this-month', '2026-09-22'), { from: '2026-09-01', to: '2026-09-30' });
+  assert.deepEqual(app.dateWindowForPreset('this-month', '2028-02-10'), { from: '2028-02-01', to: '2028-02-29' }, 'leap February');
+  assert.deepEqual(app.dateWindowForPreset('this-month', '2026-12-31'), { from: '2026-12-01', to: '2026-12-31' });
+  assert.equal(app.dateWindowForPreset('custom', '2026-09-22'), null, 'custom has no preset window');
+  assert.equal(app.dateWindowForPreset('nope', '2026-09-22'), null);
+});
+
+test('customDateWindow validates both bounds, ordering and the 366-day cap without correcting anything', () => {
+  assert.deepEqual(app.customDateWindow('2026-10-01', '2026-10-31'), { from: '2026-10-01', to: '2026-10-31' });
+  assert.deepEqual(app.customDateWindow('2026-10-01', '2026-10-01'), { from: '2026-10-01', to: '2026-10-01' }, 'single day');
+  assert.deepEqual(app.customDateWindow('2026-10-01', '2027-10-02'), { from: '2026-10-01', to: '2027-10-02' }, 'exactly 366 days');
+  assert.equal(app.customDateWindow('2026-10-01', '2027-10-03'), null, '367 days is over the cap');
+  assert.equal(app.customDateWindow('2026-10-02', '2026-10-01'), null, 'from after to');
+  assert.equal(app.customDateWindow('2027-02-29', '2027-03-01'), null, 'impossible from date');
+  assert.equal(app.customDateWindow('2026-10-01', 'next week'), null);
+  assert.equal(app.customDateWindow(undefined, '2026-10-01'), null);
+  assert.deepEqual(app.customDateWindow('2026-01-01', '2026-01-31'), { from: '2026-01-01', to: '2026-01-31' }, 'past ranges are allowed');
+});
+
+test('localRangesOverlap is the single inclusive window predicate', () => {
+  const w = ['2026-09-25', '2026-09-27']; // a Fri-Sun weekend
+  assert.equal(app.localRangesOverlap('2026-09-26', '2026-09-26', ...w), true, 'one-day inside');
+  assert.equal(app.localRangesOverlap('2026-09-20', '2026-10-05', ...w), true, 'multi-day spanning the window');
+  assert.equal(app.localRangesOverlap('2026-09-27', '2026-09-27', ...w), true, 'ends on the last day');
+  assert.equal(app.localRangesOverlap('2026-09-23', '2026-09-25', ...w), true, 'starts before, ends on the first day');
+  assert.equal(app.localRangesOverlap('2026-09-28', '2026-09-28', ...w), false, 'the Monday after');
+  assert.equal(app.localRangesOverlap('2026-09-24', '2026-09-24', ...w), false, 'the Thursday before');
+});
+
+test('vancouverOffsetFor / toVancouverIso derive the offset from Intl for the local wall-clock time', () => {
+  // Pinned transitions every tzdata release agrees on.
+  assert.equal(app.vancouverOffsetFor('2026-01-15', '12:00'), '-08:00', 'PST in January 2026');
+  assert.equal(app.vancouverOffsetFor('2026-03-08', '01:59'), '-08:00', 'just before spring-forward');
+  assert.equal(app.vancouverOffsetFor('2026-03-08', '03:00'), '-07:00', 'just after spring-forward');
+  assert.equal(app.vancouverOffsetFor('2026-07-01', '19:00'), '-07:00', 'PDT in summer');
+  assert.equal(app.vancouverOffsetFor('2026-10-30', '19:05'), '-07:00', 'late October is still PDT');
+  assert.equal(app.vancouverOffsetFor('2025-11-03', '12:00'), '-08:00', 'PST after the November 2025 fall-back');
+  // Later dates: whatever the platform tzdata says, the helper must agree
+  // with Intl's own rendering of the resulting instant (round trip).
+  for (const [d, t] of [['2026-11-02', '19:05'], ['2026-12-31', '23:30'], ['2027-03-14', '03:00'], ['2027-07-01', '10:00']]) {
+    const off = app.vancouverOffsetFor(d, t);
+    assert.match(off, /^-0[78]:00$/, `${d} ${t} must be PST or PDT`);
+    const iso = app.toVancouverIso(d, t);
+    assert.equal(iso, `${d}T${t}:00${off}`);
+    const back = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso)).replace(', ', 'T').replace(/T24:/, 'T00:');
+    assert.equal(back, `${d}T${t}`, `round trip through Intl must land on the same Okanagan wall-clock time (${iso})`);
+  }
+  assert.equal(app.toVancouverIso('2026-12-31'), '2026-12-31', 'date-only stays a bare date (all-day / time unknown)');
+  assert.equal(app.toVancouverIso('2026-12-31', ''), '2026-12-31');
+  assert.equal(app.toVancouverIso('2026-12-31', '25:00'), null, 'invalid time');
+  assert.equal(app.toVancouverIso('2026-02-30', '10:00'), null, 'invalid date');
+  assert.equal(app.vancouverOffsetFor('not-a-date'), null);
+});
+
+test('eventLocalEndDate reads the local calendar date from either stored format', () => {
+  assert.equal(app.eventLocalEndDate({ start_datetime: '2026-10-30T19:05:00-07:00', end_datetime: '2026-10-30T21:30:00-07:00' }), '2026-10-30');
+  assert.equal(app.eventLocalEndDate({ start_datetime: '2026-10-30T19:05:00-07:00', end_datetime: null }), '2026-10-30', 'no end -> start');
+  assert.equal(app.eventLocalEndDate({ start_datetime: '2099-06-01 10:00:00', end_datetime: '2099-06-01 18:00:00' }), '2099-06-01', 'legacy fixture format');
+  assert.equal(app.eventLocalEndDate({ start_datetime: '2026-12-31' }), '2026-12-31', 'bare date');
+  assert.equal(app.eventLocalEndDate({ start_datetime: 'soon' }), null);
+  assert.equal(app.eventLocalEndDate({}), null);
+});
+
+test('isEventExpired uses the Okanagan local day, so an event stays live through 23:59 Pacific on its last day', () => {
+  const ninePmPdtSep22 = new Date('2026-09-23T04:00:00Z');
+  const elevenThirtyPmPdtSep22 = new Date('2026-09-23T06:30:00Z');
+  const twelveThirtyAmPdtSep23 = new Date('2026-09-23T07:30:00Z');
+  const endsSep22 = { start_datetime: '2026-09-22T19:00:00-07:00', end_datetime: '2026-09-22T20:00:00-07:00' };
+  assert.equal(app.isEventExpired(endsSep22, ninePmPdtSep22), false, 'ended at 8 pm but the local day is not over');
+  assert.equal(app.isEventExpired(endsSep22, elevenThirtyPmPdtSep22), false, '11:30 pm local, still Sep 22 (UTC is already Sep 23)');
+  assert.equal(app.isEventExpired(endsSep22, twelveThirtyAmPdtSep23), true, '12:30 am local on Sep 23 -> expired');
+  const lateShow = { start_datetime: '2026-09-22T23:30:00-07:00', end_datetime: null };
+  assert.equal(app.isEventExpired(lateShow, elevenThirtyPmPdtSep22), false, 'an 11:30 pm event on the day it happens');
+  assert.equal(app.isEventExpired(lateShow, twelveThirtyAmPdtSep23), true);
+  const earlyShow = { start_datetime: '2026-09-23T00:30:00-07:00', end_datetime: null };
+  assert.equal(app.isEventExpired(earlyShow, elevenThirtyPmPdtSep22), false, 'a 12:30 am Sep 23 event is in the future at 11:30 pm Sep 22');
+  assert.equal(app.isEventExpired(earlyShow, twelveThirtyAmPdtSep23), false, 'and still live during Sep 23');
+  assert.equal(app.isEventExpired(earlyShow, new Date('2026-09-24T07:30:00Z')), true, 'expired on Sep 24');
+  const crossesMidnight = { start_datetime: '2026-09-22T21:00:00-07:00', end_datetime: '2026-09-23T01:00:00-07:00' };
+  assert.equal(app.isEventExpired(crossesMidnight, new Date('2026-09-23T10:00:00Z')), false, 'ends 1 am Sep 23 -> live through Sep 23');
+  assert.equal(app.isEventExpired(crossesMidnight, new Date('2026-09-24T10:00:00Z')), true);
+  assert.equal(app.isEventExpired({ start_datetime: '2099-06-01 10:00:00' }, new Date()), false, 'legacy future fixture');
+  assert.equal(app.isEventExpired({ start_datetime: '2000-01-01 10:00:00' }, new Date()), true, 'legacy past fixture');
+  assert.equal(app.isEventExpired({ start_datetime: 'soon' }, new Date()), false, 'malformed is never silently hidden');
+  // 2026-11-02T07:30Z is 00:30 Nov 2 if BC stays on UTC-7 (tzdata 2026c) but
+  // 23:30 Nov 1 if it falls back to UTC-8 (tzdata 2026a) -- deliberately not
+  // asserted; only instants both rules agree on are pinned here.
+  const nov1 = { start_datetime: '2026-11-01T20:00:00-07:00', end_datetime: null };
+  assert.equal(app.isEventExpired(nov1, new Date('2026-11-02T06:30:00Z')), false, '22:30/23:30 on Nov 1 under either tzdata rule -> not expired');
+  assert.equal(app.isEventExpired(nov1, new Date('2026-11-02T08:30:00Z')), true, 'clearly Nov 2 local under either rule -> expired');
+});
+
+test('listEventsForSitemap and GET /events decide "active" on the Okanagan local date, not UTC', async () => {
+  // Insert an event that ends TODAY (Okanagan) at 11:00 pm local. Under the
+  // old UTC comparison this row would already look expired for most of the
+  // evening; under the local-date rule it must be listed all day.
+  const today = app.todayLocal();
+  const end = app.toVancouverIso(today, '23:00');
+  const start = app.toVancouverIso(today, '19:00');
+  const info = db.prepare(`INSERT INTO events (name, slug, region, start_datetime, end_datetime) VALUES ('Step2 Today Event', 'step2-today-event', 'kelowna', ?, ?)`).run(start, end);
+  // Step 5: the sitemap also requires a scheduled occurrence, so give the row the one its span describes.
+  db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time) VALUES (?, ?, ?, ?, ?)').run(info.lastInsertRowid, today, today, '19:00', '23:00');
+  try {
+    const slugs = app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`);
+    assert.ok(slugs.includes('kelowna/step2-today-event'), 'ends today local -> still in the sitemap list');
+    assert.ok(!slugs.includes('kelowna/test-past-market'), 'expired fixture stays excluded');
+    assert.ok(slugs.includes('kelowna/test-future-festival'));
+    const yesterdayList = app.listEventsForSitemap(new Date(Date.parse(`${app.addLocalDays(today, 1)}T12:00:00Z`)));
+    assert.ok(!yesterdayList.some((e) => e.slug === 'step2-today-event'), 'evaluated tomorrow it is expired');
+    // Drive the exported http.Server on an ephemeral port so this test never
+    // competes with the single startServer() bind the HTTP routes test owns.
+    const html = await new Promise((resolve, reject) => {
+      const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+      tmp.listen(0, '127.0.0.1', async () => {
+        try {
+          const res = await fetch(`http://127.0.0.1:${tmp.address().port}/events`);
+          assert.equal(res.status, 200);
+          resolve(await res.text());
+        } catch (err) { reject(err); } finally { tmp.close(); }
+      });
+    });
+    assert.match(html, /href="\/kelowna\/events\/step2-today-event"/, 'GET /events lists an event that ends later today (Okanagan time)');
+    assert.doesNotMatch(html, /test-past-market/);
+  } finally {
+    db.prepare("DELETE FROM event_occurrences WHERE event_id IN (SELECT id FROM events WHERE slug = 'step2-today-event')").run();
+    db.prepare("DELETE FROM events WHERE slug = 'step2-today-event'").run();
+  }
+});
+
+// ---- What's On Step 3: event data layer, validation, guarded writers ---------
+// All writes below go to this throwaway fixture DB (never production). Every
+// event created here is removed again by the last test in this block so the
+// sitemap/route tests further down see exactly the Phase 1 fixture events.
+const s3meta = { reason: 'step 3 fixture', batch_id: 'test-step3' };
+const s3venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+const s3vernonVenue = db.prepare("SELECT id FROM venues WHERE slug = 'test-vernon-golf-course'").get();
+const s3redirected = db.prepare("SELECT id FROM venues WHERE slug = 'ds4-redirected-gem'").get();
+const s3base = () => ({
+  name: 'S3 Harvest Dinner', region: 'kelowna', description: 'A fixture event.',
+  source_type: 'official_venue', source_name: 'Test Trattoria', source_url: 'https://example.com/harvest',
+  venue_id: s3venue.id, categories: ['food-drink-events'],
+  occurrences: [{ start_date: '2030-10-03', start_time: '18:30', end_time: '21:00' }],
+});
+const s3ids = [];
+function s3create(overrides = {}, meta = s3meta) {
+  // Each fixture gets its own source page unless a test deliberately reuses
+  // one (the same-source-and-date duplicate rule is tested explicitly).
+  const data = { ...s3base(), ...overrides };
+  if (overrides.source_url === undefined && overrides.name) data.source_url = `https://example.com/${app.slugify(overrides.name)}`;
+  const r = app.createEvent(data, meta);
+  if (r.ok) s3ids.push(r.event.id);
+  return r;
+}
+
+test('S3 #1: a valid event is created with categories, one occurrence, a derived span and audit rows', () => {
+  const r = s3create();
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.event.slug, 's3-harvest-dinner');
+  assert.equal(r.event.status, 'scheduled');
+  assert.equal(r.event.event_confidence, 'medium');
+  assert.equal(r.event.venue_id, s3venue.id);
+  assert.deepEqual(r.categories, ['food-drink-events']);
+  assert.equal(r.occurrences.length, 1);
+  assert.equal(r.event.start_datetime, '2030-10-03T18:30:00-07:00', 'derived ISO span carries the Vancouver offset');
+  assert.equal(r.event.end_datetime, '2030-10-03T21:00:00-07:00');
+  assert.equal(r.review.length, 0);
+  const log = db.prepare('SELECT field_name, new_value, batch_id, source_ref, source FROM event_enrichment_log WHERE event_id = ? ORDER BY id').all(r.event.id);
+  assert.deepEqual(log.map((l) => l.field_name), ['create', 'categories', 'occurrence']);
+  assert.equal(log[0].new_value, 'kelowna/s3-harvest-dinner');
+  assert.equal(log[0].batch_id, 'test-step3');
+  assert.equal(log[0].source_ref, 'step 3 fixture');
+  assert.equal(log[0].source, 'Test Trattoria');
+});
+
+test('S3 #2: a multi-occurrence series spans first->last date and orders its occurrences', () => {
+  const r = s3create({
+    name: 'S3 Jazz Jam', venue_id: null, venue_name_text: 'RCA Atrium', recurrence_rule: 'Thursdays until Dec 17',
+    categories: ['live-music', 'nightlife'],
+    occurrences: [
+      { start_date: '2030-10-10', start_time: '19:00' }, { start_date: '2030-10-03', start_time: '19:00' }, { start_date: '2030-10-17', start_time: '19:00', source_ref: 'wk3' },
+    ],
+  });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.occurrences.map((o) => o.start_date), ['2030-10-03', '2030-10-10', '2030-10-17']);
+  assert.equal(r.event.start_datetime, '2030-10-03T19:00:00-07:00');
+  assert.equal(r.event.end_datetime, '2030-10-17', 'no end_time -> the last local date, bare');
+  assert.equal(app.countScheduledOccurrences(r.event.id), 3);
+});
+
+test('S3 #3: up to three categories are accepted in order; #4 four rejected; #5 duplicate rejected', () => {
+  const ok = s3create({ name: 'S3 Wine Concert', categories: ['live-music', 'wineries-wine-events', 'food-drink-events'] });
+  assert.equal(ok.ok, true, JSON.stringify(ok));
+  assert.deepEqual(ok.categories, ['live-music', 'wineries-wine-events', 'food-drink-events']);
+  assert.deepEqual(db.prepare('SELECT category_key, position FROM event_categories WHERE event_id = ? ORDER BY position').all(ok.event.id).map((r) => `${r.position}:${r.category_key}`), ['0:live-music', '1:wineries-wine-events', '2:food-drink-events']);
+  const four = s3create({ name: 'S3 Four Cats', categories: ['live-music', 'nightlife', 'family-kids', 'arts-culture'] });
+  assert.deepEqual([four.ok, four.reason], [false, 'too_many_categories']);
+  const dup = s3create({ name: 'S3 Dup Cats', categories: ['live-music', 'live-music'] });
+  assert.deepEqual([dup.ok, dup.reason], [false, 'duplicate_category']);
+  const unknown = s3create({ name: 'S3 Unknown Cat', categories: ['jazz'] });
+  assert.deepEqual([unknown.ok, unknown.reason], [false, 'unknown_category']);
+  const none = s3create({ name: 'S3 No Cats', categories: [] });
+  assert.deepEqual([none.ok, none.reason], [false, 'categories_required']);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE name LIKE 'S3 Four%' OR name LIKE 'S3 Dup%' OR name LIKE 'S3 Unknown%' OR name LIKE 'S3 No Cats'").get().n, 0, 'rejected writes leave nothing behind');
+});
+
+test('S3 #6: invalid, Shuswap and empty regions are rejected; region is immutable on update', () => {
+  for (const region of ['shuswap', 'SHUSWAP (not in region model)', 'salmon-arm', '', undefined, 'Kelowna']) {
+    const r = s3create({ name: 'S3 Bad Region', region, venue_id: null, venue_name_text: 'Somewhere' });
+    assert.deepEqual([r.ok, r.reason], [false, 'region_invalid'], `region ${JSON.stringify(region)}`);
+  }
+  const ev = s3create({ name: 'S3 Region Lock', venue_id: null, venue_name_text: 'City Park' });
+  assert.equal(ev.ok, true);
+  const upd = app.updateEvent(ev.event.id, { region: 'vernon' }, s3meta);
+  assert.deepEqual([upd.ok, upd.reason], [false, 'region_immutable']);
+  const upd2 = app.updateEvent(ev.event.id, { slug: 'other' }, s3meta);
+  assert.deepEqual([upd2.ok, upd2.reason], [false, 'slug_immutable']);
+});
+
+test('S3 #7: missing, redirected and malformed venue ids are rejected; #8 venue/region mismatch rejected unless valley-wide', () => {
+  const missing = s3create({ name: 'S3 Missing Venue', venue_id: 999999 });
+  assert.deepEqual([missing.ok, missing.reason], [false, 'venue_not_found']);
+  const redirected = s3create({ name: 'S3 Redirected Venue', venue_id: s3redirected.id });
+  assert.deepEqual([redirected.ok, redirected.reason], [false, 'venue_redirected']);
+  const bad = s3create({ name: 'S3 Bad Venue Id', venue_id: '12' });
+  assert.deepEqual([bad.ok, bad.reason], [false, 'venue_id_invalid']);
+  const mismatch = s3create({ name: 'S3 Mismatch', venue_id: s3vernonVenue.id });
+  assert.deepEqual([mismatch.ok, mismatch.reason], [false, 'venue_region_mismatch']);
+  const both = s3create({ name: 'S3 Both Venues', venue_id: s3venue.id, venue_name_text: 'Also a text venue' });
+  assert.deepEqual([both.ok, both.reason], [false, 'venue_ambiguous']);
+  const neither = s3create({ name: 'S3 No Venue', venue_id: null });
+  assert.deepEqual([neither.ok, neither.reason], [false, 'venue_required']);
+  const valleyWide = s3create({ name: 'S3 Valley Wide', venue_id: null, valley_wide: 1, categories: ['wineries-wine-events', 'events-festivals'] });
+  assert.equal(valleyWide.ok, true, 'a valley-wide event may have no single venue');
+  const valleyMismatch = s3create({ name: 'S3 Okanagan Trail Series', venue_id: s3vernonVenue.id, valley_wide: 1 });
+  assert.equal(valleyMismatch.ok, true, 'valley-wide relaxes the region match, never the existence/redirect checks');
+});
+
+test('S3 #9: a scheduled event without a scheduled occurrence is rejected; date_tbc is not supported', () => {
+  const none = s3create({ name: 'S3 No Dates', occurrences: [] });
+  assert.deepEqual([none.ok, none.reason], [false, 'no_scheduled_occurrence']);
+  const allCancelled = s3create({ name: 'S3 All Cancelled', occurrences: [{ start_date: '2030-10-03', status: 'cancelled' }] });
+  assert.deepEqual([allCancelled.ok, allCancelled.reason], [false, 'no_scheduled_occurrence']);
+  const tbc = s3create({ name: 'S3 TBC', status: 'date_tbc', occurrences: [] });
+  assert.deepEqual([tbc.ok, tbc.reason], [false, 'status_invalid']);
+  const missingOcc = app.createEvent({ ...s3base(), name: 'S3 Missing Occ', occurrences: undefined }, s3meta);
+  assert.deepEqual([missingOcc.ok, missingOcc.reason], [false, 'occurrences_required']);
+});
+
+test('S3 #10: invalid occurrence dates/times are rejected exactly, never repaired', () => {
+  const cases = [
+    [{ start_date: '2030-02-30' }, 'occurrence_start_date_invalid'],
+    [{ start_date: '2030-10-03', end_date: '2030-10-02' }, 'occurrence_end_before_start'],
+    [{ start_date: '2030-10-03', end_date: 'soon' }, 'occurrence_end_date_invalid'],
+    [{ start_date: '2030-10-03', start_time: '7pm' }, 'occurrence_start_time_invalid'],
+    [{ start_date: '2030-10-03', start_time: '25:00' }, 'occurrence_start_time_invalid'],
+    [{ start_date: '2030-10-03', start_time: '21:00', end_time: '01:00' }, 'occurrence_end_time_before_start'],
+    [{ start_date: '2030-10-03', end_time: '21:00' }, 'occurrence_end_time_without_start'],
+    [{ start_date: '2030-10-03', all_day: 1, start_time: '10:00' }, 'occurrence_all_day_with_times'],
+    [{ start_date: '2030-10-03', end_date: '2030-10-05', ends_next_day: 1 }, 'occurrence_ends_next_day_on_multi_day'],
+    [{ start_date: '2030-10-03', status: 'maybe' }, 'occurrence_status_invalid'],
+    [{ start_date: '2030-10-03', venue: 'x' }, 'occurrence_unexpected_field'],
+    ['2030-10-03', 'occurrence_invalid'],
+  ];
+  for (const [occ, reason] of cases) {
+    const r = s3create({ name: 'S3 Bad Occ', occurrences: [occ] });
+    assert.deepEqual([r.ok, r.reason], [false, reason], JSON.stringify(occ));
+  }
+  const crossesMidnight = s3create({ name: 'S3 Late Show', occurrences: [{ start_date: '2030-10-03', start_time: '21:00', end_time: '01:00', ends_next_day: 1 }] });
+  assert.equal(crossesMidnight.ok, true, 'ends_next_day = 1 makes an end before the start legal');
+  assert.equal(crossesMidnight.event.end_datetime, '2030-10-04T01:00:00-07:00', 'the derived span ends on the next local day');
+  const allDay = s3create({ name: 'S3 All Day', occurrences: [{ start_date: '2030-10-03', end_date: '2030-10-05', all_day: 1 }] });
+  assert.equal(allDay.ok, true);
+  assert.equal(allDay.event.start_datetime, '2030-10-03');
+  assert.equal(allDay.event.end_datetime, '2030-10-05');
+});
+
+test('S3 #11: date-window overlap on materialised occurrences (end_date >= from AND start_date <= to)', () => {
+  const q = (from, to) => app.queryWhatsOnEvents({ from, to }).map((e) => e.name);
+  assert.ok(q('2030-10-03', '2030-10-03').includes('S3 Harvest Dinner'), 'one-day event on its day');
+  assert.ok(!q('2030-10-04', '2030-10-04').includes('S3 Harvest Dinner'), 'not the day after');
+  assert.ok(q('2030-10-04', '2030-10-04').includes('S3 All Day'), 'multi-day event on a middle day');
+  assert.ok(q('2030-10-05', '2030-10-09').includes('S3 All Day'), 'window starting on its last day');
+  assert.ok(!q('2030-10-06', '2030-10-09').includes('S3 All Day'), 'window after it ends');
+  assert.ok(q('2030-10-04', '2030-10-04').includes('S3 Jazz Jam') === false && q('2030-10-10', '2030-10-10').includes('S3 Jazz Jam'), 'series matches only on its occurrence dates');
+  assert.ok(!q('2030-10-04', '2030-10-04').includes('S3 Late Show'), 'a show ending at 1 am is listed on its start day only');
+  assert.deepEqual(app.queryWhatsOnEvents({ from: '2030-10-05', to: '2030-10-01' }), [], 'inverted window -> nothing');
+  assert.deepEqual(app.queryWhatsOnEvents({ from: 'x', to: '2030-10-01' }), [], 'invalid window -> nothing');
+});
+
+test('S3 #12/#13: region filtering, multi-region OR, valley-wide matches any region', () => {
+  const vernon = s3create({ name: 'S3 Vernon Night', region: 'vernon', venue_id: s3vernonVenue.id, categories: ['nightlife'], occurrences: [{ start_date: '2030-10-03', start_time: '20:00' }] });
+  assert.equal(vernon.ok, true, JSON.stringify(vernon));
+  const names = (regions) => app.queryWhatsOnEvents({ from: '2030-10-03', to: '2030-10-03', regions }).map((e) => e.name);
+  assert.ok(names(['kelowna']).includes('S3 Harvest Dinner') && !names(['kelowna']).includes('S3 Vernon Night'));
+  assert.ok(names(['vernon']).includes('S3 Vernon Night') && !names(['vernon']).includes('S3 Harvest Dinner'));
+  assert.ok(names(['kelowna', 'vernon']).includes('S3 Vernon Night') && names(['kelowna', 'vernon']).includes('S3 Harvest Dinner'), 'multi-region is OR');
+  assert.ok(names(['osoyoos']).includes('S3 Valley Wide'), 'valley-wide appears for a region it is not filed under');
+  assert.ok(!names(['osoyoos']).includes('S3 Harvest Dinner'));
+  assert.deepEqual(names(['shuswap']), names([]), 'unknown regions are ignored, not matched');
+});
+
+test('S3 #14/#15/#16: category filtering, multi-category OR, and combined date + region + category', () => {
+  const names = (opts) => app.queryWhatsOnEvents({ from: '2030-10-01', to: '2030-10-31', ...opts }).map((e) => e.name);
+  assert.ok(names({ categories: ['nightlife'] }).includes('S3 Jazz Jam'));
+  assert.ok(names({ categories: ['nightlife'] }).includes('S3 Vernon Night'));
+  assert.ok(!names({ categories: ['nightlife'] }).includes('S3 Harvest Dinner'));
+  assert.ok(names({ categories: ['food-drink-events', 'nightlife'] }).includes('S3 Harvest Dinner') && names({ categories: ['food-drink-events', 'nightlife'] }).includes('S3 Jazz Jam'), 'multi-category is OR');
+  const combined = names({ from: '2030-10-03', to: '2030-10-03', regions: ['vernon'], categories: ['nightlife'] });
+  assert.deepEqual(combined, ['S3 Vernon Night'], 'date AND region AND category');
+  assert.deepEqual(names({ from: '2030-10-10', to: '2030-10-10', regions: ['vernon'], categories: ['nightlife'] }), [], 'same region/category, a date with nothing');
+  const counts = app.whatsOnCountsFor(app.queryWhatsOnEvents({ from: '2030-10-03', to: '2030-10-03' }));
+  assert.equal(counts.regions.vernon, 1 + 2, 'one Vernon event plus the two valley-wide rows');
+  assert.equal(counts.regions.osoyoos, 2, 'valley-wide rows count for every region');
+  assert.equal(counts.categories['nightlife'] >= 2, true);
+});
+
+test('S3 #17: a cancelled occurrence drops out of the window while its series stays live', () => {
+  const jam = db.prepare("SELECT id FROM events WHERE slug = 's3-jazz-jam'").get();
+  const occ = db.prepare("SELECT id FROM event_occurrences WHERE event_id = ? AND start_date = '2030-10-10'").get(jam.id);
+  const r = app.setEventOccurrenceStatus(jam.id, occ.id, 'cancelled', s3meta);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.ok(!app.queryWhatsOnEvents({ from: '2030-10-10', to: '2030-10-10' }).some((e) => e.slug === 's3-jazz-jam'));
+  assert.ok(app.queryWhatsOnEvents({ from: '2030-10-17', to: '2030-10-17' }).some((e) => e.slug === 's3-jazz-jam'), 'other dates unaffected');
+  assert.equal(app.countScheduledOccurrences(jam.id), 2);
+  const log = db.prepare("SELECT old_value, new_value, occurrence_id FROM event_enrichment_log WHERE event_id = ? AND field_name = 'occurrence_status'").get(jam.id);
+  assert.deepEqual([log.old_value, log.new_value, log.occurrence_id], ['scheduled', 'cancelled', occ.id]);
+  const again = app.setEventOccurrenceStatus(jam.id, occ.id, 'cancelled', s3meta);
+  assert.deepEqual([again.ok, again.changed], [true, false], 'idempotent');
+});
+
+test('S3 #18: a cancelled event is excluded from the window even though its occurrences remain', () => {
+  const ev = db.prepare("SELECT id FROM events WHERE slug = 's3-all-day'").get();
+  const r = app.updateEvent(ev.id, { status: 'cancelled' }, s3meta);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.changed, ['status']);
+  assert.ok(!app.queryWhatsOnEvents({ from: '2030-10-03', to: '2030-10-05' }).some((e) => e.slug === 's3-all-day'));
+  assert.equal(app.listEventOccurrences(ev.id).length, 1, 'occurrence row kept for history');
+  const back = app.updateEvent(ev.id, { status: 'scheduled' }, s3meta);
+  assert.equal(back.ok, true, 'can be re-published because a scheduled occurrence still exists');
+  const post = app.updateEvent(ev.id, { status: 'postponed' }, s3meta);
+  assert.equal(post.ok, true);
+  assert.ok(!app.queryWhatsOnEvents({ from: '2030-10-03', to: '2030-10-05' }).some((e) => e.slug === 's3-all-day'), 'postponed is excluded too');
+});
+
+test('S3 #19: the last scheduled occurrence cannot be cancelled while the event stays published', () => {
+  const ev = db.prepare("SELECT id FROM events WHERE slug = 's3-harvest-dinner'").get();
+  const occ = db.prepare('SELECT id FROM event_occurrences WHERE event_id = ?').get(ev.id);
+  const refused = app.setEventOccurrenceStatus(ev.id, occ.id, 'cancelled', s3meta);
+  assert.deepEqual([refused.ok, refused.reason], [false, 'last_occurrence']);
+  assert.equal(app.getEventById(ev.id).status, 'scheduled');
+  assert.equal(db.prepare('SELECT status FROM event_occurrences WHERE id = ?').get(occ.id).status, 'scheduled', 'nothing changed');
+  const badStatus = app.setEventOccurrenceStatus(ev.id, occ.id, 'cancelled', { ...s3meta, event_status: 'scheduled' });
+  assert.deepEqual([badStatus.ok, badStatus.reason], [false, 'event_status_invalid']);
+  const withEvent = app.setEventOccurrenceStatus(ev.id, occ.id, 'postponed', { ...s3meta, event_status: 'postponed' });
+  assert.equal(withEvent.ok, true, JSON.stringify(withEvent));
+  assert.equal(withEvent.event.status, 'postponed');
+  assert.equal(withEvent.occurrence.status, 'postponed');
+  const republish = app.updateEvent(ev.id, { status: 'scheduled' }, s3meta);
+  assert.deepEqual([republish.ok, republish.reason], [false, 'no_scheduled_occurrence'], 'cannot re-publish with zero scheduled occurrences');
+  const restore = app.setEventOccurrenceStatus(ev.id, occ.id, 'scheduled', s3meta);
+  assert.equal(restore.ok, true);
+  assert.equal(app.updateEvent(ev.id, { status: 'scheduled' }, s3meta).ok, true);
+});
+
+test('S3 #20: duplicate protection -- exact slug/identity, same source+date, fuzzy review gate, occurrence keys, source refs', () => {
+  const exact = s3create();
+  assert.deepEqual([exact.ok, exact.reason], [false, 'duplicate_event']);
+  assert.equal(exact.detail[0].rule, 'exact_slug');
+  const explicitSlug = s3create({ name: 'S3 Something Else', slug: 's3-harvest-dinner' });
+  assert.deepEqual([explicitSlug.ok, explicitSlug.reason], [false, 'duplicate_event']);
+  const sameSource = s3create({ name: 'S3 Autumn Feast Dinner', source_url: 'https://example.com/harvest' });
+  assert.deepEqual([sameSource.ok, sameSource.reason], [false, 'duplicate_event']);
+  assert.equal(sameSource.detail[0].rule, 'same_source_and_date');
+  const fuzzy = s3create({ name: 'S3 Harvest Dinner Night', source_url: 'https://example.com/other' });
+  assert.deepEqual([fuzzy.ok, fuzzy.reason], [false, 'possible_duplicate'], 'two shared significant words on the same day -> review, not written');
+  const harvestId = db.prepare("SELECT id FROM events WHERE slug = 's3-harvest-dinner'").get().id;
+  assert.equal(fuzzy.detail[0].event_id, harvestId);
+  const reviewed = s3create({ name: 'S3 Harvest Dinner Night', source_url: 'https://example.com/other' }, { ...s3meta, reviewed_duplicates: [harvestId] });
+  assert.equal(reviewed.ok, true, 'explicitly reviewed -> written as a separate event (never merged)');
+  assert.equal(reviewed.review[0].event_id, harvestId, 'the review hit is still reported');
+  assert.equal(reviewed.event.slug, 's3-harvest-dinner-night');
+  const otherDay = s3create({ name: 'S3 Harvest Dinner Night', source_url: 'https://example.com/other2', occurrences: [{ start_date: '2030-11-20' }] });
+  assert.deepEqual([otherDay.ok, otherDay.reason, otherDay.event && otherDay.event.slug], [true, undefined, 's3-harvest-dinner-night-2030-11-20'], 'base-slug collision on a different date takes the dated suffix');
+  const dupOcc = s3create({ name: 'S3 Dup Occ', occurrences: [{ start_date: '2030-10-03', start_time: '19:00' }, { start_date: '2030-10-03', start_time: '19:00' }] });
+  assert.deepEqual([dupOcc.ok, dupOcc.reason], [false, 'duplicate_occurrence']);
+  const dupRef = s3create({ name: 'S3 Dup Ref', occurrences: [{ start_date: '2030-10-03', source_ref: 'g1' }, { start_date: '2030-10-04', source_ref: 'g1' }] });
+  assert.deepEqual([dupRef.ok, dupRef.reason], [false, 'duplicate_occurrence_source_ref']);
+  const jam = db.prepare("SELECT id FROM events WHERE slug = 's3-jazz-jam'").get();
+  const up = app.upsertEventOccurrences(jam.id, [{ start_date: '2030-10-17', start_time: '19:00' }, { start_date: '2030-10-24', start_time: '19:00' }], s3meta);
+  assert.deepEqual([up.ok, up.inserted.length, up.skipped], [true, 1, 1], 'existing (date,time) key skipped, new date appended');
+  const upRef = app.upsertEventOccurrences(jam.id, [{ start_date: '2030-10-31', start_time: '19:00', source_ref: 'wk3' }], s3meta);
+  assert.deepEqual([upRef.ok, upRef.reason], [false, 'duplicate_occurrence_source_ref']);
+  const unexpected = app.createEvent({ ...s3base(), name: 'S3 Extra Field', start_datetime: '2030-01-01' }, s3meta);
+  assert.deepEqual([unexpected.ok, unexpected.reason], [false, 'unexpected_field'], 'derived columns can never be supplied');
+});
+
+test('S3 #21: window resolution -- presets, custom ranges, the 366-day cap, and the default fallback', () => {
+  const now = new Date('2026-09-23T04:00:00Z'); // Tue Sep 22 2026, 9 pm PDT
+  assert.deepEqual(app.resolveWhatsOnWindow({ when: 'today' }, now), { from: '2026-09-22', to: '2026-09-22', preset: 'today', fallback: false });
+  assert.deepEqual(app.resolveWhatsOnWindow({ when: 'this-weekend' }, now), { from: '2026-09-25', to: '2026-09-27', preset: 'this-weekend', fallback: false });
+  assert.deepEqual(app.resolveWhatsOnWindow({ when: 'this-week' }, now), { from: '2026-09-21', to: '2026-09-27', preset: 'this-week', fallback: false });
+  assert.deepEqual(app.resolveWhatsOnWindow({ when: 'this-month' }, now), { from: '2026-09-01', to: '2026-09-30', preset: 'this-month', fallback: false });
+  assert.deepEqual(app.resolveWhatsOnWindow({ from: '2027-01-01', to: '2027-01-31' }, now), { from: '2027-01-01', to: '2027-01-31', preset: 'custom', fallback: false });
+  assert.deepEqual(app.resolveWhatsOnWindow({ when: 'custom', from: '2026-10-01', to: '2027-10-02' }, now).preset, 'custom', '366 days allowed');
+  const tooLong = app.resolveWhatsOnWindow({ when: 'custom', from: '2026-10-01', to: '2027-10-03' }, now);
+  assert.deepEqual([tooLong.preset, tooLong.fallback, tooLong.from, tooLong.to], ['upcoming', true, '2026-09-22', '2026-10-22'], '>366 days -> rejected, default window with fallback flag');
+  assert.deepEqual(app.resolveWhatsOnWindow({}, now), { from: '2026-09-22', to: '2026-10-22', preset: 'upcoming', fallback: false });
+  assert.equal(app.resolveWhatsOnWindow({ when: 'someday' }, now).fallback, true);
+  assert.equal(app.WHATSON_DEFAULT_WINDOW_DAYS, 30);
+});
+
+test('S3 #22: every write is logged; updates record old/new; result rows carry the card fields', () => {
+  const ev = db.prepare("SELECT id FROM events WHERE slug = 's3-harvest-dinner'").get();
+  const before = db.prepare('SELECT COUNT(*) AS n FROM event_enrichment_log WHERE event_id = ?').get(ev.id).n;
+  const upd = app.updateEvent(ev.id, { description: 'Updated description', website: 'https://example.com/tickets', event_confidence: 'high' }, { ...s3meta, reviewed_by: 'owner' });
+  assert.equal(upd.ok, true, JSON.stringify(upd));
+  assert.deepEqual(upd.changed.sort(), ['description', 'event_confidence', 'website']);
+  const rows = db.prepare('SELECT field_name, old_value, new_value, reviewed_by, confidence FROM event_enrichment_log WHERE event_id = ? ORDER BY id').all(ev.id).slice(before);
+  assert.equal(rows.length, 3);
+  assert.deepEqual({ ...rows.find((r) => r.field_name === 'description') }, { field_name: 'description', old_value: 'A fixture event.', new_value: 'Updated description', reviewed_by: 'owner', confidence: 'high' });
+  const noop = app.updateEvent(ev.id, { description: 'Updated description' }, s3meta);
+  assert.deepEqual([noop.ok, noop.changed], [true, []], 'no change -> no log row');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_enrichment_log WHERE event_id = ?').get(ev.id).n, before + 3);
+  const badUpd = app.updateEvent(ev.id, { website: 'not a url' }, s3meta);
+  assert.deepEqual([badUpd.ok, badUpd.reason], [false, 'website_invalid']);
+  const badMeta = app.updateEvent(ev.id, { description: 'x' }, { reason: '' });
+  assert.deepEqual([badMeta.ok, badMeta.reason], [false, 'reason_required']);
+  const cats = app.replaceEventCategories(ev.id, ['food-drink-events', 'wineries-wine-events'], s3meta);
+  assert.deepEqual([cats.ok, cats.categories], [true, ['food-drink-events', 'wineries-wine-events']]);
+  const catsFour = app.replaceEventCategories(ev.id, ['a', 'b', 'c', 'd'], s3meta);
+  assert.deepEqual([catsFour.ok, catsFour.reason], [false, 'too_many_categories']);
+  const card = app.queryWhatsOnEvents({ from: '2030-10-03', to: '2030-10-03', regions: ['kelowna'] }).find((e) => e.slug === 's3-harvest-dinner');
+  assert.deepEqual({ ...card, id: undefined }, {
+    id: undefined, name: 'S3 Harvest Dinner', slug: 's3-harvest-dinner', region: 'kelowna', valleyWide: false,
+    categories: ['food-drink-events', 'wineries-wine-events'], description: 'Updated description', image: null,
+    startDate: '2030-10-03', endDate: '2030-10-03', dateLabel: 'Thu Oct 3', time: '6:30 pm', occurrenceCount: 1,
+    venueName: 'Test Trattoria', venueId: s3venue.id, sourceType: 'official_venue', sourceName: 'Test Trattoria', attribution: null, status: 'scheduled',
+  });
+  const series = app.queryWhatsOnEvents({ from: '2030-10-01', to: '2030-10-31' }).find((e) => e.slug === 's3-jazz-jam');
+  assert.equal(series.dateLabel, 'Thursdays until Dec 17 · next Thu Oct 3');
+  assert.equal(series.time, '7 pm');
+  assert.equal(series.venueName, 'RCA Atrium');
+  assert.equal(series.occurrenceCount, 3, 'Oct 3, 17, 24 (Oct 10 cancelled)');
+  const tourism = s3create({ name: 'S3 Listed By DMO', source_type: 'tourism_org', source_name: 'Tourism Kelowna', source_url: 'https://example.com/tk', occurrences: [{ start_date: '2030-12-01', end_date: '2030-12-03' }] });
+  assert.equal(tourism.ok, true);
+  const dmo = app.queryWhatsOnEvents({ from: '2030-12-02', to: '2030-12-02' }).find((e) => e.slug === 's3-listed-by-dmo');
+  assert.deepEqual([dmo.attribution, dmo.dateLabel, dmo.time], ['Tourism Kelowna', 'Dec 1 – Dec 3', '']);
+});
+
+test('S3 cleanup: remove every Step 3 fixture event so later tests see only the Phase 1 fixtures', () => {
+  const ids = db.prepare("SELECT id FROM events WHERE name LIKE 'S3 %'").all().map((r) => r.id);
+  for (const id of ids) {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(id);
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE name LIKE 'S3 %'").get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_occurrences').get().n, 5, 'only the Phase 1 fixture occurrences remain');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_enrichment_log').get().n, 0);
+});
+
+// ---- What's On Step 4: bearer-guarded write API + public reads ---------------
+// Every request goes through the exported http.Server on an ephemeral port
+// (never the single startServer() bind the HTTP-routes test owns). Writes
+// land in this throwaway fixture DB only and are removed by the cleanup test.
+const S4_TOKEN = 'test-fixture-admin-token'; // the same fixture value set at the top of this file
+async function s4request(method, urlPath, { body, token } = {}) {
+  return new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try {
+        const headers = {};
+        if (body !== undefined) headers['Content-Type'] = 'application/json';
+        if (token !== undefined) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`, { method, headers, body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)) });
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch (_) { /* non-JSON body */ }
+        resolve({ status: res.status, text, json });
+      } catch (err) { reject(err); } finally { tmp.close(); }
+    });
+  });
+}
+const s4meta = { reason: 'step 4 fixture', batch_id: 'test-step4' };
+const s4venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+const s4vernonVenueId = db.prepare("SELECT id FROM venues WHERE slug = 'test-vernon-golf-course'").get().id;
+const s4event = (over = {}) => ({
+  name: 'S4 Rockets Home Games', region: 'kelowna', description: 'Fixture series.',
+  source_type: 'league_feed', source_name: 'WHL feed', source_url: `https://example.com/s4/${app.slugify(over.name || 'S4 Rockets Home Games')}`,
+  venue_name_text: 'Prospera Place', categories: ['sports-recreation'],
+  occurrences: [{ start_date: '2031-10-04', start_time: '19:05', label: 'vs Kamloops Blazers', source_ref: 'g1' }, { start_date: '2031-10-11', start_time: '18:05', label: 'vs Vees', source_ref: 'g2' }],
+  ...s4meta, ...over,
+});
+const S4_PUBLIC_KEYS = ['id', 'name', 'slug', 'region', 'valleyWide', 'categories', 'description', 'image', 'startDate', 'endDate', 'dateLabel', 'time', 'occurrenceCount', 'venueName', 'attribution'];
+
+test('S4 #1/#2: event writes without a token or with a wrong token are 401 and write nothing', async () => {
+  const before = db.prepare('SELECT COUNT(*) AS n FROM events').get().n;
+  for (const [label, opts] of [['no auth', {}], ['wrong token', { token: 'not-the-token' }], ['empty bearer', { token: '' }]]) {
+    const res = await s4request('POST', '/api/events', { body: s4event(), ...opts });
+    assert.equal(res.status, 401, label);
+    assert.deepEqual(res.json, { error: 'Unauthorized.' }, label);
+  }
+  for (const [method, p] of [['PUT', '/api/events/1'], ['PUT', '/api/events/1/categories'], ['POST', '/api/events/1/occurrences'], ['PATCH', '/api/events/1/occurrences/1']]) {
+    const res = await s4request(method, p, { body: { reason: 'x', batch_id: 'y' }, token: 'wrong' });
+    assert.equal(res.status, 401, `${method} ${p}`);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM events').get().n, before, 'nothing written');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_enrichment_log').get().n, 0);
+});
+
+test('S4 #3: a valid token reaches the guarded writer -- create, update, categories, occurrences, occurrence status', async () => {
+  const created = await s4request('POST', '/api/events', { body: s4event(), token: S4_TOKEN });
+  assert.equal(created.status, 201, created.text);
+  assert.equal(created.json.ok, true);
+  assert.equal(created.json.event.slug, 's4-rockets-home-games');
+  assert.equal(created.json.occurrences.length, 2);
+  const id = created.json.event.id;
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_enrichment_log WHERE event_id = ? AND batch_id = ?').get(id, 'test-step4').n, 4, 'create + categories + 2 occurrences logged');
+
+  const badKey = await s4request('POST', '/api/events', { body: { ...s4event({ name: 'S4 Extra' }), start_datetime: '2031-01-01' }, token: S4_TOKEN });
+  assert.equal(badKey.status, 400);
+  assert.match(badKey.json.error, /Unexpected field\(s\): start_datetime/);
+  const malformed = await s4request('POST', '/api/events', { body: '{not json', token: S4_TOKEN });
+  assert.equal(malformed.status, 400);
+  const invalid = await s4request('POST', '/api/events', { body: s4event({ name: 'S4 Bad Region', region: 'shuswap' }), token: S4_TOKEN });
+  assert.deepEqual([invalid.status, invalid.json.error], [400, 'region_invalid']);
+  const dup = await s4request('POST', '/api/events', { body: s4event(), token: S4_TOKEN });
+  assert.deepEqual([dup.status, dup.json.error], [409, 'duplicate_event'], 'writer duplicate protection surfaces as 409');
+  const mismatch = await s4request('POST', '/api/events', { body: s4event({ name: 'S4 Mismatch', venue_name_text: undefined, venue_id: s4vernonVenueId }), token: S4_TOKEN });
+  assert.deepEqual([mismatch.status, mismatch.json.error], [409, 'venue_region_mismatch']);
+
+  const upd = await s4request('PUT', `/api/events/${id}`, { body: { description: 'Updated via API', ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([upd.status, upd.json.changed], [200, ['description']], upd.text);
+  const immut = await s4request('PUT', `/api/events/${id}`, { body: { region: 'vernon', ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([immut.status, immut.json.error], [400, 'Unexpected field(s): region']);
+  const notFound = await s4request('PUT', '/api/events/999999', { body: { description: 'x', ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([notFound.status, notFound.json.error], [404, 'event_not_found']);
+
+  const cats = await s4request('PUT', `/api/events/${id}/categories`, { body: { categories: ['sports-recreation', 'family-kids'], ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([cats.status, cats.json.categories], [200, ['sports-recreation', 'family-kids']], cats.text);
+  const four = await s4request('PUT', `/api/events/${id}/categories`, { body: { categories: ['a', 'b', 'c', 'd'], ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([four.status, four.json.error], [400, 'too_many_categories']);
+
+  const more = await s4request('POST', `/api/events/${id}/occurrences`, { body: { occurrences: [{ start_date: '2031-10-11', start_time: '18:05' }, { start_date: '2031-10-18', start_time: '19:05', source_ref: 'g3' }], ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([more.status, more.json.inserted.length, more.json.skipped], [200, 1, 1], more.text);
+  const occId = more.json.occurrences.find((o) => o.start_date === '2031-10-18').id;
+  const patched = await s4request('PATCH', `/api/events/${id}/occurrences/${occId}`, { body: { status: 'cancelled', ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([patched.status, patched.json.occurrence.status], [200, 'cancelled'], patched.text);
+  const badStatus = await s4request('PATCH', `/api/events/${id}/occurrences/${occId}`, { body: { status: 'sold-out', ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([badStatus.status, badStatus.json.error], [400, 'occurrence_status_invalid']);
+  const noMeta = await s4request('PATCH', `/api/events/${id}/occurrences/${occId}`, { body: { status: 'scheduled' }, token: S4_TOKEN });
+  assert.deepEqual([noMeta.status, noMeta.json.error], [400, 'reason_required']);
+  const wrongMethod = await s4request('DELETE', `/api/events/${id}`, { token: S4_TOKEN });
+  assert.equal(wrongMethod.status, 405, 'no delete anywhere');
+});
+
+test('S4 #4: with ENRICHMENT_ADMIN_TOKEN unset the event write API fails closed with 503 while public reads still work (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-events-503-'));
+  const projectRoot = path.join(__dirname, '..');
+  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
+  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  const ISOLATED_PORT = '3097';
+  const childEnv = { ...process.env };
+  delete childEnv.ENRICHMENT_ADMIN_TOKEN;
+  childEnv.PORT = ISOLATED_PORT;
+  const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.on('data', (c) => { output += c.toString(); });
+  child.stderr.on('data', (c) => { output += c.toString(); });
+  try {
+    const deadline = Date.now() + 10000;
+    let ready = false;
+    while (Date.now() < deadline && !ready) {
+      try { if ((await fetch(`http://localhost:${ISOLATED_PORT}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready, `isolated child never became ready: ${output}`);
+    const write = await fetch(`http://localhost:${ISOLATED_PORT}/api/events`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${S4_TOKEN}` }, body: JSON.stringify(s4event()) });
+    assert.equal(write.status, 503, 'unset token -> fail closed even with a "valid" bearer');
+    assert.deepEqual(await write.json(), { error: 'Event write endpoints are not configured.' });
+    const read = await fetch(`http://localhost:${ISOLATED_PORT}/api/events`);
+    assert.equal(read.status, 200, 'public reads do not depend on the token');
+    assert.deepEqual((await read.json()).events, [], 'the isolated child has an empty events table');
+    assert.ok(!output.includes(S4_TOKEN), 'child output never contains the token');
+  } finally {
+    child.kill('SIGTERM');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('S4 #5: public event reads need no auth and ignore a wrong bearer', async () => {
+  const list = await s4request('GET', '/api/events?from=2031-10-01&to=2031-10-31');
+  assert.equal(list.status, 200);
+  assert.equal(list.json.count, 1);
+  assert.equal(list.json.events[0].slug, 's4-rockets-home-games');
+  const withWrong = await s4request('GET', '/api/events?from=2031-10-01&to=2031-10-31', { token: 'wrong' });
+  assert.equal(withWrong.status, 200, 'a wrong token on a read is ignored, never a 401 probe');
+  assert.deepEqual(withWrong.json.events, list.json.events);
+  const id = list.json.events[0].id;
+  const one = await s4request('GET', `/api/events/${id}`);
+  assert.equal(one.status, 200);
+  assert.deepEqual(Object.keys(one.json).sort(), ['attribution', 'categories', 'dateLabel', 'description', 'id', 'image', 'name', 'occurrences', 'recurrence', 'region', 'slug', 'status', 'time', 'valleyWide', 'venueName', 'website'].sort());
+  assert.equal(one.json.occurrences.length, 2, 'cancelled occurrence not exposed publicly');
+  assert.deepEqual(Object.keys(one.json.occurrences[0]).sort(), ['allDay', 'endDate', 'endsNextDay', 'endTime', 'id', 'label', 'startDate', 'startTime'].sort());
+  const occs = await s4request('GET', `/api/events/${id}/occurrences`);
+  assert.deepEqual([occs.status, occs.json.occurrences.length], [200, 2]);
+  const verified = await s4request('GET', `/api/events/${id}`, { token: S4_TOKEN });
+  assert.equal(verified.json.event.source_url, 'https://example.com/s4/s4-rockets-home-games', 'a valid token returns the full record for write verification');
+  assert.equal(verified.json.occurrences.length, 3, 'incl. the cancelled one');
+  assert.equal((await s4request('GET', '/api/events/999999')).status, 404);
+});
+
+test('S4 #6-#9: today / this-weekend / this-week / this-month windows come from the Okanagan local date', async () => {
+  const today = app.todayLocal();
+  for (const when of ['today', 'this-weekend', 'this-week', 'this-month']) {
+    const res = await s4request('GET', `/api/events?when=${when}`);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json.window, { ...app.dateWindowForPreset(when, today), preset: when, fallback: false }, when);
+  }
+  // Data check: an event on the first day of each window is found by that preset.
+  // Distinct names (no shared significant words) so the fuzzy duplicate
+  // gate does not fire when several windows start on the same day.
+  const WINDOW_NAMES = { today: 'S4 Sunrise Yoga', 'this-weekend': 'S4 Regatta', 'this-week': 'S4 Lecture', 'this-month': 'S4 Craft Fair' };
+  for (const when of ['today', 'this-weekend', 'this-week', 'this-month']) {
+    const w = app.dateWindowForPreset(when, today);
+    const r = await s4request('POST', '/api/events', { body: s4event({ name: WINDOW_NAMES[when], venue_name_text: 'City Park', categories: ['community-events'], occurrences: [{ start_date: w.from }] }), token: S4_TOKEN });
+    assert.equal(r.status, 201, r.text);
+  }
+  for (const when of ['today', 'this-weekend', 'this-week', 'this-month']) {
+    const res = await s4request('GET', `/api/events?when=${when}`);
+    assert.ok(res.json.events.some((e) => e.name === WINDOW_NAMES[when]), `${when} window lists its event`);
+  }
+  const todayRes = await s4request('GET', '/api/events?when=today');
+  assert.ok(!todayRes.json.events.some((e) => e.name === 'S4 Rockets Home Games'), 'a 2031 series is not "today"');
+});
+
+test('S4 #10-#12: custom from/to, invalid custom ranges and >366-day ranges fall back to the rolling default window', async () => {
+  const today = app.todayLocal();
+  const ok = await s4request('GET', '/api/events?from=2031-10-01&to=2031-10-31');
+  assert.deepEqual(ok.json.window, { from: '2031-10-01', to: '2031-10-31', preset: 'custom', fallback: false });
+  const single = await s4request('GET', '/api/events?when=custom&from=2031-10-11&to=2031-10-11');
+  assert.deepEqual([single.json.count, single.json.events[0].dateLabel, single.json.events[0].time], [1, 'Sat Oct 11', '6:05 pm'], 'the series shows its occurrence inside the window');
+  const expectDefault = { from: today, to: app.addLocalDays(today, 30), preset: 'upcoming', fallback: true };
+  for (const q of ['from=2031-10-31&to=2031-10-01', 'from=2031-02-30&to=2031-03-01', 'from=abc&to=2031-03-01', 'from=2031-10-01', 'when=custom', 'from=2031-01-01&to=2032-01-03']) {
+    const res = await s4request('GET', `/api/events?${q}`);
+    assert.deepEqual(res.json.window, expectDefault, q);
+  }
+  const max = await s4request('GET', '/api/events?from=2031-01-01&to=2032-01-02');
+  assert.equal(max.json.window.fallback, false, 'exactly 366 days is allowed');
+  const none = await s4request('GET', '/api/events');
+  assert.deepEqual(none.json.window, { ...expectDefault, fallback: false }, 'no date params -> default window without the fallback flag');
+  const unknown = await s4request('GET', '/api/events?when=someday');
+  assert.equal(unknown.json.window.fallback, true);
+});
+
+test('S4 #13-#18: region / multi-region / category / multi-category / combined / valley-wide semantics over the API', async () => {
+  const mk = async (over) => { const r = await s4request('POST', '/api/events', { body: s4event(over), token: S4_TOKEN }); assert.equal(r.status, 201, r.text); return r.json.event.id; };
+  await mk({ name: 'S4 Vernon Concert', region: 'vernon', venue_name_text: 'Kal Tire Place', categories: ['live-music'], occurrences: [{ start_date: '2031-10-04', start_time: '20:00' }] });
+  await mk({ name: 'S4 Wine Festival', region: 'kelowna', venue_name_text: undefined, valley_wide: 1, categories: ['wineries-wine-events', 'events-festivals'], occurrences: [{ start_date: '2031-10-03', end_date: '2031-10-12', all_day: 1 }] });
+  await mk({ name: 'S4 Osoyoos Market', region: 'osoyoos', venue_name_text: 'Town Square', categories: ['markets-fairs', 'community-events'], occurrences: [{ start_date: '2031-10-04', start_time: '09:00', end_time: '13:00' }] });
+  const names = async (q) => (await s4request('GET', `/api/events?from=2031-10-04&to=2031-10-04&${q}`)).json.events.map((e) => e.name).sort();
+  assert.deepEqual(await names(''), ['S4 Osoyoos Market', 'S4 Rockets Home Games', 'S4 Vernon Concert', 'S4 Wine Festival']);
+  assert.deepEqual(await names('regions=kelowna'), ['S4 Rockets Home Games', 'S4 Wine Festival'], 'region filter (valley-wide included)');
+  assert.deepEqual(await names('regions=vernon'), ['S4 Vernon Concert', 'S4 Wine Festival']);
+  assert.deepEqual(await names('regions=kelowna,vernon'), ['S4 Rockets Home Games', 'S4 Vernon Concert', 'S4 Wine Festival'], 'multi-region OR');
+  assert.deepEqual(await names('regions=peachland'), ['S4 Wine Festival'], 'valley-wide matches a region with no events of its own');
+  assert.deepEqual(await names('categories=live-music'), ['S4 Vernon Concert'], 'category filter');
+  assert.deepEqual(await names('categories=live-music,markets-fairs'), ['S4 Osoyoos Market', 'S4 Vernon Concert'], 'multi-category OR');
+  assert.deepEqual(await names('regions=osoyoos,vernon&categories=markets-fairs,live-music'), ['S4 Osoyoos Market', 'S4 Vernon Concert'], 'regions AND categories');
+  assert.deepEqual(await names('regions=osoyoos&categories=live-music'), [], 'AND between groups can be empty');
+  assert.deepEqual(await names('regions=shuswap&categories=jazz'), await names(''), 'unknown region/category values are dropped, not matched');
+  const r = await s4request('GET', '/api/events?from=2031-10-04&to=2031-10-04&regions=osoyoos,vernon&categories=markets-fairs');
+  assert.deepEqual([r.json.regions, r.json.categories], [['osoyoos', 'vernon'], ['markets-fairs']], 'the echoed filter state is the parsed, de-duplicated list');
+});
+
+test('S4 #19/#20: an event with no scheduled occurrence cannot exist; cancelled events and occurrences leave the window', async () => {
+  const noOcc = await s4request('POST', '/api/events', { body: s4event({ name: 'S4 No Dates', occurrences: [] }), token: S4_TOKEN });
+  assert.deepEqual([noOcc.status, noOcc.json.error], [400, 'no_scheduled_occurrence']);
+  const allCancelled = await s4request('POST', '/api/events', { body: s4event({ name: 'S4 All Cancelled', occurrences: [{ start_date: '2031-10-04', status: 'cancelled' }] }), token: S4_TOKEN });
+  assert.deepEqual([allCancelled.status, allCancelled.json.error], [400, 'no_scheduled_occurrence']);
+  const concert = db.prepare("SELECT id FROM events WHERE slug = 's4-vernon-concert'").get();
+  const cancelEvent = await s4request('PUT', `/api/events/${concert.id}`, { body: { status: 'cancelled', ...s4meta }, token: S4_TOKEN });
+  assert.equal(cancelEvent.status, 200, cancelEvent.text);
+  const afterCancel = await s4request('GET', '/api/events?from=2031-10-04&to=2031-10-04&regions=vernon');
+  assert.ok(!afterCancel.json.events.some((e) => e.slug === 's4-vernon-concert'), 'cancelled event excluded');
+  const rockets = db.prepare("SELECT id FROM events WHERE slug = 's4-rockets-home-games'").get();
+  const occ = db.prepare("SELECT id FROM event_occurrences WHERE event_id = ? AND start_date = '2031-10-04'").get(rockets.id);
+  const cancelOcc = await s4request('PATCH', `/api/events/${rockets.id}/occurrences/${occ.id}`, { body: { status: 'cancelled', ...s4meta }, token: S4_TOKEN });
+  assert.equal(cancelOcc.status, 200, cancelOcc.text);
+  const oct4 = await s4request('GET', '/api/events?from=2031-10-04&to=2031-10-04&regions=kelowna');
+  assert.ok(!oct4.json.events.some((e) => e.slug === 's4-rockets-home-games'), 'cancelled occurrence excluded on that day');
+  const oct11 = await s4request('GET', '/api/events?from=2031-10-11&to=2031-10-11&regions=kelowna');
+  assert.ok(oct11.json.events.some((e) => e.slug === 's4-rockets-home-games'), 'series still live on its other date');
+  const lastOcc = db.prepare("SELECT id FROM event_occurrences WHERE event_id = ? AND start_date = '2031-10-11'").get(rockets.id);
+  const refuse = await s4request('PATCH', `/api/events/${rockets.id}/occurrences/${lastOcc.id}`, { body: { status: 'cancelled', ...s4meta }, token: S4_TOKEN });
+  assert.deepEqual([refuse.status, refuse.json.error], [409, 'last_occurrence'], 'the publication invariant holds through the API');
+});
+
+test('S4 #21: list responses expose only the approved public card fields', async () => {
+  const res = await s4request('GET', '/api/events?from=2031-10-01&to=2031-10-31');
+  assert.ok(res.json.count > 0);
+  assert.deepEqual(Object.keys(res.json).sort(), ['categories', 'count', 'events', 'regions', 'window']);
+  for (const ev of res.json.events) {
+    assert.deepEqual(Object.keys(ev).sort(), [...S4_PUBLIC_KEYS].sort(), ev.name);
+    for (const forbidden of ['source_url', 'source_name', 'sourceType', 'sourceName', 'event_confidence', 'status', 'venueId', 'venue_id', 'batch_id']) {
+      assert.ok(!(forbidden in ev), `${forbidden} must not be public`);
+    }
+  }
+  const festival = res.json.events.find((e) => e.name === 'S4 Wine Festival');
+  assert.deepEqual([festival.valleyWide, festival.dateLabel, festival.time, festival.venueName, festival.attribution], [true, 'Oct 3 – Oct 12', '', null, null]);
+  const dmo = await s4request('POST', '/api/events', { body: s4event({ name: 'S4 DMO Listed', source_type: 'tourism_org', source_name: 'Tourism Kelowna', venue_name_text: 'Somewhere', categories: ['arts-culture'], occurrences: [{ start_date: '2031-10-20' }] }), token: S4_TOKEN });
+  assert.equal(dmo.status, 201, dmo.text);
+  const listed = (await s4request('GET', '/api/events?from=2031-10-20&to=2031-10-20')).json.events.find((e) => e.name === 'S4 DMO Listed');
+  assert.equal(listed.attribution, 'Tourism Kelowna', 'attribution is the only provenance a card sees');
+});
+
+test('S4 #22: the bearer token never appears in responses, errors or the source\'s logging', async () => {
+  const outputs = [];
+  outputs.push((await s4request('POST', '/api/events', { body: s4event({ name: 'S4 Probe' }) })).text);
+  outputs.push((await s4request('POST', '/api/events', { body: s4event({ name: 'S4 Probe' }), token: 'wrong' })).text);
+  outputs.push((await s4request('POST', '/api/events', { body: s4event(), token: S4_TOKEN })).text); // 409 duplicate
+  outputs.push((await s4request('POST', '/api/events', { body: '{bad', token: S4_TOKEN })).text);
+  outputs.push((await s4request('POST', '/api/events', { body: s4event({ name: 'S4 Probe Created', occurrences: [{ start_date: '2031-11-01' }] }), token: S4_TOKEN })).text); // 201
+  outputs.push((await s4request('GET', '/api/events?from=2031-11-01&to=2031-11-01', { token: S4_TOKEN })).text);
+  for (const out of outputs) assert.ok(!out.includes(S4_TOKEN), `token leaked: ${out.slice(0, 120)}`);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  for (const line of src.split('\n')) {
+    if (/console\.(log|error|warn)\(/.test(line)) {
+      assert.ok(!/ENRICHMENT_ADMIN_TOKEN|authHeader|req\.headers\[['"]authorization/.test(line), `logging line references the token/header: ${line.trim()}`);
+    }
+  }
+  assert.ok(!src.includes('`Bearer ${ENRICHMENT_ADMIN_TOKEN}'), 'the token is never interpolated into a string');
+});
+
+test('S4 cleanup: remove every Step 4 fixture event', () => {
+  const ids = db.prepare("SELECT id FROM events WHERE name LIKE 'S4 %'").all().map((r) => r.id);
+  for (const id of ids) {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(id);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_occurrences').get().n, 5, 'only the Phase 1 fixture occurrences remain');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_enrichment_log').get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE name LIKE 'S4 %'").get().n, 0);
+});
+
+// ---- What's On Step 5: event detail page + sitemap integration --------------
+const s5meta = { reason: 'step 5 fixture', batch_id: 'test-step5' };
+const s5venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+function s5create(over) {
+  const r = app.createEvent({
+    region: 'kelowna', description: 'Step 5 fixture description.', source_type: 'official_venue', source_name: 'Test Trattoria',
+    source_url: `https://example.com/s5/${app.slugify(over.name)}`, venue_id: s5venue.id, categories: ['live-music'],
+    occurrences: [{ start_date: '2032-05-15', start_time: '19:30', end_time: '21:30' }], ...over,
+  }, s5meta);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  return r.event;
+}
+async function s5get(urlPath) {
+  return new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try { const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`); resolve({ status: res.status, text: await res.text() }); }
+      catch (err) { reject(err); } finally { tmp.close(); }
+    });
+  });
+}
+function s5jsonLd(html) {
+  return [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
+}
+
+test('S5 #1-#4: canonical detail URL renders a valid event; missing slug, wrong region and unknown region all 404', async () => {
+  const ev = s5create({ name: 'S5 Patio Concert' });
+  const ok = await s5get('/kelowna/events/s5-patio-concert');
+  assert.equal(ok.status, 200);
+  assert.match(ok.text, /rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/events\/s5-patio-concert"/);
+  assert.match(ok.text, /<h1>S5 Patio Concert<\/h1>/);
+  assert.match(ok.text, /Step 5 fixture description\./);
+  assert.match(ok.text, /href="\/kelowna">Kelowna<\/a>/, 'region link');
+  assert.doesNotMatch(ok.text, /name="robots" content="noindex"/);
+  assert.equal((await s5get('/kelowna/events/does-not-exist')).status, 404);
+  assert.equal((await s5get('/vernon/events/s5-patio-concert')).status, 404, 'valid slug under the wrong region');
+  assert.equal((await s5get('/shuswap/events/s5-patio-concert')).status, 404, 'unknown region');
+  assert.equal((await s5get('/kelowna/events/S5-Patio-Concert')).status, 404, 'slugs are exact');
+  assert.equal(ev.region, 'kelowna');
+});
+
+test('S5 #5/#6: cancelled and postponed events are not publishable -> 404, and revert to 200 when rescheduled', async () => {
+  const ev = s5create({ name: 'S5 Cancelled Show', occurrences: [{ start_date: '2032-05-16', start_time: '20:00' }] });
+  assert.equal((await s5get('/kelowna/events/s5-cancelled-show')).status, 200);
+  assert.equal(app.updateEvent(ev.id, { status: 'cancelled' }, s5meta).ok, true);
+  assert.equal((await s5get('/kelowna/events/s5-cancelled-show')).status, 404, 'cancelled -> 404');
+  assert.equal(app.updateEvent(ev.id, { status: 'postponed' }, s5meta).ok, true);
+  assert.equal((await s5get('/kelowna/events/s5-cancelled-show')).status, 404, 'postponed -> 404');
+  assert.equal(app.updateEvent(ev.id, { status: 'scheduled' }, s5meta).ok, true);
+  assert.equal((await s5get('/kelowna/events/s5-cancelled-show')).status, 200, 'rescheduled -> back');
+});
+
+test('S5 #7/#10/#12/#13/#15: a timed single-date event renders its occurrence, categories, image and no attribution for an official source', async () => {
+  s5create({ name: 'S5 Gallery Night', categories: ['arts-culture', 'nightlife'], image_url: 'https://example.com/gallery.jpg', website: 'https://example.com/gallery' });
+  const { text } = await s5get('/kelowna/events/s5-gallery-night');
+  assert.match(text, /<span class="label">When<\/span><span>Saturday, May 15, 2032 &middot; 7:30 pm &ndash; 9:30 pm<\/span>/.source ? /Saturday, May 15, 2032 &middot; 7:30 pm – 9:30 pm/ : /x/, 'stored local date + time range');
+  assert.match(text, /<p class="subtitle">Event in Kelowna, BC<\/p>/, 'single-date events are "Event", not "Event series"');
+  assert.doesNotMatch(text, /All dates/, 'no series list for a single date');
+  assert.match(text, /<span class="chip">Arts &amp; Culture<\/span> <span class="chip">Nightlife<\/span>/, 'category chips in position order');
+  assert.match(text, /<img src="https:\/\/example\.com\/gallery\.jpg" alt="S5 Gallery Night"/);
+  assert.match(text, /href="\/kelowna\/restaurants\/test-trattoria">Test Trattoria<\/a>/, 'venue row link');
+  assert.doesNotMatch(text, /Listed by/, 'official_venue source -> no attribution line');
+  assert.match(text, /<a href="https:\/\/example\.com\/gallery" rel="nofollow noopener" target="_blank">/);
+  assert.match(text, /class="card-action fav-btn" data-fav-name="S5 Gallery Night"/);
+  assert.match(text, /class="card-action trip-btn" data-trip-name="S5 Gallery Night" data-trip-query="S5 Gallery Night, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna"/);
+  assert.match(text, /data-venue-category="whatson"/, 'the shared fav/trip script keys off the What\'s On holder');
+  assert.doesNotMatch(text, /source_url|event_confidence|batch_id|test-fixture-admin-token/, 'no admin metadata or credentials');
+});
+
+test('S5 #9/#11: all-day and ends-next-day occurrences render from stored values only', async () => {
+  s5create({ name: 'S5 Harvest Weekend', venue_id: null, venue_name_text: 'Kelowna City Park', categories: ['events-festivals', 'food-drink-events'], occurrences: [{ start_date: '2032-09-24', end_date: '2032-09-26', all_day: 1 }] });
+  const allDay = (await s5get('/kelowna/events/s5-harvest-weekend')).text;
+  assert.match(allDay, /Friday, September 24 – Sunday, September 26, 2032 &middot; All day/);
+  assert.match(allDay, /<span class="label">Where<\/span><span>Kelowna City Park<\/span>/, 'text venue when no venue row');
+  s5create({ name: 'S5 Late Set', categories: ['nightlife'], occurrences: [{ start_date: '2032-05-15', start_time: '21:00', end_time: '01:00', ends_next_day: 1 }] });
+  const late = (await s5get('/kelowna/events/s5-late-set')).text;
+  assert.match(late, /Saturday, May 15, 2032 &middot; 9 pm – 1 am \(next day\)/);
+  const ld = s5jsonLd(late).find((b) => b['@type'] !== 'BreadcrumbList');
+  assert.deepEqual([ld.startDate, ld.endDate], ['2032-05-15T21:00:00-07:00', '2032-05-16T01:00:00-07:00'], 'ends_next_day pushes the ISO end to the next local day');
+  const ldAll = s5jsonLd(allDay).find((b) => b['@type'] !== 'BreadcrumbList');
+  assert.deepEqual([ldAll.startDate, ldAll.endDate], ['2032-09-24', '2032-09-26'], 'all-day -> bare dates, no invented times');
+});
+
+test('S5 #8/#14/#16/#17: a sports series lists its games chronologically with SportsEvent + subEvent JSON-LD; DMO rows get an attribution line', async () => {
+  s5create({
+    name: 'S5 Rockets Home Games 2032-33', venue_id: null, venue_name_text: 'Prospera Place', categories: ['sports-recreation'],
+    source_type: 'league_feed', source_name: 'WHL feed', recurrence_rule: 'Home games through March',
+    occurrences: [
+      { start_date: '2032-11-01', start_time: '19:05', label: 'vs Kamloops Blazers', source_ref: 'g2' },
+      { start_date: '2032-10-04', start_time: '18:05', label: 'vs Penticton Vees', source_ref: 'g1' },
+      { start_date: '2032-12-19', start_time: '18:05', label: 'vs Victoria Royals', source_ref: 'g3' },
+    ],
+  });
+  const { text } = await s5get('/kelowna/events/s5-rockets-home-games-2032-33');
+  assert.match(text, /<p class="subtitle">Event series in Kelowna, BC<\/p>/);
+  assert.match(text, /<span class="label">When<\/span><span>3 dates &middot; next: Monday, October 4, 2032<\/span>/);
+  const list = text.match(/<ol class="event-date-list">([\s\S]*?)<\/ol>/)[1];
+  const dates = [...list.matchAll(/<span class="event-date-when">([^<]+)<\/span> <span class="event-date-label">([^<]+)<\/span>/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(dates, [
+    ['Monday, October 4, 2032 &middot; 6:05 pm', 'vs Penticton Vees'],
+    ['Monday, November 1, 2032 &middot; 7:05 pm', 'vs Kamloops Blazers'],
+    ['Sunday, December 19, 2032 &middot; 6:05 pm', 'vs Victoria Royals'],
+  ], 'chronological, not insertion order');
+  assert.match(text, /Home games through March/);
+  const ld = s5jsonLd(text).find((b) => b['@type'] !== 'BreadcrumbList');
+  assert.equal(ld['@type'], 'SportsEvent');
+  assert.equal(ld.name, 'S5 Rockets Home Games 2032-33 – vs Penticton Vees', 'the next game is the main Event');
+  assert.equal(ld.startDate, '2032-10-04T18:05:00-07:00');
+  assert.equal(ld.eventStatus, 'https://schema.org/EventScheduled');
+  assert.deepEqual(ld.location, { '@type': 'Place', name: 'Prospera Place' });
+  assert.deepEqual(ld.subEvent.map((s) => [s['@type'], s.name, s.startDate.slice(0, 16)]), [
+    ['SportsEvent', 'S5 Rockets Home Games 2032-33 \u2013 vs Kamloops Blazers', '2032-11-01T19:05'],
+    ['SportsEvent', 'S5 Rockets Home Games 2032-33 \u2013 vs Victoria Royals', '2032-12-19T18:05'],
+  ]);
+  // The winter offset (-08:00 PST, or -07:00 if BC stays on daylight time) depends on the
+  // platform's tzdata (2026a vs 2026c disagree after Nov 2026); only its shape is pinned.
+  for (const sub of ld.subEvent) assert.match(sub.startDate, /^2032-\d{2}-\d{2}T\d{2}:\d{2}:00-0[78]:00$/);
+  assert.doesNotMatch(text, /Listed by/, 'league feed is an official source');
+  s5create({ name: 'S5 Craft Market', source_type: 'tourism_org', source_name: 'Tourism Kelowna', categories: ['markets-fairs'], venue_id: null, venue_name_text: 'Laurel Packinghouse', occurrences: [{ start_date: '2032-11-07', start_time: '10:00', end_time: '16:00' }] });
+  const dmo = (await s5get('/kelowna/events/s5-craft-market')).text;
+  assert.match(dmo, /<p class="event-attribution">Listed by Tourism Kelowna<\/p>/);
+});
+
+test('S5 #18: no fabricated dates or times -- untimed occurrences stay date-only; JSON-LD only for scheduled events with occurrences', async () => {
+  const ev = s5create({ name: 'S5 Open Studio', categories: ['arts-culture'], occurrences: [{ start_date: '2032-06-06' }] });
+  const { text } = await s5get('/kelowna/events/s5-open-studio');
+  assert.match(text, /<span class="label">When<\/span><span>Sunday, June 6, 2032<\/span>/, 'no time shown when none is stored');
+  const ld = s5jsonLd(text).find((b) => b['@type'] !== 'BreadcrumbList');
+  assert.deepEqual([ld.startDate, ld.endDate], ['2032-06-06', '2032-06-06'], 'bare date, no midnight or noon invented');
+  assert.equal(app.eventJsonLd({ ...app.getEventById(ev.id), status: 'cancelled' }, app.listEventOccurrences(ev.id), ['arts-culture'], null, 'https://x', '2026-09-22'), null, 'cancelled -> no Event JSON-LD');
+  assert.equal(app.eventJsonLd({ ...app.getEventById(ev.id), status: 'postponed' }, app.listEventOccurrences(ev.id), ['arts-culture'], null, 'https://x', '2026-09-22'), null, 'postponed -> no Event JSON-LD');
+  assert.equal(app.eventJsonLd(app.getEventById(ev.id), [], ['arts-culture'], null, 'https://x', '2026-09-22'), null, 'no occurrences -> no Event JSON-LD');
+  assert.equal(app.eventSchemaType({ type: null }, ['live-music']), 'MusicEvent');
+  assert.equal(app.eventSchemaType({ type: 'festival' }, ['live-music']), 'Festival', 'stored type hint wins');
+  assert.equal(app.eventSchemaType({ type: null }, ['workshops-classes']), 'Event');
+});
+
+test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, unexpired events once each and keeps every other URL', async () => {
+  const baseline = (await s5get('/sitemap.xml')).text;
+  const urlsOf = (xml) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  const before = urlsOf(baseline);
+  const nonEvent = (urls) => urls.filter((u) => !/\/events\/[a-z0-9-]+$/.test(u));
+  const eventUrls = (urls) => urls.filter((u) => /\/events\/[a-z0-9-]+$/.test(u));
+  // Fixture events already present: future festival (kelowna + vernon) and the weekly market are active; the past market is expired.
+  assert.deepEqual(eventUrls(before).sort(), [
+    'https://okanaganroam.com/kelowna/events/s5-cancelled-show',
+    'https://okanaganroam.com/kelowna/events/s5-craft-market',
+    'https://okanaganroam.com/kelowna/events/s5-gallery-night',
+    'https://okanaganroam.com/kelowna/events/s5-harvest-weekend',
+    'https://okanaganroam.com/kelowna/events/s5-late-set',
+    'https://okanaganroam.com/kelowna/events/s5-open-studio',
+    'https://okanaganroam.com/kelowna/events/s5-patio-concert',
+    'https://okanaganroam.com/kelowna/events/s5-rockets-home-games-2032-33',
+    'https://okanaganroam.com/kelowna/events/test-future-festival',
+    'https://okanaganroam.com/kelowna/events/test-weekly-market',
+    'https://okanaganroam.com/vernon/events/test-future-festival',
+  ]);
+  assert.ok(!before.includes('https://okanaganroam.com/kelowna/events/test-past-market'), 'expired fixture excluded');
+  assert.equal(new Set(before).size, before.length, 'no duplicate URLs');
+  const cancelled = db.prepare("SELECT id FROM events WHERE slug = 's5-cancelled-show'").get();
+  app.updateEvent(cancelled.id, { status: 'cancelled' }, s5meta);
+  const lateSet = db.prepare("SELECT id FROM events WHERE slug = 's5-late-set'").get();
+  app.updateEvent(lateSet.id, { status: 'postponed' }, s5meta);
+  const gallery = db.prepare("SELECT id FROM events WHERE slug = 's5-gallery-night'").get();
+  const galleryOcc = db.prepare('SELECT id FROM event_occurrences WHERE event_id = ?').get(gallery.id);
+  assert.equal(app.setEventOccurrenceStatus(gallery.id, galleryOcc.id, 'cancelled', { ...s5meta, event_status: 'cancelled' }).ok, true);
+  const after = urlsOf((await s5get('/sitemap.xml')).text);
+  assert.ok(!after.includes('https://okanaganroam.com/kelowna/events/s5-cancelled-show'), 'cancelled excluded');
+  assert.ok(!after.includes('https://okanaganroam.com/kelowna/events/s5-late-set'), 'postponed excluded');
+  assert.ok(!after.includes('https://okanaganroam.com/kelowna/events/s5-gallery-night'), 'no scheduled occurrence -> excluded');
+  assert.ok(after.includes('https://okanaganroam.com/kelowna/events/s5-open-studio'));
+  assert.deepEqual(nonEvent(after), nonEvent(before), 'every non-event URL unchanged, in the same order');
+  assert.deepEqual(after.slice(0, 2), ['https://okanaganroam.com/', 'https://okanaganroam.com/events'], 'homepage and /events index lead the file');
+  assert.deepEqual(app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`), app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`).slice().sort(), 'deterministic region/slug order');
+});
+
+test('S5 #24: with zero events the sitemap carries no event URLs and is unaffected by the event tables (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-sitemap-zero-events-'));
+  const projectRoot = path.join(__dirname, '..');
+  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
+  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  const ISOLATED_PORT = '3096';
+  const childEnv = { ...process.env, PORT: ISOLATED_PORT };
+  const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    const deadline = Date.now() + 10000;
+    let ready = false;
+    while (Date.now() < deadline && !ready) {
+      try { if ((await fetch(`http://localhost:${ISOLATED_PORT}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready);
+    const first = await (await fetch(`http://localhost:${ISOLATED_PORT}/sitemap.xml`)).text();
+    const urls = [...first.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    assert.equal(urls.filter((u) => /\/events\/[a-z0-9-]+$/.test(u)).length, 0, 'no event detail URLs');
+    assert.deepEqual(urls.slice(0, 2), ['https://okanaganroam.com/', 'https://okanaganroam.com/events']);
+    const second = await (await fetch(`http://localhost:${ISOLATED_PORT}/sitemap.xml`)).text();
+    assert.equal(second, first, 'byte-identical across requests with zero events');
+    assert.equal((await fetch(`http://localhost:${ISOLATED_PORT}/kelowna/events/anything`)).status, 404);
+  } finally {
+    child.kill('SIGTERM');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('S5 cleanup: remove every Step 5 fixture event', () => {
+  const ids = db.prepare("SELECT id FROM events WHERE name LIKE 'S5 %'").all().map((r) => r.id);
+  for (const id of ids) {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(id);
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE name LIKE 'S5 %'").get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_enrichment_log').get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_occurrences').get().n, 5, 'only the Phase 1 fixture occurrences remain');
+});
+
+// ---- What's On Step 6: shell wired to the event data layer -------------------
+const s6meta = { reason: 'step 6 fixture', batch_id: 'test-step6' };
+function s6create(over) {
+  const r = app.createEvent({
+    region: 'kelowna', description: 'Step 6 fixture description.', source_type: 'official_venue', source_name: 'Test Trattoria',
+    source_url: `https://example.com/s6/${app.slugify(over.name)}`, venue_name_text: 'Fixture Hall', categories: ['live-music'], ...over,
+  }, s6meta);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  return r.event;
+}
+async function s6get(urlPath) {
+  return new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try { const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`); resolve({ status: res.status, text: await res.text() }); }
+      catch (err) { reject(err); } finally { tmp.close(); }
+    });
+  });
+}
+const s6markup = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '');
+const s6cards = (html) => [...s6markup(html).matchAll(/<li class="venue-card whatson-event-card" data-venue-id="event-(\d+)"[^>]*data-event-region="([a-z-]+)" data-event-categories="([a-z,-]*)"( data-event-valley-wide="1")?/g)].map((m) => ({ id: Number(m[1]), region: m[2], cats: m[3], valley: !!m[4] }));
+
+test('S6 #1/#20/#22: with zero publishable inventory /whats-on renders the approved empty state, noindex, no date step, hidden controls (isolated child, empty DB)', async () => {
+  assert.equal(app.whatsOnInventoryExists(new Date('2200-01-01T00:00:00Z')), false, 'evaluated after every fixture has ended -> no inventory');
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-whatson-zero-'));
+  const projectRoot = path.join(__dirname, '..');
+  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
+  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  const ISOLATED_PORT = '3095';
+  const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: { ...process.env, PORT: ISOLATED_PORT }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let text;
+  try {
+    const deadline = Date.now() + 10000;
+    let ready = false;
+    while (Date.now() < deadline && !ready) {
+      try { if ((await fetch(`http://localhost:${ISOLATED_PORT}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready);
+    const res = await fetch(`http://localhost:${ISOLATED_PORT}/whats-on`);
+    assert.equal(res.status, 200);
+    text = await res.text();
+  } finally {
+    child.kill('SIGTERM');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+  const markup = s6markup(text);
+  assert.match(text, /<meta name="robots" content="noindex">/);
+  assert.match(markup, /<div class="whatson-empty" id="whatsOnEmptyInventory">\s*<h3>We’re gathering what’s on\.<\/h3>/);
+  assert.match(markup, /aria-live="polite">0 events<\/p>/);
+  assert.match(markup, /<ul class="card-grid" id="whatsOnResults" hidden><\/ul>/);
+  assert.match(markup, /id="whatsOnShowResults" hidden>Show all results</);
+  assert.match(markup, /id="whatsOnNoResults" hidden>/);
+  assert.doesNotMatch(markup, /whatsOnDatesHeading/, 'the date step only appears once inventory exists');
+  assert.match(text, /var INVENTORY = false;/);
+  // The date-window parameters are parsed even now, so the future step has its slot: the page query reader is the API's.
+  assert.deepEqual(app.parseWhatsOnPageQuery({ regions: 'kelowna', categories: 'nightlife', when: 'this-week' }), { regions: ['kelowna'], categories: ['nightlife'], when: 'this-week', from: undefined, to: undefined });
+  assert.deepEqual(app.parseWhatsOnFilterQuery({ regions: 'kelowna', when: 'today' }), { regions: ['kelowna'], categories: [] }, 'the shell-era parser is unchanged');
+});
+
+test('S6 #14-#18/#23: with fixture inventory the page is indexable and real events map into the approved card shape', async () => {
+  const today = app.todayLocal();
+  const d1 = app.addLocalDays(today, 3);
+  const d2 = app.addLocalDays(today, 10);
+  s6create({ name: 'S6 Lakeside Concert', categories: ['live-music', 'food-drink-events'], image_url: '/images/whats-on/live-music.webp', website: 'https://example.com/tickets', occurrences: [{ start_date: d1, start_time: '19:00' }] });
+  s6create({ name: 'S6 Vernon Market', region: 'vernon', venue_name_text: 'Kal Tire Place lot', categories: ['markets-fairs', 'community-events'], occurrences: [{ start_date: d2, start_time: '08:00', end_time: '13:00' }] });
+  s6create({ name: 'S6 Osoyoos Pumpkin Patch', region: 'osoyoos', venue_name_text: 'Desert Farm', categories: ['family-kids', 'holiday-seasonal'], occurrences: [{ start_date: d1, end_date: d2, all_day: 1 }] });
+  s6create({ name: 'S6 Wine Festival', venue_name_text: undefined, valley_wide: 1, categories: ['wineries-wine-events', 'events-festivals'], occurrences: [{ start_date: d2, end_date: app.addLocalDays(d2, 5), all_day: 1 }] });
+  s6create({ name: 'S6 Far Future Gala', categories: ['nightlife'], occurrences: [{ start_date: '2033-03-05', start_time: '20:30' }] });
+  assert.equal(app.whatsOnInventoryExists(), true);
+  const { text } = await s6get('/whats-on');
+  const markup = s6markup(text);
+  assert.doesNotMatch(text, /<meta name="robots" content="noindex">/, 'indexable once inventory exists');
+  assert.match(text, /rel="canonical" href="https:\/\/okanaganroam\.com\/whats-on"/, 'canonical stays the bare page URL');
+  assert.match(text, /var INVENTORY = true;/);
+  assert.match(markup, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>/);
+  assert.match(markup, /id="whatsOnShowResults">Show all results</);
+  const cards = s6cards(text);
+  assert.deepEqual(cards.map((c) => c.region), ['osoyoos', 'kelowna', 'kelowna', 'vernon'], 'default window (next 30 days) lists the four near events ordered by first occurrence (all-day first on a day); the 2033 gala is outside it');
+  assert.match(markup, /aria-live="polite">4 events<\/p>/);
+  const lakeside = markup.match(/<li class="venue-card whatson-event-card"[^>]*data-venue-name="S6 Lakeside Concert"[\s\S]*?<\/li>/)[0];
+  assert.match(lakeside, /<h2><a class="venue-card-link" href="\/kelowna\/events\/s6-lakeside-concert"><span class="venue-card-name">S6 Lakeside Concert<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a><\/h2>/, 'canonical detail URL, single link');
+  assert.equal((lakeside.match(/<a /g) || []).length, 1);
+  assert.match(lakeside, new RegExp(`<p class="venue-meta">Kelowna &middot; ${app.formatLocalDateShort(d1)} · 7 pm</p>`), 'region · date · time from the stored occurrence');
+  assert.match(lakeside, /<img class="whatson-event-img" src="\/images\/whats-on\/live-music\.webp"/);
+  assert.match(lakeside, /<span class="badge-chip whatson-category-chip">Live Music<\/span> <span class="badge-chip whatson-category-chip">Food &amp; Drink Events<\/span>/);
+  assert.match(lakeside, /<div class="golf-desc" id="golf-desc-event-\d+"><p>Step 6 fixture description\./);
+  assert.match(lakeside, /class="card-action fav-btn" data-fav-name="S6 Lakeside Concert"/);
+  assert.match(lakeside, /class="card-action trip-btn" data-trip-name="S6 Lakeside Concert" data-trip-query="S6 Lakeside Concert, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna"/);
+  assert.doesNotMatch(lakeside, /example\.com|tel:|Visit Website/, 'no website/phone on the card');
+  const pumpkin = markup.match(/<li class="venue-card whatson-event-card"[^>]*data-venue-name="S6 Osoyoos Pumpkin Patch"[\s\S]*?<\/li>/)[0];
+  assert.match(pumpkin, new RegExp(`Osoyoos &middot; ${app.formatLocalDateShort(d1, { weekday: false })} – ${app.formatLocalDateShort(d2, { weekday: false })}</p>`), 'all-day span: dates only, no time');
+  assert.doesNotMatch(pumpkin, /whatson-event-img/, 'no image -> no img tag');
+  const festival = cards.find((c) => c.valley);
+  assert.ok(festival, 'valley-wide card carries the flag for the client filter');
+  assert.doesNotMatch(text, /source_url|event_confidence|batch_id|test-fixture-admin-token|\/api\/events/, 'no admin metadata, token or API references in the page');
+});
+
+test('S6 #2-#8: the date step renders in the reserved slot; presets and custom ranges drive the server window exactly like the API', async () => {
+  const today = app.todayLocal();
+  const { text } = await s6get('/whats-on');
+  const markup = s6markup(text);
+  const order = ['id="whatsOnCategoriesHeading">Choose Category(s)</h2>', 'data-filter="category"', 'id="whatsOnDatesHeading">When are you visiting?</h2>', 'data-filter="date"', 'id="whatsOnShowResults"', 'id="whatsOnResultsTop">Results</h2>'];
+  let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `slot order: ${m}`); pos = i; }
+  for (const key of ['today', 'this-weekend', 'this-week', 'this-month']) assert.match(markup, new RegExp(`<a class="outdoor-filter-chip whatson-date-chip" href="/whats-on\\?when=${key}" data-when="${key}" aria-pressed="false">`));
+  assert.match(markup, /id="whatsOnCustomToggle" data-when="custom" aria-pressed="false" aria-expanded="false"/);
+  assert.match(markup, /<form class="whatson-custom-dates" id="whatsOnCustomDates" method="get" action="\/whats-on" hidden>/);
+  assert.match(markup, /<input type="date" name="from" id="whatsOnFrom" value="" required>/);
+  assert.match(markup, new RegExp(`Showing the next 30 days: ${app.formatLocalDateShort(today, { weekday: false })} – ${app.formatLocalDateShort(app.addLocalDays(today, 30), { weekday: false })}`));
+  assert.match(text, /var DATE = \{"when":"","from":"","to":""\};/);
+  for (const when of ['today', 'this-weekend', 'this-week', 'this-month']) {
+    const win = app.dateWindowForPreset(when, today);
+    const page = s6markup((await s6get(`/whats-on?when=${when}`)).text);
+    assert.match(page, new RegExp(`data-when="${when}" aria-pressed="true"`), `${when} chip pressed`);
+    assert.match(page, /id="whatsOnDateStatus">1 selected</);
+    const expectedNames = app.queryWhatsOnEvents({ from: win.from, to: win.to }).map((e) => e.name);
+    const shown = [...page.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(shown, expectedNames, `${when} renders exactly the API window's events`);
+  }
+  const custom = (await s6get('/whats-on?when=custom&from=2033-03-01&to=2033-03-31')).text;
+  const cm = s6markup(custom);
+  assert.match(cm, /id="whatsOnCustomToggle" data-when="custom" aria-pressed="true" aria-expanded="true"/);
+  assert.match(cm, /<form class="whatson-custom-dates" id="whatsOnCustomDates" method="get" action="\/whats-on">/, 'form open for a custom window');
+  assert.match(cm, /id="whatsOnFrom" value="2033-03-01"/); assert.match(cm, /id="whatsOnTo" value="2033-03-31"/);
+  assert.deepEqual([...cm.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1]), ['S6 Far Future Gala']);
+  assert.match(custom, /var DATE = \{"when":"custom","from":"2033-03-01","to":"2033-03-31"\};/);
+  const bare = s6markup((await s6get('/whats-on?from=2033-03-01&to=2033-03-31')).text);
+  assert.deepEqual([...bare.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1]), ['S6 Far Future Gala'], 'bare from/to works like the API');
+  for (const q of ['when=custom&from=2033-03-31&to=2033-03-01', 'when=custom&from=2033-02-30&to=2033-03-01', 'when=custom&from=2033-01-01&to=2034-01-03', 'when=custom&from=x&to=y']) {
+    const fb = s6markup((await s6get(`/whats-on?${q}`)).text);
+    assert.match(fb, /class="whatson-date-note" role="status">Those dates weren’t a valid range/, q);
+    assert.match(fb, /Showing the next 30 days:/, `${q} -> default window`);
+    assert.match(fb, /aria-live="polite">4 events<\/p>/, `${q} -> default window results`);
+  }
+  const okMax = s6markup((await s6get('/whats-on?when=custom&from=2033-01-01&to=2034-01-02')).text);
+  assert.doesNotMatch(okMax, /class="whatson-date-note"/, 'exactly 366 days is accepted');
+});
+
+test('S6 #9-#11/#21: region/category multi-select and no-match state over the rendered window', async () => {
+  const both = s6markup((await s6get('/whats-on?regions=kelowna,vernon&categories=live-music,markets-fairs')).text);
+  assert.match(both, /data-region="kelowna" aria-pressed="true"/); assert.match(both, /data-region="vernon" aria-pressed="true"/);
+  assert.match(both, /data-category="live-music" aria-pressed="true"/); assert.match(both, /data-category="markets-fairs" aria-pressed="true"/);
+  assert.match(both, /aria-live="polite">2 of 4 events<\/p>/, 'regions OR, categories OR, AND between');
+  assert.match(both, /id="whatsOnShowResults">Show 2 results</);
+  assert.match(both, /id="whatsOnClearFilters">Clear all</);
+  const regionOnly = s6markup((await s6get('/whats-on?regions=peachland')).text);
+  assert.match(regionOnly, /aria-live="polite">1 of 4 events<\/p>/, 'valley-wide festival matches a region with nothing else');
+  assert.match(regionOnly, /data-region="peachland" aria-pressed="true">Peachland<span class="outdoor-activity-count">1<\/span>/, 'region chip counts include valley-wide rows');
+  const noMatch = s6markup((await s6get('/whats-on?regions=vernon&categories=nightlife')).text);
+  assert.match(noMatch, /aria-live="polite">0 of 4 events<\/p>/);
+  assert.match(noMatch, /<p class="outdoor-no-results" id="whatsOnNoResults">No events match that combination yet\./, 'no-match state, not the empty-inventory state');
+  assert.match(noMatch, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>/);
+  assert.match(noMatch, /<ul class="card-grid" id="whatsOnResults" hidden>/);
+  assert.equal((noMatch.match(/<li class="venue-card whatson-event-card" hidden/g) || []).length, 4, 'all four window cards are rendered hidden, so unselecting a chip can reveal them client-side');
+  assert.equal((both.match(/<li class="venue-card whatson-event-card" hidden/g) || []).length, 2, 'pre-filtered render: 2 shown, 2 hidden');
+});
+
+test('S6 #12/#13/#19: the client script keeps the date window on chip pushState, reloads on Back/Forward date changes, clears all, and keeps Favorite/Add to Trip wiring', () => {
+  const script = app.renderWhatsOnFilterScriptHtml({ hasInventory: true, dateState: { when: 'this-week', from: '', to: '' } });
+  for (const needle of [
+    "var DATE = {\"when\":\"this-week\",\"from\":\"\",\"to\":\"\"};",
+    "if (d.when) q.push('when=' + encodeURIComponent(d.when));",
+    "if (d.when === 'custom') { if (d.from) q.push('from=' + encodeURIComponent(d.from)); if (d.to) q.push('to=' + encodeURIComponent(d.to)); }",
+    "window.addEventListener('popstate'",
+    "if (d.when !== DATE.when || d.from !== DATE.from || d.to !== DATE.to) { window.location.reload(); return; }",
+    "readUrlIntoChips(); openGroupsForSelection(); apply('none');",
+    "function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); }",
+    "filter(function(c){ return !c.hasAttribute('data-when'); })",
+    "querySelectorAll('a[data-when]')",
+    "customForm.addEventListener('submit'",
+    "cardMatches(d, regions, categories)",
+    "(d.valley ? allRegionKeys : [d.region])",
+    "emptyInventory.hidden = INVENTORY;",
+    "empty.hidden = !(INVENTORY && shown === 0);",
+    app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,
+  ]) assert.ok(script.includes(needle), `script contains ${needle}`);
+  const page = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'this-week' }));
+  assert.match(page, /<script src="\/scripts\/app\.js"><\/script>/, 'app.js (homepage favourites/trip modules) still loads');
+  assert.match(page, /data-venue-category="whatson"/, 'cards carry the holder attribute the shared fav/trip module keys off');
+  assert.match(page, /var INVENTORY = true;/);
+});
+
+test('S6 #24/#25: no token or admin surface in the page; the shell-era markup is unchanged apart from the data now flowing through it', async () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const page = (await s6get('/whats-on?when=today')).text;
+  assert.doesNotMatch(page, /test-fixture-admin-token|ENRICHMENT_ADMIN_TOKEN|Authorization|\/api\/events/);
+  assert.ok(!/fetch\(['"`]\/api\/events/.test(src.slice(src.indexOf('function renderWhatsOnFilterScriptHtml'), src.indexOf('function renderWhatsOnPage'))), 'the page is server-rendered; no browser-side API fetch');
+  // Structural markers of the approved shell are all still present, in order.
+  const markup = s6markup(page);
+  const order = ['<body class="golf-page outdoor-page whatson-page">', '<p class="outdoor-intro">', 'id="whatsOnRegionsHeading">Choose Region(s)</h2>', 'data-filter="region"', 'id="whatsOnCategoriesHeading">Choose Category(s)</h2>', 'data-filter="category"', 'id="whatsOnShowResults"', 'id="whatsOnClearFilters"', 'id="whatsOnResultsTop">Results</h2>', 'id="whatsOnResultsSummary"', 'id="whatsOnSelected"', 'id="whatsOnEmptyInventory"', 'id="whatsOnNoResults"', 'id="whatsOnResults"', '<footer class="home-footer"'];
+  let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
+  assert.equal((markup.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20, 'all 20 region chips');
+  assert.deepEqual([...markup.matchAll(/data-category="([a-z-]+)" aria-pressed="false"/g)].map((m) => m[1]), app.WHATSON_CATEGORIES.map((c) => c.key), 'twelve tiles in the approved order');
+});
+
+test('S6 cleanup: remove every Step 6 fixture event', () => {
+  const ids = db.prepare("SELECT id FROM events WHERE name LIKE 'S6 %'").all().map((r) => r.id);
+  for (const id of ids) {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(id);
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE name LIKE 'S6 %'").get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_occurrences').get().n, 5);
 });
 
 // ---- Event page rendering + SEO (noindex) --------------------------------
@@ -6018,4 +7267,86 @@ test('Grouped region selector: filtering semantics untouched -- regions from dif
   assert.equal((landing.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
   assert.equal((landing.match(/class="outdoor-filter-chip" data-activity="/g) || []).length, 0, 'activities are cards, not pill chips');
   assert.match(landing, /id="outdoorClearFilters" hidden>Clear all</); assert.match(landing, /id="outdoorNoResults" hidden>/);
+});
+
+// ==== What's On page shell (2026-09-22) ====================================
+
+test("What's On shell: twelve categories in the approved order, tiles are multi-select toggles, canonical region chips, URL parsing, empty state, header/footer/tray, noindex while empty", () => {
+  assert.deepEqual(app.WHATSON_CATEGORIES.map((c) => c.label), ['Events & Festivals', 'Live Music', 'Sports & Recreation', 'Arts & Culture', 'Food & Drink Events', 'Markets & Fairs', 'Family & Kids', 'Nightlife', 'Wineries & Wine Events', 'Holiday & Seasonal Events', 'Workshops & Classes', 'Community Events']);
+  assert.equal(app.WHATSON_CATEGORIES.length, 12);
+  for (const c of app.WHATSON_CATEGORIES) { assert.match(c.key, /^[a-z]+(-[a-z]+)*$/); assert.equal(app.WHATSON_CATEGORY_BY_KEY[c.key], c); }
+  assert.deepEqual(app.getWhatsOnEvents(), [], 'shell phase: no inventory');
+  assert.deepEqual(app.WHATSON_DATE_PRESETS.map((d) => d.key), ['today', 'this-weekend', 'this-week', 'this-month', 'custom'], 'future date step declared, not rendered');
+  // URL parsing follows the Outdoors convention with the group renamed.
+  assert.deepEqual(app.parseWhatsOnFilterQuery({ regions: 'vernon,kelowna,nowhere', categories: 'live-music,bogus,live-music,nightlife' }), { regions: ['vernon', 'kelowna'], categories: ['live-music', 'nightlife'] });
+  assert.deepEqual(app.parseWhatsOnFilterQuery({}), { regions: [], categories: [] });
+  const html = app.renderWhatsOnPage(app.parseWhatsOnFilterQuery({}));
+  const markup = outdoorMarkupOnly(html);
+  assert.match(html, /<title>What&#39;s On in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/whats-on"/);
+  // Step 6: the four Phase 1 fixture events (2099) are publishable inventory, so this render is indexable; the
+  // zero-inventory noindex path is covered by the isolated-child test "S6 #1/#20/#22".
+  assert.equal(app.whatsOnInventoryExists(), true);
+  assert.doesNotMatch(html, /<meta name="robots" content="noindex">/, 'inventory exists -> indexable');
+  assert.match(html, /<body class="golf-page outdoor-page whatson-page">/);
+  assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1); assert.match(markup, /<h1>What&#39;s On in the Okanagan<\/h1>/);
+  // Hierarchy: intro -> Choose Region(s) -> Choose Category(s) -> actions -> Results.
+  const order = ['<p class="outdoor-intro">', 'id="whatsOnRegionsHeading">Choose Region(s)</h2>', 'data-filter="region"', 'id="whatsOnCategoriesHeading">Choose Category(s)</h2>', 'data-filter="category"', 'data-filter="date"', 'id="whatsOnShowResults"', 'id="whatsOnResultsTop">Results</h2>', 'id="whatsOnEmptyInventory"'];
+  let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
+  // Twelve tiles, in order, each a toggle button with the outdoor card classes (so the shared pressed-state CSS applies) and a data-category hook.
+  assert.deepEqual([...markup.matchAll(/<button type="button" class="outdoor-activity-card outdoor-activity-toggle whatson-category-card whatson-category-card-([a-z-]+)[^"]*" data-category="([a-z-]+)" aria-pressed="false"/g)].map((m) => m[2]), app.WHATSON_CATEGORIES.map((c) => c.key));
+  assert.equal((markup.match(/class="outdoor-activity-card-check" aria-hidden="true">✓ Selected<\/span>/g) || markup.match(/&#10003; Selected/g) || []).length, 12);
+  assert.doesNotMatch(markup, /<a class="outdoor-activity-card/, 'tiles are filters, not links');
+  // Region chips: the complete canonical list, grouped like Outdoors; counts (all 0 in the empty default window) are shown because inventory exists.
+  for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">${app.REGION_LABELS[r].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<span class="outdoor-activity-count">0</span></button>`));
+  assert.equal((markup.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
+  assert.match(markup, /data-region-group="central">[\s\S]*?aria-expanded="true"/);
+  // Inventory exists but the default window (next 30 days) holds none of the 2099 fixtures: no-match state, empty-inventory copy hidden, no fake cards.
+  assert.match(markup, /aria-live="polite">0 events<\/p>/);
+  assert.match(markup, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>\s*<h3>We’re gathering what’s on\.<\/h3>/);
+  assert.match(markup, /<ul class="card-grid" id="whatsOnResults" hidden><\/ul>/);
+  assert.doesNotMatch(markup, /<li class="venue-card"/, 'no placeholder events rendered');
+  assert.match(markup, /id="whatsOnShowResults">Show all results</); assert.match(markup, /id="whatsOnClearFilters" hidden>Clear all</);
+  assert.match(markup, /<p class="outdoor-no-results" id="whatsOnNoResults">/);
+  // Page chrome: shared header, Trip tray, footer, app.js, analytics head; What's On script with the shared client snippets and both URL keys.
+  assert.match(html, /id="tripTray"|class="trip-tray"|trip-tray/); assert.match(html, /<footer class="home-footer"/); assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+  const script = app.renderWhatsOnFilterScriptHtml({ hasInventory: true, dateState: { when: '', from: '', to: '' } }); // the state this render carries (Step 6)
+  for (const needle of [app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC, app.OUTDOOR_REGION_GROUP_CLIENT_SRC, "'.outdoor-filter-chip, .outdoor-activity-toggle'", '#whatsOnResults > .venue-card', 'regions=', 'categories=', 'pushState', 'popstate', "apply('push')", "apply('replace')", "apply('none')", 'whatsOnSelectedClear', 'data-remove-category', 'data-event-categories']) assert.ok(script.includes(needle), `script contains ${needle}`);
+  assert.ok(html.includes(script));
+  // Pre-filtered render from the URL: pressed chips/tiles, statuses, two tag rows, Clear all shown.
+  const pre = outdoorMarkupOnly(app.renderWhatsOnPage(app.parseWhatsOnFilterQuery({ regions: 'kelowna,penticton', categories: 'live-music,food-drink-events' })));
+  assert.match(pre, /data-region="kelowna" aria-pressed="true"/); assert.match(pre, /data-region="penticton" aria-pressed="true"/);
+  assert.match(pre, /data-category="live-music" aria-pressed="true"/); assert.match(pre, /data-category="food-drink-events" aria-pressed="true"/); assert.match(pre, /data-category="nightlife" aria-pressed="false"/);
+  assert.match(pre, /id="whatsOnRegionStatus">2 selected</); assert.match(pre, /id="whatsOnCategoryStatus">2 selected</);
+  assert.match(pre, /<div class="outdoor-selected" id="whatsOnSelected"><div class="outdoor-selected-row"><span class="outdoor-selected-label">Regions<\/span> [\s\S]*?data-remove-region="kelowna"[\s\S]*?data-remove-region="penticton"[\s\S]*?<div class="outdoor-selected-row"><span class="outdoor-selected-label">Categories<\/span> [\s\S]*?data-remove-category="live-music"[\s\S]*?data-remove-category="food-drink-events"[\s\S]*?id="whatsOnSelectedClear">Clear all</);
+  assert.match(pre, /aria-live="polite">0 of 0 events<\/p>/); assert.match(pre, /id="whatsOnClearFilters">Clear all</); assert.match(pre, /id="whatsOnShowResults">Show 0 results</);
+  // Tile art: dedicated slot per category; none exists yet, so no <img> and no stock fallback.
+  for (const c of app.WHATSON_CATEGORIES) assert.equal(app.whatsOnCategoryImagePath(c.key), null, `no art yet for ${c.key}`);
+  assert.doesNotMatch(markup, /outdoor-activity-card-img/);
+});
+
+test("What's On result card contract (fixture only): name is the single link with the View details cue, region + date/time meta, clamped description, category chips, Favorite + Add to Trip; no website/phone; filter semantics reuse the Outdoors predicate", () => {
+  const ev = { id: 7, name: 'Fixture Lakeside Concert', slug: 'fixture-lakeside-concert', region: 'kelowna', categories: ['live-music', 'food-drink-events'], dateLabel: 'Sat, 18 Jul 2026', time: '7:00 pm', description: 'A fixture event used only by the automated test suite.', image: '/images/whats-on/live-music.webp', website: 'https://example.com', phone: '250-000-0000' };
+  const card = app.whatsOnEventCardHtml(ev);
+  assert.match(card, /<li class="venue-card whatson-event-card" data-venue-id="event-7" data-venue-region="kelowna" data-venue-category="whatson" data-venue-name="Fixture Lakeside Concert" data-event-region="kelowna" data-event-categories="live-music,food-drink-events" data-surface="whatson_card">/);
+  assert.match(card, /<h2><a class="venue-card-link" href="\/kelowna\/events\/fixture-lakeside-concert"><span class="venue-card-name">Fixture Lakeside Concert<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a><\/h2>/);
+  assert.equal((card.match(/<a /g) || []).length, 1, 'the name is the only link');
+  assert.match(card, /<p class="venue-meta">Kelowna &middot; Sat, 18 Jul 2026 · 7:00 pm<\/p>/);
+  assert.match(card, /<div class="golf-desc" id="golf-desc-event-7"><p>A fixture event/); assert.match(card, /class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-event-7" hidden>Read more/);
+  assert.match(card, /<span class="badge-chip whatson-category-chip">Live Music<\/span> <span class="badge-chip whatson-category-chip">Food &amp; Drink Events<\/span>/);
+  assert.match(card, /class="card-action fav-btn" data-fav-name="Fixture Lakeside Concert"/); assert.match(card, /class="card-action trip-btn" data-trip-name="Fixture Lakeside Concert" data-trip-query="Fixture Lakeside Concert, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna"/);
+  assert.match(card, /<img class="whatson-event-img" src="\/images\/whats-on\/live-music\.webp"/);
+  assert.doesNotMatch(card, /example\.com|250-000-0000|Visit Website|tel:/, 'website/phone stay off the listing card');
+  // Filtering: regions OR, categories OR, groups AND (the shared Outdoors predicate).
+  const evs = [ev, { ...ev, id: 8, region: 'vernon', categories: ['nightlife'] }, { ...ev, id: 9, region: 'penticton', categories: ['live-music'] }];
+  assert.deepEqual(app.filterWhatsOnEvents(evs, [], []).map((e) => e.id), [7, 8, 9]);
+  assert.deepEqual(app.filterWhatsOnEvents(evs, ['kelowna', 'vernon'], []).map((e) => e.id), [7, 8]);
+  assert.deepEqual(app.filterWhatsOnEvents(evs, [], ['live-music', 'nightlife']).map((e) => e.id), [7, 8, 9]);
+  assert.deepEqual(app.filterWhatsOnEvents(evs, ['kelowna', 'penticton'], ['live-music']).map((e) => e.id), [7, 9]);
+  assert.deepEqual(app.filterWhatsOnEvents(evs, ['vernon'], ['live-music']), []);
+  assert.equal(app.whatsOnSummaryText(3, 3, false), '3 events'); assert.equal(app.whatsOnSummaryText(1, 3, true), '1 of 3 events'); assert.equal(app.whatsOnSummaryText(1, 1, false), '1 event');
+  // The card rules for the What's On card attribute are derived from the Golf rules, page-scoped.
+  const css = app.renderWhatsOnStyles();
+  assert.match(css, /\.venue-card\[data-venue-category="whatson"\] \.card-action/); assert.match(css, /body\.whatson-page \.whatson-category-grid \{ grid-template-columns: repeat\(4, 1fr\)/);
+  assert.doesNotMatch(css, /\[data-venue-category="golf"\]|\[data-venue-category="beach"\]|\[data-venue-category="outdoor"\]/, 'no golf/beach/outdoor selectors emitted by the What\'s On styles');
 });

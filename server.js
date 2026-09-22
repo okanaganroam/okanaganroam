@@ -1366,25 +1366,952 @@ function findEventBySlug(region, slug) {
   return row ? rowToEvent(row) : null;
 }
 
-// An event is "expired" once its published end (or, if it has none, its
-// start) is in the past. A recurring series' end_datetime is expected to
-// represent its next/current upcoming occurrence (per the Phase 1
-// architecture decision — this phase does not expand occurrences), so this
-// same check correctly keeps an active recurring series "not expired" for
-// as long as its stored end_datetime is kept current.
-function isEventExpired(event, now = new Date()) {
-  const reference = event.end_datetime || event.start_datetime;
-  const referenceDate = new Date(reference.replace(' ', 'T') + 'Z');
-  if (Number.isNaN(referenceDate.getTime())) return false; // malformed date — do not guess; treat as not expired rather than silently hiding it
-  return referenceDate.getTime() < now.getTime();
+// ---------- What's On, Step 2 (2026-09-22): Okanagan local-date helpers ----------
+//
+// Source of truth for every event date on this site is America/Vancouver
+// CIVIL time (the frozen What's On design, §4). The production process runs
+// with TZ=UTC, so nothing below may lean on the process timezone, `Date`'s
+// local getters, or SQLite's `datetime('now')`: "today" is obtained by
+// formatting the instant in the IANA zone with Intl, and every window is
+// then plain calendar arithmetic on 'YYYY-MM-DD' strings (Date.UTC is used
+// purely as a day counter, never as a clock). Dates compare lexically, so
+// DST transitions can never move an event across a day boundary.
+//
+// Deliberately minimal: no date library, no RRULE, no occurrence expansion
+// -- exactly the helpers the expiry fix (below) and later steps need.
+const OKANAGAN_TIME_ZONE = 'America/Vancouver';
+const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const LOCAL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const MAX_CUSTOM_WINDOW_DAYS = 366; // frozen design: Choose Dates spans at most a year
+
+// 'en-CA' yields ISO order (YYYY-MM-DD) for numeric parts, so no manual
+// reassembly of formatToParts() output is needed.
+const okanaganDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: OKANAGAN_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+// The Okanagan calendar date ('YYYY-MM-DD') of an instant. `now` is
+// injectable for tests; production callers pass nothing.
+function todayLocal(now = new Date()) {
+  return okanaganDateFormatter.format(now);
 }
+
+// Strict 'YYYY-MM-DD' validation: shape AND a real calendar day (rejects
+// 2027-02-29, month 13, day 32 ...). Returns null rather than throwing so
+// query-string callers can fall back cleanly.
+function parseLocalDate(value) {
+  if (typeof value !== 'string' || !LOCAL_DATE_PATTERN.test(value)) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return null;
+  return value;
+}
+
+function localDateToDayNumber(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+function dayNumberToLocalDate(n) {
+  return new Date(n * 86400000).toISOString().slice(0, 10);
+}
+
+// Calendar arithmetic on local dates (timezone-free by construction).
+function addLocalDays(dateStr, days) {
+  return dayNumberToLocalDate(localDateToDayNumber(dateStr) + days);
+}
+
+function localDaysBetween(fromStr, toStr) {
+  return localDateToDayNumber(toStr) - localDateToDayNumber(fromStr);
+}
+
+// 0 = Sunday ... 6 = Saturday, for the local calendar date itself.
+function localWeekday(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+// The frozen window definitions (design D3 / §4), all inclusive
+// [from, to] local-date ranges keyed by the WHATSON_DATE_PRESETS keys:
+//   today         -> [today, today]
+//   this-weekend  -> Friday-Sunday: the coming Fri-Sun when today is Mon-Thu,
+//                    today-through-Sunday when today is already Fri-Sun
+//   this-week     -> Monday-Sunday containing today
+//   this-month    -> first-last day of today's local calendar month
+// Returns null for an unknown preset (callers decide the fallback).
+function dateWindowForPreset(preset, today = todayLocal()) {
+  const wd = localWeekday(today); // 0 Sun .. 6 Sat
+  if (preset === 'today') return { from: today, to: today };
+  if (preset === 'this-weekend') {
+    const daysToFriday = wd >= 5 || wd === 0 ? 0 : 5 - wd;
+    const from = daysToFriday === 0 ? today : addLocalDays(today, daysToFriday);
+    const to = addLocalDays(today, wd === 0 ? 0 : 7 - wd); // this Sunday
+    return { from, to };
+  }
+  if (preset === 'this-week') {
+    const from = addLocalDays(today, wd === 0 ? -6 : 1 - wd); // Monday
+    return { from, to: addLocalDays(from, 6) };
+  }
+  if (preset === 'this-month') {
+    const [y, m] = today.split('-').map(Number);
+    const first = `${today.slice(0, 7)}-01`;
+    const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); // day 0 of next month
+    return { from: first, to: last };
+  }
+  return null;
+}
+
+// Choose Dates: both bounds must be real local dates, from <= to, and the
+// span at most MAX_CUSTOM_WINDOW_DAYS. Anything else -> null (the caller
+// falls back to its default window); nothing is silently "corrected".
+function customDateWindow(from, to) {
+  const f = parseLocalDate(from);
+  const t = parseLocalDate(to);
+  if (!f || !t) return null;
+  if (localDaysBetween(f, t) < 0) return null;
+  if (localDaysBetween(f, t) > MAX_CUSTOM_WINDOW_DAYS) return null;
+  return { from: f, to: t };
+}
+
+// An occurrence [start_date, end_date] overlaps a window [from, to] iff it
+// starts no later than the window ends and ends no earlier than the window
+// starts -- the single predicate every date filter uses (also expressed in
+// SQL as `start_date <= :to AND end_date >= :from`).
+function localRangesOverlap(startDate, endDate, from, to) {
+  return startDate <= to && endDate >= from;
+}
+
+// The UTC offset America/Vancouver observes at a given local date/time
+// ('-07:00' PDT, '-08:00' PST), derived from Intl rather than a hard-coded
+// table so the DST rules are the platform's. The local wall-clock time is
+// first treated as if it were UTC to find the approximate instant, then
+// corrected by the offset Intl reports for that instant (a second pass
+// handles the hour around a transition). Used to build the derived
+// ISO-8601-with-offset strings (`events.start_datetime`/`end_datetime`)
+// that later steps write; never used for filtering.
+const okanaganOffsetFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: OKANAGAN_TIME_ZONE, timeZoneName: 'longOffset',
+});
+function offsetAtInstant(instantMs) {
+  const part = okanaganOffsetFormatter.formatToParts(new Date(instantMs)).find((p) => p.type === 'timeZoneName');
+  const m = /GMT([+-])(\d{2}):?(\d{2})?/.exec(part ? part.value : '');
+  if (!m) return null;
+  return { sign: m[1] === '-' ? -1 : 1, hours: Number(m[2]), minutes: Number(m[3] || 0) };
+}
+function vancouverOffsetFor(dateStr, timeStr = '12:00') {
+  if (!parseLocalDate(dateStr)) return null;
+  const time = LOCAL_TIME_PATTERN.test(timeStr) ? timeStr : '12:00';
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const [h, mi] = time.split(':').map(Number);
+  const naive = Date.UTC(y, mo - 1, d, h, mi);
+  let off = offsetAtInstant(naive);
+  if (!off) return null;
+  const toMs = (o) => o.sign * (o.hours * 60 + o.minutes) * 60000;
+  const refined = offsetAtInstant(naive - toMs(off));
+  if (refined) off = refined;
+  const abs = Math.abs(off.sign * (off.hours * 60 + off.minutes));
+  return `${off.sign < 0 ? '-' : '+'}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
+}
+
+// 'YYYY-MM-DDTHH:MM:00-07:00' for a local date + time; a date alone (all-day
+// or time unknown) stays a bare 'YYYY-MM-DD', which schema.org accepts for
+// startDate/endDate. Either form starts with the local calendar date, which
+// is exactly what the expiry check and the idx_events_end_local index read.
+function toVancouverIso(dateStr, timeStr = null) {
+  if (!parseLocalDate(dateStr)) return null;
+  if (timeStr == null || timeStr === '') return dateStr;
+  if (!LOCAL_TIME_PATTERN.test(timeStr)) return null;
+  const offset = vancouverOffsetFor(dateStr, timeStr);
+  return offset ? `${dateStr}T${timeStr}:00${offset}` : null;
+}
+
+// The local calendar date an event's stored span ends on: the first ten
+// characters of end_datetime (or start_datetime when there is no end).
+// Works for both the derived ISO-with-offset strings later steps write and
+// the legacy 'YYYY-MM-DD HH:MM:SS' fixture format, since both lead with the
+// date. Returns null for anything that is not a real date.
+function eventLocalEndDate(event) {
+  const reference = event && (event.end_datetime || event.start_datetime);
+  return typeof reference === 'string' ? parseLocalDate(reference.slice(0, 10)) : null;
+}
+
+// An event is "expired" once the Okanagan calendar day its span ends on has
+// passed -- i.e. it stays live through 23:59 America/Vancouver on its last
+// day regardless of the process clock. (Previously this appended 'Z' and
+// compared UTC instants, which marked a 7 pm Okanagan event expired at 4 pm
+// on its own day between March and November, and would not even parse the
+// offset-bearing strings the frozen design stores.) Malformed dates are
+// still treated as NOT expired: don't guess, don't silently hide.
+function isEventExpired(event, now = new Date()) {
+  const endDate = eventLocalEndDate(event);
+  if (!endDate) return false;
+  return endDate < todayLocal(now);
+}
+
+// Same predicate in SQL, for the routes that select active events directly.
+// COALESCE keeps the "no end -> use start" rule identical to isEventExpired.
+const ACTIVE_EVENT_DATE_SQL = "substr(COALESCE(end_datetime, start_datetime), 1, 10) >= ?";
 
 // Only non-expired events belong in the sitemap — the same reasoning the
 // existing sitemap already applies to retired venues via `redirect_to IS
-// NULL`: a sitemap should not advertise pages with no ongoing value.
-function listEventsForSitemap() {
-  const rows = db.prepare('SELECT * FROM events').all().map(rowToEvent);
-  return rows.filter((e) => !isEventExpired(e));
+// NULL`: a sitemap should not advertise pages with no ongoing value. The
+// "not expired" test now runs in SQL against the Okanagan local date
+// instead of scanning the table and comparing UTC instants in JS.
+// Step 5: a sitemap entry needs a publishable event (status = scheduled)
+// with at least one scheduled occurrence whose span has not ended on the
+// Okanagan calendar; cancelled/postponed rows and rows without a scheduled
+// occurrence never appear. (region, slug) uniqueness means no duplicates;
+// ORDER BY keeps the file deterministic. lastmod stays events.updated_at
+// (bumped by every occurrence write), as the sitemap already does.
+function listEventsForSitemap(now = new Date()) {
+  return db
+    .prepare(`SELECT * FROM events
+      WHERE status = 'scheduled'
+        AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = events.id AND o.status = 'scheduled')
+        AND ${ACTIVE_EVENT_DATE_SQL}
+      ORDER BY region, slug`)
+    .all(todayLocal(now))
+    .map(rowToEvent);
+}
+
+// ---------- What's On, Step 3 (2026-09-22): event data layer + guarded writers ----------
+//
+// Internal only: no route, page or API calls anything in this section yet
+// (Step 4 adds the bearer-guarded API, Step 5 the detail page/sitemap,
+// Step 6 the What's On hook-up). Everything here follows the frozen design
+// (scratchpad/whatson-research/WHATSON_TECHNICAL_DESIGN.md) and the
+// existing venue-write conventions: explicit allow-lists, typed validation
+// that FAILS rather than repairs, `{ ok:false, reason }` results the future
+// routes map to 400/404/409, BEGIN/COMMIT/ROLLBACK around every write, and
+// one event_enrichment_log row per changed thing inside that transaction.
+//
+// Vocabularies are closed and application-enforced (same discipline as
+// venues.type / collections.kind). 'date_tbc' is reserved by the frozen
+// design and deliberately NOT accepted in v1: every published (scheduled)
+// event must carry at least one scheduled occurrence, and no date is ever
+// manufactured to satisfy that.
+const EVENT_STATUSES = ['scheduled', 'postponed', 'cancelled'];
+const EVENT_OCCURRENCE_STATUSES = ['scheduled', 'cancelled', 'postponed'];
+const EVENT_CONFIDENCES = ['high', 'medium']; // 'low' never enters the events table
+const EVENT_SOURCE_TYPES = ['official_organizer', 'official_venue', 'league_feed', 'municipal', 'tourism_org', 'secondary'];
+const EVENT_OFFICIAL_SOURCE_TYPES = ['official_organizer', 'official_venue', 'league_feed', 'municipal'];
+const EVENT_MAX_CATEGORIES = 3;
+// Scalar event fields a writer may set. slug/region are create-only (a
+// region move is a new row + editorial decision, never an UPDATE); the
+// derived start_datetime/end_datetime are never accepted from callers.
+const EVENT_CREATE_FIELDS = [
+  'name', 'slug', 'region', 'description', 'website', 'image_url', 'type', 'status', 'event_confidence',
+  'source_type', 'source_name', 'source_url', 'source_checked_at', 'venue_id', 'venue_name_text', 'valley_wide',
+  'recurrence_rule', 'categories', 'occurrences',
+];
+const EVENT_UPDATE_FIELDS = [
+  'name', 'description', 'website', 'image_url', 'type', 'status', 'event_confidence',
+  'source_type', 'source_name', 'source_url', 'source_checked_at', 'venue_id', 'venue_name_text', 'valley_wide',
+  'recurrence_rule',
+];
+const EVENT_OCCURRENCE_FIELDS = ['start_date', 'end_date', 'start_time', 'end_time', 'ends_next_day', 'all_day', 'status', 'label', 'source_ref'];
+const EVENT_TYPES = ['sporting', 'festival', 'concert']; // existing EVENT_SCHEMA_TYPE_MAP keys
+const EVENT_STOPWORDS = new Set(['live', 'with', 'the', 'and', 'music', 'night', 'show', 'tour', 'kelowna', 'vernon', 'west', 'centre', 'theatre', 'winery', 'estate', 'wines', 'okanagan', 'park', 'club', 'series', 'featuring', 'presents', 'from', 'this', 'that', 'for']);
+
+function eventFail(reason, detail) {
+  return { ok: false, reason, detail: detail === undefined ? null : detail };
+}
+function isPlainObject(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+function isNullish(v) { return v === undefined || v === null; }
+function optionalString(v) { return isNullish(v) ? null : (typeof v === 'string' ? v.trim() : undefined); }
+
+// --- validation -----------------------------------------------------------
+// Each validator returns null when fine, or an eventFail() result. They
+// never coerce or repair: a bad value is reported back exactly as received.
+
+function validateEventCategories(categories) {
+  if (!Array.isArray(categories) || categories.length === 0) return eventFail('categories_required', 'categories must be a non-empty array of category keys');
+  if (categories.length > EVENT_MAX_CATEGORIES) return eventFail('too_many_categories', `at most ${EVENT_MAX_CATEGORIES} categories per event`);
+  const seen = new Set();
+  for (const key of categories) {
+    if (typeof key !== 'string' || !WHATSON_CATEGORY_BY_KEY[key]) return eventFail('unknown_category', key);
+    if (seen.has(key)) return eventFail('duplicate_category', key);
+    seen.add(key);
+  }
+  return null;
+}
+
+function validateEventOccurrence(occ, index = 0) {
+  if (!isPlainObject(occ)) return eventFail('occurrence_invalid', `occurrence[${index}] must be an object`);
+  const unexpected = Object.keys(occ).filter((k) => !EVENT_OCCURRENCE_FIELDS.includes(k));
+  if (unexpected.length) return eventFail('occurrence_unexpected_field', `occurrence[${index}]: ${unexpected.join(', ')}`);
+  const startDate = parseLocalDate(occ.start_date);
+  if (!startDate) return eventFail('occurrence_start_date_invalid', `occurrence[${index}].start_date must be a real YYYY-MM-DD local date`);
+  const endDate = isNullish(occ.end_date) ? startDate : parseLocalDate(occ.end_date);
+  if (!endDate) return eventFail('occurrence_end_date_invalid', `occurrence[${index}].end_date must be a real YYYY-MM-DD local date`);
+  if (endDate < startDate) return eventFail('occurrence_end_before_start', `occurrence[${index}] ends before it starts`);
+  const allDay = isNullish(occ.all_day) ? 0 : occ.all_day;
+  const endsNextDay = isNullish(occ.ends_next_day) ? 0 : occ.ends_next_day;
+  if (allDay !== 0 && allDay !== 1) return eventFail('occurrence_all_day_invalid', `occurrence[${index}].all_day must be 0 or 1`);
+  if (endsNextDay !== 0 && endsNextDay !== 1) return eventFail('occurrence_ends_next_day_invalid', `occurrence[${index}].ends_next_day must be 0 or 1`);
+  const startTime = isNullish(occ.start_time) ? null : occ.start_time;
+  const endTime = isNullish(occ.end_time) ? null : occ.end_time;
+  if (startTime !== null && !(typeof startTime === 'string' && LOCAL_TIME_PATTERN.test(startTime))) return eventFail('occurrence_start_time_invalid', `occurrence[${index}].start_time must be HH:MM (24h) or null`);
+  if (endTime !== null && !(typeof endTime === 'string' && LOCAL_TIME_PATTERN.test(endTime))) return eventFail('occurrence_end_time_invalid', `occurrence[${index}].end_time must be HH:MM (24h) or null`);
+  if (allDay === 1 && (startTime !== null || endTime !== null)) return eventFail('occurrence_all_day_with_times', `occurrence[${index}] is all-day but carries times`);
+  if (endTime !== null && startTime === null) return eventFail('occurrence_end_time_without_start', `occurrence[${index}] has an end_time but no start_time`);
+  if (startTime !== null && endTime !== null && startDate === endDate && endTime < startTime && endsNextDay !== 1) {
+    return eventFail('occurrence_end_time_before_start', `occurrence[${index}] end_time precedes start_time; set ends_next_day = 1 if it crosses midnight`);
+  }
+  if (endsNextDay === 1 && startDate !== endDate) return eventFail('occurrence_ends_next_day_on_multi_day', `occurrence[${index}]: ends_next_day applies to a single-day occurrence only`);
+  const status = isNullish(occ.status) ? 'scheduled' : occ.status;
+  if (!EVENT_OCCURRENCE_STATUSES.includes(status)) return eventFail('occurrence_status_invalid', `occurrence[${index}].status ${JSON.stringify(status)}`);
+  for (const f of ['label', 'source_ref']) {
+    if (!isNullish(occ[f]) && typeof occ[f] !== 'string') return eventFail('occurrence_field_invalid', `occurrence[${index}].${f} must be a string`);
+  }
+  return null;
+}
+
+function normalizeEventOccurrence(occ) {
+  const startDate = occ.start_date;
+  return {
+    start_date: startDate,
+    end_date: isNullish(occ.end_date) ? startDate : occ.end_date,
+    start_time: isNullish(occ.start_time) ? null : occ.start_time,
+    end_time: isNullish(occ.end_time) ? null : occ.end_time,
+    ends_next_day: isNullish(occ.ends_next_day) ? 0 : occ.ends_next_day,
+    all_day: isNullish(occ.all_day) ? 0 : occ.all_day,
+    status: isNullish(occ.status) ? 'scheduled' : occ.status,
+    label: isNullish(occ.label) ? null : occ.label.trim() || null,
+    source_ref: isNullish(occ.source_ref) ? null : occ.source_ref.trim() || null,
+  };
+}
+
+// Validates a list of occurrences as a set: each one individually, no two
+// with the same (start_date, start_time) key, no two with the same
+// non-null source_ref, and -- when the parent is scheduled -- at least one
+// scheduled occurrence (the publication invariant).
+function validateEventOccurrenceSet(occurrences, eventStatus) {
+  if (!Array.isArray(occurrences)) return eventFail('occurrences_required', 'occurrences must be an array');
+  const keys = new Set();
+  const refs = new Set();
+  let scheduled = 0;
+  for (let i = 0; i < occurrences.length; i++) {
+    const err = validateEventOccurrence(occurrences[i], i);
+    if (err) return err;
+    const n = normalizeEventOccurrence(occurrences[i]);
+    const key = `${n.start_date}|${n.start_time || ''}`;
+    if (keys.has(key)) return eventFail('duplicate_occurrence', `occurrence[${i}] repeats ${n.start_date} ${n.start_time || '(no time)'}`);
+    keys.add(key);
+    if (n.source_ref) {
+      if (refs.has(n.source_ref)) return eventFail('duplicate_occurrence_source_ref', n.source_ref);
+      refs.add(n.source_ref);
+    }
+    if (n.status === 'scheduled') scheduled++;
+  }
+  if (eventStatus === 'scheduled' && scheduled === 0) return eventFail('no_scheduled_occurrence', 'a scheduled event needs at least one scheduled occurrence; dates are never manufactured');
+  return null;
+}
+
+// Venue rule (frozen §8): venue_id must be a real, non-redirected venues
+// row in the event's region (or the event is valley-wide); otherwise the
+// event names its place in venue_name_text. Both set -> ambiguous; neither
+// set on a non-valley-wide event -> incomplete. Nothing is substituted.
+function validateEventVenue(data) {
+  const hasId = !isNullish(data.venue_id);
+  const hasText = !isNullish(data.venue_name_text) && String(data.venue_name_text).trim() !== '';
+  const valleyWide = data.valley_wide === 1;
+  if (hasId && hasText) return eventFail('venue_ambiguous', 'set venue_id OR venue_name_text, not both');
+  if (!hasId && !hasText && !valleyWide) return eventFail('venue_required', 'a non-valley-wide event needs venue_id or venue_name_text');
+  if (hasId) {
+    if (!Number.isInteger(data.venue_id) || data.venue_id <= 0) return eventFail('venue_id_invalid', 'venue_id must be a positive integer');
+    const venue = db.prepare('SELECT id, region, redirect_to FROM venues WHERE id = ?').get(data.venue_id);
+    if (!venue) return eventFail('venue_not_found', data.venue_id);
+    if (venue.redirect_to !== null) return eventFail('venue_redirected', `venue ${data.venue_id} redirects to ${venue.redirect_to}; use the canonical venue explicitly`);
+    if (!valleyWide && venue.region !== data.region) return eventFail('venue_region_mismatch', `venue ${data.venue_id} is in ${venue.region}, event is in ${data.region}`);
+  }
+  return null;
+}
+
+// Scalar-field validation shared by create and update. `partial` = update
+// (only the supplied keys are checked); create requires the full set.
+function validateEventScalars(data, { partial = false } = {}) {
+  const has = (k) => Object.prototype.hasOwnProperty.call(data, k);
+  const need = (k) => !partial || has(k);
+  if (need('name') && (typeof data.name !== 'string' || data.name.trim() === '')) return eventFail('name_required');
+  if (!partial && !REGION_LABELS[data.region]) return eventFail('region_invalid', `region must be one of the known region slugs (got ${JSON.stringify(data.region)})`);
+  if (partial && has('region')) return eventFail('region_immutable', 'region cannot be changed after creation');
+  if (partial && has('slug')) return eventFail('slug_immutable', 'slug cannot be changed after creation');
+  if (!partial && !isNullish(data.slug) && (typeof data.slug !== 'string' || !EXPLICIT_SLUG_PATTERN.test(data.slug))) return eventFail('slug_invalid', 'slug must be lowercase alphanumeric segments separated by single hyphens');
+  if (has('status') && !EVENT_STATUSES.includes(data.status)) return eventFail('status_invalid', `status must be one of ${EVENT_STATUSES.join('|')} ('date_tbc' is not supported in v1)`);
+  if (has('event_confidence') && !EVENT_CONFIDENCES.includes(data.event_confidence)) return eventFail('event_confidence_invalid', `event_confidence must be one of ${EVENT_CONFIDENCES.join('|')}`);
+  if (need('source_type') && !EVENT_SOURCE_TYPES.includes(data.source_type)) return eventFail('source_type_invalid', `source_type must be one of ${EVENT_SOURCE_TYPES.join('|')}`);
+  for (const f of ['source_name', 'source_url']) {
+    if (need(f) && (typeof data[f] !== 'string' || data[f].trim() === '')) return eventFail(`${f}_required`, `${f} is required (provenance is mandatory)`);
+  }
+  if (has('source_url') && !/^https?:\/\/\S+$/i.test(data.source_url.trim())) return eventFail('source_url_invalid', 'source_url must be an http(s) URL');
+  if (has('website') && !isNullish(data.website) && !(typeof data.website === 'string' && /^https?:\/\/\S+$/i.test(data.website.trim()))) return eventFail('website_invalid', 'website must be an http(s) URL or null');
+  if (has('source_checked_at') && !isNullish(data.source_checked_at) && !parseLocalDate(data.source_checked_at)) return eventFail('source_checked_at_invalid', 'source_checked_at must be YYYY-MM-DD');
+  if (has('valley_wide') && data.valley_wide !== 0 && data.valley_wide !== 1) return eventFail('valley_wide_invalid', 'valley_wide must be 0 or 1');
+  if (has('type') && !isNullish(data.type) && !EVENT_TYPES.includes(data.type)) return eventFail('type_invalid', `type must be null or one of ${EVENT_TYPES.join('|')}`);
+  for (const f of ['description', 'image_url', 'recurrence_rule', 'venue_name_text']) {
+    if (has(f) && !isNullish(data[f]) && typeof data[f] !== 'string') return eventFail(`${f}_invalid`, `${f} must be a string or null`);
+  }
+  if (has('venue_id') && !isNullish(data.venue_id) && !(Number.isInteger(data.venue_id) && data.venue_id > 0)) return eventFail('venue_id_invalid', 'venue_id must be a positive integer or null');
+  return null;
+}
+
+function validateEventMeta(meta) {
+  if (!isPlainObject(meta)) return eventFail('meta_required', 'writer meta { reason, batch_id } is required');
+  if (typeof meta.reason !== 'string' || meta.reason.trim() === '') return eventFail('reason_required');
+  if (typeof meta.batch_id !== 'string' || meta.batch_id.trim() === '') return eventFail('batch_id_required');
+  return null;
+}
+
+// --- duplicate protection (frozen §12, deterministic, never merging) -------
+function eventSignificantWords(name) {
+  return new Set(slugify(name).split('-').filter((w) => w.length > 3 && !EVENT_STOPWORDS.has(w)));
+}
+// Candidate duplicates for a proposed event, each tagged with the rule that
+// fired. `exact` hits are hard rejections; `fuzzy` hits are review items
+// the caller must explicitly acknowledge (meta.reviewed_duplicates) --
+// they are never merged and never silently dropped.
+function findDuplicateEventCandidates(data, { excludeEventId = null } = {}) {
+  const hits = [];
+  const baseSlug = slugify(data.name || '');
+  const rows = db.prepare('SELECT id, name, slug, region, venue_id, venue_name_text, source_url FROM events WHERE region = ?').all(data.region);
+  const occDates = (Array.isArray(data.occurrences) ? data.occurrences : [])
+    .map((o) => (isPlainObject(o) ? parseLocalDate(o.start_date) : null)).filter(Boolean);
+  const words = eventSignificantWords(data.name || '');
+  for (const row of rows) {
+    if (excludeEventId !== null && row.id === excludeEventId) continue;
+    const rowDates = db.prepare('SELECT start_date FROM event_occurrences WHERE event_id = ?').all(row.id).map((r) => r.start_date);
+    const nearDate = occDates.some((d) => rowDates.some((rd) => Math.abs(localDaysBetween(d, rd)) <= 1));
+    // Same identity = same base slug in the same region on (or next to) the
+    // same date, or an explicitly requested slug that is already taken. The
+    // same name on a clearly different date is NOT a duplicate (a repeat
+    // show, a later edition) -- createEvent gives it the dated-suffix slug.
+    if ((typeof data.slug === 'string' && row.slug === data.slug) || (row.slug === baseSlug && (nearDate || !occDates.length))) {
+      hits.push({ event_id: row.id, rule: 'exact_slug', name: row.name });
+      continue;
+    }
+    if (!nearDate) continue;
+    if (typeof data.source_url === 'string' && row.source_url && row.source_url === data.source_url.trim()
+        && occDates.some((d) => rowDates.includes(d))) {
+      hits.push({ event_id: row.id, rule: 'same_source_and_date', name: row.name });
+      continue;
+    }
+    const shared = [...eventSignificantWords(row.name)].filter((w) => words.has(w)).length;
+    const sameVenue = (!isNullish(data.venue_id) && data.venue_id === row.venue_id)
+      || (typeof data.venue_name_text === 'string' && row.venue_name_text && slugify(data.venue_name_text) === slugify(row.venue_name_text));
+    if (shared >= 2 || (shared >= 1 && sameVenue)) hits.push({ event_id: row.id, rule: 'fuzzy_same_day', name: row.name });
+  }
+  return hits;
+}
+
+// --- audit log --------------------------------------------------------------
+// One row per changed thing, inside the caller's transaction. Mirrors the
+// venue_enrichment_log convention: source = who/what asserted the value,
+// source_ref = the human reason, confidence = the event's confidence.
+function logEventChange(eventId, occurrenceId, fieldName, oldValue, newValue, meta) {
+  db.prepare(
+    `INSERT INTO event_enrichment_log
+       (event_id, occurrence_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`
+  ).run(
+    eventId, occurrenceId, fieldName,
+    isNullish(oldValue) ? null : String(oldValue),
+    isNullish(newValue) ? null : String(newValue),
+    meta.source || 'events_writer', meta.reason.trim(), meta.confidence || 'medium', meta.batch_id.trim(), meta.reviewed_by || null
+  );
+}
+
+// --- derived span -----------------------------------------------------------
+// events.start_datetime / end_datetime = the ISO-with-offset span of the
+// event's non-cancelled occurrences (all of them if every one is cancelled),
+// recomputed inside every write transaction. Their first ten characters
+// are the local first/last dates the expiry check and sitemap read.
+function recomputeEventSpan(eventId) {
+  let rows = db.prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND status <> 'cancelled'").all(eventId);
+  if (!rows.length) rows = db.prepare('SELECT * FROM event_occurrences WHERE event_id = ?').all(eventId);
+  if (!rows.length) return null;
+  let first = null;
+  let last = null;
+  for (const o of rows) {
+    const s = o.all_day === 1 || !o.start_time ? o.start_date : toVancouverIso(o.start_date, o.start_time);
+    const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date, 1) : o.end_date;
+    const e = o.all_day === 1 || !o.end_time ? endDate : toVancouverIso(endDate, o.end_time);
+    if (first === null || s < first) first = s;
+    if (last === null || e > last) last = e;
+  }
+  db.prepare('UPDATE events SET start_datetime = ?, end_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(first, last, eventId);
+  return { start_datetime: first, end_datetime: last };
+}
+
+// --- reads ------------------------------------------------------------------
+function rowToEventOccurrence(row) {
+  return {
+    id: row.id, event_id: row.event_id, start_date: row.start_date, end_date: row.end_date,
+    start_time: row.start_time, end_time: row.end_time, ends_next_day: row.ends_next_day, all_day: row.all_day,
+    status: row.status, label: row.label, source_ref: row.source_ref, created_at: row.created_at, updated_at: row.updated_at,
+  };
+}
+function rowToEventFull(row) {
+  return {
+    ...rowToEvent(row),
+    status: row.status, event_confidence: row.event_confidence, source_type: row.source_type, source_name: row.source_name,
+    source_url: row.source_url, source_checked_at: row.source_checked_at, venue_name_text: row.venue_name_text,
+    valley_wide: row.valley_wide,
+  };
+}
+function getEventById(id) {
+  const row = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
+  return row ? rowToEventFull(row) : null;
+}
+function getEventCategoryKeys(eventId) {
+  return db.prepare('SELECT category_key FROM event_categories WHERE event_id = ? ORDER BY position').all(eventId).map((r) => r.category_key);
+}
+function listEventOccurrences(eventId, { includeCancelled = true } = {}) {
+  const sql = includeCancelled
+    ? 'SELECT * FROM event_occurrences WHERE event_id = ? ORDER BY start_date, COALESCE(start_time, \'\'), id'
+    : "SELECT * FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' ORDER BY start_date, COALESCE(start_time, ''), id";
+  return db.prepare(sql).all(eventId).map(rowToEventOccurrence);
+}
+function countScheduledOccurrences(eventId) {
+  return db.prepare("SELECT COUNT(*) AS n FROM event_occurrences WHERE event_id = ? AND status = 'scheduled'").get(eventId).n;
+}
+
+// --- writers ----------------------------------------------------------------
+// createEvent(data, meta): the only way an event enters the table. Validates
+// everything, checks duplicates, then inserts event + categories +
+// occurrences + audit rows in ONE transaction and recomputes the span.
+// Returns { ok:true, event, categories, occurrences, review } or eventFail().
+function createEvent(data, meta) {
+  if (!isPlainObject(data)) return eventFail('body_invalid');
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  const unexpected = Object.keys(data).filter((k) => !EVENT_CREATE_FIELDS.includes(k));
+  if (unexpected.length) return eventFail('unexpected_field', unexpected.join(', '));
+  const input = {
+    ...data,
+    status: isNullish(data.status) ? 'scheduled' : data.status,
+    event_confidence: isNullish(data.event_confidence) ? 'medium' : data.event_confidence,
+    valley_wide: isNullish(data.valley_wide) ? 0 : data.valley_wide,
+  };
+  const scalarErr = validateEventScalars(input);
+  if (scalarErr) return scalarErr;
+  const venueErr = validateEventVenue(input);
+  if (venueErr) return venueErr;
+  const catErr = validateEventCategories(input.categories);
+  if (catErr) return catErr;
+  const occErr = validateEventOccurrenceSet(input.occurrences, input.status);
+  if (occErr) return occErr;
+
+  // Duplicate gate: exact identity is a hard stop; fuzzy hits must have been
+  // reviewed (ids listed in meta.reviewed_duplicates) or the write fails.
+  const candidates = findDuplicateEventCandidates(input);
+  const exact = candidates.filter((c) => c.rule !== 'fuzzy_same_day');
+  if (exact.length) return eventFail('duplicate_event', exact);
+  const reviewed = new Set(Array.isArray(meta.reviewed_duplicates) ? meta.reviewed_duplicates : []);
+  const unreviewed = candidates.filter((c) => !reviewed.has(c.event_id));
+  if (unreviewed.length) return eventFail('possible_duplicate', unreviewed);
+
+  // Slug: explicit (must be free) or slugify(name); on a base-slug
+  // collision a one-off may take its first start date as suffix (frozen
+  // §L); if that is taken too, fail rather than invent anything else.
+  const occs = input.occurrences.map(normalizeEventOccurrence);
+  const firstDate = occs.map((o) => o.start_date).sort()[0];
+  const taken = (slug) => !!db.prepare('SELECT 1 FROM events WHERE region = ? AND slug = ?').get(input.region, slug);
+  let slug;
+  if (!isNullish(input.slug)) {
+    if (taken(input.slug)) return eventFail('slug_collision', `${input.region}/${input.slug}`);
+    slug = input.slug;
+  } else {
+    slug = slugify(input.name);
+    if (!slug) return eventFail('slug_invalid', 'name produces an empty slug');
+    if (taken(slug)) {
+      const dated = `${slug}-${firstDate}`;
+      if (taken(dated)) return eventFail('slug_collision', `${input.region}/${slug} and ${dated}`);
+      slug = dated;
+    }
+  }
+
+  const logMeta = { ...meta, source: input.source_name.trim(), confidence: input.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const info = db.prepare(`
+      INSERT INTO events (name, slug, region, description, start_datetime, end_datetime, recurrence_rule, venue_id, website, image_url, type,
+        status, event_confidence, source_type, source_name, source_url, source_checked_at, venue_name_text, valley_wide)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      input.name.trim(), slug, input.region, optionalString(input.description), firstDate, firstDate,
+      optionalString(input.recurrence_rule), isNullish(input.venue_id) ? null : input.venue_id,
+      optionalString(input.website), optionalString(input.image_url), isNullish(input.type) ? null : input.type,
+      input.status, input.event_confidence, input.source_type, input.source_name.trim(), input.source_url.trim(),
+      isNullish(input.source_checked_at) ? null : input.source_checked_at,
+      optionalString(input.venue_name_text) || null, input.valley_wide,
+    );
+    const eventId = Number(info.lastInsertRowid);
+    logEventChange(eventId, null, 'create', null, `${input.region}/${slug}`, logMeta);
+    input.categories.forEach((key, position) => {
+      db.prepare('INSERT INTO event_categories (event_id, category_key, position) VALUES (?, ?, ?)').run(eventId, key, position);
+    });
+    logEventChange(eventId, null, 'categories', null, input.categories.join(','), logMeta);
+    const insOcc = db.prepare(`INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time, ends_next_day, all_day, status, label, source_ref)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const o of occs) {
+      const occId = Number(insOcc.run(eventId, o.start_date, o.end_date, o.start_time, o.end_time, o.ends_next_day, o.all_day, o.status, o.label, o.source_ref).lastInsertRowid);
+      logEventChange(eventId, occId, 'occurrence', null, `${o.start_date}${o.start_time ? ' ' + o.start_time : ''} ${o.status}`, logMeta);
+    }
+    recomputeEventSpan(eventId);
+    db.exec('COMMIT');
+    txOpen = false;
+    return {
+      ok: true, event: getEventById(eventId), categories: getEventCategoryKeys(eventId), occurrences: listEventOccurrences(eventId),
+      review: candidates.filter((c) => c.rule === 'fuzzy_same_day'),
+    };
+  } catch (err) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+// updateEvent(id, data, meta): scalar fields only (allow-listed), each
+// changed field logged with old/new. Moving to 'scheduled' requires a
+// scheduled occurrence; the venue rule is re-checked with the merged row.
+function updateEvent(id, data, meta) {
+  if (!isPlainObject(data)) return eventFail('body_invalid');
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
+  if (!existing) return eventFail('event_not_found', id);
+  const unexpected = Object.keys(data).filter((k) => !EVENT_UPDATE_FIELDS.includes(k));
+  if (unexpected.length) return eventFail(['region', 'slug'].some((k) => unexpected.includes(k)) ? `${unexpected.find((k) => k === 'region' || k === 'slug')}_immutable` : 'unexpected_field', unexpected.join(', '));
+  const scalarErr = validateEventScalars(data, { partial: true });
+  if (scalarErr) return scalarErr;
+  const merged = { ...existing, ...data };
+  if (Object.prototype.hasOwnProperty.call(data, 'venue_id') || Object.prototype.hasOwnProperty.call(data, 'venue_name_text') || Object.prototype.hasOwnProperty.call(data, 'valley_wide')) {
+    const venueErr = validateEventVenue(merged);
+    if (venueErr) return venueErr;
+  }
+  if (data.status === 'scheduled' && existing.status !== 'scheduled' && countScheduledOccurrences(id) === 0) {
+    return eventFail('no_scheduled_occurrence', 'cannot publish an event with no scheduled occurrence');
+  }
+  const changed = EVENT_UPDATE_FIELDS.filter((f) => Object.prototype.hasOwnProperty.call(data, f) && (isNullish(data[f]) ? null : data[f]) !== existing[f]);
+  if (!changed.length) return { ok: true, event: getEventById(id), changed: [] };
+  const logMeta = { ...meta, source: meta.source || existing.source_name, confidence: merged.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const setClause = changed.map((f) => `${f} = ?`).join(', ');
+    db.prepare(`UPDATE events SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(...changed.map((f) => (isNullish(data[f]) ? null : data[f])), id);
+    for (const f of changed) logEventChange(id, null, f, existing[f], data[f], logMeta);
+    db.exec('COMMIT');
+    txOpen = false;
+  } catch (err) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw err;
+  }
+  return { ok: true, event: getEventById(id), changed };
+}
+
+// replaceEventCategories(id, keys, meta): the full ordered list (1-3).
+function replaceEventCategories(id, keys, meta) {
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  const existing = db.prepare('SELECT id, source_name, event_confidence FROM events WHERE id = ?').get(id);
+  if (!existing) return eventFail('event_not_found', id);
+  const catErr = validateEventCategories(keys);
+  if (catErr) return catErr;
+  const before = getEventCategoryKeys(id);
+  if (before.join(',') === keys.join(',')) return { ok: true, categories: before, changed: false };
+  const logMeta = { ...meta, source: meta.source || existing.source_name, confidence: existing.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+    keys.forEach((key, position) => db.prepare('INSERT INTO event_categories (event_id, category_key, position) VALUES (?, ?, ?)').run(id, key, position));
+    db.prepare('UPDATE events SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    logEventChange(id, null, 'categories', before.join(','), keys.join(','), logMeta);
+    db.exec('COMMIT');
+    txOpen = false;
+  } catch (err) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw err;
+  }
+  return { ok: true, categories: getEventCategoryKeys(id), changed: true };
+}
+
+// upsertEventOccurrences(id, occurrences, meta): appends occurrences to a
+// series (e.g. the next six months of a weekly event, the rest of a
+// season). Idempotent on (start_date, start_time): an occurrence that
+// already exists with that key is left untouched and reported as skipped
+// -- it is never overwritten, so a re-run of the same feed changes nothing.
+function upsertEventOccurrences(id, occurrences, meta) {
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
+  if (!existing) return eventFail('event_not_found', id);
+  const setErr = validateEventOccurrenceSet(occurrences, null);
+  if (setErr) return setErr;
+  const occs = occurrences.map(normalizeEventOccurrence);
+  const current = listEventOccurrences(id);
+  const currentKeys = new Set(current.map((o) => `${o.start_date}|${o.start_time || ''}`));
+  const currentRefs = new Set(current.map((o) => o.source_ref).filter(Boolean));
+  const toInsert = [];
+  const skipped = [];
+  for (const o of occs) {
+    const key = `${o.start_date}|${o.start_time || ''}`;
+    if (currentKeys.has(key)) { skipped.push(o); continue; }
+    if (o.source_ref && currentRefs.has(o.source_ref)) return eventFail('duplicate_occurrence_source_ref', o.source_ref);
+    toInsert.push(o);
+  }
+  if (!toInsert.length) return { ok: true, inserted: [], skipped: skipped.length, occurrences: current };
+  const logMeta = { ...meta, source: meta.source || existing.source_name, confidence: existing.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const insOcc = db.prepare(`INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time, ends_next_day, all_day, status, label, source_ref)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const inserted = [];
+    for (const o of toInsert) {
+      const occId = Number(insOcc.run(id, o.start_date, o.end_date, o.start_time, o.end_time, o.ends_next_day, o.all_day, o.status, o.label, o.source_ref).lastInsertRowid);
+      logEventChange(id, occId, 'occurrence', null, `${o.start_date}${o.start_time ? ' ' + o.start_time : ''} ${o.status}`, logMeta);
+      inserted.push(occId);
+    }
+    recomputeEventSpan(id);
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, inserted, skipped: skipped.length, occurrences: listEventOccurrences(id) };
+  } catch (err) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+// setEventOccurrenceStatus(eventId, occId, status, meta): cancel /
+// postpone / restore one date. Cancelling or postponing the LAST scheduled
+// occurrence of a scheduled event is refused ('last_occurrence') unless the
+// caller also passes meta.event_status ('cancelled' | 'postponed'), in
+// which case the parent changes status in the same transaction -- the
+// publication invariant can never be broken by a single date change.
+function setEventOccurrenceStatus(eventId, occId, status, meta) {
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  if (!EVENT_OCCURRENCE_STATUSES.includes(status)) return eventFail('occurrence_status_invalid', status);
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  if (!event) return eventFail('event_not_found', eventId);
+  const occ = db.prepare('SELECT * FROM event_occurrences WHERE id = ? AND event_id = ?').get(occId, eventId);
+  if (!occ) return eventFail('occurrence_not_found', occId);
+  if (occ.status === status) return { ok: true, changed: false, occurrence: rowToEventOccurrence(occ), event: getEventById(eventId) };
+  const eventStatus = isNullish(meta.event_status) ? null : meta.event_status;
+  if (eventStatus !== null && !['cancelled', 'postponed'].includes(eventStatus)) return eventFail('event_status_invalid', 'meta.event_status may only be cancelled or postponed');
+  const remaining = countScheduledOccurrences(eventId) - (occ.status === 'scheduled' ? 1 : 0) + (status === 'scheduled' ? 1 : 0);
+  if (event.status === 'scheduled' && remaining === 0 && eventStatus === null) {
+    return eventFail('last_occurrence', 'this is the last scheduled occurrence; pass meta.event_status = cancelled|postponed to change the event with it');
+  }
+  const logMeta = { ...meta, source: meta.source || event.source_name, confidence: event.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    db.prepare('UPDATE event_occurrences SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(status, occId);
+    logEventChange(eventId, occId, 'occurrence_status', occ.status, status, logMeta);
+    if (eventStatus !== null && eventStatus !== event.status) {
+      db.prepare('UPDATE events SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(eventStatus, eventId);
+      logEventChange(eventId, null, 'status', event.status, eventStatus, logMeta);
+    }
+    recomputeEventSpan(eventId);
+    db.exec('COMMIT');
+    txOpen = false;
+  } catch (err) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw err;
+  }
+  return { ok: true, changed: true, occurrence: rowToEventOccurrence(db.prepare('SELECT * FROM event_occurrences WHERE id = ?').get(occId)), event: getEventById(eventId) };
+}
+
+// --- What's On window query -------------------------------------------------
+// resolveWhatsOnWindow({ when, from, to }, now): the frozen date-filter
+// state -> an inclusive local window. Presets come from WHATSON_DATE_PRESETS
+// keys; `custom` (or bare from/to) uses customDateWindow's validation; an
+// invalid or absent selection falls back to the rolling default window
+// (today -> today + WHATSON_DEFAULT_WINDOW_DAYS) and reports `fallback`.
+const WHATSON_DEFAULT_WINDOW_DAYS = 30;
+function resolveWhatsOnWindow(params = {}, now = new Date()) {
+  const today = todayLocal(now);
+  const when = typeof params.when === 'string' ? params.when : null;
+  if (when && when !== 'custom') {
+    const w = dateWindowForPreset(when, today);
+    if (w) return { ...w, preset: when, fallback: false };
+    return { from: today, to: addLocalDays(today, WHATSON_DEFAULT_WINDOW_DAYS), preset: 'upcoming', fallback: true };
+  }
+  if (when === 'custom' || params.from !== undefined || params.to !== undefined) {
+    const w = customDateWindow(params.from, params.to);
+    if (w) return { ...w, preset: 'custom', fallback: false };
+    return { from: today, to: addLocalDays(today, WHATSON_DEFAULT_WINDOW_DAYS), preset: 'upcoming', fallback: true };
+  }
+  return { from: today, to: addLocalDays(today, WHATSON_DEFAULT_WINDOW_DAYS), preset: 'upcoming', fallback: false };
+}
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function formatLocalDateShort(dateStr, { weekday = true } = {}) {
+  const [, m, d] = dateStr.split('-').map(Number);
+  const md = `${MONTH_SHORT[m - 1]} ${d}`;
+  return weekday ? `${WEEKDAY_SHORT[localWeekday(dateStr)]} ${md}` : md;
+}
+function formatLocalTime(timeStr) {
+  if (!timeStr) return '';
+  const [h, mi] = timeStr.split(':').map(Number);
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}${mi ? ':' + String(mi).padStart(2, '0') : ''} ${h < 12 ? 'am' : 'pm'}`;
+}
+// The card's date wording, from the occurrences of ONE event that fall in
+// the window (ordered): a single day, a multi-day span, or a series count.
+function whatsOnDateLabel(event, occsInWindow) {
+  if (!occsInWindow.length) return '';
+  const first = occsInWindow[0];
+  if (occsInWindow.length === 1) {
+    if (first.start_date === first.end_date) return formatLocalDateShort(first.start_date);
+    return `${formatLocalDateShort(first.start_date, { weekday: false })} – ${formatLocalDateShort(first.end_date, { weekday: false })}`;
+  }
+  const rule = event.recurrence_rule ? event.recurrence_rule.trim() : '';
+  const next = formatLocalDateShort(first.start_date);
+  return rule ? `${rule} · next ${next}` : `${next} + ${occsInWindow.length - 1} more date${occsInWindow.length - 1 === 1 ? '' : 's'}`;
+}
+function whatsOnTimeLabel(occsInWindow) {
+  const times = [...new Set(occsInWindow.filter((o) => o.all_day !== 1).map((o) => o.start_time || ''))];
+  if (!times.length || (times.length === 1 && times[0] === '')) return '';
+  if (times.length > 1) return 'Times vary';
+  return formatLocalTime(times[0]);
+}
+
+// queryWhatsOnEvents({ from, to, regions, categories }): the series-level
+// result set for the What's On page. One row per event; only scheduled
+// events with at least one scheduled occurrence overlapping [from, to]
+// (occurrence.end_date >= from AND occurrence.start_date <= to). Regions
+// OR, categories OR, AND between; a valley_wide event matches any region.
+// Filtering is entirely in SQL over event_occurrences (no UTC arithmetic,
+// no client-side date parsing); ordering is by the first occurrence inside
+// the window. No row cap: the window bounds the result.
+function queryWhatsOnEvents({ from, to, regions = [], categories = [] } = {}) {
+  const f = parseLocalDate(from);
+  const t = parseLocalDate(to);
+  if (!f || !t || t < f) return [];
+  const regionList = (Array.isArray(regions) ? regions : []).filter((r) => REGION_LABELS[r]);
+  const categoryList = (Array.isArray(categories) ? categories : []).filter((c) => WHATSON_CATEGORY_BY_KEY[c]);
+  const params = [f, t];
+  let regionSql = '';
+  if (regionList.length) {
+    regionSql = ` AND (e.valley_wide = 1 OR e.region IN (${regionList.map(() => '?').join(',')}))`;
+    params.push(...regionList);
+  }
+  let categorySql = '';
+  if (categoryList.length) {
+    categorySql = ` AND EXISTS (SELECT 1 FROM event_categories c WHERE c.event_id = e.id AND c.category_key IN (${categoryList.map(() => '?').join(',')}))`;
+    params.push(...categoryList);
+  }
+  const rows = db.prepare(`
+    SELECT e.*, MIN(o.start_date) AS next_start, MIN(o.start_date || 'T' || COALESCE(o.start_time, '')) AS next_key
+    FROM events e
+    JOIN event_occurrences o ON o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? AND o.start_date <= ?
+    WHERE e.status = 'scheduled'${regionSql}${categorySql}
+    GROUP BY e.id
+    ORDER BY next_key, e.name, e.id
+  `).all(...params);
+  const occStmt = db.prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND end_date >= ? AND start_date <= ? ORDER BY start_date, COALESCE(start_time, ''), id");
+  return rows.map((row) => {
+    const event = rowToEventFull(row);
+    const occs = occStmt.all(row.id, f, t).map(rowToEventOccurrence);
+    const venue = event.venue_id ? getVenue(event.venue_id) : null;
+    return {
+      id: event.id,
+      name: event.name,
+      slug: event.slug,
+      region: event.region,
+      valleyWide: event.valley_wide === 1,
+      categories: getEventCategoryKeys(event.id),
+      description: event.description || '',
+      image: event.image_url || null,
+      startDate: occs[0].start_date,
+      endDate: occs[0].end_date,
+      dateLabel: whatsOnDateLabel(event, occs),
+      time: whatsOnTimeLabel(occs),
+      occurrenceCount: occs.length,
+      venueName: venue ? venue.name : (event.venue_name_text || null),
+      venueId: venue ? venue.id : null,
+      sourceType: event.source_type,
+      sourceName: event.source_name,
+      attribution: EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) ? null : event.source_name,
+      status: event.status,
+    };
+  });
+}
+// Chip/tile counts for a result set (valley-wide rows count once per
+// region chip), mirroring what the shell computes client-side.
+function whatsOnCountsFor(rows) {
+  const regions = Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, 0]));
+  const categories = Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, 0]));
+  for (const row of rows) {
+    if (row.valleyWide) for (const r of Object.keys(regions)) regions[r]++;
+    else if (regions[row.region] !== undefined) regions[row.region]++;
+    for (const k of row.categories) if (categories[k] !== undefined) categories[k]++;
+  }
+  return { regions, categories };
+}
+
+// --- Step 4 (2026-09-22): HTTP plumbing for the data layer -------------------
+// Writer result reasons -> HTTP status (everything else is a 400).
+const EVENT_WRITE_STATUS_MAP = {
+  event_not_found: 404, occurrence_not_found: 404, venue_not_found: 404,
+  duplicate_event: 409, possible_duplicate: 409, slug_collision: 409, last_occurrence: 409,
+  venue_redirected: 409, venue_region_mismatch: 409, duplicate_occurrence: 409, duplicate_occurrence_source_ref: 409,
+};
+const EVENT_META_KEYS = ['reason', 'batch_id', 'reviewed_by', 'reviewed_duplicates', 'event_status'];
+
+// The public card contract (frozen §15 / the shell's getWhatsOnEvents
+// comment): exactly what a listing card needs, nothing about sources,
+// confidence, status or internal ids beyond the event's own id.
+function whatsOnPublicEvent(row) {
+  return {
+    id: row.id, name: row.name, slug: row.slug, region: row.region, valleyWide: row.valleyWide,
+    categories: row.categories, description: row.description, image: row.image,
+    startDate: row.startDate, endDate: row.endDate, dateLabel: row.dateLabel, time: row.time,
+    occurrenceCount: row.occurrenceCount, venueName: row.venueName, attribution: row.attribution,
+  };
+}
+function whatsOnPublicOccurrence(o) {
+  return { id: o.id, startDate: o.start_date, endDate: o.end_date, startTime: o.start_time, endTime: o.end_time, endsNextDay: o.ends_next_day, allDay: o.all_day, label: o.label };
+}
+// Public single-event shape: the card fields for the event's *next* window
+// (from today, no upper bound needed -- the rolling default) plus its
+// scheduled occurrences. Not the detail page (Step 5); just the data.
+function whatsOnPublicEventDetail(event) {
+  const occs = listEventOccurrences(event.id, { includeCancelled: false });
+  const venue = event.venue_id ? getVenue(event.venue_id) : null;
+  return {
+    id: event.id, name: event.name, slug: event.slug, region: event.region, valleyWide: event.valley_wide === 1,
+    categories: getEventCategoryKeys(event.id), description: event.description || '', image: event.image_url || null,
+    website: event.website || null, recurrence: event.recurrence_rule || null, status: event.status,
+    venueName: venue ? venue.name : (event.venue_name_text || null),
+    attribution: EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) ? null : event.source_name,
+    dateLabel: whatsOnDateLabel(event, occs), time: whatsOnTimeLabel(occs),
+    occurrences: occs.map(whatsOnPublicOccurrence),
+  };
+}
+// GET /api/events?when=&from=&to=&regions=&categories= -> the frozen
+// window semantics in one place; the What's On page (Step 6) will call
+// the same functions server-side rather than fetching its own API.
+function parseWhatsOnReadQuery(query) {
+  const { regions, categories } = parseWhatsOnFilterQuery(query);
+  const str = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v[0] : undefined);
+  return { regions, categories, when: str(query && query.when), from: str(query && query.from), to: str(query && query.to) };
+}
+function listWhatsOnEventsPublic(query, now = new Date()) {
+  const { regions, categories, when, from, to } = parseWhatsOnReadQuery(query);
+  const window = resolveWhatsOnWindow({ when, from, to }, now);
+  const rows = queryWhatsOnEvents({ from: window.from, to: window.to, regions, categories });
+  return { window, regions, categories, count: rows.length, events: rows.map(whatsOnPublicEvent) };
 }
 
 // ---------- Phase 2 Sprint 3 (Hidden Gems) — minimal data access ----------
@@ -6869,6 +7796,538 @@ ${golfEngagementHeadHtml(type)}
 </html>`;
 }
 
+// ---------- What's On (2026-09-22): page shell at /whats-on ----------
+//
+// The What's On counterpart to the Outdoors explorer: Choose Region(s) ->
+// Choose Category(s) -> Results, built from the SAME classes, scripts
+// snippets and page chrome the /outdoors landing uses (golf-page +
+// outdoor-page theme, region chips, image-card toggles, step headings,
+// selected-filter rows, Trip tray, header, footer) so nothing in the
+// Outdoors implementation is changed and the two pages cannot drift.
+// Everything page-specific is scoped to body.whatson-page. This phase
+// ships the SHELL only: the twelve category tiles, the region chips, the
+// filter/URL behaviour and the result-card contract -- the event data
+// source (getWhatsOnEvents) is intentionally empty and the page renders a
+// clean empty state rather than any placeholder inventory. Date filtering
+// ("When are you visiting?") is deliberately not rendered yet; see
+// WHATSON_DATE_PRESETS / whatsOnDateStepHtml for where it slots in.
+const WHATSON_CATEGORIES = [
+  { key: 'events-festivals', label: 'Events & Festivals' },
+  { key: 'live-music', label: 'Live Music' },
+  { key: 'sports-recreation', label: 'Sports & Recreation' },
+  { key: 'arts-culture', label: 'Arts & Culture' },
+  { key: 'food-drink-events', label: 'Food & Drink Events' },
+  { key: 'markets-fairs', label: 'Markets & Fairs' },
+  { key: 'family-kids', label: 'Family & Kids' },
+  { key: 'nightlife', label: 'Nightlife' },
+  { key: 'wineries-wine-events', label: 'Wineries & Wine Events' },
+  { key: 'holiday-seasonal', label: 'Holiday & Seasonal Events' },
+  { key: 'workshops-classes', label: 'Workshops & Classes' },
+  { key: 'community-events', label: 'Community Events' },
+];
+const WHATSON_CATEGORY_BY_KEY = Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, c]));
+// Tile art: /images/whats-on/<key>.webp (1376x768 WebP, the same format
+// and per-group subdirectory convention as /images/outdoors). Emitted only
+// when the file exists, so a tile without art shows the on-brand navy
+// fallback with its line icon -- never a stock or unrelated image.
+const WHATSON_IMAGE_DIR = path.join(__dirname, 'public', 'images', 'whats-on');
+function whatsOnCategoryImagePath(key) {
+  const file = path.join(WHATSON_IMAGE_DIR, `${key}.webp`);
+  return fs.existsSync(file) ? `/images/whats-on/${key}.webp` : null;
+}
+// Plain inline line icons in the same minimal white-stroke style as the
+// outdoor activity cards and homepage mood cards.
+const WHATSON_CATEGORY_ICONS = {
+  'events-festivals': '<path d="M4 20 6 6l6 4 6-4 2 14z"/><path d="M12 10v10"/>',
+  'live-music': '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+  'sports-recreation': '<circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M3 12h18"/>',
+  'arts-culture': '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-1-2 0-3 3 0 4-1 1-2 1-3a9 9 0 0 0-7-9z"/><circle cx="8" cy="11" r="1"/><circle cx="11" cy="7" r="1"/><circle cx="16" cy="8" r="1"/>',
+  'food-drink-events': '<path d="M8 3v7a3 3 0 0 0 6 0V3"/><path d="M11 13v8"/><path d="M17 3v18"/><path d="M17 3c2 0 3 2 3 5s-1 4-3 4"/>',
+  'markets-fairs': '<path d="M3 10 5 4h14l2 6"/><path d="M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 13v8h14v-8"/><path d="M10 21v-5h4v5"/>',
+  'family-kids': '<circle cx="9" cy="6" r="2.5"/><circle cx="17" cy="8" r="2"/><path d="M4 21v-5a5 5 0 0 1 10 0v5"/><path d="M14 21v-4a3 3 0 0 1 6 0v4"/>',
+  'nightlife': '<path d="M14 3a8 8 0 1 0 7 11 7 7 0 0 1-7-11z"/><path d="M5 5v2M4 6h2"/><path d="M8 13v2M7 14h2"/>',
+  'wineries-wine-events': '<path d="M8 3h8l-1 7a3 3 0 0 1-6 0z"/><path d="M12 13v7"/><path d="M8 20h8"/>',
+  'holiday-seasonal': '<path d="M12 3v18"/><path d="M4 8l16 8"/><path d="M4 16 20 8"/><path d="m9 5 3 2 3-2"/><path d="m9 19 3-2 3 2"/><path d="m5 10 3 1 1-3"/><path d="m19 14-3-1-1 3"/>',
+  'workshops-classes': '<path d="M4 5h16v11H4z"/><path d="M8 21h8"/><path d="M12 16v5"/><path d="M8 9h8M8 12h5"/>',
+  'community-events': '<circle cx="12" cy="7" r="3"/><circle cx="5" cy="10" r="2"/><circle cx="19" cy="10" r="2"/><path d="M2 20v-2a3 3 0 0 1 3-3h1"/><path d="M22 20v-2a3 3 0 0 0-3-3h-1"/><path d="M7 21v-3a5 5 0 0 1 10 0v3"/>',
+};
+// Future "When are you visiting?" step. Not rendered in this phase; the
+// presets are declared so the third filter group has a home when the
+// event inventory exists (the client script already treats filter groups
+// generically: regions OR, categories OR, groups AND).
+const WHATSON_DATE_PRESETS = [
+  { key: 'today', label: 'Today' },
+  { key: 'this-weekend', label: 'This Weekend' },
+  { key: 'this-week', label: 'This Week' },
+  { key: 'this-month', label: 'This Month' },
+  { key: 'custom', label: 'Choose Dates' },
+];
+// Step 6 (2026-09-22): the "When are you visiting?" step, rendered in the
+// slot the shell reserved. Presets are plain links (a date change is a
+// server round-trip that re-selects the event window -- frozen design D2),
+// styled with the same chip class as the region pills; the client script
+// leaves them out of its toggle set and rewrites their hrefs so the
+// current region/category selection travels with them. "Choose Dates" is
+// a small GET form with real date inputs. The window shown is the one the
+// server resolved (resolveWhatsOnWindow), so an invalid custom range is
+// reported honestly as the default window with a note -- never corrected.
+function whatsOnDateStepHtml(state = {}) {
+  const win = state.window || null;
+  if (!win) return '';
+  const active = win.preset;
+  const chip = (d) => {
+    if (d.key === 'custom') return '';
+    const pressed = active === d.key;
+    return `<a class="outdoor-filter-chip whatson-date-chip" href="/whats-on?when=${d.key}" data-when="${d.key}" aria-pressed="${pressed ? 'true' : 'false'}">${escapeHtml(d.label)}</a>`;
+  };
+  const customPressed = active === 'custom';
+  const upcoming = active === 'upcoming';
+  const label = upcoming
+    ? `Showing the next ${WHATSON_DEFAULT_WINDOW_DAYS} days: ${escapeHtml(formatLocalDateShort(win.from, { weekday: false }))} – ${escapeHtml(formatLocalDateShort(win.to, { weekday: false }))}`
+    : `Showing ${escapeHtml(formatLocalDateShort(win.from))}${win.to !== win.from ? ` – ${escapeHtml(formatLocalDateShort(win.to))}` : ''}`;
+  const note = win.fallback ? `<p class="whatson-date-note" role="status">Those dates weren’t a valid range (real dates, start before end, at most ${MAX_CUSTOM_WINDOW_DAYS} days), so the next ${WHATSON_DEFAULT_WINDOW_DAYS} days are shown instead.</p>` : '';
+  return `<section class="outdoor-step whatson-date-step" aria-labelledby="whatsOnDatesHeading">
+  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="whatsOnDatesHeading">When are you visiting?</h2><span class="outdoor-step-status" id="whatsOnDateStatus"${upcoming ? ' hidden' : ''}>${upcoming ? '' : '1 selected'}</span></div>
+  <div class="category-region-selector outdoor-filter-group whatson-date-group" role="group" aria-label="Choose dates" data-filter="date">
+    ${WHATSON_DATE_PRESETS.map(chip).filter(Boolean).join('\n    ')}
+    <button type="button" class="outdoor-filter-chip whatson-date-chip" id="whatsOnCustomToggle" data-when="custom" aria-pressed="${customPressed ? 'true' : 'false'}" aria-expanded="${customPressed ? 'true' : 'false'}" aria-controls="whatsOnCustomDates">Choose Dates</button>
+  </div>
+  <form class="whatson-custom-dates" id="whatsOnCustomDates" method="get" action="/whats-on"${customPressed ? '' : ' hidden'}>
+    <input type="hidden" name="when" value="custom">
+    <label>From <input type="date" name="from" id="whatsOnFrom" value="${customPressed ? escapeHtml(win.from) : ''}" required></label>
+    <label>To <input type="date" name="to" id="whatsOnTo" value="${customPressed ? escapeHtml(win.to) : ''}" required></label>
+    <button type="submit" class="cta whatson-custom-go">Show these dates</button>
+  </form>
+  <p class="whatson-date-showing" id="whatsOnDateShowing">${label}</p>
+  ${note}
+</section>`;
+}
+// Data source (Step 6): the Step 3/4 public read path. `window` is a
+// resolved { from, to } (see resolveWhatsOnWindow); with none given the
+// rolling default applies. Rows are the public card shape -- exactly what
+// whatsOnEventCardHtml consumes ({ id, name, slug, region, categories,
+// dateLabel, time, description, image, valleyWide, ... }). Website/phone
+// stay OFF the listing card by the site's card rule; they belong on the
+// detail page.
+function getWhatsOnEvents(window = null) {
+  const win = window || resolveWhatsOnWindow({});
+  return queryWhatsOnEvents({ from: win.from, to: win.to }).map(whatsOnPublicEvent);
+}
+// Whether any publishable inventory exists at all (a scheduled event with
+// a scheduled occurrence that has not ended). This -- not the current
+// window's result count -- drives noindex and the "We're gathering" state,
+// so an empty Tuesday never makes the page claim there are no events.
+function whatsOnInventoryExists(now = new Date()) {
+  return !!db.prepare(`SELECT 1 FROM events e
+    WHERE e.status = 'scheduled'
+      AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?)
+    LIMIT 1`).get(todayLocal(now));
+}
+// ?regions=a,b&categories=x,y -- the Outdoors URL convention with the
+// group renamed. Unknown regions/categories are dropped, duplicates
+// collapse, order is kept, so a stale link degrades to fewer constraints.
+function parseWhatsOnFilterQuery(query) {
+  const split = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : '').split(',').map((x) => x.trim()).filter(Boolean);
+  const regions = [], categories = [];
+  for (const r of split(query && query.regions)) if (REGION_LABELS[r] && !regions.includes(r)) regions.push(r);
+  for (const c of split(query && query.categories)) if (WHATSON_CATEGORY_BY_KEY[c] && !categories.includes(c)) categories.push(c);
+  return { regions, categories };
+}
+function filterWhatsOnEvents(events, regions, categories) {
+  // A valley-wide event matches whatever regions are selected (frozen G/N).
+  return events.filter((e) => outdoorFilterMatches(e.valleyWide ? [] : regions, categories, e.region, e.categories || []));
+}
+// The page's full query state: regions/categories (as before) plus the
+// date-window parameters the Step 4 API also reads.
+function parseWhatsOnPageQuery(query) {
+  return parseWhatsOnReadQuery(query);
+}
+// Region chips: the complete canonical region list in FOOTER_REGION_GROUPS
+// order, same grouped/collapsible markup and classes as the Outdoors
+// landing (so its CSS and the shared group-toggle snippet apply), but
+// counts are shown only when there is an event inventory to count.
+function whatsOnRegionChipsHtml(state = {}) {
+  const selected = new Set(state.selectedRegions || []);
+  const counts = state.counts || null;
+  const chip = (r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="${selected.has(r) ? 'true' : 'false'}">${escapeHtml(REGION_LABELS[r])}${counts ? `<span class="outdoor-activity-count">${counts[r] || 0}</span>` : ''}</button>`;
+  const placed = new Set();
+  const groups = FOOTER_REGION_GROUPS.map((g) => ({ label: g.label, slug: outdoorRegionGroupSlug(g.label), regions: g.regions.filter((r) => REGION_LABELS[r]) }));
+  groups.forEach((g) => g.regions.forEach((r) => placed.add(r)));
+  const leftover = canonicalOutdoorRegionOrder().filter((r) => !placed.has(r));
+  if (leftover.length) groups.push({ label: 'Other', slug: 'other', regions: leftover });
+  const blocks = groups.map((g) => {
+    const nSel = g.regions.filter((r) => selected.has(r)).length;
+    const open = g.slug === OUTDOOR_REGION_GROUP_DEFAULT_OPEN || nSel > 0;
+    const listId = `whatsOnRegionGroup-${g.slug}`;
+    return `<div class="outdoor-region-group-block${nSel ? ' has-selection' : ''}" data-region-group="${g.slug}">
+      <button type="button" class="outdoor-region-group-toggle" id="${listId}-toggle" aria-expanded="${open ? 'true' : 'false'}" aria-controls="${listId}"><span class="outdoor-region-group-name">${escapeHtml(g.label)}</span><span class="outdoor-region-group-meta">${g.regions.length} region${g.regions.length === 1 ? '' : 's'}</span><span class="outdoor-region-group-selected"${nSel ? '' : ' hidden'}>${nSel ? `· ${nSel} selected` : ''}</span><span class="outdoor-region-group-chevron" aria-hidden="true"></span></button>
+      <div class="outdoor-region-group-chips" id="${listId}" role="group" aria-label="${escapeHtml(g.label)} regions"${open ? '' : ' hidden'}>
+        ${g.regions.map(chip).join('\n        ')}
+      </div>
+    </div>`;
+  }).join('\n      ');
+  return `<div class="category-region-selector outdoor-filter-group outdoor-region-groups" role="group" aria-label="Choose regions" data-filter="region">
+      ${blocks}
+    </div>`;
+}
+// One category tile: the outdoor activity card treatment as a multi-select
+// toggle (same classes, so the existing pressed/ring/badge CSS applies),
+// with a data-category hook for the What's On script.
+function whatsOnCategoryTileHtml(cat, state = {}) {
+  const img = whatsOnCategoryImagePath(cat.key);
+  const pressed = (state.selectedCategories || []).includes(cat.key);
+  const count = state.counts ? (state.counts[cat.key] || 0) : null;
+  const icon = `<span class="outdoor-activity-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${WHATSON_CATEGORY_ICONS[cat.key] || ''}</svg></span>`;
+  return `<button type="button" class="outdoor-activity-card outdoor-activity-toggle whatson-category-card whatson-category-card-${cat.key}${img ? '' : ' whatson-category-card-noart'}" data-category="${cat.key}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${escapeHtml(cat.label)}"><span class="outdoor-activity-card-check" aria-hidden="true">&#10003; Selected</span>${img ? `<img class="outdoor-activity-card-img" src="${img}" width="1376" height="768" alt="" loading="lazy">` : ''}
+      <span class="outdoor-activity-card-overlay">
+        ${icon}
+        <span class="outdoor-activity-card-title">${escapeHtml(cat.label)}</span>
+        ${count === null ? '' : `<span class="outdoor-activity-card-count"><span class="outdoor-activity-count">${count}</span> <span class="outdoor-activity-count-noun">event${count === 1 ? '' : 's'}</span></span>`}
+      </span></button>`;
+}
+function whatsOnCategoryGridHtml(state = {}) {
+  const nSel = (state.selectedCategories || []).length;
+  return `<section class="outdoor-activity-showcase outdoor-step" aria-labelledby="whatsOnCategoriesHeading">
+  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="whatsOnCategoriesHeading">Choose Category(s)</h2><span class="outdoor-step-status" id="whatsOnCategoryStatus"${nSel ? '' : ' hidden'}>${nSel ? `${nSel} selected` : ''}</span></div>
+  <div class="outdoor-activity-card-grid whatson-category-grid" role="group" aria-label="Choose categories" data-filter="category">
+    ${WHATSON_CATEGORIES.map((c) => whatsOnCategoryTileHtml(c, state)).join('\n    ')}
+  </div>
+</section>`;
+}
+// The result card contract: the themed venue card (name as the single
+// link with the "View details" cue, meta line, clamped description,
+// category chips, Favorite + Add to Trip) for an event record. No website
+// or phone on the listing card. The detail href follows the existing
+// events route (/:region/events/:slug).
+function whatsOnEventCardHtml(ev) {
+  const href = `/${ev.region}/events/${ev.slug}`;
+  const when = [ev.dateLabel, ev.time].filter(Boolean).join(' · ');
+  const meta = [REGION_LABELS[ev.region] ? escapeHtml(REGION_LABELS[ev.region]) : null, when ? escapeHtml(when) : null].filter(Boolean).join(' &middot; ');
+  const chips = (ev.categories || []).filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="badge-chip whatson-category-chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
+  const descId = `golf-desc-event-${ev.id}`;
+  const tripQuery = `${ev.name}, ${REGION_LABELS[ev.region] || ev.region}, Okanagan Valley, BC`;
+  return `
+      <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''} data-surface="whatson_card">
+        ${ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : ''}
+        <h2><a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(ev.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>
+        <p class="venue-meta">${meta}</p>
+        ${ev.description ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(ev.description)}</p></div>
+        <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>` : ''}
+        <p class="chips">${chips}</p>
+        <div class="card-actions">
+          <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(ev.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(ev.name)}">&#9825; Favorite</button>
+          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(ev.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(ev.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(ev.name)} to trip">&#65291; Add to Trip</button>
+        </div>
+      </li>`;
+}
+function whatsOnSelectedTagsHtml(selectedRegions, selectedCategories) {
+  const tag = (kind, value, label) => `<button type="button" class="outdoor-selected-tag" data-remove-${kind}="${escapeHtml(value)}" aria-label="Remove ${escapeHtml(label)}">${escapeHtml(label)}<span class="outdoor-selected-x" aria-hidden="true">×</span></button>`;
+  const row = (label, tags) => (tags.length ? `<div class="outdoor-selected-row"><span class="outdoor-selected-label">${label}</span> ${tags.join(' ')}</div>` : '');
+  const regionTags = selectedRegions.map((r) => tag('region', r, REGION_LABELS[r] || r));
+  const categoryTags = selectedCategories.map((c) => tag('category', c, (WHATSON_CATEGORY_BY_KEY[c] || { label: c }).label));
+  const any = regionTags.length + categoryTags.length > 0;
+  return `<div class="outdoor-selected" id="whatsOnSelected"${any ? '' : ' hidden'}>${row('Regions', regionTags)}${row('Categories', categoryTags)}${any ? '<button type="button" class="outdoor-selected-clear" id="whatsOnSelectedClear">Clear all</button>' : ''}</div>`;
+}
+function whatsOnSummaryText(shown, total, filtered) {
+  const noun = total === 1 ? 'event' : 'events';
+  return filtered ? `${shown} of ${total} ${noun}` : `${total} ${noun}`;
+}
+// Page-scoped styles only (body.whatson-page): the What's On card rules
+// derived from the Golf card rules exactly as Beach/Outdoor derive theirs,
+// a four-across desktop grid for the twelve tiles, and the event card's
+// image/meta details. Nothing here touches other pages.
+// The derived card rules are then narrowed to selectors that actually carry
+// the What's On attribute: the Golf source groups some card rules with the
+// venue-page CTA row (`body.golf-page .venue-cta-row …`), and this page has
+// no CTA row, so those grouped selectors are dropped rather than re-emitted.
+function whatsOnOnlySelectors(cssText) {
+  const noComments = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
+  return noComments.replace(/([^{}]+)\{([^{}]*)\}/g, (m, selectors, body) => {
+    const kept = selectors.split(',').map((x) => x.trim()).filter((x) => x.includes('[data-venue-category="whatson"]'));
+    return kept.length ? `\n  ${kept.join(', ')} {${body}}` : '';
+  }).replace(/\n\s*\n/g, '\n');
+}
+function renderWhatsOnStyles() {
+  const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
+  return `<style>
+  /* What's On page (2026-09-22): the Golf card rules re-keyed to the What's On card attribute. */
+  ${whatsOnOnlySelectors(deriveBeachRulesFromGolfCss(SEO_PAGE_CSS, 'whatson'))}
+  ${whatsOnOnlySelectors(deriveBeachRulesFromGolfCss(themeCss, 'whatson'))}
+  /* Twelve category tiles: 2 across on phones (inherited), 3 from 600px (inherited), 4 across from 900px. */
+  @media (min-width: 900px) { body.whatson-page .whatson-category-grid { grid-template-columns: repeat(4, 1fr); max-width: none; } }
+  body.whatson-page .whatson-category-card-noart .outdoor-activity-card-overlay { background: linear-gradient(180deg, rgba(27,43,58,0.15) 0%, rgba(20,14,10,0.82) 100%); }
+  body.whatson-page .whatson-event-img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; margin: 0 0 12px; display: block; }
+  body.whatson-page .whatson-category-chip { background: rgba(42,107,103,0.1); color: var(--teal-deep, #1E4F4C); }
+  body.whatson-page #whatsOnResults .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
+  body.whatson-page #whatsOnResults > .venue-card[hidden] { display: none; }
+  body.whatson-page .whatson-empty { background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px; padding: 18px 20px; margin: 0 0 26px; max-width: 68ch; }
+  body.whatson-page .whatson-empty h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 6px; color: var(--ink); }
+  body.whatson-page .whatson-empty p { margin: 0; color: var(--ink); opacity: 0.8; line-height: 1.55; }
+  body.whatson-page .whatson-empty a { color: var(--ref-navy); font-weight: 700; }
+  /* Step 6: the "When are you visiting?" step -- preset chips reuse the region-chip rules; the custom-range form and the "Showing" line are page-scoped. */
+  body.whatson-page a.whatson-date-chip { text-decoration: none; }
+  body.whatson-page .whatson-custom-dates { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0 4px; }
+  body.whatson-page .whatson-custom-dates[hidden] { display: none; }
+  body.whatson-page .whatson-custom-dates label { display: flex; flex-direction: column; gap: 4px; font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 800; color: var(--ink); }
+  body.whatson-page .whatson-custom-dates input[type="date"] { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(74,52,40,0.25); background: var(--paper); color: var(--ink); min-height: 40px; }
+  body.whatson-page .whatson-custom-dates .cta.whatson-custom-go { margin: 0; }
+  body.whatson-page .whatson-date-showing { margin: 10px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--ink); opacity: 0.8; }
+  body.whatson-page .whatson-date-note { margin: 6px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--plum, #7a2e4a); font-weight: 700; }
+</style>`;
+}
+// The inline script: the Outdoors filter behaviour with the activity group
+// renamed to categories and the URL keys ?regions=&categories=. Reuses the
+// shared client snippets verbatim (region-group open/close, OR/AND
+// predicate). Works with zero result cards so the chips, statuses, tags,
+// URL state and Back/Forward all behave before any inventory exists.
+function renderWhatsOnFilterScriptHtml(state = {}) {
+  const labels = { regions: { ...REGION_LABELS }, categories: Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, c.label])) };
+  // Step 6: INVENTORY = whether any publishable inventory exists (drives the
+  // empty-inventory vs no-match states); DATE = the server-resolved date
+  // parameters, carried on every pushState so a chip click never drops the
+  // chosen window. Both default to the shell-phase values.
+  const inventory = state.hasInventory === true;
+  const dateState = state.dateState || { when: '', from: '', to: '' };
+  return `<script>
+(function(){
+  var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  var INVENTORY = ${inventory ? 'true' : 'false'};
+  var DATE = ${JSON.stringify(dateState).replace(/</g, '\\u003c')};
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle')).filter(function(c){ return !c.hasAttribute('data-when'); });
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#whatsOnResults > .venue-card'));
+  var summary = document.getElementById('whatsOnResultsSummary');
+  var showBtn = document.getElementById('whatsOnShowResults');
+  var clearBtn = document.getElementById('whatsOnClearFilters');
+  var empty = document.getElementById('whatsOnNoResults');
+  var emptyInventory = document.getElementById('whatsOnEmptyInventory');
+  var results = document.getElementById('whatsOnResults');
+  var selectedBox = document.getElementById('whatsOnSelected');
+  var regionStatus = document.getElementById('whatsOnRegionStatus'), categoryStatus = document.getElementById('whatsOnCategoryStatus');
+  if (!chips.length) return;
+  ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
+  ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
+  function summaryText(shown, total, filtered){ var noun = total === 1 ? 'event' : 'events'; return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' ' + noun); }
+  var groupsRoot = document.querySelector('.outdoor-region-groups');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.outdoor-region-group-block'));
+  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 899px)') : null;
+  function setGroupOpen(block, open){ var t = block.querySelector('.outdoor-region-group-toggle'), l = block.querySelector('.outdoor-region-group-chips'); if (!t || !l) return; t.setAttribute('aria-expanded', open ? 'true' : 'false'); l.hidden = !open; }
+  function updateGroupHeaders(){
+    groups.forEach(function(block){
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      var sel = block.querySelector('.outdoor-region-group-selected');
+      if (sel) { sel.textContent = groupSelectedText(n); sel.hidden = n === 0; }
+      block.classList.toggle('has-selection', n > 0);
+    });
+  }
+  if (groupsRoot) groupsRoot.classList.add('js');
+  groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
+  function selected(kind){ return chips.filter(function(c){ return c.getAttribute('data-' + kind) && c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute('data-' + kind); }); }
+  function cardData(card){ return { region: card.getAttribute('data-event-region'), cats: (card.getAttribute('data-event-categories') || '').split(',').filter(Boolean), valley: card.getAttribute('data-event-valley-wide') === '1' }; }
+  function cardMatches(d, regions, categories){ return matches(d.valley ? [] : regions, categories, d.region, d.cats); }
+  var allRegionKeys = Object.keys(LABELS.regions);
+  function updateChipCounts(regions, categories){
+    var regionCounts = {}, categoryCounts = {};
+    cards.forEach(function(card){
+      var d = cardData(card);
+      if (cardMatches(d, [], categories)) { (d.valley ? allRegionKeys : [d.region]).forEach(function(r){ regionCounts[r] = (regionCounts[r] || 0) + 1; }); }
+      if (cardMatches(d, regions, [])) d.cats.forEach(function(c){ categoryCounts[c] = (categoryCounts[c] || 0) + 1; });
+    });
+    chips.forEach(function(c){
+      var r = c.getAttribute('data-region'), k = c.getAttribute('data-category'), n = c.querySelector('.outdoor-activity-count');
+      if (!n) return;
+      var count = r ? (regionCounts[r] || 0) : (categoryCounts[k] || 0);
+      n.textContent = String(count);
+      var noun = c.querySelector('.outdoor-activity-count-noun'); if (noun) noun.textContent = count === 1 ? 'event' : 'events';
+    });
+  }
+  function updateStepStatus(el, n){ if (!el) return; el.textContent = n ? (n + ' selected') : ''; el.hidden = n === 0; }
+  function renderSelected(regions, categories){
+    if (!selectedBox) return;
+    var any = regions.length || categories.length;
+    function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
+    function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
+    var html = row('Regions', regions.map(function(r){ return tag('region', r, LABELS.regions[r] || r); }))
+      + row('Categories', categories.map(function(k){ return tag('category', k, LABELS.categories[k] || k); }));
+    if (any) html += '<button type="button" class="outdoor-selected-clear" id="whatsOnSelectedClear">Clear all</button>';
+    selectedBox.innerHTML = html; selectedBox.hidden = !any;
+  }
+  function queryFor(regions, categories, date){
+    var d = date || DATE, q = [];
+    if (d.when) q.push('when=' + encodeURIComponent(d.when));
+    if (d.when === 'custom') { if (d.from) q.push('from=' + encodeURIComponent(d.from)); if (d.to) q.push('to=' + encodeURIComponent(d.to)); }
+    if (regions.length) q.push('regions=' + regions.join(','));
+    if (categories.length) q.push('categories=' + categories.join(','));
+    return q.length ? '?' + q.join('&') : '';
+  }
+  function dateParamsOf(search){ var p = new URLSearchParams(search); return { when: p.get('when') || '', from: p.get('from') || '', to: p.get('to') || '' }; }
+  function apply(historyMode){
+    var regions = selected('region'), categories = selected('category');
+    var shown = 0;
+    cards.forEach(function(card){ var d = cardData(card); var ok = cardMatches(d, regions, categories); card.hidden = !ok; if (ok) shown++; });
+    var total = cards.length, filtered = regions.length || categories.length;
+    if (summary) summary.textContent = summaryText(shown, total, filtered);
+    updateGroupHeaders(); updateChipCounts(regions, categories);
+    updateStepStatus(regionStatus, regions.length); updateStepStatus(categoryStatus, categories.length);
+    renderSelected(regions, categories);
+    if (showBtn) { showBtn.textContent = filtered ? ('Show ' + shown + ' result' + (shown === 1 ? '' : 's')) : 'Show all results'; showBtn.hidden = !INVENTORY; }
+    if (clearBtn) clearBtn.hidden = !filtered;
+    if (emptyInventory) emptyInventory.hidden = INVENTORY;
+    if (empty) empty.hidden = !(INVENTORY && shown === 0);
+    // Date links carry the live region/category selection to the server.
+    Array.prototype.forEach.call(document.querySelectorAll('a[data-when]'), function(a){ a.setAttribute('href', window.location.pathname + queryFor(regions, categories, { when: a.getAttribute('data-when') })); });
+    if (results) results.hidden = shown === 0;
+    var next = window.location.pathname + queryFor(regions, categories) + window.location.hash;
+    if (window.history && historyMode !== 'none') {
+      if (historyMode === 'push' && window.history.pushState && next !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState({ whatson: true }, '', next);
+      else if (window.history.replaceState) window.history.replaceState({ whatson: true }, '', next);
+    }
+  }
+  function setPressed(kind, value, on){ chips.forEach(function(c){ if (c.getAttribute('data-' + kind) === value) c.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
+  chips.forEach(function(chip){ chip.addEventListener('click', function(){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }); });
+  function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); }
+  if (clearBtn) clearBtn.addEventListener('click', clearAll);
+  var emptyClear = document.getElementById('whatsOnNoResultsClear');
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  if (selectedBox) selectedBox.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
+    if (t.id === 'whatsOnSelectedClear') { clearAll(); return; }
+    var r = t.getAttribute('data-remove-region'), k = t.getAttribute('data-remove-category');
+    if (r) { setPressed('region', r, false); apply('push'); }
+    else if (k) { setPressed('category', k, false); apply('push'); }
+  });
+  if (showBtn) showBtn.addEventListener('click', function(){ var t = document.getElementById('whatsOnResultsTop'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  function readUrlIntoChips(){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var pre = { region: (params.get('regions') || '').split(',').filter(Boolean), category: (params.get('categories') || '').split(',').filter(Boolean) };
+      chips.forEach(function(c){ ['region', 'category'].forEach(function(k){ var v = c.getAttribute('data-' + k); if (v) c.setAttribute('aria-pressed', pre[k].indexOf(v) !== -1 ? 'true' : 'false'); }); });
+    } catch (e) {}
+  }
+  function openGroupsForSelection(){
+    groups.forEach(function(block){
+      var isDefault = block.getAttribute('data-region-group') === '${OUTDOOR_REGION_GROUP_DEFAULT_OPEN}';
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
+    });
+  }
+  // Back/Forward: region/category state is re-read from the URL as before; a
+  // change to the date parameters means a different server-selected window,
+  // so the page reloads to render it.
+  window.addEventListener('popstate', function(){
+    var d = dateParamsOf(window.location.search);
+    if (d.when !== DATE.when || d.from !== DATE.from || d.to !== DATE.to) { window.location.reload(); return; }
+    readUrlIntoChips(); openGroupsForSelection(); apply('none');
+  });
+  var customToggle = document.getElementById('whatsOnCustomToggle'), customForm = document.getElementById('whatsOnCustomDates');
+  if (customToggle && customForm) {
+    customToggle.addEventListener('click', function(){ var open = customForm.hidden; customForm.hidden = !open; customToggle.setAttribute('aria-expanded', open ? 'true' : 'false'); if (open) { var f = document.getElementById('whatsOnFrom'); if (f && f.focus) f.focus(); } });
+    customForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var f = document.getElementById('whatsOnFrom'), t = document.getElementById('whatsOnTo');
+      window.location.assign(window.location.pathname + queryFor(selected('region'), selected('category'), { when: 'custom', from: f ? f.value : '', to: t ? t.value : '' }));
+    });
+  }
+  readUrlIntoChips(); openGroupsForSelection(); apply('replace');
+  // Description clamp / Read more for event cards (same behaviour as the themed venue cards).
+  var MORE = 'Read more \\u2192', LESS = 'Read less \\u2191';
+  cards.forEach(function(card){
+    var desc = card.querySelector('.golf-desc'), btn = card.querySelector('.desc-toggle'); if (!desc || !btn) return;
+    var p = desc.querySelector('p'); if (!p) return;
+    desc.classList.add('is-clamped'); btn.hidden = !(p.scrollHeight > p.clientHeight + 1);
+    btn.addEventListener('click', function(){ var expanded = btn.getAttribute('aria-expanded') === 'true'; desc.classList.toggle('is-clamped', expanded); btn.setAttribute('aria-expanded', expanded ? 'false' : 'true'); btn.textContent = expanded ? MORE : LESS; });
+  });
+})();
+</script>`;
+}
+// GET /whats-on -- the page. `filter` is parseWhatsOnFilterQuery(query).
+function renderWhatsOnPage(filter = null) {
+  const selectedRegions = filter ? filter.regions : [];
+  const selectedCategories = filter ? filter.categories : [];
+  // Step 6: the date window is resolved server-side from ?when= / ?from=&to=
+  // (default: the rolling next 30 days) and selects the events rendered;
+  // region/category chips then filter that set exactly as before.
+  const window = resolveWhatsOnWindow(filter || {});
+  const events = getWhatsOnEvents(window);
+  const matching = filterWhatsOnEvents(events, selectedRegions, selectedCategories);
+  const filtered = selectedRegions.length > 0 || selectedCategories.length > 0;
+  const hasInventory = whatsOnInventoryExists();
+  const counts = hasInventory ? {
+    regions: Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, filterWhatsOnEvents(events, [], selectedCategories).filter((e) => e.valleyWide || e.region === r).length])),
+    categories: Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, filterWhatsOnEvents(events, selectedRegions, []).filter((e) => (e.categories || []).includes(c.key)).length])),
+  } : null;
+  const dateState = { when: window.preset === 'upcoming' ? '' : (window.preset === 'custom' ? 'custom' : window.preset), from: window.preset === 'custom' ? window.from : '', to: window.preset === 'custom' ? window.to : '' };
+  const heading = "What's On in the Okanagan";
+  const title = `${heading} | Okanagan Roam`;
+  const description = 'Discover what is happening across the Okanagan Valley: festivals, live music, markets, wine events, family days and more, by community and by category.';
+  const canonical = 'https://okanaganroam.com/whats-on';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: "What's On", url: canonical },
+  ]);
+  // Step 6: every event in the window is rendered (non-matching cards start
+  // hidden) so a shared pre-filtered URL can still reveal the rest when a
+  // chip is unselected -- the client script only shows/hides cards.
+  const matchingIds = new Set(matching.map((e) => e.id));
+  const cardsHtml = events.length
+    ? `<ul class="card-grid" id="whatsOnResults"${matching.length ? '' : ' hidden'}>${events.map((e) => (matchingIds.has(e.id) ? whatsOnEventCardHtml(e) : whatsOnEventCardHtml(e).replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden'))).join('')}
+  </ul>`
+    : `<ul class="card-grid" id="whatsOnResults" hidden></ul>`;
+  // Body classes: `golf-page` is the site's themed category-page namespace
+  // (Golf, Beaches and Outdoors all carry it -- see themedBodyClassAttr): it
+  // scopes the homepage header/nav/button system, h1, breadcrumb, card grid,
+  // venue card and teal-marker heading rules. `outdoor-page` scopes the
+  // explorer interaction components this page mirrors (region chips, image
+  // tile toggles, step headings, selected-filter rows). Neither class is
+  // Golf- or Outdoors-specific styling copied for convenience; both are the
+  // shared rule sets, reused unchanged. `whatson-page` is the primary
+  // namespace for everything specific to this page (renderWhatsOnStyles).
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, outdoorTheme: true, noindex: !hasInventory })}
+${renderWhatsOnStyles()}
+${renderAnalyticsHeadHtml()}
+</head>
+<body class="golf-page outdoor-page whatson-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: "What's On" },
+  ])}
+  <h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro">Festivals on the lakeshore, live music in the vineyards, farmers’ markets, hockey nights and holiday lights — there is always something happening somewhere in the valley. Pick the communities you will be in and the kinds of things you want to do; leave both empty to see everything that is on.</p>
+  <section class="outdoor-step" aria-labelledby="whatsOnRegionsHeading">
+  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="whatsOnRegionsHeading">Choose Region(s)</h2><span class="outdoor-step-status" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span></div>
+  ${whatsOnRegionChipsHtml({ selectedRegions, counts: counts ? counts.regions : null })}
+  </section>
+  ${whatsOnCategoryGridHtml({ selectedCategories, counts: counts ? counts.categories : null })}
+  ${hasInventory ? whatsOnDateStepHtml({ window }) : ''}
+  <div class="outdoor-filter-actions">
+    <button type="button" class="cta outdoor-show-results" id="whatsOnShowResults"${hasInventory ? '' : ' hidden'}>${filtered ? `Show ${matching.length} result${matching.length === 1 ? '' : 's'}` : 'Show all results'}</button>
+    <button type="button" class="outdoor-clear-filters" id="whatsOnClearFilters"${filtered ? '' : ' hidden'}>Clear all</button>
+  </div>
+  <section class="outdoor-step outdoor-step-results" aria-labelledby="whatsOnResultsTop">
+  <h2 class="category-subsection-heading" id="whatsOnResultsTop">Results</h2>
+  <p class="outdoor-results-summary" id="whatsOnResultsSummary" aria-live="polite">${escapeHtml(whatsOnSummaryText(matching.length, events.length, filtered))}</p>
+  ${whatsOnSelectedTagsHtml(selectedRegions, selectedCategories)}
+  <div class="whatson-empty" id="whatsOnEmptyInventory"${hasInventory ? ' hidden' : ''}>
+    <h3>We’re gathering what’s on.</h3>
+    <p>Okanagan Roam is building its What’s On listings community by community. Your region and category choices are saved in the address bar, so this page is ready the moment the first events arrive — in the meantime, <a href="/outdoors">explore the outdoors</a> or <a href="/trip">start planning a trip</a>.</p>
+  </div>
+  <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 ? '' : ' hidden'}>No events match that combination yet. <a href="/whats-on" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
+  ${cardsHtml}
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${renderWhatsOnFilterScriptHtml({ hasInventory, dateState })}
+</body>
+</html>`;
+}
+
 // GET /:region/:category/:slug — individual venue page
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const regionLabel = REGION_LABELS[venue.region];
@@ -7131,75 +8590,201 @@ const EVENT_SCHEMA_TYPE_MAP = {
   concert: 'MusicEvent',
 };
 
-function renderEventPage(event, hostVenue) {
-  const regionLabel = REGION_LABELS[event.region];
-  const canonical = `https://okanaganroam.com/${event.region}/events/${event.slug}`;
-  const title = `${event.name} \u2014 Event in ${regionLabel}, BC | Okanagan Roam`;
-  const rawDesc = event.description || `${event.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`;
-  const description = rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc;
-  const expired = isEventExpired(event);
-
-  const breadcrumb = breadcrumbListSchema([
-    { name: 'Home', url: 'https://okanaganroam.com/' },
-    { name: regionLabel, url: `https://okanaganroam.com/${event.region}` },
-    { name: event.name, url: canonical },
-  ]);
-
-  // schema.org Event — a distinct, correct type from the LocalBusiness
-  // subtypes used for venues; only conditionally-real fields are included,
-  // matching the existing venue JSON-LD's "never fabricate" convention.
-  const eventSchema = {
+// ---------- What's On, Step 5 (2026-09-22): event detail page -------------
+// The frozen detail page (design §L / "FINAL DESIGN DECISIONS" §9): built
+// on the same pageHead/siteHeader/breadcrumb/footer foundation as before,
+// now rendering the event's materialised occurrences (Step 3) in
+// chronological order, its categories, venue (row or text), image, an
+// attribution line for calendar-sourced rows, and Favorite / Add to Trip
+// controls that use the exact localStorage contract the homepage, Golf
+// and What's On cards share (HOLDER = [data-venue-category="whatson"]).
+// Times and dates are the stored America/Vancouver civil values -- never
+// computed from the process clock, never invented. Legacy rows with no
+// occurrence rows (only the Phase 1 fixtures) fall back to their stored
+// span text and get NO Event JSON-LD.
+const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function formatLocalDateLong(dateStr, { year = true, weekday = true } = {}) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const core = `${MONTH_LONG[m - 1]} ${d}${year ? `, ${y}` : ''}`;
+  return weekday ? `${WEEKDAY_LONG[localWeekday(dateStr)]}, ${core}` : core;
+}
+// One occurrence -> { dateText, timeText } from stored values only.
+function describeEventOccurrence(o) {
+  const sameYear = o.start_date.slice(0, 4) === o.end_date.slice(0, 4);
+  const dateText = o.start_date === o.end_date
+    ? formatLocalDateLong(o.start_date)
+    : `${formatLocalDateLong(o.start_date, { year: !sameYear })} – ${formatLocalDateLong(o.end_date)}`;
+  let timeText = '';
+  if (o.all_day === 1) timeText = 'All day';
+  else if (o.start_time && o.end_time) timeText = `${formatLocalTime(o.start_time)} – ${formatLocalTime(o.end_time)}${o.ends_next_day === 1 ? ' (next day)' : ''}`;
+  else if (o.start_time) timeText = formatLocalTime(o.start_time);
+  return { dateText, timeText };
+}
+// schema.org subtype: the stored `type` hint first, else the primary category.
+const WHATSON_CATEGORY_SCHEMA_TYPE = { 'sports-recreation': 'SportsEvent', 'live-music': 'MusicEvent', 'events-festivals': 'Festival' };
+function eventSchemaType(event, categories) {
+  if (event.type && EVENT_SCHEMA_TYPE_MAP[event.type]) return EVENT_SCHEMA_TYPE_MAP[event.type];
+  return WHATSON_CATEGORY_SCHEMA_TYPE[categories[0]] || 'Event';
+}
+function occurrenceIsoStart(o) { return o.all_day === 1 || !o.start_time ? o.start_date : toVancouverIso(o.start_date, o.start_time); }
+function occurrenceIsoEnd(o) {
+  const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date, 1) : o.end_date;
+  return o.all_day === 1 || !o.end_time ? endDate : toVancouverIso(endDate, o.end_time);
+}
+// JSON-LD for a scheduled event with real occurrences: the next upcoming
+// occurrence (or the first, when all are past) is the Event; further
+// occurrences become subEvent entries (cap 10). Nothing is emitted for a
+// cancelled/postponed row or a row with no occurrences.
+function eventJsonLd(event, occurrences, categories, hostVenue, canonical, todayStr) {
+  if (event.status !== 'scheduled' || !occurrences.length) return null;
+  const upcoming = occurrences.filter((o) => o.end_date >= todayStr);
+  const main = upcoming[0] || occurrences[0];
+  const others = occurrences.filter((o) => o.id !== main.id && o.end_date >= todayStr).slice(0, 10);
+  const schemaType = eventSchemaType(event, categories);
+  const location = hostVenue
+    ? { '@type': 'Place', name: hostVenue.name, address: hostVenue.address || undefined }
+    : { '@type': 'Place', name: event.venue_name_text || (event.valley_wide === 1 ? 'Okanagan Valley, BC' : REGION_LABELS[event.region]) };
+  const sub = (o) => ({
+    '@type': schemaType,
+    name: o.label ? `${event.name} – ${o.label}` : event.name,
+    startDate: occurrenceIsoStart(o),
+    endDate: occurrenceIsoEnd(o),
+    location,
+  });
+  return {
     '@context': 'https://schema.org',
-    '@type': EVENT_SCHEMA_TYPE_MAP[event.type] || 'Event',
-    name: event.name,
+    '@type': schemaType,
+    name: main.label ? `${event.name} – ${main.label}` : event.name,
     description: event.description || undefined,
-    startDate: event.start_datetime ? event.start_datetime.replace(' ', 'T') : undefined,
-    endDate: event.end_datetime ? event.end_datetime.replace(' ', 'T') : undefined,
+    startDate: occurrenceIsoStart(main),
+    endDate: occurrenceIsoEnd(main),
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     eventStatus: 'https://schema.org/EventScheduled',
     url: canonical,
-    location: hostVenue
-      ? { '@type': 'Place', name: hostVenue.name, address: hostVenue.address || undefined }
-      : { '@type': 'Place', name: regionLabel },
+    image: event.image_url || undefined,
+    location,
+    subEvent: others.length ? others.map(sub) : undefined,
   };
+}
+function renderEventPage(event, hostVenue, opts = {}) {
+  const now = opts.now || new Date();
+  const todayStr = todayLocal(now);
+  const full = getEventById(event.id) || event; // status/source/venue text when the caller passed a bare rowToEvent()
+  const regionLabel = REGION_LABELS[full.region];
+  const canonical = `https://okanaganroam.com/${full.region}/events/${full.slug}`;
+  const title = `${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`;
+  const rawDesc = full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`;
+  const description = rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc;
+  const expired = isEventExpired(full, now);
+  const occurrences = listEventOccurrences(full.id, { includeCancelled: false });
+  const categories = getEventCategoryKeys(full.id);
+  const isSeries = occurrences.length > 1;
+  const upcoming = occurrences.filter((o) => o.end_date >= todayStr);
 
-  const dateRangeText = event.end_datetime && event.end_datetime !== event.start_datetime
-    ? `${event.start_datetime} \u2013 ${event.end_datetime}`
-    : event.start_datetime;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: regionLabel, url: `https://okanaganroam.com/${full.region}` },
+    { name: full.name, url: canonical },
+  ]);
+  const eventSchema = eventJsonLd(full, occurrences, categories, hostVenue, canonical, todayStr);
 
+  // When: single date / span, or the series list; legacy rows fall back to
+  // the stored span text exactly as before.
+  let whenHtml;
+  if (!occurrences.length) {
+    const dateRangeText = full.end_datetime && full.end_datetime !== full.start_datetime ? `${full.start_datetime} – ${full.end_datetime}` : full.start_datetime;
+    whenHtml = escapeHtml(dateRangeText);
+  } else if (!isSeries) {
+    const d = describeEventOccurrence(occurrences[0]);
+    whenHtml = `${escapeHtml(d.dateText)}${d.timeText ? ` &middot; ${escapeHtml(d.timeText)}` : ''}`;
+  } else {
+    const next = upcoming[0];
+    whenHtml = `${occurrences.length} dates${next ? ` &middot; next: ${escapeHtml(describeEventOccurrence(next).dateText)}` : ' &middot; all dates have passed'}`;
+  }
+  const datesListHtml = isSeries ? `
+  <section class="event-dates" aria-labelledby="eventDatesHeading">
+    <h2 id="eventDatesHeading">All dates</h2>
+    <ol class="event-date-list">
+${occurrences.map((o) => {
+    const d = describeEventOccurrence(o);
+    const past = o.end_date < todayStr;
+    return `      <li class="event-date${past ? ' event-date-past' : ''}"><span class="event-date-when">${escapeHtml(d.dateText)}${d.timeText ? ` &middot; ${escapeHtml(d.timeText)}` : ''}</span>${o.label ? ` <span class="event-date-label">${escapeHtml(o.label)}</span>` : ''}${past ? ' <span class="event-date-past-tag">(past)</span>' : ''}</li>`;
+  }).join('\n')}
+    </ol>
+  </section>` : '';
+
+  const venueHtml = hostVenue
+    ? `<a href="/${hostVenue.region}/${CATEGORY_SLUGS[hostVenue.type]}/${hostVenue.slug}">${escapeHtml(hostVenue.name)}</a>${hostVenue.address ? ` &middot; ${escapeHtml(hostVenue.address)}` : ''}`
+    : (full.venue_name_text ? escapeHtml(full.venue_name_text) : (full.valley_wide === 1 ? 'Across the Okanagan Valley' : null));
+  const attribution = full.source_type && !EVENT_OFFICIAL_SOURCE_TYPES.includes(full.source_type) && full.source_name
+    ? `<p class="event-attribution">Listed by ${escapeHtml(full.source_name)}</p>` : '';
+  const chips = categories.filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
   const detailRows = [
-    ['When', escapeHtml(dateRangeText)],
-    event.recurrence_rule ? ['Recurs', escapeHtml(event.recurrence_rule)] : null,
-    ['Region', `<a href="/${event.region}">${escapeHtml(regionLabel)}</a>`],
-    hostVenue ? ['Venue', `<a href="/${hostVenue.region}/${CATEGORY_SLUGS[hostVenue.type]}/${hostVenue.slug}">${escapeHtml(hostVenue.name)}</a>`] : null,
-    event.website ? ['Website', `<a href="${escapeHtml(event.website)}" rel="nofollow noopener" target="_blank">${escapeHtml(event.website)}</a>`] : null,
+    ['When', whenHtml],
+    full.recurrence_rule ? ['Recurs', escapeHtml(full.recurrence_rule)] : null,
+    venueHtml ? ['Where', venueHtml] : null,
+    ['Region', `<a href="/${full.region}">${escapeHtml(regionLabel)}</a>`],
+    full.website ? ['Website', `<a href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">${escapeHtml(full.website)}</a>`] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
-
-  const imageHtml = event.image_url
-    ? `<img src="${escapeHtml(event.image_url)}" alt="${escapeHtml(event.name)}" style="width:100%;max-height:340px;object-fit:cover;border-radius:10px;margin-bottom:20px;">`
+  const imageHtml = full.image_url
+    ? `<img src="${escapeHtml(full.image_url)}" alt="${escapeHtml(full.name)}" style="width:100%;max-height:340px;object-fit:cover;border-radius:10px;margin-bottom:20px;">`
     : '';
+  const tripQuery = `${full.name}, ${regionLabel}, Okanagan Valley, BC`;
+  const actionsHtml = `
+  <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}" data-surface="event_page">
+    <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(full.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(full.name)}">&#9825; Favorite</button>
+    <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(full.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(full.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(full.name)} to trip">&#65291; Add to Trip</button>
+  </div>`;
+  const pageCtx = JSON.stringify({ event_id: full.id, event_name: full.name, event_region: full.region, surface: 'event_page' }).replace(/</g, '\\u003c');
+  const actionsScript = `<script>
+(function(){
+  var pageCtx = ${pageCtx};
+  function ctx(){ var c = {}; for (var k in pageCtx) c[k] = pageCtx[k]; return c; }
+  function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
+${golfFavTripScriptBody('whatson')}
+})();
+</script>`;
+  const statusNote = expired ? ' — this event has ended' : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, eventSchema], { noindex: expired })}
+${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { noindex: expired })}
+<style>
+  .event-actions { margin: 4px 0 18px; }
+  .event-actions .card-action { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid #cfd8dc; background: #fff; color: #1b2a33; font: inherit; font-size: 0.95rem; cursor: pointer; }
+  .event-actions .card-action.is-fav, .event-actions .card-action.in-trip { background: #2F6F73; border-color: #2F6F73; color: #fff; }
+  .event-attribution { color: #5f6b73; font-size: 0.9rem; margin: 4px 0 16px; }
+  .event-dates h2 { font-size: 1.1rem; margin: 24px 0 8px; }
+  .event-date-list { padding-left: 20px; margin: 0 0 20px; }
+  .event-date { margin: 4px 0; }
+  .event-date-label { color: #5f6b73; }
+  .event-date-past { color: #8a959b; }
+  .event-date-past-tag { font-size: 0.85rem; }
+</style>
 </head>
 <body>
-  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
-    { name: regionLabel, href: `/${event.region}` },
-    { name: event.name },
+    { name: regionLabel, href: `/${full.region}` },
+    { name: full.name },
   ])}
   ${imageHtml}
-  <h1>${escapeHtml(event.name)}</h1>
-  <p class="subtitle">Event in ${escapeHtml(regionLabel)}, BC${expired ? ' \u2014 this event has ended' : ''}</p>
-  <p>${escapeHtml(event.description || '')}</p>
+  <h1>${escapeHtml(full.name)}</h1>
+  <p class="subtitle">${isSeries ? 'Event series' : 'Event'} in ${escapeHtml(regionLabel)}, BC${statusNote}</p>
+  ${chips ? `<p class="chips">${chips}</p>` : ''}
+  ${actionsHtml}
+  <p>${escapeHtml(full.description || '')}</p>
   ${detailRows}
-  <a class="cta" href="/${event.region}">Explore all of ${escapeHtml(regionLabel)}</a>
+  ${datesListHtml}
+  ${attribution}
+  <a class="cta" href="/${full.region}">Explore all of ${escapeHtml(regionLabel)}</a>
   ${renderHomeFooterHTML(true)}
+  ${actionsScript}
 </body>
 </html>`;
 }
@@ -9228,6 +10813,115 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, merged_fields: result.mergedFields, canonical: result.canonical, duplicate: result.duplicate });
     }
 
+    // ---------- What's On, Step 4 (2026-09-22): event read/write API ----------
+    //
+    // Writes: the same bearer guard every other write route uses
+    // (ENRICHMENT_ADMIN_TOKEN, 503 fail-closed when unset, timing-safe 401),
+    // strict key allow-lists, then the Step 3 guarded writers -- the route
+    // layer never validates business rules itself, never touches tables and
+    // never logs a header. Reads: public, no auth, exactly the What's On
+    // card fields (see whatsOnPublicEvent) plus the resolved window.
+    if (pathname === '/api/events' || /^\/api\/events\/\d+(\/(categories|occurrences(\/\d+)?))?$/.test(pathname)) {
+      const eventRouteMatch = pathname.match(/^\/api\/events(?:\/(\d+)(?:\/(categories|occurrences)(?:\/(\d+))?)?)?$/);
+      const eventId = eventRouteMatch && eventRouteMatch[1] ? parseInt(eventRouteMatch[1], 10) : null;
+      const subResource = eventRouteMatch ? eventRouteMatch[2] || null : null;
+      const occurrenceId = eventRouteMatch && eventRouteMatch[3] ? parseInt(eventRouteMatch[3], 10) : null;
+      const isWrite = method !== 'GET' && method !== 'HEAD';
+
+      if (isWrite) {
+        if (!ENRICHMENT_ADMIN_TOKEN) {
+          return sendJSON(res, 503, { error: 'Event write endpoints are not configured.' });
+        }
+        const authHeader = req.headers['authorization'] || '';
+        const match = /^Bearer (.+)$/.exec(authHeader);
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+          return sendJSON(res, 401, { error: 'Unauthorized.' });
+        }
+        let body;
+        try {
+          body = await readBody(req);
+        } catch (err) {
+          return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+        }
+        if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+          return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        }
+        const unexpectedKeys = (allowed) => Object.keys(body).filter((k) => !allowed.includes(k));
+        const rejectUnexpected = (allowed) => {
+          const unexpected = unexpectedKeys(allowed);
+          if (!unexpected.length) return false;
+          sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+          return true;
+        };
+        const metaFromBody = () => ({
+          reason: body.reason, batch_id: body.batch_id, reviewed_by: body.reviewed_by,
+          reviewed_duplicates: body.reviewed_duplicates, event_status: body.event_status,
+        });
+        const respond = (result, successStatus = 200) => {
+          if (result.ok) return sendJSON(res, successStatus, result);
+          return sendJSON(res, EVENT_WRITE_STATUS_MAP[result.reason] || 400, { error: result.reason, detail: result.detail });
+        };
+        try {
+          if (pathname === '/api/events' && method === 'POST') {
+            if (rejectUnexpected([...EVENT_CREATE_FIELDS, ...EVENT_META_KEYS])) return;
+            const data = {};
+            for (const k of EVENT_CREATE_FIELDS) if (Object.prototype.hasOwnProperty.call(body, k)) data[k] = body[k];
+            return respond(createEvent(data, metaFromBody()), 201);
+          }
+          if (eventId !== null && subResource === null && method === 'PUT') {
+            if (rejectUnexpected([...EVENT_UPDATE_FIELDS, ...EVENT_META_KEYS])) return;
+            const data = {};
+            for (const k of EVENT_UPDATE_FIELDS) if (Object.prototype.hasOwnProperty.call(body, k)) data[k] = body[k];
+            return respond(updateEvent(eventId, data, metaFromBody()));
+          }
+          if (eventId !== null && subResource === 'categories' && occurrenceId === null && method === 'PUT') {
+            if (rejectUnexpected(['categories', ...EVENT_META_KEYS])) return;
+            return respond(replaceEventCategories(eventId, body.categories, metaFromBody()));
+          }
+          if (eventId !== null && subResource === 'occurrences' && occurrenceId === null && method === 'POST') {
+            if (rejectUnexpected(['occurrences', ...EVENT_META_KEYS])) return;
+            return respond(upsertEventOccurrences(eventId, body.occurrences, metaFromBody()));
+          }
+          if (eventId !== null && subResource === 'occurrences' && occurrenceId !== null && method === 'PATCH') {
+            if (rejectUnexpected(['status', ...EVENT_META_KEYS])) return;
+            return respond(setEventOccurrenceStatus(eventId, occurrenceId, body.status, metaFromBody()));
+          }
+        } catch (err) {
+          // Writers roll back before rethrowing; surface a plain message,
+          // never the request (which would carry the Authorization header).
+          return sendJSON(res, 500, { error: 'Event write failed and was rolled back.', detail: String(err.message || err) });
+        }
+        return sendJSON(res, 405, { error: 'Method not allowed.' });
+      }
+
+      // ---- public reads (no auth) ----
+      if (pathname === '/api/events' && method === 'GET') {
+        return sendJSON(res, 200, listWhatsOnEventsPublic(query));
+      }
+      if (eventId !== null && subResource === null && method === 'GET') {
+        const event = getEventById(eventId);
+        if (!event) return sendJSON(res, 404, { error: 'Event not found' });
+        // A valid bearer token unlocks the full stored record (source
+        // fields, confidence, every occurrence incl. cancelled) so the
+        // executor can verify its own writes field by field; a token that
+        // is absent or wrong is simply ignored and the public shape is
+        // returned -- it never produces an error that could probe the guard.
+        const authHeader = req.headers['authorization'] || '';
+        const bearer = /^Bearer (.+)$/.exec(authHeader);
+        const verified = !!(ENRICHMENT_ADMIN_TOKEN && bearer && safeTokenEquals(bearer[1], ENRICHMENT_ADMIN_TOKEN));
+        if (verified) {
+          return sendJSON(res, 200, { event, categories: getEventCategoryKeys(eventId), occurrences: listEventOccurrences(eventId) });
+        }
+        return sendJSON(res, 200, whatsOnPublicEventDetail(event));
+      }
+      if (eventId !== null && subResource === 'occurrences' && occurrenceId === null && method === 'GET') {
+        const event = getEventById(eventId);
+        if (!event) return sendJSON(res, 404, { error: 'Event not found' });
+        return sendJSON(res, 200, { id: eventId, occurrences: listEventOccurrences(eventId, { includeCancelled: false }).map(whatsOnPublicOccurrence) });
+      }
+      return sendJSON(res, 405, { error: 'Method not allowed.' });
+    }
+
     // GET /api/venues
     if (pathname === '/api/venues' && method === 'GET') {
       return sendJSON(res, 200, listVenues(query));
@@ -9491,13 +11185,23 @@ const server = http.createServer(async (req, res) => {
     // below (which would otherwise treat "events" as an unrecognized
     // region and 404 it). Same active-event criteria the old homepage
     // Happening Soon strip used, with no LIMIT — see renderEventsIndexPage().
+    // GET /whats-on -- What's On page shell (2026-09-22). Filter state
+    // comes from ?regions=&categories= (see parseWhatsOnFilterQuery).
+    if ((pathname === '/whats-on' || pathname === '/whats-on/') && method === 'GET') {
+      const html = renderWhatsOnPage(parseWhatsOnPageQuery(query));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(html);
+    }
+
     if (pathname === '/events' && method === 'GET') {
+      // What's On Step 2: "upcoming" is decided on the Okanagan local date
+      // (see isEventExpired / ACTIVE_EVENT_DATE_SQL), not on SQLite's UTC
+      // datetime('now'), so an event stays listed through its last local day.
       const events = db.prepare(`
         SELECT * FROM events
-        WHERE (end_datetime IS NOT NULL AND end_datetime >= datetime('now'))
-           OR (end_datetime IS NULL AND start_datetime >= datetime('now'))
+        WHERE ${ACTIVE_EVENT_DATE_SQL}
         ORDER BY start_datetime ASC
-      `).all().map(rowToEvent);
+      `).all(todayLocal()).map(rowToEvent);
       const html = renderEventsIndexPage(events);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(html);
@@ -9515,7 +11219,10 @@ const server = http.createServer(async (req, res) => {
       const [, region, slug] = eventPageMatch;
       if (REGION_LABELS[region]) {
         const event = findEventBySlug(region, slug);
-        if (event) {
+        // Step 5: only publishable (status = scheduled) events have a page;
+        // cancelled/postponed rows 404 like a missing slug. Expired but
+        // scheduled events still render 200 + noindex (unchanged).
+        if (event && (getEventById(event.id) || {}).status === 'scheduled') {
           const hostVenue = event.venue_id ? getVenue(event.venue_id) : null;
           const html = renderEventPage(event, hostVenue);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -9762,6 +11469,65 @@ module.exports = {
   findEventBySlug,
   isEventExpired,
   listEventsForSitemap,
+  // What's On Step 2: local-date helpers (America/Vancouver civil dates)
+  OKANAGAN_TIME_ZONE,
+  todayLocal,
+  parseLocalDate,
+  addLocalDays,
+  localDaysBetween,
+  localWeekday,
+  dateWindowForPreset,
+  customDateWindow,
+  localRangesOverlap,
+  vancouverOffsetFor,
+  toVancouverIso,
+  eventLocalEndDate,
+  ACTIVE_EVENT_DATE_SQL,
+  // What's On Step 3: event data layer + guarded writers (internal; no route yet)
+  EVENT_STATUSES,
+  EVENT_OCCURRENCE_STATUSES,
+  EVENT_CONFIDENCES,
+  EVENT_SOURCE_TYPES,
+  EVENT_OFFICIAL_SOURCE_TYPES,
+  EVENT_MAX_CATEGORIES,
+  EVENT_CREATE_FIELDS,
+  EVENT_UPDATE_FIELDS,
+  validateEventCategories,
+  validateEventOccurrence,
+  validateEventOccurrenceSet,
+  validateEventVenue,
+  validateEventScalars,
+  findDuplicateEventCandidates,
+  recomputeEventSpan,
+  getEventById,
+  getEventCategoryKeys,
+  listEventOccurrences,
+  countScheduledOccurrences,
+  createEvent,
+  updateEvent,
+  replaceEventCategories,
+  upsertEventOccurrences,
+  setEventOccurrenceStatus,
+  WHATSON_DEFAULT_WINDOW_DAYS,
+  resolveWhatsOnWindow,
+  formatLocalDateShort,
+  formatLocalTime,
+  whatsOnDateLabel,
+  whatsOnTimeLabel,
+  queryWhatsOnEvents,
+  whatsOnCountsFor,
+  // What's On Step 5: detail page helpers
+  formatLocalDateLong,
+  describeEventOccurrence,
+  eventSchemaType,
+  eventJsonLd,
+  // What's On Step 4: API plumbing
+  EVENT_WRITE_STATUS_MAP,
+  EVENT_META_KEYS,
+  whatsOnPublicEvent,
+  whatsOnPublicEventDetail,
+  parseWhatsOnReadQuery,
+  listWhatsOnEventsPublic,
   renderEventPage,
   pageHead,
   // Events index (2026-09-17)
@@ -9841,6 +11607,25 @@ module.exports = {
   outdoorRegionGroupSlug,
   renderOutdoorActivityFilterChips,
   renderOutdoorFilterScriptHtml,
+  // What's On (2026-09-22)
+  WHATSON_CATEGORIES,
+  WHATSON_CATEGORY_BY_KEY,
+  WHATSON_DATE_PRESETS,
+  whatsOnCategoryImagePath,
+  getWhatsOnEvents,
+  whatsOnInventoryExists,
+  parseWhatsOnFilterQuery,
+  parseWhatsOnPageQuery,
+  filterWhatsOnEvents,
+  whatsOnRegionChipsHtml,
+  whatsOnCategoryTileHtml,
+  whatsOnCategoryGridHtml,
+  whatsOnEventCardHtml,
+  whatsOnSelectedTagsHtml,
+  whatsOnSummaryText,
+  renderWhatsOnStyles,
+  renderWhatsOnFilterScriptHtml,
+  renderWhatsOnPage,
   OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,
   renderOutdoorActivityPage,
   // Golf venue page polish (2026-09-20)
