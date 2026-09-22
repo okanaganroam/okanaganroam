@@ -3543,6 +3543,88 @@ test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, u
 // Same publication predicate as the sitemap and the event-page block; the
 // section is omitted entirely below MIN_REGION_EVENTS, so a one-event or
 // zero-event region keeps its existing page exactly as before.
+// ---- H1 mid-span date display (2026-09-22) ----
+// The list helpers pick the next scheduled occurrence that has not finished.
+// For a multi-day occurrence already under way that occurrence STARTED in the
+// past, and printing its start date showed a visitor a date that had gone.
+// upcomingEventDateLabel() prints "Until {end}" in that case only; every other
+// event keeps the exact label it had before.
+test('H1 mid-span dates: a card for an in-progress multi-day event shows its end date, single-date and future events are unchanged, and all three H1 helpers carry the end date', () => {
+  const NOW = new Date('2026-09-22T12:00:00-07:00');
+  const label = (a, b) => app.upcomingEventDateLabel(a, b, NOW);
+
+  // The bug: next occurrence is mid-span, so its start date is in the past.
+  assert.equal(label('2026-06-13', '2026-10-25'), 'Until Sun Oct 25', 'mid-span -> end date');
+  assert.equal(label('2026-09-11', '2026-09-29'), 'Until Tue Sep 29', 'mid-span -> end date');
+  assert.equal(label('2026-09-18', '2026-09-27'), 'Until Sun Sep 27', 'mid-span -> end date');
+
+  // Everything else keeps its previous wording exactly.
+  assert.equal(label('2026-09-22', '2026-09-22'), 'Tue Sep 22', 'single date today');
+  assert.equal(label('2026-09-26', '2026-09-26'), 'Sat Sep 26', 'ordinary single-date event');
+  assert.equal(label('2026-11-30', '2026-11-30'), 'Mon Nov 30', 'ordinary future event');
+  assert.equal(label('2026-10-02', '2026-10-05'), 'Fri Oct 2', 'future multi-day event keeps its start date');
+  assert.equal(label('2026-09-22', '2026-09-30'), 'Tue Sep 22', 'span starting today keeps its start date');
+  assert.equal(label('2026-09-20', '2026-09-22'), 'Until Tue Sep 22', 'span ending today is still in progress');
+  assert.equal(label(null, null), '', 'no date -> no label');
+  assert.equal(label('2026-09-26', null), 'Sat Sep 26', 'missing end date falls back to the start date');
+
+  // All three H1 helpers must expose nextEndDate so they share the fix.
+  const region = 'peachland';
+  const mk = (name, occurrences) => {
+    const r = app.createEvent({
+      region, name, description: 'Mid-span fixture.', source_type: 'official_organizer',
+      source_name: `midspan ${name}`, source_url: `https://example.com/midspan/${app.slugify(name)}`,
+      venue_name_text: `Midspan Hall ${name}`, categories: ['arts-culture'], occurrences,
+    }, { reason: 'mid-span fixture', batch_id: 'test-midspan' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    return r.event;
+  };
+  const running = mk('Longrun Exhibition', [{ start_date: '2026-06-13', end_date: '2026-10-25' }]);
+  const plain = mk('Brightwater Concert', [{ start_date: '2026-10-02' }]);
+
+  const fromRegion = app.listUpcomingEventsForRegion(region, { limit: 10, now: NOW });
+  const r1 = fromRegion.find((e) => e.id === running.id);
+  const p1 = fromRegion.find((e) => e.id === plain.id);
+  assert.ok(r1 && p1, 'both fixtures are publishable');
+  assert.equal(r1.nextDate, '2026-06-13', 'selection is unchanged: the in-progress occurrence is still chosen');
+  assert.equal(r1.nextEndDate, '2026-10-25', 'region helper carries the end date');
+  assert.equal(label(r1.nextDate, r1.nextEndDate), 'Until Sun Oct 25');
+  assert.equal(label(p1.nextDate, p1.nextEndDate), 'Fri Oct 2', 'ordinary event unchanged');
+
+  const fromEvent = app.listRelatedEventsInRegion(plain, { limit: 10, now: NOW });
+  const r2 = fromEvent.find((e) => e.id === running.id);
+  assert.ok(r2, 'event helper returns the in-progress event');
+  assert.equal(r2.nextEndDate, '2026-10-25', 'event helper carries the end date');
+
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'second-test-restaurant');
+  const atVenue = app.createEvent({
+    region: 'kelowna', name: 'Harbourlight Residency', description: 'Mid-span fixture.',
+    source_type: 'official_organizer', source_name: 'midspan venue', source_url: 'https://example.com/midspan/venue',
+    venue_id: venue.id, categories: ['arts-culture'], occurrences: [{ start_date: '2026-06-13', end_date: '2026-10-25' }],
+  }, { reason: 'mid-span fixture', batch_id: 'test-midspan' });
+  assert.equal(atVenue.ok, true, JSON.stringify(atVenue));
+  const atVenue2 = app.createEvent({
+    region: 'kelowna', name: 'Quayside Sessions', description: 'Mid-span fixture.',
+    source_type: 'official_organizer', source_name: 'midspan venue 2', source_url: 'https://example.com/midspan/venue2',
+    venue_id: venue.id, categories: ['live-music'], occurrences: [{ start_date: '2026-11-14' }],
+  }, { reason: 'mid-span fixture', batch_id: 'test-midspan' });
+  assert.equal(atVenue2.ok, true, JSON.stringify(atVenue2));
+  const r3 = app.listUpcomingEventsAtVenue(venue.id, { limit: 10, now: NOW }).find((e) => e.id === atVenue.event.id);
+  assert.ok(r3, 'venue helper returns the in-progress event');
+  assert.equal(r3.nextEndDate, '2026-10-25', 'venue helper carries the end date');
+  assert.equal(label(r3.nextDate, r3.nextEndDate), 'Until Sun Oct 25');
+
+  // Cleanup: leave the shared fixture DB exactly as this test found it.
+  for (const e of [running, plain, atVenue.event, atVenue2.event]) {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+  }
+  assert.equal(app.listUpcomingEventsForRegion(region, { now: NOW }).length, 0, 'fixture rows removed');
+  assert.equal(app.listUpcomingEventsAtVenue(venue.id, { limit: 50, now: NOW }).length, 0, 'venue fixture rows removed');
+});
+
 // ---- H1 Step 3: "Events at {Venue}" block on venue detail pages ----
 // Linked strictly through events.venue_id (never by venue name), using the
 // same publication predicate as the sitemap and the event/region blocks. The

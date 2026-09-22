@@ -1887,7 +1887,8 @@ function countScheduledOccurrences(eventId) {
 function listRelatedEventsInRegion(event, { limit = 4, now = new Date() } = {}) {
   const rows = db
     .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
-        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date
+        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date,
+        (SELECT o.end_date FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? ORDER BY o.start_date, o.end_date LIMIT 1) AS next_end_date
       FROM events e
       WHERE e.region = ?
         AND e.id <> ?
@@ -1895,7 +1896,7 @@ function listRelatedEventsInRegion(event, { limit = 4, now = new Date() } = {}) 
         AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
         AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
       ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
-    .all(todayLocal(now), event.region, event.id, todayLocal(now));
+    .all(todayLocal(now), todayLocal(now), event.region, event.id, todayLocal(now));
   const picked = [];
   const seenCategory = new Set();
   for (const r of rows) {
@@ -1912,7 +1913,26 @@ function listRelatedEventsInRegion(event, { limit = 4, now = new Date() } = {}) 
     ...rowToEvent(r),
     primaryCategory: r.primary_category || null,
     nextDate: r.next_date || null,
+    nextEndDate: r.next_end_date || null,
   }));
+}
+
+// The date shown on an internal-linking card (H1 Steps 1-3 all use this one
+// function). The three list helpers above pick the next scheduled occurrence
+// that has not finished -- which, for a multi-day occurrence already under
+// way, is one that STARTED in the past. Printing its start date told a visitor
+// on 2026-09-22 that "Skillful" was on "Sat Jun 13", a date that has gone.
+// When the chosen occurrence is mid-span we therefore print what is still
+// true and still useful -- the day it ends -- and otherwise print the start
+// date exactly as before. Selection, ordering and the publication predicate
+// are untouched; this only changes wording.
+function upcomingEventDateLabel(nextDate, nextEndDate, now = new Date()) {
+  if (!nextDate) return '';
+  const today = todayLocal(now);
+  if (nextEndDate && nextDate < today && nextEndDate >= today) {
+    return `Until ${formatLocalDateShort(nextEndDate)}`;
+  }
+  return formatLocalDateShort(nextDate);
 }
 
 // H1 internal linking, Step 2 (2026-09-22): the next few publishable events a
@@ -1928,19 +1948,21 @@ function listUpcomingEventsForRegion(region, { limit = 3, now = new Date() } = {
   const today = todayLocal(now);
   const rows = db
     .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
-        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date
+        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date,
+        (SELECT o.end_date FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? ORDER BY o.start_date, o.end_date LIMIT 1) AS next_end_date
       FROM events e
       WHERE e.region = ?
         AND e.status = 'scheduled'
         AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
         AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
       ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
-    .all(today, region, today);
+    .all(today, today, region, today);
   if (rows.length < MIN_REGION_EVENTS) return [];
   return rows.slice(0, limit).map((r) => ({
     ...rowToEvent(r),
     primaryCategory: r.primary_category || null,
     nextDate: r.next_date || null,
+    nextEndDate: r.next_end_date || null,
   }));
 }
 
@@ -1959,19 +1981,21 @@ function listUpcomingEventsAtVenue(venueId, { limit = 3, now = new Date() } = {}
   const today = todayLocal(now);
   const rows = db
     .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
-        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date
+        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date,
+        (SELECT o.end_date FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? ORDER BY o.start_date, o.end_date LIMIT 1) AS next_end_date
       FROM events e
       WHERE e.venue_id = ?
         AND e.status = 'scheduled'
         AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
         AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
       ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
-    .all(today, venueId, today);
+    .all(today, today, venueId, today);
   if (rows.length < MIN_VENUE_EVENTS) return [];
   return rows.slice(0, limit).map((r) => ({
     ...rowToEvent(r),
     primaryCategory: r.primary_category || null,
     nextDate: r.next_date || null,
+    nextEndDate: r.next_end_date || null,
   }));
 }
 
@@ -7019,7 +7043,7 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
         <h2>Upcoming events in ${escapeHtml(regionLabel)}</h2>
         <div class="related-grid">
 ${upcomingEvents.map((e) => {
-      const when = e.nextDate ? formatLocalDateShort(e.nextDate) : '';
+      const when = upcomingEventDateLabel(e.nextDate, e.nextEndDate);
       const cat = e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '';
       const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
       return `          <div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
@@ -8637,7 +8661,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     ? `<div class="related-section">
         <h2>Events at ${escapeHtml(venue.name)}</h2>
         <div class="related-grid">${venueEvents.map((e) => {
-      const when = e.nextDate ? formatLocalDateShort(e.nextDate) : '';
+      const when = upcomingEventDateLabel(e.nextDate, e.nextEndDate);
       const cat = e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '';
       const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
       return `<div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
@@ -8903,7 +8927,7 @@ ${golfFavTripScriptBody('whatson')}
     <h2 id="eventRelatedHeading">More events in ${escapeHtml(regionLabel)}</h2>
     <ul class="event-related-list">
 ${related.map((r) => {
-    const when = r.nextDate ? formatLocalDateShort(r.nextDate) : '';
+    const when = upcomingEventDateLabel(r.nextDate, r.nextEndDate, now);
     const cat = r.primaryCategory && WHATSON_CATEGORY_BY_KEY[r.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[r.primaryCategory].label : '';
     return `      <li><a href="/${r.region}/events/${r.slug}">${escapeHtml(r.name)}</a>${when ? ` <span class="event-related-meta">${escapeHtml(when)}${cat ? ` &middot; ${escapeHtml(cat)}` : ''}</span>` : ''}</li>`;
   }).join('\n')}
@@ -11675,6 +11699,7 @@ module.exports = {
   listRelatedEventsInRegion,
   listUpcomingEventsForRegion,
   listUpcomingEventsAtVenue,
+  upcomingEventDateLabel,
   createEvent,
   updateEvent,
   replaceEventCategories,
