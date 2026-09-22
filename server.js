@@ -1876,6 +1876,45 @@ function countScheduledOccurrences(eventId) {
   return db.prepare("SELECT COUNT(*) AS n FROM event_occurrences WHERE event_id = ? AND status = 'scheduled'").get(eventId).n;
 }
 
+// H1 internal linking (2026-09-22): the handful of other events a visitor on
+// one event page is most likely to want next. Same publication rules as the
+// sitemap (scheduled event, at least one scheduled occurrence, not expired on
+// the Okanagan local date), same region, never the event itself, soonest
+// first. Variety: at most one event per primary category is taken on the
+// first pass, then the remaining slots are filled in date order, so a page in
+// a region dominated by one category still shows a mix where the inventory
+// allows it. Read-only; the caller renders nothing when fewer than 2 remain.
+function listRelatedEventsInRegion(event, { limit = 4, now = new Date() } = {}) {
+  const rows = db
+    .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
+        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date
+      FROM events e
+      WHERE e.region = ?
+        AND e.id <> ?
+        AND e.status = 'scheduled'
+        AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
+        AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
+      ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
+    .all(todayLocal(now), event.region, event.id, todayLocal(now));
+  const picked = [];
+  const seenCategory = new Set();
+  for (const r of rows) {
+    if (picked.length >= limit) break;
+    if (r.primary_category && seenCategory.has(r.primary_category)) continue;
+    if (r.primary_category) seenCategory.add(r.primary_category);
+    picked.push(r);
+  }
+  for (const r of rows) {
+    if (picked.length >= limit) break;
+    if (!picked.includes(r)) picked.push(r);
+  }
+  return picked.map((r) => ({
+    ...rowToEvent(r),
+    primaryCategory: r.primary_category || null,
+    nextDate: r.next_date || null,
+  }));
+}
+
 // --- writers ----------------------------------------------------------------
 // createEvent(data, meta): the only way an event enters the table. Validates
 // everything, checks duplicates, then inserts event + categories +
@@ -8749,6 +8788,26 @@ ${golfFavTripScriptBody('whatson')}
 </script>`;
   const statusNote = expired ? ' — this event has ended' : '';
 
+  // H1 internal linking (2026-09-22): a short "More events in {Region}" list.
+  // Compact links only (never a full listing), each pointing at the other
+  // event's own canonical /{region}/events/{slug} URL; the "see all" link
+  // keeps the filtered What's On view one click away. Nothing renders when
+  // the region has no other publishable event, so sparse regions and pages
+  // whose siblings have expired simply omit the section.
+  const related = listRelatedEventsInRegion(full, { limit: 4, now });
+  const relatedHtml = related.length ? `
+  <section class="event-related" aria-labelledby="eventRelatedHeading">
+    <h2 id="eventRelatedHeading">More events in ${escapeHtml(regionLabel)}</h2>
+    <ul class="event-related-list">
+${related.map((r) => {
+    const when = r.nextDate ? formatLocalDateShort(r.nextDate) : '';
+    const cat = r.primaryCategory && WHATSON_CATEGORY_BY_KEY[r.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[r.primaryCategory].label : '';
+    return `      <li><a href="/${r.region}/events/${r.slug}">${escapeHtml(r.name)}</a>${when ? ` <span class="event-related-meta">${escapeHtml(when)}${cat ? ` &middot; ${escapeHtml(cat)}` : ''}</span>` : ''}</li>`;
+  }).join('\n')}
+    </ul>
+    <p class="event-related-all"><a href="/whats-on?regions=${encodeURIComponent(full.region)}">See what&rsquo;s on in ${escapeHtml(regionLabel)}</a></p>
+  </section>` : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8764,6 +8823,11 @@ ${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boole
   .event-date-label { color: #5f6b73; }
   .event-date-past { color: #8a959b; }
   .event-date-past-tag { font-size: 0.85rem; }
+  .event-related h2 { font-size: 1.1rem; margin: 24px 0 8px; }
+  .event-related-list { list-style: none; padding: 0; margin: 0 0 10px; }
+  .event-related-list li { margin: 6px 0; }
+  .event-related-meta { color: #5f6b73; font-size: 0.9rem; }
+  .event-related-all { margin: 0 0 20px; font-size: 0.95rem; }
 </style>
 </head>
 <body>
@@ -8782,6 +8846,7 @@ ${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boole
   ${detailRows}
   ${datesListHtml}
   ${attribution}
+  ${relatedHtml}
   <a class="cta" href="/${full.region}">Explore all of ${escapeHtml(regionLabel)}</a>
   ${renderHomeFooterHTML(true)}
   ${actionsScript}
@@ -11504,6 +11569,7 @@ module.exports = {
   getEventCategoryKeys,
   listEventOccurrences,
   countScheduledOccurrences,
+  listRelatedEventsInRegion,
   createEvent,
   updateEvent,
   replaceEventCategories,
