@@ -1944,6 +1944,37 @@ function listUpcomingEventsForRegion(region, { limit = 3, now = new Date() } = {
   }));
 }
 
+// H1 internal linking, Step 3 (2026-09-22): the next few publishable events
+// happening at one venue. Same predicate as listRelatedEventsInRegion(),
+// listUpcomingEventsForRegion() and the sitemap (scheduled event, at least one
+// scheduled occurrence, not expired on the Okanagan local date), ordered by
+// next scheduled occurrence. The relationship is events.venue_id ONLY -- an
+// event naming its place in venue_name_text is never matched to a venue row,
+// so nothing here depends on name similarity. Returns [] below
+// MIN_VENUE_EVENTS so a venue hosting a single event renders no block at all,
+// and the block disappears on its own as events expire.
+const MIN_VENUE_EVENTS = 2;
+function listUpcomingEventsAtVenue(venueId, { limit = 3, now = new Date() } = {}) {
+  if (!Number.isInteger(venueId) || venueId <= 0) return [];
+  const today = todayLocal(now);
+  const rows = db
+    .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
+        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date
+      FROM events e
+      WHERE e.venue_id = ?
+        AND e.status = 'scheduled'
+        AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
+        AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
+      ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
+    .all(today, venueId, today);
+  if (rows.length < MIN_VENUE_EVENTS) return [];
+  return rows.slice(0, limit).map((r) => ({
+    ...rowToEvent(r),
+    primaryCategory: r.primary_category || null,
+    nextDate: r.next_date || null,
+  }));
+}
+
 // --- writers ----------------------------------------------------------------
 // createEvent(data, meta): the only way an event enters the table. Validates
 // everything, checks duplicates, then inserts event + categories +
@@ -8593,6 +8624,27 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     </div>`;
   }
 
+  // H1 Step 3 (2026-09-22): a short "Events at {Venue}" block, built from the
+  // same live predicate as the sitemap and the event/region blocks, so links
+  // vanish by themselves as events expire. Linked strictly through
+  // events.venue_id -- never by venue name -- and rendered only for a venue
+  // hosting at least MIN_VENUE_EVENTS upcoming events. Direct canonical event
+  // URLs only. Reuses the .related-section/.related-grid/.related-card styles
+  // this page already loads, so no new CSS. Sits before the broader "other
+  // {category} in {region}" and "more to explore" discovery sections.
+  const venueEvents = listUpcomingEventsAtVenue(venue.id, { limit: 3 });
+  const venueEventsHtml = venueEvents.length
+    ? `<div class="related-section">
+        <h2>Events at ${escapeHtml(venue.name)}</h2>
+        <div class="related-grid">${venueEvents.map((e) => {
+      const when = e.nextDate ? formatLocalDateShort(e.nextDate) : '';
+      const cat = e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '';
+      const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
+      return `<div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
+    }).join('')}</div>
+      </div>`
+    : '';
+
   const relatedHtml = relatedVenues.length
     ? `<div class="related-section">
         <h2>Other ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}</h2>
@@ -8650,7 +8702,7 @@ ${golfEngagementHeadHtml(venue.type)}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours">${hoursHtml}</div>` : ''}
   ${guideLinks}
-  ${relatedHtml}
+  ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
   <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
@@ -11622,6 +11674,7 @@ module.exports = {
   countScheduledOccurrences,
   listRelatedEventsInRegion,
   listUpcomingEventsForRegion,
+  listUpcomingEventsAtVenue,
   createEvent,
   updateEvent,
   replaceEventCategories,

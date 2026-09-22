@@ -3543,6 +3543,102 @@ test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, u
 // Same publication predicate as the sitemap and the event-page block; the
 // section is omitted entirely below MIN_REGION_EVENTS, so a one-event or
 // zero-event region keeps its existing page exactly as before.
+// ---- H1 Step 3: "Events at {Venue}" block on venue detail pages ----
+// Linked strictly through events.venue_id (never by venue name), using the
+// same publication predicate as the sitemap and the event/region blocks. The
+// section is omitted entirely below MIN_VENUE_EVENTS, so a venue hosting one
+// event or none keeps its existing page exactly as before.
+test('H1 Step 3: venue pages link the next publishable events at that venue, omit the block below the threshold, and never link an unpublishable event', () => {
+  // second-test-restaurant is used by the redirect fixtures only and carries no
+  // events; test-trattoria deliberately is NOT used here because the S3 event
+  // fixtures attach their own events to it.
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'second-test-restaurant');
+  assert.ok(venue, 'fixture venue exists');
+  const other = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  assert.ok(other, 'second fixture venue exists');
+  const otherBaseline = app.listUpcomingEventsAtVenue(other.id, { limit: 50 }).map((e) => e.slug).sort();
+  const html = () => app.renderVenuePage(venue, [], [], []);
+  const cardsOf = (h) => {
+    const m = h.match(/<h2>Events at [^<]*<\/h2>[\s\S]*?<\/div>\s*<\/div>/);
+    return m ? [...m[0].matchAll(/<a href="(\/[a-z-]+\/events\/[a-z0-9-]+)">/g)].map((x) => x[1]) : [];
+  };
+
+  // 1. Zero events at this venue -> no block at all.
+  assert.equal(app.listUpcomingEventsAtVenue(venue.id).length, 0, 'fixture venue starts with no events');
+  const bare = html();
+  assert.doesNotMatch(bare, /Events at /, 'zero events -> no block');
+
+  const mk = (name, over = {}) => {
+    const r = app.createEvent({
+      region: 'kelowna', name, description: 'H1 Step 3 fixture.', source_type: 'official_organizer',
+      source_name: `H1S3 ${name}`, source_url: `https://example.com/h1s3/${app.slugify(name)}`,
+      venue_id: venue.id, categories: ['community-events'], occurrences: [{ start_date: '2033-05-02' }], ...over,
+    }, { reason: 'H1 Step 3 fixture', batch_id: 'test-h1s3' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    return r.event;
+  };
+
+  // 2. One event -> still no block.
+  const a = mk('Cellarwork Nocturne', { occurrences: [{ start_date: '2033-05-02' }] });
+  assert.equal(app.listUpcomingEventsAtVenue(venue.id).length, 0, 'one event is below the threshold');
+  assert.doesNotMatch(html(), /Events at /, 'one event -> still no block');
+
+  // 3. Two events -> exactly 2 cards, in next-date order, heading names the venue.
+  const b = mk('Harvestide Banquet', { categories: ['food-drink-events'], occurrences: [{ start_date: '2033-05-09' }] });
+  const two = html();
+  assert.deepEqual(cardsOf(two), [`/kelowna/events/${a.slug}`, `/kelowna/events/${b.slug}`], 'two cards in next-date order');
+  assert.ok(two.includes(`<h2>Events at ${venue.name}</h2>`), 'heading is "Events at {Venue Name}"');
+
+  // 4. Four events -> capped at 3, still ordered by next occurrence.
+  const c = mk('Lanternfall Recital', { categories: ['arts-culture'], occurrences: [{ start_date: '2033-05-05' }] });
+  mk('Duskwine Tasting', { categories: ['nightlife'], occurrences: [{ start_date: '2033-06-20' }] });
+  assert.deepEqual(cardsOf(html()), [`/kelowna/events/${a.slug}`, `/kelowna/events/${c.slug}`, `/kelowna/events/${b.slug}`], 'max 3 cards, next-date order');
+
+  // 5. Cancelled, postponed and expired events at this venue are never linked.
+  const cancelled = mk('Shuttered Doorway', { categories: ['workshops-classes'], occurrences: [{ start_date: '2033-05-03' }] });
+  app.updateEvent(cancelled.id, { status: 'cancelled' }, { reason: 'H1 Step 3 fixture', batch_id: 'test-h1s3' });
+  const postponed = mk('Deferred Interlude', { categories: ['wineries-wine-events'], occurrences: [{ start_date: '2033-05-04' }] });
+  app.updateEvent(postponed.id, { status: 'postponed' }, { reason: 'H1 Step 3 fixture', batch_id: 'test-h1s3' });
+  const expired = mk('Antiquevine Soiree', { categories: ['live-music'], occurrences: [{ start_date: '2019-05-04' }] });
+  const slugs = app.listUpcomingEventsAtVenue(venue.id, { limit: 50 }).map((e) => e.slug);
+  assert.ok(!slugs.includes(cancelled.slug), 'cancelled never linked');
+  assert.ok(!slugs.includes(postponed.slug), 'postponed never linked');
+  assert.ok(!slugs.includes(expired.slug), 'expired never linked');
+
+  // 6. Links are direct canonical event URLs, never a filtered view, never the venue itself.
+  for (const href of cardsOf(html())) {
+    assert.match(href, /^\/kelowna\/events\/[a-z0-9-]+$/, `canonical event URL: ${href}`);
+    assert.ok(!href.includes('?'), 'no query-string links');
+  }
+
+  // 7. The relationship is venue_id only -- an event naming this venue in
+  //    venue_name_text is never picked up.
+  const byName = app.createEvent({
+    region: 'kelowna', name: 'Nameplate Gathering', description: 'H1 Step 3 fixture.', source_type: 'official_organizer',
+    source_name: 'H1S3 name-only', source_url: 'https://example.com/h1s3/name-only',
+    venue_name_text: venue.name, categories: ['community-events'], occurrences: [{ start_date: '2033-05-06' }],
+  }, { reason: 'H1 Step 3 fixture', batch_id: 'test-h1s3' });
+  assert.equal(byName.ok, true, JSON.stringify(byName));
+  assert.ok(!app.listUpcomingEventsAtVenue(venue.id, { limit: 50 }).map((e) => e.slug).includes(byName.event.slug), 'venue_name_text match is never linked');
+
+  // 8. A different venue never picks up this venue's events.
+  assert.deepEqual(app.listUpcomingEventsAtVenue(other.id, { limit: 50 }).map((e) => e.slug).sort(), otherBaseline,
+    'another venue\'s event list is untouched by events created here');
+
+  // Cleanup: leave the shared fixture DB exactly as this test found it.
+  const made = [a, b, c, cancelled, postponed, expired, byName.event];
+  for (const e of app.listUpcomingEventsAtVenue(venue.id, { limit: 50 })) if (!made.some((x) => x.id === e.id)) made.push(e);
+  for (const e of made) {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+  }
+  db.prepare("DELETE FROM events WHERE source_url LIKE 'https://example.com/h1s3/%'").run();
+  assert.equal(app.listUpcomingEventsAtVenue(venue.id, { limit: 50 }).length, 0, 'fixture rows removed');
+  assert.doesNotMatch(html(), /Events at /, 'page back to its original shape');
+});
+
 test('H1 Step 2: region pages link the next publishable events, omit the block below the threshold, and never link an unpublishable event', () => {
   const counts = app.getRegionCategoryCounts('kelowna');
   const regionHtml = (region) => app.renderRegionPage(region, app.getRegionCategoryCounts(region) || counts, []);
