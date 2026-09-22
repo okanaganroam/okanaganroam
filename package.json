@@ -4,7 +4,7 @@
   "description": "REST API and SQLite database for the Okanagan Roam venue directory",
   "main": "server.js",
   "engines": {
-    "node": ">=22.5.0"
+    "node": "24.x"
   },
   "scripts": {
     "seed": "node --no-warnings seed.js",
