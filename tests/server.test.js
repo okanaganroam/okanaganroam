@@ -3531,6 +3531,10 @@ test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, u
   assert.ok(after.includes('https://okanaganroam.com/kelowna/events/s5-open-studio'));
   assert.deepEqual(nonEvent(after), nonEvent(before), 'every non-event URL unchanged, in the same order');
   assert.equal(after[0], 'https://okanaganroam.com/', 'homepage leads the file');
+  for (const hub of ['whats-on', 'outdoors', 'golf', 'beaches']) {
+    assert.equal(after.filter((u) => u === `https://okanaganroam.com/${hub}`).length, 1, `valley-wide hub /${hub} listed exactly once`);
+  }
+  assert.ok(!after.includes('https://okanaganroam.com/trip'), '/trip is deliberately not listed');
   assert.ok(!after.includes('https://okanaganroam.com/events'), 'the retired /events index is no longer listed (it redirects to /whats-on)');
   assert.deepEqual(app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`), app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`).slice().sort(), 'deterministic region/slug order');
 });
@@ -6035,7 +6039,9 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     const sitemapAfter = await (await fetch(`${base}/sitemap.xml`)).text();
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches<\/loc>/);
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches\/homepage-beach-one<\/loc>/);
-    assert.doesNotMatch(sitemapBefore, /beaches/);
+    // No beach *category or venue* URLs before the data exists. (The static
+    // valley-wide /beaches hub is always listed, so match region-scoped URLs.)
+    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/[a-z-]+\/beaches/);
 
     // Region hub shows the new category card.
     const hub = await (await fetch(`${base}/kelowna`)).text();
@@ -6380,7 +6386,9 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     const sitemapAfter = await (await fetch(`${base}/sitemap.xml`)).text();
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors<\/loc>/);
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors\/fixture-canyon-park<\/loc>/);
-    assert.doesNotMatch(sitemapBefore, /outdoors/);
+    // No outdoor *category or venue* URLs before the data exists. (The static
+    // valley-wide /outdoors hub is always listed, so match region-scoped URLs.)
+    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/[a-z-]+\/outdoors/);
     const hub = await (await fetch(`${base}/kelowna`)).text();
     assert.match(hub, /<h2><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h2>/, 'region hub gains the category card, exactly as Beaches did');
     // Phase 2: an activity page appears only once the activity has MIN_ACTIVITY_VENUES destinations.
