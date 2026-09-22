@@ -7320,9 +7320,10 @@ test("What's On shell: twelve categories in the approved order, tiles are multi-
   assert.match(pre, /id="whatsOnRegionStatus">2 selected</); assert.match(pre, /id="whatsOnCategoryStatus">2 selected</);
   assert.match(pre, /<div class="outdoor-selected" id="whatsOnSelected"><div class="outdoor-selected-row"><span class="outdoor-selected-label">Regions<\/span> [\s\S]*?data-remove-region="kelowna"[\s\S]*?data-remove-region="penticton"[\s\S]*?<div class="outdoor-selected-row"><span class="outdoor-selected-label">Categories<\/span> [\s\S]*?data-remove-category="live-music"[\s\S]*?data-remove-category="food-drink-events"[\s\S]*?id="whatsOnSelectedClear">Clear all</);
   assert.match(pre, /aria-live="polite">0 of 0 events<\/p>/); assert.match(pre, /id="whatsOnClearFilters">Clear all</); assert.match(pre, /id="whatsOnShowResults">Show 0 results</);
-  // Tile art: dedicated slot per category; none exists yet, so no <img> and no stock fallback.
-  for (const c of app.WHATSON_CATEGORIES) assert.equal(app.whatsOnCategoryImagePath(c.key), null, `no art yet for ${c.key}`);
-  assert.doesNotMatch(markup, /outdoor-activity-card-img/);
+  // Tile art: dedicated slot per category, one approved 1376x768 WebP per key under /images/whats-on/.
+  for (const c of app.WHATSON_CATEGORIES) assert.equal(app.whatsOnCategoryImagePath(c.key), `/images/whats-on/${c.key}.webp`, `art for ${c.key}`);
+  assert.deepEqual([...markup.matchAll(/<img class="outdoor-activity-card-img" src="\/images\/whats-on\/([a-z-]+)\.webp" width="1376" height="768" alt="" loading="lazy">/g)].map((m) => m[1]), app.WHATSON_CATEGORIES.map((c) => c.key), 'twelve tile images in the approved order');
+  assert.doesNotMatch(markup, /whatson-category-card-noart/, 'no tile falls back to the no-art state');
 });
 
 test("What's On result card contract (fixture only): name is the single link with the View details cue, region + date/time meta, clamped description, category chips, Favorite + Add to Trip; no website/phone; filter semantics reuse the Outdoors predicate", () => {
