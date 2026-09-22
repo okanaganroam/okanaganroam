@@ -1606,6 +1606,32 @@ function listLiveOutdoorActivities() {
   const counts = getOutdoorActivityCounts();
   return OUTDOOR_ACTIVITIES.filter((a) => counts[a.slug] >= MIN_ACTIVITY_VENUES).map((a) => ({ ...a, count: counts[a.slug] }));
 }
+// The /outdoors landing's destination universe (2026-09-22): every
+// canonical outdoor-type venue PLUS every other allowlisted-type venue
+// (today: Beaches -- the provincial parks) that belongs to a live
+// activity, so the landing's activity cards, its filtered results and
+// the /outdoors/<activity> pages all count the same destinations
+// (getOutdoorActivityVenues / getOutdoorActivityCounts use the same
+// allowlist + membership rule). A beach with no live activity
+// membership stays a beach only. Same order as getVenuesByCategory.
+// Region outdoor directories (/:region/outdoors) are untouched.
+function getOutdoorLandingVenues() {
+  const liveKinds = listLiveOutdoorActivities().map((a) => a.kind);
+  const others = OUTDOOR_ACTIVITY_VENUE_TYPES.filter((t) => t !== 'outdoor');
+  if (!liveKinds.length || !others.length) return getVenuesByCategory('outdoor');
+  return db.prepare(`
+    SELECT v.* FROM venues v
+    WHERE v.redirect_to IS NULL AND (
+      v.type = 'outdoor'
+      OR (v.type IN (${others.map(() => '?').join(', ')}) AND v.id IN (
+        SELECT ci.content_id FROM collection_items ci
+        JOIN collections c ON c.id = ci.collection_id
+        WHERE ci.content_type = 'venue' AND c.kind IN (${liveKinds.map(() => '?').join(', ')})
+      ))
+    )
+    ORDER BY v.region ASC, v.name ASC
+  `).all(...others, ...liveKinds).map(rowToVenue);
+}
 
 // venue id -> note text for one collection kind (the most recently added
 // note wins if several). Shared by the advisory and dog-friendly kinds.
@@ -4652,7 +4678,7 @@ function golfEngagementHeadHtml(type) {
 function golfFavTripScriptBody(type = 'golf') {
   return `
   var MAX_STOPS = 10;
-  var HOLDER = '[data-venue-category="${type}"]';
+  var HOLDER = '${themedCardHolderSelector(type)}';
   function readList(key){
     try { var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
@@ -4854,22 +4880,44 @@ function renderOutdoorThemeStyles() {
   /* Outdoors discovery (Phase 2): intro line, activity chips (region-chip
      pills with a small count) and the featured grid. Outdoor pages only. */
   body.outdoor-page .outdoor-intro { font-size: 1.04rem; line-height: 1.65; max-width: 68ch; color: var(--ink); opacity: 0.85; margin: -8px 0 22px; }
-  /* Activity showcase (2026-09-20): the homepage mood-card treatment
-     (bottom gradient, white icon + Fraunces title) under outdoor-scoped
-     classes, so the homepage's own .mood-card rules are untouched. Cards
-     are 16:9 to match the approved outdoor image format (1376x768
-     sources, cover-fit). Two across on phones, three on small tablets,
-     six across from 900px. "Coming soon" tiles are the same card, not a
-     link. */
-  body.outdoor-page .outdoor-activity-showcase { margin: 0 0 26px; }
+  /* Activity cards (2026-09-20 presentation; 2026-09-22 explorer): the
+     homepage mood-card treatment (bottom gradient, white icon + Fraunces
+     title) under outdoor-scoped classes, so the homepage's own .mood-card
+     rules are untouched. Cards are 16:9 to match the approved outdoor
+     image format (1376x768 sources, cover-fit). Two across on phones,
+     three across (a 3 x 3 grid of the nine activities) from 600px. A live
+     card is a <button> filter toggle; "Coming soon" tiles are the same
+     card, inert. */
+  body.outdoor-page .outdoor-activity-showcase { margin: 0; }
   body.outdoor-page .outdoor-activity-card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   body.outdoor-page .outdoor-activity-card {
-    position: relative; display: block; border-radius: 10px; overflow: hidden; text-decoration: none; color: #fff;
+    position: relative; display: block; width: 100%; border-radius: 10px; overflow: hidden; text-decoration: none; color: #fff;
     aspect-ratio: 16 / 9; background: var(--ref-navy); box-shadow: 0 10px 22px -16px rgba(74,52,40,0.4);
+    border: 0; padding: 0; margin: 0; font: inherit; text-align: left;
   }
   body.outdoor-page .outdoor-activity-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
-  body.outdoor-page a.outdoor-activity-card:hover .outdoor-activity-card-img { transform: scale(1.045); }
-  body.outdoor-page a.outdoor-activity-card:focus-visible { outline: 3px solid var(--ref-gold); outline-offset: 2px; }
+  body.outdoor-page .outdoor-activity-toggle { cursor: pointer; transition: box-shadow .15s ease; }
+  body.outdoor-page .outdoor-activity-toggle:hover .outdoor-activity-card-img { transform: scale(1.045); }
+  body.outdoor-page .outdoor-activity-toggle:focus-visible { outline: 3px solid var(--ref-gold); outline-offset: 2px; }
+  /* Selected card: teal ring, teal-tinted overlay and a "Selected" badge
+     -- unmistakable at a glance, same palette as the region pills. */
+  body.outdoor-page .outdoor-activity-toggle[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--teal), 0 10px 22px -16px rgba(74,52,40,0.4); }
+  body.outdoor-page .outdoor-activity-toggle[aria-pressed="true"] .outdoor-activity-card-overlay { background: linear-gradient(180deg, rgba(42,107,103,0.35) 0%, rgba(30,79,76,0.9) 100%); }
+  body.outdoor-page .outdoor-activity-card-check {
+    display: none; position: absolute; top: 8px; left: 8px; z-index: 1; padding: 4px 9px; border-radius: 999px;
+    background: var(--teal); color: #fff; font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em;
+  }
+  body.outdoor-page .outdoor-activity-toggle[aria-pressed="true"] .outdoor-activity-card-check { display: inline-block; }
+  /* The card's count reuses the region-chip count hook; undo the pill
+     styling so it reads as the card's own caption. */
+  body.outdoor-page .outdoor-activity-card .outdoor-activity-count { display: inline; margin: 0; font-size: inherit; opacity: 1; }
+  /* Guide link beside the toggle: a small text link to the existing
+     /outdoors/<activity> page, kept out of the button so the card stays a
+     single control. */
+  body.outdoor-page .outdoor-activity-card-wrap { display: flex; flex-direction: column; gap: 4px; }
+  body.outdoor-page .outdoor-activity-card-link { align-self: flex-end; font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; padding: 2px 4px; border-radius: 4px; }
+  body.outdoor-page .outdoor-activity-card-link:hover { color: var(--ref-gold); text-decoration: underline; }
+  body.outdoor-page .outdoor-activity-card-link:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoor-activity-card-overlay {
     position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
     background: linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(20,14,10,0.78) 100%);
@@ -4881,20 +4929,18 @@ function renderOutdoorThemeStyles() {
   body.outdoor-page .outdoor-activity-card-pending { cursor: default; }
   body.outdoor-page .outdoor-activity-card-pending .outdoor-activity-card-overlay { background: linear-gradient(180deg, rgba(27,43,58,0.15) 0%, rgba(20,14,10,0.82) 100%); }
   body.outdoor-page .outdoor-activity-card-soon { color: var(--ref-gold); }
-  body.outdoor-page .outdoor-activity-more { margin: 14px 0 0; }
-  body.outdoor-page .outdoor-activity-more-toggle {
-    display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; min-height: 44px; padding: 8px 18px;
-    border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: transparent; color: var(--ref-navy);
-    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.86rem; letter-spacing: 0.01em;
-  }
-  body.outdoor-page .outdoor-activity-more-toggle::-webkit-details-marker { display: none; }
-  body.outdoor-page .outdoor-activity-more-toggle:hover { background: rgba(27,43,58,0.06); }
-  body.outdoor-page .outdoor-activity-more-toggle:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
-  body.outdoor-page .outdoor-activity-more-chevron { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s ease; margin-top: -3px; }
-  body.outdoor-page .outdoor-activity-more[open] .outdoor-activity-more-chevron { transform: rotate(-135deg); margin-top: 3px; }
-  body.outdoor-page .outdoor-activity-card-grid-secondary { margin-top: 12px; }
   @media (min-width: 600px) { body.outdoor-page .outdoor-activity-card-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
-  @media (min-width: 900px) { body.outdoor-page .outdoor-activity-card-grid { grid-template-columns: repeat(6, 1fr); } body.outdoor-page .outdoor-activity-card-grid-secondary { grid-template-columns: repeat(6, 1fr); } }
+  @media (min-width: 900px) { body.outdoor-page .outdoor-activity-card-grid { gap: 16px; max-width: 1040px; } }
+  /* Explorer steps (2026-09-22): Choose Region(s) -> Choose Activity(s)
+     -> Results as three clearly separated blocks with the existing
+     teal-marker heading; a small "N selected" status sits beside the
+     heading of the two choice steps. */
+  body.outdoor-page .outdoor-step { margin: 0 0 30px; }
+  body.outdoor-page .outdoor-step-results { margin-bottom: 0; padding-top: 4px; }
+  body.outdoor-page .outdoor-step-head { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; }
+  body.outdoor-page .outdoor-step-head .category-subsection-heading { margin-bottom: 0; }
+  body.outdoor-page .outdoor-step-status { font-family: 'Nunito', sans-serif; font-size: 0.8rem; font-weight: 800; color: var(--teal); padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(42,107,103,0.35); background: rgba(42,107,103,0.08); margin-bottom: 4px; }
+  body.outdoor-page .outdoor-step-status[hidden] { display: none; }
   body.outdoor-page .outdoor-activity-selector { margin-bottom: 8px; }
   /* Step 1 (Choose a Region): the primary choice, so its pills are a
      touch larger than the activity pills; same pill treatment otherwise. */
@@ -4910,7 +4956,7 @@ function renderOutdoorThemeStyles() {
     cursor: pointer; line-height: 1.3; transition: background .12s ease, color .12s ease, border-color .12s ease;
   }
   body.outdoor-page .outdoor-filter-chip:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
-  body.outdoor-page .outdoor-filter-chip[aria-pressed="true"] { background: var(--ref-navy); color: var(--paper); border-color: var(--ref-navy); }
+  body.outdoor-page .outdoor-filter-chip[aria-pressed="true"] { background: var(--ref-navy); color: var(--paper); border-color: var(--ref-navy); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--teal); }
   body.outdoor-page .outdoor-filter-chip[aria-pressed="true"]::before { content: "\\2713"; margin-right: 6px; font-size: 0.78em; }
   body.outdoor-page .outdoor-filter-chip[aria-pressed="true"] .outdoor-activity-count { opacity: 0.8; }
   body.outdoor-page .outdoor-filter-chip:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
@@ -4922,15 +4968,18 @@ function renderOutdoorThemeStyles() {
     font-family: 'Nunito', sans-serif; text-decoration: none; transition: background .15s ease;
   }
   body.outdoor-page .outdoor-filter-actions .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
-  body.outdoor-page .outdoor-filter-actions .cta.secondary { background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); }
-  body.outdoor-page .outdoor-filter-actions .cta.secondary:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.outdoor-page .outdoor-filter-actions .cta[hidden] { display: none; }
+  body.outdoor-page .outdoor-clear-filters { background: transparent; border: 0; padding: 6px 8px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; align-self: center; }
+  body.outdoor-page .outdoor-clear-filters:hover { color: var(--ref-gold); }
+  body.outdoor-page .outdoor-clear-filters:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.outdoor-page .outdoor-clear-filters[hidden] { display: none; }
   body.outdoor-page .outdoor-results-summary { font-size: 0.95rem; color: var(--ink); opacity: 0.75; margin: -6px 0 10px; }
   /* Selected-filter tags beside the results (2026-09-20 discovery
      refinement): removable navy tags + "Clear all", hidden when empty. */
-  body.outdoor-page .outdoor-selected { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
+  body.outdoor-page .outdoor-selected { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 0 0 16px; }
   body.outdoor-page .outdoor-selected[hidden] { display: none; }
-  body.outdoor-page .outdoor-selected-label { font-size: 0.86rem; font-weight: 700; color: var(--ink); opacity: 0.7; }
+  body.outdoor-page .outdoor-selected-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  body.outdoor-page .outdoor-selected-label { font-size: 0.8rem; font-weight: 800; color: var(--ink); opacity: 0.6; min-width: 64px; text-transform: uppercase; letter-spacing: 0.04em; }
   body.outdoor-page .outdoor-selected-tag {
     display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--ref-navy);
     background: var(--ref-navy); color: var(--paper); font: inherit; font-size: 0.84rem; font-weight: 700; cursor: pointer; line-height: 1.3;
@@ -4943,13 +4992,18 @@ function renderOutdoorThemeStyles() {
      and the action buttons span the width so they are easy to hit. */
   @media (max-width: 899px) {
     body.outdoor-page .outdoor-filter-chip { min-height: 44px; padding: 10px 16px; font-size: 0.92rem; }
-    body.outdoor-page .outdoor-region-group-chips, body.outdoor-page .outdoor-filter-group[data-filter="activity"] { gap: 10px; }
+    body.outdoor-page .outdoor-region-group-chips { gap: 10px; }
+    body.outdoor-page .outdoor-activity-card-link { min-height: 40px; display: inline-flex; align-items: center; }
     body.outdoor-page .outdoor-selected-tag { min-height: 40px; padding: 8px 14px; }
     body.outdoor-page .outdoor-selected-clear { min-height: 40px; }
     body.outdoor-page .outdoor-filter-actions .cta { flex: 1 1 100%; min-height: 48px; justify-content: center; }
   }
   body.outdoor-page .outdoor-no-results { background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px; padding: 16px 18px; margin: 0 0 26px; }
   body.outdoor-page #outdoorResults > .venue-card[hidden] { display: none; }
+  /* Landing result cards are more compact: about three lines of
+     description before the existing "Read more" (activity and region
+     pages keep the four-line clamp). */
+  body.outdoor-page #outdoorResults .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
   /* Grouped region selector: headers are compact secondary controls; on
      desktop they are hidden and the four blocks flow as one chip row. */
   body.outdoor-page .outdoor-region-groups { display: block; }
@@ -5624,18 +5678,28 @@ function golfAtAGlanceHtml(venue) {
 // toggle is inline with aria-expanded/aria-controls, and impressions
 // (>=50% visible, once per card per page view) plus expand/collapse are
 // reported through window.trackEvent.
+// Outdoor surfaces (2026-09-22) list every OUTDOOR_ACTIVITY_VENUE_TYPES
+// record (a beach-type activity member renders as a beach card there), so
+// on those pages the card selector covers each allowlisted type -- the
+// clamp / Read more, impressions and favourite/trip mirroring then apply
+// to every card on the page and the reported venue_category is the
+// card's own. Golf and Beach pages' scripts are byte-identical to before.
+function themedCardHolderSelector(type) {
+  if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
+  return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
+}
 function golfCardEngagementScriptHtml(type) {
   if (!usesThemedCategoryLayout(type)) return '';
   return `<script>
 (function(){
-  var cards = document.querySelectorAll('.venue-card[data-venue-category="${type}"]');
+  var cards = document.querySelectorAll('.venue-card${themedCardHolderSelector(type)}');
   if (!cards.length) return;
   function ctx(card){
     return {
       venue_id: Number(card.dataset.venueId),
       venue_name: card.dataset.venueName,
       venue_region: card.dataset.venueRegion,
-      venue_category: '${type}',
+      venue_category: ${type === 'outdoor' ? "card.dataset.venueCategory || 'outdoor'" : `'${type}'`},
       surface: card.dataset.surface || 'category_card',
       page_path: location.pathname
     };
@@ -6186,30 +6250,29 @@ function outdoorChipCounts(venues, activitySlugsByVenueId, selectedRegions, sele
   }
   return { regions, activities };
 }
-// The one-line results summary, shared verbatim by the server render and
-// the client script: "20 of 62 outdoor destinations · Kelowna, Vernon ·
-// Hiking & Trails, Viewpoints" (or just "62 outdoor destinations").
+// The one-line results count, shared verbatim by the server render and
+// the client script: "20 of 62 outdoor destinations" while a filter is
+// active, "62 outdoor destinations" otherwise. (2026-09-22: the selected
+// region/activity labels moved out of this line into the removable
+// filter rows beneath it, renderOutdoorSelectedTagsHtml.)
 function outdoorSummaryText(shown, total, regionLabels, activityLabels) {
   const filtered = regionLabels.length || activityLabels.length;
-  let text = filtered ? `${shown} of ${total} outdoor destinations` : `${total} outdoor destinations`;
-  const parts = [];
-  if (regionLabels.length) parts.push(regionLabels.join(', '));
-  if (activityLabels.length) parts.push(activityLabels.join(', '));
-  if (parts.length) text += ' · ' + parts.join(' · ');
-  return text;
+  return filtered ? `${shown} of ${total} outdoor destinations` : `${total} outdoor destinations`;
 }
 // Selected-filter tags shown beside the results: one removable tag per
 // chosen region and activity plus "Clear all", so what is filtering the
 // list is visible right where the list is (the chip rows may be a screen
 // or two above on a phone). Empty (hidden) when nothing is selected.
+// (2026-09-22 explorer: one row per filter group -- "Regions Kelowna ×
+// Penticton ×" / "Activities Hiking & Trails × Camping ×" -- so the
+// active filters read as the two choices the visitor made.)
 function renderOutdoorSelectedTagsHtml(selectedRegions, selectedActivities) {
   const tag = (kind, value, label) => `<button type="button" class="outdoor-selected-tag" data-remove-${kind}="${escapeHtml(value)}" aria-label="Remove ${escapeHtml(label)}">${escapeHtml(label)}<span class="outdoor-selected-x" aria-hidden="true">×</span></button>`;
-  const tags = [
-    ...selectedRegions.map((r) => tag('region', r, REGION_LABELS[r] || r)),
-    ...selectedActivities.map((a) => tag('activity', a, (OUTDOOR_ACTIVITY_BY_SLUG[a] || { label: a }).label)),
-  ];
-  const any = tags.length > 0;
-  return `<div class="outdoor-selected" id="outdoorSelected"${any ? '' : ' hidden'}><span class="outdoor-selected-label">Showing:</span> ${tags.join(' ')}${any ? ' <button type="button" class="outdoor-selected-clear" id="outdoorSelectedClear">Clear all</button>' : ''}</div>`;
+  const row = (label, tags) => (tags.length ? `<div class="outdoor-selected-row"><span class="outdoor-selected-label">${label}</span> ${tags.join(' ')}</div>` : '');
+  const regionTags = selectedRegions.map((r) => tag('region', r, REGION_LABELS[r] || r));
+  const activityTags = selectedActivities.map((a) => tag('activity', a, (OUTDOOR_ACTIVITY_BY_SLUG[a] || { label: a }).label));
+  const any = regionTags.length + activityTags.length > 0;
+  return `<div class="outdoor-selected" id="outdoorSelected"${any ? '' : ' hidden'}>${row('Regions', regionTags)}${row('Activities', activityTags)}${any ? '<button type="button" class="outdoor-selected-clear" id="outdoorSelectedClear">Clear all</button>' : ''}</div>`;
 }
 // venue id -> [activity slugs] (live activities only, so the chips and the
 // per-venue data can never disagree).
@@ -6314,12 +6377,7 @@ function renderOutdoorActivityFilterChips(state = {}) {
 // Client twin of outdoorSummaryText() (same wording, same separators).
 const OUTDOOR_SUMMARY_CLIENT_SRC = `function summaryText(shown, total, regionLabels, activityLabels){
     var filtered = regionLabels.length || activityLabels.length;
-    var text = filtered ? (shown + ' of ' + total + ' outdoor destinations') : (total + ' outdoor destinations');
-    var parts = [];
-    if (regionLabels.length) parts.push(regionLabels.join(', '));
-    if (activityLabels.length) parts.push(activityLabels.join(', '));
-    if (parts.length) text += ' \\u00b7 ' + parts.join(' \\u00b7 ');
-    return text;
+    return filtered ? (shown + ' of ' + total + ' outdoor destinations') : (total + ' outdoor destinations');
   }`;
 const OUTDOOR_FILTER_CLIENT_PREDICATE_SRC = `function matches(regions, activities, venueRegion, venueActivities){
     var regionOk = !regions.length || regions.indexOf(venueRegion) !== -1;
@@ -6334,7 +6392,9 @@ function renderOutdoorFilterScriptHtml() {
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
   var mapEl = document.getElementById('outdoorActivityMap');
   var activityMap = mapEl ? JSON.parse(mapEl.textContent || '{}') : {};
-  var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip'));
+  // Region pills and the activity cards share one toggle contract
+  // (data-region / data-activity + aria-pressed).
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle'));
   var cards = Array.prototype.slice.call(document.querySelectorAll('#outdoorResults > .venue-card'));
   var summary = document.getElementById('outdoorResultsSummary');
   var showBtn = document.getElementById('outdoorShowResults');
@@ -6342,6 +6402,7 @@ function renderOutdoorFilterScriptHtml() {
   var empty = document.getElementById('outdoorNoResults');
   var results = document.getElementById('outdoorResults');
   var selectedBox = document.getElementById('outdoorSelected');
+  var regionStatus = document.getElementById('outdoorRegionStatus'), activityStatus = document.getElementById('outdoorActivityStatus');
   if (!chips.length || !cards.length) return;
   ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
@@ -6377,17 +6438,23 @@ function renderOutdoorFilterScriptHtml() {
     chips.forEach(function(c){
       var r = c.getAttribute('data-region'), a = c.getAttribute('data-activity'), n = c.querySelector('.outdoor-activity-count');
       if (!n) return;
-      n.textContent = String(r ? (regionCounts[r] || 0) : (activityCounts[a] || 0));
+      var count = r ? (regionCounts[r] || 0) : (activityCounts[a] || 0);
+      n.textContent = String(count);
+      var noun = c.querySelector('.outdoor-activity-count-noun');
+      if (noun) noun.textContent = count === 1 ? 'destination' : 'destinations';
     });
   }
+  // "N selected" beside the Choose Region(s) / Choose Activity(s) headings.
+  function updateStepStatus(el, n){ if (!el) return; el.textContent = n ? (n + ' selected') : ''; el.hidden = n === 0; }
   // Selected-filter tags beside the results (removable), mirroring
   // renderOutdoorSelectedTagsHtml on the server.
   function renderSelected(regions, activities){
     if (!selectedBox) return;
     var any = regions.length || activities.length;
-    var html = '<span class="outdoor-selected-label">Showing:</span> ';
-    regions.forEach(function(r){ html += '<button type="button" class="outdoor-selected-tag" data-remove-region="' + r + '" aria-label="Remove ' + (LABELS.regions[r] || r) + '">' + (LABELS.regions[r] || r) + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button> '; });
-    activities.forEach(function(a){ html += '<button type="button" class="outdoor-selected-tag" data-remove-activity="' + a + '" aria-label="Remove ' + (LABELS.activities[a] || a) + '">' + (LABELS.activities[a] || a) + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button> '; });
+    function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
+    function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
+    var html = row('Regions', regions.map(function(r){ return tag('region', r, LABELS.regions[r] || r); }))
+      + row('Activities', activities.map(function(a){ return tag('activity', a, LABELS.activities[a] || a); }));
     if (any) html += '<button type="button" class="outdoor-selected-clear" id="outdoorSelectedClear">Clear all</button>';
     selectedBox.innerHTML = html;
     selectedBox.hidden = !any;
@@ -6413,6 +6480,8 @@ function renderOutdoorFilterScriptHtml() {
     if (summary) summary.textContent = summaryText(shown, total, labelsOf('regions', regions), labelsOf('activities', activities));
     updateGroupHeaders();
     updateChipCounts(regions, activities);
+    updateStepStatus(regionStatus, regions.length);
+    updateStepStatus(activityStatus, activities.length);
     renderSelected(regions, activities);
     if (showBtn) showBtn.textContent = filtered ? ('Show ' + shown + ' result' + (shown === 1 ? '' : 's')) : 'Show all results';
     if (clearBtn) clearBtn.hidden = !filtered;
@@ -6464,31 +6533,30 @@ function renderOutdoorFilterScriptHtml() {
 </script>`;
 }
 
-// Outdoor activity showcase (2026-09-20, approved presentation): six
-// featured activity cards at the top of /outdoors, then "View All Outdoor
-// Activities" revealing five more. Presentation only -- every card that
-// can link points at the EXISTING activity page (/outdoors/<slug>), which
-// is the same activity data the filter chips use; nothing here is a
-// second data system. A card links only when its activity exists in
-// OUTDOOR_ACTIVITIES *and* is live (>= MIN_ACTIVITY_VENUES, the same
-// gate the chips use); an activity with no slug yet (Fishing, Boating &
-// Marinas, Climbing) or below the gate (Water, Camping today) renders as
-// a non-link "Coming soon" tile rather than a dead link or an invented
-// slug -- it becomes a link automatically the day its data is live.
-// `title` is the approved card wording; the underlying activity's own
-// label/slug/URL are unchanged.
+// Outdoor activity cards (2026-09-20 approved presentation; 2026-09-22
+// explorer): the nine activities of the data model as image cards in a
+// 3 x 3 grid under "Choose Activity(s)". Since 2026-09-22 a live card is
+// a multi-select FILTER toggle (the same aria-pressed contract as the
+// region chips, so one client script drives both groups and the URL
+// state), with a small "Guide" link beside it to the EXISTING activity
+// page (/outdoors/<slug>) -- the cards are no longer navigation only.
+// The count on a card is the live activity count from the data (and the
+// contextual count once the other group has a selection); nothing here
+// is a second data system. An activity below MIN_ACTIVITY_VENUES renders
+// as a non-interactive "Coming soon" tile rather than a dead control --
+// it becomes a toggle automatically the day its data is live. `title`
+// is the approved card wording; the activity's own label/slug/URL are
+// unchanged.
 const OUTDOOR_ACTIVITY_CARDS = [
-  { key: 'hiking', title: 'Hiking & Trails', slug: 'hiking', featured: true },
-  { key: 'cycling', title: 'Cycling & Bike Trails', slug: 'cycling', featured: true },
-  { key: 'water', title: 'Water Activities', slug: 'water', featured: true },
-  { key: 'adventure', title: 'Adventure', slug: 'adventure', featured: true },
-  { key: 'fishing', title: 'Fishing', slug: 'fishing', featured: true },
-  { key: 'winter', title: 'Winter', slug: 'winter', featured: true },
-  { key: 'nature', title: 'Nature & Wildlife', slug: 'nature', featured: false },
-  { key: 'viewpoints', title: 'Viewpoints & Lookouts', slug: 'viewpoints', featured: false },
-  { key: 'camping', title: 'Camping', slug: 'camping', featured: false },
-  { key: 'boating', title: 'Boating & Marinas', slug: null, featured: false },
-  { key: 'climbing', title: 'Climbing', slug: null, featured: false },
+  { key: 'hiking', title: 'Hiking & Trails', slug: 'hiking' },
+  { key: 'cycling', title: 'Cycling & Bike Trails', slug: 'cycling' },
+  { key: 'water', title: 'Water Activities', slug: 'water' },
+  { key: 'adventure', title: 'Adventure', slug: 'adventure' },
+  { key: 'fishing', title: 'Fishing', slug: 'fishing' },
+  { key: 'winter', title: 'Winter', slug: 'winter' },
+  { key: 'nature', title: 'Nature & Wildlife', slug: 'nature' },
+  { key: 'viewpoints', title: 'Viewpoints & Lookouts', slug: 'viewpoints' },
+  { key: 'camping', title: 'Camping', slug: 'camping' },
 ];
 // Card images: /images/outdoors/<key>.webp under public/images (same
 // static route and per-group subdirectory convention as mood/, regions/,
@@ -6514,40 +6582,43 @@ const OUTDOOR_ACTIVITY_ICONS = {
   boating: '<path d="M4 15h16l-2 4H6z"/><path d="M12 4v11"/><path d="M12 4c4 2 5 5 5 7H12z"/>',
   climbing: '<path d="M12 3v4"/><circle cx="12" cy="9" r="2"/><path d="m8 21 3-8 2 3 3-4 1 9"/><path d="M5 13c3-1 4-3 4-6"/>',
 };
-function outdoorActivityCardHtml(card, liveBySlug, size) {
+// One card. `state` (optional) is the server-applied URL selection:
+// { selectedActivities, counts } -> pressed toggles and contextual counts
+// on the first paint, exactly what the client script would produce.
+// The count is split into number + noun so the script can update the
+// number in place (the same .outdoor-activity-count hook the region chips
+// use) and keep the noun's plural right.
+function outdoorActivityCardHtml(card, liveBySlug, state = {}) {
   const live = card.slug ? liveBySlug[card.slug] : null;
   const img = outdoorActivityImagePath(card.key);
   const icon = `<span class="outdoor-activity-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${OUTDOOR_ACTIVITY_ICONS[card.key] || ''}</svg></span>`;
+  const count = live ? (state.counts && state.counts.activities ? (state.counts.activities[card.slug] || 0) : live.count) : 0;
   const inner = `${img ? `<img class="outdoor-activity-card-img" src="${img}" width="1376" height="768" alt="" loading="lazy">` : ''}
       <span class="outdoor-activity-card-overlay">
         ${icon}
         <span class="outdoor-activity-card-title">${escapeHtml(card.title)}</span>
-        ${live ? `<span class="outdoor-activity-card-count">${live.count} destination${live.count === 1 ? '' : 's'}</span>` : '<span class="outdoor-activity-card-soon">Coming soon</span>'}
+        ${live ? `<span class="outdoor-activity-card-count"><span class="outdoor-activity-count">${count}</span> <span class="outdoor-activity-count-noun">destination${count === 1 ? '' : 's'}</span></span>` : '<span class="outdoor-activity-card-soon">Coming soon</span>'}
       </span>`;
-  const cls = `outdoor-activity-card outdoor-activity-card-${card.key}${size === 'secondary' ? ' outdoor-activity-card-secondary' : ''}${live ? '' : ' outdoor-activity-card-pending'}`;
-  return live
-    ? `<a class="${cls}" href="/outdoors/${card.slug}">${inner}</a>`
-    : `<div class="${cls}" aria-disabled="true">${inner}</div>`;
+  const cls = `outdoor-activity-card outdoor-activity-card-${card.key}${live ? ' outdoor-activity-toggle' : ' outdoor-activity-card-pending'}`;
+  if (!live) return `<div class="${cls}" aria-disabled="true">${inner}</div>`;
+  const pressed = (state.selectedActivities || []).includes(card.slug);
+  return `<div class="outdoor-activity-card-wrap">
+      <button type="button" class="${cls}" data-activity="${card.slug}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${escapeHtml(card.title)}"><span class="outdoor-activity-card-check" aria-hidden="true">&#10003; Selected</span>${inner}</button>
+      <a class="outdoor-activity-card-link" href="/outdoors/${card.slug}" aria-label="${escapeHtml(card.title)} guide">Guide &rarr;</a>
+    </div>`;
 }
-// The showcase block for the /outdoors landing: six featured cards, then
-// a native <details> whose <summary> is the "View All Outdoor Activities"
-// control (works without scripting, keyboard/touch friendly) revealing the
-// five secondary cards in the same treatment.
-function renderOutdoorActivityShowcaseHtml() {
+// The Choose Activity(s) block for the /outdoors landing: the nine cards
+// in one grid (3 x 3 from 600px, 2 across on phones), every live one a
+// filter toggle. `state` as for outdoorActivityCardHtml.
+function renderOutdoorActivityShowcaseHtml(state = {}) {
   const liveBySlug = Object.fromEntries(listLiveOutdoorActivities().map((a) => [a.slug, a]));
-  const featured = OUTDOOR_ACTIVITY_CARDS.filter((c) => c.featured).map((c) => outdoorActivityCardHtml(c, liveBySlug, 'featured')).join('\n    ');
-  const more = OUTDOOR_ACTIVITY_CARDS.filter((c) => !c.featured).map((c) => outdoorActivityCardHtml(c, liveBySlug, 'secondary')).join('\n      ');
-  return `<section class="outdoor-activity-showcase" aria-labelledby="outdoorActivitiesHeading">
-  <h2 class="category-subsection-heading" id="outdoorActivitiesHeading">Explore by Activity</h2>
-  <div class="outdoor-activity-card-grid">
-    ${featured}
+  const cards = OUTDOOR_ACTIVITY_CARDS.map((c) => outdoorActivityCardHtml(c, liveBySlug, state)).join('\n    ');
+  const nSel = (state.selectedActivities || []).length;
+  return `<section class="outdoor-activity-showcase outdoor-step" aria-labelledby="outdoorActivitiesHeading">
+  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="outdoorActivitiesHeading">Choose Activity(s)</h2><span class="outdoor-step-status" id="outdoorActivityStatus"${nSel ? '' : ' hidden'}>${nSel ? `${nSel} selected` : ''}</span></div>
+  <div class="outdoor-activity-card-grid" role="group" aria-label="Choose activities" data-filter="activity">
+    ${cards}
   </div>
-  <details class="outdoor-activity-more" id="outdoorActivityMore">
-    <summary class="outdoor-activity-more-toggle">View All Outdoor Activities<span class="outdoor-activity-more-chevron" aria-hidden="true"></span></summary>
-    <div class="outdoor-activity-card-grid outdoor-activity-card-grid-secondary">
-      ${more}
-    </div>
-  </details>
 </section>`;
 }
 
@@ -6707,15 +6778,23 @@ function renderCategoryAllRegionsPage(type, venues, filter = null) {
   const outdoorSummary = isOutdoorLanding
     ? outdoorSummaryText(outdoorMatching.length, venues.length, selectedRegions.map((r) => REGION_LABELS[r]), selectedActivities.map((a) => (OUTDOOR_ACTIVITY_BY_SLUG[a] || { label: a }).label))
     : '';
+  // Explorer layout (2026-09-22): three clearly separated steps, each an
+  // .outdoor-step with the existing teal-marker heading -- Choose
+  // Region(s) -> Choose Activity(s) -> Results -- and a small "N selected"
+  // status beside the first two headings. The Show results / Clear all
+  // controls sit between the choices and the results.
   const outdoorIntroHtml = isOutdoorLanding
     ? `<p class="outdoor-intro">Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs \u2014 the Okanagan\u2019s outdoors run the length of the valley. Pick the communities you want to visit and the things you want to do; leave both empty to browse everything.</p>
-  <h2 class="category-subsection-heading">Choose Region(s)</h2>
+  <section class="outdoor-step" aria-labelledby="outdoorRegionsHeading">
+  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="outdoorRegionsHeading">Choose Region(s)</h2><span class="outdoor-step-status" id="outdoorRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span></div>
   ${renderOutdoorRegionFilterChips(venues, { selectedRegions, counts: outdoorCounts })}
-  ${renderOutdoorActivityShowcaseHtml()}
+  </section>
+  ${renderOutdoorActivityShowcaseHtml({ selectedActivities, counts: outdoorCounts })}
   <div class="outdoor-filter-actions">
     <button type="button" class="cta outdoor-show-results" id="outdoorShowResults">${outdoorFiltered ? `Show ${outdoorMatching.length} result${outdoorMatching.length === 1 ? '' : 's'}` : 'Show all results'}</button>
-    <button type="button" class="cta secondary outdoor-clear-filters" id="outdoorClearFilters"${outdoorFiltered ? '' : ' hidden'}>Clear filters</button>
+    <button type="button" class="outdoor-clear-filters" id="outdoorClearFilters"${outdoorFiltered ? '' : ' hidden'}>Clear all</button>
   </div>
+  <section class="outdoor-step outdoor-step-results" aria-labelledby="outdoorResultsTop">
   <h2 class="category-subsection-heading" id="outdoorResultsTop">Results</h2>
   <p class="outdoor-results-summary" id="outdoorResultsSummary" aria-live="polite">${escapeHtml(outdoorSummary)}</p>
   ${renderOutdoorSelectedTagsHtml(selectedRegions, selectedActivities)}
@@ -6752,6 +6831,10 @@ function renderCategoryAllRegionsPage(type, venues, filter = null) {
   // Okanagan-wide listing: cards carry their community so same-named
   // venues in different communities can be told apart. The Outdoors
   // landing instead renders the compact region-grouped index.
+  // Landing (2026-09-22): the venue list is the activity universe
+  // (getOutdoorLandingVenues), so a beach-type activity member renders as
+  // a beach card here; the beach card rules are loaded in pageHead only
+  // when one is present (beachTheme), so a landing without any is as before.
   // Landing: the results list is pre-filtered to the URL selection (cards
   // outside it carry `hidden`, the list itself is hidden when nothing
   // matches) so the first paint, a no-script visitor and the client script
@@ -6765,7 +6848,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${golfEngagementHeadHtml(type)}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -6776,7 +6859,7 @@ ${golfEngagementHeadHtml(type)}
   ])}
   <h1>${escapeHtml(heading)}</h1>
   ${isOutdoorLanding ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
-  ${outdoorDirectoryHeading}${cardsHtml}
+  ${outdoorDirectoryHeading}${cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
@@ -9547,7 +9630,10 @@ const server = http.createServer(async (req, res) => {
       method === 'GET'
     ) {
       const type = SLUG_TO_TYPE[allRegionsCategorySlug];
-      const venues = getVenuesByCategory(type);
+      // The Outdoors landing lists the activity universe (outdoor-type
+      // venues plus allowlisted-type activity members); every other
+      // category lists its own type.
+      const venues = type === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(type);
       if (venues.length >= MIN_CATEGORY_VENUES) {
         // /outdoors?regions=..&activities=.. renders pre-filtered (see
         // parseOutdoorFilterQuery); other categories ignore the query.
@@ -9729,6 +9815,7 @@ module.exports = {
   MIN_ACTIVITY_VENUES,
   OUTDOOR_FEATURED_KEYS,
   OUTDOOR_ACTIVITY_VENUE_TYPES,
+  getOutdoorLandingVenues,
   getOutdoorActivityVenues,
   getOutdoorActivityCounts,
   listLiveOutdoorActivities,

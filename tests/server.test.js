@@ -4970,11 +4970,11 @@ test('/outdoors (Okanagan-wide) renders the discovery landing: one H1, canonical
   assert.equal(cards.length, rows.length, 'exactly one result card per outdoor venue');
   assert.match(html, /<ul class="card-grid" id="outdoorResults">/);
   assert.match(markup, /Test Canyon Regional Park<\/span><span class="venue-card-cue"[^<]*<\/span><\/a><\/h2>\s*<p class="venue-meta">Kelowna<\/p>/, 'community line on result cards');
-  // Hierarchy (2026-09-21): Choose Region(s) -> Explore by Activity (showcase + View All) -> Show results -> Results; no Choose Activity(s) row.
-  const iRegion = markup.indexOf('Choose Region(s)</h2>'), iActivity = markup.indexOf('id="outdoorActivitiesHeading">Explore by Activity</h2>'), iMore = markup.indexOf('id="outdoorActivityMore"'), iShow = markup.indexOf('id="outdoorShowResults"'), iResults = markup.indexOf('id="outdoorResultsTop">Results</h2>');
-  assert.ok(iRegion > 0 && iActivity > iRegion && iMore > iActivity && iShow > iMore && iResults > iShow, 'Region -> Explore by Activity -> View All -> Show results -> Results');
-  assert.doesNotMatch(markup, /Choose Activity\(s\)|data-filter="activity"|class="outdoor-filter-chip" data-activity=/, 'the Choose Activity(s) chip row is gone');
-  assert.equal((markup.match(/Explore by Activity<\/h2>/g) || []).length, 1, 'exactly one Explore by Activity section');
+  // Hierarchy (2026-09-22 explorer): Choose Region(s) -> Choose Activity(s) (nine toggle cards) -> Show results -> Results.
+  const iRegion = markup.indexOf('Choose Region(s)</h2>'), iActivity = markup.indexOf('id="outdoorActivitiesHeading">Choose Activity(s)</h2>'), iShow = markup.indexOf('id="outdoorShowResults"'), iResults = markup.indexOf('id="outdoorResultsTop">Results</h2>');
+  assert.ok(iRegion > 0 && iActivity > iRegion && iShow > iActivity && iResults > iShow, 'Region -> Choose Activity(s) -> Show results -> Results');
+  assert.doesNotMatch(markup, /Explore by Activity|outdoorActivityMore|View All Outdoor Activities|class="outdoor-filter-chip" data-activity=/, 'the former showcase reveal and the old activity chip row are gone');
+  assert.equal((markup.match(/Choose Activity\(s\)<\/h2>/g) || []).length, 1, 'exactly one Choose Activity(s) section');
   for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">`), `canonical region chip for ${r}`);
   assert.match(markup, /<p class="outdoor-results-summary" id="outdoorResultsSummary" aria-live="polite">\d+ outdoor destinations<\/p>/);
   assert.match(markup, /id="outdoorNoResults" hidden>/);
@@ -5246,11 +5246,12 @@ test('Activity page + landing sections render once an activity reaches the thres
     const landing = app.renderCategoryAllRegionsPage('outdoor', all);
     assert.equal((landing.match(/<h1[\s>]/g) || []).length, 1);
     assert.match(landing, /<h1>Outdoors in the Okanagan<\/h1>/);
-    const order = ['<p class="outdoor-intro">', 'Choose Region(s)</h2>', 'data-filter="region"', 'id="outdoorActivitiesHeading">Explore by Activity</h2>', 'id="outdoorActivityMore"', 'id="outdoorShowResults"', 'id="outdoorResultsTop">Results</h2>', '<ul class="card-grid" id="outdoorResults">'];
+    const order = ['<p class="outdoor-intro">', 'Choose Region(s)</h2>', 'data-filter="region"', 'id="outdoorActivitiesHeading">Choose Activity(s)</h2>', 'data-filter="activity"', 'id="outdoorShowResults"', 'id="outdoorResultsTop">Results</h2>', '<ul class="card-grid" id="outdoorResults">'];
     const landingMarkup = outdoorMarkupOnly(landing);
     let pos = -1; for (const marker of order) { const i = landingMarkup.indexOf(marker); assert.ok(i > pos, `landing section order: ${marker}`); pos = i; }
-    assert.match(landing, /<a class="outdoor-activity-card outdoor-activity-card-hiking" href="\/outdoors\/hiking">[\s\S]*?<span class="outdoor-activity-card-count">4 destinations<\/span>/, 'the live activity card carries its count and links to the activity page');
-    assert.doesNotMatch(landing, /data-activity="viewpoints"|data-activity="camping"|href="\/outdoors\/(viewpoints|camping)"/, 'sub-threshold activities get no chip and no link');
+    assert.match(landing, /<button type="button" class="outdoor-activity-card outdoor-activity-card-hiking outdoor-activity-toggle" data-activity="hiking" aria-pressed="false"[^>]*>[\s\S]*?<span class="outdoor-activity-card-count"><span class="outdoor-activity-count">4<\/span> <span class="outdoor-activity-count-noun">destinations<\/span><\/span>/, 'the live activity card is a filter toggle carrying its count');
+    assert.match(landing, /<a class="outdoor-activity-card-link" href="\/outdoors\/hiking" aria-label="Hiking &amp; Trails guide">Guide &rarr;<\/a>/, 'and keeps a link to the activity page');
+    assert.doesNotMatch(landing, /data-activity="viewpoints"|data-activity="camping"|href="\/outdoors\/(viewpoints|camping)"/, 'sub-threshold activities get no toggle and no link');
     assert.equal((outdoorMarkupOnly(landing).match(/<li class="venue-card" /g) || []).length, all.length, 'every destination rendered once');
     // The per-venue activity map only carries live activities.
     const mapJson = JSON.parse(landing.match(/id="outdoorActivityMap">([\s\S]*?)<\/script>/)[1]);
@@ -5259,7 +5260,7 @@ test('Activity page + landing sections render once an activity reaches the thres
     assert.doesNotMatch(outdoorMarkupOnly(html), /outdoor-activity-count/, 'no chip counts on activity pages');
     assert.doesNotMatch(landing, /Featured Outdoor Experiences/, 'the landing directory has no featured section');
     assert.doesNotMatch(outdoorMarkupOnly(landing), /aria-label="Filter by region"|category-region-selector-active">All Regions/, 'the shared All-Regions selector is not rendered on the landing');
-    const chipRegions = [...outdoorMarkupOnly(landing).match(/data-filter="region"[\s\S]*?Explore by Activity/)[0].matchAll(/data-region="([a-z-]+)"/g)].map((m) => m[1]);
+    const chipRegions = [...outdoorMarkupOnly(landing).match(/data-filter="region"[\s\S]*?Choose Activity\(s\)/)[0].matchAll(/data-region="([a-z-]+)"/g)].map((m) => m[1]);
     assert.deepEqual(chipRegions, app.canonicalOutdoorRegionOrder(), 'region chips: the complete canonical region list in the site order');
     assert.equal(app.renderOutdoorFeaturedHtml(all), '');
     // Featured section, when a key resolves, captions cards with their activities and never duplicates the venue.
@@ -5386,14 +5387,15 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     const landing = await (await fetch(`${base}/outdoors`)).text();
     assert.equal((landing.match(/<h1[\s>]/g) || []).length, 1);
     const lm = landing.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
-    assert.ok(lm.indexOf('Choose Region(s)</h2>') < lm.indexOf('Explore by Activity</h2>') && lm.indexOf('Explore by Activity</h2>') < lm.indexOf('Results</h2>'), 'Region -> Explore by Activity -> Results');
-    assert.doesNotMatch(lm, /Choose Activity\(s\)/);
+    assert.ok(lm.indexOf('Choose Region(s)</h2>') < lm.indexOf('Choose Activity(s)</h2>') && lm.indexOf('Choose Activity(s)</h2>') < lm.indexOf('Results</h2>'), 'Region -> Choose Activity(s) -> Results');
+    assert.doesNotMatch(lm, /Explore by Activity/);
     for (const r of ['kelowna', 'penticton', 'vernon']) {
       assert.match(lm, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">`), `region chip for ${r}`);
       assert.equal((await fetch(`${base}/${r}/outdoors`)).status, 200, `/${r}/outdoors is valid`);
     }
     assert.equal((await fetch(`${base}/outdoors/camping`)).status, 404); assert.equal((await fetch(`${base}/outdoors/water`)).status, 404);
-    assert.match(landing, /<a class="outdoor-activity-card outdoor-activity-card-hiking" href="\/outdoors\/hiking">[\s\S]*?<span class="outdoor-activity-card-count">3 destinations<\/span>/);
+    assert.match(landing, /<button type="button" class="outdoor-activity-card outdoor-activity-card-hiking outdoor-activity-toggle" data-activity="hiking" aria-pressed="false"[^>]*>[\s\S]*?<span class="outdoor-activity-count">3<\/span> <span class="outdoor-activity-count-noun">destinations<\/span>/);
+    assert.match(landing, /<a class="outdoor-activity-card-link" href="\/outdoors\/hiking"/);
     assert.equal((lm.match(/<li class="venue-card" /g) || []).length, 3, 'results list has each venue once');
     assert.match(landing, /id="outdoorResults"/);
     assert.match(landing, /querySelectorAll\('#outdoorResults > \.venue-card'\)/, 'filter script shipped on the landing');
@@ -5501,8 +5503,9 @@ test('outdoorSummaryText and the shipped client twin produce identical wording f
     assert.equal(client(shown, total, r, a), text);
   }
   assert.equal(app.outdoorSummaryText(62, 62, [], []), '62 outdoor destinations');
-  assert.equal(app.outdoorSummaryText(20, 62, ['Kelowna', 'Vernon'], ['Hiking & Trails', 'Viewpoints']), '20 of 62 outdoor destinations · Kelowna, Vernon · Hiking & Trails, Viewpoints');
-  assert.equal(app.outdoorSummaryText(0, 62, ['Baldy'], []), '0 of 62 outdoor destinations · Baldy');
+  // 2026-09-22: the count line is count only; the labels live in the selected-filter rows.
+  assert.equal(app.outdoorSummaryText(20, 62, ['Kelowna', 'Vernon'], ['Hiking & Trails', 'Viewpoints']), '20 of 62 outdoor destinations');
+  assert.equal(app.outdoorSummaryText(0, 62, ['Baldy'], []), '0 of 62 outdoor destinations');
 });
 
 test('/outdoors with a filter query renders pre-filtered: pressed chips, contextual counts, hidden cards, summary, Show N / Clear, selected tags, empty state; no query = unchanged landing', () => {
@@ -5539,16 +5542,16 @@ test('/outdoors with a filter query renders pre-filtered: pressed chips, context
     const markup = outdoorMarkupOnly(filtered);
     const expected = app.filterOutdoorVenues(all, ['kelowna', 'vernon'], ['hiking', 'winter'], map);
     assert.match(markup, /data-region="kelowna" aria-pressed="true">/); assert.match(markup, /data-region="vernon" aria-pressed="true">/); assert.match(markup, /data-region="apex" aria-pressed="false">/);
-    assert.doesNotMatch(markup, /data-activity="hiking"/, 'no activity chips on the landing; the URL activity selection is still applied to the cards below');
+    assert.match(markup, /data-activity="hiking" aria-pressed="true"/); assert.match(markup, /data-activity="winter" aria-pressed="true"/, 'URL-selected activity cards render pressed');
     const hiddenCards = (markup.match(/<li class="venue-card" data-venue-id="\d+"[^>]*? hidden>/g) || []).length;
     const totalCards = (markup.match(/<li class="venue-card" data-venue-id="\d+"/g) || []).length;
     assert.equal(totalCards, all.length, 'every destination is still in the markup for the script to toggle');
     assert.equal(totalCards - hiddenCards, expected.length, 'exactly the matching cards are visible');
     for (const v of expected) assert.match(markup, new RegExp(`<li class="venue-card" data-venue-id="${v.id}"(?![^>]* hidden)[^>]*>`), `${v.name} visible`);
-    assert.match(markup, new RegExp(`id="outdoorResultsSummary" aria-live="polite">${expected.length} of ${all.length} outdoor destinations · Kelowna, Vernon · Hiking &amp; Trails, Winter</p>`));
+    assert.match(markup, new RegExp(`id="outdoorResultsSummary" aria-live="polite">${expected.length} of ${all.length} outdoor destinations</p>`));
     assert.match(markup, new RegExp(`id="outdoorShowResults">Show ${expected.length} results</button>`));
-    assert.match(markup, /id="outdoorClearFilters">Clear filters</); assert.doesNotMatch(markup, /id="outdoorClearFilters" hidden/);
-    assert.match(markup, /<div class="outdoor-selected" id="outdoorSelected"><span class="outdoor-selected-label">Showing:<\/span> <button type="button" class="outdoor-selected-tag" data-remove-region="kelowna" aria-label="Remove Kelowna">Kelowna<span class="outdoor-selected-x" aria-hidden="true">×<\/span><\/button> <button type="button" class="outdoor-selected-tag" data-remove-region="vernon"[^>]*>Vernon/);
+    assert.match(markup, /id="outdoorClearFilters">Clear all</); assert.doesNotMatch(markup, /id="outdoorClearFilters" hidden/);
+    assert.match(markup, /<div class="outdoor-selected" id="outdoorSelected"><div class="outdoor-selected-row"><span class="outdoor-selected-label">Regions<\/span> <button type="button" class="outdoor-selected-tag" data-remove-region="kelowna" aria-label="Remove Kelowna">Kelowna<span class="outdoor-selected-x" aria-hidden="true">×<\/span><\/button> <button type="button" class="outdoor-selected-tag" data-remove-region="vernon"[^>]*>Vernon[\s\S]*?<\/div><div class="outdoor-selected-row"><span class="outdoor-selected-label">Activities<\/span> /);
     assert.match(markup, /data-remove-activity="hiking"[^>]*>Hiking &amp; Trails</); assert.match(markup, /id="outdoorSelectedClear">Clear all<\/button>/);
     assert.match(markup, /id="outdoorNoResults" hidden>/); assert.match(markup, /<ul class="card-grid" id="outdoorResults">/);
     // Group holding a selection is open with its meta; the rest keep their default state.
@@ -5563,7 +5566,8 @@ test('/outdoors with a filter query renders pre-filtered: pressed chips, context
     const empty = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['baldy'], activities: ['winter'] }));
     assert.match(empty, /<ul class="card-grid" id="outdoorResults" hidden>/);
     assert.match(empty, /id="outdoorNoResults">No outdoor destinations match that combination yet\./);
-    assert.match(empty, new RegExp(`aria-live="polite">0 of ${all.length} outdoor destinations · Baldy · Winter</p>`));
+    assert.match(empty, new RegExp(`aria-live="polite">0 of ${all.length} outdoor destinations</p>`));
+    assert.match(empty, /data-remove-region="baldy"/); assert.match(empty, /data-remove-activity="winter"/);
     assert.match(empty, /id="outdoorShowResults">Show 0 results</);
     assert.equal((empty.match(/<li class="venue-card" data-venue-id="\d+"(?![^>]* hidden)[^>]*>/g) || []).length, 0);
 
@@ -5573,7 +5577,7 @@ test('/outdoors with a filter query renders pre-filtered: pressed chips, context
     assert.equal(app.renderCategoryAllRegionsPage('outdoor', all, null), plainHtml);
     const pm = outdoorMarkupOnly(plainHtml);
     assert.doesNotMatch(pm, /aria-pressed="true"|data-venue-id="\d+"[^>]* hidden>/);
-    assert.match(pm, /id="outdoorSelected" hidden><span class="outdoor-selected-label">Showing:<\/span> <\/div>/);
+    assert.match(pm, /id="outdoorSelected" hidden><\/div>/);
     assert.match(pm, /id="outdoorClearFilters" hidden>/); assert.match(pm, /id="outdoorShowResults">Show all results</);
     // Other categories ignore the filter argument entirely.
     const golfRows = app.getVenuesByCategory('golf');
@@ -5617,8 +5621,8 @@ test('/outdoors?regions=..&activities=.. over HTTP renders pre-filtered; the bar
     const filtered = await (await fetch(`${base}/outdoors?regions=kelowna&activities=hiking`)).text();
     assert.notEqual(plain, filtered);
     const fm = outdoorMarkupOnly(filtered);
-    assert.match(fm, /data-region="kelowna" aria-pressed="true">/); assert.doesNotMatch(fm, /data-activity="hiking"/);
-    assert.match(fm, /aria-live="polite">2 of 4 outdoor destinations · Kelowna · Hiking &amp; Trails</);
+    assert.match(fm, /data-region="kelowna" aria-pressed="true">/); assert.match(fm, /data-activity="hiking" aria-pressed="true"/);
+    assert.match(fm, /aria-live="polite">2 of 4 outdoor destinations</); assert.match(fm, /data-remove-activity="hiking"/);
     assert.equal((fm.match(/<li class="venue-card" data-venue-id="\d+"(?![^>]* hidden)[^>]*>/g) || []).length, 2);
     assert.match(fm, /data-remove-region="kelowna"/);
     assert.match(filtered, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors"/);
@@ -5637,40 +5641,46 @@ test('/outdoors?regions=..&activities=.. over HTTP renders pre-filtered; the bar
 
 // ==== Outdoor activity showcase (2026-09-20 approved presentation) ==========
 
-test('Outdoor activity showcase: six featured cards in the approved order, five behind "View All Outdoor Activities"; links only to existing live activity pages, "Coming soon" otherwise; no invented slugs', () => {
+test('Outdoor activity cards (2026-09-22 explorer): nine data-model activities in the approved order, live ones are filter toggles with a Guide link, below-gate ones are inert "Coming soon" tiles; no invented slugs', () => {
   const cards = app.OUTDOOR_ACTIVITY_CARDS;
-  assert.deepEqual(cards.filter((c) => c.featured).map((c) => c.title), ['Hiking & Trails', 'Cycling & Bike Trails', 'Water Activities', 'Adventure', 'Fishing', 'Winter']);
-  assert.deepEqual(cards.filter((c) => !c.featured).map((c) => c.title), ['Nature & Wildlife', 'Viewpoints & Lookouts', 'Camping', 'Boating & Marinas', 'Climbing']);
-  for (const c of cards) if (c.slug) assert.ok(app.OUTDOOR_ACTIVITY_BY_SLUG[c.slug], `${c.title} maps onto an existing activity slug (${c.slug})`);
-  assert.deepEqual(cards.filter((c) => !c.slug).map((c) => c.key), ['boating', 'climbing'], 'the two activities with no data model entry carry no slug');
-  assert.equal(app.OUTDOOR_ACTIVITIES.length, 9, 'Fishing is the only activity added to the data model');
+  assert.deepEqual(cards.map((c) => c.title), ['Hiking & Trails', 'Cycling & Bike Trails', 'Water Activities', 'Adventure', 'Fishing', 'Winter', 'Nature & Wildlife', 'Viewpoints & Lookouts', 'Camping']);
+  assert.equal(cards.length, 9, 'one card per data-model activity');
+  for (const c of cards) assert.ok(app.OUTDOOR_ACTIVITY_BY_SLUG[c.slug], `${c.title} maps onto an existing activity slug (${c.slug})`);
+  assert.deepEqual([...cards.map((c) => c.slug)].sort(), [...app.OUTDOOR_ACTIVITIES.map((a) => a.slug)].sort(), 'exactly the nine activities, nothing invented');
 
   const meta = { reason: 'test', batch_id: 'outdoors-showcase-test', reviewed_by: null };
   const ids = []; const added = [];
   const mk = (name, region, slug) => { const info = insert.run({ name, region, type: 'outdoor', cuisine: null, phone: null, price: null, reviews: null, rating: null, description: `${name} fixture.`, address: null, latitude: null, longitude: null, hours: null, slug }); ids.push(Number(info.lastInsertRowid)); return Number(info.lastInsertRowid); };
   const add = (kind, id) => { const r = app.guardedCollectionMembershipUpdate(kind, id, 'add', null, meta); assert.equal(r.ok, true, JSON.stringify(r)); added.push([kind, id]); };
   try {
-    // Nothing live yet: every card is a "Coming soon" tile, none is a link.
+    // Nothing live yet: every card is a "Coming soon" tile, none is a control.
     const none = app.renderOutdoorActivityShowcaseHtml();
-    assert.equal((none.match(/<a class="outdoor-activity-card/g) || []).length, 0);
-    assert.equal((none.match(/Coming soon/g) || []).length, 11);
-    // Make hiking live (3 members) -> only Hiking links, to the existing activity page.
+    assert.equal((none.match(/<button type="button" class="outdoor-activity-card/g) || []).length, 0);
+    assert.equal((none.match(/Coming soon/g) || []).length, 9);
+    assert.doesNotMatch(none, /outdoor-activity-card-link/, 'no guide links while nothing is live');
+    // Make hiking live (3 members) -> only Hiking is a toggle (+ guide link to the existing activity page).
     const a = mk('Showcase A', 'kelowna', 'showcase-a'), b = mk('Showcase B', 'vernon', 'showcase-b'), c = mk('Showcase C', 'apex', 'showcase-c');
     add('activity_hiking', a); add('activity_hiking', b); add('activity_hiking', c);
     const html = app.renderOutdoorActivityShowcaseHtml();
-    assert.match(html, /<h2 class="category-subsection-heading" id="outdoorActivitiesHeading">Explore by Activity<\/h2>/);
-    assert.match(html, /<a class="outdoor-activity-card outdoor-activity-card-hiking" href="\/outdoors\/hiking">[\s\S]*?Hiking &amp; Trails<\/span>\s*<span class="outdoor-activity-card-count">3 destinations<\/span>/);
-    assert.equal((html.match(/<a class="outdoor-activity-card/g) || []).length, 1, 'only the live activity is a link');
+    assert.match(html, /<h2 class="category-subsection-heading" id="outdoorActivitiesHeading">Choose Activity\(s\)<\/h2>/);
+    assert.match(html, /<div class="outdoor-activity-card-grid" role="group" aria-label="Choose activities" data-filter="activity">/);
+    assert.match(html, /<button type="button" class="outdoor-activity-card outdoor-activity-card-hiking outdoor-activity-toggle" data-activity="hiking" aria-pressed="false" aria-label="Hiking &amp; Trails"><span class="outdoor-activity-card-check" aria-hidden="true">&#10003; Selected<\/span>[\s\S]*?Hiking &amp; Trails<\/span>\s*<span class="outdoor-activity-card-count"><span class="outdoor-activity-count">3<\/span> <span class="outdoor-activity-count-noun">destinations<\/span><\/span>/);
+    assert.match(html, /<a class="outdoor-activity-card-link" href="\/outdoors\/hiking" aria-label="Hiking &amp; Trails guide">Guide &rarr;<\/a>/);
+    assert.equal((html.match(/<button type="button" class="outdoor-activity-card/g) || []).length, 1, 'only the live activity is a toggle');
+    assert.equal((html.match(/outdoor-activity-card-link/g) || []).length, 1, 'only the live activity has a guide link');
     assert.match(html, /<div class="outdoor-activity-card outdoor-activity-card-fishing outdoor-activity-card-pending" aria-disabled="true">[\s\S]*?Fishing<\/span>\s*<span class="outdoor-activity-card-soon">Coming soon<\/span>/, 'Fishing exists in the data model but has no members in the fixture, so it is a Coming soon tile');
     assert.match(html, /<div class="outdoor-activity-card outdoor-activity-card-water outdoor-activity-card-pending" aria-disabled="true">/, 'an existing activity below the gate is a Coming soon tile too');
-    assert.doesNotMatch(html, /href="\/outdoors\/(fishing|boating|climbing|water|camping)"/, 'no dead or invented activity links');
-    // Order: featured grid before the details block; the five secondary inside it.
-    const iGrid = html.indexOf('<div class="outdoor-activity-card-grid">'), iMore = html.indexOf('<details class="outdoor-activity-more" id="outdoorActivityMore">'), iSummary = html.indexOf('View All Outdoor Activities'), iSecondary = html.indexOf('outdoor-activity-card-grid-secondary');
-    assert.ok(iGrid > 0 && iMore > iGrid && iSummary > iMore && iSecondary > iSummary);
-    const featuredBlock = html.slice(iGrid, iMore), moreBlock = html.slice(iMore);
-    for (const k of ['hiking', 'cycling', 'water', 'adventure', 'fishing', 'winter']) assert.match(featuredBlock, new RegExp(`outdoor-activity-card-${k}`));
-    for (const k of ['nature', 'viewpoints', 'camping', 'boating', 'climbing']) { assert.match(moreBlock, new RegExp(`outdoor-activity-card-${k} outdoor-activity-card-secondary`)); assert.doesNotMatch(featuredBlock, new RegExp(`outdoor-activity-card-${k}\\b`)); }
-    assert.doesNotMatch(html, /<details[^>]* open/, 'secondary activities start collapsed');
+    assert.doesNotMatch(html, /href="\/outdoors\/(fishing|water|camping)"|data-activity="(fishing|water|camping)"/, 'no dead links or controls for below-gate activities');
+    assert.doesNotMatch(html, /<details|View All Outdoor Activities|outdoor-activity-card-secondary|boating|climbing/, 'no reveal, no secondary grid, no non-data-model cards');
+    // Order: the nine cards in one grid in the approved order.
+    assert.deepEqual([...html.matchAll(/outdoor-activity-card outdoor-activity-card-([a-z]+)/g)].map((m) => m[1]), cards.map((c) => c.key));
+    // Pressed + contextual count from the server-applied URL state.
+    const pressed = app.renderOutdoorActivityShowcaseHtml({ selectedActivities: ['hiking'], counts: { activities: { hiking: 2 } } });
+    assert.match(pressed, /data-activity="hiking" aria-pressed="true"/);
+    assert.match(pressed, /<span class="outdoor-activity-count">2<\/span> <span class="outdoor-activity-count-noun">destinations<\/span>/);
+    assert.match(pressed, /<span class="outdoor-step-status" id="outdoorActivityStatus">1 selected<\/span>/);
+    assert.match(html, /<span class="outdoor-step-status" id="outdoorActivityStatus" hidden><\/span>/);
+    assert.match(app.renderOutdoorActivityShowcaseHtml({ counts: { activities: { hiking: 1 } } }), /<span class="outdoor-activity-count">1<\/span> <span class="outdoor-activity-count-noun">destination<\/span>/, 'singular noun');
     // Images only when the asset exists; otherwise no <img> (navy fallback), never a broken src.
     for (const cd of app.OUTDOOR_ACTIVITY_CARDS) {
       const p = app.outdoorActivityImagePath(cd.key);
@@ -5678,22 +5688,177 @@ test('Outdoor activity showcase: six featured cards in the approved order, five 
       else assert.doesNotMatch(html, new RegExp(`/images/outdoors/${cd.key}\\.webp`));
     }
     for (const k of ['hiking', 'cycling', 'water', 'adventure', 'fishing', 'winter']) assert.equal(app.outdoorActivityImagePath(k), `/images/outdoors/${k}.webp`, `approved image wired for ${k}`);
-    for (const k of ['nature', 'viewpoints', 'camping', 'boating', 'climbing']) assert.equal(app.outdoorActivityImagePath(k), null, `no art yet for ${k}`);
-    // Placement on the landing (2026-09-21): intro -> Choose Region(s) -> showcase -> View All -> Show all results; region filter markup unchanged, no activity chip row.
+    for (const k of ['nature', 'viewpoints', 'camping']) assert.equal(app.outdoorActivityImagePath(k), null, `no art yet for ${k}`);
+    // Placement on the landing: intro -> Choose Region(s) -> Choose Activity(s) -> Show all results -> Results; region filter markup unchanged.
     const landing = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor')));
-    const iIntro = landing.indexOf('<p class="outdoor-intro">'), iRegion = landing.indexOf('Choose Region(s)</h2>'), iShow = landing.indexOf('outdoor-activity-showcase'), iMore2 = landing.indexOf('id="outdoorActivityMore"'), iBtn = landing.indexOf('id="outdoorShowResults"');
-    assert.ok(iIntro > 0 && iRegion > iIntro && iShow > iRegion && iMore2 > iShow && iBtn > iMore2, 'intro -> Choose Region(s) -> showcase -> View All -> Show all results');
-    assert.doesNotMatch(landing, /Choose Activity\(s\)|data-filter="activity"/, 'no Choose Activity(s) section');
-    assert.equal((landing.match(/Explore by Activity<\/h2>/g) || []).length, 1, 'one Explore by Activity section');
+    const iIntro = landing.indexOf('<p class="outdoor-intro">'), iRegion = landing.indexOf('Choose Region(s)</h2>'), iShow = landing.indexOf('outdoor-activity-showcase'), iBtn = landing.indexOf('id="outdoorShowResults"'), iRes = landing.indexOf('id="outdoorResultsTop">Results</h2>');
+    assert.ok(iIntro > 0 && iRegion > iIntro && iShow > iRegion && iBtn > iShow && iRes > iBtn, 'intro -> Choose Region(s) -> Choose Activity(s) -> Show all results -> Results');
+    assert.equal((landing.match(/Choose Activity\(s\)<\/h2>/g) || []).length, 1, 'one Choose Activity(s) section');
     assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">\d+<\/span>/, 'region chip and label untouched');
-    // Activity pages and region pages do not carry the showcase.
-    // (markup only -- the shared outdoor <style> block legitimately carries the showcase class names on every outdoor page)
-    assert.doesNotMatch(outdoorMarkupOnly(app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking))), /outdoor-activity-showcase|outdoorActivityMore/);
-    assert.doesNotMatch(outdoorMarkupOnly(app.renderCategoryPage('kelowna', 'outdoor', app.getVenuesByRegionCategory('kelowna', 'outdoor'), [])), /outdoor-activity-showcase|outdoorActivityMore/);
+    // Activity pages and region pages do not carry the activity cards.
+    // (markup only -- the shared outdoor <style> block legitimately carries the card class names on every outdoor page)
+    assert.doesNotMatch(outdoorMarkupOnly(app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking))), /outdoor-activity-showcase|outdoor-activity-toggle/);
+    assert.doesNotMatch(outdoorMarkupOnly(app.renderCategoryPage('kelowna', 'outdoor', app.getVenuesByRegionCategory('kelowna', 'outdoor'), [])), /outdoor-activity-showcase|outdoor-activity-toggle/);
   } finally {
     for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
     for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
+});
+
+// ==== Outdoors explorer (2026-09-22): Choose Region(s) + Choose Activity(s) -> Results ==
+
+test('Outdoors explorer: no filter = every destination; one/many regions (OR); one/many activities (OR); region AND activity; clear = everything; counts, statuses, tags, Clear all, compact cards; homepage/golf/beaches untouched (fixture-only, cleaned up)', () => {
+  const meta = { reason: 'test', batch_id: 'outdoors-explorer-test', reviewed_by: null };
+  const ids = []; const added = [];
+  const mk = (name, region, slug) => { const info = insert.run({ name, region, type: 'outdoor', cuisine: null, phone: null, price: null, reviews: null, rating: null, description: `${name} is a fixture outdoor destination with a description long enough to be clamped by the landing card, used only by the automated test suite.`, address: null, latitude: null, longitude: null, hours: null, slug }); ids.push(Number(info.lastInsertRowid)); return Number(info.lastInsertRowid); };
+  const add = (kind, id) => { const r = app.guardedCollectionMembershipUpdate(kind, id, 'add', null, meta); assert.equal(r.ok, true, JSON.stringify(r)); added.push([kind, id]); };
+  const homeBefore = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+  const golfBefore = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf'));
+  const beachBefore = app.renderCategoryAllRegionsPage('beach', app.getVenuesByCategory('beach'));
+  try {
+    const kelA = mk('Explorer Kelowna Trail', 'kelowna', 'explorer-kelowna-trail');
+    const kelB = mk('Explorer Kelowna Campground', 'kelowna', 'explorer-kelowna-campground');
+    const penA = mk('Explorer Penticton Bluffs', 'penticton', 'explorer-penticton-bluffs');
+    const verA = mk('Explorer Vernon Falls', 'vernon', 'explorer-vernon-falls');
+    const osoA = mk('Explorer Osoyoos Desert', 'osoyoos', 'explorer-osoyoos-desert');
+    // hiking: kelA, penA, verA, osoA (live); camping: kelB, penA, verA (live); nature: osoA (below gate)
+    for (const id of [kelA, penA, verA, osoA]) add('activity_hiking', id);
+    for (const id of [kelB, penA, verA]) add('activity_camping', id);
+    add('activity_nature', osoA);
+    const all = app.getVenuesByCategory('outdoor');
+    const map = app.getOutdoorActivitySlugsByVenue(all);
+    const byId = (list) => list.map((v) => v.id).sort((x, y) => x - y);
+    const visible = (html) => [...outdoorMarkupOnly(html).matchAll(/<li class="venue-card" data-venue-id="(\d+)"(?![^>]* hidden)[^>]*>/g)].map((m) => Number(m[1])).sort((x, y) => x - y);
+    const summary = (html) => outdoorMarkupOnly(html).match(/id="outdoorResultsSummary" aria-live="polite">([^<]*)<\/p>/)[1];
+
+    // 1. No filters -> every current outdoor destination, plain count, nothing pressed, statuses hidden, Clear all hidden.
+    const plain = app.renderCategoryAllRegionsPage('outdoor', all);
+    assert.deepEqual(visible(plain), byId(all));
+    assert.equal(summary(plain), `${all.length} outdoor destinations`);
+    const pm = outdoorMarkupOnly(plain);
+    assert.doesNotMatch(pm, /aria-pressed="true"/);
+    assert.match(pm, /id="outdoorRegionStatus" hidden>/); assert.match(pm, /id="outdoorActivityStatus" hidden>/);
+    assert.match(pm, /id="outdoorClearFilters" hidden>Clear all</); assert.match(pm, /id="outdoorSelected" hidden><\/div>/);
+    // Nine activity cards in a single grid; live ones toggles (hiking, camping), the rest Coming soon.
+    assert.equal((pm.match(/outdoor-activity-card outdoor-activity-card-[a-z]+/g) || []).length, 9);
+    assert.deepEqual([...pm.matchAll(/data-activity="([a-z]+)" aria-pressed="false"/g)].map((m) => m[1]), ['hiking', 'camping']);
+    assert.match(pm, /data-activity="hiking"[^>]*>[\s\S]*?<span class="outdoor-activity-count">4<\/span>/); assert.match(pm, /data-activity="camping"[^>]*>[\s\S]*?<span class="outdoor-activity-count">3<\/span>/);
+
+    // 2. One region.
+    const kel = app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['kelowna'], activities: [] });
+    const kelExpected = all.filter((v) => v.region === 'kelowna');
+    assert.deepEqual(visible(kel), byId(kelExpected));
+    assert.equal(summary(kel), `${kelExpected.length} of ${all.length} outdoor destinations`);
+    const km = outdoorMarkupOnly(kel);
+    assert.match(km, /data-region="kelowna" aria-pressed="true"/); assert.match(km, /id="outdoorRegionStatus">1 selected</); assert.match(km, /id="outdoorActivityStatus" hidden>/);
+    assert.match(km, /<div class="outdoor-selected-row"><span class="outdoor-selected-label">Regions<\/span> <button type="button" class="outdoor-selected-tag" data-remove-region="kelowna"/);
+    assert.doesNotMatch(km, /outdoor-selected-label">Activities/);
+    assert.match(km, /id="outdoorClearFilters">Clear all</); assert.match(km, /id="outdoorSelectedClear">Clear all</);
+    // Activity card counts are contextual to the region selection: hiking in Kelowna = kelA (1), camping in Kelowna = kelB (1).
+    assert.match(km, /data-activity="hiking"[^>]*>[\s\S]*?<span class="outdoor-activity-count">1<\/span> <span class="outdoor-activity-count-noun">destination<\/span>/);
+    assert.match(km, /data-activity="camping"[^>]*>[\s\S]*?<span class="outdoor-activity-count">1<\/span> <span class="outdoor-activity-count-noun">destination<\/span>/);
+
+    // 3. Multiple regions = OR.
+    const kp = app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['kelowna', 'penticton'], activities: [] });
+    const kpExpected = all.filter((v) => v.region === 'kelowna' || v.region === 'penticton');
+    assert.deepEqual(visible(kp), byId(kpExpected));
+    assert.equal(summary(kp), `${kpExpected.length} of ${all.length} outdoor destinations`);
+    assert.match(outdoorMarkupOnly(kp), /id="outdoorRegionStatus">2 selected</);
+    assert.deepEqual(app.filterOutdoorVenues(all, ['kelowna', 'penticton'], [], map).map((v) => v.id).sort((x, y) => x - y), byId(kpExpected));
+
+    // 4. One activity.
+    const camp = app.renderCategoryAllRegionsPage('outdoor', all, { regions: [], activities: ['camping'] });
+    assert.deepEqual(visible(camp), [kelB, penA, verA].sort((x, y) => x - y));
+    assert.equal(summary(camp), `3 of ${all.length} outdoor destinations`);
+    const cm = outdoorMarkupOnly(camp);
+    assert.match(cm, /data-activity="camping" aria-pressed="true"/); assert.match(cm, /data-activity="hiking" aria-pressed="false"/);
+    assert.match(cm, /id="outdoorActivityStatus">1 selected</); assert.match(cm, /id="outdoorRegionStatus" hidden>/);
+    assert.match(cm, /<div class="outdoor-selected-row"><span class="outdoor-selected-label">Activities<\/span> <button type="button" class="outdoor-selected-tag" data-remove-activity="camping" aria-label="Remove Camping">Camping<span/);
+    assert.doesNotMatch(cm, /outdoor-selected-label">Regions/);
+    // Region pill counts are contextual to the activity selection: Kelowna camping = 1, Osoyoos camping = 0.
+    assert.match(cm, /data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">1<\/span>/);
+    assert.match(cm, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/);
+
+    // 5. Multiple activities = OR.
+    const hc = app.renderCategoryAllRegionsPage('outdoor', all, { regions: [], activities: ['hiking', 'camping'] });
+    assert.deepEqual(visible(hc), [kelA, kelB, penA, verA, osoA].sort((x, y) => x - y));
+    assert.equal(summary(hc), `5 of ${all.length} outdoor destinations`);
+    assert.match(outdoorMarkupOnly(hc), /id="outdoorActivityStatus">2 selected</);
+
+    // 6. Regions AND activities: (Kelowna OR Penticton) AND (Hiking OR Camping).
+    const both = app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['kelowna', 'penticton'], activities: ['hiking', 'camping'] });
+    assert.deepEqual(visible(both), [kelA, kelB, penA].sort((x, y) => x - y), 'verA (Vernon) and osoA (Osoyoos) are outside the region group; kelB has camping only, kelA hiking only, penA both -- each listed once');
+    assert.equal(summary(both), `3 of ${all.length} outdoor destinations`);
+    const bm = outdoorMarkupOnly(both);
+    assert.match(bm, /id="outdoorShowResults">Show 3 results</);
+    assert.match(bm, /<div class="outdoor-selected" id="outdoorSelected"><div class="outdoor-selected-row"><span class="outdoor-selected-label">Regions<\/span> [\s\S]*?data-remove-region="kelowna"[\s\S]*?data-remove-region="penticton"[\s\S]*?<\/div><div class="outdoor-selected-row"><span class="outdoor-selected-label">Activities<\/span> [\s\S]*?data-remove-activity="hiking"[\s\S]*?data-remove-activity="camping"[\s\S]*?<\/div><button type="button" class="outdoor-selected-clear" id="outdoorSelectedClear">Clear all<\/button><\/div>/);
+    // Contextual counts in the combined state: Kelowna = Kelowna venues with hiking OR camping (kelA, kelB) = 2; hiking = hiking venues in Kelowna OR Penticton (kelA, penA) = 2.
+    assert.match(bm, /data-region="kelowna" aria-pressed="true">Kelowna<span class="outdoor-activity-count">2<\/span>/);
+    assert.match(bm, /data-activity="hiking" aria-pressed="true"[^>]*>[\s\S]*?<span class="outdoor-activity-count">2<\/span>/);
+    // Same result from the shipped client predicate.
+    const clientMatches = new Function(`${app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}; return matches;`)();
+    assert.deepEqual(all.filter((v) => clientMatches(['kelowna', 'penticton'], ['hiking', 'camping'], v.region, map.get(v.id) || [])).map((v) => v.id).sort((x, y) => x - y), [kelA, kelB, penA].sort((x, y) => x - y));
+
+    // 7. Clear all -> back to the unfiltered landing (server: the empty filter; client: clearAll() re-applies with nothing pressed).
+    assert.equal(app.renderCategoryAllRegionsPage('outdoor', all, { regions: [], activities: [] }), plain);
+    const script = app.renderOutdoorFilterScriptHtml();
+    assert.ok(script.includes("function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); }"));
+    assert.ok(script.includes("querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle')"), 'the activity cards are driven by the same toggle script as the region pills');
+    for (const needle of ['outdoorRegionStatus', 'outdoorActivityStatus', 'updateStepStatus', 'outdoor-activity-count-noun', "row('Regions'", "row('Activities'", 'pushState', 'popstate', 'readUrlIntoChips']) assert.ok(script.includes(needle), `script contains ${needle}`);
+
+    // 8. Existing activity links/pages: the Guide link points at the real page, and the page renders.
+    assert.match(pm, /<a class="outdoor-activity-card-link" href="\/outdoors\/camping" aria-label="Camping guide">Guide &rarr;<\/a>/);
+    const campingPage = app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.camping, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.camping));
+    assert.match(campingPage, /<h1>Camping in the Okanagan<\/h1>/); assert.match(campingPage, /Explorer Penticton Bluffs/);
+    assert.deepEqual(app.listLiveOutdoorActivities().map((a) => a.slug).sort(), ['camping', 'hiking']);
+
+    // 10. Favorite / Add to trip, View details, region line and description survive on every landing card; no phone/website on list cards; compact clamp shipped.
+    assert.match(pm, new RegExp(`<li class="venue-card" data-venue-id="${kelA}" data-venue-region="kelowna" data-venue-category="outdoor" data-venue-name="Explorer Kelowna Trail" data-surface="category_card">\\s*<h2><a class="venue-card-link" href="/kelowna/outdoors/explorer-kelowna-trail"><span class="venue-card-name">Explorer Kelowna Trail</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>\\s*<p class="venue-meta">Kelowna</p>\\s*<div class="golf-desc" id="golf-desc-${kelA}"><p>Explorer Kelowna Trail is a fixture[^<]*</p></div>\\s*<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-${kelA}" hidden>Read more &rarr;</button>[\\s\\S]*?<button type="button" class="card-action fav-btn" data-fav-name="Explorer Kelowna Trail"[\\s\\S]*?<button type="button" class="card-action trip-btn" data-trip-name="Explorer Kelowna Trail"`));
+    assert.doesNotMatch(pm.slice(pm.indexOf('id="outdoorResults"')), /card-action-website|card-action-phone|tel:/);
+    assert.ok(plain.includes('body.outdoor-page #outdoorResults .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }'), 'landing cards clamp to about three lines');
+    assert.ok(!app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking)).includes('id="outdoorResults"'), 'activity pages keep the four-line clamp (no #outdoorResults there)');
+    assert.ok(plain.includes(app.GOLF_APP_SCRIPT_TAG || '/scripts/app.js'), 'trip tray / favourites script still loaded');
+
+    // 11. Landing universe = activity universe (2026-09-22): a beach-type venue that belongs to a live
+    // activity is listed on the landing, so the activity card count, the filtered result and the
+    // /outdoors/<activity> page all agree; a beach without a live membership is not.
+    assert.deepEqual(byId(app.getOutdoorLandingVenues()), byId(all), 'no beach member yet -> the landing is exactly the outdoor-type list');
+    assert.doesNotMatch(plain, /Beach page theme/);
+    const beach = app.findVenueBySlug('kelowna', 'beach', 'test-beach-park');
+    add('activity_hiking', beach.id);
+    const universe = app.getOutdoorLandingVenues();
+    assert.deepEqual(byId(universe), byId([...all, beach]), 'the beach member joins the landing list');
+    assert.equal(app.getOutdoorActivityCounts().hiking, 5);
+    const landing = app.renderCategoryAllRegionsPage('outdoor', universe);
+    const lm = outdoorMarkupOnly(landing);
+    assert.match(lm, /data-activity="hiking"[^>]*>[\s\S]*?<span class="outdoor-activity-count">5<\/span>/, 'the Hiking card shows the activity count (same number as /outdoors/hiking)');
+    assert.equal(app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking).length, 5);
+    assert.equal(summary(landing), `${all.length + 1} outdoor destinations`);
+    assert.match(lm, new RegExp(`<li class="venue-card" data-venue-id="${beach.id}" data-venue-region="kelowna" data-venue-category="beach" data-venue-name="Test Beach Park"`));
+    assert.match(lm, /href="\/kelowna\/beaches\/test-beach-park"/, 'the beach card links to its own beach page');
+    assert.match(landing, /Beach page theme/, 'beach card rules are loaded only now that a beach card is present');
+    const hikingOnly = app.renderCategoryAllRegionsPage('outdoor', universe, { regions: [], activities: ['hiking'] });
+    assert.deepEqual(visible(hikingOnly), [kelA, penA, verA, osoA, beach.id].sort((x, y) => x - y), 'selecting Hiking shows the 5 the card promised');
+    assert.equal(summary(hikingOnly), `5 of ${all.length + 1} outdoor destinations`);
+    // The card engagement script (clamp / Read more, impressions, favourite + trip mirroring) covers every allowlisted card type on outdoor surfaces; Golf/Beach pages keep their own selector.
+    assert.ok(landing.includes(`querySelectorAll('.venue-card:is([data-venue-category="outdoor"],[data-venue-category="beach"])')`));
+    assert.ok(landing.includes(`var HOLDER = ':is([data-venue-category="outdoor"],[data-venue-category="beach"])';`));
+    assert.ok(landing.includes("venue_category: card.dataset.venueCategory || 'outdoor'"));
+    assert.ok(golfBefore.includes(`querySelectorAll('.venue-card[data-venue-category="golf"]')`) && golfBefore.includes(`var HOLDER = '[data-venue-category="golf"]';`));
+    assert.ok(beachBefore.includes(`var HOLDER = '[data-venue-category="beach"]';`));
+    // Region outdoor directories are untouched by the landing universe.
+    assert.doesNotMatch(outdoorMarkupOnly(app.renderCategoryPage('kelowna', 'outdoor', app.getVenuesByRegionCategory('kelowna', 'outdoor'), [])), /Test Beach Park/);
+
+    // 9. Golf, Beaches and the homepage do not change while the explorer state exists.
+    assert.equal(app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf')), golfBefore);
+    assert.equal(app.renderCategoryAllRegionsPage('beach', app.getVenuesByCategory('beach')), beachBefore);
+    assert.equal(fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8'), homeBefore, 'the homepage file is never touched by rendering the explorer');
+    assert.doesNotMatch(app.renderHomeFooterHTML(true), /outdoor-activity-toggle|outdoorRegionStatus|Choose Activity/, 'the shared footer carries none of the explorer markup');
+  } finally {
+    for (const [kind, id] of added) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+  assert.deepEqual(app.listLiveOutdoorActivities(), []);
 });
 
 // ==== I.3 (2026-09-20): finalized Outdoor activity order and labels ========
@@ -5735,8 +5900,9 @@ test('I.3: the landing filter chips and the activity-page chips present the six 
     const landing = app.renderCategoryAllRegionsPage('outdoor', all);
     const lm = outdoorMarkupOnly(landing);
     assert.deepEqual([...app.renderOutdoorActivityFilterChips().matchAll(/data-activity="([a-z]+)"/g)].map((m) => m[1]), expectedSlugs, 'chip renderer keeps the display order (no longer placed on the landing)');
-    assert.deepEqual([...lm.match(/<div class="outdoor-activity-card-grid">[\s\S]*?<details/)[0].matchAll(/href="\/outdoors\/([a-z]+)"/g)].map((m) => m[1]), ['hiking', 'cycling', 'adventure', 'winter'].filter((k) => expectedSlugs.includes(k)), 'featured cards link only live activities, in the approved order');
-    assert.ok(lm.indexOf('Choose Region(s)</h2>') < lm.indexOf('Explore by Activity</h2>') && lm.indexOf('Explore by Activity</h2>') < lm.indexOf('id="outdoorShowResults"') && lm.indexOf('id="outdoorShowResults"') < lm.indexOf('Results</h2>'));
+    assert.deepEqual([...lm.match(/<div class="outdoor-activity-card-grid"[\s\S]*?<\/section>/)[0].matchAll(/data-activity="([a-z]+)"/g)].map((m) => m[1]), ['hiking', 'cycling', 'adventure', 'winter', 'nature', 'viewpoints'], 'only live activities are toggles, in the approved card order');
+    assert.deepEqual([...lm.match(/<div class="outdoor-activity-card-grid"[\s\S]*?<\/section>/)[0].matchAll(/class="outdoor-activity-card-link" href="\/outdoors\/([a-z]+)"/g)].map((m) => m[1]), ['hiking', 'cycling', 'adventure', 'winter', 'nature', 'viewpoints'], 'guide links only for live activities');
+    assert.ok(lm.indexOf('Choose Region(s)</h2>') < lm.indexOf('Choose Activity(s)</h2>') && lm.indexOf('Choose Activity(s)</h2>') < lm.indexOf('id="outdoorShowResults"') && lm.indexOf('id="outdoorShowResults"') < lm.indexOf('Results</h2>'));
     assert.match(lm, /<button type="button" class="outdoor-filter-chip" data-region="kelowna" aria-pressed="false">/, 'region controls are still toggle buttons');
     assert.match(landing, /replaceState|URLSearchParams/, 'URL query persistence still shipped');
     const winter = app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.winter, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.winter));
@@ -5782,7 +5948,7 @@ test('Outdoor region chips use the complete canonical region list (REGION_LABELS
   // Full page still carries the multi-select experience.
   const landing = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', rows));
   assert.equal((landing.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
-  assert.ok(landing.indexOf('Choose Region(s)</h2>') < landing.indexOf('Explore by Activity</h2>'));
+  assert.ok(landing.indexOf('Choose Region(s)</h2>') < landing.indexOf('Choose Activity(s)</h2>'));
   assert.match(landing, /id="outdoorClearFilters"/); assert.match(landing, /id="outdoorNoResults" hidden>/);
 });
 
@@ -5834,7 +6000,7 @@ test('Grouped region selector: four FOOTER_REGION_GROUPS blocks in order, all 20
   // The script wires the headers, updates them on every apply, and never treats a header as a filter.
   const script = app.renderOutdoorFilterScriptHtml();
   for (const needle of ['outdoor-region-group-toggle', 'aria-expanded', 'updateGroupHeaders()', "classList.add('js')", 'groupShouldOpen(isDefault, n)', "matchMedia('(max-width: 899px)')"]) assert.ok(script.includes(needle), needle);
-  assert.match(script, /var chips = Array\.prototype\.slice\.call\(document\.querySelectorAll\('\.outdoor-filter-chip'\)\);/, 'only the chips are filters');
+  assert.match(script, /var chips = Array\.prototype\.slice\.call\(document\.querySelectorAll\('\.outdoor-filter-chip, \.outdoor-activity-toggle'\)\);/, 'the region chips and the activity cards are the filters; group headers are not');
 });
 
 test('Grouped region selector: filtering semantics untouched -- regions from different groups (incl. zero-count) combine with OR, AND with activities, clear resets (server predicate)', () => {
@@ -5847,8 +6013,8 @@ test('Grouped region selector: filtering semantics untouched -- regions from dif
   assert.deepEqual(app.filterOutdoorVenues(rows, [zero], [], map), [], 'zero-count region alone = no results');
   assert.equal(app.filterOutdoorVenues(rows, [], [], map).length, rows.length, 'clear = everything');
   const landing = outdoorMarkupOnly(app.renderCategoryAllRegionsPage('outdoor', rows));
-  assert.ok(landing.indexOf('Choose Region(s)</h2>') < landing.indexOf('Explore by Activity</h2>') && landing.indexOf('Explore by Activity</h2>') < landing.indexOf('id="outdoorShowResults"') && landing.indexOf('id="outdoorShowResults"') < landing.indexOf('Results</h2>'), 'overall structure');
+  assert.ok(landing.indexOf('Choose Region(s)</h2>') < landing.indexOf('Choose Activity(s)</h2>') && landing.indexOf('Choose Activity(s)</h2>') < landing.indexOf('id="outdoorShowResults"') && landing.indexOf('id="outdoorShowResults"') < landing.indexOf('Results</h2>'), 'overall structure');
   assert.equal((landing.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
-  assert.equal((landing.match(/class="outdoor-filter-chip" data-activity="/g) || []).length, 0, 'no activity chips on the landing');
-  assert.match(landing, /id="outdoorClearFilters" hidden>Clear filters</); assert.match(landing, /id="outdoorNoResults" hidden>/);
+  assert.equal((landing.match(/class="outdoor-filter-chip" data-activity="/g) || []).length, 0, 'activities are cards, not pill chips');
+  assert.match(landing, /id="outdoorClearFilters" hidden>Clear all</); assert.match(landing, /id="outdoorNoResults" hidden>/);
 });
