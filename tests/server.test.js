@@ -3539,6 +3539,85 @@ test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, u
   assert.deepEqual(app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`), app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`).slice().sort(), 'deterministic region/slug order');
 });
 
+// ---- H1 Step 2: "Upcoming events in {Region}" block on region hub pages ----
+// Same publication predicate as the sitemap and the event-page block; the
+// section is omitted entirely below MIN_REGION_EVENTS, so a one-event or
+// zero-event region keeps its existing page exactly as before.
+test('H1 Step 2: region pages link the next publishable events, omit the block below the threshold, and never link an unpublishable event', () => {
+  const counts = app.getRegionCategoryCounts('kelowna');
+  const regionHtml = (region) => app.renderRegionPage(region, app.getRegionCategoryCounts(region) || counts, []);
+  const eventLinksOf = (html) => {
+    const m = html.match(/<h2>Upcoming events in [^<]*<\/h2>[\s\S]*?<\/div>\s*<p>/);
+    return m ? [...m[0].matchAll(/<a href="(\/[a-z-]+\/events\/[a-z0-9-]+)">/g)].map((x) => x[1]) : [];
+  };
+
+  // 1. A region with plenty of publishable events links exactly 3, all direct
+  //    canonical event-detail URLs in that region (never a /whats-on?... URL).
+  const kelowna = regionHtml('kelowna');
+  const kelownaLinks = eventLinksOf(kelowna);
+  assert.equal(kelownaLinks.length, 3, 'a well-stocked region links exactly 3 events');
+  for (const href of kelownaLinks) assert.match(href, /^\/kelowna\/events\/[a-z0-9-]+$/, `canonical event URL: ${href}`);
+  assert.match(kelowna, /<h2>Upcoming events in Kelowna<\/h2>/);
+  // 6. The secondary link exists alongside the block, and only as a secondary link.
+  assert.match(kelowna, /<a href="\/whats-on\?regions=kelowna">See what&rsquo;s on in Kelowna &rarr;<\/a>/);
+  assert.equal(kelownaLinks.filter((h) => h.includes('whats-on')).length, 0, 'no filtered URL is used as a primary event link');
+
+  // 7. The pre-existing region page is otherwise intact.
+  assert.match(kelowna, /<h1>Kelowna, BC<\/h1>/);
+  assert.match(kelowna, /<ul class="card-grid">/);
+  assert.match(kelowna, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna">/);
+  assert.doesNotMatch(kelowna, /<meta name="robots"/, 'region pages stay indexable');
+  assert.equal(app.listUpcomingEventsForRegion('kelowna', { limit: 3 }).length, 3);
+
+  // 2/3/4. Threshold behaviour, driven by real fixture data rather than counts.
+  const twoRegion = 'peachland';
+  const before = app.listUpcomingEventsForRegion(twoRegion).length;
+  assert.equal(before, 0, 'fixture DB starts with no peachland events');
+  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'zero publishable events -> no block');
+  const pvenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const mk = (name, over) => {
+    const r = app.createEvent({
+      region: twoRegion, name, description: 'H1 Step 2 fixture.', source_type: 'official_organizer', source_name: `H1S2 ${name}`,
+      source_url: `https://example.com/h1s2/${app.slugify(name)}`, venue_name_text: `H1S2 Hall ${name}`, categories: ['community-events'],
+      occurrences: [{ start_date: '2032-08-01' }], ...over,
+    }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    return r.event;
+  };
+  const one = mk('H1S2 Lantern Walk', { occurrences: [{ start_date: '2032-08-01' }] });
+  assert.equal(app.listUpcomingEventsForRegion(twoRegion).length, 0, 'one publishable event is below the threshold');
+  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'one event -> still no block');
+
+  const two = mk('H1S2 Harbour Recital', { categories: ['live-music'], occurrences: [{ start_date: '2032-08-08' }] });
+  const twoHtml = regionHtml(twoRegion);
+  const twoLinks = eventLinksOf(twoHtml);
+  assert.equal(twoLinks.length, 2, 'a two-event region links exactly 2');
+  assert.deepEqual(twoLinks, [`/${twoRegion}/events/${one.slug}`, `/${twoRegion}/events/${two.slug}`], 'ordered by next scheduled occurrence');
+  assert.match(twoHtml, /<h2>Upcoming events in Peachland<\/h2>/);
+
+  // 5. Cancelled, postponed and expired events are never linked.
+  const cancelled = mk('H1S2 Toolshare Meetup', { categories: ['workshops-classes'], occurrences: [{ start_date: '2032-07-01' }] });
+  app.updateEvent(cancelled.id, { status: 'cancelled' }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
+  const postponed = mk('H1S2 Almanac Reading', { categories: ['arts-culture'], occurrences: [{ start_date: '2032-07-02' }] });
+  app.updateEvent(postponed.id, { status: 'postponed' }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
+  const expired = mk('H1S2 Bellows Social', { categories: ['nightlife'], occurrences: [{ start_date: '2020-07-03' }] });
+  const slugs = app.listUpcomingEventsForRegion(twoRegion, { limit: 20 }).map((e) => e.slug);
+  assert.ok(!slugs.includes(cancelled.slug), 'cancelled event never linked');
+  assert.ok(!slugs.includes(postponed.slug), 'postponed event never linked');
+  assert.ok(!slugs.includes(expired.slug), 'expired event never linked');
+  assert.deepEqual(slugs, [one.slug, two.slug], 'only the publishable pair remains');
+
+  // Cleanup: leave the shared fixture DB exactly as this test found it.
+  for (const e of [one, two, cancelled, postponed, expired]) {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(e.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+  }
+  assert.equal(app.listUpcomingEventsForRegion(twoRegion).length, 0, 'fixture rows removed');
+  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'page back to its original shape');
+});
+
 test('S5 #24: with zero events the sitemap carries no event URLs and is unaffected by the event tables (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-sitemap-zero-events-'));
   const projectRoot = path.join(__dirname, '..');

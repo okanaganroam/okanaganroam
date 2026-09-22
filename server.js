@@ -1915,6 +1915,35 @@ function listRelatedEventsInRegion(event, { limit = 4, now = new Date() } = {}) 
   }));
 }
 
+// H1 internal linking, Step 2 (2026-09-22): the next few publishable events a
+// visitor on a region hub page could go to. Same predicate as
+// listRelatedEventsInRegion() and the sitemap (scheduled event, at least one
+// scheduled occurrence, not expired on the Okanagan local date), ordered by
+// next scheduled occurrence. No self-exclusion applies -- the caller is a
+// region page, not an event. Returns [] below MIN_REGION_EVENTS so a region
+// with a single event (or only a valley-wide one belonging elsewhere) renders
+// no block at all, and the block disappears on its own as events expire.
+const MIN_REGION_EVENTS = 2;
+function listUpcomingEventsForRegion(region, { limit = 3, now = new Date() } = {}) {
+  const today = todayLocal(now);
+  const rows = db
+    .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
+        (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date
+      FROM events e
+      WHERE e.region = ?
+        AND e.status = 'scheduled'
+        AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
+        AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
+      ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
+    .all(today, region, today);
+  if (rows.length < MIN_REGION_EVENTS) return [];
+  return rows.slice(0, limit).map((r) => ({
+    ...rowToEvent(r),
+    primaryCategory: r.primary_category || null,
+    nextDate: r.next_date || null,
+  }));
+}
+
 // --- writers ----------------------------------------------------------------
 // createEvent(data, meta): the only way an event enters the table. Validates
 // everything, checks duplicates, then inserts event + categories +
@@ -6947,6 +6976,28 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
     })
     .join('\n');
 
+  // H1 Step 2 (2026-09-22): a short "Upcoming events in {Region}" block, built
+  // from the same live predicate as the sitemap and the event-page block, so
+  // links vanish by themselves as events expire. Direct canonical event URLs
+  // only; the filtered What's On view is the secondary "see all" link. Reuses
+  // the .related-section/.related-grid/.related-card styles this page already
+  // loads, so no new CSS. Renders nothing for a region below the threshold.
+  const upcomingEvents = listUpcomingEventsForRegion(region, { limit: 3 });
+  const eventLinks = upcomingEvents.length
+    ? `<div class="related-section">
+        <h2>Upcoming events in ${escapeHtml(regionLabel)}</h2>
+        <div class="related-grid">
+${upcomingEvents.map((e) => {
+      const when = e.nextDate ? formatLocalDateShort(e.nextDate) : '';
+      const cat = e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '';
+      const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
+      return `          <div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
+    }).join('\n')}
+        </div>
+        <p><a href="/whats-on?regions=${encodeURIComponent(region)}">See what&rsquo;s on in ${escapeHtml(regionLabel)} &rarr;</a></p>
+      </div>`
+    : '';
+
   const guideLinks = regionGuidePages.length
     ? `<div class="related-section">
         <h2>Browse ${escapeHtml(regionLabel)} by what matters to you</h2>
@@ -6972,7 +7023,7 @@ ${pageHead(title, description, canonical, [breadcrumb])}
   <ul class="card-grid">
     ${categoryCards}
   </ul>
-  ${guideLinks}
+  ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
   <a class="cta" href="https://okanaganroam.com/">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
   ${renderHomeFooterHTML(true)}
 </body>
@@ -11570,6 +11621,7 @@ module.exports = {
   listEventOccurrences,
   countScheduledOccurrences,
   listRelatedEventsInRegion,
+  listUpcomingEventsForRegion,
   createEvent,
   updateEvent,
   replaceEventCategories,
