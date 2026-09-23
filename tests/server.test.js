@@ -2170,7 +2170,7 @@ test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach
   assert.match(html, /class="mood-card mood-card-whats-on" href="\/whats-on">/);
   assert.match(html, /class="mood-card mood-card-food-drink" href="\/browse\?types=restaurant,cafe,brewery,pub,cocktail" data-mood-filter="restaurant,cafe,brewery,pub,cocktail">/);
   assert.match(html, /class="mood-card mood-card-golf" href="\/golf">/);
-  assert.match(html, /class="mood-card mood-card-wine" href="\/browse\?types=winery" data-mood-filter="winery">/);
+  assert.match(html, /class="mood-card mood-card-wine" href="\/wineries" data-mood-filter="winery">/);
 });
 
 test('Mood cards: Hidden Gems is no longer one of the six mood cards', () => {
@@ -2188,15 +2188,61 @@ test('Mood cards: Golf links to the Okanagan-wide /golf listing (not a single re
   );
 });
 
-test('Mood cards: Wine links to the valley-wide winery browse route, not a single region', () => {
+test('Mood cards: Wine links to the dedicated valley-wide /wineries hub, not a single region', () => {
   const html = app.renderMoodCardsHTML();
   const wineMatch = html.match(/class="mood-card mood-card-wine" href="([^"]*)"/);
   assert.ok(wineMatch, 'expected the Wine card to have an href');
   assert.strictEqual(
     wineMatch[1],
-    '/browse?types=winery',
-    `Wine href must be the Okanagan-wide /browse?types=winery route, got: ${wineMatch[1]}`
+    '/wineries',
+    `Wine href must be the Okanagan-wide /wineries hub, got: ${wineMatch[1]}`
   );
+});
+
+test('Wine hub: /wineries is enabled, winery-only, valley-wide, and themed for the hub ONLY', async () => {
+  // 1. the route is enabled via the ALL_REGIONS_CATEGORIES allowlist
+  assert.ok(app.ALL_REGIONS_CATEGORIES.includes('winery'), '/wineries Okanagan-wide hub must be enabled');
+  assert.ok(app.ALL_REGIONS_CATEGORIES.includes('beach'), 'enabling Wine must not disable Beaches');
+  assert.ok(app.ALL_REGIONS_CATEGORIES.includes('golf'), 'enabling Wine must not disable Golf');
+
+  // 2. every winery in the valley is present before any region is chosen,
+  //    and the hub carries the Beaches-style themed presentation
+  const wineries = app.getVenuesByCategory('winery');
+  const hub = app.renderCategoryAllRegionsPage('winery', wineries);
+  assert.match(hub, /<h1>Wineries in the Okanagan<\/h1>/, 'hub needs the Wineries heading');
+  assert.match(hub, /class="golf-page winery-page"/, 'hub uses the Beaches-style themed body class');
+  assert.match(hub, /class="category-region-selector"/, 'hub shows the Beaches-style region selector');
+  for (const v of wineries) {
+    assert.ok(hub.includes(v.name), `hub must list every winery before filtering: ${v.name}`);
+  }
+
+  // 3. winery-only: every rendered card is a winery, and no other type leaks in
+  const nonWinery = wineries.filter((v) => v.type !== 'winery');
+  assert.equal(nonWinery.length, 0, 'getVenuesByCategory("winery") must return winery venues only');
+  // Match only real cards (data-venue-category on a card carries a
+  // data-venue-name beside it); the themed page's CSS/script also mention
+  // data-venue-category="golf" in selectors, which are not cards.
+  const cardTypes = [...hub.matchAll(/data-venue-category="([a-z]+)" data-venue-name=/g)].map((m) => m[1]);
+  assert.ok(cardTypes.length > 0, 'themed hub cards must carry data-venue-category');
+  assert.deepEqual([...new Set(cardTypes)], ['winery'], 'the hub must render winery cards and nothing else');
+  for (const other of ['restaurant', 'cafe', 'brewery', 'pub', 'cocktail', 'golf', 'beach', 'outdoor']) {
+    assert.ok(!hub.includes(`data-venue-category="${other}" data-venue-name=`), `hub must not contain any ${other} card`);
+  }
+
+  // 4. the region selector filters by linking to the existing region pages
+  const regions = [...new Set(wineries.map((v) => v.region))];
+  for (const r of regions) {
+    assert.ok(hub.includes(`href="/${r}/wineries"`), `region selector must link to /${r}/wineries`);
+  }
+
+  // 5. hub-only theming: the REGION page and the VENUE page must be untouched
+  const first = wineries[0];
+  const regionPage = app.renderCategoryPage(first.region, 'winery', app.getVenuesByRegionCategory(first.region, 'winery'), []);
+  assert.doesNotMatch(regionPage, /class="golf-page/, 'winery region pages must NOT be themed');
+  assert.doesNotMatch(regionPage, /venue-card-cue/, 'winery region cards must keep their original markup');
+  const venuePage = app.renderVenuePage(first, [], [], []);
+  assert.doesNotMatch(venuePage, /class="golf-page/, 'winery venue pages must NOT be themed');
+  assert.ok(!app.THEMED_CATEGORY_TYPES.has('winery'), 'winery must never join the global THEMED_CATEGORY_TYPES');
 });
 
 test('Mood cards: Food & Drink links to /browse pre-filtered by its multi-type filter (no single category page covers all five types)', () => {
@@ -2303,7 +2349,7 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
   assert.equal(items.length, 7, 'expected exactly 7 Explore links');
   assert.equal(items[0].text, 'Food &amp; Drinks');
   assert.equal(items[0].href, '/browse?types=restaurant,cafe,brewery,pub,cocktail');
-  assert.ok(items[1].href === '/browse?types=winery', `Wine href unexpected: ${items[1].href}`);
+  assert.ok(items[1].href === '/wineries', `Wine href unexpected: ${items[1].href}`);
   assert.equal(items[2].href, '#exploreRegions');
   assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
   assert.equal(items[4].href, '/whats-on');
@@ -4311,7 +4357,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // back-link or the split-section rendering.
   const wineryPage = await fetch(`${base}/kelowna/wineries`);
   const wineryBody = await wineryPage.text();
-  assert.doesNotMatch(wineryBody, /<a class="category-back-link"/, 'non-golf category pages must not render a back-link');
+  assert.match(wineryBody, /<a class="category-back-link" href="\/wineries">← All Wineries<\/a>/, 'winery region pages link back to the /wineries hub now that winery is in ALL_REGIONS_CATEGORIES');
+  assert.doesNotMatch(wineryBody, /class="golf-page/, 'winery REGION pages must stay unthemed -- the Beaches-style treatment is hub-only');
   assert.doesNotMatch(wineryBody, /<h2 class="category-subsection-heading">/, 'non-golf category pages must not render the Golf/Indoor split');
 
   // Reusable-architecture allowlist (2026-09-19): a real, valid category
@@ -4319,8 +4366,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // wide page just because the route was generalized -- generalizing the
   // route must not silently expose a new public URL for every existing
   // category.
-  const wineriesAllRegionsPage = await fetch(`${base}/wineries`);
-  assert.equal(wineriesAllRegionsPage.status, 404, '/wineries must stay 404 -- only categories explicitly listed in ALL_REGIONS_CATEGORIES get an Okanagan-wide page');
+  const restaurantsAllRegionsPage = await fetch(`${base}/restaurants`);
+  assert.equal(restaurantsAllRegionsPage.status, 404, '/restaurants must stay 404 -- only categories explicitly listed in ALL_REGIONS_CATEGORIES get an Okanagan-wide page');
 
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');

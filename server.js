@@ -989,6 +989,20 @@ function usesThemedCategoryLayout(type) {
   return THEMED_CATEGORY_TYPES.has(type);
 }
 
+// Types that get the themed (Golf/Beaches-style) treatment on their
+// Okanagan-wide /:category hub ONLY, never on their /:region/:category
+// pages or their individual venue pages. Wine (2026-09-23) is the first:
+// its hub is a new page, but wineries already have 14 live regional pages
+// and 204 live venue pages whose current presentation must not change.
+// THEMED_CATEGORY_TYPES stays the global switch; this set is consulted
+// only by renderCategoryAllRegionsPage(), which threads the result down
+// as an explicit `themed` override. Every shared helper still defaults to
+// usesThemedCategoryLayout(), so no other caller's output can move.
+const HUB_ONLY_THEMED_TYPES = new Set(['winery']);
+function usesThemedHubLayout(type) {
+  return usesThemedCategoryLayout(type) || HUB_ONLY_THEMED_TYPES.has(type);
+}
+
 // Categories that exist as venue pages but are deliberately NOT offered
 // by the Build My Trip planner yet (interest chips on /trip, the
 // `interests` field of POST /api/trip/generate, the LLM/deterministic
@@ -1013,7 +1027,7 @@ function isTripPlannerType(type) {
 // effect of this refactor. getVenuesByCategory()/renderCategoryAllRegionsPage()
 // below are already fully generic by `type`; only the route dispatch is
 // gated by this list.
-const ALL_REGIONS_CATEGORIES = ['golf', 'beach', 'outdoor'];
+const ALL_REGIONS_CATEGORIES = ['golf', 'beach', 'outdoor', 'winery'];
 
 // Human-readable label per category, singular and plural, for titles/H1s
 const CATEGORY_LABELS = {
@@ -4273,7 +4287,7 @@ function renderMoodCardsHTML() {
   // one golf venue exists; falls back to /browse exactly as before when
   // there are none yet.
   const golfHref = bestRegionForType.golf && CATEGORY_SLUGS.golf ? `/${CATEGORY_SLUGS.golf}` : '/browse';
-  const wineHref = '/browse?types=winery';
+  const wineHref = '/wineries';
   // Beaches (2026-09-20): same pattern as Golf. Now that the Okanagan-wide
   // /beaches listing is live, the Beaches mood card points at it whenever
   // at least one beach venue exists; with no beach data it keeps its
@@ -4408,7 +4422,7 @@ function renderHomeFooterHTML(fromBrowse) {
   // identical golfHref -- Golf venues span multiple regions, so this links
   // to the Okanagan-wide /golf listing instead of one region's subset.
   const golfHref = bestRegionForType.golf && CATEGORY_SLUGS.golf ? `/${CATEGORY_SLUGS.golf}` : '/browse';
-  const wineHref = '/browse?types=winery';
+  const wineHref = '/wineries';
   const exploreRegionsHref = fromBrowse ? '/#exploreRegions' : '#exploreRegions';
   const hiddenGemsHref = fromBrowse ? '/#hiddenGems' : '#hiddenGems';
   // Outdoors (2026-09-20): the same gated destination as the homepage's
@@ -5710,8 +5724,8 @@ function renderAnalyticsHeadHtml() {
 </script>`;
 }
 
-function golfEngagementHeadHtml(type) {
-  return usesThemedCategoryLayout(type) ? renderAnalyticsHeadHtml() : '';
+function golfEngagementHeadHtml(type, themed = usesThemedCategoryLayout(type)) {
+  return themed ? renderAnalyticsHeadHtml() : '';
 }
 
 // Shared Favorite / Add to Trip behaviour for Golf pages (2026-09-19).
@@ -5887,9 +5901,9 @@ const GOLF_APP_SCRIPT_TAG = '<script src="/scripts/app.js"></script>';
 // body.golf-page rules ARE the design system these pages share) plus a
 // `beach-page` marker for beach-specific tests/styling. Non-themed pages
 // get no class attribute at all, exactly as before.
-function themedBodyClassAttr(type) {
+function themedBodyClassAttr(type, themed = usesThemedCategoryLayout(type)) {
   if (type === 'golf') return ' class="golf-page"';
-  if (usesThemedCategoryLayout(type)) return ` class="golf-page ${type}-page"`;
+  if (themed) return ` class="golf-page ${type}-page"`;
   return '';
 }
 
@@ -6736,8 +6750,8 @@ function themedCardHolderSelector(type) {
   if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
   return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
 }
-function golfCardEngagementScriptHtml(type) {
-  if (!usesThemedCategoryLayout(type)) return '';
+function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(type)) {
+  if (!themed) return '';
   return `<script>
 (function(){
   var cards = document.querySelectorAll('.venue-card${themedCardHolderSelector(type)}');
@@ -6937,7 +6951,7 @@ function venueCardHtml(venue, opts = {}) {
   // and URL use), so identically named venues in different communities
   // are distinguishable without opening them. Off by default, so every
   // other surface's card markup is unchanged.
-  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, showRegion = false } = opts;
+  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, showRegion = false, themed = usesThemedCategoryLayout(venue.type) } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -6946,7 +6960,7 @@ function venueCardHtml(venue, opts = {}) {
   // name). Styled by the golf theme; every other category's title markup
   // is unchanged.
   const nameHtml = href
-    ? (usesThemedCategoryLayout(venue.type)
+    ? (themed
       ? `<a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(venue.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a>`
       : `<a href="${href}">${escapeHtml(venue.name)}</a>`)
     : escapeHtml(venue.name);
@@ -6962,7 +6976,7 @@ function venueCardHtml(venue, opts = {}) {
   // category renders exactly what it did before.
   // `isGolf` now means "uses the themed (Golf-style) card": Golf and, since
   // 2026-09-19, Beaches (THEMED_CATEGORY_TYPES). Golf output is unchanged.
-  const isGolf = usesThemedCategoryLayout(venue.type);
+  const isGolf = themed;
   const descId = `golf-desc-${venue.id}`;
   const desc = !venue.description ? '' : isGolf
     ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(venue.description)}</p></div>
@@ -7089,7 +7103,7 @@ ${pageHead(title, description, canonical, [breadcrumb])}
 // Falls back to CATEGORY_LABELS.plural for any category without an
 // entry here, so it never breaks if a future category is added to
 // ALL_REGIONS_CATEGORIES without also adding a short label.
-const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches', outdoor: 'Outdoors' };
+const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches', outdoor: 'Outdoors', winery: 'Wineries' };
 
 // Golf's inventory deliberately includes both outdoor courses and indoor
 // golf-simulator venues under the same type='golf' (2026-09-19), so the
@@ -7817,6 +7831,10 @@ ${renderGolfHeaderHtml()}
 function renderCategoryAllRegionsPage(type, venues, filter = null) {
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
+  // Themed presentation for this hub only (see HUB_ONLY_THEMED_TYPES).
+  // Threaded explicitly into every shared helper below so a hub-only type
+  // never reaches renderCategoryPage() or renderVenuePage().
+  const hubThemed = usesThemedHubLayout(type);
   // Outdoors Phase 2: /outdoors is a discovery landing page ("Outdoors in
   // the Okanagan": intro, activity selector, featured experiences, region
   // chips, then the full directory) rather than a bare listing. Every
@@ -7910,19 +7928,19 @@ function renderCategoryAllRegionsPage(type, venues, filter = null) {
   // matches) so the first paint, a no-script visitor and the client script
   // all agree; every card is still in the markup for the script to toggle.
   const cardsHtml = isOutdoorLanding
-    ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true })
+    ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed })
         .replace('<ul class="card-grid">', `<ul class="card-grid" id="outdoorResults"${outdoorMatching.length === 0 ? ' hidden' : ''}>`)
         .replace(/<li class="venue-card" data-venue-id="(\d+)"([^>]*)>/g, (m, id, rest) => (outdoorMatchIds.has(Number(id)) ? m : `<li class="venue-card" data-venue-id="${id}"${rest} hidden>`))
-    : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true });
+    : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed });
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
-${golfEngagementHeadHtml(type)}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${golfEngagementHeadHtml(type, hubThemed)}
 </head>
-<body${themedBodyClassAttr(type)}>
-  ${usesThemedCategoryLayout(type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+<body${themedBodyClassAttr(type, hubThemed)}>
+  ${hubThemed ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: label.plural },
@@ -7931,10 +7949,10 @@ ${golfEngagementHeadHtml(type)}
   ${isOutdoorLanding ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
   ${outdoorDirectoryHeading}${cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
-  ${usesThemedCategoryLayout(type) ? '</main>' : ''}
+  ${hubThemed ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
-  ${usesThemedCategoryLayout(type) ? GOLF_APP_SCRIPT_TAG : ''}
-  ${golfCardEngagementScriptHtml(type)}${isOutdoorLanding ? '\n  ' + renderOutdoorFilterScriptHtml() : ''}
+  ${hubThemed ? GOLF_APP_SCRIPT_TAG : ''}
+  ${golfCardEngagementScriptHtml(type, hubThemed)}${isOutdoorLanding ? '\n  ' + renderOutdoorFilterScriptHtml() : ''}
 </body>
 </html>`;
 }
@@ -10157,6 +10175,7 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/outdoors</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...regionCounts.map(
           ({ region, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
