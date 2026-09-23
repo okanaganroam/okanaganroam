@@ -2170,7 +2170,7 @@ test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach
   assert.match(html, /class="mood-card mood-card-whats-on" href="\/whats-on">/);
   assert.match(html, /class="mood-card mood-card-food-drink" href="\/browse\?types=restaurant,cafe,brewery,pub,cocktail" data-mood-filter="restaurant,cafe,brewery,pub,cocktail">/);
   assert.match(html, /class="mood-card mood-card-golf" href="\/golf">/);
-  assert.match(html, /class="mood-card mood-card-wine" href="\/[a-z-]+\/wineries" data-mood-filter="winery">/);
+  assert.match(html, /class="mood-card mood-card-wine" href="\/browse\?types=winery" data-mood-filter="winery">/);
 });
 
 test('Mood cards: Hidden Gems is no longer one of the six mood cards', () => {
@@ -2188,13 +2188,14 @@ test('Mood cards: Golf links to the Okanagan-wide /golf listing (not a single re
   );
 });
 
-test('Mood cards: Wine still uses the existing dynamic bestRegionForType mechanism with a /browse fallback', () => {
+test('Mood cards: Wine links to the valley-wide winery browse route, not a single region', () => {
   const html = app.renderMoodCardsHTML();
   const wineMatch = html.match(/class="mood-card mood-card-wine" href="([^"]*)"/);
   assert.ok(wineMatch, 'expected the Wine card to have an href');
-  assert.ok(
-    wineMatch[1] === '/browse' || /^\/[a-z-]+\/wineries$/.test(wineMatch[1]),
-    `Wine href must be either the /browse fallback (no winery venues exist) or a real /:region/wineries category page, got: ${wineMatch[1]}`
+  assert.strictEqual(
+    wineMatch[1],
+    '/browse?types=winery',
+    `Wine href must be the Okanagan-wide /browse?types=winery route, got: ${wineMatch[1]}`
   );
 });
 
@@ -2302,7 +2303,7 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
   assert.equal(items.length, 7, 'expected exactly 7 Explore links');
   assert.equal(items[0].text, 'Food &amp; Drinks');
   assert.equal(items[0].href, '/browse?types=restaurant,cafe,brewery,pub,cocktail');
-  assert.ok(items[1].href === '/browse' || /^\/[a-z-]+\/wineries$/.test(items[1].href), `Wine href unexpected: ${items[1].href}`);
+  assert.ok(items[1].href === '/browse?types=winery', `Wine href unexpected: ${items[1].href}`);
   assert.equal(items[2].href, '#exploreRegions');
   assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
   assert.equal(items[4].href, '/whats-on');

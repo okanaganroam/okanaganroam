@@ -4273,8 +4273,7 @@ function renderMoodCardsHTML() {
   // one golf venue exists; falls back to /browse exactly as before when
   // there are none yet.
   const golfHref = bestRegionForType.golf && CATEGORY_SLUGS.golf ? `/${CATEGORY_SLUGS.golf}` : '/browse';
-  const wineRegion = bestRegionForType.winery;
-  const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
+  const wineHref = '/browse?types=winery';
   // Beaches (2026-09-20): same pattern as Golf. Now that the Okanagan-wide
   // /beaches listing is live, the Beaches mood card points at it whenever
   // at least one beach venue exists; with no beach data it keeps its
@@ -4409,8 +4408,7 @@ function renderHomeFooterHTML(fromBrowse) {
   // identical golfHref -- Golf venues span multiple regions, so this links
   // to the Okanagan-wide /golf listing instead of one region's subset.
   const golfHref = bestRegionForType.golf && CATEGORY_SLUGS.golf ? `/${CATEGORY_SLUGS.golf}` : '/browse';
-  const wineRegion = bestRegionForType.winery;
-  const wineHref = wineRegion && CATEGORY_SLUGS.winery ? `/${wineRegion}/${CATEGORY_SLUGS.winery}` : '/browse';
+  const wineHref = '/browse?types=winery';
   const exploreRegionsHref = fromBrowse ? '/#exploreRegions' : '#exploreRegions';
   const hiddenGemsHref = fromBrowse ? '/#hiddenGems' : '#hiddenGems';
   // Outdoors (2026-09-20): the same gated destination as the homepage's
