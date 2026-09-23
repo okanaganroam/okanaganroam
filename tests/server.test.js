@@ -2280,6 +2280,71 @@ test('Wine engagement: winery region and venue pages carry Favorite / Add to Tri
   assert.ok(!app.ENGAGEMENT_ONLY_TYPES.has('restaurant'), 'only winery is an engagement-only type for now');
 });
 
+// ---- category-change redirect (2026-09-24) ------------------------------
+//
+// When a venue's `type` is corrected (e.g. a pub that had been filed as a
+// restaurant), CATEGORY_SLUGS changes its canonical URL, so the previously
+// published/indexed URL would 404. server.js's venue route now falls back to
+// findActiveVenueBySlugAcrossTypes() and 301s to the new URL instead.
+//
+// The subtle part -- and what this test protects -- is the helper's guards,
+// not the 301 itself: (region, slug) is NOT unique in production (three golf
+// clubs keep a clubhouse-restaurant record under the same region+slug as the
+// course), and a retired venue must stay with the existing venue-to-venue
+// redirect rather than being caught here.
+//
+// Deliberately NOT an HTTP test: the shared harness's only listener runs on
+// port 3001 inside the long 'HTTP routes' test, which currently fails on a
+// pre-existing golf-selector assertion BEFORE reaching its app.server.close()
+// -- so that port can still be held when later tests run. A port-bound test
+// here would be flaky for reasons unrelated to this feature.
+test('Category-change redirect: the cross-type slug lookup resolves a moved venue and refuses to guess', () => {
+  const insertRedirect = db.prepare(
+    'INSERT INTO venues (name, region, type, slug, redirect_to) VALUES (?, ?, ?, ?, ?)'
+  );
+  const insertPlain = db.prepare(
+    'INSERT INTO venues (name, region, type, slug) VALUES (?, ?, ?, ?)'
+  );
+
+  // 1. A venue whose type was corrected: findable by region+slug across types.
+  insertPlain.run('CCR Moved Pub', 'kelowna', 'pub', 'ccr-moved-pub');
+  const moved = app.findActiveVenueBySlugAcrossTypes('kelowna', 'ccr-moved-pub');
+  assert.ok(moved, 'a single active venue must be found by region+slug regardless of type');
+  assert.equal(moved.type, 'pub');
+  assert.equal(app.CATEGORY_SLUGS[moved.type], 'pubs', 'the redirect target slug comes from CATEGORY_SLUGS');
+  // The old URL's category slug differs from the new one -- the route's
+  // redirect condition -- so no self-redirect (loop) is possible.
+  assert.notEqual(app.CATEGORY_SLUGS[moved.type], 'restaurants');
+
+  // 2. Ambiguity guard: two ACTIVE venues sharing region+slug must return null,
+  //    so the route 404s rather than guessing between them. This mirrors real
+  //    production data (e.g. penticton/penticton-golf-country-club exists as
+  //    both type='golf' and type='restaurant').
+  insertPlain.run('CCR Ambiguous Course', 'vernon', 'golf', 'ccr-ambiguous');
+  insertPlain.run('CCR Ambiguous Clubhouse', 'vernon', 'restaurant', 'ccr-ambiguous');
+  assert.equal(
+    app.findActiveVenueBySlugAcrossTypes('vernon', 'ccr-ambiguous'),
+    null,
+    'an ambiguous (region, slug) must return null -- never guess between two real venues'
+  );
+  // Each remains individually reachable by its own exact type.
+  assert.ok(app.findVenueBySlug('vernon', 'golf', 'ccr-ambiguous'));
+  assert.ok(app.findVenueBySlug('vernon', 'restaurant', 'ccr-ambiguous'));
+
+  // 3. Retired venues stay out of this path, so the pre-existing
+  //    venue-to-venue redirect keeps owning them.
+  const target = app.findVenueBySlug('kelowna', 'pub', 'ccr-moved-pub');
+  insertRedirect.run('CCR Retired', 'penticton', 'restaurant', 'ccr-retired', target.id);
+  assert.equal(
+    app.findActiveVenueBySlugAcrossTypes('penticton', 'ccr-retired'),
+    null,
+    'a redirected venue must not be resolved here'
+  );
+
+  // 4. Unknown slug -> null (plain 404, no redirect).
+  assert.equal(app.findActiveVenueBySlugAcrossTypes('kelowna', 'ccr-no-such-slug'), null);
+});
+
 test('Mood cards: Food & Drink links to /browse pre-filtered by its multi-type filter (no single category page covers all five types)', () => {
   const html = app.renderMoodCardsHTML();
   const cardMatch = html.match(/class="mood-card mood-card-food-drink" href="([^"]*)"/);

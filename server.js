@@ -1365,6 +1365,28 @@ function findVenueBySlug(region, type, slug) {
   return row ? rowToVenue(row) : null;
 }
 
+// Category-change lookup (2026-09-24): the same region+slug, ignoring type.
+// Used ONLY to 301 an old category URL after a venue's `type` is corrected
+// (e.g. a pub that had been filed as a restaurant), so previously indexed
+// URLs keep working instead of 404ing.
+//
+// Deliberately returns null unless EXACTLY ONE active venue matches, because
+// (region, slug) is NOT unique: three golf clubs currently keep a separate
+// clubhouse-restaurant record under the same region and slug as the course
+// itself (e.g. penticton/penticton-golf-country-club exists as both
+// type='golf' and type='restaurant'). Both of those URLs resolve correctly
+// on their own, so this fallback must never guess between them.
+//
+// `redirect_to IS NULL` keeps this clear of the venue-to-venue duplicate
+// redirect above: a retired venue reached under the wrong category still
+// 404s, exactly as it does today.
+function findActiveVenueBySlugAcrossTypes(region, slug) {
+  const rows = db
+    .prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL')
+    .all(region, slug);
+  return rows.length === 1 ? rowToVenue(rows[0]) : null;
+}
+
 // ---------- Phase 1 (Events architecture gate) — minimal data access ----------
 // Deliberately narrow: exactly what Phase 1's route/render/sitemap code
 // below needs. No create/update/delete endpoints are added in this phase —
@@ -11561,6 +11583,21 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
+        // No venue in this region/category/slug. Before 404ing, check whether
+        // this exact region+slug exists under a DIFFERENT category -- i.e. the
+        // venue's `type` was corrected after this URL was published/indexed --
+        // and 301 to its current canonical URL. Only reached on a path that
+        // would otherwise 404, so no existing 200 response can change.
+        const moved = findActiveVenueBySlugAcrossTypes(region, slug);
+        const movedSlug = moved && CATEGORY_SLUGS[moved.type];
+        if (moved && movedSlug && movedSlug !== categorySlug) {
+          const target = `/${region}/${movedSlug}/${slug}`;
+          // Loop guard: never redirect a path to itself.
+          if (target !== pathname.replace(/\/+$/, '')) {
+            res.writeHead(301, { Location: `${target}${parsed.search || ''}` });
+            return res.end();
+          }
+        }
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
@@ -11711,6 +11748,7 @@ module.exports = {
   getVenue,
   getVenuesByRegionCategory,
   findVenueBySlug,
+  findActiveVenueBySlugAcrossTypes,
   getRelatedVenues,
   getNearbyVenues,
   getRegionCategoryCounts,
