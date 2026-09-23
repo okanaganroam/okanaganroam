@@ -123,9 +123,9 @@ categories: `restaurants` (20 regions) · `outdoors` (19) · `cafes` (19) · `pu
 | 42 | GENERATED / READY TO PUBLISH | Kettle Valley Rail Trail cycling | Valley-wide | Okanagan Hiking & Outdoor Adventures | GENERATED (848 x 1264) | **NOT PUBLISHED** |
 | 43 | GENERATED / READY TO PUBLISH | Summerland, an underrated stop | Summerland | Hidden Gems of the Okanagan | GENERATED (848 x 1264) | **NOT PUBLISHED** |
 | 44 | GENERATED / READY TO PUBLISH | Peachland waterfront | Peachland | Okanagan Beaches & Lakes | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 45 | GENERATED / READY TO PUBLISH | Okanagan golf courses | Valley-wide | Okanagan Golf | GENERATED (848 x 1264) | **NOT PUBLISHED** |
+| 45 | GENERATED / READY TO PUBLISH | Kelowna golf courses | Kelowna | Okanagan Golf | GENERATED (848 x 1264) | **NOT PUBLISHED** |
 | 46 | GENERATED / READY TO PUBLISH | Penticton breweries | Penticton | Okanagan Food & Drink | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 47 | GENERATED / READY TO PUBLISH | Okanagan fall events | Valley-wide | Okanagan Events & Festivals | GENERATED (848 x 1264) | **NOT PUBLISHED** |
+| 47 | GENERATED / READY TO PUBLISH | Okanagan live music | Valley-wide | Okanagan Events & Festivals | GENERATED (848 x 1264) | **NOT PUBLISHED** |
 | 48 | GENERATED / READY TO PUBLISH | Lake Country / Kalamalka Lake | Lake Country | Okanagan Weekend Getaways | GENERATED (848 x 1264) | **NOT PUBLISHED** |
 | 49 | GENERATED / READY TO PUBLISH | Okanagan scenic viewpoints | Valley-wide | Things to Do in the Okanagan | GENERATED (848 x 1264) | **NOT PUBLISHED** |
 | 50 | GENERATED / READY TO PUBLISH | Oliver, wine capital | Oliver | Okanagan Wineries & Wine Country | GENERATED (848 x 1264) | **NOT PUBLISHED** |
@@ -636,61 +636,77 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 **PIN #:** 45
 
 **Topic**
-Okanagan golf courses — region/destination: Valley-wide
+Kelowna golf courses — region/destination: Kelowna
 
 **Pinterest Title**
-Okanagan Golf ⛳ | Courses With Lake & Mountain Views
+Kelowna Golf ⛳ | Courses, Views & Okanagan Tee Time
 
 **Board**
 Okanagan Golf
 
 **Destination**
-https://okanaganroam.com/golf
-*(verified HTTP 200 on 2026-09-23)*
+https://okanaganroam.com/kelowna/golf
+*(verified HTTP 200, 0 redirects, on 2026-09-23)*
 
 **Description**
-The Okanagan is one of Canada's best golf valleys ⛳ Long warm shoulder seasons, dry fairways cut into benchland and hillside, and holes that look out over the lake and the mountains. Browse Okanagan golf courses by region with Okanagan Roam.
+Planning a round in Kelowna? ⛳ Twenty verified courses sit within easy reach of the city — lakeview layouts on the benchland, mountain courses above the valley, and indoor simulators for the shoulder season. Compare Kelowna golf courses and plan your tee time with Okanagan Roam.
 
 **Overlay Text**
 ```
-OKANAGAN GOLF ⛳
-LAKE & MOUNTAIN VIEWS
+KELOWNA GOLF ⛳
+OKANAGAN, BC
 ```
 
-**Final Gemini Prompt used (v1 — as generated)**
+**Final Gemini Prompt used (v1 — replacement concept, as generated)**
 ```
 Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
 
-Scene: golden-hour light on a golf course built into the benchland of the Okanagan Valley, British Columbia. Foreground: a manicured green fairway and a closely mown green sweeping downhill, edged by pale sand bunkers. The maintained turf ends abruptly against untamed native terrain — dry golden bunchgrass, sagebrush and scattered ponderosa pine on rocky ground. Mid-ground: the land falls away to a deep blue Okanagan lake in the valley below. Background: dry, sparsely treed brown-gold hillsides and layered blue-grey mountain ridges.
+Scene: first light on a golf course above Kelowna in British Columbia's Okanagan Valley. Close foreground: a beautifully manicured putting green with a slender flagstick and pin set in it, fine mown turf texture, subtle dew still beading on the grass and catching the early light, a pale sand bunker curving along one edge. Beyond the green the land falls away into the Okanagan valley — dry golden bunchgrass, sagebrush and scattered open-canopy ponderosa pine on rocky benchland, then a long, deep blue Okanagan Lake on the valley floor. Background: dry brown-gold hillsides rising from the far shore and layered blue-grey mountain ridges receding into soft morning haze.
 
-Light and mood: warm, low, raking golden-hour sun, long shadows across the fairway, clear dry interior air. Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation. No people, no golfers, no carts.
+Light and mood: soft, cool, low first-light from the side, long gentle shadows across the green, thin mist lying on the lake, crisp clear interior-British-Columbia air. Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation. No people, no golfers, no recognisable individuals, no golf carts.
 
-Important: this must read as an interior British Columbia course. Do NOT render a lush green parkland course, a Scottish links, a Florida or Arizona desert resort course, or tropical scenery. The contrast between irrigated green turf and dry golden native hillside is the essential subject.
+Important: this must read as the Okanagan Valley specifically, not generic golf imagery. The contrast between irrigated green turf and dry golden native hillside is essential. Do NOT render a lush green parkland course, a Scottish links, a Florida or Arizona desert resort course, an Irish coastal course, tropical scenery, or palm trees.
 
 Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
 
-OKANAGAN GOLF ⛳
-LAKE & MOUNTAIN VIEWS
+KELOWNA GOLF ⛳
+OKANAGAN, BC
 
-Set the first line larger than the second. Use elegant, highly readable travel-magazine typography — a refined serif or a clean high-contrast sans serif — in white or warm cream, with a subtle shadow or gentle darkening behind the text so it stays legible against the sky.
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second.
 
-Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown.
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no gradient wash, no vignette behind the text, no darkened sky band, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
 
-Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, no decorative border, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides.
+
+Reproduce the overlay text EXACTLY as written above, character for character. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown.
+
+CRITICAL — do NOT add any stray character before or after either line. There must be no apostrophe, no single or double quotation mark, no opening or closing quote glyph, no comma, no period, no colon, no dash, no bullet, no asterisk and no decorative mark at the start or the end of either line. Neither line ends with any punctuation.
+
+Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+CRITICAL: there must be no course signage, no tee markers with text, no scorecards, no flag logos, no sponsor boards and no text of any kind on any object in the image.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, no fake branding, and no user-interface elements.
 ```
 
 **Image**
 - Path: `pinterest-assets/pin-0045.jpg`
 - Dimensions: **848 x 1264**
-- Size: 979,569 bytes
-- MD5: `184106f835dadeb806c9a093e5c6d6a8`
+- Size: 865,022 bytes
+- MD5: `c728d588d24693b1d792ddae90644aec`
 
 **Status**
 **GENERATED / READY TO PUBLISH — NOT PUBLISHED**
 
 **Notes**
-- No individual course is named or depicted, so no venue claim is made and no course is implicitly endorsed.
-- Visual concept: golf / golden hour. Destination is the golf hub, which lists courses by region.
+- **Replacement Pin (2026-09-23).** The original #45 was a valley-wide *Okanagan Golf* concept. A read-only audit of the live Pinterest account found an existing published Pin, *Okanagan Golf | Golf Courses & Scenic Views in BC*, with the same `OKANAGAN GOLF` overlay headline, the same `/golf` destination and the same green-plus-lake image concept — classified TRUE DUPLICATE. This replacement moves one level more specific.
+- Destination changed from `/golf` to `/kelowna/golf`, a distinct server-rendered page with its own canonical and title (*Golf Courses in Kelowna, BC*) listing **20 verified courses** — the largest of the 11 regional golf pages (Vernon 9, Penticton 5, Osoyoos and West Kelowna 3, Oliver and Summerland 2).
+- Search intent differs in kind: the existing Pin serves destination-dreaming (*Okanagan golf*); this one serves trip-planning by someone who has already chosen the town (*golf courses in Kelowna*).
+- Note: this is the batch's second Kelowna Pin alongside #51 Knox Mountain. Different board, activity and imagery, but it relaxes the earlier one-Kelowna-slot constraint — accepted by the owner.
+- Description was drafted by Claude (the owner supplied title, overlay and image concept only) and is grounded in the live page: 20 verified courses and a *Kelowna Indoor Golf & Simulators* section both render on `/kelowna/golf`.
+- Superseded image md5 `184106f835dadeb806c9a093e5c6d6a8` (discarded — the valley-wide golf concept).
 
 ---
 
@@ -771,70 +787,79 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 **PIN #:** 47
 
 **Topic**
-Okanagan fall events — region/destination: Valley-wide
+Okanagan live music — region/destination: Valley-wide
 
 **Pinterest Title**
-Fall Events in the Okanagan 🍂 | What's On This Season
+Live Music in the Okanagan 🎶 | Gigs, Patios & Vineyard Shows
 
 **Board**
 Okanagan Events & Festivals
 
 **Destination**
-https://okanaganroam.com/whats-on
-*(verified HTTP 200 on 2026-09-23)*
+https://okanaganroam.com/whats-on?categories=live-music
+*(verified HTTP 200, 0 redirects, on 2026-09-23)*
 
 **Description**
-Wondering what's on in the Okanagan this fall? 🍂 Harvest festivals, farmers' markets, corn mazes, pumpkin patches and small-town community events run right through the season across the valley. See current Okanagan events by date and region with Okanagan Roam.
+Looking for live music in the Okanagan? 🎶 From vineyard stages and brewery patios to small-town halls and lakeside festivals, there are gigs on across the valley most nights of the week. Browse what's playing near you by date and region with Okanagan Roam.
 
 **Overlay Text**
 ```
-OKANAGAN FALL EVENTS 🍂
-WHAT'S ON THIS SEASON
+OKANAGAN LIVE MUSIC 🎶
+GIGS ACROSS THE VALLEY
 ```
 
-**Final Gemini Prompt used (v2 — regenerated, final)**
+**Final Gemini Prompt used (v1 — replacement concept, as generated)**
 ```
 Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
 
-Scene: a bright autumn afternoon at an outdoor harvest market in a small Okanagan town in British Columbia. Foreground: rustic wooden crates and tables heaped with local autumn produce — red and green apples, pears, winter squash, pumpkins, root vegetables and bunches of grapes — under the edge of a plain white canvas market canopy. Mid-ground: a few more simple unbranded market stalls along a tree-lined street, the trees turned yellow and orange. Background, softly out of focus: dry golden Okanagan hillsides rising behind the town under a clear blue sky.
+Scene: an early-evening outdoor concert at a vineyard in British Columbia's Okanagan Valley. Mid-ground: a simple raised timber stage on a grass terrace at the edge of the vineyard, strung overhead with warm string lights on slender poles. On the stage, an unbranded acoustic guitar on a stand, a second guitar, a simple drum kit and two small amplifiers, stage lights just switched on and glowing warm. Foreground: neat rows of mature grapevines catching the very last light, leaves deep green turning early-autumn gold. Background: dry golden Okanagan hillsides descending toward a deep blue lake, with layered blue-grey ridges beyond.
 
-Light and mood: bright, crisp, clear autumn afternoon light, warm natural colour, dappled shade under the canopy. Sophisticated travel-editorial photography — natural colour, realistic texture, no HDR look, no oversaturation. No people and no faces.
+Light and mood: blue hour just after sunset, the sky graduating from soft peach at the horizon to deep indigo above, warm practical stage and string lighting glowing against the cool sky, calm and inviting. Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation.
 
-Important: this must read as a small interior British Columbia town in autumn. Do NOT render a New England town green, a European market square, a French or Italian village, or a tropical setting. The hills behind the town must be dry and golden, not lush green woodland.
+People: prefer NO people at all. If any figures appear they must be small, distant, softly blurred silhouettes only — no faces, no recognisable individuals, no performers on stage.
+
+Important: this must read as an Okanagan vineyard at dusk. Do NOT render a stadium or arena concert, an indoor nightclub, a large European music festival, a tropical or beach setting, a crowded festival ground, or laser/smoke show effects.
 
 Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
 
-OKANAGAN FALL EVENTS 🍂
-WHAT'S ON THIS SEASON
+OKANAGAN LIVE MUSIC 🎶
+GIGS ACROSS THE VALLEY
 
 The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second.
 
-Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no gradient wash, no vignette behind the text, no darkened sky band, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
 
-CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, no decorative border, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner.
 
-Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+Keep the entire overlay comfortably inside the frame with clear margins on all sides.
 
-Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+Reproduce the overlay text EXACTLY as written above, character for character. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown.
 
-CRITICAL: there must be no stall signage, no price boards, no banners, no chalkboards and no text of any kind on any sign, stall or object in the image.
+CRITICAL — do NOT add any stray character before or after either line. There must be no apostrophe, no single or double quotation mark, no opening or closing quote glyph, no comma, no period, no colon, no dash, no bullet, no asterisk and no decorative mark at the start or the end of either line. Neither line ends with any punctuation.
 
-Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+CRITICAL: there must be no band names, no banners, no posters, no drum-head logos, no amplifier brand marks, no stage signage, no set lists and no text of any kind on any object in the image.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, no fake branding, and no user-interface elements.
 ```
 
 **Image**
 - Path: `pinterest-assets/pin-0047.jpg`
 - Dimensions: **848 x 1264**
-- Size: 841,741 bytes
-- MD5: `eb16185ac99cf6f2bfecfa470bc845dc`
+- Size: 880,816 bytes
+- MD5: `660946eb1e56c3a449bb823bedbcde6c`
 
 **Status**
 **GENERATED / READY TO PUBLISH — NOT PUBLISHED**
 
 **Notes**
-- No specific event, date, venue or organiser is named — the Pin points at the live /whats-on listing, which stays current on its own.
-- Visual concept: town / market / bright autumn.
-- **Regenerated (v2).** First generation wrapped the main line onto three lines. The v2 prompt below forces exactly two unbroken lines. Verified fixed. Superseded image md5 `0c9be809f4c69c7e30aa4a720cf1a889` (discarded).
+- **Replacement Pin (2026-09-23).** The original #47 was a generic *Fall Events in the Okanagan* concept. The live-account audit found **three** overlapping published Pins — *Fall Events in the Okanagan*, *Okanagan Fall Events & Festivals | What's On This Autumn* (both fall-specific, same `/whats-on` destination, near-identical overlay wording and autumn-market imagery) and the evergreen *Okanagan Events & Festivals | What's On in the Okanagan*. Classified TRUE DUPLICATE.
+- This replacement drops the seasonal frame entirely and targets the site's largest event category: **140 live-music events**, versus Arts & Culture 89, Food & Drink 71, Wineries & Wine 71, Community 55, Nightlife 49, Sports & Rec 39, Workshops 34, Family & Kids 27, Holiday & Seasonal 23, Events & Festivals 20, Markets & Fairs 18. No existing Pin covers music.
+- **Destination caveat:** the `?categories=` filter is applied **client-side**. The URL returns HTTP 200 and the Live Music filter is confirmed to apply on page load (verified in-browser), so a visitor lands correctly on the filtered listing — but the page's title and meta remain the generic What's On values, so it is not a separate page for SEO purposes. Plain `/whats-on` is the canonical alternative, at the cost of sharing a destination with the existing evergreen Events Pin.
+- Fully evergreen — publishable in any month, and the destination stays populated year-round as listings move from patios to indoor venues.
+- Minor QC observation: a faint grille marking appears on the right-hand amplifier. It is texture, not legible text, and no brand name, banner, poster or drum-head logo is present.
+- Superseded image md5 `eb16185ac99cf6f2bfecfa470bc845dc` (discarded — the fall-events concept).
 
 ---
 
