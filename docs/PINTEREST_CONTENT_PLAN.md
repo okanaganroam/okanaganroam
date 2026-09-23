@@ -117,20 +117,20 @@ categories: `restaurants` (20 regions) · `outdoors` (19) · `cafes` (19) · `pu
 | Pin | Status | Topic | Destination/Region | Board | Image Status | Published |
 |----:|--------|-------|--------------------|-------|--------------|-----------|
 | 38 | PUBLISHED | Fall weekend in Vernon | Vernon | Okanagan Weekend Getaways | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
-| 39 | GENERATED / READY TO PUBLISH | Naramata Bench wineries | Naramata | Okanagan Wineries & Wine Country | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 40 | GENERATED / READY TO PUBLISH | Osoyoos desert & warmest lake | Osoyoos | Okanagan Travel Guide | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 41 | GENERATED / READY TO PUBLISH | Big White ski season | Big White | Things to Do in the Okanagan | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 42 | GENERATED / READY TO PUBLISH | Kettle Valley Rail Trail cycling | Valley-wide | Okanagan Hiking & Outdoor Adventures | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 43 | GENERATED / READY TO PUBLISH | Summerland, an underrated stop | Summerland | Hidden Gems of the Okanagan | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 44 | GENERATED / READY TO PUBLISH | Peachland waterfront | Peachland | Okanagan Beaches & Lakes | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 45 | GENERATED / READY TO PUBLISH | Kelowna golf courses | Kelowna | Okanagan Golf | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 46 | GENERATED / READY TO PUBLISH | Penticton breweries | Penticton | Okanagan Food & Drink | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 47 | GENERATED / READY TO PUBLISH | Okanagan live music | Valley-wide | Okanagan Events & Festivals | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 48 | GENERATED / READY TO PUBLISH | Lake Country / Kalamalka Lake | Lake Country | Okanagan Weekend Getaways | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 49 | GENERATED / READY TO PUBLISH | Okanagan scenic viewpoints | Valley-wide | Things to Do in the Okanagan | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 50 | GENERATED / READY TO PUBLISH | Oliver, wine capital | Oliver | Okanagan Wineries & Wine Country | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 51 | GENERATED / READY TO PUBLISH | Knox Mountain hike | Kelowna | Okanagan Hiking & Outdoor Adventures | GENERATED (848 x 1264) | **NOT PUBLISHED** |
-| 52 | GENERATED / READY TO PUBLISH | Armstrong farm country | Armstrong | Hidden Gems of the Okanagan | GENERATED (848 x 1264) | **NOT PUBLISHED** |
+| 39 | PUBLISHED | Naramata Bench wineries | Naramata | Okanagan Wineries & Wine Country | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 40 | PUBLISHED | Osoyoos desert & warmest lake | Osoyoos | Okanagan Travel Guide | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 41 | PUBLISHED | Big White ski season | Big White | Things to Do in the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 42 | PUBLISHED | Kettle Valley Rail Trail cycling | Valley-wide | Okanagan Hiking & Outdoor Adventures | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 43 | PUBLISHED | Summerland, an underrated stop | Summerland | Hidden Gems of the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 44 | PUBLISHED | Peachland waterfront | Peachland | Okanagan Beaches & Lakes | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 45 | PUBLISHED | Kelowna golf courses | Kelowna | Okanagan Golf | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 46 | PUBLISHED | Penticton breweries | Penticton | Okanagan Food & Drink | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 47 | PUBLISHED | Okanagan live music | Valley-wide | Okanagan Events & Festivals | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 48 | PUBLISHED | Lake Country / Kalamalka Lake | Lake Country | Okanagan Weekend Getaways | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 49 | PUBLISHED | Okanagan scenic viewpoints | Valley-wide | Things to Do in the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 50 | PUBLISHED | Oliver, wine capital | Oliver | Okanagan Wineries & Wine Country | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 51 | PUBLISHED | Knox Mountain hike | Kelowna | Okanagan Hiking & Outdoor Adventures | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 52 | PUBLISHED | Armstrong farm country | Armstrong | Hidden Gems of the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
 
 ---
 
@@ -293,7 +293,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `82ee7261e0825fea3285e8d3ba4bc5ec`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517062/
 
 **Notes**
 - Long-tail intent: people search "Naramata Bench wineries" by name far more than "Okanagan wineries".
@@ -357,7 +360,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `0711060fc91c0efd74d7c6256dbdce98`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517169/
 
 **Notes**
 - Strong long-tail hook: "Canada's warmest lake" and "Canada's only desert" are real, distinctive, high-curiosity search angles.
@@ -420,7 +426,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `08c23431a8355e5761303bf077e9492d`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517246/
 
 **Notes**
 - Seasonal lead-in: ski-trip planning searches ramp up through October and November, ahead of the season.
@@ -494,7 +503,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `8d524efdf7df366c47a06cac870db7ae`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517350/
 
 **Notes**
 - Named-landmark long-tail: "Kettle Valley Rail Trail" and "Myra Canyon trestles" are high-intent search terms.
@@ -559,7 +571,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `231392dcd96e97632e79c85410f1d823`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517437/
 
 **Notes**
 - Description sticks to geography and landscape only. No business, attraction or operating claim is made — the compromised Summerland tourism sources were not used and are not needed here.
@@ -622,7 +637,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `ff073c76d874980cd6e45a7bf5605a96`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517537/
 
 **Notes**
 - Beach content runs year-round on Pinterest because users save it while planning ahead for summer.
@@ -698,7 +716,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `c728d588d24693b1d792ddae90644aec`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517755/
 
 **Notes**
 - **Replacement Pin (2026-09-23).** The original #45 was a valley-wide *Okanagan Golf* concept. A read-only audit of the live Pinterest account found an existing published Pin, *Okanagan Golf | Golf Courses & Scenic Views in BC*, with the same `OKANAGAN GOLF` overlay headline, the same `/golf` destination and the same green-plus-lake image concept — classified TRUE DUPLICATE. This replacement moves one level more specific.
@@ -773,7 +794,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `25949cfcf45d71091929331e89a8cbc2`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001517838/
 
 **Notes**
 - No brewery is named, and the prompt explicitly forbids any visible branding or signage — this avoids depicting a real business.
@@ -851,7 +875,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `660946eb1e56c3a449bb823bedbcde6c`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001518020/
 
 **Notes**
 - **Replacement Pin (2026-09-23).** The original #47 was a generic *Fall Events in the Okanagan* concept. The live-account audit found **three** overlapping published Pins — *Fall Events in the Okanagan*, *Okanagan Fall Events & Festivals | What's On This Autumn* (both fall-specific, same `/whats-on` destination, near-identical overlay wording and autumn-market imagery) and the evergreen *Okanagan Events & Festivals | What's On in the Okanagan*. Classified TRUE DUPLICATE.
@@ -918,7 +945,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `0b3b9932e54899a1df176ad05bdb4c80`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001518113/
 
 **Notes**
 - "Kalamalka Lake" is a strong named-landmark search term and the turquoise water is highly saveable on Pinterest.
@@ -988,7 +1018,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `1b8affabdfc3917d4d34cf1aa0c013be`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001518209/
 
 **Notes**
 - Deliberately the only moody / low-saturation / misty image in the batch, so the grid does not read as fourteen sunny photos.
@@ -1052,7 +1085,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `213495b93b7cdf7cfd1dc793be5f7de8`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001518409/
 
 **Notes**
 - Second Wineries Pin, deliberately separated from #39: different region (South vs Naramata Bench), different light (flat overcast vs golden hour), different composition (wide flat rows vs terraced lake overlook), and dark overlay type instead of cream.
@@ -1115,7 +1151,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `949c00ef9c8d25ba0bc487f337517a45`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001518544/
 
 **Notes**
 - The only Kelowna Pin in the batch — Kelowna is deliberately held to one slot so it does not dominate.
@@ -1179,7 +1218,10 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 - MD5: `97cb5a5398b4ce0e1aee40e8edceb6b4`
 
 **Status**
-**GENERATED / READY TO PUBLISH — NOT PUBLISHED**
+**PUBLISHED 2026-09-23**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001518662/
 
 **Notes**
 - Intentionally the only Pin in the batch with no lake and no vineyard — it shows a part of the valley the other thirteen Pins do not.
