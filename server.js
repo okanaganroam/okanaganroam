@@ -1003,6 +1003,21 @@ function usesThemedHubLayout(type) {
   return usesThemedCategoryLayout(type) || HUB_ONLY_THEMED_TYPES.has(type);
 }
 
+// Types that get the Favorite / Add to Trip controls on their REGION and
+// VENUE pages without the themed visual treatment (2026-09-23). Wine is the
+// first: its /wineries hub is themed, but its 14 region pages and 204 venue
+// pages must keep their existing presentation exactly, so they receive the
+// controls plus the small stylesheet those controls need -- and nothing
+// else: no golf body class, no app.css, no trip tray, no card redesign.
+// This is possible because golfFavTripScriptBody()'s standalone branch
+// already implements the full behaviour against the same okanaganFavorites
+// / okanaganTrip localStorage keys the homepage Trip Planner reads, so
+// app.js is not required to make the buttons work.
+const ENGAGEMENT_ONLY_TYPES = new Set(['winery']);
+function usesEngagementControls(type) {
+  return usesThemedCategoryLayout(type) || ENGAGEMENT_ONLY_TYPES.has(type);
+}
+
 // Categories that exist as venue pages but are deliberately NOT offered
 // by the Build My Trip planner yet (interest chips on /trip, the
 // `interests` field of POST /api/trip/generate, the LLM/deterministic
@@ -5882,6 +5897,42 @@ function renderGolfHeaderHtml() {
     .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>');
 }
 
+// Favorite / Add to Trip styling for ENGAGEMENT_ONLY_TYPES pages only
+// (2026-09-23). Injected ONLY by the region/venue pages of those types, so
+// the unscoped `.venue-cta-row .card-action` rules below cannot reach any
+// other page. Mirrors the pill styling the themed pages already use, so the
+// controls read as the same feature without pulling in the golf theme.
+function renderEngagementControlStyles() {
+  const cardSel = [...ENGAGEMENT_ONLY_TYPES]
+    .map((t) => `.venue-card[data-venue-category="${t}"]`)
+    .join(',\n  ');
+  return `<style>
+  ${cardSel} .card-actions {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(74,52,40,0.10);
+  }
+  ${cardSel} .chips:not(:empty) + .card-actions { margin-top: 8px; padding-top: 0; border-top: 0; }
+  ${cardSel} .card-action,
+  .venue-cta-row .card-action {
+    display: inline-flex; align-items: center; gap: 5px; margin: 0;
+    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    color: var(--ink); background: var(--sand-deep); border: none; text-decoration: none;
+    border-radius: 999px; padding: 5px 12px; cursor: pointer; width: fit-content;
+    transition: background 0.15s;
+  }
+  ${cardSel} .card-action:hover,
+  .venue-cta-row .card-action:hover { background: rgba(224,169,78,0.35); color: var(--ink); text-decoration: none; }
+  ${cardSel} .card-action:focus-visible,
+  .venue-cta-row .card-action:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
+  ${cardSel} .trip-btn.in-trip,
+  .venue-cta-row .trip-btn.in-trip { background: var(--teal, #2F6F73); color: var(--paper); }
+  ${cardSel} .fav-btn.is-fav,
+  .venue-cta-row .fav-btn.is-fav { background: var(--plum); color: var(--paper); }
+  .trip-notice { margin: 8px 0 0; font-size: 0.85rem; color: var(--plum); }
+  .trip-notice:empty { display: none; }
+</style>`;
+}
+
 // The site-wide floating "Trip" control: the same #tripTray fragment
 // okanagan.html ships (and /trip already reuses), driven by the same
 // trip-tray module in public/scripts/app.js. Golf pages load app.js just
@@ -6824,7 +6875,7 @@ ${golfFavTripScriptBody(type)}
 // outbound_click event with link_type plus venue identity, and one
 // venue_view on load so page-level impressions carry venue_id too.
 function golfVenueEngagementScriptHtml(venue) {
-  if (!usesThemedCategoryLayout(venue.type)) return '';
+  if (!usesEngagementControls(venue.type)) return '';
   const pageCtx = JSON.stringify({
     venue_id: venue.id,
     venue_name: venue.name,
@@ -6951,7 +7002,7 @@ function venueCardHtml(venue, opts = {}) {
   // and URL use), so identically named venues in different communities
   // are distinguishable without opening them. Off by default, so every
   // other surface's card markup is unchanged.
-  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, showRegion = false, themed = usesThemedCategoryLayout(venue.type) } = opts;
+  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -6982,7 +7033,11 @@ function venueCardHtml(venue, opts = {}) {
     ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(venue.description)}</p></div>
         <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`
     : `<p>${escapeHtml(venue.description)}</p>`;
-  const liAttrs = isGolf
+  // Emitted for themed cards and for ENGAGEMENT_ONLY_TYPES cards alike: the
+  // shared engagement script locates a card by data-venue-category, so an
+  // unthemed card carrying the controls needs these attributes too. They are
+  // data attributes only -- no themed CSS rule matches a non-golf category.
+  const liAttrs = (isGolf || actions)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="category_card"`
     : '';
   // Golf-only (2026-09-19): the listing card's only actions are Favorite
@@ -6990,7 +7045,7 @@ function venueCardHtml(venue, opts = {}) {
   // live on the venue page instead -- the data is untouched, only where it
   // is shown. Rendered inline after the chips line, so non-Golf cards stay
   // byte-identical to their pre-feature markup (no stray blank line).
-  const cardActions = isGolf
+  const cardActions = actions
     ? `
         <div class="card-actions">
           ${golfFavTripButtonsHtml(venue)}
@@ -7186,7 +7241,12 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
 
   const hiddenGemIds = getHiddenGemVenueIds();
   const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes());
+  // Favorite / Add to Trip on this region page. True for the themed types
+  // exactly as before, and now also for ENGAGEMENT_ONLY_TYPES, which get the
+  // controls without any visual change (see usesEngagementControls).
+  const engagement = usesEngagementControls(type);
+  const engagementOnly = engagement && !usesThemedCategoryLayout(type);
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { actions: engagement });
 
   // Back-link to the Okanagan-wide page, only for categories that
   // actually have one (ALL_REGIONS_CATEGORIES) -- every other category
@@ -7207,7 +7267,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type)}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -7226,7 +7286,7 @@ ${golfEngagementHeadHtml(type)}
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
   ${usesThemedCategoryLayout(type) ? GOLF_APP_SCRIPT_TAG : ''}
-  ${golfCardEngagementScriptHtml(type)}
+  ${golfCardEngagementScriptHtml(type, engagement)}
 </body>
 </html>`;
 }
@@ -8632,9 +8692,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>Call</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
-    usesThemedCategoryLayout(venue.type) ? golfFavTripButtonsHtml(venue) : null,
+    usesEngagementControls(venue.type) ? golfFavTripButtonsHtml(venue) : null,
   ].filter(Boolean).join('\n  ');
-  const ctaRowAttrs = usesThemedCategoryLayout(venue.type)
+  const ctaRowAttrs = usesEngagementControls(venue.type)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
     : '';
   // Temporary condition (advisory collection), rendered between the
@@ -8716,7 +8776,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !usesThemedCategoryLayout(venue.type) ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type)}
 </head>
 <body${themedBodyClassAttr(venue.type)}>
@@ -11769,6 +11829,7 @@ module.exports = {
   ALL_REGIONS_CATEGORIES,
   renderGolfThemeStyles,
   THEMED_CATEGORY_TYPES,
+  ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
   themedBodyClassAttr,
   TRIP_PLANNER_EXCLUDED_TYPES,

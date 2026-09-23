@@ -2245,6 +2245,41 @@ test('Wine hub: /wineries is enabled, winery-only, valley-wide, and themed for t
   assert.ok(!app.THEMED_CATEGORY_TYPES.has('winery'), 'winery must never join the global THEMED_CATEGORY_TYPES');
 });
 
+test('Wine engagement: winery region and venue pages carry Favorite / Add to Trip WITHOUT the themed styling', () => {
+  const wineries = app.getVenuesByCategory('winery');
+  const first = wineries[0];
+
+  // 1. region page: controls present, presentation untouched
+  const regionPage = app.renderCategoryPage(first.region, 'winery', app.getVenuesByRegionCategory(first.region, 'winery'), []);
+  assert.match(regionPage, /class="card-action fav-btn"/, 'winery region cards must render Favorite');
+  assert.match(regionPage, /class="card-action trip-btn"/, 'winery region cards must render Add to Trip');
+  assert.match(regionPage, /data-venue-category="winery" data-venue-name=/, 'cards need the attributes the engagement script binds to');
+  assert.doesNotMatch(regionPage, /class="golf-page/, 'winery region pages must stay unthemed');
+  assert.doesNotMatch(regionPage, /venue-card-cue/, 'winery region cards keep their original markup');
+  assert.doesNotMatch(regionPage, /class="golf-desc"/, 'winery region cards must not gain the themed description block');
+  assert.doesNotMatch(regionPage, /id="tripTray"/, 'engagement-only pages must not pull in the trip tray');
+
+  // 2. venue page: controls in the CTA row, presentation untouched
+  const venuePage = app.renderVenuePage(first, [], [], []);
+  assert.match(venuePage, /class="card-action fav-btn"/, 'winery venue pages must render Favorite');
+  assert.match(venuePage, /class="card-action trip-btn"/, 'winery venue pages must render Add to Trip');
+  assert.match(venuePage, /<div class="venue-cta-row" data-venue-id=/, 'the CTA row needs its engagement attributes');
+  assert.doesNotMatch(venuePage, /class="golf-page/, 'winery venue pages must stay unthemed');
+
+  // 3. the controls are wired: the standalone script needs no app.js
+  assert.match(regionPage, /var HOLDER = '\[data-venue-category="winery"\]'/, 'region page must bind the engagement script to winery cards');
+  assert.match(venuePage, /okanaganFavorites/, 'venue page controls must use the shared favourites key');
+  assert.match(venuePage, /okanaganTrip/, 'venue page controls must use the shared trip key');
+
+  // 4. a category with no engagement controls is untouched
+  const restaurants = app.getVenuesByRegionCategory(first.region, 'restaurant');
+  if (restaurants.length) {
+    const other = app.renderCategoryPage(first.region, 'restaurant', restaurants, []);
+    assert.doesNotMatch(other, /class="card-action fav-btn"/, 'non-engagement categories must not gain the controls');
+  }
+  assert.ok(!app.ENGAGEMENT_ONLY_TYPES.has('restaurant'), 'only winery is an engagement-only type for now');
+});
+
 test('Mood cards: Food & Drink links to /browse pre-filtered by its multi-type filter (no single category page covers all five types)', () => {
   const html = app.renderMoodCardsHTML();
   const cardMatch = html.match(/class="mood-card mood-card-food-drink" href="([^"]*)"/);
