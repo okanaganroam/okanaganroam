@@ -451,11 +451,11 @@ The Kettle Valley Rail Trail is one of British Columbia's great easy rides 🚲 
 
 **Overlay Text**
 ```
-KETTLE VALLEY RAIL TRAIL 🚲
+KETTLE VALLEY TRAIL 🚲
 OKANAGAN, BC
 ```
 
-**Final Gemini Prompt used (v1 — as generated)**
+**Final Gemini Prompt used (v2 — regenerated, final)**
 ```
 Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
 
@@ -467,12 +467,22 @@ Important: this must read as interior British Columbia. Do NOT render New Englan
 
 Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
 
-KETTLE VALLEY RAIL TRAIL 🚲
+KETTLE VALLEY TRAIL 🚲
 OKANAGAN, BC
 
-Set the first line larger than the second. Use elegant, highly readable travel-magazine typography — a refined serif or a clean high-contrast sans serif — in white or warm cream, with a subtle shadow or gentle darkening behind the text so it stays legible.
+The overlay must be EXACTLY two lines in total. Set the whole of KETTLE VALLEY TRAIL 🚲 on ONE single line — do not wrap, split, stack or hyphenate it, and never break it after KETTLE or after VALLEY. Size the type so the line fits the image width comfortably with clear margins on both sides. Three lines of text is WRONG; two lines is the only acceptable result. Set the first line larger than the second.
 
-Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown.
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, no darkened sky band, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides.
+
+Reproduce the overlay text EXACTLY as written above, character for character. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. In particular, do not add the word RAIL — the first line reads KETTLE VALLEY TRAIL and nothing more.
+
+CRITICAL — do NOT add any stray character before or after either line. There must be no apostrophe, no single or double quotation mark, no opening or closing quote glyph, no comma, no period, no colon, no dash, no bullet, no asterisk and no decorative mark at the start or the end of either line. The first line must begin with the letter K of KETTLE and nothing else. The second line must begin with the letter O of OKANAGAN and nothing else. Neither line ends with any punctuation.
+
+Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
 
 Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
 ```
@@ -480,8 +490,8 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 **Image**
 - Path: `pinterest-assets/pin-0042.jpg`
 - Dimensions: **848 x 1264**
-- Size: 1,073,375 bytes
-- MD5: `c01dbaf6a893eaaba397cae85334d14e`
+- Size: 990,869 bytes
+- MD5: `8d524efdf7df366c47a06cac870db7ae`
 
 **Status**
 **GENERATED / READY TO PUBLISH — NOT PUBLISHED**
@@ -489,6 +499,8 @@ Do not add any other text anywhere in the image. No logos, no watermarks, no sig
 **Notes**
 - Named-landmark long-tail: "Kettle Valley Rail Trail" and "Myra Canyon trestles" are high-intent search terms.
 - Visual concept: trail / trestle / autumn morning — an engineered structure, unlike every other Pin in the batch.
+- **Regenerated (v2).** First generation rendered a stray apostrophe before KETTLE and set the overlay over a darkened gradient band. Two further attempts cleared both but wrapped the 24-character line onto three lines, so the overlay line was shortened to `KETTLE VALLEY TRAIL 🚲` (21 characters, inside the width that Gemini reliably sets on one line). The v2 prompt above carries the tightened overlay block plus explicit no-stray-punctuation and no-RAIL guards. Verified fixed: exactly two lines, no backing shape, emoji inline. Superseded image md5 `c01dbaf6a893eaaba397cae85334d14e` (discarded).
+- The **Pinterest title and description deliberately keep the full name “Kettle Valley Rail Trail”** — only the on-image overlay was shortened, so the searchable text fields still carry the landmark's official name.
 
 ---
 
