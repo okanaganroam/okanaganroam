@@ -902,6 +902,13 @@ function venueCardHtml(v){
 
   return '' +
     '<article class="venue-card" data-name="' + escapeAttr(v.name) + '" data-region="' + escapeAttr(v.region) + '" data-type="' + escapeAttr(v.type) + '"' +
+    // Effective Food & Drink categories: the venue's own type plus any
+    // secondary category memberships the API reports. Absent for venues with
+    // no Food & Drink identity (wineries, golf, beaches, outdoors), whose
+    // card markup is therefore unchanged.
+    (Array.isArray(v.fd_categories) && v.fd_categories.length
+      ? ' data-fd-categories="' + escapeAttr(v.fd_categories.join(',')) + '"'
+      : '') +
     ' data-dog="' + (v.dog_friendly ? 1 : 0) + '" data-vegan="' + (v.vegan ? 1 : 0) + '" data-vegetarian="' + (v.vegetarian ? 1 : 0) + '"' +
     ' data-patio="' + (v.patio ? 1 : 0) + '" data-kids="' + (v.kid_friendly ? 1 : 0) + '" data-gluten="' + (v.gluten_free ? 1 : 0) + '"' +
     ' data-view="' + (v.lake_view ? 1 : 0) + '" data-nonalc="' + (v.nonalcoholic ? 1 : 0) + '"' +
@@ -1134,7 +1141,20 @@ function initBlock1(){
   function applyFilters(){
     var visibleCount = 0;
     cards.forEach(function(card){
-      var matchesType = activeTypes.size === 0 || activeTypes.has(card.dataset.type);
+      // A venue matches when ANY of its effective Food & Drink categories is
+      // selected, so a brewery that is also a restaurant appears under either
+      // filter -- and, because each venue renders exactly one card, only once
+      // when both are selected. Venues without fd_categories (every other
+      // section) fall back to their single data-type, unchanged.
+      var matchesType = activeTypes.size === 0 || (function(){
+        var raw = card.dataset.fdCategories;
+        if (!raw) return activeTypes.has(card.dataset.type);
+        var cats = raw.split(',');
+        for (var ci = 0; ci < cats.length; ci++) {
+          if (activeTypes.has(cats[ci])) return true;
+        }
+        return false;
+      })();
 
       var matchesFilters = true;
       activeFilters.forEach(function(f){

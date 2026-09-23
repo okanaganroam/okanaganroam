@@ -533,4 +533,30 @@ for (const [slug, kind, title] of ACTIVITY_COLLECTIONS) {
   }
 }
 
+// --- Food & Drink category collections (2026-09-24) ---------------------
+// Secondary Food & Drink categories. `venues.type` stays the single
+// canonical/primary category -- it drives the venue's URL via
+// CATEGORY_SLUGS, its breadcrumbs, its schema.org type and the sitemap --
+// and these collections carry ONLY the additional categories a venue also
+// genuinely belongs to (a brewery that is equally a restaurant, a cafe
+// with a real bar upstairs). A venue's effective category set is therefore
+// `type` plus any of these memberships.
+//
+// Same tables, same find-or-create discipline and same audited write path
+// (POST /admin/collection-membership) as the activity collections above;
+// no new table and no migration. Wineries are deliberately absent: Wine is
+// its own section with its own /wineries hub, not a Food & Drink category.
+const FD_CATEGORY_COLLECTIONS = [
+  ['fd-restaurants', 'fd_restaurants', 'Restaurants'],
+  ['fd-cafes', 'fd_cafes', 'Cafés & Coffee'],
+  ['fd-pubs', 'fd_pubs', 'Pubs & Bars'],
+  ['fd-cocktails', 'fd_cocktails', 'Cocktail Lounges'],
+  ['fd-breweries', 'fd_breweries', 'Breweries'],
+];
+for (const [slug, kind, title] of FD_CATEGORY_COLLECTIONS) {
+  if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(slug)) {
+    db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)').run(slug, kind, title);
+  }
+}
+
 module.exports = db;

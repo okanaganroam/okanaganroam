@@ -113,6 +113,41 @@ function listVenues(query) {
     clauses.push('type = ?');
     params.push(query.type);
   }
+  // Multi-select (2026-09-24): `regions=a,b` and `types=a,b,c`, alongside --
+  // never replacing -- the single-value `region`/`type` above, so every
+  // existing caller behaves exactly as before. Combined with AND between
+  // the two groups and OR within each, which is what the directory needs:
+  // (Kelowna OR Penticton) AND (restaurant OR brewery).
+  const csv = (value) => String(value).split(',').map((s) => s.trim()).filter(Boolean);
+  if (query.regions) {
+    const regions = csv(query.regions);
+    if (regions.length) {
+      clauses.push(`region IN (${regions.map(() => '?').join(', ')})`);
+      params.push(...regions);
+    }
+  }
+  if (query.types) {
+    const types = csv(query.types);
+    if (types.length) {
+      // Matches a venue's PRIMARY type or any SECONDARY Food & Drink
+      // category membership, so a brewery that is also a restaurant is
+      // returned by types=restaurant. One correlated subquery, not N+1.
+      const fdKinds = types.map((t) => FD_CATEGORY_KIND_BY_TYPE[t]).filter(Boolean);
+      const typeIn = `type IN (${types.map(() => '?').join(', ')})`;
+      if (fdKinds.length) {
+        clauses.push(`(${typeIn} OR EXISTS (
+          SELECT 1 FROM collection_items ci
+          JOIN collections c ON c.id = ci.collection_id
+          WHERE ci.content_type = 'venue' AND ci.content_id = venues.id
+            AND c.kind IN (${fdKinds.map(() => '?').join(', ')})
+        ))`);
+        params.push(...types, ...fdKinds);
+      } else {
+        clauses.push(typeIn);
+        params.push(...types);
+      }
+    }
+  }
   if (query.search) {
     clauses.push('(name LIKE ? OR description LIKE ? OR cuisine LIKE ?)');
     const like = `%${query.search}%`;
@@ -144,13 +179,16 @@ function listVenues(query) {
     page,
     limit,
     total_pages: Math.ceil(countRow.n / limit),
-    venues: rows.map(rowToVenue),
+    // One bulk lookup for the whole page, not one per venue.
+    venues: attachFoodDrinkCategories(rows.map(rowToVenue)),
   };
 }
 
 function getVenue(id) {
   const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
-  return row ? rowToVenue(row) : null;
+  if (!row) return null;
+  // Single row: attachFoodDrinkCategories does exactly one extra query here.
+  return attachFoodDrinkCategories([rowToVenue(row)])[0];
 }
 
 // Optional explicit slug support (2026-09-19): `slug` is deliberately not
@@ -2593,7 +2631,89 @@ const DOG_FRIENDLY_COLLECTION_KIND = 'dog_friendly';
 // operational kinds above they are NOT trip "discovery" preferences, so
 // the Build My Trip parser/API vocabulary is unchanged by their existence.
 const ACTIVITY_COLLECTION_KINDS = ['activity_hiking', 'activity_cycling', 'activity_viewpoints', 'activity_nature', 'activity_winter', 'activity_camping', 'activity_water', 'activity_adventure', 'activity_fishing'];
-const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS]);
+// ---------- Food & Drink secondary categories (2026-09-24) ----------
+//
+// `venues.type` remains the single canonical/primary category: it builds
+// the venue's URL through CATEGORY_SLUGS, its breadcrumbs, its schema.org
+// type and its sitemap entry. These collections carry ONLY the ADDITIONAL
+// Food & Drink categories a venue also genuinely belongs to, so a venue's
+// effective set is `type` plus its memberships here.
+//
+// Bootstrapped in db.js beside the activity collections (no new table, no
+// migration) and written through the same audited
+// POST /admin/collection-membership route. Wine is deliberately not a
+// Food & Drink category -- it has its own section and /wineries hub.
+const FD_CATEGORY_KIND_BY_TYPE = {
+  restaurant: 'fd_restaurants',
+  cafe: 'fd_cafes',
+  pub: 'fd_pubs',
+  cocktail: 'fd_cocktails',
+  brewery: 'fd_breweries',
+};
+const FD_CATEGORY_TYPE_BY_KIND = Object.fromEntries(
+  Object.entries(FD_CATEGORY_KIND_BY_TYPE).map(([type, kind]) => [kind, type])
+);
+const FOOD_DRINK_TYPES = Object.keys(FD_CATEGORY_KIND_BY_TYPE);
+const FD_CATEGORY_COLLECTION_KINDS = Object.values(FD_CATEGORY_KIND_BY_TYPE);
+
+// These are taxonomy, not editorial discovery: without this the five kinds
+// would surface as Build My Trip `discovery` options the moment the first
+// membership row exists, because that list is queried live from
+// collections.kind rather than hardcoded.
+const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS, ...FD_CATEGORY_COLLECTION_KINDS]);
+
+// venue id -> Set of SECONDARY Food & Drink category types, for a given set
+// of venue ids, in ONE query (never per-venue: listVenues serves up to 2000
+// rows and an N+1 here would be 2000 extra statements per request).
+// Callers merge this with each venue's own `type` to get its effective set.
+function getFoodDrinkCategoriesForVenueIds(ids) {
+  const byId = new Map();
+  if (!Array.isArray(ids) || ids.length === 0) return byId;
+  const placeholders = ids.map(() => '?').join(', ');
+  const kindPlaceholders = FD_CATEGORY_COLLECTION_KINDS.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, c.kind AS kind
+    FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue'
+      AND c.kind IN (${kindPlaceholders})
+      AND ci.content_id IN (${placeholders})
+  `).all(...FD_CATEGORY_COLLECTION_KINDS, ...ids);
+  for (const row of rows) {
+    const type = FD_CATEGORY_TYPE_BY_KIND[row.kind];
+    if (!type) continue;
+    if (!byId.has(row.id)) byId.set(row.id, new Set());
+    byId.get(row.id).add(type);
+  }
+  return byId;
+}
+
+// A venue's effective Food & Drink categories: its own `type` first (the
+// primary), then any secondary memberships, de-duplicated and in a stable
+// order. Returns [] for a venue that is neither a Food & Drink type nor a
+// member of any of these collections, so nothing is added to the payload of
+// Golf / Beach / Outdoor / Winery venues.
+function effectiveFoodDrinkCategories(venue, secondary) {
+  const out = [];
+  if (FD_CATEGORY_KIND_BY_TYPE[venue.type]) out.push(venue.type);
+  for (const t of FOOD_DRINK_TYPES) {
+    if (t !== venue.type && secondary && secondary.has(t)) out.push(t);
+  }
+  return out;
+}
+
+// Attach `fd_categories` to a list of already-serialized venues using a
+// single bulk lookup. Venues with no Food & Drink identity are left exactly
+// as they were -- no new field -- so other sections' payloads are unchanged.
+function attachFoodDrinkCategories(venues) {
+  if (!Array.isArray(venues) || venues.length === 0) return venues;
+  const secondaryById = getFoodDrinkCategoriesForVenueIds(venues.map((v) => v.id));
+  for (const v of venues) {
+    const cats = effectiveFoodDrinkCategories(v, secondaryById.get(v.id));
+    if (cats.length) v.fd_categories = cats;
+  }
+  return venues;
+}
 
 // Outdoor activity discovery (2026-09-20, Outdoors Phase 2). One outdoor
 // destination keeps ONE canonical venue record and page; what a visitor
@@ -11749,6 +11869,10 @@ module.exports = {
   getVenuesByRegionCategory,
   findVenueBySlug,
   findActiveVenueBySlugAcrossTypes,
+  FD_CATEGORY_KIND_BY_TYPE,
+  FD_CATEGORY_COLLECTION_KINDS,
+  getFoodDrinkCategoriesForVenueIds,
+  effectiveFoodDrinkCategories,
   getRelatedVenues,
   getNearbyVenues,
   getRegionCategoryCounts,

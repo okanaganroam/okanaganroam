@@ -2345,6 +2345,83 @@ test('Category-change redirect: the cross-type slug lookup resolves a moved venu
   assert.equal(app.findActiveVenueBySlugAcrossTypes('kelowna', 'ccr-no-such-slug'), null);
 });
 
+// ---- Food & Drink multi-category plumbing (2026-09-24) ------------------
+//
+// `venues.type` stays the single canonical/primary category (it builds the
+// URL, breadcrumbs, schema.org type and sitemap entry). Additional genuine
+// categories -- a brewery that is equally a restaurant, a cafe with a real
+// bar -- live as membership in the five fd_* collections bootstrapped in
+// db.js, reusing collection_items rather than any new table.
+test('Food & Drink categories: a venue can hold a secondary category, and it is found by either', () => {
+  const kindFor = app.FD_CATEGORY_KIND_BY_TYPE;
+  assert.deepEqual(Object.keys(kindFor).sort(), ['brewery', 'cafe', 'cocktail', 'pub', 'restaurant']);
+  assert.ok(!kindFor.winery, 'wine is its own section, never a Food & Drink category');
+
+  // All five collections exist (bootstrapped by db.js, not by this test).
+  for (const kind of Object.values(kindFor)) {
+    const row = db.prepare('SELECT id FROM collections WHERE kind = ?').get(kind);
+    assert.ok(row, `collection ${kind} must be bootstrapped`);
+  }
+
+  // A brewery that is genuinely also a restaurant.
+  db.prepare('INSERT INTO venues (name, region, type, slug) VALUES (?, ?, ?, ?)')
+    .run('FD Dual Brewery', 'kelowna', 'brewery', 'fd-dual-brewery');
+  const dual = app.findVenueBySlug('kelowna', 'brewery', 'fd-dual-brewery');
+  const restaurantCollection = db.prepare('SELECT id FROM collections WHERE kind = ?').get(kindFor.restaurant);
+  db.prepare("INSERT INTO collection_items (collection_id, content_type, content_id, position) VALUES (?, 'venue', ?, 1)")
+    .run(restaurantCollection.id, dual.id);
+
+  // 1. Represented under BOTH categories, primary first.
+  const secondary = app.getFoodDrinkCategoriesForVenueIds([dual.id]);
+  assert.deepEqual([...(secondary.get(dual.id) || [])], ['restaurant'], 'the secondary membership is read back');
+  const effective = app.effectiveFoodDrinkCategories(dual, secondary.get(dual.id));
+  assert.deepEqual(effective, ['brewery', 'restaurant'], 'effective set is primary type then secondaries');
+
+  // 2. Either category finds it; 3. selecting both yields it exactly once.
+  const byBrewery = app.listVenues({ types: 'brewery', limit: 2000 }).venues.map((v) => v.id);
+  const byRestaurant = app.listVenues({ types: 'restaurant', limit: 2000 }).venues.map((v) => v.id);
+  const byBoth = app.listVenues({ types: 'brewery,restaurant', limit: 2000 }).venues.map((v) => v.id);
+  assert.ok(byBrewery.includes(dual.id), 'found via its primary type');
+  assert.ok(byRestaurant.includes(dual.id), 'found via its secondary membership');
+  assert.equal(byBoth.filter((id) => id === dual.id).length, 1, 'selecting both categories must not duplicate it');
+  assert.equal(byBoth.length, new Set(byBoth).size, 'no duplicate rows at all when several categories are selected');
+
+  // The API payload carries the effective set for the client filter.
+  const served = app.listVenues({ types: 'brewery', limit: 2000 }).venues.find((v) => v.id === dual.id);
+  assert.deepEqual(served.fd_categories, ['brewery', 'restaurant']);
+
+  // 5. A single-category Food & Drink venue is unchanged apart from gaining
+  //    its own type as a one-element effective set.
+  const plain = app.listVenues({ types: 'restaurant', limit: 2000 }).venues.find((v) => v.type === 'restaurant');
+  assert.deepEqual(plain.fd_categories, ['restaurant'], 'a plain restaurant reports exactly one category');
+
+  // 6. Other sections are untouched: no fd_categories on their payloads, and
+  //    their own filtering still returns only their own type.
+  for (const type of ['winery', 'golf', 'beach', 'outdoor']) {
+    for (const v of app.listVenues({ type, limit: 2000 }).venues) {
+      assert.ok(!('fd_categories' in v), `${type} venues must not gain fd_categories`);
+      assert.equal(v.type, type, `${type} filtering must still return only ${type}`);
+    }
+  }
+
+  // Region multi-select combines with categories as AND-between / OR-within.
+  const regionScoped = app.listVenues({ regions: 'kelowna', types: 'brewery,restaurant', limit: 2000 }).venues;
+  assert.ok(regionScoped.every((v) => v.region === 'kelowna'), 'regions= must scope the result');
+  assert.ok(regionScoped.some((v) => v.id === dual.id), 'the dual-category venue is in Kelowna and must appear');
+});
+
+test('Food & Drink categories are taxonomy, not Build My Trip discovery options', () => {
+  const discovery = app.getKnownDiscoveryKinds();
+  for (const kind of app.FD_CATEGORY_COLLECTION_KINDS) {
+    assert.ok(
+      !discovery.includes(kind),
+      `${kind} must never surface as a trip discovery option -- that list is queried live from collections.kind`
+    );
+  }
+  // The guard is the shared exclusion set, not a coincidence of empty data.
+  assert.ok(app.FD_CATEGORY_COLLECTION_KINDS.length === 5);
+});
+
 test('Mood cards: Food & Drink links to /browse pre-filtered by its multi-type filter (no single category page covers all five types)', () => {
   const html = app.renderMoodCardsHTML();
   const cardMatch = html.match(/class="mood-card mood-card-food-drink" href="([^"]*)"/);
