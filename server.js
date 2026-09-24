@@ -4121,6 +4121,14 @@ const HIDDEN_GEM_EDITORIAL_CARDS = [
     blurbKey: 'gems.dogFriendly.blurb',
     blurb: 'Patios and trails where your dog belongs.',
     img: '/images/hidden-gems/dog-friendly.webp',
+    // Repointed 2026-09-24 to the dedicated /dog-friendly hub, exactly the
+    // way the Food & Drink mood card was repointed to /food-drink: an
+    // explicit href here opts this ONE card out of the homepage route's
+    // blanket href="#directory" -> href="/browse" rewrite. The other two
+    // theme cards have no href and still resolve to /browse, and nothing
+    // else about the Hidden Gems section -- markup, classes, imagery,
+    // copy, order -- changes.
+    href: '/dog-friendly',
   },
   {
     titleKey: 'gems.localFavourites.title',
@@ -4148,7 +4156,7 @@ function hiddenGemEditorialCardHtml(card) {
   // the <h3> also contains the (aria-hidden, non-text) pin SVG as a
   // sibling -- textContent-based translation on the <h3> itself would
   // have wiped that icon out.
-  return `<a class="hidden-gem-card" href="#directory">
+  return `<a class="hidden-gem-card" href="${card.href || '#directory'}">
     <img class="hidden-gem-card-img" src="${card.img}" width="640" height="196" alt="" loading="lazy">
     <span class="hidden-gem-card-scrim" aria-hidden="true"></span>
     <span class="hidden-gem-card-body">
@@ -7043,6 +7051,9 @@ function themedCardHolderSelector(type) {
   // types; without this its non-restaurant cards got no engagement wiring at
   // all, so their Favorite / Add to Trip buttons did nothing.
   if (type === 'fd') return `:is(${FOOD_DRINK_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
+  // 'dog' is the Dog Friendly Finds hub, whose one list mixes the five Food &
+  // Drink types, wineries and the curated dog beaches.
+  if (type === 'dog') return `:is(${DOG_HUB_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
   return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
 }
@@ -7269,7 +7280,14 @@ function venueCardHtml(venue, opts = {}) {
   // and URL use), so identically named venues in different communities
   // are distinguishable without opening them. Off by default, so every
   // other surface's card markup is unchanged.
-  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed } = opts;
+  // dogNoteInline (2026-09-24): the Dog Friendly Finds hub renders the
+  // official restriction that comes with a dog-beach membership as a VISIBLE
+  // line on the card instead of leaving it in the badge's title= tooltip --
+  // "off-leash only inside the fence" or "not on the swimming beach" is the
+  // single most important thing on that card and a tooltip does not exist on
+  // a phone. Off by default, so /beaches, /outdoors, region, category and
+  // venue pages keep byte-identical markup.
+  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -7326,6 +7344,9 @@ function venueCardHtml(venue, opts = {}) {
   const showLocalFavourite = isLocalFavourite && !venue.redirect_to;
   const showDogFriendly = dogFriendlyNote !== null && dogFriendlyNote !== undefined && !venue.redirect_to;
   const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
+  const dogNoteHtml = (dogNoteInline && showDogFriendly && String(dogFriendlyNote || '').trim())
+    ? `\n        <p class="dog-note"><span class="dog-note-label">Dogs:</span> ${escapeHtml(String(dogFriendlyNote).trim())}</p>`
+    : '';
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${advisoryNoticeHtml(advisoryNote)}`
     : '';
@@ -7333,7 +7354,7 @@ function venueCardHtml(venue, opts = {}) {
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>
-        ${desc}${advisoryHtml}
+        ${desc}${advisoryHtml}${dogNoteHtml}
         <p class="chips">${editorialChips}${badgeChipsHtml(venue)}</p>${cardActions}
       </li>`;
 }
@@ -9045,6 +9066,598 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
   ${renderFoodDrinkHubScriptHtml()}
+</body>
+</html>`;
+}
+
+// ---------- Dog Friendly Finds (2026-09-24): the directory at /dog-friendly ----------
+//
+// The homepage has carried a "Dog-Friendly Finds" card under Hidden Gems
+// since 2026-09-17, but its href resolved to /browse -- the generic wizard,
+// with no dog filter applied -- so the promise on the card ("patios and
+// trails where your dog belongs") had no destination. This is that
+// destination: a NEW, purely additive server-rendered hub in the same shape
+// as /wineries, /outdoors and /food-drink. okanagan.html, app.js, /browse,
+// Wine, Golf, Beaches, Outdoors, What's On and Food & Drink are unchanged;
+// the only homepage change is that one card's href (see
+// HIDDEN_GEM_EDITORIAL_CARDS).
+//
+// The hub unions the site's TWO dog datasets, which are disjoint in
+// production (audited 2026-09-24: 254 + 27, zero overlap):
+//
+//   venues.dog_friendly = 1          -- 254 places that welcome your dog WITH
+//                                       you: restaurants, cafes, pubs,
+//                                       cocktail lounges, breweries,
+//                                       wineries. Read-only here: the frozen
+//                                       homepage embeds per-region counts of
+//                                       this column in its hidden SEO block,
+//                                       so flipping one would change '/'.
+//   the 'dog_friendly' collection    -- 27 curated beaches where the dog
+//                                       itself is officially allowed, each
+//                                       carrying the exact restriction
+//                                       (off-leash, designated area,
+//                                       seasonal) in collection_items.note.
+//
+// Wineries ARE included even though /wineries exists: this directory answers
+// "where can I take my dog", and a dog-friendly tasting patio is one of the
+// best answers in the valley. /wineries remains the dedicated wine discovery
+// directory and is untouched.
+const DOG_BEACH_TYPE_KEY = 'dog-beach';
+const DOG_HUB_TYPES = [
+  { type: 'restaurant', label: 'Restaurants' },
+  { type: 'cafe', label: 'Caf\u00e9s' },
+  { type: 'pub', label: 'Pubs & Bars' },
+  { type: 'cocktail', label: 'Cocktail Lounges' },
+  { type: 'brewery', label: 'Breweries' },
+  { type: 'winery', label: 'Wineries' },
+  { type: DOG_BEACH_TYPE_KEY, label: 'Dog Beaches' },
+];
+const DOG_HUB_TYPE_KEYS = new Set(DOG_HUB_TYPES.map((t) => t.type));
+// The venues.type values a card on this page can have, for the engagement
+// script's holder selector. 'dog-beach' is a hub-only grouping key, not a
+// venues.type -- those rows are type 'beach'.
+const DOG_HUB_VENUE_TYPES = [...FOOD_DRINK_TYPES, 'winery', 'beach'];
+// Only three features, and only ones with real coverage on these records.
+// Deliberately NOT offered: off-leash, dog park, water access, parking and
+// seasonal restrictions -- no column represents any of them, and the
+// off-leash/seasonal detail that DOES exist lives as free text inside the
+// beach notes, which is shown on the card rather than pretended into a
+// filter. The dog beaches carry none of these three flags (verified), so
+// selecting a feature legitimately narrows to the "bring your dog along"
+// side; the contextual counts say so rather than promising otherwise.
+const DOG_HUB_FEATURES = [
+  { key: 'patio', label: 'Patio', icon: '\u2600\uFE0F' },
+  { key: 'lake_view', label: 'Lake View', icon: '\uD83C\uDF0A' },
+  { key: 'great_groups', label: 'Great for Groups', icon: '\uD83D\uDC65' },
+];
+const DOG_HUB_FEATURE_KEYS = new Set(DOG_HUB_FEATURES.map((f) => f.key));
+const DOG_HUB_LABEL_BY_TYPE = Object.fromEntries(DOG_HUB_TYPES.map((t) => [t.type, t.label]));
+const DOG_HUB_LABEL_BY_FEATURE = Object.fromEntries(DOG_HUB_FEATURES.map((f) => [f.key, f.label]));
+
+// The hub's universe: every active venue that is either flagged dog_friendly
+// or holds a dog_friendly collection membership. One query, one ORDER BY, so
+// a venue that is somehow both appears exactly once.
+function getDogFriendlyHubVenues() {
+  const rows = db.prepare(`
+    SELECT v.* FROM venues v
+    WHERE v.redirect_to IS NULL AND (
+      v.dog_friendly = 1
+      OR EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON c.id = ci.collection_id
+        WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = ?
+      )
+    )
+    ORDER BY v.name ASC
+  `).all(DOG_FRIENDLY_COLLECTION_KIND).map(rowToVenue);
+  return attachFoodDrinkCategories(rows);
+}
+// venue id -> the hub type keys it answers to. A dog beach contributes
+// 'dog-beach'; a dog_friendly venue contributes its effective Food & Drink
+// categories (so a brewery that is also a restaurant answers to both) or its
+// own type for wineries.
+function dogHubCategoriesByVenue(venues, beachIds) {
+  const map = new Map();
+  for (const v of venues) {
+    const cats = [];
+    if (beachIds.has(v.id)) cats.push(DOG_BEACH_TYPE_KEY);
+    if (Number(v.dog_friendly) === 1) {
+      const fd = (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [];
+      for (const t of fd) if (DOG_HUB_TYPE_KEYS.has(t) && !cats.includes(t)) cats.push(t);
+      if (DOG_HUB_TYPE_KEYS.has(v.type) && !cats.includes(v.type)) cats.push(v.type);
+    }
+    map.set(v.id, cats);
+  }
+  return map;
+}
+function dogHubFeaturesByVenue(venues) {
+  const map = new Map();
+  for (const v of venues) map.set(v.id, DOG_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key));
+  return map;
+}
+
+// The filter predicate, shared verbatim by the server render and the inline
+// client script (see DOG_HUB_FILTER_CLIENT_PREDICATE_SRC). Same three-group
+// contract as Food & Drink -- types OR, regions OR, features AND, AND between
+// the groups -- but this is the dog hub's OWN copy: /food-drink's predicate
+// is untouched.
+function dogFilterMatches(selTypes, selFeatures, selRegions, venueCats, venueFeatures, venueRegion) {
+  const typeOk = !selTypes.length || selTypes.some((t) => venueCats.includes(t));
+  const regionOk = !selRegions.length || selRegions.includes(venueRegion);
+  const featureOk = selFeatures.every((f) => venueFeatures.includes(f));
+  return typeOk && regionOk && featureOk;
+}
+const DOG_HUB_FILTER_CLIENT_PREDICATE_SRC = `function dogMatches(types, features, regions, venueCats, venueFeatures, venueRegion){
+    var typeOk = !types.length, regionOk = !regions.length || regions.indexOf(venueRegion) !== -1;
+    for (var i = 0; i < types.length && !typeOk; i++) { if (venueCats.indexOf(types[i]) !== -1) typeOk = true; }
+    var featureOk = true;
+    for (var j = 0; j < features.length && featureOk; j++) { if (venueFeatures.indexOf(features[j]) === -1) featureOk = false; }
+    return typeOk && regionOk && featureOk;
+  }`;
+function filterDogVenues(venues, f, catsById, featsById) {
+  return venues.filter((v) => dogFilterMatches(f.types, f.features, f.regions, catsById.get(v.id) || [], featsById.get(v.id) || [], v.region));
+}
+// ?types=a,b&features=x,y&regions=c,d -- unknown values are dropped and
+// duplicates collapse, so a hand-edited link degrades to "fewer constraints",
+// never an error page.
+function parseDogFilterQuery(query) {
+  const split = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : '').split(',').map((x) => x.trim()).filter(Boolean);
+  const types = [], features = [], regions = [];
+  for (const t of split(query && query.types)) if (DOG_HUB_TYPE_KEYS.has(t) && !types.includes(t)) types.push(t);
+  for (const f of split(query && query.features)) if (DOG_HUB_FEATURE_KEYS.has(f) && !features.includes(f)) features.push(f);
+  for (const r of split(query && query.regions)) if (REGION_LABELS[r] && !regions.includes(r)) regions.push(r);
+  return { types, features, regions };
+}
+// Contextual counts: each chip shows how many venues it would contribute
+// given the OTHER groups' current selection, so a count can never promise
+// results a tap won't deliver.
+function dogChipCounts(venues, f, catsById, featsById) {
+  const types = {}, features = {}, regions = {};
+  for (const v of venues) {
+    const cats = catsById.get(v.id) || [], feats = featsById.get(v.id) || [];
+    if (dogFilterMatches([], f.features, f.regions, cats, feats, v.region)) for (const t of cats) types[t] = (types[t] || 0) + 1;
+    if (dogFilterMatches(f.types, f.features, [], cats, feats, v.region)) regions[v.region] = (regions[v.region] || 0) + 1;
+    if (dogFilterMatches(f.types, [], f.regions, cats, feats, v.region)) for (const k of feats) features[k] = (features[k] || 0) + 1;
+  }
+  return { types, features, regions };
+}
+// The one-line count, shared verbatim by the server and the client twin.
+function dogSummaryText(shown, total, filtered) {
+  const noun = total === 1 ? 'place' : 'places';
+  return filtered ? `${shown} of ${total} ${noun}` : `${total} dog-friendly ${noun}`;
+}
+const DOG_HUB_SUMMARY_CLIENT_SRC = `function dogSummaryText(shown, total, filtered){
+    var noun = total === 1 ? 'place' : 'places';
+    return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' dog-friendly ' + noun);
+  }`;
+
+function dogSearchHtml() {
+  return `<div class="fd-search">
+    <label class="visually-hidden" for="dogSearch">Search dog friendly places</label>
+    <input type="search" id="dogSearch" class="fd-search-input" placeholder="Search by name, place or beach..." autocomplete="off" spellcheck="false">
+    <button type="button" class="fd-search-clear" id="dogSearchClear" aria-label="Clear search" hidden>&#215;</button>
+  </div>`;
+}
+// Venue-type chips: "All" plus the seven. "All" is a reset control
+// (data-dog-type-all), not an eighth type.
+function dogTypeChipsHtml(state = {}) {
+  const selected = new Set(state.types || []);
+  const counts = state.counts && state.counts.types ? state.counts.types : null;
+  const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-dog-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
+  const chips = DOG_HUB_TYPES.map((t) => {
+    const n = counts ? (counts[t.type] || 0) : null;
+    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-dog-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+  }).join('');
+  return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="dog-type">${all}${chips}</div>`;
+}
+function dogFeatureChipsHtml(state = {}) {
+  const selected = new Set(state.features || []);
+  const counts = state.counts && state.counts.features ? state.counts.features : null;
+  const chips = DOG_HUB_FEATURES.map((f) => {
+    const n = counts ? (counts[f.key] || 0) : null;
+    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-dog-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+  }).join('');
+  return `<div class="fd-feature-grid" role="group" aria-label="Choose what you are looking for" data-filter="dog-feature">${chips}</div>`;
+}
+// The two popovers. Regions reuses renderOutdoorRegionFilterChips() verbatim,
+// so the canonical region list and its FOOTER_REGION_GROUPS grouping are
+// literally the same code the other directories use -- no second region
+// taxonomy, and it cannot drift.
+function dogFilterBarHtml(venues, state = {}) {
+  const nF = (state.features || []).length, nR = (state.regions || []).length;
+  const pop = (id, label, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-dog-apply>Show results</button></div>
+      </div>
+    </div>`;
+  return `<div class="fd-controls">
+    ${pop('dogFeatures', 'What are you looking for?', '\u2728', nF || '', dogFeatureChipsHtml(state))}
+    ${pop('dogRegions', 'Regions', '\uD83D\uDCCD', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
+  </div>`;
+}
+function dogSelectedTagsHtml(state = {}) {
+  const tag = (kind, v, label) => `<button type="button" class="outdoor-selected-tag" data-dog-remove-${kind}="${escapeHtml(v)}" aria-label="Remove ${escapeHtml(label)}">${escapeHtml(label)}<span class="outdoor-selected-x" aria-hidden="true">\u00d7</span></button>`;
+  const row = (label, tags) => (tags.length ? `<div class="outdoor-selected-row"><span class="outdoor-selected-label">${label}</span> ${tags.join(' ')}</div>` : '');
+  const t = (state.types || []).map((x) => tag('type', x, DOG_HUB_LABEL_BY_TYPE[x] || x));
+  const f = (state.features || []).map((x) => tag('feature', x, DOG_HUB_LABEL_BY_FEATURE[x] || x));
+  const r = (state.regions || []).map((x) => tag('region', x, REGION_LABELS[x] || x));
+  const any = t.length + f.length + r.length > 0;
+  return `<div class="outdoor-selected" id="dogSelected"${any ? '' : ' hidden'}>${row('Types', t)}${row('Looking for', f)}${row('Regions', r)}${any ? '<button type="button" class="outdoor-selected-clear" id="dogSelectedClear">Clear all</button>' : ''}</div>`;
+}
+function dogResultBarHtml(summary, state) {
+  return `<div class="fd-resultbar">
+    <p class="fd-count" id="dogResultsSummary" aria-live="polite">${escapeHtml(summary)}</p>
+  </div>
+  ${dogSelectedTagsHtml(state)}`;
+}
+// The regional /guide/<region>/dog_friendly pages already exist, are indexed
+// and are already in the sitemap. Linking them from the hub joins the two up
+// instead of competing with them. Built from the same listGuideCombos()
+// predicate the sitemap uses, so a link cannot outlive its page.
+function dogRegionGuideLinksHtml() {
+  const combos = listGuideCombos(MIN_GUIDE_VENUES)
+    .filter((c) => c.badge === 'dog_friendly' && REGION_LABELS[c.region])
+    .sort((a, b) => b.count - a.count);
+  if (!combos.length) return '';
+  return `<div class="related-section dog-guides">
+        <h2>Dog-friendly guides by community</h2>
+        <p>${combos.map((c) => `<a href="/guide/${c.region}/${c.badge}">${escapeHtml(REGION_LABELS[c.region])} (${c.count})</a>`).join(', ')}</p>
+      </div>`;
+}
+
+// Page-scoped stylesheet. The Food & Drink hub's .fd-* control classes are
+// reused verbatim (same controls, same behaviour, no reason for a second
+// visual language) and are NOT modified here -- this block only scopes them
+// to body.dog-page and adds the one thing this page has that no other
+// directory does: the inline dog-beach restriction note.
+function renderDogHubStyles() {
+  return `<style>
+  body.dog-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  body.dog-page .fd-intro { margin: 0 0 14px; max-width: 70ch; }
+
+  body.dog-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
+  body.dog-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.dog-page .fd-search-input::placeholder { color: rgba(42,32,25,0.55); }
+  body.dog-page .fd-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.dog-page .fd-search-input::-webkit-search-cancel-button, body.dog-page .fd-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+  body.dog-page .fd-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--ink); opacity: 0.6; padding: 6px 8px; }
+  body.dog-page .fd-search-clear[hidden] { display: none; }
+
+  /* flex-wrap: nowrap is explicit so the chips scroll sideways on a phone
+     instead of stacking into a tall block; desktop wraps instead. */
+  body.dog-page .fd-type-row { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; padding: 2px 0 8px; margin: 0 0 10px; }
+  body.dog-page .fd-type-row::-webkit-scrollbar { height: 6px; }
+  body.dog-page .fd-type-row::-webkit-scrollbar-thumb { background: rgba(74,52,40,0.2); border-radius: 999px; }
+  body.dog-page .fd-type-row .outdoor-filter-chip { flex: 0 0 auto; white-space: nowrap; }
+  @media (min-width: 900px) { body.dog-page .fd-type-row { flex-wrap: wrap; overflow: visible; } }
+
+  body.dog-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  body.dog-page .fd-pop { position: relative; }
+  body.dog-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.dog-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.dog-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.dog-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
+  body.dog-page .fd-pop-count[hidden] { display: none; }
+  body.dog-page .fd-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 620px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
+  body.dog-page .fd-pop-panel[hidden] { display: none; }
+  /* Without scripting a popover can never be opened, so the panels stay
+     visible inline and the page degrades to the full control set. */
+  body.dog-page .fd-controls:not(.js) .fd-pop-panel, body.dog-page .fd-controls:not(.js) .fd-pop-panel[hidden] { position: static; display: block; max-width: none; max-height: none; box-shadow: none; border: 0; padding: 10px 0 0; }
+  body.dog-page .fd-controls:not(.js) .fd-pop-btn { display: none; }
+  /* On phones a panel is a full-width sheet under the controls row; the ROW
+     is the positioning context, so the offset resolves against the button. */
+  @media (max-width: 640px) {
+    body.dog-page .fd-controls { position: relative; }
+    body.dog-page .fd-pop { position: static; }
+    body.dog-page .fd-pop-panel { left: 0; right: 0; width: auto; min-width: 0; max-width: none; }
+  }
+  @media (min-width: 900px) { body.dog-page .fd-pop-panel { min-width: 520px; } }
+  body.dog-page .fd-pop-panel .outdoor-region-groups { margin: 0; }
+  body.dog-page .fd-feature-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.dog-page .fd-feature-icon { font-size: 0.95em; }
+
+  body.dog-page .fd-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
+  body.dog-page .fd-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.dog-page .fd-pop-apply:hover { background: var(--ref-navy-deep); }
+  body.dog-page .fd-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+
+  body.dog-page .fd-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
+  body.dog-page .fd-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+  body.dog-page .fd-results-step { margin-top: 4px; }
+  body.dog-page #dogResults > .venue-card[hidden] { display: none; }
+  body.dog-page .fd-no-results { margin: 14px 0 0; font-family: 'Nunito', sans-serif; font-weight: 700; }
+
+  /* The dog-beach restriction, on the card where it is actually read. Teal
+     rather than the advisory's amber: this is standing official information,
+     not a temporary warning, and the two must not look alike. */
+  body.dog-page .dog-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+  body.dog-page .dog-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
+  body.dog-page .dog-guides { margin-top: 28px; }
+</style>`;
+}
+
+// The inline script: the same interaction contract as the Food & Drink hub
+// (toggle chips, filter the already-rendered cards, keep the selection in the
+// URL, pushState/popstate, Clear all) over this page's three groups. No
+// incremental rendering: every card is in the list from the first byte, so
+// there is no <template>, no "Show more" and no re-parenting -- at this size
+// that machinery would cost more than it saves. No network, no framework.
+function renderDogHubScriptHtml() {
+  const labels = {
+    regions: { ...REGION_LABELS },
+    types: { ...DOG_HUB_LABEL_BY_TYPE },
+    features: { ...DOG_HUB_LABEL_BY_FEATURE },
+  };
+  return `<script>
+(function(){
+  var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  var dataEl = document.getElementById('dogVenueData');
+  var DATA = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
+  var typeChips = Array.prototype.slice.call(document.querySelectorAll('[data-dog-type]'));
+  var featureChips = Array.prototype.slice.call(document.querySelectorAll('[data-dog-feature]'));
+  var regionChips = Array.prototype.slice.call(document.querySelectorAll('[data-region]'));
+  var allChip = document.querySelector('[data-dog-type-all]');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#dogResults > .venue-card'));
+  if (!cards.length) return;
+  var searchInput = document.getElementById('dogSearch');
+  var searchClear = document.getElementById('dogSearchClear');
+  var summary = document.getElementById('dogResultsSummary');
+  var selectedBox = document.getElementById('dogSelected');
+  var empty = document.getElementById('dogNoResults');
+  var results = document.getElementById('dogResults');
+  var featuresCount = document.getElementById('dogFeaturesCount');
+  var regionsCount = document.getElementById('dogRegionsCount');
+  var searchTerm = '';
+  var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-dog-apply]'));
+  ${DOG_HUB_FILTER_CLIENT_PREDICATE_SRC}
+  ${DOG_HUB_SUMMARY_CLIENT_SRC}
+  ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
+  // Searchable text per card, built once from data already in the markup:
+  // name, community label, the labels of its types and features, the
+  // meta/description lines and the dog-beach restriction note. No new data is
+  // shipped for search.
+  cards.forEach(function(card){
+    var id = card.getAttribute('data-venue-id');
+    var d = DATA[id] || { c: [], f: [], r: '' };
+    var meta = card.querySelector('.venue-meta'), desc = card.querySelector('.golf-desc'), note = card.querySelector('.dog-note');
+    var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
+                 d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
+                 d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
+                 meta ? meta.textContent : '', desc ? desc.textContent : '', note ? note.textContent : ''];
+    card.__dog = parts.join(' ').toLowerCase();
+  });
+  function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
+  var groupsRoot = document.querySelector('.outdoor-region-groups');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.outdoor-region-group-block'));
+  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 899px)') : null;
+  function setGroupOpen(block, open){ var t = block.querySelector('.outdoor-region-group-toggle'), l = block.querySelector('.outdoor-region-group-chips'); if (!t || !l) return; t.setAttribute('aria-expanded', open ? 'true' : 'false'); l.hidden = !open; }
+  function updateGroupHeaders(){
+    groups.forEach(function(block){
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      var sel = block.querySelector('.outdoor-region-group-selected');
+      if (sel) { sel.textContent = groupSelectedText(n); sel.hidden = n === 0; }
+      block.classList.toggle('has-selection', n > 0);
+    });
+  }
+  if (groupsRoot) groupsRoot.classList.add('js');
+  groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
+  function updateCounts(types, features, regions){
+    var tC = {}, fC = {}, rC = {};
+    cards.forEach(function(card){
+      var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
+      if (dogMatches([], features, regions, d.c, d.f, d.r)) d.c.forEach(function(t){ tC[t] = (tC[t] || 0) + 1; });
+      if (dogMatches(types, features, [], d.c, d.f, d.r)) rC[d.r] = (rC[d.r] || 0) + 1;
+      if (dogMatches(types, [], regions, d.c, d.f, d.r)) d.f.forEach(function(k){ fC[k] = (fC[k] || 0) + 1; });
+    });
+    function paint(list, attr, counts){ list.forEach(function(c){ var n = c.querySelector('.outdoor-activity-count'); if (n) n.textContent = String(counts[c.getAttribute(attr)] || 0); }); }
+    paint(typeChips, 'data-dog-type', tC); paint(featureChips, 'data-dog-feature', fC); paint(regionChips, 'data-region', rC);
+  }
+  function renderSelected(types, features, regions){
+    if (!selectedBox) return;
+    var any = types.length || features.length || regions.length;
+    function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-dog-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
+    function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
+    var html = row('Types', types.map(function(v){ return tag('type', v, LABELS.types[v] || v); }))
+      + row('Looking for', features.map(function(v){ return tag('feature', v, LABELS.features[v] || v); }))
+      + row('Regions', regions.map(function(v){ return tag('region', v, LABELS.regions[v] || v); }));
+    if (any) html += '<button type="button" class="outdoor-selected-clear" id="dogSelectedClear">Clear all</button>';
+    selectedBox.innerHTML = html;
+    selectedBox.hidden = !any;
+  }
+  function queryFor(types, features, regions){
+    var q = [];
+    if (types.length) q.push('types=' + types.join(','));
+    if (features.length) q.push('features=' + features.join(','));
+    if (regions.length) q.push('regions=' + regions.join(','));
+    return q.length ? '?' + q.join('&') : '';
+  }
+  function apply(historyMode){
+    var types = pressed(typeChips, 'data-dog-type'), features = pressed(featureChips, 'data-dog-feature'), regions = pressed(regionChips, 'data-region');
+    var shown = 0;
+    cards.forEach(function(card){
+      var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
+      var ok = dogMatches(types, features, regions, d.c, d.f, d.r) && (!searchTerm || (card.__dog || '').indexOf(searchTerm) !== -1);
+      card.hidden = !ok;
+      if (ok) shown++;
+    });
+    var total = cards.length, filtered = types.length || features.length || regions.length || !!searchTerm;
+    if (allChip) allChip.setAttribute('aria-pressed', types.length ? 'false' : 'true');
+    if (featuresCount) { featuresCount.textContent = features.length ? (' \\u00b7 ' + features.length) : ''; featuresCount.hidden = features.length === 0; }
+    if (regionsCount) { regionsCount.textContent = regions.length ? (' \\u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
+    if (searchClear) searchClear.hidden = !searchTerm;
+    if (summary) summary.textContent = dogSummaryText(shown, total, filtered);
+    applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
+    updateGroupHeaders(); updateCounts(types, features, regions); renderSelected(types, features, regions);
+    if (empty) empty.hidden = shown !== 0;
+    if (results) results.hidden = shown === 0;
+    var next = window.location.pathname + queryFor(types, features, regions) + window.location.hash;
+    if (window.history && historyMode !== 'none') {
+      if (historyMode === 'push' && window.history.pushState && next !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState({ dog: true }, '', next);
+      else if (window.history.replaceState) window.history.replaceState({ dog: true }, '', next);
+    }
+  }
+  function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }
+  [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
+  function clearAll(){
+    [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
+    searchTerm = ''; if (searchInput) searchInput.value = '';
+    apply('push');
+  }
+  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); });
+  if (searchInput) {
+    var timer = null;
+    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120); });
+  }
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
+  if (selectedBox) selectedBox.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
+    if (t.id === 'dogSelectedClear') { clearAll(); return; }
+    var map = [['data-dog-remove-type', typeChips, 'data-dog-type'], ['data-dog-remove-feature', featureChips, 'data-dog-feature'], ['data-dog-remove-region', regionChips, 'data-region']];
+    for (var i = 0; i < map.length; i++) {
+      var v = t.getAttribute(map[i][0]);
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); apply('push'); return; }
+    }
+  });
+  var emptyClear = document.getElementById('dogNoResultsClear');
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  var popsRoot = document.querySelector('.fd-controls');
+  var pops = Array.prototype.slice.call(document.querySelectorAll('.fd-pop'));
+  if (popsRoot) popsRoot.classList.add('js');
+  function closePops(except){
+    pops.forEach(function(pop){
+      if (pop === except) return;
+      var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+      if (b) b.setAttribute('aria-expanded', 'false');
+      if (pnl) pnl.hidden = true;
+    });
+  }
+  pops.forEach(function(pop){
+    var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+    if (!b || !pnl) return;
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = b.getAttribute('aria-expanded') === 'true';
+      closePops(pop);
+      b.setAttribute('aria-expanded', open ? 'false' : 'true');
+      pnl.hidden = open;
+    });
+    pnl.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  applyBtns.forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); closePops(null); }); });
+  if (pops.length) {
+    document.addEventListener('click', function(){ closePops(null); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
+  }
+  function readUrlIntoChips(){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var pre = { t: (params.get('types') || '').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
+      typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-dog-type')) !== -1 ? 'true' : 'false'); });
+      featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-dog-feature')) !== -1 ? 'true' : 'false'); });
+      regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
+    } catch (e) {}
+  }
+  function openGroupsForSelection(){
+    groups.forEach(function(block){
+      var isDefault = block.getAttribute('data-region-group') === '${OUTDOOR_REGION_GROUP_DEFAULT_OPEN}';
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
+    });
+  }
+  window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); apply('none'); });
+  readUrlIntoChips();
+  openGroupsForSelection();
+  apply('replace');
+})();
+</script>`;
+}
+
+// The page. Same themed shell as /food-drink and /wineries (homepage header,
+// Trip tray, app.css, name-as-link cards with the "View details" cue,
+// Favorite / Add to Trip) so the engagement contract is identical -- list
+// cards carry ONLY Favorite and Add to Trip; Website / Directions / Call stay
+// on the venue detail pages, which are untouched.
+function renderDogHubPage(venues, filter = null) {
+  const f = filter || { types: [], features: [], regions: [] };
+  const beachIds = getCollectionVenueIds(DOG_FRIENDLY_COLLECTION_KIND);
+  const dogNotes = getDogFriendlyNotes();
+  const catsById = dogHubCategoriesByVenue(venues, beachIds);
+  const featsById = dogHubFeaturesByVenue(venues);
+  const matching = filterDogVenues(venues, f, catsById, featsById);
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = dogChipCounts(venues, f, catsById, featsById);
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0;
+  const state = { types: f.types, features: f.features, regions: f.regions, counts };
+  const beachCount = venues.filter((v) => beachIds.has(v.id)).length;
+
+  const heading = 'Dog Friendly Finds';
+  const title = `Dog Friendly Finds in the Okanagan | Okanagan Roam`;
+  const description = `${venues.length} dog-friendly places across the Okanagan Valley — patios, cafes, taprooms and tasting rooms that welcome your dog, plus ${beachCount} designated dog beaches with their official on-leash and off-leash rules.`;
+  const canonical = 'https://okanaganroam.com/dog-friendly';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Dog Friendly Finds', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+    })),
+  };
+  // id -> { c: types, f: features, r: region } for the client script.
+  const payload = {};
+  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
+
+  const advisoryNotes = getAdvisoryNotes();
+  // Every card is rendered into the list server-side and simply hidden when
+  // it does not match -- the /food-drink <template> + "Show more" machinery
+  // is deliberately NOT reused. That page had 850 cards costing 2-3s of
+  // style+layout; this one is an order of magnitude smaller, closer to
+  // /outdoors (196 cards, fast), so batching would add moving parts and cost
+  // the page its "everything is in the HTML" simplicity for no measured win.
+  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, dogNotes, { showRegion: true, themed: true, dogNoteInline: true })
+    .replace('<ul class="card-grid">', `<ul class="card-grid" id="dogResults"${matching.length === 0 ? ' hidden' : ''}>`)
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card"${matchIds.has(Number(id)) ? '' : ' hidden'} data-venue-id="${id}"`);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${renderOutdoorThemeStyles()}
+${renderDogHubStyles()}
+${golfEngagementHeadHtml('dog', true)}
+</head>
+<body class="golf-page outdoor-page dog-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Dog Friendly Finds' }])}
+  <h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">Patios, caf&eacute;s, taprooms and tasting rooms across the Okanagan that welcome your dog &mdash; plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.</p>
+  ${dogSearchHtml()}
+  ${dogTypeChipsHtml(state)}
+  ${dogFilterBarHtml(venues, state)}
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="dogResultsTop">
+  <h2 class="visually-hidden" id="dogResultsTop">Results</h2>
+  ${dogResultBarHtml(dogSummaryText(matching.length, venues.length, filtered), state)}
+  <p class="fd-no-results" id="dogNoResults"${matching.length === 0 ? '' : ' hidden'}>No dog-friendly places match that combination yet. <a href="/dog-friendly" id="dogNoResultsClear">Clear the filters</a> to see everything.</p>
+  ${cardsHtml}
+  <script type="application/json" id="dogVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  ${dogRegionGuideLinksHtml()}
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('dog', true)}
+  ${renderDogHubScriptHtml()}
 </body>
 </html>`;
 }
@@ -11459,6 +12072,7 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        `  <url>\n    <loc>https://okanaganroam.com/dog-friendly</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...regionCounts.map(
           ({ region, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
@@ -12741,6 +13355,21 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // GET /dog-friendly -- Dog Friendly Finds (2026-09-24), the destination
+    // for the homepage's Hidden Gems card. A fixed route registered with the
+    // other named pages and before the broad region/category patterns below,
+    // so "dog-friendly" can never be read as a region slug.
+    if (pathname === '/dog-friendly' && method === 'GET') {
+      const dogVenues = getDogFriendlyHubVenues();
+      if (dogVenues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderDogHubPage(dogVenues, parseDogFilterQuery(query));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // ---------- SEO architecture: region / category / venue pages ----------
     // Registered last, after every fixed route and every /api/* route above,
     // so these broad patterns can never shadow anything that already exists.
@@ -13102,6 +13731,20 @@ module.exports = {
   DOG_FRIENDLY_COLLECTION_KIND,
   getCollectionNotes,
   getDogFriendlyNotes,
+  DOG_HUB_TYPES,
+  DOG_HUB_FEATURES,
+  DOG_BEACH_TYPE_KEY,
+  getDogFriendlyHubVenues,
+  dogHubCategoriesByVenue,
+  dogHubFeaturesByVenue,
+  dogFilterMatches,
+  filterDogVenues,
+  parseDogFilterQuery,
+  dogChipCounts,
+  dogSummaryText,
+  renderDogHubPage,
+  renderDogHubStyles,
+  renderDogHubScriptHtml,
   dogFriendlyBadgeHtml,
   advisoryNoticeHtml,
   parseAdvisoryNote,

@@ -1874,10 +1874,18 @@ test('exactly 3 Hidden Gems editorial cards render, in the approved order, each 
   assert.match(html, /src="\/images\/hidden-gems\/secret-spots\.webp"/);
 });
 
-test('Hidden Gems editorial cards all link to #directory (no fabricated per-theme venue list)', () => {
+test('Hidden Gems editorial cards link to a real destination, not a fabricated per-theme venue list', () => {
+  // 2026-09-24: Dog-Friendly Finds now has a dedicated directory, so that ONE
+  // card carries an explicit href and opts out of the homepage route's
+  // href="#directory" -> href="/browse" rewrite. Local Favourites and Secret
+  // Spots have no destination of their own yet and still resolve to /browse.
+  // None of the three points at a specific venue -- they are themes.
   const html = app.renderHiddenGemsHomepageHTML();
   const hrefs = Array.from(html.matchAll(/class="hidden-gem-card" href="([^"]*)"/g)).map((m) => m[1]);
-  assert.deepEqual(hrefs, ['#directory', '#directory', '#directory']);
+  assert.deepEqual(hrefs, ['/dog-friendly', '#directory', '#directory']);
+  const rendered = html.replace(/href="#directory"/g, 'href="/browse"');
+  const live = Array.from(rendered.matchAll(/class="hidden-gem-card" href="([^"]*)"/g)).map((m) => m[1]);
+  assert.deepEqual(live, ['/dog-friendly', '/browse', '/browse'], 'what the homepage actually serves');
 });
 
 test('Hidden Gems editorial cards have no badge/region-chip, just an inline pin before the title', () => {
@@ -8471,4 +8479,310 @@ test("What's On result card contract (fixture only): name is the single link wit
   const css = app.renderWhatsOnStyles();
   assert.match(css, /\.venue-card\[data-venue-category="whatson"\] \.card-action/); assert.match(css, /body\.whatson-page \.whatson-category-grid \{ grid-template-columns: repeat\(4, 1fr\)/);
   assert.doesNotMatch(css, /\[data-venue-category="golf"\]|\[data-venue-category="beach"\]|\[data-venue-category="outdoor"\]/, 'no golf/beach/outdoor selectors emitted by the What\'s On styles');
+});
+
+// ---------- Dog Friendly Finds (2026-09-24): the /dog-friendly directory ----------
+//
+// The suite rebuilds okanagan.db from the db.js seed, which carries NO
+// dog_friendly venues and (by design -- see the bootstrap comment) NO
+// dog_friendly collection members. So these tests seed their own, which also
+// lets them exercise the dog-beach half that the production-shaped committed
+// fixture could not. Seeding is idempotent and happens inside the tests, so
+// every test above this point sees exactly the fixture it always did.
+let dogFixture = null;
+function seedDogFixture() {
+  if (dogFixture) return dogFixture;
+  const add = (row) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, dog_friendly, patio, lake_view, great_groups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(row.name, row.region, row.type, row.slug, row.description, row.rating ?? null, row.dog_friendly ?? 0, row.patio ?? 0, row.lake_view ?? 0, row.great_groups ?? 0);
+    return db.prepare('SELECT * FROM venues WHERE slug = ?').get(row.slug);
+  };
+  // The "bring your dog along" side: three types, three regions, a spread of
+  // the three features so AND/OR semantics have something to bite on.
+  const cafe = add({ name: 'Dog Fixture Cafe', region: 'kelowna', type: 'cafe', slug: 'dog-fixture-cafe', description: 'A fixture cafe used only by the automated test suite.', rating: 4.4, dog_friendly: 1, patio: 1 });
+  const winery = add({ name: 'Dog Fixture Winery', region: 'kelowna', type: 'winery', slug: 'dog-fixture-winery', description: 'A fixture winery used only by the automated test suite.', rating: 4.6, dog_friendly: 1, patio: 1, lake_view: 1 });
+  const brewery = add({ name: 'Dog Fixture Brewery', region: 'vernon', type: 'brewery', slug: 'dog-fixture-brewery', description: 'A fixture brewery used only by the automated test suite.', rating: 4.2, dog_friendly: 1, great_groups: 1 });
+  // A dog_friendly venue with no features at all, so "features AND" can drop it.
+  const pub = add({ name: 'Dog Fixture Pub', region: 'penticton', type: 'pub', slug: 'dog-fixture-pub', description: 'A fixture pub used only by the automated test suite.', rating: 4.0, dog_friendly: 1 });
+  // The curated dog-beach side: NOT dog_friendly=1, membership + note only.
+  const beachA = add({ name: 'Dog Fixture Off-Leash Beach', region: 'west-kelowna', type: 'beach', slug: 'dog-fixture-offleash-beach', description: 'A fixture beach used only by the automated test suite.', rating: 4.7 });
+  const beachB = add({ name: 'Dog Fixture Designated Beach', region: 'penticton', type: 'beach', slug: 'dog-fixture-designated-beach', description: 'A second fixture beach used only by the automated test suite.', rating: 4.3 });
+  const collection = db.prepare('SELECT id FROM collections WHERE kind = ?').get(app.DOG_FRIENDLY_COLLECTION_KIND);
+  assert.ok(collection, 'the dog_friendly collection is bootstrapped');
+  const join = db.prepare("INSERT INTO collection_items (collection_id, content_type, content_id, note, position) VALUES (?, 'venue', ?, ?, ?)");
+  join.run(collection.id, beachA.id, 'Off-leash only inside the fence', 1);
+  join.run(collection.id, beachB.id, 'Designated dog beach; on leash elsewhere', 2);
+  dogFixture = { cafe, winery, brewery, pub, beachA, beachB, beachIds: [beachA.id, beachB.id] };
+  return dogFixture;
+}
+
+//
+// The hub unions the two disjoint dog datasets: venues.dog_friendly = 1 (the
+// "bring your dog along" side) and the curated 'dog_friendly' collection (the
+// dog beaches). NOTE ON THE FIXTURE: db.js seeds NO collection members, so
+// this fixture has only the boolean side. Every assertion below is therefore
+// written against what the fixture actually holds and cross-checks the page's
+// own internal consistency (summary == visible cards == predicate result);
+// the dog-beach behaviour that the fixture cannot exercise is asserted
+// directly against the renderers instead.
+test('Dog Friendly Finds: /dog-friendly renders every dog venue with the canonical/ItemList/sitemap conventions', () => {
+  seedDogFixture();
+  const venues = app.getDogFriendlyHubVenues();
+  assert.ok(venues.length > 0, 'the fixture has dog-friendly venues');
+  // The universe is exactly "flagged dog_friendly OR a dog-beach member".
+  const beachIds = app.getCollectionVenueIds(app.DOG_FRIENDLY_COLLECTION_KIND);
+  for (const v of venues) {
+    assert.ok(Number(v.dog_friendly) === 1 || beachIds.has(v.id), `${v.name} belongs to at least one dog dataset`);
+    assert.equal(v.redirect_to ?? null, null, 'no retired/redirected venue is listed');
+  }
+  assert.equal(new Set(venues.map((v) => v.id)).size, venues.length, 'a venue in both datasets still appears once');
+
+  const html = app.renderDogHubPage(venues, app.parseDogFilterQuery({}));
+  const markup = s6markup(html);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/dog-friendly">/);
+  assert.match(markup, /<title>Dog Friendly Finds in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(markup, /<h1>Dog Friendly Finds<\/h1>/);
+  assert.match(markup, /<meta name="description" content="[^"]*dog-friendly places across the Okanagan Valley[^"]*designated dog beaches[^"]*"/);
+  // Breadcrumb: Home > Dog Friendly Finds, in the nav and in schema.
+  assert.match(markup, /<a href="\/">Home<\/a>/);
+  assert.match(markup, /Dog Friendly Finds/);
+
+  // ALL venues are rendered server-side -- no <template>, no "Show more".
+  const cards = (markup.match(/<li class="venue-card"/g) || []).length;
+  assert.equal(cards, venues.length, 'every venue is a real card in the HTML');
+  assert.equal((html.match(/<template id="dogRest">/g) || []).length, 0, 'no deferred-card template');
+  assert.equal((markup.match(/class="fd-show-more"/g) || []).length, 0, 'no Show more button');
+  assert.equal((markup.match(/<li class="venue-card" hidden/g) || []).length, 0, 'nothing is hidden with no filter applied');
+
+  // ItemList covers every venue (the BreadcrumbList block also uses ListItem,
+  // so parse the blocks rather than counting the string).
+  const blocks = html.split('<script type="application/ld+json">').slice(1).map((x) => JSON.parse(x.split('</script>')[0]));
+  const itemList = blocks.find((b) => b['@type'] === 'ItemList');
+  assert.ok(itemList, 'an ItemList block is emitted');
+  assert.equal(itemList.itemListElement.length, venues.length, 'ItemList covers every destination');
+  assert.equal(itemList.itemListElement[0].position, 1);
+  for (const el of itemList.itemListElement) assert.match(el.url, /^https:\/\/okanaganroam\.com\/[a-z-]+\/[a-z-]+\/[a-z0-9-]+$/, 'canonical venue detail URLs');
+  const crumb = blocks.find((b) => b['@type'] === 'BreadcrumbList');
+  assert.ok(crumb && crumb.itemListElement.some((i) => i.item === 'https://okanaganroam.com/dog-friendly' || (i.item && i.item['@id'] === 'https://okanaganroam.com/dog-friendly') || i.name === 'Dog Friendly Finds'), 'breadcrumb names the hub');
+
+});
+
+test('Dog Friendly Finds: the live route answers 200, the sitemap lists it once, and the neighbouring directories still respond', async () => {
+  seedDogFixture();
+  const hub = await s5get('/dog-friendly');
+  assert.equal(hub.status, 200, '/dog-friendly returns 200');
+  assert.match(hub.text, /<h1>Dog Friendly Finds<\/h1>/);
+  assert.match(hub.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/dog-friendly">/);
+  const baseline = app.getDogFriendlyHubVenues().length;
+  assert.equal((s6markup(hub.text).match(/<li class="venue-card"/g) || []).length, baseline, 'the route renders the full baseline set');
+
+  // Query-string filtering survives the round trip.
+  const wineries = await s5get('/dog-friendly?types=winery');
+  assert.equal(wineries.status, 200);
+  assert.match(wineries.text, /data-dog-type="winery" aria-pressed="true"/, 'the URL selection is reflected server-side');
+  const junk = await s5get('/dog-friendly?types=bogus&regions=atlantis');
+  assert.equal(junk.status, 200, 'a hand-edited query degrades instead of erroring');
+
+  // Sitemap lists the hub exactly once.
+  const sitemap = await s5get('/sitemap.xml');
+  assert.equal(sitemap.status, 200);
+  assert.equal((sitemap.text.match(/<loc>https:\/\/okanaganroam\.com\/dog-friendly<\/loc>/g) || []).length, 1);
+
+  // Nothing this change touched has stopped answering.
+  for (const p of ['/food-drink', '/outdoors', '/wineries', '/whats-on', '/browse', '/']) {
+    assert.equal((await s5get(p)).status, 200, `${p} still returns 200`);
+  }
+});
+
+test('Dog Friendly Finds: type, region, feature and search controls are present, small, and use the canonical region system', () => {
+  seedDogFixture();
+  const venues = app.getDogFriendlyHubVenues();
+  const markup = s6markup(app.renderDogHubPage(venues, app.parseDogFilterQuery({})));
+
+  // Seven type chips plus the All reset -- and NOT a filter wall.
+  assert.equal((markup.match(/data-dog-type="/g) || []).length, app.DOG_HUB_TYPES.length);
+  assert.equal(app.DOG_HUB_TYPES.length, 7);
+  assert.equal((markup.match(/data-dog-type-all="1"/g) || []).length, 1);
+  for (const t of ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'winery', app.DOG_BEACH_TYPE_KEY]) {
+    assert.match(markup, new RegExp(`data-dog-type="${t}"`), `${t} chip is offered`);
+  }
+  assert.match(markup, /data-dog-type="dog-beach"[^>]*>Dog Beaches/);
+  assert.match(markup, /data-dog-type="winery"[^>]*>Wineries/, 'wineries stay in this directory');
+
+  // Exactly three features, all real BOOL_FIELDS columns. No invented claims.
+  assert.deepEqual(app.DOG_HUB_FEATURES.map((f) => f.key), ['patio', 'lake_view', 'great_groups']);
+  assert.equal((markup.match(/data-dog-feature="/g) || []).length, 3);
+  assert.doesNotMatch(markup, /data-dog-feature="(off_leash|dog_park|water_access|parking|seasonal|leash)"/, 'no invented dog attributes are offered as filters');
+
+  // Regions come from the shared canonical chips, grouped by FOOTER_REGION_GROUPS.
+  assert.match(markup, /class="category-region-selector outdoor-filter-group outdoor-region-groups"/);
+  assert.ok((markup.match(/data-region="/g) || []).length >= 15, 'the canonical region chips are rendered');
+  assert.doesNotMatch(markup, /data-dog-region="/, 'no second region taxonomy');
+
+  // Search, result count, active filters, Clear all.
+  assert.match(markup, /<input type="search" id="dogSearch"/);
+  assert.match(markup, /id="dogSearchClear"/);
+  // Search runs over the FULL set and reads name, region, type/feature labels,
+  // the meta and description lines and the dog-beach note -- no new payload.
+  const script = app.renderDogHubScriptHtml ? app.renderDogHubScriptHtml() : '';
+  if (script) {
+    assert.match(script, /card\.getAttribute\('data-venue-name'\)/);
+    assert.match(script, /LABELS\.regions\[d\.r\]/);
+    assert.match(script, /querySelector\('\.dog-note'\)/, 'the restriction note is searchable');
+    assert.match(script, /card\.__dog = parts\.join\(' '\)\.toLowerCase\(\)/);
+  }
+  assert.match(markup, /id="dogResultsSummary" aria-live="polite"/);
+  assert.match(markup, /id="dogSelected"/);
+  assert.match(markup, /id="dogNoResults"/);
+  // Clear all appears once a filter is active.
+  const filteredMarkup = s6markup(app.renderDogHubPage(venues, app.parseDogFilterQuery({ types: 'winery' })));
+  assert.match(filteredMarkup, /id="dogSelectedClear">Clear all</);
+  assert.match(filteredMarkup, /data-dog-remove-type="winery"[^>]*>Wineries/, 'the active filter is shown as a removable tag');
+});
+
+test('Dog Friendly Finds: filtering is types-OR, regions-OR, features-AND, AND between groups, with honest counts', () => {
+  seedDogFixture();
+  const venues = app.getDogFriendlyHubVenues();
+  const beachIds = app.getCollectionVenueIds(app.DOG_FRIENDLY_COLLECTION_KIND);
+  const cats = app.dogHubCategoriesByVenue(venues, beachIds);
+  const feats = app.dogHubFeaturesByVenue(venues);
+  const visible = (q) => (s6markup(app.renderDogHubPage(venues, app.parseDogFilterQuery(q))).match(/<li class="venue-card"(?! hidden)/g) || []).length;
+  const sel = (q) => app.filterDogVenues(venues, app.parseDogFilterQuery(q), cats, feats).length;
+
+  // The predicate itself.
+  assert.equal(app.dogFilterMatches([], [], [], ['cafe'], ['patio'], 'kelowna'), true, 'no constraint matches everything');
+  assert.equal(app.dogFilterMatches(['cafe', 'brewery'], [], [], ['brewery'], [], 'kelowna'), true, 'types OR');
+  assert.equal(app.dogFilterMatches(['cafe'], [], [], ['brewery'], [], 'kelowna'), false);
+  assert.equal(app.dogFilterMatches([], [], ['kelowna', 'vernon'], ['cafe'], [], 'vernon'), true, 'regions OR');
+  assert.equal(app.dogFilterMatches([], ['patio', 'lake_view'], [], ['cafe'], ['patio'], 'kelowna'), false, 'features AND');
+  assert.equal(app.dogFilterMatches([], ['patio', 'lake_view'], [], ['cafe'], ['patio', 'lake_view'], 'kelowna'), true);
+  assert.equal(app.dogFilterMatches(['cafe'], ['patio'], ['vernon'], ['cafe'], ['patio'], 'kelowna'), false, 'AND between groups');
+
+  // Rendered page agrees with the predicate, and the summary agrees with both.
+  for (const q of [{}, { types: 'winery' }, { types: 'cafe,brewery' }, { features: 'patio' }, { regions: 'kelowna' }, { regions: 'kelowna,vernon' }, { types: 'winery', features: 'patio', regions: 'kelowna' }]) {
+    const html = app.renderDogHubPage(venues, app.parseDogFilterQuery(q));
+    const shown = sel(q);
+    assert.equal(visible(q), shown, `visible cards match the predicate for ${JSON.stringify(q)}`);
+    const summary = (s6markup(html).match(/id="dogResultsSummary"[^>]*>([^<]*)</) || [])[1];
+    const anyFilter = Object.keys(q).length > 0;
+    assert.equal(summary, app.dogSummaryText(shown, venues.length, anyFilter), `summary text for ${JSON.stringify(q)}`);
+  }
+  assert.ok(sel({ regions: 'kelowna,vernon' }) >= sel({ regions: 'kelowna' }), 'multi-select region widens the result set');
+  assert.ok(sel({ features: 'patio' }) <= venues.length);
+
+  // Summary wording.
+  assert.equal(app.dogSummaryText(5, 10, true), '5 of 10 places');
+  assert.equal(app.dogSummaryText(10, 10, false), '10 dog-friendly places');
+  assert.equal(app.dogSummaryText(1, 1, false), '1 dog-friendly place');
+
+  // Clear all == no query at all.
+  assert.equal(visible({}), venues.length);
+  // Unknown values degrade to "fewer constraints", never an error.
+  assert.deepEqual(app.parseDogFilterQuery({ types: 'bogus', features: 'off_leash', regions: 'atlantis' }), { types: [], features: [], regions: [] });
+  assert.deepEqual(app.parseDogFilterQuery({ types: 'winery,winery,cafe' }).types, ['winery', 'cafe'], 'duplicates collapse');
+  assert.equal(visible({ types: 'bogus' }), venues.length);
+
+  // The dog-beach half: a curated beach is reachable by its own type chip,
+  // is NOT flagged dog_friendly, and carries its official restriction inline.
+  const fx = seedDogFixture();
+  assert.equal(sel({ types: 'dog-beach' }), fx.beachIds.length, 'the Dog Beaches chip selects exactly the curated beaches');
+  const beachHtml = s6markup(app.renderDogHubPage(venues, app.parseDogFilterQuery({ types: 'dog-beach' })));
+  assert.match(beachHtml, /<p class="dog-note"><span class="dog-note-label">Dogs:<\/span> Off-leash only inside the fence<\/p>/);
+  assert.match(beachHtml, /<p class="dog-note"><span class="dog-note-label">Dogs:<\/span> Designated dog beach; on leash elsewhere<\/p>/);
+  for (const id of fx.beachIds) {
+    const v = venues.find((x) => x.id === id);
+    assert.ok(v, 'the curated beach is in the hub');
+    assert.notEqual(Number(v.dog_friendly), 1, 'a dog beach earns its place through the collection, not the amenity column');
+    assert.deepEqual(cats.get(id), ['dog-beach']);
+  }
+  // Beaches carry none of the three features, so a feature filter honestly
+  // narrows to the "bring your dog along" side rather than promising more.
+  assert.equal(app.filterDogVenues(venues, app.parseDogFilterQuery({ types: 'dog-beach', features: 'patio' }), cats, feats).length, 0);
+
+  // Contextual chip counts never promise results a tap will not deliver.
+  const f = app.parseDogFilterQuery({ regions: 'kelowna' });
+  const counts = app.dogChipCounts(venues, f, cats, feats);
+  for (const t of Object.keys(counts.types)) {
+    assert.equal(counts.types[t], app.filterDogVenues(venues, { ...f, types: [t] }, cats, feats).length, `the ${t} chip count is what tapping it yields`);
+  }
+});
+
+test('Dog Friendly Finds: dog-beach restriction notes render inline on the card, and only on this hub', () => {
+  const beach = { id: 9901, name: 'Gellatly Dog Beach', slug: 'gellatly-dog-beach', region: 'west-kelowna', type: 'beach', description: 'A fixture beach used only by the automated test suite.', rating: 4.5 };
+  const note = 'Off-leash only inside the fence';
+
+  // On the hub: a visible line, not a tooltip.
+  const inline = app.venueCardHtml(beach, { themed: true, dogFriendlyNote: note, dogNoteInline: true });
+  assert.match(inline, /<p class="dog-note"><span class="dog-note-label">Dogs:<\/span> Off-leash only inside the fence<\/p>/);
+  assert.match(inline, /class="chip dog-friendly-badge"/, 'the badge is still there too');
+
+  // Everywhere else (/beaches, /outdoors, region, category, venue pages): unchanged.
+  const other = app.venueCardHtml(beach, { themed: true, dogFriendlyNote: note });
+  assert.doesNotMatch(other, /dog-note/, 'no inline note without the opt-in');
+  assert.match(other, /class="chip dog-friendly-badge" title="Off-leash only inside the fence"/);
+  assert.equal(other, app.venueCardHtml(beach, { themed: true, dogFriendlyNote: note, dogNoteInline: false }), 'explicit false is the default');
+
+  // A member with no note text gets the badge but no empty note line.
+  assert.doesNotMatch(app.venueCardHtml(beach, { themed: true, dogFriendlyNote: '', dogNoteInline: true }), /dog-note/);
+  // A non-member gets neither.
+  assert.doesNotMatch(app.venueCardHtml(beach, { themed: true, dogNoteInline: true }), /dog-note|dog-friendly-badge/);
+
+  // The hub styles carry the rule, page-scoped, and do not touch other directories.
+  const css = app.renderDogHubStyles();
+  assert.match(css, /body\.dog-page \.dog-note \{/);
+  assert.doesNotMatch(css, /body\.fd-page|body\.whatson-page|\[data-venue-category="golf"\]/, 'the dog styles cannot reach another directory');
+});
+
+test('Dog Friendly Finds: card contract, engagement wiring and internal links', () => {
+  seedDogFixture();
+  const venues = app.getDogFriendlyHubVenues();
+  const html = app.renderDogHubPage(venues, app.parseDogFilterQuery({}));
+  const markup = s6markup(html);
+
+  // Name is the link, with the View details cue; Favorite + Add to Trip; no website/phone.
+  assert.match(markup, /<h2><a class="venue-card-link" href="\/[a-z-]+\/[a-z-]+\/[a-z0-9-]+"><span class="venue-card-name">/);
+  assert.match(markup, /<span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span>/);
+  assert.equal((markup.match(/class="card-action fav-btn"/g) || []).length, venues.length, 'every card has Favorite');
+  assert.equal((markup.match(/class="card-action trip-btn"/g) || []).length, venues.length, 'every card has Add to Trip');
+  assert.doesNotMatch(markup, /class="card-action[^"]*"[^>]*href="tel:/, 'no phone button on list cards');
+  assert.doesNotMatch(markup, /Visit Website/, 'no website button on list cards');
+
+  // The engagement script covers every type this page can render -- a cafe,
+  // winery or beach card's buttons must not be inert (the bug /food-drink hit).
+  const engagement = app.golfCardEngagementScriptHtml('dog', true);
+  for (const t of ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'winery', 'beach']) {
+    assert.match(engagement, new RegExp(`\\[data-venue-category="${t}"\\]`), `${t} cards get engagement wiring`);
+  }
+
+  // The existing regional guide pages are linked, not duplicated.
+  const combos = app.listGuideCombos(app.MIN_GUIDE_VENUES).filter((c) => c.badge === 'dog_friendly');
+  if (combos.length) {
+    assert.match(markup, /<h2>Dog-friendly guides by community<\/h2>/);
+    for (const c of combos) assert.match(markup, new RegExp(`href="/guide/${c.region}/dog_friendly"`), `${c.region} guide is linked`);
+  }
+
+  // Trip tray, header and footer are the shared ones -- the logo returns home.
+  assert.match(markup, /class="golf-page outdoor-page dog-page"/);
+  assert.match(markup, /id="floatingTooltip"/);
+});
+
+test('Dog Friendly Finds: the homepage Hidden Gems card now opens /dog-friendly, and nothing else in the section moves', () => {
+  const section = app.renderHiddenGemsHomepageHTML();
+  // The homepage route's final pass rewrites the remaining in-page anchors.
+  const rendered = section.replace(/href="#directory"/g, 'href="/browse"');
+  const cardHrefs = (rendered.match(/<a class="hidden-gem-card" href="([^"]*)"/g) || []).map((x) => x.match(/href="([^"]*)"/)[1]);
+  assert.deepEqual(cardHrefs, ['/dog-friendly', '/browse', '/browse'], 'only the Dog-Friendly Finds card is repointed');
+
+  // Everything else about the section is untouched: order, titles, blurbs,
+  // i18n keys, imagery, heading and the "View all hidden gems" link.
+  assert.deepEqual(app.HIDDEN_GEM_EDITORIAL_CARDS.map((c) => c.title), ['Dog-Friendly Finds', 'Local Favourites', 'Secret Spots']);
+  assert.deepEqual(app.HIDDEN_GEM_EDITORIAL_CARDS.map((c) => c.img), ['/images/hidden-gems/dog-friendly.webp', '/images/hidden-gems/local-favourites.webp', '/images/hidden-gems/secret-spots.webp']);
+  assert.equal(app.HIDDEN_GEM_EDITORIAL_CARDS[0].blurb, 'Patios and trails where your dog belongs.');
+  assert.match(section, /<span data-i18n="gems.dogFriendly.title">Dog-Friendly Finds<\/span>/);
+  assert.match(section, /id="hiddenGems"/);
+  assert.match(rendered, /class="discover-heading-link" href="\/browse" data-i18n="gems.viewAll"/);
+  assert.equal((section.match(/class="hidden-gem-card"/g) || []).length, 3);
+  // The dog_friendly boolean the frozen homepage's SEO counts are built from
+  // is NOT touched by any of this.
+  assert.ok(app.BOOL_FIELDS.includes('dog_friendly'), 'the amenity column is still a badge field');
 });
