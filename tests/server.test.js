@@ -2528,7 +2528,7 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
     .map((m) => ({ href: m[1], text: m[2] }));
   assert.equal(items.length, 7, 'expected exactly 7 Explore links');
   assert.equal(items[0].text, 'Food &amp; Drinks');
-  assert.equal(items[0].href, '/browse?types=restaurant,cafe,brewery,pub,cocktail');
+  assert.equal(items[0].href, '/food-drink', 'Food & Drinks points at the dedicated hub, matching the mood card and the Wine link below it');
   assert.ok(items[1].href === '/wineries', `Wine href unexpected: ${items[1].href}`);
   assert.equal(items[2].href, '#exploreRegions');
   assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);

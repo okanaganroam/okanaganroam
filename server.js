@@ -4626,7 +4626,7 @@ function renderHomeFooterHTML(fromBrowse) {
       <div class="home-footer-col">
         <h4 data-i18n="homeFooter.explore">Explore</h4>
         <ul>
-          <li><a href="/browse?types=restaurant,cafe,brewery,pub,cocktail" data-i18n="homeFooter.foodDrinks">Food &amp; Drinks</a></li>
+          <li><a href="/food-drink" data-i18n="homeFooter.foodDrinks">Food &amp; Drinks</a></li>
           <li><a href="${wineHref}" data-i18n="mood.wine.title">Wine</a></li>
           <li><a href="${exploreRegionsHref}" data-i18n="mood.beaches.title">Beaches</a></li>
           <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
