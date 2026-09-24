@@ -1878,15 +1878,15 @@ test('Hidden Gems editorial cards link to a real destination, not a fabricated p
   // 2026-09-24: Dog-Friendly Finds now has a dedicated directory, so that ONE
   // card carries an explicit href and opts out of the homepage route's
   // href="#directory" -> href="/browse" rewrite. Local Favourites got its
-  // own /local-favorites page the same way (also 2026-09-24); Secret Spots
-  // has no destination of its own yet and still resolves to /browse.
+  // own /local-favorites page the same way (also 2026-09-24), and Secret
+  // Spots its own /secret-spots page (2026-09-25).
   // None of the three points at a specific venue -- they are themes.
   const html = app.renderHiddenGemsHomepageHTML();
   const hrefs = Array.from(html.matchAll(/class="hidden-gem-card" href="([^"]*)"/g)).map((m) => m[1]);
-  assert.deepEqual(hrefs, ['/dog-friendly', '/local-favorites', '#directory']);
+  assert.deepEqual(hrefs, ['/dog-friendly', '/local-favorites', '/secret-spots']);
   const rendered = html.replace(/href="#directory"/g, 'href="/browse"');
   const live = Array.from(rendered.matchAll(/class="hidden-gem-card" href="([^"]*)"/g)).map((m) => m[1]);
-  assert.deepEqual(live, ['/dog-friendly', '/local-favorites', '/browse'], 'what the homepage actually serves');
+  assert.deepEqual(live, ['/dog-friendly', '/local-favorites', '/secret-spots'], 'what the homepage actually serves');
 });
 
 test('Hidden Gems editorial cards have no badge/region-chip, just an inline pin before the title', () => {
@@ -8818,7 +8818,7 @@ test('Dog Friendly Finds: the homepage Hidden Gems card now opens /dog-friendly,
   // The homepage route's final pass rewrites the remaining in-page anchors.
   const rendered = section.replace(/href="#directory"/g, 'href="/browse"');
   const cardHrefs = (rendered.match(/<a class="hidden-gem-card" href="([^"]*)"/g) || []).map((x) => x.match(/href="([^"]*)"/)[1]);
-  assert.deepEqual(cardHrefs, ['/dog-friendly', '/local-favorites', '/browse'], 'Dog-Friendly Finds and Local Favourites are repointed; Secret Spots still opens /browse');
+  assert.deepEqual(cardHrefs, ['/dog-friendly', '/local-favorites', '/secret-spots'], 'all three theme cards open their own pages');
 
   // Everything else about the section is untouched: order, titles, blurbs,
   // i18n keys, imagery, heading and the "View all hidden gems" link.
@@ -8894,4 +8894,71 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
   // The homepage card is the only homepage change.
   const card = app.HIDDEN_GEM_EDITORIAL_CARDS.find((c) => c.title === 'Local Favourites');
   assert.equal(card.href, '/local-favorites');
+});
+
+// ---- Secret Spots page (2026-09-25) --------------------------------------
+//
+// /secret-spots lists the live 'hidden_gem' collection narrowed to places
+// (outdoor + beach). A Hidden Gem cafe stays a Hidden Gem but is not a
+// Secret Spot. Fixture memberships are removed again at the end.
+test('Secret Spots: /secret-spots renders only the Hidden Gem places, with filters, SEO and the homepage card repointed', () => {
+  const add = (row) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(row.name, row.region, row.type, row.slug, row.description, 4.5);
+    return db.prepare('SELECT * FROM venues WHERE slug = ?').get(row.slug);
+  };
+  const trail = add({ name: 'SS Fixture Trail', region: 'peachland', type: 'outdoor', slug: 'ss-fixture-trail', description: 'A fixture trail used only by the automated test suite.' });
+  const beach = add({ name: 'SS Fixture Beach', region: 'oliver', type: 'beach', slug: 'ss-fixture-beach', description: 'A fixture beach used only by the automated test suite.' });
+  const cafe = add({ name: 'SS Fixture Gem Cafe', region: 'vernon', type: 'cafe', slug: 'ss-fixture-gem-cafe', description: 'A Hidden Gem that is not a place.' });
+  const outsider = add({ name: 'SS Fixture Outsider', region: 'peachland', type: 'outdoor', slug: 'ss-fixture-outsider', description: 'Not a member.' });
+  const meta = { reason: 'test', batch_id: 'test-ss-page' };
+  const before = app.getSecretSpotVenues().map((v) => v.id);
+  try {
+    for (const v of [trail, beach, cafe]) assert.equal(app.guardedCollectionMembershipUpdate('hidden_gem', v.id, 'add', 'internal rationale must not render', meta).ok, true);
+    const venues = app.getSecretSpotVenues();
+    const ids = venues.map((v) => v.id);
+    assert.deepEqual(new Set(ids), new Set([...before, trail.id, beach.id]), 'the page universe is the Hidden Gem places');
+    assert.ok(!ids.includes(cafe.id), 'a Hidden Gem cafe is not a Secret Spot');
+    assert.ok(app.getHiddenGemVenueIds().has(cafe.id), '...but it is still a Hidden Gem');
+    assert.ok(!ids.includes(outsider.id), 'a non-member is never listed');
+    for (const v of venues) assert.ok(app.SECRET_SPOT_TYPES.includes(v.type));
+
+    const html = app.renderSecretSpotsPage(venues, app.parseLocalFavouritesFilterQuery({}));
+    const markup = s6markup(html);
+    assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/secret-spots">/);
+    assert.match(markup, /<title>Secret Spots in the Okanagan \| Okanagan Roam<\/title>/);
+    assert.match(markup, /<h1>Secret Spots<\/h1>/);
+    assert.match(markup, /<nav class="breadcrumb"><a href="\/">Home<\/a> &rsaquo; Secret Spots<\/nav>/);
+    assert.doesNotMatch(markup, /name="robots" content="noindex"/, 'the page is indexable');
+    assert.match(html, /"@type":"BreadcrumbList"/);
+    assert.match(html, /"@type":"ItemList"/);
+    const cards = markup.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
+    assert.equal(cards.length, venues.length, 'every Secret Spot is a card');
+    for (const c of cards) {
+      assert.match(c, /hidden-gem-badge/, 'every card carries the Hidden Gem badge');
+      assert.match(c, /class="card-action fav-btn"/);
+      assert.match(c, /class="card-action trip-btn"/);
+      assert.match(c, /View details &rarr;/);
+    }
+    assert.match(markup, /href="\/peachland\/outdoors\/ss-fixture-trail"/, 'cards link to the canonical venue page');
+    assert.match(markup, /Oliver &middot; Beach/, 'cards name the region and the category');
+    assert.doesNotMatch(markup, /SS Fixture Gem Cafe/);
+    assert.doesNotMatch(html, /internal rationale must not render/, 'the membership note stays internal');
+    assert.match(html, /id="tripTray"/, 'the floating Trip tray is present');
+    assert.match(markup, /data-lf-type="outdoor"/);
+    assert.match(markup, /data-lf-type="beach"/);
+    assert.match(markup, /data-region="oliver"/);
+    assert.match(markup, /No secret spots match that combination yet\. <a href="\/secret-spots"/);
+
+    // Server-applied filter works the same way as /local-favorites.
+    const filtered = s6markup(app.renderSecretSpotsPage(venues, app.parseLocalFavouritesFilterQuery({ types: 'beach' })));
+    assert.match(filtered, new RegExp(`<li class="venue-card" data-venue-id="${beach.id}"`));
+    assert.match(filtered, new RegExp(`<li class="venue-card" hidden data-venue-id="${trail.id}"`));
+  } finally {
+    for (const v of [trail, beach, cafe]) app.guardedCollectionMembershipUpdate('hidden_gem', v.id, 'remove', null, meta);
+  }
+  assert.deepEqual(app.getSecretSpotVenues().map((v) => v.id), before, 'fixture memberships removed again');
+
+  const card = app.HIDDEN_GEM_EDITORIAL_CARDS.find((c) => c.title === 'Secret Spots');
+  assert.equal(card.href, '/secret-spots');
 });

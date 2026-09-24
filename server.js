@@ -4181,6 +4181,9 @@ const HIDDEN_GEM_EDITORIAL_CARDS = [
     blurbKey: 'gems.secretSpots.blurb',
     blurb: 'Quiet corners away from the crowds.',
     img: '/images/hidden-gems/secret-spots.webp',
+    // Repointed 2026-09-25 to the dedicated /secret-spots page, exactly the
+    // way the other two cards were repointed. Nothing else changes.
+    href: '/secret-spots',
   },
 ];
 
@@ -9775,9 +9778,9 @@ function localFavouriteChipCounts(venues, f) {
   }
   return { types, regions };
 }
-function localFavouritesSummaryText(shown, total, filtered) {
+function localFavouritesSummaryText(shown, total, filtered, label = 'local favourite') {
   const noun = total === 1 ? 'place' : 'places';
-  return filtered ? `${shown} of ${total} ${noun}` : `${total} local favourite ${noun}`;
+  return filtered ? `${shown} of ${total} ${noun}` : `${total} ${label} ${noun}`;
 }
 const LOCAL_FAVOURITES_SUMMARY_CLIENT_SRC = `function lfSummaryText(shown, total, filtered){
     var noun = total === 1 ? 'place' : 'places';
@@ -9817,7 +9820,7 @@ function renderLocalFavouritesStyles() {
     .replace(/body\.dog-page/g, 'body.lf-page')
     .replace(/#dogResults/g, '#lfResults');
 }
-function renderLocalFavouritesScriptHtml() {
+function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite') {
   const labels = {
     regions: { ...REGION_LABELS },
     types: Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].plural])),
@@ -9842,7 +9845,7 @@ function renderLocalFavouritesScriptHtml() {
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-lf-apply]'));
   var searchTerm = '';
   ${LOCAL_FAVOURITES_FILTER_CLIENT_PREDICATE_SRC}
-  ${LOCAL_FAVOURITES_SUMMARY_CLIENT_SRC}
+  ${LOCAL_FAVOURITES_SUMMARY_CLIENT_SRC.replace("' local favourite '", `' ${summaryLabel} '`)}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
   cards.forEach(function(card){
     var d = DATA[card.getAttribute('data-venue-id')] || { t: '', r: '' };
@@ -9990,6 +9993,23 @@ function renderLocalFavouritesScriptHtml() {
 </script>`;
 }
 function renderLocalFavouritesPage(venues, filter = null) {
+  return renderCuratedCollectionPage({
+    path: '/local-favorites',
+    heading: 'Local Favourites',
+    title: 'Local Favourites in the Okanagan | Okanagan Roam',
+    description: `${venues.length} places across the Okanagan Valley with genuine local roots and credible evidence that locals value, recommend or have worked to preserve them \u2014 from independent restaurants, caf\u00e9s and pubs to community-protected parks, trails and beaches. Not a ranking.`,
+    introHtml: 'Places with genuine local roots &mdash; the caf&eacute;s, pubs, restaurants, parks, trails and beaches that people who live here value, recommend, support or have worked to protect. Each one is here because of specific evidence of that local connection, not because it is popular with visitors or highly rated. They are listed alphabetically, not ranked.',
+    searchLabel: 'Search local favourites',
+    pluralNoun: 'local favourites',
+    summaryLabel: 'local favourite',
+  }, venues, filter);
+}
+// The shared page body behind /local-favorites and /secret-spots: one curated
+// list with search, category chips, the grouped region selector, the Trip
+// tray and Favorite / Add to Trip. Only the words differ between the two
+// pages (cfg); the element ids, styles and script are the Local Favourites
+// ones, so both pages behave identically and cannot drift apart.
+function renderCuratedCollectionPage(cfg, venues, filter = null) {
   const f = filter || { types: [], regions: [] };
   const types = localFavouriteTypesPresent(venues);
   const matching = venues.filter((v) => localFavouriteFilterMatches(f.types, f.regions, v.type, v.region));
@@ -9998,13 +10018,13 @@ function renderLocalFavouritesPage(venues, filter = null) {
   const filtered = f.types.length > 0 || f.regions.length > 0;
   const state = { types: f.types, regions: f.regions, counts };
 
-  const heading = 'Local Favourites';
-  const title = 'Local Favourites in the Okanagan | Okanagan Roam';
-  const description = `${venues.length} places across the Okanagan Valley with genuine local roots and credible evidence that locals value, recommend or have worked to preserve them \u2014 from independent restaurants, caf\u00e9s and pubs to community-protected parks, trails and beaches. Not a ranking.`;
-  const canonical = 'https://okanaganroam.com/local-favorites';
+  const heading = cfg.heading;
+  const title = cfg.title;
+  const description = cfg.description;
+  const canonical = `https://okanaganroam.com${cfg.path}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
-    { name: 'Local Favourites', url: canonical },
+    { name: heading, url: canonical },
   ]);
   const itemList = {
     '@context': 'https://schema.org',
@@ -10039,11 +10059,11 @@ ${golfEngagementHeadHtml('lf', true)}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
-  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Local Favourites' }])}
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: heading }])}
   <h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">Places with genuine local roots &mdash; the caf&eacute;s, pubs, restaurants, parks, trails and beaches that people who live here value, recommend, support or have worked to protect. Each one is here because of specific evidence of that local connection, not because it is popular with visitors or highly rated. They are listed alphabetically, not ranked.</p>
+  <p class="outdoor-intro fd-intro">${cfg.introHtml}</p>
   <div class="fd-search">
-    <label class="visually-hidden" for="lfSearch">Search local favourites</label>
+    <label class="visually-hidden" for="lfSearch">${escapeHtml(cfg.searchLabel)}</label>
     <input type="search" id="lfSearch" class="fd-search-input" placeholder="Search by name, place or category..." autocomplete="off" spellcheck="false">
     <button type="button" class="fd-search-clear" id="lfSearchClear" aria-label="Clear search" hidden>&#215;</button>
   </div>
@@ -10052,10 +10072,10 @@ ${renderGolfHeaderHtml()}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="lfResultsTop">
   <h2 class="visually-hidden" id="lfResultsTop">Results</h2>
   <div class="fd-resultbar">
-    <p class="fd-count" id="lfResultsSummary" aria-live="polite">${escapeHtml(localFavouritesSummaryText(matching.length, venues.length, filtered))}</p>
+    <p class="fd-count" id="lfResultsSummary" aria-live="polite">${escapeHtml(localFavouritesSummaryText(matching.length, venues.length, filtered, cfg.summaryLabel))}</p>
   </div>
   ${localFavouritesSelectedTagsHtml(state)}
-  <p class="fd-no-results" id="lfNoResults"${matching.length === 0 ? '' : ' hidden'}>No local favourites match that combination yet. <a href="/local-favorites" id="lfNoResultsClear">Clear the filters</a> to see everything.</p>
+  <p class="fd-no-results" id="lfNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(cfg.pluralNoun)} match that combination yet. <a href="${cfg.path}" id="lfNoResultsClear">Clear the filters</a> to see everything.</p>
   ${cardsHtml}
   <script type="application/json" id="lfVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
   </section>
@@ -10063,9 +10083,44 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('lf', true)}
-  ${renderLocalFavouritesScriptHtml()}
+  ${renderLocalFavouritesScriptHtml(cfg.summaryLabel)}
 </body>
 </html>`;
+}
+
+// ---------- Secret Spots (2026-09-25): the page at /secret-spots ----------
+//
+// The destination for the homepage's Hidden Gems "Secret Spots" card, which
+// until now resolved to /browse. A Secret Spot is a Hidden Gem that is a
+// PLACE -- a park, garden, waterfall, trail or quieter beach -- so the page
+// lists the live 'hidden_gem' collection narrowed to the outdoor and beach
+// types. The Hidden Gem cafes, breweries, pubs, wineries and golf courses
+// stay in the collection (and keep their badge everywhere else) but are not
+// Secret Spots. Membership stays in collection_items, so an audited change
+// through POST /admin/collection-membership shows up here immediately.
+const SECRET_SPOT_TYPES = ['outdoor', 'beach'];
+function getSecretSpotVenues() {
+  return db.prepare(`
+    SELECT v.* FROM venues v
+    WHERE v.redirect_to IS NULL AND v.type IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')}) AND EXISTS (
+      SELECT 1 FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id
+      WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'hidden_gem'
+    )
+    ORDER BY v.name ASC
+  `).all(...SECRET_SPOT_TYPES).map(rowToVenue);
+}
+function renderSecretSpotsPage(venues, filter = null) {
+  return renderCuratedCollectionPage({
+    path: '/secret-spots',
+    heading: 'Secret Spots',
+    title: 'Secret Spots in the Okanagan | Okanagan Roam',
+    description: `${venues.length} tucked-away parks, gardens, waterfalls and quieter beaches across the Okanagan Valley that are easy to miss and worth seeking out — each one chosen on specific evidence, not popularity. Not a ranking.`,
+    introHtml: 'Looking for the places that are a little easier to miss? Secret Spots brings together tucked-away parks, gardens, waterfalls and quieter beaches across the Okanagan &mdash; the finds worth seeking out once you have seen the famous ones. Each is here because a local tourism, parks or community source points to it as a quieter or lesser-known find, not because it is popular or highly rated. They are listed alphabetically, not ranked.',
+    searchLabel: 'Search secret spots',
+    pluralNoun: 'secret spots',
+    summaryLabel: 'tucked-away',
+  }, venues, filter);
 }
 
 // ---------- What's On (2026-09-22): page shell at /whats-on ----------
@@ -12482,6 +12537,9 @@ const server = http.createServer(async (req, res) => {
         ...(getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES
           ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
           : []),
+        ...(getSecretSpotVenues().length >= MIN_CATEGORY_VENUES
+          ? [`  <url>\n    <loc>https://okanaganroam.com/secret-spots</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
+          : []),
         ...regionCounts.map(
           ({ region, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
@@ -13793,6 +13851,19 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // GET /secret-spots -- Secret Spots (2026-09-25), the destination for the
+    // homepage's Hidden Gems "Secret Spots" card. Same shape as /local-favorites.
+    if (pathname === '/secret-spots' && method === 'GET') {
+      const ssVenues = getSecretSpotVenues();
+      if (ssVenues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderSecretSpotsPage(ssVenues, parseLocalFavouritesFilterQuery(query));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // ---------- SEO architecture: region / category / venue pages ----------
     // Registered last, after every fixed route and every /api/* route above,
     // so these broad patterns can never shadow anything that already exists.
@@ -14180,6 +14251,9 @@ module.exports = {
   localFavouriteFilterMatches,
   parseLocalFavouritesFilterQuery,
   renderLocalFavouritesPage,
+  getSecretSpotVenues,
+  renderSecretSpotsPage,
+  SECRET_SPOT_TYPES,
   renderLocalFavouritesStyles,
   renderLocalFavouritesScriptHtml,
   renderDogHubStyles,
