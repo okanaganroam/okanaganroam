@@ -552,6 +552,7 @@ const FD_CATEGORY_COLLECTIONS = [
   ['fd-pubs', 'fd_pubs', 'Pubs & Bars'],
   ['fd-cocktails', 'fd_cocktails', 'Cocktail Lounges'],
   ['fd-breweries', 'fd_breweries', 'Breweries'],
+  ['fd-distilleries', 'fd_distilleries', 'Distilleries'],
 ];
 for (const [slug, kind, title] of FD_CATEGORY_COLLECTIONS) {
   if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(slug)) {

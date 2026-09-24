@@ -1002,6 +1002,11 @@ const CATEGORY_SLUGS = {
   brewery: 'breweries',
   pub: 'pubs',
   cocktail: 'cocktail-lounges',
+  // Distilleries (2026-09-24): craft distilleries were previously filed as
+  // `cocktail` or `brewery`. A plain Food & Drink type like brewery -- same
+  // region/category pages and /food-drink filter (not the trip planner; see
+  // TRIP_PLANNER_EXCLUDED_TYPES).
+  distillery: 'distilleries',
   golf: 'golf',
   beach: 'beaches',
   // Outdoors (2026-09-20, Phase 1 seed): parks, trails, viewpoints,
@@ -1064,7 +1069,10 @@ function usesEngagementControls(type) {
 // interest is a separate, later decision. Favorite and Add to Trip on a
 // beach page still work -- those are name-keyed localStorage features of
 // the homepage module and never consult this list.
-const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach', 'outdoor']);
+// Distilleries (2026-09-24) are excluded for the same reason as beaches: the
+// /trip client labels stops with app.js's type.* keys, and app.js is a frozen
+// homepage asset with no type.distillery entry.
+const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach', 'outdoor', 'distillery']);
 const TRIP_INTEREST_TYPES = Object.keys(CATEGORY_SLUGS).filter((t) => !TRIP_PLANNER_EXCLUDED_TYPES.has(t));
 function isTripPlannerType(type) {
   return TRIP_INTEREST_TYPES.includes(type);
@@ -1090,6 +1098,7 @@ const CATEGORY_LABELS = {
   brewery: { singular: 'Brewery', plural: 'Breweries' },
   pub: { singular: 'Pub', plural: 'Pubs' },
   cocktail: { singular: 'Cocktail Lounge', plural: 'Cocktail Lounges' },
+  distillery: { singular: 'Distillery', plural: 'Distilleries' },
   golf: { singular: 'Golf Course', plural: 'Golf Courses' },
   beach: { singular: 'Beach', plural: 'Beaches' },
   outdoor: { singular: 'Outdoor Destination', plural: 'Outdoor Destinations' },
@@ -1109,6 +1118,7 @@ const CATEGORY_TAGLINES = {
   winery: "Tasting rooms across the valley's growing wine country.",
   brewery: "Local beer, made close to where you're standing.",
   pub: 'Casual food and a drink, no reservation needed.',
+  distillery: 'Small-batch spirits, poured where they are made.',
   golf: "Courses across the Okanagan's valleys and benches.",
   beach: 'Public beaches and swimming spots on the valley’s lakes.',
 };
@@ -1150,6 +1160,9 @@ const TYPE_ACCENT_GRADIENTS = {
   cafe: ['#C08A4E', '#8A631F'],
   pub: ['#6B8B5E', '#4A6741'],
   cocktail: ['#A25C93', '#7A3B6E'],
+  // 'distillery' (2026-09-24): brewery's second stop deepened into cafe's,
+  // so no new hue family enters the site.
+  distillery: ['#B8802E', '#8A631F'],
   golf: ['#4E7A5E', '#345942'],
   // 'beach' (2026-09-19): the reference navy pair from tokens.css
   // (--ref-navy -> --ref-navy-deep), the only token family not already
@@ -1193,6 +1206,7 @@ const HIDDEN_GEM_TYPE_IMAGE = {
   brewery: '/images/mood/eat.webp',
   pub: '/images/mood/eat.webp',
   cocktail: '/images/mood/eat.webp',
+  distillery: '/images/mood/drink.webp',
   golf: '/images/mood/golf.webp',
   beach: '/images/mood/beaches.webp',
 };
@@ -1264,6 +1278,7 @@ const SCHEMA_TYPE_MAP = {
   brewery: 'Brewery',
   pub: 'BarOrPub',
   cocktail: 'BarOrPub', // schema.org has no distinct "cocktail lounge" type; BarOrPub is the correct closest official type
+  distillery: 'Distillery', // schema.org/Distillery, a FoodEstablishment subtype
   golf: 'GolfCourse',
   beach: 'Beach', // schema.org/Beach (a CivicStructure), the exact type for a public beach
   outdoor: 'TouristAttraction', // parks, trails, viewpoints, nature centres and ski/Nordic areas are all Places a visitor seeks out; no single narrower schema.org type fits every seed record
@@ -1422,6 +1437,18 @@ function findActiveVenueBySlugAcrossTypes(region, slug) {
   const rows = db
     .prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL')
     .all(region, slug);
+  return rows.length === 1 ? rowToVenue(rows[0]) : null;
+}
+
+// Region-change lookup (2026-09-24): the same type+slug, ignoring region.
+// Used ONLY to 301 an old URL after a venue's `region` is corrected (e.g.
+// Blind Tiger Vineyards, filed under Vernon but in Lake Country), and only
+// when EXACTLY ONE active venue matches -- the same no-guessing rule as the
+// category-change lookup above.
+function findActiveVenueBySlugAcrossRegions(type, slug) {
+  const rows = db
+    .prepare('SELECT * FROM venues WHERE type = ? AND slug = ? AND redirect_to IS NULL')
+    .all(type, slug);
   return rows.length === 1 ? rowToVenue(rows[0]) : null;
 }
 
@@ -2649,6 +2676,7 @@ const FD_CATEGORY_KIND_BY_TYPE = {
   pub: 'fd_pubs',
   cocktail: 'fd_cocktails',
   brewery: 'fd_breweries',
+  distillery: 'fd_distilleries',
 };
 const FD_CATEGORY_TYPE_BY_KIND = Object.fromEntries(
   Object.entries(FD_CATEGORY_KIND_BY_TYPE).map(([type, kind]) => [kind, type])
@@ -5796,6 +5824,7 @@ const SEO_PAGE_CSS = `
   .venue-hero-restaurant { background: linear-gradient(135deg, #2A6B67, #1E4F4C); }
   .venue-hero-winery     { background: linear-gradient(135deg, #8C4A5E, #6B2C40); }
   .venue-hero-brewery    { background: linear-gradient(135deg, #E0A94E, #B8802E); }
+  .venue-hero-distillery { background: linear-gradient(135deg, #B8802E, #8A631F); }
   .venue-hero-cafe       { background: linear-gradient(135deg, #C08A4E, #8A631F); }
   .venue-hero-pub        { background: linear-gradient(135deg, #6B8B5E, #4A6741); }
   .venue-hero-cocktail   { background: linear-gradient(135deg, #A25C93, #7A3B6E); }
@@ -5827,6 +5856,7 @@ const SEO_PAGE_CSS = `
   .related-card-restaurant { border-top-color: #2A6B67; }
   .related-card-winery { border-top-color: #6B2C40; }
   .related-card-brewery { border-top-color: #B8802E; }
+  .related-card-distillery { border-top-color: #8A631F; }
   .related-card-cafe { border-top-color: #8A631F; }
   .related-card-pub { border-top-color: #4A6741; }
   .related-card-cocktail { border-top-color: #7A3B6E; }
@@ -8486,6 +8516,7 @@ const FD_HUB_TYPES = [
   { type: 'pub', label: 'Pubs & Bars' },
   { type: 'cocktail', label: 'Cocktail Lounges' },
   { type: 'brewery', label: 'Breweries' },
+  { type: 'distillery', label: 'Distilleries' },
 ];
 // Wineries are deliberately absent: they are their own section with their own
 // /wineries hub, and duplicating them here would split that directory.
@@ -9109,6 +9140,7 @@ const DOG_HUB_TYPES = [
   { type: 'pub', label: 'Pubs & Bars' },
   { type: 'cocktail', label: 'Cocktail Lounges' },
   { type: 'brewery', label: 'Breweries' },
+  { type: 'distillery', label: 'Distilleries' },
   { type: 'winery', label: 'Wineries' },
   { type: DOG_BEACH_TYPE_KEY, label: 'Dog Beaches' },
 ];
@@ -13443,6 +13475,13 @@ const server = http.createServer(async (req, res) => {
             return res.end();
           }
         }
+        // Same check for a corrected `region`: this exact category+slug now
+        // lives in a different region.
+        const relocated = findActiveVenueBySlugAcrossRegions(type, slug);
+        if (relocated && relocated.region !== region) {
+          res.writeHead(301, { Location: `/${relocated.region}/${categorySlug}/${slug}${parsed.search || ''}` });
+          return res.end();
+        }
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
@@ -13594,6 +13633,7 @@ module.exports = {
   getVenuesByRegionCategory,
   findVenueBySlug,
   findActiveVenueBySlugAcrossTypes,
+  findActiveVenueBySlugAcrossRegions,
   FD_CATEGORY_KIND_BY_TYPE,
   FD_CATEGORY_COLLECTION_KINDS,
   getFoodDrinkCategoriesForVenueIds,

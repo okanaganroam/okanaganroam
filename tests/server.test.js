@@ -2353,6 +2353,43 @@ test('Category-change redirect: the cross-type slug lookup resolves a moved venu
   assert.equal(app.findActiveVenueBySlugAcrossTypes('kelowna', 'ccr-no-such-slug'), null);
 });
 
+// ---- region-change redirect + Distillery type (2026-09-24) ---------------
+//
+// A corrected `region` moves a venue's canonical URL the same way a corrected
+// `type` does, so the venue route also falls back to
+// findActiveVenueBySlugAcrossRegions(). Same guards: exactly one active match,
+// never a retired venue. Not an HTTP test, for the port-3001 reason above.
+test('Region-change redirect: the cross-region slug lookup resolves a moved venue and refuses to guess', () => {
+  const insertPlain = db.prepare('INSERT INTO venues (name, region, type, slug) VALUES (?, ?, ?, ?)');
+  const insertRedirect = db.prepare('INSERT INTO venues (name, region, type, slug, redirect_to) VALUES (?, ?, ?, ?, ?)');
+
+  insertPlain.run('RCR Moved Winery', 'lake-country', 'winery', 'rcr-moved-winery');
+  const moved = app.findActiveVenueBySlugAcrossRegions('winery', 'rcr-moved-winery');
+  assert.ok(moved, 'a single active venue must be found by type+slug regardless of region');
+  assert.equal(moved.region, 'lake-country');
+
+  // Two active venues share type+slug in different regions: never guess.
+  insertPlain.run('RCR Twin', 'kelowna', 'cafe', 'rcr-twin');
+  insertPlain.run('RCR Twin', 'vernon', 'cafe', 'rcr-twin');
+  assert.equal(app.findActiveVenueBySlugAcrossRegions('cafe', 'rcr-twin'), null);
+
+  // A retired venue stays with the venue-to-venue redirect.
+  insertRedirect.run('RCR Retired', 'penticton', 'pub', 'rcr-retired', moved.id);
+  assert.equal(app.findActiveVenueBySlugAcrossRegions('pub', 'rcr-retired'), null);
+
+  assert.equal(app.findActiveVenueBySlugAcrossRegions('winery', 'rcr-no-such-slug'), null);
+});
+
+test('Distillery type: its own category URL and schema type, a Food & Drink filter, and kept out of the trip planner', () => {
+  assert.equal(app.CATEGORY_SLUGS.distillery, 'distilleries');
+  assert.deepEqual(app.CATEGORY_LABELS.distillery, { singular: 'Distillery', plural: 'Distilleries' });
+  assert.equal(app.SCHEMA_TYPE_MAP.distillery, 'Distillery');
+  assert.equal(app.FD_CATEGORY_KIND_BY_TYPE.distillery, 'fd_distilleries');
+  assert.ok(db.prepare("SELECT id FROM collections WHERE kind = 'fd_distilleries'").get(), 'db.js bootstraps the fd_distilleries collection');
+  assert.ok(app.FD_HUB_TYPES.some((t) => t.type === 'distillery'), '/food-drink offers a Distilleries filter');
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('distillery'), 'app.js (frozen) has no type.distillery key, so the planner must not offer it');
+});
+
 // ---- Food & Drink multi-category plumbing (2026-09-24) ------------------
 //
 // `venues.type` stays the single canonical/primary category (it builds the
@@ -2362,7 +2399,7 @@ test('Category-change redirect: the cross-type slug lookup resolves a moved venu
 // db.js, reusing collection_items rather than any new table.
 test('Food & Drink categories: a venue can hold a secondary category, and it is found by either', () => {
   const kindFor = app.FD_CATEGORY_KIND_BY_TYPE;
-  assert.deepEqual(Object.keys(kindFor).sort(), ['brewery', 'cafe', 'cocktail', 'pub', 'restaurant']);
+  assert.deepEqual(Object.keys(kindFor).sort(), ['brewery', 'cafe', 'cocktail', 'distillery', 'pub', 'restaurant']);
   assert.ok(!kindFor.winery, 'wine is its own section, never a Food & Drink category');
 
   // All five collections exist (bootstrapped by db.js, not by this test).
@@ -2427,7 +2464,7 @@ test('Food & Drink categories are taxonomy, not Build My Trip discovery options'
     );
   }
   // The guard is the shared exclusion set, not a coincidence of empty data.
-  assert.ok(app.FD_CATEGORY_COLLECTION_KINDS.length === 5);
+  assert.ok(app.FD_CATEGORY_COLLECTION_KINDS.length === 6);
 });
 
 test('Mood cards: Food & Drink links to the dedicated /food-drink hub, and keeps data-mood-filter for the /browse wizard', () => {
@@ -8599,11 +8636,11 @@ test('Dog Friendly Finds: type, region, feature and search controls are present,
   const venues = app.getDogFriendlyHubVenues();
   const markup = s6markup(app.renderDogHubPage(venues, app.parseDogFilterQuery({})));
 
-  // Seven type chips plus the All reset -- and NOT a filter wall.
+  // Eight type chips plus the All reset -- and NOT a filter wall.
   assert.equal((markup.match(/data-dog-type="/g) || []).length, app.DOG_HUB_TYPES.length);
-  assert.equal(app.DOG_HUB_TYPES.length, 7);
+  assert.equal(app.DOG_HUB_TYPES.length, 8);
   assert.equal((markup.match(/data-dog-type-all="1"/g) || []).length, 1);
-  for (const t of ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'winery', app.DOG_BEACH_TYPE_KEY]) {
+  for (const t of ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', app.DOG_BEACH_TYPE_KEY]) {
     assert.match(markup, new RegExp(`data-dog-type="${t}"`), `${t} chip is offered`);
   }
   assert.match(markup, /data-dog-type="dog-beach"[^>]*>Dog Beaches/);
