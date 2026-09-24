@@ -6352,14 +6352,6 @@ function renderOutdoorsSimplifiedStyles() {
   body.outdoor-page .outdoors-act-row .outdoor-filter-chip { flex: 0 0 auto; white-space: nowrap; }
   @media (min-width: 900px) { body.outdoor-page .outdoors-act-row { flex-wrap: wrap; overflow: visible; } }
 
-  /* Activity guides: secondary to the filters -- small, quiet, one line. */
-  body.outdoor-page .outdoors-guides { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 0 0 12px; font-family: 'Nunito', sans-serif; font-size: 0.82rem; }
-  body.outdoor-page .outdoors-guides-label { font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem; color: var(--ink); opacity: 0.55; }
-  body.outdoor-page .outdoors-guides-links { display: flex; flex-wrap: wrap; gap: 6px 10px; }
-  body.outdoor-page .outdoors-guide-link { color: var(--teal-deep, #23555a); text-decoration: none; border-bottom: 1px solid rgba(47,111,115,0.35); }
-  body.outdoor-page .outdoors-guide-link:hover { color: var(--ref-navy); border-bottom-color: currentColor; }
-  body.outdoor-page .outdoors-guide-link:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
-
   body.outdoor-page .outdoors-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.outdoor-page .outdoors-pop { position: relative; }
   body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(74,52,40,0.25); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
@@ -8070,6 +8062,11 @@ function renderOutdoorActivityShowcaseHtml(state = {}) {
 //
 // Outdoors has NO date filter: destinations are not time-sensitive. There
 // is deliberately no Date control, no preset, and no ?when= anywhere here.
+//
+// The landing carries no links to the /outdoors/<activity> pages (the
+// "Activity guides" row was removed 2026-09-24 by owner decision). Those
+// pages are unchanged and still reachable from each other through
+// renderOutdoorActivitySelector() and from the sitemap.
 
 // Compact search over the already-rendered cards. New on this page. It
 // filters client-side only and adds no query parameter, so every existing
@@ -8099,20 +8096,6 @@ function outdoorsActivityChipsHtml(state = {}) {
   return inner
     .replace('<div class="category-region-selector outdoor-filter-group"', '<div class="category-region-selector outdoor-filter-group outdoors-act-row"')
     .replace('data-filter="activity">', `data-filter="activity">${allChip}`);
-}
-
-// The nine activity landing pages keep their only inbound internal link.
-// Compact, secondary to the filters, and live-gated exactly as the tiles'
-// Guide links were -- an activity below MIN_ACTIVITY_VENUES has no page to
-// link to, so it gets no link rather than a 404.
-function outdoorsActivityGuidesHtml() {
-  const live = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities());
-  if (!live.length) return '';
-  const links = live.map((a) => `<a class="outdoors-guide-link" href="/outdoors/${a.slug}">${escapeHtml(a.label)}</a>`).join('');
-  return `<div class="outdoors-guides">
-    <span class="outdoors-guides-label">Activity guides</span>
-    <nav class="outdoors-guides-links" aria-label="Outdoor activity guides">${links}</nav>
-  </div>`;
 }
 
 // The Regions control. One popover holding the EXISTING region accordion
@@ -8276,7 +8259,13 @@ function renderCategoryAllRegionsPage(type, venues, filter = null) {
   // chips, then the full directory) rather than a bare listing. Every
   // other category keeps its heading, copy and section order untouched.
   const isOutdoorLanding = type === 'outdoor';
-  const heading = isOutdoorLanding ? 'Outdoors in the Okanagan' : `${label.plural} in the Okanagan`;
+  // The landing's heading (2026-09-24, owner decision): "Outdoor Adventures"
+  // rather than the "<Plural> in the Okanagan" pattern the other hubs use.
+  // `heading` also builds `title`, so the <title>, og:title, twitter:title
+  // and the ItemList schema name all follow it -- the rename is deliberately
+  // consistent across all of them. The breadcrumb still reads "Outdoor
+  // Destinations" (it comes from CATEGORY_LABELS, not from here).
+  const heading = isOutdoorLanding ? 'Outdoor Adventures' : `${label.plural} in the Okanagan`;
   const title = `${heading} | Okanagan Roam`;
   const description = isOutdoorLanding
     ? `${venues.length} verified outdoor destinations across the Okanagan Valley — hiking, cycling, winter, nature, viewpoints and more, from Enderby to Osoyoos and the ski resorts.`
@@ -8315,7 +8304,6 @@ function renderCategoryAllRegionsPage(type, venues, filter = null) {
     ? `<p class="outdoor-intro outdoors-intro">Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs \u2014 the Okanagan\u2019s outdoors run the length of the valley.</p>
   ${outdoorsSearchHtml()}
   ${outdoorsActivityChipsHtml({ selectedActivities, counts: outdoorCounts })}
-  ${outdoorsActivityGuidesHtml()}
   ${outdoorsFilterBarHtml(venues, { selectedRegions, counts: outdoorCounts })}
   <span class="visually-hidden" id="outdoorRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span>
   <span class="visually-hidden" id="outdoorActivityStatus"${selectedActivities.length ? '' : ' hidden'}>${selectedActivities.length ? `${selectedActivities.length} selected` : ''}</span>
@@ -12431,7 +12419,6 @@ module.exports = {
   renderOutdoorActivityShowcaseHtml,
   outdoorsSearchHtml,
   outdoorsActivityChipsHtml,
-  outdoorsActivityGuidesHtml,
   outdoorsFilterBarHtml,
   outdoorsResultBarHtml,
   renderOutdoorRegionChoice,

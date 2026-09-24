@@ -6762,10 +6762,11 @@ test('/outdoors (Okanagan-wide) renders the discovery landing: one H1, canonical
   assert.ok(rows.length >= 2);
   const html = app.renderCategoryAllRegionsPage('outdoor', rows);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
-  assert.match(html, /<h1>Outdoors in the Okanagan<\/h1>/);
-  assert.match(html, /<title>Outdoors in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /<h1>Outdoor Adventures<\/h1>/);
+  assert.match(html, /<title>Outdoor Adventures \| Okanagan Roam<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors"/);
-  assert.match(html, /<meta property="og:title" content="Outdoors in the Okanagan \| Okanagan Roam">/);
+  assert.match(html, /<meta property="og:title" content="Outdoor Adventures \| Okanagan Roam">/);
+  assert.match(html, /"name":"Outdoor Adventures \| Okanagan Roam"/, 'the ItemList schema name follows the heading too');
   assert.match(html, /<body class="golf-page outdoor-page">/);
   assert.match(html, /Outdoor page theme \(2026-09-20\)/);
   // Region choice is a multi-select chip row (buttons), not links; regional pages stay reachable from region hubs, cards and the sitemap.
@@ -6780,11 +6781,12 @@ test('/outdoors (Okanagan-wide) renders the discovery landing: one H1, canonical
   // Hierarchy (2026-09-24 simplification): search -> activity chips -> activity
   // guides -> the Regions popover -> the count -> the results. The three step
   // headings and the "Show N results" CTA are gone.
-  const iSearch = markup.indexOf('id="outdoorsSearch"'), iActs = markup.indexOf('outdoors-act-row'), iGuides = markup.indexOf('class="outdoors-guides"'), iRegion = markup.indexOf('id="outdoorRegionsBtn"'), iCount = markup.indexOf('id="outdoorResultsSummary"'), iResults = markup.indexOf('id="outdoorResults"');
+  const iSearch = markup.indexOf('id="outdoorsSearch"'), iActs = markup.indexOf('outdoors-act-row'), iRegion = markup.indexOf('id="outdoorRegionsBtn"'), iCount = markup.indexOf('id="outdoorResultsSummary"'), iResults = markup.indexOf('id="outdoorResults"');
   assert.ok(iSearch > 0 && iRegion > iSearch && iCount > iRegion && iResults > iCount, 'search -> Regions -> count -> results');
-  // The chip row and the guides row exist only when an activity is live
-  // (>= MIN_ACTIVITY_VENUES); when they do they sit between search and Regions.
-  if (iActs !== -1) assert.ok(iActs > iSearch && iGuides > iActs && iRegion > iGuides, 'search -> activity chips -> guides -> Regions');
+  // The chip row exists only when an activity is live (>= MIN_ACTIVITY_VENUES);
+  // when it does it sits between the search field and the Regions control.
+  if (iActs !== -1) assert.ok(iActs > iSearch && iRegion > iActs, 'search -> activity chips -> Regions');
+  assert.doesNotMatch(markup, /outdoors-guides|outdoors-guide-link/, 'the Activity guides row is gone');
   assert.doesNotMatch(markup, /Explore by Activity|outdoorActivityMore|View All Outdoor Activities|outdoor-activity-card-img/, 'the former showcase reveal and the image tiles are gone');
   assert.equal((markup.match(/Choose Activity\(s\)<\/h2>/g) || []).length, 0, 'no step headings on the simplified landing');
   assert.equal((markup.match(/Choose Region\(s\)<\/h2>/g) || []).length, 0, 'no step headings on the simplified landing');
@@ -7061,12 +7063,13 @@ test('Activity page + landing sections render once an activity reaches the thres
     const all = app.getVenuesByCategory('outdoor');
     const landing = app.renderCategoryAllRegionsPage('outdoor', all);
     assert.equal((landing.match(/<h1[\s>]/g) || []).length, 1);
-    assert.match(landing, /<h1>Outdoors in the Okanagan<\/h1>/);
-    const order = ['<p class="outdoor-intro outdoors-intro">', 'id="outdoorsSearch"', 'data-filter="activity"', 'class="outdoors-guides"', 'id="outdoorRegionsBtn"', 'data-filter="region"', 'id="outdoorResultsSummary"', '<ul class="card-grid" id="outdoorResults">'];
+    assert.match(landing, /<h1>Outdoor Adventures<\/h1>/);
+    const order = ['<p class="outdoor-intro outdoors-intro">', 'id="outdoorsSearch"', 'data-filter="activity"', 'id="outdoorRegionsBtn"', 'data-filter="region"', 'id="outdoorResultsSummary"', '<ul class="card-grid" id="outdoorResults">'];
     const landingMarkup = outdoorMarkupOnly(landing);
     let pos = -1; for (const marker of order) { const i = landingMarkup.indexOf(marker); assert.ok(i > pos, `landing section order: ${marker}`); pos = i; }
     assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-activity="hiking" aria-pressed="false">Hiking &amp; Trails<span class="outdoor-activity-count">4<\/span><\/button>/, 'the live activity is a compact filter chip carrying its count');
-    assert.match(landing, /<a class="outdoors-guide-link" href="\/outdoors\/hiking">Hiking &amp; Trails<\/a>/, 'and keeps a link to the activity page in the compact guides row');
+    assert.doesNotMatch(landing, /outdoors-guide-link|outdoors-guides/, 'the landing carries no Activity guides row');
+    assert.match(app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking)), /<h1>Hiking &amp; Trails in the Okanagan<\/h1>/, 'the activity page itself is untouched and still renders');
     assert.doesNotMatch(landing, /data-activity="viewpoints"|data-activity="camping"|href="\/outdoors\/(viewpoints|camping)"/, 'sub-threshold activities get no toggle and no link');
     assert.equal((outdoorMarkupOnly(landing).match(/<li class="venue-card" /g) || []).length, all.length, 'every destination rendered once');
     // The per-venue activity map only carries live activities.
@@ -7211,7 +7214,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     }
     assert.equal((await fetch(`${base}/outdoors/camping`)).status, 404); assert.equal((await fetch(`${base}/outdoors/water`)).status, 404);
     assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-activity="hiking" aria-pressed="false">Hiking &amp; Trails<span class="outdoor-activity-count">3<\/span><\/button>/);
-    assert.match(landing, /<a class="outdoors-guide-link" href="\/outdoors\/hiking">/);
+    assert.doesNotMatch(landing, /outdoors-guide-link/);
     assert.equal((lm.match(/<li class="venue-card" /g) || []).length, 3, 'results list has each venue once');
     assert.match(landing, /id="outdoorResults"/);
     assert.match(landing, /querySelectorAll\('#outdoorResults > \.venue-card'\)/, 'filter script shipped on the landing');
@@ -7631,8 +7634,9 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     assert.ok(script.includes("querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle')"), 'the activity chips are driven by the same toggle script as the region pills');
     for (const needle of ['outdoorRegionStatus', 'outdoorActivityStatus', 'updateStepStatus', 'outdoor-activity-count-noun', "row('Regions'", "row('Activities'", 'pushState', 'popstate', 'readUrlIntoChips']) assert.ok(script.includes(needle), `script contains ${needle}`);
 
-    // 8. Existing activity links/pages: the compact guides row points at the real page, and the page renders.
-    assert.match(pm, /<a class="outdoors-guide-link" href="\/outdoors\/camping">Camping<\/a>/);
+    // 8. The landing no longer links to the activity pages (the guides row was
+    // removed 2026-09-24); the pages themselves are unchanged and still render.
+    assert.doesNotMatch(pm, /outdoors-guide-link|outdoors-guides/);
     const campingPage = app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.camping, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.camping));
     assert.match(campingPage, /<h1>Camping in the Okanagan<\/h1>/); assert.match(campingPage, /Explorer Penticton Bluffs/);
     assert.deepEqual(app.listLiveOutdoorActivities().map((a) => a.slug).sort(), ['camping', 'hiking']);
@@ -7728,8 +7732,8 @@ test('I.3: the landing filter chips and the activity-page chips present the six 
     // Since 2026-09-24 the landing PLACES that chip row (the renderer is the single source of chip truth).
     const actRow = lm.match(/<div class="category-region-selector outdoor-filter-group outdoors-act-row"[\s\S]*?<\/div>/)[0];
     assert.deepEqual([...actRow.matchAll(/data-activity="([a-z]+)"/g)].map((m) => m[1]), expectedSlugs, 'the landing chip row is the renderer output, in display order');
-    assert.deepEqual([...lm.match(/<nav class="outdoors-guides-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="\/outdoors\/([a-z]+)"/g)].map((m) => m[1]), expectedSlugs, 'guide links only for live activities, in the same order');
-    assert.ok(lm.indexOf('id="outdoorsSearch"') < lm.indexOf('outdoors-act-row') && lm.indexOf('outdoors-act-row') < lm.indexOf('class="outdoors-guides"') && lm.indexOf('class="outdoors-guides"') < lm.indexOf('id="outdoorRegionsBtn"') && lm.indexOf('id="outdoorRegionsBtn"') < lm.indexOf('id="outdoorResults"'));
+    assert.doesNotMatch(lm, /outdoors-guides-links|outdoors-guide-link/, 'no guide links on the landing');
+    assert.ok(lm.indexOf('id="outdoorsSearch"') < lm.indexOf('outdoors-act-row') && lm.indexOf('outdoors-act-row') < lm.indexOf('id="outdoorRegionsBtn"') && lm.indexOf('id="outdoorRegionsBtn"') < lm.indexOf('id="outdoorResults"'));
     assert.match(lm, /<button type="button" class="outdoor-filter-chip" data-region="kelowna" aria-pressed="false">/, 'region controls are still toggle buttons');
     assert.match(landing, /replaceState|URLSearchParams/, 'URL query persistence still shipped');
     const winter = app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.winter, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.winter));
@@ -7768,7 +7772,7 @@ test('Outdoors simplification: compact surface, no date control anywhere, activi
     assert.match(markup, /<button type="button" class="outdoors-pop-btn" id="outdoorRegionsBtn" aria-expanded="false" aria-controls="outdoorRegionsPanel">/, 'Regions control');
     assert.match(markup, /<div class="outdoors-pop-panel" id="outdoorRegionsPanel" hidden>/, 'the Regions popover starts closed');
     assert.match(markup, /<p class="outdoors-count" id="outdoorResultsSummary" aria-live="polite">/, 'compact result bar');
-    const order = ['<p class="outdoor-intro outdoors-intro">', 'id="outdoorsSearch"', 'outdoors-act-row', 'class="outdoors-guides"', 'class="outdoors-controls"', 'id="outdoorRegionsBtn"', 'id="outdoorResultsSummary"', 'id="outdoorSelected"', 'id="outdoorNoResults"', 'id="outdoorResults"'];
+    const order = ['<p class="outdoor-intro outdoors-intro">', 'id="outdoorsSearch"', 'outdoors-act-row', 'class="outdoors-controls"', 'id="outdoorRegionsBtn"', 'id="outdoorResultsSummary"', 'id="outdoorSelected"', 'id="outdoorNoResults"', 'id="outdoorResults"'];
     let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
 
     // 2. The old oversized surface is gone.
@@ -7783,13 +7787,15 @@ test('Outdoors simplification: compact surface, no date control anywhere, activi
       assert.ok(html.indexOf(d) === -1, `no date artefact on Outdoors (${d})`);
     assert.deepEqual(Object.keys(app.parseOutdoorFilterQuery({ regions: 'kelowna', activities: 'hiking', when: 'today', from: '2026-01-01' })), ['regions', 'activities'], 'the query parser gained no date keys');
 
-    // 4. Activity guides survive: one compact link per LIVE activity, to the real route.
-    const guides = markup.match(/<div class="outdoors-guides">[\s\S]*?<\/div>/)[0];
-    const guideSlugs = [...guides.matchAll(/class="outdoors-guide-link" href="\/outdoors\/([a-z]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(guideSlugs, app.sortOutdoorActivitiesForDisplay(app.listLiveOutdoorActivities()).map((x) => x.slug), 'a guide link for every live activity, in display order');
-    assert.ok(guideSlugs.includes('hiking') && guideSlugs.includes('cycling'));
-    for (const slug of guideSlugs) assert.ok(app.OUTDOOR_ACTIVITY_BY_SLUG[slug], `${slug} is a real activity route`);
-    assert.doesNotMatch(guides, /href="\/outdoors\/(camping|water|fishing)"/, 'no guide link for an activity whose page would 404');
+    // 4. The Activity guides row is gone (removed 2026-09-24 by owner decision):
+    // no guide markup, and no link from the landing to any activity page. The
+    // nine activity pages themselves are untouched and still render.
+    assert.doesNotMatch(markup, /outdoors-guides|outdoors-guide-link|Activity guides/, 'no Activity guides row');
+    assert.doesNotMatch(markup, /href="\/outdoors\/[a-z]+"/, 'the landing links to no /outdoors/<activity> page');
+    for (const slug of ['hiking', 'cycling']) {
+      const act = app.OUTDOOR_ACTIVITY_BY_SLUG[slug];
+      assert.ok(app.renderOutdoorActivityPage(act, app.getOutdoorActivityVenues(act)).includes(`<h1>${slug === 'hiking' ? 'Hiking &amp; Trails' : 'Cycling &amp; Biking'} in the Okanagan</h1>`), `/outdoors/${slug} still renders`);
+    }
 
     // 5. Accessibility: both live regions kept, semantic buttons, labelled search.
     assert.match(markup, /<span class="visually-hidden" id="outdoorRegionStatus" hidden><\/span>/);
