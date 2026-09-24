@@ -8381,6 +8381,536 @@ ${golfEngagementHeadHtml(type, hubThemed)}
 </html>`;
 }
 
+// ---------- Food & Drink hub (2026-09-24): the directory at /food-drink ----------
+//
+// Until now the "Food & Drink directory" was /browse?types=restaurant,cafe,
+// brewery,pub,cocktail -- i.e. okanagan.html (the frozen homepage file) with
+// its client-side wizard. That page cannot be redesigned without editing the
+// approved homepage, so this is a NEW, purely additive server-rendered hub in
+// the same shape as /wineries and /outdoors: nothing in okanagan.html,
+// app.js, /browse, Wine, Golf, Beaches, Outdoors or What's On changes.
+//
+// The visitor-facing model is three independent filter groups over one list:
+//   venue type  (OR within the group)   -- what kind of place
+//   features    (AND within the group)  -- what you are looking for
+//   region      (OR within the group)   -- where
+// and AND between the groups. Features are ANDed on purpose: "dog friendly
+// AND patio" is what someone choosing a place actually means, whereas two
+// venue types or two regions read as alternatives.
+//
+// Every feature below is an existing BOOL_FIELDS column with real coverage in
+// production -- nothing here is inferred or invented. Requests for Breakfast /
+// Takeout / Delivery are deliberately NOT offered: no column represents them,
+// and guessing would put false claims on venue cards. "Cocktails" and "Craft
+// Beer" are the Cocktail Lounges and Breweries venue types.
+const FD_HUB_TYPES = [
+  { type: 'restaurant', label: 'Restaurants' },
+  { type: 'cafe', label: 'Cafés' },
+  { type: 'pub', label: 'Pubs & Bars' },
+  { type: 'cocktail', label: 'Cocktail Lounges' },
+  { type: 'brewery', label: 'Breweries' },
+];
+// Wineries are deliberately absent: they are their own section with their own
+// /wineries hub, and duplicating them here would split that directory.
+const FD_HUB_FEATURES = [
+  { key: 'patio', label: 'Patio', icon: '☀️' },
+  { key: 'dog_friendly', label: 'Dog Friendly', icon: '🐕' },
+  { key: 'kid_friendly', label: 'Kid Friendly', icon: '👶' },
+  { key: 'vegetarian', label: 'Vegetarian Options', icon: '🥗' },
+  { key: 'vegan', label: 'Vegan Options', icon: '🌱' },
+  { key: 'gluten_free', label: 'Gluten-Free Options', icon: '🌾' },
+  { key: 'live_music', label: 'Live Music', icon: '🎵' },
+  { key: 'lake_view', label: 'Lake View', icon: '🌊' },
+  { key: 'great_groups', label: 'Great for Groups', icon: '👥' },
+  { key: 'happy_hour', label: 'Happy Hour', icon: '🍸' },
+  { key: 'sports_tv', label: 'Sports on TV', icon: '📺' },
+  { key: 'nonalcoholic', label: 'Non-Alcoholic Options', icon: '🥤' },
+];
+const FD_HUB_FEATURE_KEYS = new Set(FD_HUB_FEATURES.map((f) => f.key));
+const FD_HUB_LABEL_BY_TYPE = Object.fromEntries(FD_HUB_TYPES.map((t) => [t.type, t.label]));
+const FD_HUB_LABEL_BY_FEATURE = Object.fromEntries(FD_HUB_FEATURES.map((f) => [f.key, f.label]));
+
+// The hub's universe: every active venue whose PRIMARY type is one of the
+// five, plus every venue holding an fd_* secondary membership -- the same
+// "effective categories" rule the API already uses, so a brewery that is also
+// a restaurant appears once and answers to both chips.
+function getFoodDrinkHubVenues() {
+  const typePlaceholders = FOOD_DRINK_TYPES.map(() => '?').join(', ');
+  const kindPlaceholders = FD_CATEGORY_COLLECTION_KINDS.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT v.* FROM venues v
+    WHERE v.redirect_to IS NULL AND (
+      v.type IN (${typePlaceholders})
+      OR EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON c.id = ci.collection_id
+        WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind IN (${kindPlaceholders})
+      )
+    )
+    ORDER BY v.name ASC
+  `).all(...FOOD_DRINK_TYPES, ...FD_CATEGORY_COLLECTION_KINDS).map(rowToVenue);
+  return attachFoodDrinkCategories(rows);
+}
+// venue id -> effective category list, for the client script's filtering.
+function foodDrinkCategoriesByVenue(venues) {
+  const map = new Map();
+  for (const v of venues) map.set(v.id, (v.fd_categories && v.fd_categories.length) ? v.fd_categories : (FD_CATEGORY_KIND_BY_TYPE[v.type] ? [v.type] : []));
+  return map;
+}
+// venue id -> the feature keys that venue actually has set.
+function foodDrinkFeaturesByVenue(venues) {
+  const map = new Map();
+  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key));
+  return map;
+}
+
+// The filter predicate, shared verbatim by the server render and the inline
+// client script (see FD_HUB_FILTER_CLIENT_PREDICATE_SRC). Types OR, regions
+// OR, features AND, and AND between the three groups; an empty group imposes
+// no constraint. This is Food & Drink's OWN predicate -- the Outdoors/What's
+// On one is untouched, because their semantics differ (no feature group).
+function foodDrinkFilterMatches(selTypes, selFeatures, selRegions, venueCats, venueFeatures, venueRegion) {
+  const typeOk = !selTypes.length || selTypes.some((t) => venueCats.includes(t));
+  const regionOk = !selRegions.length || selRegions.includes(venueRegion);
+  const featureOk = selFeatures.every((f) => venueFeatures.includes(f));
+  return typeOk && regionOk && featureOk;
+}
+const FD_HUB_FILTER_CLIENT_PREDICATE_SRC = `function fdMatches(types, features, regions, venueCats, venueFeatures, venueRegion){
+    var typeOk = !types.length, regionOk = !regions.length || regions.indexOf(venueRegion) !== -1;
+    for (var i = 0; i < types.length && !typeOk; i++) { if (venueCats.indexOf(types[i]) !== -1) typeOk = true; }
+    var featureOk = true;
+    for (var j = 0; j < features.length && featureOk; j++) { if (venueFeatures.indexOf(features[j]) === -1) featureOk = false; }
+    return typeOk && regionOk && featureOk;
+  }`;
+function filterFoodDrinkVenues(venues, f, catsById, featsById) {
+  return venues.filter((v) => foodDrinkFilterMatches(f.types, f.features, f.regions, catsById.get(v.id) || [], featsById.get(v.id) || [], v.region));
+}
+// ?types=a,b&features=x,y&regions=c,d -- unknown values are dropped and
+// duplicates collapse, so a hand-edited link degrades to "fewer constraints",
+// never an error page. Anything else in the query is ignored.
+function parseFoodDrinkFilterQuery(query) {
+  const split = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : '').split(',').map((x) => x.trim()).filter(Boolean);
+  const types = [], features = [], regions = [];
+  for (const t of split(query && query.types)) if (FD_CATEGORY_KIND_BY_TYPE[t] && !types.includes(t)) types.push(t);
+  for (const f of split(query && query.features)) if (FD_HUB_FEATURE_KEYS.has(f) && !features.includes(f)) features.push(f);
+  for (const r of split(query && query.regions)) if (REGION_LABELS[r] && !regions.includes(r)) regions.push(r);
+  return { types, features, regions };
+}
+// Contextual counts: each chip shows how many venues it would contribute
+// given the OTHER groups' current selection, so a count can never promise
+// results a tap won't deliver. A feature chip ignores only its own group's
+// other selections in the same way.
+function foodDrinkChipCounts(venues, f, catsById, featsById) {
+  const types = {}, features = {}, regions = {};
+  for (const v of venues) {
+    const cats = catsById.get(v.id) || [], feats = featsById.get(v.id) || [];
+    if (foodDrinkFilterMatches([], f.features, f.regions, cats, feats, v.region)) for (const t of cats) types[t] = (types[t] || 0) + 1;
+    if (foodDrinkFilterMatches(f.types, f.features, [], cats, feats, v.region)) regions[v.region] = (regions[v.region] || 0) + 1;
+    if (foodDrinkFilterMatches(f.types, [], f.regions, cats, feats, v.region)) for (const k of feats) features[k] = (features[k] || 0) + 1;
+  }
+  return { types, features, regions };
+}
+// The one-line count, shared verbatim by the server and the client twin.
+function foodDrinkSummaryText(shown, total, filtered) {
+  const noun = total === 1 ? 'place' : 'places';
+  return filtered ? `${shown} of ${total} ${noun}` : `${total} ${noun}`;
+}
+const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered){
+    var noun = total === 1 ? 'place' : 'places';
+    return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' ' + noun);
+  }`;
+
+function foodDrinkSearchHtml() {
+  return `<div class="fd-search">
+    <label class="visually-hidden" for="fdSearch">Search food and drink</label>
+    <input type="search" id="fdSearch" class="fd-search-input" placeholder="Search by name, place or dish..." autocomplete="off" spellcheck="false">
+    <button type="button" class="fd-search-clear" id="fdSearchClear" aria-label="Clear search" hidden>&#215;</button>
+  </div>`;
+}
+// Venue-type chips: "All" plus the five categories. "All" is a reset control
+// (data-fd-type-all), not a sixth type -- it is pressed exactly when no type
+// is chosen, which is already what "no constraint" means to the predicate.
+function foodDrinkTypeChipsHtml(state = {}) {
+  const selected = new Set(state.types || []);
+  const counts = state.counts && state.counts.types ? state.counts.types : null;
+  const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
+  const chips = FD_HUB_TYPES.map((t) => {
+    const n = counts ? (counts[t.type] || 0) : null;
+    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+  }).join('');
+  return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="fd-type">${all}${chips}</div>`;
+}
+// "What are you looking for?" -- the twelve verified feature columns, as
+// toggles inside a popover so the page does not become a wall of controls.
+function foodDrinkFeatureChipsHtml(state = {}) {
+  const selected = new Set(state.features || []);
+  const counts = state.counts && state.counts.features ? state.counts.features : null;
+  const chips = FD_HUB_FEATURES.map((f) => {
+    const n = counts ? (counts[f.key] || 0) : null;
+    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-fd-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+  }).join('');
+  return `<div class="fd-feature-grid" role="group" aria-label="Choose what you are looking for" data-filter="fd-feature">${chips}</div>`;
+}
+// The two popovers. Regions reuses renderOutdoorRegionFilterChips() verbatim,
+// so the canonical 20-region list and its FOOTER_REGION_GROUPS grouping are
+// literally the same code the other directories use -- no second region
+// system, and it cannot drift.
+function foodDrinkFilterBarHtml(venues, state = {}) {
+  const nF = (state.features || []).length, nR = (state.regions || []).length;
+  const pop = (id, label, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}</div>
+    </div>`;
+  return `<div class="fd-controls">
+    ${pop('fdFeatures', 'What are you looking for?', '✨', nF || '', foodDrinkFeatureChipsHtml(state))}
+    ${pop('fdRegions', 'Regions', '📍', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
+  </div>`;
+}
+// Removable active-filter tags, one row per group, plus Clear all.
+function foodDrinkSelectedTagsHtml(state = {}) {
+  const tag = (kind, v, label) => `<button type="button" class="outdoor-selected-tag" data-fd-remove-${kind}="${escapeHtml(v)}" aria-label="Remove ${escapeHtml(label)}">${escapeHtml(label)}<span class="outdoor-selected-x" aria-hidden="true">×</span></button>`;
+  const row = (label, tags) => (tags.length ? `<div class="outdoor-selected-row"><span class="outdoor-selected-label">${label}</span> ${tags.join(' ')}</div>` : '');
+  const t = (state.types || []).map((x) => tag('type', x, FD_HUB_LABEL_BY_TYPE[x] || x));
+  const f = (state.features || []).map((x) => tag('feature', x, FD_HUB_LABEL_BY_FEATURE[x] || x));
+  const r = (state.regions || []).map((x) => tag('region', x, REGION_LABELS[x] || x));
+  const any = t.length + f.length + r.length > 0;
+  return `<div class="outdoor-selected" id="fdSelected"${any ? '' : ' hidden'}>${row('Types', t)}${row('Looking for', f)}${row('Regions', r)}${any ? '<button type="button" class="outdoor-selected-clear" id="fdSelectedClear">Clear all</button>' : ''}</div>`;
+}
+function foodDrinkResultBarHtml(summary, state) {
+  return `<div class="fd-resultbar">
+    <p class="fd-count" id="fdResultsSummary" aria-live="polite">${escapeHtml(summary)}</p>
+  </div>
+  ${foodDrinkSelectedTagsHtml(state)}`;
+}
+
+// Page-scoped stylesheet, emitted ONLY by this page (never by the shared
+// theme blocks), so nothing here can reach the homepage, Wine, Outdoors,
+// What's On, Golf or Beaches. The base .outdoor-filter-chip / .outdoor-
+// selected-* rules are reused as-is and deliberately NOT modified, because
+// the other directories depend on them.
+function renderFoodDrinkHubStyles() {
+  return `<style>
+  body.fd-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  body.fd-page .fd-intro { margin: 0 0 14px; max-width: 70ch; }
+
+  body.fd-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
+  body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(74,52,40,0.25); background: var(--paper); color: var(--ink); }
+  body.fd-page .fd-search-input::placeholder { color: rgba(42,32,25,0.55); }
+  body.fd-page .fd-search-input:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.fd-page .fd-search-input::-webkit-search-cancel-button, body.fd-page .fd-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+  body.fd-page .fd-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--ink); opacity: 0.6; padding: 6px 8px; }
+  body.fd-page .fd-search-clear[hidden] { display: none; }
+
+  /* flex-wrap: nowrap is explicit so the chips scroll sideways on a phone
+     instead of stacking into a tall block; desktop wraps instead. */
+  body.fd-page .fd-type-row { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; padding: 2px 0 8px; margin: 0 0 10px; }
+  body.fd-page .fd-type-row::-webkit-scrollbar { height: 6px; }
+  body.fd-page .fd-type-row::-webkit-scrollbar-thumb { background: rgba(74,52,40,0.2); border-radius: 999px; }
+  body.fd-page .fd-type-row .outdoor-filter-chip { flex: 0 0 auto; white-space: nowrap; }
+  @media (min-width: 900px) { body.fd-page .fd-type-row { flex-wrap: wrap; overflow: visible; } }
+
+  body.fd-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  body.fd-page .fd-pop { position: relative; }
+  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(74,52,40,0.25); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
+  body.fd-page .fd-pop-btn:hover { background: rgba(224,169,78,0.18); }
+  body.fd-page .fd-pop-btn:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.fd-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
+  body.fd-page .fd-pop-count[hidden] { display: none; }
+  body.fd-page .fd-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 620px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(74,52,40,0.2); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
+  body.fd-page .fd-pop-panel[hidden] { display: none; }
+  /* Without scripting a popover can never be opened, so the panels stay
+     visible inline and the page degrades to the full control set. */
+  body.fd-page .fd-controls:not(.js) .fd-pop-panel, body.fd-page .fd-controls:not(.js) .fd-pop-panel[hidden] { position: static; display: block; max-width: none; max-height: none; box-shadow: none; border: 0; padding: 10px 0 0; }
+  body.fd-page .fd-controls:not(.js) .fd-pop-btn { display: none; }
+  /* On phones a panel is a full-width sheet under the controls row; the ROW
+     is the positioning context, so the offset resolves against the button. */
+  @media (max-width: 640px) {
+    body.fd-page .fd-controls { position: relative; }
+    body.fd-page .fd-pop { position: static; }
+    body.fd-page .fd-pop-panel { left: 0; right: 0; width: auto; min-width: 0; max-width: none; }
+  }
+  @media (min-width: 900px) { body.fd-page .fd-pop-panel { min-width: 520px; } }
+  body.fd-page .fd-pop-panel .outdoor-filter-group { margin: 0; }
+  body.fd-page .fd-feature-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.fd-page .fd-feature-icon { font-size: 0.95em; }
+
+  body.fd-page .fd-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
+  body.fd-page .fd-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+  body.fd-page .fd-results-step { margin-top: 4px; }
+  body.fd-page #fdResults > .venue-card[hidden] { display: none; }
+  body.fd-page .fd-no-results { margin: 14px 0 0; font-family: 'Nunito', sans-serif; font-weight: 700; }
+</style>`;
+}
+
+// The inline script: the same interaction contract as the Outdoors explorer
+// (toggle chips, filter the already-rendered cards, keep the selection in the
+// URL, pushState/popstate, Clear all) with this page's three groups and its
+// own client-side search. No network, no framework.
+function renderFoodDrinkHubScriptHtml() {
+  const labels = {
+    regions: { ...REGION_LABELS },
+    types: { ...FD_HUB_LABEL_BY_TYPE },
+    features: { ...FD_HUB_LABEL_BY_FEATURE },
+  };
+  return `<script>
+(function(){
+  var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  var dataEl = document.getElementById('fdVenueData');
+  var DATA = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
+  var typeChips = Array.prototype.slice.call(document.querySelectorAll('[data-fd-type]'));
+  var featureChips = Array.prototype.slice.call(document.querySelectorAll('[data-fd-feature]'));
+  var regionChips = Array.prototype.slice.call(document.querySelectorAll('[data-region]'));
+  var allChip = document.querySelector('[data-fd-type-all]');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#fdResults > .venue-card'));
+  if (!cards.length) return;
+  var searchInput = document.getElementById('fdSearch');
+  var searchClear = document.getElementById('fdSearchClear');
+  var summary = document.getElementById('fdResultsSummary');
+  var selectedBox = document.getElementById('fdSelected');
+  var empty = document.getElementById('fdNoResults');
+  var results = document.getElementById('fdResults');
+  var featuresCount = document.getElementById('fdFeaturesCount');
+  var regionsCount = document.getElementById('fdRegionsCount');
+  var searchTerm = '';
+  ${FD_HUB_FILTER_CLIENT_PREDICATE_SRC}
+  ${FD_HUB_SUMMARY_CLIENT_SRC}
+  ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
+  // Searchable text per card, built once from data already in the markup:
+  // name, community label, the labels of its categories and features, and
+  // the meta/description lines. No new data is shipped for search.
+  cards.forEach(function(card){
+    var id = card.getAttribute('data-venue-id');
+    var d = DATA[id] || { c: [], f: [], r: '' };
+    var meta = card.querySelector('.venue-meta'), desc = card.querySelector('.golf-desc');
+    var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
+                 d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
+                 d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
+                 meta ? meta.textContent : '', desc ? desc.textContent : ''];
+    card.__fd = parts.join(' ').toLowerCase();
+  });
+  function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
+  function labelsOf(kind, list){ return list.map(function(v){ return LABELS[kind][v] || v; }); }
+  var groupsRoot = document.querySelector('.outdoor-region-groups');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.outdoor-region-group-block'));
+  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 899px)') : null;
+  function setGroupOpen(block, open){ var t = block.querySelector('.outdoor-region-group-toggle'), l = block.querySelector('.outdoor-region-group-chips'); if (!t || !l) return; t.setAttribute('aria-expanded', open ? 'true' : 'false'); l.hidden = !open; }
+  function updateGroupHeaders(){
+    groups.forEach(function(block){
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      var sel = block.querySelector('.outdoor-region-group-selected');
+      if (sel) { sel.textContent = groupSelectedText(n); sel.hidden = n === 0; }
+      block.classList.toggle('has-selection', n > 0);
+    });
+  }
+  if (groupsRoot) groupsRoot.classList.add('js');
+  groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
+  function updateCounts(types, features, regions){
+    var tC = {}, fC = {}, rC = {};
+    cards.forEach(function(card){
+      var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
+      if (fdMatches([], features, regions, d.c, d.f, d.r)) d.c.forEach(function(t){ tC[t] = (tC[t] || 0) + 1; });
+      if (fdMatches(types, features, [], d.c, d.f, d.r)) rC[d.r] = (rC[d.r] || 0) + 1;
+      if (fdMatches(types, [], regions, d.c, d.f, d.r)) d.f.forEach(function(k){ fC[k] = (fC[k] || 0) + 1; });
+    });
+    function paint(list, attr, counts){ list.forEach(function(c){ var n = c.querySelector('.outdoor-activity-count'); if (n) n.textContent = String(counts[c.getAttribute(attr)] || 0); }); }
+    paint(typeChips, 'data-fd-type', tC); paint(featureChips, 'data-fd-feature', fC); paint(regionChips, 'data-region', rC);
+  }
+  function renderSelected(types, features, regions){
+    if (!selectedBox) return;
+    var any = types.length || features.length || regions.length;
+    function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-fd-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
+    function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
+    var html = row('Types', types.map(function(v){ return tag('type', v, LABELS.types[v] || v); }))
+      + row('Looking for', features.map(function(v){ return tag('feature', v, LABELS.features[v] || v); }))
+      + row('Regions', regions.map(function(v){ return tag('region', v, LABELS.regions[v] || v); }));
+    if (any) html += '<button type="button" class="outdoor-selected-clear" id="fdSelectedClear">Clear all</button>';
+    selectedBox.innerHTML = html;
+    selectedBox.hidden = !any;
+  }
+  function queryFor(types, features, regions){
+    var q = [];
+    if (types.length) q.push('types=' + types.join(','));
+    if (features.length) q.push('features=' + features.join(','));
+    if (regions.length) q.push('regions=' + regions.join(','));
+    return q.length ? '?' + q.join('&') : '';
+  }
+  function apply(historyMode){
+    var types = pressed(typeChips, 'data-fd-type'), features = pressed(featureChips, 'data-fd-feature'), regions = pressed(regionChips, 'data-region');
+    var shown = 0;
+    cards.forEach(function(card){
+      var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
+      var ok = fdMatches(types, features, regions, d.c, d.f, d.r) && (!searchTerm || (card.__fd || '').indexOf(searchTerm) !== -1);
+      card.hidden = !ok; if (ok) shown++;
+    });
+    var total = cards.length, filtered = types.length || features.length || regions.length || !!searchTerm;
+    if (allChip) allChip.setAttribute('aria-pressed', types.length ? 'false' : 'true');
+    if (featuresCount) { featuresCount.textContent = features.length ? (' \\u00b7 ' + features.length) : ''; featuresCount.hidden = features.length === 0; }
+    if (regionsCount) { regionsCount.textContent = regions.length ? (' \\u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
+    if (searchClear) searchClear.hidden = !searchTerm;
+    if (summary) summary.textContent = fdSummaryText(shown, total, filtered);
+    updateGroupHeaders(); updateCounts(types, features, regions); renderSelected(types, features, regions);
+    if (empty) empty.hidden = shown !== 0;
+    if (results) results.hidden = shown === 0;
+    var next = window.location.pathname + queryFor(types, features, regions) + window.location.hash;
+    if (window.history && historyMode !== 'none') {
+      if (historyMode === 'push' && window.history.pushState && next !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState({ fd: true }, '', next);
+      else if (window.history.replaceState) window.history.replaceState({ fd: true }, '', next);
+    }
+  }
+  function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }
+  [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
+  function clearAll(){
+    [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
+    searchTerm = ''; if (searchInput) searchInput.value = '';
+    apply('push');
+  }
+  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); });
+  if (searchInput) {
+    var timer = null;
+    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120); });
+  }
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
+  if (selectedBox) selectedBox.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
+    if (t.id === 'fdSelectedClear') { clearAll(); return; }
+    var map = [['data-fd-remove-type', typeChips, 'data-fd-type'], ['data-fd-remove-feature', featureChips, 'data-fd-feature'], ['data-fd-remove-region', regionChips, 'data-region']];
+    for (var i = 0; i < map.length; i++) {
+      var v = t.getAttribute(map[i][0]);
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); apply('push'); return; }
+    }
+  });
+  var emptyClear = document.getElementById('fdNoResultsClear');
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  var popsRoot = document.querySelector('.fd-controls');
+  var pops = Array.prototype.slice.call(document.querySelectorAll('.fd-pop'));
+  if (popsRoot) popsRoot.classList.add('js');
+  function closePops(except){
+    pops.forEach(function(pop){
+      if (pop === except) return;
+      var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+      if (b) b.setAttribute('aria-expanded', 'false');
+      if (pnl) pnl.hidden = true;
+    });
+  }
+  pops.forEach(function(pop){
+    var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+    if (!b || !pnl) return;
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = b.getAttribute('aria-expanded') === 'true';
+      closePops(pop);
+      b.setAttribute('aria-expanded', open ? 'false' : 'true');
+      pnl.hidden = open;
+    });
+    pnl.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  if (pops.length) {
+    document.addEventListener('click', function(){ closePops(null); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
+  }
+  function readUrlIntoChips(){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var pre = { t: (params.get('types') || '').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
+      typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-fd-type')) !== -1 ? 'true' : 'false'); });
+      featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-fd-feature')) !== -1 ? 'true' : 'false'); });
+      regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
+    } catch (e) {}
+  }
+  function openGroupsForSelection(){
+    groups.forEach(function(block){
+      var isDefault = block.getAttribute('data-region-group') === '${OUTDOOR_REGION_GROUP_DEFAULT_OPEN}';
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
+    });
+  }
+  window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); apply('none'); });
+  readUrlIntoChips();
+  openGroupsForSelection();
+  apply('replace');
+})();
+</script>`;
+}
+
+// The page. Same themed shell as the /wineries hub (homepage header, Trip
+// tray, app.css, name-as-link cards with the "View details" cue, Favorite /
+// Add to Trip) so the engagement contract is identical -- list cards carry
+// ONLY Favorite and Add to Trip; Website / Directions / Call stay on the
+// venue detail pages, which are untouched.
+function renderFoodDrinkHubPage(venues, filter = null) {
+  const f = filter || { types: [], features: [], regions: [] };
+  const catsById = foodDrinkCategoriesByVenue(venues);
+  const featsById = foodDrinkFeaturesByVenue(venues);
+  const matching = filterFoodDrinkVenues(venues, f, catsById, featsById);
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = foodDrinkChipCounts(venues, f, catsById, featsById);
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0;
+  const state = { types: f.types, features: f.features, regions: f.regions, counts };
+
+  const heading = 'Food & Drink in the Okanagan';
+  const title = `${heading} | Okanagan Roam`;
+  const description = `${venues.length} restaurants, cafes, pubs, cocktail lounges and breweries across the Okanagan Valley — filter by what you are looking for, from patios and dog-friendly rooms to vegan, vegetarian and gluten-free options.`;
+  const canonical = 'https://okanaganroam.com/food-drink';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Food & Drink', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+    })),
+  };
+  // id -> { c: categories, f: features, r: region } for the client script.
+  const payload = {};
+  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
+
+  const advisoryNotes = getAdvisoryNotes();
+  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true })
+    .replace('<ul class="card-grid">', `<ul class="card-grid" id="fdResults"${matching.length === 0 ? ' hidden' : ''}>`)
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"([^>]*)>/g, (m, id, rest) => (matchIds.has(Number(id)) ? m : `<li class="venue-card" data-venue-id="${id}"${rest} hidden>`));
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${renderOutdoorThemeStyles()}
+${renderFoodDrinkHubStyles()}
+${golfEngagementHeadHtml('restaurant', true)}
+</head>
+<body class="golf-page outdoor-page fd-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Food & Drink' }])}
+  <h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley&rsquo;s best dining rooms &mdash; every restaurant, caf&eacute;, pub, cocktail lounge and brewery Okanagan Roam has verified.</p>
+  ${foodDrinkSearchHtml()}
+  ${foodDrinkTypeChipsHtml(state)}
+  ${foodDrinkFilterBarHtml(venues, state)}
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
+  <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state)}
+  <p class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}>No places match that combination yet. <a href="/food-drink" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
+  ${cardsHtml}
+  <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('restaurant', true)}
+  ${renderFoodDrinkHubScriptHtml()}
+</body>
+</html>`;
+}
+
 // ---------- What's On (2026-09-22): page shell at /whats-on ----------
 //
 // The What's On counterpart to the Outdoors explorer: Choose Region(s) ->
@@ -10768,6 +11298,7 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...regionCounts.map(
           ({ region, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
@@ -12035,6 +12566,21 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // GET /food-drink -- the Food & Drink directory (2026-09-24). A fixed
+    // route, registered with the other named pages and before the broad
+    // region/category patterns below, so "food-drink" can never be read as a
+    // region slug. /browse is untouched and still serves okanagan.html.
+    if (pathname === '/food-drink' && method === 'GET') {
+      const fdVenues = getFoodDrinkHubVenues();
+      if (fdVenues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderFoodDrinkHubPage(fdVenues, parseFoodDrinkFilterQuery(query));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // ---------- SEO architecture: region / category / venue pages ----------
     // Registered last, after every fixed route and every /api/* route above,
     // so these broad patterns can never shadow anything that already exists.
@@ -12432,6 +12978,20 @@ module.exports = {
   renderOutdoorSelectedTagsHtml,
   OUTDOOR_SUMMARY_CLIENT_SRC,
   renderOutdoorRegionFilterChips,
+  FD_HUB_TYPES,
+  FD_HUB_FEATURES,
+  getFoodDrinkHubVenues,
+  parseFoodDrinkFilterQuery,
+  foodDrinkFilterMatches,
+  filterFoodDrinkVenues,
+  foodDrinkChipCounts,
+  foodDrinkSummaryText,
+  foodDrinkTypeChipsHtml,
+  foodDrinkFeatureChipsHtml,
+  foodDrinkFilterBarHtml,
+  renderFoodDrinkHubPage,
+  renderFoodDrinkHubScriptHtml,
+  FD_HUB_FILTER_CLIENT_PREDICATE_SRC,
   canonicalOutdoorRegionOrder,
   OUTDOOR_REGION_GROUP_DEFAULT_OPEN,
   OUTDOOR_REGION_GROUP_CLIENT_SRC,
@@ -12498,4 +13058,5 @@ module.exports = {
   // Homepage footer redesign (2026-09-17)
   renderHomeFooterHTML,
   FOOTER_REGION_GROUPS,
+  BOOL_FIELDS,
 };

@@ -7884,6 +7884,221 @@ test('Outdoors simplification: All chip semantics, search over name/region/activ
 });
 
 
+// ==== Food & Drink hub (2026-09-24): the directory at /food-drink ==========
+
+test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chips with All, the two popovers, the result bar, and no oversized tiles or step headings', () => {
+  const venues = app.getFoodDrinkHubVenues();
+  assert.ok(venues.length > 0, 'the hub has an inventory');
+  const html = app.renderFoodDrinkHubPage(venues, app.parseFoodDrinkFilterQuery({}));
+  const markup = outdoorMarkupOnly(html);
+
+  // Page identity, canonical and schema.
+  assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
+  assert.match(html, /<h1>Food &amp; Drink in the Okanagan<\/h1>/);
+  assert.match(html, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink"/);
+  assert.match(html, /"@type":"ItemList"/);
+  assert.match(markup, /<body class="golf-page outdoor-page fd-page">/);
+  assert.match(markup, /Home<\/a>[\s\S]{0,80}Food &amp; Drink/, 'breadcrumb');
+
+  // The compact surface, in order, with the results directly after it.
+  assert.match(markup, /<input type="search" id="fdSearch" class="fd-search-input"/, 'compact search');
+  assert.match(markup, /<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="fd-type">/, 'venue-type chip row');
+  assert.match(markup, /<button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel">/);
+  assert.match(markup, /<button type="button" class="fd-pop-btn" id="fdRegionsBtn" aria-expanded="false" aria-controls="fdRegionsPanel">/);
+  assert.match(markup, /<div class="fd-pop-panel" id="fdFeaturesPanel" hidden>/, 'features popover starts closed');
+  assert.match(markup, /<div class="fd-pop-panel" id="fdRegionsPanel" hidden>/, 'regions popover starts closed');
+  assert.match(markup, /<p class="fd-count" id="fdResultsSummary" aria-live="polite">/, 'compact result bar');
+  const order = ['class="outdoor-intro fd-intro"', 'id="fdSearch"', 'class="fd-type-row"', 'class="fd-controls"', 'id="fdFeaturesBtn"', 'id="fdRegionsBtn"', 'id="fdResultsSummary"', 'id="fdSelected"', 'id="fdNoResults"', 'id="fdResults"'];
+  let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
+
+  // None of the old oversized directory treatment.
+  assert.equal((markup.match(/<img/g) || []).length, 0, 'no images above or among the controls');
+  assert.doesNotMatch(markup.slice(0, markup.indexOf('<li class="venue-card"')), /<h2[^>]*class="category-subsection-heading"/, 'no visible step headings above the results');
+  assert.match(markup, /<h2 class="visually-hidden" id="fdResultsTop">Results<\/h2>/, 'the Results heading is screen-reader only');
+  assert.doesNotMatch(markup, /<select/, 'no dropdown controls');
+  assert.doesNotMatch(markup, /id="fdSort"|data-fd-sort/, 'no Sort control');
+
+  // Venue types: All + the five, with counts, and NO wineries.
+  assert.deepEqual([...markup.matchAll(/data-fd-type="([a-z]+)"/g)].map((m) => m[1]), app.FD_HUB_TYPES.map((t) => t.type));
+  assert.match(markup, /<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="true">All<\/button>/);
+  assert.doesNotMatch(markup, /data-fd-type="winery"/, 'Wineries are not a Food & Drink type here');
+  assert.doesNotMatch(markup, /data-venue-category="winery"/, 'no winery cards on the Food & Drink hub');
+  assert.ok(venues.every((v) => v.type !== 'winery'), 'the hub universe excludes wineries entirely');
+
+  // Features: every chip is a real BOOL_FIELDS column, never an invented one.
+  assert.equal(app.FD_HUB_FEATURES.length, 12);
+  for (const f of app.FD_HUB_FEATURES) assert.ok(app.BOOL_FIELDS.includes(f.key), `${f.key} is a real venue column`);
+  assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key));
+
+  // Regions: the canonical list, from the SAME renderer the other directories use.
+  for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`data-region="${r}"`), `canonical region chip for ${r}`);
+  assert.equal((markup.match(/class="outdoor-region-group-block/g) || []).length, app.FOOTER_REGION_GROUPS.length, 'FOOTER_REGION_GROUPS grouping reused verbatim');
+
+  // Cards: name is the link with the cue, ONLY Favorite + Add to Trip.
+  const list = markup.slice(markup.indexOf('id="fdResults"'));
+  assert.match(list, /<span class="venue-card-name">/); assert.match(list, /<span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span>/);
+  assert.match(list, /class="card-action fav-btn"/); assert.match(list, /class="card-action trip-btn"/);
+  assert.doesNotMatch(list, /card-action-website|card-action-phone|tel:/, 'no website/phone buttons on list cards');
+  assert.match(html, /id="tripTray"|trip-tray/, 'Trip tray present'); assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+  assert.match(html, /<footer class="home-footer"/);
+});
+
+test('Food & Drink hub: types OR, features AND, regions OR, AND between groups; All resets types; search; Clear all; URL query; counts', () => {
+  const venues = app.getFoodDrinkHubVenues();
+  const cats = new Map(venues.map((v) => [v.id, (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type]]));
+  const feats = new Map(venues.map((v) => [v.id, app.FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key)]));
+  const sum = (html) => outdoorMarkupOnly(html).match(/id="fdResultsSummary" aria-live="polite">([^<]*)</)[1];
+  const shown = (html) => (outdoorMarkupOnly(html).match(/<li class="venue-card" data-venue-id="\d+"(?![^>]* hidden)/g) || []).length;
+
+  // No filters -> everything, plain count, only the All chip pressed.
+  const plain = app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] });
+  assert.equal(sum(plain), `${venues.length} places`);
+  assert.equal(shown(plain), venues.length);
+  assert.equal((outdoorMarkupOnly(plain).match(/aria-pressed="true"/g) || []).length, 1, 'only All is pressed');
+  assert.match(outdoorMarkupOnly(plain), /id="fdSelected" hidden><\/div>/);
+
+  // Types OR.
+  const one = { types: ['brewery'], features: [], regions: [] };
+  const two = { types: ['brewery', 'cafe'], features: [], regions: [] };
+  const nOne = app.filterFoodDrinkVenues(venues, one, cats, feats).length;
+  const nTwo = app.filterFoodDrinkVenues(venues, two, cats, feats).length;
+  assert.ok(nOne > 0 && nTwo > nOne, 'a second type ADDS results (OR)');
+  assert.equal(shown(app.renderFoodDrinkHubPage(venues, two)), nTwo);
+  assert.equal(sum(app.renderFoodDrinkHubPage(venues, two)), `${nTwo} of ${venues.length} places`);
+  assert.match(outdoorMarkupOnly(app.renderFoodDrinkHubPage(venues, one)), /data-fd-type-all="1" aria-pressed="false"/, 'All releases once a type is chosen');
+
+  // Features AND.
+  const f1 = { types: [], features: ['patio'], regions: [] };
+  const f2 = { types: [], features: ['patio', 'dog_friendly'], regions: [] };
+  const nF1 = app.filterFoodDrinkVenues(venues, f1, cats, feats).length;
+  const nF2 = app.filterFoodDrinkVenues(venues, f2, cats, feats).length;
+  assert.ok(nF1 > 0 && nF2 <= nF1, 'a second feature NARROWS the results (AND)');
+  for (const v of app.filterFoodDrinkVenues(venues, f2, cats, feats)) {
+    assert.equal(Number(v.patio), 1); assert.equal(Number(v.dog_friendly), 1);
+  }
+
+  // Regions OR, and AND between the groups.
+  const regions = Object.keys(app.REGION_LABELS).filter((r) => venues.some((v) => v.region === r)).slice(0, 2);
+  const r1 = { types: [], features: [], regions: [regions[0]] };
+  const r2 = { types: [], features: [], regions };
+  assert.ok(app.filterFoodDrinkVenues(venues, r2, cats, feats).length >= app.filterFoodDrinkVenues(venues, r1, cats, feats).length, 'a second region adds results (OR)');
+  const combo = { types: ['cafe'], features: ['patio'], regions: [regions[0]] };
+  for (const v of app.filterFoodDrinkVenues(venues, combo, cats, feats)) {
+    assert.ok((cats.get(v.id) || []).includes('cafe')); assert.equal(Number(v.patio), 1); assert.equal(v.region, regions[0]);
+  }
+  // The shipped client predicate agrees with the server one, case for case.
+  const clientMatches = new Function(`${app.FD_HUB_FILTER_CLIENT_PREDICATE_SRC}; return fdMatches;`)();
+  for (const f of [one, two, f1, f2, r1, r2, combo]) {
+    const server = app.filterFoodDrinkVenues(venues, f, cats, feats).map((v) => v.id).sort((a, b) => a - b);
+    const client = venues.filter((v) => clientMatches(f.types, f.features, f.regions, cats.get(v.id) || [], feats.get(v.id) || [], v.region)).map((v) => v.id).sort((a, b) => a - b);
+    assert.deepEqual(client, server, 'client predicate twin matches the server');
+  }
+
+  // Selected tags, one row per group, plus Clear all.
+  const tagged = outdoorMarkupOnly(app.renderFoodDrinkHubPage(venues, combo));
+  assert.match(tagged, /<span class="outdoor-selected-label">Types<\/span>[\s\S]*?data-fd-remove-type="cafe"/);
+  assert.match(tagged, /<span class="outdoor-selected-label">Looking for<\/span>[\s\S]*?data-fd-remove-feature="patio"/);
+  assert.match(tagged, new RegExp(`<span class="outdoor-selected-label">Regions</span>[\\s\\S]*?data-fd-remove-region="${regions[0]}"`));
+  assert.match(tagged, /id="fdSelectedClear">Clear all</);
+  // Clearing everything is exactly the unfiltered page.
+  assert.equal(app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] }), plain);
+
+  // Query parsing: unknown values dropped, duplicates collapsed, no other keys.
+  assert.deepEqual(app.parseFoodDrinkFilterQuery({ types: 'cafe,winery,cafe,nope', features: 'patio,unicorn', regions: 'kelowna,atlantis', when: 'today' }),
+    { types: ['cafe'], features: ['patio'], regions: ['kelowna'] });
+  assert.deepEqual(Object.keys(app.parseFoodDrinkFilterQuery({})), ['types', 'features', 'regions'], 'no date or sort state');
+
+  // Contextual counts never promise results a tap will not deliver.
+  const counts = app.foodDrinkChipCounts(venues, one, cats, feats);
+  assert.equal(counts.regions[regions[0]], app.filterFoodDrinkVenues(venues, { types: ['brewery'], features: [], regions: [regions[0]] }, cats, feats).length);
+
+  // The client script ships search over name/region/type/feature/description,
+  // the three groups, Clear all and the URL keys -- and no date state.
+  const script = app.renderFoodDrinkHubScriptHtml();
+  for (const needle of ["card.getAttribute('data-venue-name')", 'LABELS.regions[d.r]', 'LABELS.types[t]', 'LABELS.features[k]', "card.querySelector('.venue-meta')", "card.querySelector('.golf-desc')",
+    app.FD_HUB_FILTER_CLIENT_PREDICATE_SRC, "'types='", "'features='", "'regions='", 'pushState', 'popstate', 'fdSelectedClear', 'data-fd-remove-type', 'data-fd-remove-feature', 'data-fd-remove-region'])
+    assert.ok(script.includes(needle), `script contains ${needle}`);
+  assert.ok(!script.includes("'when='") && !script.includes('data-when'), 'no date state on the Food & Drink hub');
+});
+
+test('Food & Drink hub: the /food-drink route serves it, and /browse, the Wine hub, the F&D category/region/venue routes and the other directories are untouched (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-fd-'));
+  const projectRoot = path.join(__dirname, '..');
+  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
+  const port = 3599;
+  const child = require('node:child_process').spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
+  const get = async (p) => { const r = await fetch(`http://localhost:${port}${p}`); return { status: r.status, text: await r.text() }; };
+  try {
+    let ready = false;
+    for (let i = 0; i < 100 && !ready; i++) {
+      try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready, 'child server started');
+    const hub = await get('/food-drink');
+    assert.equal(hub.status, 200);
+    assert.match(hub.text, /<h1>Food &amp; Drink in the Okanagan<\/h1>/);
+    // Pre-filtered from the URL, server-side.
+    const pre = await get('/food-drink?types=cafe&features=patio&regions=kelowna');
+    assert.equal(pre.status, 200);
+    assert.match(pre.text, /data-fd-type="cafe" aria-pressed="true"/);
+    assert.match(pre.text, /data-fd-feature="patio" aria-pressed="true"/);
+    assert.match(pre.text, /data-region="kelowna" aria-pressed="true"/);
+    assert.match(outdoorMarkupOnly(pre.text), /id="fdResultsSummary" aria-live="polite">\d+ of \d+ places</);
+    // /browse still serves okanagan.html, untouched by this work.
+    const browse = await get('/browse');
+    assert.equal(browse.status, 200);
+    assert.doesNotMatch(browse.text, /fd-type-row|id="fdSearch"|fd-pop-btn/, 'the hub does not leak onto /browse');
+    // Other directories are untouched by the new page. (The F&D category,
+    // region and venue pages are asserted in-process below, where the full
+    // project tree is available -- this child only carries the four files.)
+    for (const p of ['/whats-on', '/outdoors', '/wineries']) {
+      const r = await get(p);
+      assert.equal(r.status, 200);
+      assert.doesNotMatch(r.text, /fd-type-row|id="fdSearch"|fd-pop-btn|fd-page/, `${p} carries no Food & Drink hub markup or CSS`);
+    }
+    // The sitemap lists the hub exactly once.
+    const sm = await get('/sitemap.xml');
+    assert.equal((sm.text.match(/<loc>https:\/\/okanaganroam\.com\/food-drink<\/loc>/g) || []).length, 1, 'sitemapped once');
+  } finally {
+    child.kill('SIGTERM');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+  // The existing Food & Drink category / region / venue surfaces still render
+  // and carry none of the hub's markup or CSS.
+  // Pick a Food & Drink region/type pair that actually has venues in whatever
+  // state the shared fixture is in at this point in the run.
+  const fdVenues = app.getFoodDrinkHubVenues();
+  const sample = fdVenues.find((v) => app.CATEGORY_SLUGS[v.type]);
+  assert.ok(sample, 'the fixture has at least one Food & Drink venue');
+  const sameCell = app.getVenuesByRegionCategory(sample.region, sample.type);
+  assert.ok(sameCell.length > 0, `${sample.region}/${sample.type} has venues`);
+  const catPage = app.renderCategoryPage(sample.region, sample.type, sameCell, []);
+  assert.equal((catPage.match(/<h1[\s>]/g) || []).length, 1, 'category page still renders one H1');
+  assert.doesNotMatch(catPage, /fd-type-row|id="fdSearch"|fd-pop-btn|fd-page/, 'category page carries no hub markup or CSS');
+  const venuePage = app.renderVenuePage(sample, [], [], []);
+  assert.doesNotMatch(venuePage, /fd-type-row|id="fdSearch"|fd-pop-btn|fd-page/, 'venue detail page carries no hub markup or CSS');
+  assert.match(venuePage, /venue-cta-row|card-action|Get Directions|Visit Website/, 'venue detail page keeps its own CTA row');
+});
+
+test('FROZEN HOMEPAGE (Food & Drink hub): "/" and the Outdoors/What\'s On surfaces are byte-identical with the hub in place', () => {
+  const homeBefore = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+  // Rendering the hub must not mutate any shared state the other pages read.
+  const venues = app.getFoodDrinkHubVenues();
+  const outdoorsBefore = app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor'));
+  const whatsOnBefore = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({}));
+  app.renderFoodDrinkHubPage(venues, app.parseFoodDrinkFilterQuery({ types: 'cafe' }));
+  assert.equal(fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8'), homeBefore, 'okanagan.html untouched');
+  assert.equal(app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor')), outdoorsBefore, '/outdoors byte-identical');
+  assert.equal(app.renderWhatsOnPage(app.parseWhatsOnPageQuery({})), whatsOnBefore, '/whats-on byte-identical');
+  // The shared Outdoors predicate is one implementation and is not this one.
+  assert.notEqual(app.FD_HUB_FILTER_CLIENT_PREDICATE_SRC, app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC);
+  assert.ok(outdoorsBefore.includes(app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC) && whatsOnBefore.includes(app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC));
+  assert.ok(!outdoorsBefore.includes('fd-type-row') && !whatsOnBefore.includes('fd-type-row'));
+});
+
+
 // ==== Outdoors region selector = canonical region list (2026-09-20) ========
 
 test('Outdoor region chips use the complete canonical region list (REGION_LABELS, in FOOTER_REGION_GROUPS order): every region present, zero-count regions show 0, counts accurate, no invented regions', () => {
