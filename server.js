@@ -7039,6 +7039,10 @@ function golfAtAGlanceHtml(venue) {
 // to every card on the page and the reported venue_category is the
 // card's own. Golf and Beach pages' scripts are byte-identical to before.
 function themedCardHolderSelector(type) {
+  // 'fd' is the Food & Drink hub, whose one list mixes all five Food & Drink
+  // types; without this its non-restaurant cards got no engagement wiring at
+  // all, so their Favorite / Add to Trip buttons did nothing.
+  if (type === 'fd') return `:is(${FOOD_DRINK_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
   return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
 }
@@ -7046,14 +7050,14 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
   if (!themed) return '';
   return `<script>
 (function(){
-  var cards = document.querySelectorAll('.venue-card${themedCardHolderSelector(type)}');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.venue-card${themedCardHolderSelector(type)}'));
   if (!cards.length) return;
   function ctx(card){
     return {
       venue_id: Number(card.dataset.venueId),
       venue_name: card.dataset.venueName,
       venue_region: card.dataset.venueRegion,
-      venue_category: ${type === 'outdoor' ? "card.dataset.venueCategory || 'outdoor'" : `'${type}'`},
+      venue_category: ${(type === 'outdoor' || type === 'fd') ? `card.dataset.venueCategory || '${type}'` : `'${type}'`},
       surface: card.dataset.surface || 'category_card',
       page_path: location.pathname
     };
@@ -7105,6 +7109,28 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
   // array of venue names; okanaganTrip is [{name, query, region}], capped
   // at MAX_STOPS), so the existing Trip Planner and favourites filter see
   // exactly what was chosen here.
+  // Additive hook (2026-09-24): a page that reveals more venue cards after
+  // load -- the Food & Drink hub's "Show more" -- calls this so those cards
+  // get exactly this wiring (description clamp / Read more, impression
+  // tracking, Favorite / Add to Trip state) rather than a divergent copy.
+  // Click handling already works for them without this, because the
+  // Favorite/Trip listeners are delegated on document. Nothing here runs
+  // unless a page calls it, so every other page is unaffected.
+  //
+  // This sits ABOVE golfFavTripScriptBody on purpose: that body returns out
+  // of this IIFE when app.js is present, so anything after it is dead code.
+  // syncAll is a hoisted function declaration in the same scope, so calling
+  // it from here still works.
+  window.__ogWireVenueCards = function(list){
+    (list || []).forEach(function(card){
+      if (!card || card.__ogWired) return;
+      card.__ogWired = true;
+      cards.push(card);
+      setup(card);
+      if (typeof io !== 'undefined' && io) io.observe(card);
+    });
+    if (typeof syncAll === 'function') syncAll();
+  };
 ${golfFavTripScriptBody(type)}
 })();
 </script>`;
@@ -8457,6 +8483,11 @@ const FD_HUB_FEATURES = [
   { key: 'nonalcoholic', label: 'Non-Alcoholic Options', icon: '🥤' },
 ];
 const FD_HUB_FEATURE_KEYS = new Set(FD_HUB_FEATURES.map((f) => f.key));
+// How many cards are in the render tree at a time. 75 keeps the initial page
+// well under the point where style+layout becomes noticeable while still
+// filling more than a screen on every viewport; see the incremental-rendering
+// note in renderFoodDrinkHubPage.
+const FD_PAGE_SIZE = 75;
 const FD_HUB_LABEL_BY_TYPE = Object.fromEntries(FD_HUB_TYPES.map((t) => [t.type, t.label]));
 const FD_HUB_LABEL_BY_FEATURE = Object.fromEntries(FD_HUB_FEATURES.map((f) => [f.key, f.label]));
 
@@ -8675,6 +8706,15 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.fd-page .fd-pop-apply:hover { background: var(--ref-navy-deep); }
   body.fd-page .fd-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  /* "Show more" reveals the next batch. Centered, comfortable target, and the
+     homepage's navy/gold button system -- same language as the popovers'
+     "Show results". It removes itself once every match is on screen. */
+  body.fd-page .fd-more-row { display: flex; justify-content: center; margin: 22px 0 8px; }
+  body.fd-page .fd-show-more { font-family: 'Nunito', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 12px 26px; min-height: 48px; cursor: pointer; transition: background .12s ease; }
+  body.fd-page .fd-show-more:hover { background: var(--ref-navy-deep); }
+  body.fd-page .fd-show-more:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.fd-page .fd-show-more[hidden] { display: none; }
+
   body.fd-page .fd-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.fd-page .fd-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.fd-page .fd-results-step { margin-top: 4px; }
@@ -8702,8 +8742,18 @@ function renderFoodDrinkHubScriptHtml() {
   var featureChips = Array.prototype.slice.call(document.querySelectorAll('[data-fd-feature]'));
   var regionChips = Array.prototype.slice.call(document.querySelectorAll('[data-region]'));
   var allChip = document.querySelector('[data-fd-type-all]');
-  var cards = Array.prototype.slice.call(document.querySelectorAll('#fdResults > .venue-card'));
+  // The pool is every card on the page: the ones already in the list plus the
+  // ones parsed into the inert <template>. Reading attributes and text off a
+  // template's cards costs nothing -- they are never styled or laid out --
+  // so search, filtering and the counts all still run over the FULL set.
+  var tpl = document.getElementById('fdRest');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#fdResults > .venue-card'))
+    .concat(tpl ? Array.prototype.slice.call(tpl.content.querySelectorAll('.venue-card')) : [])
+    .sort(function(a, b){ return Number(a.getAttribute('data-fd-i')) - Number(b.getAttribute('data-fd-i')); });
   if (!cards.length) return;
+  var PAGE_SIZE = ${FD_PAGE_SIZE};
+  var page = 1;
+  var showMore = document.getElementById('fdShowMore');
   var searchInput = document.getElementById('fdSearch');
   var searchClear = document.getElementById('fdSearchClear');
   var summary = document.getElementById('fdResultsSummary');
@@ -8778,12 +8828,23 @@ function renderFoodDrinkHubScriptHtml() {
   }
   function apply(historyMode){
     var types = pressed(typeChips, 'data-fd-type'), features = pressed(featureChips, 'data-fd-feature'), regions = pressed(regionChips, 'data-region');
-    var shown = 0;
-    cards.forEach(function(card){
+    var matches = cards.filter(function(card){
       var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
-      var ok = fdMatches(types, features, regions, d.c, d.f, d.r) && (!searchTerm || (card.__fd || '').indexOf(searchTerm) !== -1);
-      card.hidden = !ok; if (ok) shown++;
+      return fdMatches(types, features, regions, d.c, d.f, d.r) && (!searchTerm || (card.__fd || '').indexOf(searchTerm) !== -1);
     });
+    var shown = matches.length;
+    // Only the current page of MATCHING cards goes into the render tree; the
+    // rest stay detached (or in the template) until "Show more" asks for them.
+    var visible = matches.slice(0, page * PAGE_SIZE);
+    if (results) {
+      var fresh = visible.filter(function(c){ return c.parentNode !== results; });
+      results.replaceChildren.apply(results, visible);
+      if (fresh.length && window.__ogWireVenueCards) window.__ogWireVenueCards(fresh);
+    }
+    if (showMore) {
+      showMore.hidden = visible.length >= shown;
+      showMore.textContent = 'Show more (' + visible.length + ' of ' + shown + ')';
+    }
     var total = cards.length, filtered = types.length || features.length || regions.length || !!searchTerm;
     if (allChip) allChip.setAttribute('aria-pressed', types.length ? 'false' : 'true');
     if (featuresCount) { featuresCount.textContent = features.length ? (' \\u00b7 ' + features.length) : ''; featuresCount.hidden = features.length === 0; }
@@ -8800,26 +8861,28 @@ function renderFoodDrinkHubScriptHtml() {
       else if (window.history.replaceState) window.history.replaceState({ fd: true }, '', next);
     }
   }
-  function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }
+  function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); page = 1; apply('push'); }
+  if (showMore) showMore.addEventListener('click', function(){ page += 1; apply('none'); });
   [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
   function clearAll(){
     [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
     searchTerm = ''; if (searchInput) searchInput.value = '';
+    page = 1;
     apply('push');
   }
-  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); });
+  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); page = 1; apply('push'); });
   if (searchInput) {
     var timer = null;
-    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120); });
+    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); page = 1; apply('none'); }, 120); });
   }
-  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } page = 1; apply('none'); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
     if (t.id === 'fdSelectedClear') { clearAll(); return; }
     var map = [['data-fd-remove-type', typeChips, 'data-fd-type'], ['data-fd-remove-feature', featureChips, 'data-fd-feature'], ['data-fd-remove-region', regionChips, 'data-region']];
     for (var i = 0; i < map.length; i++) {
       var v = t.getAttribute(map[i][0]);
-      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); apply('push'); return; }
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); page = 1; apply('push'); return; }
     }
   });
   var emptyClear = document.getElementById('fdNoResultsClear');
@@ -8870,7 +8933,7 @@ function renderFoodDrinkHubScriptHtml() {
       setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
     });
   }
-  window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); apply('none'); });
+  window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); page = 1; apply('none'); });
   readUrlIntoChips();
   openGroupsForSelection();
   apply('replace');
@@ -8918,9 +8981,38 @@ function renderFoodDrinkHubPage(venues, filter = null) {
   for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
 
   const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true })
-    .replace('<ul class="card-grid">', `<ul class="card-grid" id="fdResults"${matching.length === 0 ? ' hidden' : ''}>`)
-    .replace(/<li class="venue-card" data-venue-id="(\d+)"([^>]*)>/g, (m, id, rest) => (matchIds.has(Number(id)) ? m : `<li class="venue-card" data-venue-id="${id}"${rest} hidden>`));
+  // Incremental rendering (2026-09-24). Putting all 850 cards in the render
+  // tree cost ~2.0-3.2s of style+layout before the page was interactive
+  // (measured: domInteractive 2054ms local / 3157ms live, 18,024-23,855 DOM
+  // nodes) -- parsing and the scripts were never the bottleneck. So only the
+  // first FD_PAGE_SIZE MATCHING cards go into the list; every other card is
+  // parsed into an inert <template>, which the browser does not style, lay
+  // out or paint. "Show more" moves the next batch across.
+  //
+  // The card HTML is byte-for-byte the SAME markup either way -- it is the
+  // same renderCategoryCardsHtml() output, just split -- so there is no
+  // second, client-side card renderer to drift out of sync.
+  //
+  // Search and filtering still run over the FULL set: the client reads the
+  // data attributes and text of the template's cards without instantiating
+  // them, so every venue stays searchable and filterable and the count is
+  // always "N of 850". data-fd-i keeps the canonical order stable no matter
+  // which subset happens to be live.
+  const orderById = new Map(venues.map((v, i) => [v.id, i]));
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true })
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
+  const cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
+  const firstBatch = [], deferred = [];
+  for (const chunk of cardChunks) {
+    const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
+    if (matchIds.has(id) && firstBatch.length < FD_PAGE_SIZE) firstBatch.push(chunk);
+    else deferred.push(chunk);
+  }
+  const cardsHtml = `<ul class="card-grid" id="fdResults"${firstBatch.length === 0 ? ' hidden' : ''}>
+    ${firstBatch.join('\n')}
+  </ul>
+  <div class="fd-more-row"><button type="button" class="fd-show-more" id="fdShowMore"${matching.length > firstBatch.length ? '' : ' hidden'}>Show more</button></div>
+  <template id="fdRest">${deferred.join('\n')}</template>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -8928,7 +9020,7 @@ function renderFoodDrinkHubPage(venues, filter = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
-${golfEngagementHeadHtml('restaurant', true)}
+${golfEngagementHeadHtml('fd', true)}
 </head>
 <body class="golf-page outdoor-page fd-page">
   ${renderGolfTripTrayHtml()}
@@ -8951,7 +9043,7 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
-  ${golfCardEngagementScriptHtml('restaurant', true)}
+  ${golfCardEngagementScriptHtml('fd', true)}
   ${renderFoodDrinkHubScriptHtml()}
 </body>
 </html>`;
@@ -13050,6 +13142,8 @@ module.exports = {
   OUTDOOR_SUMMARY_CLIENT_SRC,
   renderOutdoorRegionFilterChips,
   FD_HUB_TYPES,
+  FD_PAGE_SIZE,
+  golfCardEngagementScriptHtml,
   FD_HUB_FEATURES,
   getFoodDrinkHubVenues,
   parseFoodDrinkFilterQuery,

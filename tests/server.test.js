@@ -7952,12 +7952,20 @@ test('Food & Drink hub: types OR, features AND, regions OR, AND between groups; 
   const cats = new Map(venues.map((v) => [v.id, (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type]]));
   const feats = new Map(venues.map((v) => [v.id, app.FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key)]));
   const sum = (html) => outdoorMarkupOnly(html).match(/id="fdResultsSummary" aria-live="polite">([^<]*)</)[1];
-  const shown = (html) => (outdoorMarkupOnly(html).match(/<li class="venue-card" data-venue-id="\d+"(?![^>]* hidden)/g) || []).length;
+  // Cards in the live list (the first FD_PAGE_SIZE matches); the rest sit in
+  // the <template> and are revealed by "Show more".
+  const liveList = (html) => { const m = outdoorMarkupOnly(html); const a = m.indexOf('id="fdResults"'); const b = m.indexOf('<template id="fdRest">'); return m.slice(a, b === -1 ? undefined : b); };
+  const shown = (html) => (liveList(html).match(/<li class="venue-card"/g) || []).length;
+  const deferred = (html) => { const m = outdoorMarkupOnly(html); const b = m.indexOf('<template id="fdRest">'); return b === -1 ? 0 : (m.slice(b).match(/<li class="venue-card"/g) || []).length; };
 
   // No filters -> everything, plain count, only the All chip pressed.
   const plain = app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] });
   assert.equal(sum(plain), `${venues.length} places`);
-  assert.equal(shown(plain), venues.length);
+  // Incremental rendering: the live list holds at most one page; every other
+  // card is still on the page, inside the inert template, so nothing is lost.
+  assert.equal(shown(plain), Math.min(app.FD_PAGE_SIZE, venues.length), 'first batch only in the render tree');
+  assert.equal(shown(plain) + deferred(plain), venues.length, 'every venue is still on the page');
+  if (venues.length > app.FD_PAGE_SIZE) assert.match(outdoorMarkupOnly(plain), /<button type="button" class="fd-show-more" id="fdShowMore">Show more<\/button>/, 'Show more offered when there is more');
   assert.equal((outdoorMarkupOnly(plain).match(/aria-pressed="true"/g) || []).length, 1, 'only All is pressed');
   assert.match(outdoorMarkupOnly(plain), /id="fdSelected" hidden><\/div>/);
 
@@ -7967,7 +7975,8 @@ test('Food & Drink hub: types OR, features AND, regions OR, AND between groups; 
   const nOne = app.filterFoodDrinkVenues(venues, one, cats, feats).length;
   const nTwo = app.filterFoodDrinkVenues(venues, two, cats, feats).length;
   assert.ok(nOne > 0 && nTwo > nOne, 'a second type ADDS results (OR)');
-  assert.equal(shown(app.renderFoodDrinkHubPage(venues, two)), nTwo);
+  assert.equal(shown(app.renderFoodDrinkHubPage(venues, two)), Math.min(app.FD_PAGE_SIZE, nTwo), 'a filtered render still shows one page');
+  assert.equal(shown(app.renderFoodDrinkHubPage(venues, two)) + deferred(app.renderFoodDrinkHubPage(venues, two)), venues.length, 'and still carries every venue for search/filtering');
   assert.equal(sum(app.renderFoodDrinkHubPage(venues, two)), `${nTwo} of ${venues.length} places`);
   assert.match(outdoorMarkupOnly(app.renderFoodDrinkHubPage(venues, one)), /data-fd-type-all="1" aria-pressed="false"/, 'All releases once a type is chosen');
 
@@ -8099,6 +8108,88 @@ test('FROZEN HOMEPAGE (Food & Drink hub): "/" and the Outdoors/What\'s On surfac
   assert.notEqual(app.FD_HUB_FILTER_CLIENT_PREDICATE_SRC, app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC);
   assert.ok(outdoorsBefore.includes(app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC) && whatsOnBefore.includes(app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC));
   assert.ok(!outdoorsBefore.includes('fd-type-row') && !whatsOnBefore.includes('fd-type-row'));
+});
+
+
+test('Food & Drink incremental rendering: one batch in the render tree, every venue still present and filterable, Show more reveals the rest', () => {
+  const venues = app.getFoodDrinkHubVenues();
+  assert.ok(venues.length > 0);
+  const batched = venues.length > app.FD_PAGE_SIZE;
+  const html = app.renderFoodDrinkHubPage(venues, app.parseFoodDrinkFilterQuery({}));
+  const markup = outdoorMarkupOnly(html);
+  const split = markup.indexOf('<template id="fdRest">');
+  assert.ok(split > 0, 'the deferred cards go into an inert <template>, not hidden with CSS');
+  const live = markup.slice(markup.indexOf('id="fdResults"'), split);
+  const rest = markup.slice(split);
+
+  // At most one batch is in the render tree; everything else is in the template.
+  assert.equal((live.match(/<li class="venue-card"/g) || []).length, Math.min(app.FD_PAGE_SIZE, venues.length));
+  assert.equal((rest.match(/<li class="venue-card"/g) || []).length, Math.max(0, venues.length - app.FD_PAGE_SIZE));
+  // NOT hidden with CSS -- that would keep the DOM cost this exists to remove.
+  assert.doesNotMatch(live, /<li class="venue-card"[^>]* hidden/, 'live cards are not hidden-by-attribute');
+  assert.ok(!/#fdResults > \.venue-card \{[^}]*display: none/.test(html), 'deferred cards are not merely display:none');
+
+  // Identical card markup either way -- one renderer, no client-side copy.
+  const liveFirst = live.match(/<li class="venue-card"[\s\S]*?<\/li>/)[0];
+  const restFirst = batched ? rest.match(/<li class="venue-card"[\s\S]*?<\/li>/)[0] : null;
+  for (const marker of ['venue-card-link', 'venue-card-name', 'venue-card-cue', 'fav-btn', 'trip-btn']) {
+    assert.ok(liveFirst.includes(marker), `${marker} present in live cards`);
+    if (restFirst) assert.ok(restFirst.includes(marker), `${marker} present in deferred cards too`);
+  }
+  // Stable canonical ordering so the client can re-render any subset in order.
+  const idx = [...markup.matchAll(/data-fd-i="(\d+)"/g)].map((m) => Number(m[1]));
+  assert.equal(idx.length, venues.length, 'every card carries its canonical index');
+  assert.equal(new Set(idx).size, venues.length, 'indices are unique');
+
+  // The count is always over the FULL set, never the rendered batch.
+  assert.match(markup, new RegExp(`id="fdResultsSummary" aria-live="polite">${venues.length} places<`));
+  // Show more is offered only when there is more, and withheld otherwise.
+  if (batched) assert.match(markup, /<button type="button" class="fd-show-more" id="fdShowMore">Show more<\/button>/);
+  else assert.match(markup, /id="fdShowMore" hidden>/, 'nothing beyond one batch -> no Show more');
+  const narrow = { types: [], features: app.FD_HUB_FEATURES.map((f) => f.key), regions: [] };
+  const narrowHtml = outdoorMarkupOnly(app.renderFoodDrinkHubPage(venues, narrow));
+  const nNarrow = app.filterFoodDrinkVenues(venues, narrow,
+    new Map(venues.map((v) => [v.id, (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type]])),
+    new Map(venues.map((v) => [v.id, app.FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key)]))).length;
+  if (nNarrow <= app.FD_PAGE_SIZE) assert.match(narrowHtml, /id="fdShowMore" hidden>/, 'Show more is withheld when everything matching is already shown');
+
+  // SEO: the structured data still describes every venue, not just the batch.
+  // (Count inside the ItemList only -- the BreadcrumbList uses ListItem too.)
+  const itemList = html.split('<script type="application/ld+json">').map((b) => b.split('</script>')[0].trim())
+    .filter((b) => b.startsWith('{') && b.includes('"@type":"ItemList"')).map((b) => JSON.parse(b))[0];
+  assert.ok(itemList, 'the ItemList block is present');
+  assert.equal(itemList.itemListElement.length, venues.length, 'every venue is still in the ItemList schema');
+  assert.ok(itemList.itemListElement.every((x) => x.url && x.item && x.item.name), 'each entry keeps its URL and name');
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink"/);
+  assert.match(html, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/);
+});
+
+test('Food & Drink incremental rendering: the client filters the FULL pool and wires revealed cards through the shared hook', () => {
+  const script = app.renderFoodDrinkHubScriptHtml();
+  // The pool is live cards PLUS the template's, so search/filter see all of them.
+  assert.ok(script.includes("var tpl = document.getElementById('fdRest');"), 'the template is read');
+  assert.ok(script.includes("tpl.content.querySelectorAll('.venue-card')"), 'its cards join the pool without being instantiated');
+  assert.ok(script.includes("data-fd-i"), 'the pool is sorted into canonical order');
+  // Only the current page is put in the render tree.
+  assert.ok(script.includes('var visible = matches.slice(0, page * PAGE_SIZE);'), 'one page of matches is rendered');
+  assert.ok(script.includes('results.replaceChildren.apply(results, visible);'));
+  assert.ok(script.includes("showMore.hidden = visible.length >= shown;"), 'Show more disappears when everything matching is shown');
+  assert.ok(script.includes("showMore.textContent = 'Show more (' + visible.length + ' of ' + shown + ')';"), 'it reports progress');
+  // The count is the FULL match total, not the rendered count.
+  assert.ok(script.includes('var shown = matches.length;'));
+  // Any filter or search change resets to the first page.
+  assert.equal((script.match(/page = 1;/g) || []).length >= 6, true, 'every filter/search entry point resets the page');
+  assert.ok(script.includes("showMore.addEventListener('click', function(){ page += 1; apply('none'); });"));
+  // Revealed cards are wired by the SHARED engagement code, not a copy.
+  assert.ok(script.includes('window.__ogWireVenueCards(fresh)'), 'newly revealed cards go through the shared hook');
+  const engagement = app.golfCardEngagementScriptHtml('fd', true);
+  assert.ok(engagement.includes('window.__ogWireVenueCards = function(list)'), 'the hook exists');
+  assert.ok(engagement.indexOf('window.__ogWireVenueCards') < engagement.indexOf('__syncTripButtons'),
+    'the hook is defined BEFORE the fav/trip body, which returns out of the IIFE when app.js is present');
+  // And the hub wires all five Food & Drink types, not just restaurants.
+  for (const t of ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery']) {
+    assert.ok(engagement.includes(`[data-venue-category="${t}"]`), `${t} cards get engagement wiring`);
+  }
 });
 
 
