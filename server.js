@@ -4859,7 +4859,16 @@ function renderCanonicalFooterStyles() {
      handler), so these three selectors are explicitly scoped to
      body:not(.page-browse) (the marker only the /browse route sets) to
      keep the original "homepage-only" intent intact now that the block
-     they live in is shared. Direction: a small persistent "your trip"
+     they live in is shared.
+
+     2026-09-24 (UX polish pass): the body:not(.page-browse) scoping is GONE.
+     It left /browse -- and only /browse -- on app.css's original plum/paper/
+     amber toggle with the suitcase emoji, while every other page showed this
+     navy/gold one, so the "floating Trip button" was effectively two different
+     components depending on where you were. These rules are now unscoped and
+     apply everywhere the tray renders. / is unaffected (it already matched the
+     negation, and its computed styling is identical); only /browse changes, to
+     match everything else. Direction: a small persistent "your trip"
      control, not a primary CTA -- smaller footprint, the homepage's own
      navy/cream/gold system instead of the old plum/paper/amber, a lighter
      shadow, and a smaller/quieter count badge, while leaving position
@@ -4868,30 +4877,29 @@ function renderCanonicalFooterStyles() {
      untouched -- this only restyles the closed-state toggle and its
      count, never #tripTrayPanel (the expanded trip list keeps its
      existing look, on both pages). */
-  body:not(.page-browse) #tripTrayToggle {
+  #tripTrayToggle {
     background: var(--ref-navy); color: var(--ref-cream);
     border: 1px solid var(--ref-gold);
     border-radius: 999px; padding: 9px 16px; gap: 8px;
     font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;
     box-shadow: 0 4px 14px -6px rgba(16,27,36,0.45);
   }
-  body:not(.page-browse) #tripTrayToggle:hover { background: var(--ref-navy-deep); }
-  body:not(.page-browse) #tripTrayCount {
+  #tripTrayToggle:hover { background: var(--ref-navy-deep); }
+  #tripTrayCount {
     background: var(--ref-gold); color: var(--ref-navy-deep);
     width: 16px; height: 16px; font-size: 0.62rem; font-weight: 800;
   }
   /* Suitcase-icon removal (approved refinement, 2026-09-19): the 🧳 emoji
      lives in the shared #tripTrayToggle markup in okanagan.html (reused
      as-is by /browse and /trip), wrapped in .trip-toggle-icon specifically
-     so it can be hidden here, homepage-only, without touching that shared
-     markup's actual content -- /browse's own (unscoped) styling is
-     completely unaffected and keeps showing the icon exactly as before.
+     so it can be hidden without touching that shared markup's actual
+     content. Site-wide since the 2026-09-24 polish pass.
      .trip-toggle-arrow is an empty span in that same shared markup; on
      every other page it's simply an empty, invisible inline element, and
      only here does it get real content -- a small gold chevron, replacing
      the suitcase as a subtle "opens something" cue rather than an icon. */
-  body:not(.page-browse) #tripTrayToggle .trip-toggle-icon { display: none; }
-  body:not(.page-browse) #tripTrayToggle .trip-toggle-arrow::after {
+  #tripTrayToggle .trip-toggle-icon { display: none; }
+  #tripTrayToggle .trip-toggle-arrow::after {
     content: '\\2192'; margin-left: 1px; color: var(--ref-gold); font-weight: 800;
   }
 
@@ -5637,7 +5645,7 @@ const SEO_PAGE_CSS = `
   }
   .venue-card[data-venue-category="golf"] .card-action:hover { background: rgba(224,169,78,0.35); color: var(--ink); text-decoration: none; }
   .venue-card[data-venue-category="golf"] .card-action:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
-  .venue-card[data-venue-category="golf"] .trip-btn.in-trip { background: var(--teal, #2F6F73); color: var(--paper); }
+  .venue-card[data-venue-category="golf"] .trip-btn.in-trip { background: var(--teal, #2A6B67); color: var(--paper); }
   .venue-card[data-venue-category="golf"] .fav-btn.is-fav { background: var(--plum); color: var(--paper); }
   .venue-card[data-venue-category="golf"] .trip-notice { margin: 8px 0 0; font-size: 0.85rem; color: var(--plum); }
   .venue-card[data-venue-category="golf"] .trip-notice:empty { display: none; }
@@ -6073,7 +6081,7 @@ function renderEngagementControlStyles() {
   ${cardSel} .card-action:focus-visible,
   .venue-cta-row .card-action:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
   ${cardSel} .trip-btn.in-trip,
-  .venue-cta-row .trip-btn.in-trip { background: var(--teal, #2F6F73); color: var(--paper); }
+  .venue-cta-row .trip-btn.in-trip { background: var(--teal, #2A6B67); color: var(--paper); }
   ${cardSel} .fav-btn.is-fav,
   .venue-cta-row .fav-btn.is-fav { background: var(--plum); color: var(--paper); }
   .trip-notice { margin: 8px 0 0; font-size: 0.85rem; color: var(--plum); }
@@ -6341,9 +6349,9 @@ function renderOutdoorsSimplifiedStyles() {
   body.outdoor-page .outdoors-intro { margin-bottom: 14px; }
 
   body.outdoor-page .outdoors-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.outdoor-page .outdoors-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(74,52,40,0.25); background: var(--paper); color: var(--ink); }
+  body.outdoor-page .outdoors-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.outdoor-page .outdoors-search-input::placeholder { color: rgba(42,32,25,0.55); }
-  body.outdoor-page .outdoors-search-input:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.outdoor-page .outdoors-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   /* The page draws its own clear button, so suppress the browser's native one. */
   body.outdoor-page .outdoors-search-input::-webkit-search-cancel-button, body.outdoor-page .outdoors-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
   body.outdoor-page .outdoors-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--ink); opacity: 0.6; padding: 6px 8px; }
@@ -6360,12 +6368,12 @@ function renderOutdoorsSimplifiedStyles() {
 
   body.outdoor-page .outdoors-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.outdoor-page .outdoors-pop { position: relative; }
-  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(74,52,40,0.25); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
-  body.outdoor-page .outdoors-pop-btn:hover { background: rgba(224,169,78,0.18); }
-  body.outdoor-page .outdoors-pop-btn:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.outdoor-page .outdoors-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.outdoor-page .outdoors-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoors-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
   body.outdoor-page .outdoors-pop-count[hidden] { display: none; }
-  body.outdoor-page .outdoors-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 620px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(74,52,40,0.2); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
+  body.outdoor-page .outdoors-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 620px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
   body.outdoor-page .outdoors-pop-panel[hidden] { display: none; }
   /* Without scripting the popover can never be opened, so the panel stays
      visible and the page degrades to the full region selector inline --
@@ -6386,6 +6394,15 @@ function renderOutdoorsSimplifiedStyles() {
      there), so give the panel room to lay them out a few per row. */
   @media (min-width: 900px) { body.outdoor-page .outdoors-pop-panel { min-width: 520px; } }
 
+  /* "Show results" (2026-09-24): selecting the last filter in a popover used
+     to leave the visitor having to click somewhere outside it to get back to
+     the list. Filtering is already live, so this is an explicit dismiss +
+     confirmation affordance -- the primary action in the panel, in the
+     homepage's navy/gold system, with the live count as its label. */
+  body.outdoor-page .outdoors-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
+  body.outdoor-page .outdoors-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.outdoor-page .outdoors-pop-apply:hover { background: var(--ref-navy-deep); }
+  body.outdoor-page .outdoors-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoors-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.outdoor-page .outdoors-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.outdoor-page .outdoors-results-step { margin-top: 4px; }</style>`;
@@ -7871,6 +7888,7 @@ function renderOutdoorFilterScriptHtml() {
     if (regionsCount) { regionsCount.textContent = regions.length ? (' \u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
     if (searchClear) searchClear.hidden = !searchTerm;
     if (summary) summary.textContent = summaryText(shown, total, labelsOf('regions', regions), labelsOf('activities', activities), searchTerm);
+    applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
     updateGroupHeaders();
     updateChipCounts(regions, activities);
     updateStepStatus(regionStatus, regions.length);
@@ -7900,6 +7918,7 @@ function renderOutdoorFilterScriptHtml() {
   }
   if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
   var popsRoot = document.querySelector('.outdoors-controls');
+  var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-outdoors-apply]'));
   var pops = Array.prototype.slice.call(document.querySelectorAll('.outdoors-pop'));
   if (popsRoot) popsRoot.classList.add('js');
   function closePops(except){
@@ -7922,6 +7941,9 @@ function renderOutdoorFilterScriptHtml() {
     });
     pnl.addEventListener('click', function(e){ e.stopPropagation(); });
   });
+  // "Show results": filtering is already live, so this closes the panel and
+  // hands the visitor back to the list. Every other selection is preserved.
+  applyBtns.forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); closePops(null); }); });
   if (pops.length) {
     document.addEventListener('click', function(){ closePops(null); });
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
@@ -8114,7 +8136,9 @@ function outdoorsFilterBarHtml(venues, state = {}) {
   return `<div class="outdoors-controls">
     <div class="outdoors-pop">
       <button type="button" class="outdoors-pop-btn" id="outdoorRegionsBtn" aria-expanded="false" aria-controls="outdoorRegionsPanel"><span class="outdoors-pop-icon" aria-hidden="true">&#128205;</span> Regions<span class="outdoors-pop-count" id="outdoorRegionsCount"${nRegions ? '' : ' hidden'}>${nRegions ? ` · ${nRegions}` : ''}</span></button>
-      <div class="outdoors-pop-panel" id="outdoorRegionsPanel" hidden>${renderOutdoorRegionFilterChips(venues, state)}</div>
+      <div class="outdoors-pop-panel" id="outdoorRegionsPanel" hidden>${renderOutdoorRegionFilterChips(venues, state)}
+        <div class="outdoors-pop-actions"><button type="button" class="outdoors-pop-apply" data-outdoors-apply>Show results</button></div>
+      </div>
     </div>
   </div>`;
 }
@@ -8565,7 +8589,9 @@ function foodDrinkFilterBarHtml(venues, state = {}) {
   const nF = (state.features || []).length, nR = (state.regions || []).length;
   const pop = (id, label, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}</div>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
+      </div>
     </div>`;
   return `<div class="fd-controls">
     ${pop('fdFeatures', 'What are you looking for?', '✨', nF || '', foodDrinkFeatureChipsHtml(state))}
@@ -8600,9 +8626,9 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-intro { margin: 0 0 14px; max-width: 70ch; }
 
   body.fd-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(74,52,40,0.25); background: var(--paper); color: var(--ink); }
+  body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.fd-page .fd-search-input::placeholder { color: rgba(42,32,25,0.55); }
-  body.fd-page .fd-search-input:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.fd-page .fd-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-search-input::-webkit-search-cancel-button, body.fd-page .fd-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
   body.fd-page .fd-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--ink); opacity: 0.6; padding: 6px 8px; }
   body.fd-page .fd-search-clear[hidden] { display: none; }
@@ -8617,12 +8643,12 @@ function renderFoodDrinkHubStyles() {
 
   body.fd-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.fd-page .fd-pop { position: relative; }
-  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(74,52,40,0.25); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
-  body.fd-page .fd-pop-btn:hover { background: rgba(224,169,78,0.18); }
-  body.fd-page .fd-pop-btn:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.fd-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.fd-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
   body.fd-page .fd-pop-count[hidden] { display: none; }
-  body.fd-page .fd-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 620px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(74,52,40,0.2); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
+  body.fd-page .fd-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 620px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
   body.fd-page .fd-pop-panel[hidden] { display: none; }
   /* Without scripting a popover can never be opened, so the panels stay
      visible inline and the page degrades to the full control set. */
@@ -8640,6 +8666,15 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-feature-grid { display: flex; flex-wrap: wrap; gap: 8px; }
   body.fd-page .fd-feature-icon { font-size: 0.95em; }
 
+  /* "Show results" (2026-09-24): selecting the last filter in a popover used
+     to leave the visitor having to click somewhere outside it to get back to
+     the list. Filtering is already live, so this is an explicit dismiss +
+     confirmation affordance -- the primary action in the panel, in the
+     homepage's navy/gold system, with the live count as its label. */
+  body.fd-page .fd-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
+  body.fd-page .fd-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.fd-page .fd-pop-apply:hover { background: var(--ref-navy-deep); }
+  body.fd-page .fd-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.fd-page .fd-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.fd-page .fd-results-step { margin-top: 4px; }
@@ -8678,6 +8713,7 @@ function renderFoodDrinkHubScriptHtml() {
   var featuresCount = document.getElementById('fdFeaturesCount');
   var regionsCount = document.getElementById('fdRegionsCount');
   var searchTerm = '';
+  var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-fd-apply]'));
   ${FD_HUB_FILTER_CLIENT_PREDICATE_SRC}
   ${FD_HUB_SUMMARY_CLIENT_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
@@ -8754,6 +8790,7 @@ function renderFoodDrinkHubScriptHtml() {
     if (regionsCount) { regionsCount.textContent = regions.length ? (' \\u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
     if (searchClear) searchClear.hidden = !searchTerm;
     if (summary) summary.textContent = fdSummaryText(shown, total, filtered);
+    applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
     updateGroupHeaders(); updateCounts(types, features, regions); renderSelected(types, features, regions);
     if (empty) empty.hidden = shown !== 0;
     if (results) results.hidden = shown === 0;
@@ -8810,6 +8847,9 @@ function renderFoodDrinkHubScriptHtml() {
     });
     pnl.addEventListener('click', function(e){ e.stopPropagation(); });
   });
+  // "Show results": filtering is already live, so this closes the panel and
+  // hands the visitor back to the list. Every other selection is preserved.
+  applyBtns.forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); closePops(null); }); });
   if (pops.length) {
     document.addEventListener('click', function(){ closePops(null); });
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
@@ -9168,7 +9208,9 @@ function whatsOnFilterBarHtml(state = {}) {
   const dateActive = state.window && state.window.preset !== 'upcoming';
   const pop = (id, label, icon, badge, panelHtml) => `<div class="whatson-pop">
       <button type="button" class="whatson-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="whatson-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="whatson-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="whatson-pop-panel" id="${id}Panel" hidden>${panelHtml}</div>
+      <div class="whatson-pop-panel" id="${id}Panel" hidden>${panelHtml}
+        <div class="whatson-pop-actions"><button type="button" class="whatson-pop-apply" data-whatson-apply>Show results</button></div>
+      </div>
     </div>`;
   return `<div class="whatson-controls">
     ${pop('whatsOnRegions', 'Regions', '&#128205;', nRegions || '', whatsOnRegionChipsHtml(state))}
@@ -9261,10 +9303,10 @@ function renderWhatsOnStyles() {
   body.whatson-page .whatson-custom-dates { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0 4px; }
   body.whatson-page .whatson-custom-dates[hidden] { display: none; }
   body.whatson-page .whatson-custom-dates label { display: flex; flex-direction: column; gap: 4px; font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 800; color: var(--ink); }
-  body.whatson-page .whatson-custom-dates input[type="date"] { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(74,52,40,0.25); background: var(--paper); color: var(--ink); min-height: 40px; }
+  body.whatson-page .whatson-custom-dates input[type="date"] { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); min-height: 40px; }
   body.whatson-page .whatson-custom-dates .cta.whatson-custom-go { margin: 0; }
   body.whatson-page .whatson-date-showing { margin: 10px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--ink); opacity: 0.8; }
-  body.whatson-page .whatson-date-note { margin: 6px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--plum, #7a2e4a); font-weight: 700; }
+  body.whatson-page .whatson-date-note { margin: 6px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--plum, #6B2C40); font-weight: 700; }
 
   /* ---- Simplified filter surface (2026-09-24) -----------------------------
      Compact search + one horizontal category chip row + Regions/Date
@@ -9276,11 +9318,11 @@ function renderWhatsOnStyles() {
   body.whatson-page .whatson-intro { margin-bottom: 14px; }
 
   body.whatson-page .whatson-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.whatson-page .whatson-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(74,52,40,0.25); background: var(--paper); color: var(--ink); }
+  body.whatson-page .whatson-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.whatson-page .whatson-search-input::placeholder { color: rgba(42,32,25,0.55); }
   /* The page draws its own clear button, so suppress the browser's native one. */
   body.whatson-page .whatson-search-input::-webkit-search-cancel-button, body.whatson-page .whatson-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
-  body.whatson-page .whatson-search-input:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.whatson-page .whatson-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.whatson-page .whatson-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--ink); opacity: 0.6; padding: 6px 8px; }
   body.whatson-page .whatson-search-clear[hidden] { display: none; }
 
@@ -9292,11 +9334,11 @@ function renderWhatsOnStyles() {
 
   body.whatson-page .whatson-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.whatson-page .whatson-pop { position: relative; }
-  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(74,52,40,0.25); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
-  body.whatson-page .whatson-pop-btn:hover { background: rgba(224,169,78,0.18); }
+  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.whatson-page .whatson-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.whatson-page .whatson-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
   body.whatson-page .whatson-pop-count[hidden] { display: none; }
-  body.whatson-page .whatson-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 560px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(74,52,40,0.2); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
+  body.whatson-page .whatson-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 560px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
   body.whatson-page .whatson-pop-panel[hidden] { display: none; }
   /* On phones the panel becomes a full-width sheet under the controls rather than a cramped popover. */
   @media (max-width: 640px) {
@@ -9307,6 +9349,15 @@ function renderWhatsOnStyles() {
   body.whatson-page .whatson-pop-panel .outdoor-step { margin: 0; }
   body.whatson-page .whatson-date-compact { margin: 0; }
 
+  /* "Show results" (2026-09-24): selecting the last filter in a popover used
+     to leave the visitor having to click somewhere outside it to get back to
+     the list. Filtering is already live, so this is an explicit dismiss +
+     confirmation affordance -- the primary action in the panel, in the
+     homepage's navy/gold system, with the live count as its label. */
+  body.whatson-page .whatson-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
+  body.whatson-page .whatson-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.whatson-page .whatson-pop-apply:hover { background: var(--ref-navy-deep); }
+  body.whatson-page .whatson-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.whatson-page .whatson-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.whatson-page .whatson-results-step { margin-top: 4px; }
@@ -9423,6 +9474,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     if (regionsCount) { regionsCount.textContent = regions.length ? (' \u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
     if (searchClear) searchClear.hidden = !searchTerm;
     if (summary) summary.textContent = summaryText(shown, total, filtered);
+    applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
     updateGroupHeaders(); updateChipCounts(regions, categories);
     updateStepStatus(regionStatus, regions.length);
     renderSelected(regions, categories);
@@ -9454,6 +9506,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     });
   }
   if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
+  var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-whatson-apply]'));
   var pops = Array.prototype.slice.call(document.querySelectorAll('.whatson-pop'));
   function closePops(except){
     pops.forEach(function(pop){
@@ -9477,6 +9530,9 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     });
     pnl.addEventListener('click', function(e){ e.stopPropagation(); });
   });
+  // "Show results": filtering is already live, so this closes the panel and
+  // hands the visitor back to the list. Every other selection is preserved.
+  applyBtns.forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); closePops(null); }); });
   if (pops.length) {
     document.addEventListener('click', function(){ closePops(null); });
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
@@ -10086,7 +10142,7 @@ ${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boole
 <style>
   .event-actions { margin: 4px 0 18px; }
   .event-actions .card-action { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid #cfd8dc; background: #fff; color: #1b2a33; font: inherit; font-size: 0.95rem; cursor: pointer; }
-  .event-actions .card-action.is-fav, .event-actions .card-action.in-trip { background: #2F6F73; border-color: #2F6F73; color: #fff; }
+  .event-actions .card-action.is-fav, .event-actions .card-action.in-trip { background: var(--teal, #2A6B67); border-color: var(--teal, #2A6B67); color: var(--paper, #fff); }
   .event-attribution { color: #5f6b73; font-size: 0.9rem; margin: 4px 0 16px; }
   .event-dates h2 { font-size: 1.1rem; margin: 24px 0 8px; }
   .event-date-list { padding-left: 20px; margin: 0 0 20px; }
@@ -10550,7 +10606,9 @@ function renderTripPlannerPage() {
     headerHtml = headerHtml
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
-      .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"');
+      .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
+      // Same dead-anchor fix as /browse: the logo goes home from here.
+      .replace(/href="#top"/g, 'href="/"');
   }
 
   const regionOptions = VALID_REGIONS
@@ -11176,7 +11234,11 @@ const server = http.createServer(async (req, res) => {
         html = html
           .replace(/href="#moodCards"/g, 'href="/#moodCards"')
           .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
-          .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"');
+          .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
+          // The header logo's href="#top" is a real scroll target on / only;
+          // here it was a dead anchor. Send it home, as every themed page's
+          // renderGolfHeaderHtml() already does.
+          .replace(/href="#top"/g, 'href="/"');
 
         // Footer harmonization: swap the old plain footer (still on the
         // pre-redesign --sand/--plum palette, a hardcoded 4-region list,
@@ -12913,6 +12975,9 @@ module.exports = {
   renderEventsIndexPage,
   // Build My Trip, Stage 2 (frontend)
   renderTripPlannerPage,
+  renderCanonicalFooterStyles,
+  renderGolfHeaderHtml,
+  renderGolfTripTrayHtml,
   extractHtmlFragment,
   TRIP_INTEREST_I18N_KEY,
   // Phase 2 Sprint 2 (Event Types)

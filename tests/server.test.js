@@ -1265,7 +1265,7 @@ test('renderTripPlannerPage renders the full step-wizard form, all 20 regions, a
   assert.match(html, /<footer class="home-footer">/, '/trip must render the approved home-footer');
   assert.match(html, /home-footer-region-subcol/, "/trip's footer must include the two Regions subcolumns");
   assert.match(html, /\.home-footer \{[\s\S]{0,80}background: var\(--ref-navy\)/, '/trip must load the canonical footer CSS, not just the markup');
-  assert.match(html, /body:not\(\.page-browse\) #tripTrayToggle \{/, '/trip must load the canonical (gold-border, no-suitcase) trip-button CSS');
+  assert.match(html, /\n  #tripTrayToggle \{/, '/trip must load the canonical (gold-border, no-suitcase) trip-button CSS -- unscoped since 2026-09-24 so every page shares one Trip button');
   // No unterminated HTML comment leaking from the extraction (regression
   // guard for the exact bug this page hit during manual QA).
   const openComments = (html.match(/<!--/g) || []).length;
@@ -8099,6 +8099,99 @@ test('FROZEN HOMEPAGE (Food & Drink hub): "/" and the Outdoors/What\'s On surfac
   assert.notEqual(app.FD_HUB_FILTER_CLIENT_PREDICATE_SRC, app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC);
   assert.ok(outdoorsBefore.includes(app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC) && whatsOnBefore.includes(app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC));
   assert.ok(!outdoorsBefore.includes('fd-type-row') && !whatsOnBefore.includes('fd-type-row'));
+});
+
+
+// ==== Site-wide UX polish (2026-09-24) =====================================
+
+test('Polish: the header logo goes home from every page type, and / keeps its own #top scroll anchor', () => {
+  // Themed pages already rewrote it; /browse and /trip did not, so the logo
+  // there was a dead anchor pointing at a section that only exists on /.
+  const header = app.renderGolfHeaderHtml();
+  assert.match(header, /<a href="\/" class="logo"/, 'themed pages: logo -> /');
+  assert.doesNotMatch(header, /href="#top"/, 'no dead #top anchor left in the shared header');
+  const trip = app.renderTripPlannerPage();
+  assert.match(trip, /<a href="\/" class="logo"/, '/trip: logo -> /');
+  assert.doesNotMatch(trip.slice(0, trip.indexOf('</header>')), /href="#top"/);
+  // The homepage template itself is untouched: it still owns the #top anchor,
+  // because there it is a real in-page scroll target.
+  const home = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+  assert.match(home, /<a href="#top" class="logo"/, 'okanagan.html is unchanged');
+});
+
+test('Polish: one global Trip button -- the navy/gold toggle rules are no longer scoped away from /browse', () => {
+  const css = app.renderCanonicalFooterStyles();
+  assert.doesNotMatch(css, /body:not\(\.page-browse\) #tripTray/, 'no page-specific Trip button styling remains');
+  // The rules themselves are unchanged, so / renders exactly as before.
+  assert.match(css, /#tripTrayToggle \{[\s\S]*?background: var\(--ref-navy\); color: var\(--ref-cream\);/);
+  assert.match(css, /#tripTrayToggle:hover \{ background: var\(--ref-navy-deep\); \}/);
+  assert.match(css, /#tripTrayCount \{[\s\S]*?background: var\(--ref-gold\); color: var\(--ref-navy-deep\);/);
+  assert.match(css, /#tripTrayToggle \.trip-toggle-icon \{ display: none; \}/);
+  // The tray markup is one shared component already; assert it stays that way.
+  const tray = app.renderGolfTripTrayHtml();
+  for (const id of ['tripTray', 'tripTrayPanel', 'tripTrayToggle', 'tripTrayCount']) assert.ok(tray.includes(`id="${id}"`), `tray keeps #${id}`);
+});
+
+test('Polish: directory controls use the homepage colour system -- no stray teal/plum/ink shades', () => {
+  const pages = {
+    'food-drink': app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), app.parseFoodDrinkFilterQuery({})),
+    outdoors: app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor')),
+    'whats-on': app.renderWhatsOnPage(app.parseWhatsOnPageQuery({})),
+  };
+  const tokens = fs.readFileSync(path.join(__dirname, '..', 'public', 'styles', 'tokens.css'), 'utf8');
+  assert.match(tokens, /--teal:\s*#2A6B67/i); assert.match(tokens, /--plum:\s*#6B2C40/i);
+  for (const [name, html] of Object.entries(pages)) {
+    // These two are near-duplicates of --teal / --plum that belong to no token.
+    assert.ok(!/#2F6F73/i.test(html), `${name}: no off-system teal`);
+    assert.ok(!/#7a2e4a/i.test(html), `${name}: no off-system plum`);
+    // Filter controls share the chip system's border + focus ring.
+    assert.ok(!/border: 1px solid rgba\(74,52,40,0\.25\)/.test(html), `${name}: controls use the ref-navy border, not an ink one`);
+    assert.ok(!/-btn:hover \{ background: rgba\(224,169,78/.test(html), `${name}: controls use the ref-navy hover, not an amber one`);
+    assert.ok(html.includes('outline: 2px solid var(--ref-gold)'), `${name}: focus rings use --ref-gold`);
+  }
+});
+
+test('Polish: every filter popover carries a "Show results" button that closes it, on all three directories', () => {
+  const fd = app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), app.parseFoodDrinkFilterQuery({}));
+  const od = app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor'));
+  const wo = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({}));
+  // One button per popover panel, inside the panel.
+  assert.equal((fd.match(/<button type="button" class="fd-pop-apply" data-fd-apply>Show results<\/button>/g) || []).length, 2, 'Food & Drink: both popovers');
+  assert.equal((od.match(/<button type="button" class="outdoors-pop-apply" data-outdoors-apply>Show results<\/button>/g) || []).length, 1, 'Outdoors: the Regions popover');
+  assert.ok((wo.match(/<button type="button" class="whatson-pop-apply" data-whatson-apply>Show results<\/button>/g) || []).length >= 1, "What's On: at least the Regions popover");
+  for (const [name, html, sel] of [['fd', fd, '.fd-pop-panel'], ['outdoors', od, '.outdoors-pop-panel'], ['whatson', wo, '.whatson-pop-panel']]) {
+    assert.ok(html.includes(sel), `${name}: panels present`);
+    assert.ok(html.includes('-pop-apply { display: block; width: 100%'), `${name}: the button is styled as the panel's primary action`);
+  }
+  // Each page's script closes the popover on click and keeps the label in step
+  // with the live count. Filtering itself stays immediate -- unchanged.
+  for (const [name, script, attr] of [
+    ['fd', app.renderFoodDrinkHubScriptHtml(), 'data-fd-apply'],
+    ['outdoors', app.renderOutdoorFilterScriptHtml(), 'data-outdoors-apply'],
+    ['whatson', app.renderWhatsOnFilterScriptHtml({ hasInventory: true, dateState: { when: '', from: '', to: '' } }), 'data-whatson-apply'],
+  ]) {
+    assert.ok(script.includes(`querySelectorAll('[${attr}]')`), `${name}: apply buttons collected`);
+    assert.ok(script.includes("applyBtns.forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); closePops(null); }); });"), `${name}: click closes the popover`);
+    assert.ok(script.includes("b.textContent = 'Show ' + shown + ' result'"), `${name}: label tracks the live count`);
+  }
+});
+
+test('Polish: Show results does not change the filtering model -- multi-select, counts and Clear all are as before', () => {
+  const venues = app.getFoodDrinkHubVenues();
+  const cats = new Map(venues.map((v) => [v.id, (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type]]));
+  const feats = new Map(venues.map((v) => [v.id, app.FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key)]));
+  const regions = Object.keys(app.REGION_LABELS).filter((r) => venues.some((v) => v.region === r)).slice(0, 2);
+  const multi = { types: [], features: [], regions };
+  // Multi-select still ORs, and the server render still pre-applies it.
+  assert.ok(app.filterFoodDrinkVenues(venues, multi, cats, feats).length >= app.filterFoodDrinkVenues(venues, { types: [], features: [], regions: [regions[0]] }, cats, feats).length);
+  const html = outdoorMarkupOnly(app.renderFoodDrinkHubPage(venues, multi));
+  for (const r of regions) assert.match(html, new RegExp(`data-region="${r}" aria-pressed="true"`));
+  assert.match(html, /id="fdSelectedClear">Clear all</, 'Clear all still lives in the result bar');
+  // Clearing everything is still exactly the unfiltered page.
+  assert.equal(app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] }),
+               app.renderFoodDrinkHubPage(venues, app.parseFoodDrinkFilterQuery({})));
+  // The apply button is inside the panel, so it cannot overflow the page.
+  assert.match(html, /<div class="fd-pop-panel" id="fdRegionsPanel" hidden>[\s\S]*?<div class="fd-pop-actions">/);
 });
 
 
