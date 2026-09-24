@@ -4169,6 +4169,11 @@ const HIDDEN_GEM_EDITORIAL_CARDS = [
     blurbKey: 'gems.localFavourites.blurb',
     blurb: 'The spots locals keep coming back to.',
     img: '/images/hidden-gems/local-favourites.webp',
+    // Repointed 2026-09-24 to the dedicated /local-favorites page, exactly
+    // the way the Dog-Friendly Finds card was repointed: an explicit href
+    // opts this ONE card out of the blanket href="#directory" -> "/browse"
+    // rewrite. Nothing else about the Hidden Gems section changes.
+    href: '/local-favorites',
   },
   {
     titleKey: 'gems.secretSpots.title',
@@ -7089,6 +7094,8 @@ function themedCardHolderSelector(type) {
   // 'dog' is the Dog Friendly Finds hub, whose one list mixes the five Food &
   // Drink types, wineries and the curated dog beaches.
   if (type === 'dog') return `:is(${DOG_HUB_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
+  // 'lf' is the Local Favourites page, whose one list can hold any venue type.
+  if (type === 'lf') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
   return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
 }
@@ -7322,7 +7329,11 @@ function venueCardHtml(venue, opts = {}) {
   // single most important thing on that card and a tooltip does not exist on
   // a phone. Off by default, so /beaches, /outdoors, region, category and
   // venue pages keep byte-identical markup.
-  const { showType = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed } = opts;
+  // showTypeLabel (2026-09-24): the Local Favourites page mixes every venue
+  // type in one list, so its cards name the category ("Restaurant",
+  // "Outdoor Destination") in the meta line. Off by default, so every other
+  // surface's card markup is unchanged.
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -7338,6 +7349,7 @@ function venueCardHtml(venue, opts = {}) {
   const meta = [
     showRegion && REGION_LABELS[venue.region] ? escapeHtml(REGION_LABELS[venue.region]) : null,
     showType && venue.type ? escapeHtml(venue.type) : null,
+    showTypeLabel && CATEGORY_LABELS[venue.type] ? escapeHtml(CATEGORY_LABELS[venue.type].singular) : null,
     venue.cuisine ? escapeHtml(venue.cuisine) : null,
     venue.rating ? `${venue.rating}\u2605` : null,
   ].filter(Boolean).join(' &middot; ');
@@ -9699,6 +9711,359 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('dog', true)}
   ${renderDogHubScriptHtml()}
+</body>
+</html>`;
+}
+
+// ---------- Local Favourites (2026-09-24): the page at /local-favorites ----------
+//
+// The destination for the homepage's Hidden Gems "Local Favourites" card,
+// which until now resolved to /browse. Membership is read live from the
+// 'local_favorite' collection -- nothing is hard-coded, so an audited
+// membership change through POST /admin/collection-membership is reflected
+// here immediately. The per-membership rationale in collection_items.note is
+// internal editorial metadata and is deliberately NOT rendered.
+//
+// Same themed shell and controls as /dog-friendly (homepage header, Trip
+// tray, name-as-link cards with the "View details" cue, Favorite / Add to
+// Trip only, search, type chips, the canonical grouped region selector),
+// reduced to the two filters this collection genuinely supports: category
+// (OR) and region (OR), ANDed together. No feature filter: the members carry
+// almost no badge flags, so one would offer choices that return nothing.
+// The page's styles are derived from renderDogHubStyles() by re-scoping the
+// selector, so the two directories share one visual language and
+// /dog-friendly's own output is untouched.
+function getLocalFavouriteVenues() {
+  return db.prepare(`
+    SELECT v.* FROM venues v
+    WHERE v.redirect_to IS NULL AND EXISTS (
+      SELECT 1 FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id
+      WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'local_favorite'
+    )
+    ORDER BY v.name ASC
+  `).all().map(rowToVenue);
+}
+// The category chips offered: the venue types actually present, in the
+// site's canonical CATEGORY_SLUGS order, labelled with CATEGORY_LABELS.
+function localFavouriteTypesPresent(venues) {
+  const present = new Set(venues.map((v) => v.type));
+  return Object.keys(CATEGORY_SLUGS).filter((t) => present.has(t) && CATEGORY_LABELS[t]);
+}
+function localFavouriteFilterMatches(selTypes, selRegions, venueType, venueRegion) {
+  return (!selTypes.length || selTypes.includes(venueType)) && (!selRegions.length || selRegions.includes(venueRegion));
+}
+const LOCAL_FAVOURITES_FILTER_CLIENT_PREDICATE_SRC = `function lfMatches(types, regions, venueType, venueRegion){
+    return (!types.length || types.indexOf(venueType) !== -1) && (!regions.length || regions.indexOf(venueRegion) !== -1);
+  }`;
+// ?types=a,b&regions=c,d -- unknown values are dropped and duplicates
+// collapse, so a hand-edited link degrades to "fewer constraints".
+function parseLocalFavouritesFilterQuery(query) {
+  const split = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : '').split(',').map((x) => x.trim()).filter(Boolean);
+  const types = [], regions = [];
+  for (const t of split(query && query.types)) if (CATEGORY_SLUGS[t] && !types.includes(t)) types.push(t);
+  for (const r of split(query && query.regions)) if (REGION_LABELS[r] && !regions.includes(r)) regions.push(r);
+  return { types, regions };
+}
+// Contextual counts: each chip shows what it would contribute given the
+// other group's current selection.
+function localFavouriteChipCounts(venues, f) {
+  const types = {}, regions = {};
+  for (const v of venues) {
+    if (localFavouriteFilterMatches([], f.regions, v.type, v.region)) types[v.type] = (types[v.type] || 0) + 1;
+    if (localFavouriteFilterMatches(f.types, [], v.type, v.region)) regions[v.region] = (regions[v.region] || 0) + 1;
+  }
+  return { types, regions };
+}
+function localFavouritesSummaryText(shown, total, filtered) {
+  const noun = total === 1 ? 'place' : 'places';
+  return filtered ? `${shown} of ${total} ${noun}` : `${total} local favourite ${noun}`;
+}
+const LOCAL_FAVOURITES_SUMMARY_CLIENT_SRC = `function lfSummaryText(shown, total, filtered){
+    var noun = total === 1 ? 'place' : 'places';
+    return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' local favourite ' + noun);
+  }`;
+function localFavouritesTypeChipsHtml(types, state = {}) {
+  const selected = new Set(state.types || []);
+  const counts = state.counts && state.counts.types ? state.counts.types : {};
+  const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-lf-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
+  const chips = types.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-lf-type="${t}" aria-pressed="${selected.has(t) ? 'true' : 'false'}">${escapeHtml(CATEGORY_LABELS[t].plural)}<span class="outdoor-activity-count">${counts[t] || 0}</span></button>`).join('');
+  return `<div class="fd-type-row" role="group" aria-label="Choose categories" data-filter="lf-type">${all}${chips}</div>`;
+}
+function localFavouritesFilterBarHtml(venues, state = {}) {
+  const nR = (state.regions || []).length;
+  return `<div class="fd-controls">
+    <div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="lfRegionsBtn" aria-expanded="false" aria-controls="lfRegionsPanel"><span class="fd-pop-icon" aria-hidden="true">\uD83D\uDCCD</span> Regions<span class="fd-pop-count" id="lfRegionsCount"${nR ? '' : ' hidden'}>${nR ? ` \u00b7 ${nR}` : ''}</span></button>
+      <div class="fd-pop-panel" id="lfRegionsPanel" hidden>${renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts })}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-lf-apply>Show results</button></div>
+      </div>
+    </div>
+  </div>`;
+}
+function localFavouritesSelectedTagsHtml(state = {}) {
+  const tag = (kind, v, label) => `<button type="button" class="outdoor-selected-tag" data-lf-remove-${kind}="${escapeHtml(v)}" aria-label="Remove ${escapeHtml(label)}">${escapeHtml(label)}<span class="outdoor-selected-x" aria-hidden="true">\u00d7</span></button>`;
+  const row = (label, tags) => (tags.length ? `<div class="outdoor-selected-row"><span class="outdoor-selected-label">${label}</span> ${tags.join(' ')}</div>` : '');
+  const t = (state.types || []).map((x) => tag('type', x, CATEGORY_LABELS[x] ? CATEGORY_LABELS[x].plural : x));
+  const r = (state.regions || []).map((x) => tag('region', x, REGION_LABELS[x] || x));
+  const any = t.length + r.length > 0;
+  return `<div class="outdoor-selected" id="lfSelected"${any ? '' : ' hidden'}>${row('Categories', t)}${row('Regions', r)}${any ? '<button type="button" class="outdoor-selected-clear" id="lfSelectedClear">Clear all</button>' : ''}</div>`;
+}
+function renderLocalFavouritesStyles() {
+  return renderDogHubStyles()
+    .split('\n')
+    .filter((line) => !/dog-note|dog-guides|The dog-beach restriction|rather than the advisory|not a temporary warning/.test(line))
+    .join('\n')
+    .replace(/body\.dog-page/g, 'body.lf-page')
+    .replace(/#dogResults/g, '#lfResults');
+}
+function renderLocalFavouritesScriptHtml() {
+  const labels = {
+    regions: { ...REGION_LABELS },
+    types: Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].plural])),
+  };
+  return `<script>
+(function(){
+  var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  var dataEl = document.getElementById('lfVenueData');
+  var DATA = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
+  var typeChips = Array.prototype.slice.call(document.querySelectorAll('[data-lf-type]'));
+  var regionChips = Array.prototype.slice.call(document.querySelectorAll('[data-region]'));
+  var allChip = document.querySelector('[data-lf-type-all]');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#lfResults > .venue-card'));
+  if (!cards.length) return;
+  var searchInput = document.getElementById('lfSearch');
+  var searchClear = document.getElementById('lfSearchClear');
+  var summary = document.getElementById('lfResultsSummary');
+  var selectedBox = document.getElementById('lfSelected');
+  var empty = document.getElementById('lfNoResults');
+  var results = document.getElementById('lfResults');
+  var regionsCount = document.getElementById('lfRegionsCount');
+  var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-lf-apply]'));
+  var searchTerm = '';
+  ${LOCAL_FAVOURITES_FILTER_CLIENT_PREDICATE_SRC}
+  ${LOCAL_FAVOURITES_SUMMARY_CLIENT_SRC}
+  ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
+  cards.forEach(function(card){
+    var d = DATA[card.getAttribute('data-venue-id')] || { t: '', r: '' };
+    var meta = card.querySelector('.venue-meta'), desc = card.querySelector('.golf-desc');
+    card.__lf = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '', LABELS.types[d.t] || '', meta ? meta.textContent : '', desc ? desc.textContent : ''].join(' ').toLowerCase();
+  });
+  function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
+  var groupsRoot = document.querySelector('.outdoor-region-groups');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.outdoor-region-group-block'));
+  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 899px)') : null;
+  function setGroupOpen(block, open){ var t = block.querySelector('.outdoor-region-group-toggle'), l = block.querySelector('.outdoor-region-group-chips'); if (!t || !l) return; t.setAttribute('aria-expanded', open ? 'true' : 'false'); l.hidden = !open; }
+  function updateGroupHeaders(){
+    groups.forEach(function(block){
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      var sel = block.querySelector('.outdoor-region-group-selected');
+      if (sel) { sel.textContent = groupSelectedText(n); sel.hidden = n === 0; }
+      block.classList.toggle('has-selection', n > 0);
+    });
+  }
+  if (groupsRoot) groupsRoot.classList.add('js');
+  groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
+  function updateCounts(types, regions){
+    var tC = {}, rC = {};
+    cards.forEach(function(card){
+      var d = DATA[card.getAttribute('data-venue-id')] || { t: '', r: '' };
+      if (lfMatches([], regions, d.t, d.r)) tC[d.t] = (tC[d.t] || 0) + 1;
+      if (lfMatches(types, [], d.t, d.r)) rC[d.r] = (rC[d.r] || 0) + 1;
+    });
+    function paint(list, attr, counts){ list.forEach(function(c){ var n = c.querySelector('.outdoor-activity-count'); if (n) n.textContent = String(counts[c.getAttribute(attr)] || 0); }); }
+    paint(typeChips, 'data-lf-type', tC); paint(regionChips, 'data-region', rC);
+  }
+  function renderSelected(types, regions){
+    if (!selectedBox) return;
+    var any = types.length || regions.length;
+    function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-lf-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
+    function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
+    var html = row('Categories', types.map(function(v){ return tag('type', v, LABELS.types[v] || v); }))
+      + row('Regions', regions.map(function(v){ return tag('region', v, LABELS.regions[v] || v); }));
+    if (any) html += '<button type="button" class="outdoor-selected-clear" id="lfSelectedClear">Clear all</button>';
+    selectedBox.innerHTML = html;
+    selectedBox.hidden = !any;
+  }
+  function queryFor(types, regions){
+    var q = [];
+    if (types.length) q.push('types=' + types.join(','));
+    if (regions.length) q.push('regions=' + regions.join(','));
+    return q.length ? '?' + q.join('&') : '';
+  }
+  function apply(historyMode){
+    var types = pressed(typeChips, 'data-lf-type'), regions = pressed(regionChips, 'data-region');
+    var shown = 0;
+    cards.forEach(function(card){
+      var d = DATA[card.getAttribute('data-venue-id')] || { t: '', r: '' };
+      var ok = lfMatches(types, regions, d.t, d.r) && (!searchTerm || (card.__lf || '').indexOf(searchTerm) !== -1);
+      card.hidden = !ok;
+      if (ok) shown++;
+    });
+    var total = cards.length, filtered = types.length || regions.length || !!searchTerm;
+    if (allChip) allChip.setAttribute('aria-pressed', types.length ? 'false' : 'true');
+    if (regionsCount) { regionsCount.textContent = regions.length ? (' \\u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
+    if (searchClear) searchClear.hidden = !searchTerm;
+    if (summary) summary.textContent = lfSummaryText(shown, total, filtered);
+    applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
+    updateGroupHeaders(); updateCounts(types, regions); renderSelected(types, regions);
+    if (empty) empty.hidden = shown !== 0;
+    if (results) results.hidden = shown === 0;
+    var next = window.location.pathname + queryFor(types, regions) + window.location.hash;
+    if (window.history && historyMode !== 'none') {
+      if (historyMode === 'push' && window.history.pushState && next !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState({ lf: true }, '', next);
+      else if (window.history.replaceState) window.history.replaceState({ lf: true }, '', next);
+    }
+  }
+  function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }
+  [typeChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
+  function clearAll(){
+    [typeChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
+    searchTerm = ''; if (searchInput) searchInput.value = '';
+    apply('push');
+  }
+  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); });
+  if (searchInput) {
+    var timer = null;
+    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120); });
+  }
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
+  if (selectedBox) selectedBox.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
+    if (t.id === 'lfSelectedClear') { clearAll(); return; }
+    var map = [['data-lf-remove-type', typeChips, 'data-lf-type'], ['data-lf-remove-region', regionChips, 'data-region']];
+    for (var i = 0; i < map.length; i++) {
+      var v = t.getAttribute(map[i][0]);
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }); apply('push'); return; }
+    }
+  });
+  var emptyClear = document.getElementById('lfNoResultsClear');
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  var popsRoot = document.querySelector('.fd-controls');
+  var pops = Array.prototype.slice.call(document.querySelectorAll('.fd-pop'));
+  if (popsRoot) popsRoot.classList.add('js');
+  function closePops(except){
+    pops.forEach(function(pop){
+      if (pop === except) return;
+      var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+      if (b) b.setAttribute('aria-expanded', 'false');
+      if (pnl) pnl.hidden = true;
+    });
+  }
+  pops.forEach(function(pop){
+    var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+    if (!b || !pnl) return;
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = b.getAttribute('aria-expanded') === 'true';
+      closePops(pop);
+      b.setAttribute('aria-expanded', open ? 'false' : 'true');
+      pnl.hidden = open;
+    });
+    pnl.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  applyBtns.forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); closePops(null); }); });
+  if (pops.length) {
+    document.addEventListener('click', function(){ closePops(null); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
+  }
+  function readUrlIntoChips(){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var pre = { t: (params.get('types') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
+      typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-lf-type')) !== -1 ? 'true' : 'false'); });
+      regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
+    } catch (e) {}
+  }
+  function openGroupsForSelection(){
+    groups.forEach(function(block){
+      var isDefault = block.getAttribute('data-region-group') === '${OUTDOOR_REGION_GROUP_DEFAULT_OPEN}';
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
+    });
+  }
+  window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); apply('none'); });
+  readUrlIntoChips();
+  openGroupsForSelection();
+  apply('replace');
+})();
+</script>`;
+}
+function renderLocalFavouritesPage(venues, filter = null) {
+  const f = filter || { types: [], regions: [] };
+  const types = localFavouriteTypesPresent(venues);
+  const matching = venues.filter((v) => localFavouriteFilterMatches(f.types, f.regions, v.type, v.region));
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = localFavouriteChipCounts(venues, f);
+  const filtered = f.types.length > 0 || f.regions.length > 0;
+  const state = { types: f.types, regions: f.regions, counts };
+
+  const heading = 'Local Favourites';
+  const title = 'Local Favourites in the Okanagan | Okanagan Roam';
+  const description = `${venues.length} places across the Okanagan Valley with genuine local roots and credible evidence that locals value, recommend or have worked to preserve them \u2014 from independent restaurants, caf\u00e9s and pubs to community-protected parks, trails and beaches. Not a ranking.`;
+  const canonical = 'https://okanaganroam.com/local-favorites';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Local Favourites', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+    })),
+  };
+  const payload = {};
+  for (const v of venues) payload[String(v.id)] = { t: v.type, r: v.region };
+
+  const advisoryNotes = getAdvisoryNotes();
+  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true })
+    .replace('<ul class="card-grid">', `<ul class="card-grid" id="lfResults"${matching.length === 0 ? ' hidden' : ''}>`)
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card"${matchIds.has(Number(id)) ? '' : ' hidden'} data-venue-id="${id}"`);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${renderOutdoorThemeStyles()}
+${renderLocalFavouritesStyles()}
+${golfEngagementHeadHtml('lf', true)}
+</head>
+<body class="golf-page outdoor-page lf-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Local Favourites' }])}
+  <h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">Places with genuine local roots &mdash; the caf&eacute;s, pubs, restaurants, parks, trails and beaches that people who live here value, recommend, support or have worked to protect. Each one is here because of specific evidence of that local connection, not because it is popular with visitors or highly rated. They are listed alphabetically, not ranked.</p>
+  <div class="fd-search">
+    <label class="visually-hidden" for="lfSearch">Search local favourites</label>
+    <input type="search" id="lfSearch" class="fd-search-input" placeholder="Search by name, place or category..." autocomplete="off" spellcheck="false">
+    <button type="button" class="fd-search-clear" id="lfSearchClear" aria-label="Clear search" hidden>&#215;</button>
+  </div>
+  ${localFavouritesTypeChipsHtml(types, state)}
+  ${localFavouritesFilterBarHtml(venues, state)}
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="lfResultsTop">
+  <h2 class="visually-hidden" id="lfResultsTop">Results</h2>
+  <div class="fd-resultbar">
+    <p class="fd-count" id="lfResultsSummary" aria-live="polite">${escapeHtml(localFavouritesSummaryText(matching.length, venues.length, filtered))}</p>
+  </div>
+  ${localFavouritesSelectedTagsHtml(state)}
+  <p class="fd-no-results" id="lfNoResults"${matching.length === 0 ? '' : ' hidden'}>No local favourites match that combination yet. <a href="/local-favorites" id="lfNoResultsClear">Clear the filters</a> to see everything.</p>
+  ${cardsHtml}
+  <script type="application/json" id="lfVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('lf', true)}
+  ${renderLocalFavouritesScriptHtml()}
 </body>
 </html>`;
 }
@@ -12114,6 +12479,9 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/dog-friendly</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        ...(getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES
+          ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
+          : []),
         ...regionCounts.map(
           ({ region, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
@@ -13411,6 +13779,20 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // GET /local-favorites -- Local Favourites (2026-09-24), the destination
+    // for the homepage's Hidden Gems "Local Favourites" card. Registered with
+    // the other fixed pages, before the broad region/category patterns.
+    if (pathname === '/local-favorites' && method === 'GET') {
+      const lfVenues = getLocalFavouriteVenues();
+      if (lfVenues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderLocalFavouritesPage(lfVenues, parseLocalFavouritesFilterQuery(query));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // ---------- SEO architecture: region / category / venue pages ----------
     // Registered last, after every fixed route and every /api/* route above,
     // so these broad patterns can never shadow anything that already exists.
@@ -13793,6 +14175,13 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  getLocalFavouriteVenues,
+  localFavouriteTypesPresent,
+  localFavouriteFilterMatches,
+  parseLocalFavouritesFilterQuery,
+  renderLocalFavouritesPage,
+  renderLocalFavouritesStyles,
+  renderLocalFavouritesScriptHtml,
   renderDogHubStyles,
   renderDogHubScriptHtml,
   dogFriendlyBadgeHtml,
