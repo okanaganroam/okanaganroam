@@ -1015,6 +1015,11 @@ const CATEGORY_SLUGS = {
   // ALL_REGIONS_CATEGORIES below.
   outdoor: 'outdoors',
 };
+// Regional category URLs that were published and later emptied by a type
+// correction (2026-09-24: Maple Leaf Spirits and Alchemist Distiller moved
+// cocktail -> distillery). They keep answering 200 with a zero-results state
+// instead of 404ing; every other empty region/category pair still 404s.
+const RETAINED_EMPTY_CATEGORY_PAGES = new Set(['naramata/cocktail', 'summerland/cocktail']);
 const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([type, slug]) => [slug, type]));
 
 // Beaches (2026-09-19, Phase 2): the second category rendered with the
@@ -7531,7 +7536,9 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
   const title = `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
-  const description = `${venues.length} verified ${label.plural.toLowerCase()} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
+  const description = venues.length === 0
+    ? `No ${label.plural.toLowerCase()} are currently listed in ${regionLabel}, BC. Browse everything else Okanagan Roam covers in ${regionLabel}.`
+    : `${venues.length} verified ${label.plural.toLowerCase()} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}/${catSlug}`;
 
   const breadcrumb = breadcrumbListSchema([
@@ -7585,7 +7592,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0 })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type)}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -7597,8 +7604,10 @@ ${golfEngagementHeadHtml(type)}
   ])}
   ${backLink}
   <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
-  <p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}.</p>
-  ${cardsHtml}
+  ${venues.length === 0
+    ? `<p class="subtitle">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`
+    : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}.</p>
+  ${cardsHtml}`}
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
@@ -13494,7 +13503,7 @@ const server = http.createServer(async (req, res) => {
       const type = SLUG_TO_TYPE[categorySlug];
       if (REGION_LABELS[region] && type) {
         const venues = getVenuesByRegionCategory(region, type);
-        if (venues.length >= MIN_CATEGORY_VENUES) {
+        if (venues.length >= MIN_CATEGORY_VENUES || RETAINED_EMPTY_CATEGORY_PAGES.has(`${region}/${type}`)) {
           const categoryGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter(
             (c) => c.region === region && venues.some((v) => v[c.badge])
           );
@@ -13634,6 +13643,7 @@ module.exports = {
   findVenueBySlug,
   findActiveVenueBySlugAcrossTypes,
   findActiveVenueBySlugAcrossRegions,
+  RETAINED_EMPTY_CATEGORY_PAGES,
   FD_CATEGORY_KIND_BY_TYPE,
   FD_CATEGORY_COLLECTION_KINDS,
   getFoodDrinkCategoriesForVenueIds,

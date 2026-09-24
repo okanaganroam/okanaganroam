@@ -2380,6 +2380,15 @@ test('Region-change redirect: the cross-region slug lookup resolves a moved venu
   assert.equal(app.findActiveVenueBySlugAcrossRegions('winery', 'rcr-no-such-slug'), null);
 });
 
+test('Retained empty category pages: only the two emptied cocktail URLs render a zero-results state', () => {
+  assert.deepEqual([...app.RETAINED_EMPTY_CATEGORY_PAGES].sort(), ['naramata/cocktail', 'summerland/cocktail']);
+  const html = app.renderCategoryPage('naramata', 'cocktail', [], []);
+  assert.match(html, /<h1>Cocktail Lounges in Naramata, BC<\/h1>/);
+  assert.match(html, /No cocktail lounges are listed in Naramata right now\./);
+  assert.match(html, /<meta name="robots" content="noindex">/, 'an empty page must not be indexed');
+  assert.doesNotMatch(html, /0 verified cocktail lounges/);
+});
+
 test('Distillery type: its own category URL and schema type, a Food & Drink filter, and kept out of the trip planner', () => {
   assert.equal(app.CATEGORY_SLUGS.distillery, 'distilleries');
   assert.deepEqual(app.CATEGORY_LABELS.distillery, { singular: 'Distillery', plural: 'Distilleries' });
