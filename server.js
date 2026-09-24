@@ -4481,7 +4481,13 @@ function renderMoodCardsHTML() {
   // claiming otherwise) -- mood.foodDrink.title/mood.beaches.title now
   // give all six cards real TRANSLATIONS.en/.fr entries.
   const cards = [
-    { key: 'food-drink', href: '/browse?types=restaurant,cafe,brewery,pub,cocktail', filter: 'restaurant,cafe,brewery,pub,cocktail', img: '/images/mood/eat.webp', titleKey: 'mood.foodDrink.title', title: 'Food & Drink' },
+    // Repointed 2026-09-24 to the dedicated /food-drink hub, the same way
+    // Wine points at /wineries. data-mood-filter is left in place (as Wine's
+    // is) purely so the attribute contract is unchanged: the mood grid only
+    // renders on /, where app.js's handler returns early because there are no
+    // .type-chip buttons, so the href is what navigates. /browse has the
+    // chips but not this grid, and its markup is byte-identical.
+    { key: 'food-drink', href: '/food-drink', filter: 'restaurant,cafe,brewery,pub,cocktail', img: '/images/mood/eat.webp', titleKey: 'mood.foodDrink.title', title: 'Food & Drink' },
     { key: 'wine', href: wineHref, filter: 'winery', img: '/images/mood/drink.webp', titleKey: 'mood.wine.title', title: 'Wine' },
     { key: 'beaches', href: beachesHref, filter: null, img: '/images/mood/beaches.webp', titleKey: 'mood.beaches.title', title: 'Beaches' },
     { key: 'golf', href: golfHref, filter: null, img: '/images/mood/golf.webp', titleKey: 'mood.golf.title', title: 'Golf' },

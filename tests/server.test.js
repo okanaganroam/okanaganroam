@@ -2168,7 +2168,7 @@ test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach
   // The other cards keep their existing destinations.
   assert.match(html, /class="mood-card mood-card-outdoors" href="\/outdoors">/);
   assert.match(html, /class="mood-card mood-card-whats-on" href="\/whats-on">/);
-  assert.match(html, /class="mood-card mood-card-food-drink" href="\/browse\?types=restaurant,cafe,brewery,pub,cocktail" data-mood-filter="restaurant,cafe,brewery,pub,cocktail">/);
+  assert.match(html, /class="mood-card mood-card-food-drink" href="\/food-drink" data-mood-filter="restaurant,cafe,brewery,pub,cocktail">/);
   assert.match(html, /class="mood-card mood-card-golf" href="\/golf">/);
   assert.match(html, /class="mood-card mood-card-wine" href="\/wineries" data-mood-filter="winery">/);
 });
@@ -2422,11 +2422,14 @@ test('Food & Drink categories are taxonomy, not Build My Trip discovery options'
   assert.ok(app.FD_CATEGORY_COLLECTION_KINDS.length === 5);
 });
 
-test('Mood cards: Food & Drink links to /browse pre-filtered by its multi-type filter (no single category page covers all five types)', () => {
+test('Mood cards: Food & Drink links to the dedicated /food-drink hub, and keeps data-mood-filter for the /browse wizard', () => {
   const html = app.renderMoodCardsHTML();
   const cardMatch = html.match(/class="mood-card mood-card-food-drink" href="([^"]*)"/);
   assert.ok(cardMatch, 'expected the Food & Drink card to have an href');
-  assert.equal(cardMatch[1], '/browse?types=restaurant,cafe,brewery,pub,cocktail');
+  assert.equal(cardMatch[1], '/food-drink');
+  // The attribute stays so the card's markup contract is otherwise unchanged
+  // (Wine's card carries its own the same way); the href is what navigates.
+  assert.match(html, /mood-card-food-drink"[^>]*data-mood-filter="restaurant,cafe,brewery,pub,cocktail"/);
 });
 
 test('Mood cards: image paths are correct for all six cards, including the not-yet-supplied Beaches asset', () => {
