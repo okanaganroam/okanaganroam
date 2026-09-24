@@ -4112,7 +4112,8 @@ test('S6 #1/#20/#22: with zero publishable inventory /whats-on renders the appro
   assert.match(markup, /<div class="whatson-empty" id="whatsOnEmptyInventory">\s*<h3>We’re gathering what’s on\.<\/h3>/);
   assert.match(markup, /aria-live="polite">0 events<\/p>/);
   assert.match(markup, /<ul class="card-grid" id="whatsOnResults" hidden><\/ul>/);
-  assert.match(markup, /id="whatsOnShowResults" hidden>Show all results</);
+  assert.match(markup, /<input type="search" id="whatsOnSearch"/, 'search is present even with no inventory');
+  assert.doesNotMatch(markup, /id="whatsOnDateBtn"/, 'no Date control until inventory exists');
   assert.match(markup, /id="whatsOnNoResults" hidden>/);
   assert.doesNotMatch(markup, /whatsOnDatesHeading/, 'the date step only appears once inventory exists');
   assert.match(text, /var INVENTORY = false;/);
@@ -4137,7 +4138,7 @@ test('S6 #14-#18/#23: with fixture inventory the page is indexable and real even
   assert.match(text, /rel="canonical" href="https:\/\/okanaganroam\.com\/whats-on"/, 'canonical stays the bare page URL');
   assert.match(text, /var INVENTORY = true;/);
   assert.match(markup, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>/);
-  assert.match(markup, /id="whatsOnShowResults">Show all results</);
+  assert.match(markup, /<button type="button" class="whatson-pop-btn" id="whatsOnDateBtn"/, 'the Date control appears once inventory exists');
   const cards = s6cards(text);
   assert.deepEqual(cards.map((c) => c.region), ['osoyoos', 'kelowna', 'kelowna', 'vernon'], 'default window (next 30 days) lists the four near events ordered by first occurrence (all-day first on a day); the 2033 gala is outside it');
   assert.match(markup, /aria-live="polite">4 events<\/p>/);
@@ -4163,7 +4164,10 @@ test('S6 #2-#8: the date step renders in the reserved slot; presets and custom r
   const today = app.todayLocal();
   const { text } = await s6get('/whats-on');
   const markup = s6markup(text);
-  const order = ['id="whatsOnCategoriesHeading">Choose Category(s)</h2>', 'data-filter="category"', 'id="whatsOnDatesHeading">When are you visiting?</h2>', 'data-filter="date"', 'id="whatsOnShowResults"', 'id="whatsOnResultsTop">Results</h2>'];
+  // Simplified surface (2026-09-24): the category image grid, the step
+  // headings and the "Show results" CTA are gone. Categories are a chip row,
+  // dates live in the Date popover, and results follow immediately.
+  const order = ['data-filter="category"', 'id="whatsOnDateBtn"', 'data-filter="date"', 'id="whatsOnResultsSummary"', 'id="whatsOnResults"'];
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `slot order: ${m}`); pos = i; }
   for (const key of ['today', 'this-weekend', 'this-week', 'this-month']) assert.match(markup, new RegExp(`<a class="outdoor-filter-chip whatson-date-chip" href="/whats-on\\?when=${key}" data-when="${key}" aria-pressed="false">`));
   assert.match(markup, /id="whatsOnCustomToggle" data-when="custom" aria-pressed="false" aria-expanded="false"/);
@@ -4175,7 +4179,7 @@ test('S6 #2-#8: the date step renders in the reserved slot; presets and custom r
     const win = app.dateWindowForPreset(when, today);
     const page = s6markup((await s6get(`/whats-on?when=${when}`)).text);
     assert.match(page, new RegExp(`data-when="${when}" aria-pressed="true"`), `${when} chip pressed`);
-    assert.match(page, /id="whatsOnDateStatus">1 selected</);
+    assert.match(page, /id="whatsOnDateCount"> · 1</, `${when} shows on the Date popover badge`);
     const expectedNames = app.queryWhatsOnEvents({ from: win.from, to: win.to }).map((e) => e.name);
     const shown = [...page.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1]);
     assert.deepEqual(shown, expectedNames, `${when} renders exactly the API window's events`);
@@ -4204,8 +4208,8 @@ test('S6 #9-#11/#21: region/category multi-select and no-match state over the re
   assert.match(both, /data-region="kelowna" aria-pressed="true"/); assert.match(both, /data-region="vernon" aria-pressed="true"/);
   assert.match(both, /data-category="live-music" aria-pressed="true"/); assert.match(both, /data-category="markets-fairs" aria-pressed="true"/);
   assert.match(both, /aria-live="polite">2 of 4 events<\/p>/, 'regions OR, categories OR, AND between');
-  assert.match(both, /id="whatsOnShowResults">Show 2 results</);
-  assert.match(both, /id="whatsOnClearFilters">Clear all</);
+  assert.match(both, /id="whatsOnResultsSummary" aria-live="polite">2 of \d+ events</, 'the compact count reports the filtered total');
+  assert.match(both, /id="whatsOnSelectedClear">Clear all</, 'Clear all now lives with the removable filter chips');
   const regionOnly = s6markup((await s6get('/whats-on?regions=peachland')).text);
   assert.match(regionOnly, /aria-live="polite">1 of 4 events<\/p>/, 'valley-wide festival matches a region with nothing else');
   assert.match(regionOnly, /data-region="peachland" aria-pressed="true">Peachland<span class="outdoor-activity-count">1<\/span>/, 'region chip counts include valley-wide rows');
@@ -4227,8 +4231,8 @@ test('S6 #12/#13/#19: the client script keeps the date window on chip pushState,
     "window.addEventListener('popstate'",
     "if (d.when !== DATE.when || d.from !== DATE.from || d.to !== DATE.to) { window.location.reload(); return; }",
     "readUrlIntoChips(); openGroupsForSelection(); apply('none');",
-    "function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); }",
-    "filter(function(c){ return !c.hasAttribute('data-when'); })",
+    "function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); searchTerm = ''; if (searchInput) searchInput.value = ''; apply('push'); }",
+    "filter(function(c){ return !c.hasAttribute('data-when') && !c.hasAttribute('data-category-all'); })",
     "querySelectorAll('a[data-when]')",
     "customForm.addEventListener('submit'",
     "cardMatches(d, regions, categories)",
@@ -4250,10 +4254,59 @@ test('S6 #24/#25: no token or admin surface in the page; the shell-era markup is
   assert.ok(!/fetch\(['"`]\/api\/events/.test(src.slice(src.indexOf('function renderWhatsOnFilterScriptHtml'), src.indexOf('function renderWhatsOnPage'))), 'the page is server-rendered; no browser-side API fetch');
   // Structural markers of the approved shell are all still present, in order.
   const markup = s6markup(page);
-  const order = ['<body class="golf-page outdoor-page whatson-page">', '<p class="outdoor-intro">', 'id="whatsOnRegionsHeading">Choose Region(s)</h2>', 'data-filter="region"', 'id="whatsOnCategoriesHeading">Choose Category(s)</h2>', 'data-filter="category"', 'id="whatsOnShowResults"', 'id="whatsOnClearFilters"', 'id="whatsOnResultsTop">Results</h2>', 'id="whatsOnResultsSummary"', 'id="whatsOnSelected"', 'id="whatsOnEmptyInventory"', 'id="whatsOnNoResults"', 'id="whatsOnResults"', '<footer class="home-footer"'];
+  // Simplified surface (2026-09-24): search -> category chips -> compact
+  // Regions/Date controls -> count -> results. The region chips still exist
+  // in full, now inside the Regions popover panel.
+  const order = ['<body class="golf-page outdoor-page whatson-page">', '<p class="outdoor-intro whatson-intro">', 'id="whatsOnSearch"', 'class="whatson-cat-row"', 'data-filter="category"', 'class="whatson-controls"', 'id="whatsOnRegionsBtn"', 'data-filter="region"', 'id="whatsOnResultsSummary"', 'id="whatsOnSelected"', 'id="whatsOnEmptyInventory"', 'id="whatsOnNoResults"', 'id="whatsOnResults"', '<footer class="home-footer"'];
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
-  assert.equal((markup.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20, 'all 20 region chips');
-  assert.deepEqual([...markup.matchAll(/data-category="([a-z-]+)" aria-pressed="false"/g)].map((m) => m[1]), app.WHATSON_CATEGORIES.map((c) => c.key), 'twelve tiles in the approved order');
+  assert.equal((markup.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20, 'all 20 region chips still present, inside the Regions popover');
+  assert.deepEqual([...markup.matchAll(/data-category="([a-z-]+)" aria-pressed="false"/g)].map((m) => m[1]), app.WHATSON_CATEGORIES.map((c) => c.key), 'twelve category chips in the approved order');
+});
+
+test("What's On simplification: results are reachable without scrolling past a filter form", async () => {
+  const { text } = await s6get('/whats-on');
+  const markup = s6markup(text);
+
+  // 1. The twelve 1376x768 category tiles are gone from above the results --
+  //    they were the single biggest mobile cost on this page.
+  const above = markup.slice(markup.indexOf('<h1>'), markup.indexOf('id="whatsOnResults"'));
+  assert.ok(above.length > 0, 'results list must come after the heading');
+  assert.equal((above.match(/outdoor-activity-card/g) || []).length, 0, 'no category image tiles above the results');
+  assert.equal((above.match(/<img/g) || []).length, 0, 'no images at all above the results');
+
+  // 2. Replaced by one compact chip row: All + the twelve categories.
+  assert.match(markup, /<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">/);
+  assert.match(markup, /data-category-all="1"/, 'an All reset chip');
+  assert.equal((markup.match(/<button type="button" class="outdoor-filter-chip whatson-cat-chip/g) || []).length, app.WHATSON_CATEGORIES.length + 1, 'All + one chip per category');
+
+  // 3. Search exists and is a real input, not a heading-sized block.
+  assert.match(markup, /<input type="search" id="whatsOnSearch" class="whatson-search-input" placeholder="Search events\.\.\."/);
+
+  // 4. Regions collapse into a popover that starts closed, and the full
+  //    region chip set still lives inside it (nothing was removed).
+  assert.match(markup, /<button type="button" class="whatson-pop-btn" id="whatsOnRegionsBtn" aria-expanded="false"/);
+  assert.match(markup, /<div class="whatson-pop-panel" id="whatsOnRegionsPanel" hidden>/);
+  assert.equal((markup.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20, 'all 20 regions still selectable');
+  assert.match(markup, /data-region-group="/, 'the derived region grouping is preserved');
+
+  // 5. The old step scaffolding is gone.
+  for (const gone of ['Choose Region(s)</h2>', 'Choose Category(s)</h2>', 'id="whatsOnShowResults"']) {
+    assert.ok(markup.indexOf(gone) === -1, `removed from the page: ${gone}`);
+  }
+
+  // 6. No sort control was added (deliberately out of scope).
+  assert.ok(markup.indexOf('whatsOnSort') === -1, 'sort was intentionally not added');
+});
+
+test("What's On simplification does not disturb the Outdoors explorer", () => {
+  // Both pages share OUTDOOR_FILTER_CLIENT_PREDICATE_SRC and the region-group
+  // markup; Outdoors must keep its own step headings and image cards.
+  const landing = app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor'));
+  assert.match(landing, /Choose Region\(s\)<\/h2>/, 'Outdoors keeps its region step heading');
+  assert.match(landing, /id="outdoorActivitiesHeading">Choose Activity\(s\)<\/h2>/, 'Outdoors keeps its activity step heading');
+  assert.match(landing, /outdoor-activity-card/, 'Outdoors keeps its image activity cards');
+  assert.ok(landing.indexOf('whatson-cat-row') === -1, 'the What\'s On chip row must not leak onto Outdoors');
+  assert.ok(landing.indexOf('whatson-pop-btn') === -1, 'the What\'s On popovers must not leak onto Outdoors');
 });
 
 test('S6 cleanup: remove every Step 6 fixture event', () => {
@@ -7783,12 +7836,14 @@ test("What's On shell: twelve categories in the approved order, tiles are multi-
   assert.match(html, /<body class="golf-page outdoor-page whatson-page">/);
   assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1); assert.match(markup, /<h1>What&#39;s On in the Okanagan<\/h1>/);
   // Hierarchy: intro -> Choose Region(s) -> Choose Category(s) -> actions -> Results.
-  const order = ['<p class="outdoor-intro">', 'id="whatsOnRegionsHeading">Choose Region(s)</h2>', 'data-filter="region"', 'id="whatsOnCategoriesHeading">Choose Category(s)</h2>', 'data-filter="category"', 'data-filter="date"', 'id="whatsOnShowResults"', 'id="whatsOnResultsTop">Results</h2>', 'id="whatsOnEmptyInventory"'];
+  const order = ['<p class="outdoor-intro whatson-intro">', 'id="whatsOnSearch"', 'class="whatson-cat-row"', 'data-filter="category"', 'class="whatson-controls"', 'id="whatsOnRegionsBtn"', 'data-filter="region"', 'id="whatsOnResultsSummary"', 'id="whatsOnEmptyInventory"'];
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
   // Twelve tiles, in order, each a toggle button with the outdoor card classes (so the shared pressed-state CSS applies) and a data-category hook.
-  assert.deepEqual([...markup.matchAll(/<button type="button" class="outdoor-activity-card outdoor-activity-toggle whatson-category-card whatson-category-card-([a-z-]+)[^"]*" data-category="([a-z-]+)" aria-pressed="false"/g)].map((m) => m[2]), app.WHATSON_CATEGORIES.map((c) => c.key));
-  assert.equal((markup.match(/class="outdoor-activity-card-check" aria-hidden="true">✓ Selected<\/span>/g) || markup.match(/&#10003; Selected/g) || []).length, 12);
-  assert.doesNotMatch(markup, /<a class="outdoor-activity-card/, 'tiles are filters, not links');
+  // Simplified (2026-09-24): twelve compact chips in the approved order,
+  // preceded by the All reset chip. The image tiles are gone from this page.
+  assert.deepEqual([...markup.matchAll(/<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="([a-z-]+)" aria-pressed="false"/g)].map((m) => m[1]), app.WHATSON_CATEGORIES.map((c) => c.key));
+  assert.match(markup, /data-category-all="1" aria-pressed="true">All</, 'All is pressed when no category is chosen');
+  assert.doesNotMatch(markup, /whatson-category-card/, 'the image tiles are no longer rendered on this page');
   // Region chips: the complete canonical list, grouped like Outdoors; counts (all 0 in the empty default window) are shown because inventory exists.
   for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">${app.REGION_LABELS[r].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<span class="outdoor-activity-count">0</span></button>`));
   assert.equal((markup.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
@@ -7798,7 +7853,7 @@ test("What's On shell: twelve categories in the approved order, tiles are multi-
   assert.match(markup, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>\s*<h3>We’re gathering what’s on\.<\/h3>/);
   assert.match(markup, /<ul class="card-grid" id="whatsOnResults" hidden><\/ul>/);
   assert.doesNotMatch(markup, /<li class="venue-card"/, 'no placeholder events rendered');
-  assert.match(markup, /id="whatsOnShowResults">Show all results</); assert.match(markup, /id="whatsOnClearFilters" hidden>Clear all</);
+  assert.match(markup, /<div class="whatson-pop-panel" id="whatsOnRegionsPanel" hidden>/, 'the Regions popover starts closed');
   assert.match(markup, /<p class="outdoor-no-results" id="whatsOnNoResults">/);
   // Page chrome: shared header, Trip tray, footer, app.js, analytics head; What's On script with the shared client snippets and both URL keys.
   assert.match(html, /id="tripTray"|class="trip-tray"|trip-tray/); assert.match(html, /<footer class="home-footer"/); assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
@@ -7809,13 +7864,15 @@ test("What's On shell: twelve categories in the approved order, tiles are multi-
   const pre = outdoorMarkupOnly(app.renderWhatsOnPage(app.parseWhatsOnFilterQuery({ regions: 'kelowna,penticton', categories: 'live-music,food-drink-events' })));
   assert.match(pre, /data-region="kelowna" aria-pressed="true"/); assert.match(pre, /data-region="penticton" aria-pressed="true"/);
   assert.match(pre, /data-category="live-music" aria-pressed="true"/); assert.match(pre, /data-category="food-drink-events" aria-pressed="true"/); assert.match(pre, /data-category="nightlife" aria-pressed="false"/);
-  assert.match(pre, /id="whatsOnRegionStatus">2 selected</); assert.match(pre, /id="whatsOnCategoryStatus">2 selected</);
+  assert.match(pre, /id="whatsOnRegionStatus">2 selected</); assert.match(pre, /whatson-cat-chip whatson-cat-all" data-category-all="1" aria-pressed="false"/, 'the All chip releases once categories are chosen');
   assert.match(pre, /<div class="outdoor-selected" id="whatsOnSelected"><div class="outdoor-selected-row"><span class="outdoor-selected-label">Regions<\/span> [\s\S]*?data-remove-region="kelowna"[\s\S]*?data-remove-region="penticton"[\s\S]*?<div class="outdoor-selected-row"><span class="outdoor-selected-label">Categories<\/span> [\s\S]*?data-remove-category="live-music"[\s\S]*?data-remove-category="food-drink-events"[\s\S]*?id="whatsOnSelectedClear">Clear all</);
-  assert.match(pre, /aria-live="polite">0 of 0 events<\/p>/); assert.match(pre, /id="whatsOnClearFilters">Clear all</); assert.match(pre, /id="whatsOnShowResults">Show 0 results</);
+  assert.match(pre, /aria-live="polite">0 of 0 events<\/p>/); assert.match(pre, /id="whatsOnSelectedClear">Clear all</);
   // Tile art: dedicated slot per category, one approved 1376x768 WebP per key under /images/whats-on/.
   for (const c of app.WHATSON_CATEGORIES) assert.equal(app.whatsOnCategoryImagePath(c.key), `/images/whats-on/${c.key}.webp`, `art for ${c.key}`);
-  assert.deepEqual([...markup.matchAll(/<img class="outdoor-activity-card-img" src="\/images\/whats-on\/([a-z-]+)\.webp" width="1376" height="768" alt="" loading="lazy">/g)].map((m) => m[1]), app.WHATSON_CATEGORIES.map((c) => c.key), 'twelve tile images in the approved order');
-  assert.doesNotMatch(markup, /whatson-category-card-noart/, 'no tile falls back to the no-art state');
+  // The twelve 1376x768 tile images are deliberately no longer loaded here --
+  // they were the largest mobile cost above the results. The artwork itself is
+  // untouched and still served from /images/whats-on/.
+  assert.equal((markup.match(/<img class="outdoor-activity-card-img"/g) || []).length, 0, 'no category tile images on the simplified page');
 });
 
 test("What's On result card contract (fixture only): name is the single link with the View details cue, region + date/time meta, clamped description, category chips, Favorite + Add to Trip; no website/phone; filter semantics reuse the Outdoors predicate", () => {

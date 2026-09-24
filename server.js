@@ -8249,8 +8249,15 @@ function whatsOnDateStepHtml(state = {}) {
     ? `Showing the next ${WHATSON_DEFAULT_WINDOW_DAYS} days: ${escapeHtml(formatLocalDateShort(win.from, { weekday: false }))} – ${escapeHtml(formatLocalDateShort(win.to, { weekday: false }))}`
     : `Showing ${escapeHtml(formatLocalDateShort(win.from))}${win.to !== win.from ? ` – ${escapeHtml(formatLocalDateShort(win.to))}` : ''}`;
   const note = win.fallback ? `<p class="whatson-date-note" role="status">Those dates weren’t a valid range (real dates, start before end, at most ${MAX_CUSTOM_WINDOW_DAYS} days), so the next ${WHATSON_DEFAULT_WINDOW_DAYS} days are shown instead.</p>` : '';
-  return `<section class="outdoor-step whatson-date-step" aria-labelledby="whatsOnDatesHeading">
-  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="whatsOnDatesHeading">When are you visiting?</h2><span class="outdoor-step-status" id="whatsOnDateStatus"${upcoming ? ' hidden' : ''}>${upcoming ? '' : '1 selected'}</span></div>
+  // `compact` (2026-09-24) renders the same controls without the step
+  // wrapper/heading, for the Date popover in the simplified filter bar. The
+  // presets stay plain links -- a date change is a server round-trip that
+  // re-selects the event window, which this does not alter.
+  const compact = state.compact === true;
+  const openTag = compact ? '<div class="whatson-date-step whatson-date-compact">' : `<section class="outdoor-step whatson-date-step" aria-labelledby="whatsOnDatesHeading">
+  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="whatsOnDatesHeading">When are you visiting?</h2><span class="outdoor-step-status" id="whatsOnDateStatus"${upcoming ? ' hidden' : ''}>${upcoming ? '' : '1 selected'}</span></div>`;
+  const closeTag = compact ? '</div>' : '</section>';
+  return `${openTag}
   <div class="category-region-selector outdoor-filter-group whatson-date-group" role="group" aria-label="Choose dates" data-filter="date">
     ${WHATSON_DATE_PRESETS.map(chip).filter(Boolean).join('\n    ')}
     <button type="button" class="outdoor-filter-chip whatson-date-chip" id="whatsOnCustomToggle" data-when="custom" aria-pressed="${customPressed ? 'true' : 'false'}" aria-expanded="${customPressed ? 'true' : 'false'}" aria-controls="whatsOnCustomDates">Choose Dates</button>
@@ -8263,7 +8270,7 @@ function whatsOnDateStepHtml(state = {}) {
   </form>
   <p class="whatson-date-showing" id="whatsOnDateShowing">${label}</p>
   ${note}
-</section>`;
+${closeTag}`;
 }
 // Data source (Step 6): the Step 3/4 public read path. `window` is a
 // resolved { from, to } (see resolveWhatsOnWindow); with none given the
@@ -8357,6 +8364,70 @@ function whatsOnCategoryGridHtml(state = {}) {
   </div>
 </section>`;
 }
+// ---------- What's On simplified controls (2026-09-24) ----------
+//
+// The page previously opened with ~23KB of filter markup -- twelve 1376x768
+// category image tiles, four region accordions and four step headings --
+// before the first event. These builders replace that with a compact chip
+// row and two popovers, so results are reachable almost immediately on a
+// phone. The filter CONTRACT is unchanged: every control still exposes
+// data-region / data-category + aria-pressed, so the existing client script
+// and the shared OUTDOOR_FILTER_CLIENT_PREDICATE_SRC keep working untouched.
+
+// Compact search over the already-rendered cards. New on this page: there
+// was no search before. Filters client-side only; it never changes the
+// server-selected date window.
+function whatsOnSearchHtml() {
+  return `<div class="whatson-search">
+    <label class="visually-hidden" for="whatsOnSearch">Search events</label>
+    <input type="search" id="whatsOnSearch" class="whatson-search-input" placeholder="Search events..." autocomplete="off" spellcheck="false">
+    <button type="button" class="whatson-search-clear" id="whatsOnSearchClear" aria-label="Clear search" hidden>&#215;</button>
+  </div>`;
+}
+
+// Horizontal category chips, replacing whatsOnCategoryGridHtml's image grid.
+// "All" is a reset control (data-category-all), not a 13th category, so the
+// existing multi-select semantics are untouched: no categories pressed means
+// everything shows, which is exactly what "All" represents.
+function whatsOnCategoryChipsHtml(state = {}) {
+  const selected = new Set(state.selectedCategories || []);
+  const counts = state.counts || null;
+  const allChip = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-cat-all" data-category-all="1" aria-pressed="${selected.size === 0 ? 'true' : 'false'}">All</button>`;
+  const chips = WHATSON_CATEGORIES.map((c) => {
+    const n = counts ? (counts[c.key] || 0) : null;
+    return `<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="${escapeHtml(c.key)}" aria-pressed="${selected.has(c.key) ? 'true' : 'false'}">${escapeHtml(c.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+  }).join('');
+  return `<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">${allChip}${chips}</div>`;
+}
+
+// The Regions / Date control row. Each popover holds the EXISTING markup for
+// that filter unchanged -- the region accordion groups (still derived from
+// FOOTER_REGION_GROUPS, so the grouping is whatever the data says) and the
+// date presets (still server-side links, per the page's frozen design) --
+// so no filtering behaviour moves, only where it lives.
+function whatsOnFilterBarHtml(state = {}) {
+  const nRegions = (state.selectedRegions || []).length;
+  const dateActive = state.window && state.window.preset !== 'upcoming';
+  const pop = (id, label, icon, badge, panelHtml) => `<div class="whatson-pop">
+      <button type="button" class="whatson-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="whatson-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="whatson-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="whatson-pop-panel" id="${id}Panel" hidden>${panelHtml}</div>
+    </div>`;
+  return `<div class="whatson-controls">
+    ${pop('whatsOnRegions', 'Regions', '&#128205;', nRegions || '', whatsOnRegionChipsHtml(state))}
+    ${state.hasInventory ? pop('whatsOnDate', 'Date', '&#128197;', dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true })) : ''}
+  </div>`;
+}
+
+// Compact result bar: the live count, then the removable filter chips and
+// Clear all directly beneath. Replaces the old "Show N results" CTA + a
+// separate Results heading + summary paragraph.
+function whatsOnResultBarHtml(shown, total, filtered, selectedRegions, selectedCategories) {
+  return `<div class="whatson-resultbar">
+    <p class="whatson-count" id="whatsOnResultsSummary" aria-live="polite">${escapeHtml(whatsOnSummaryText(shown, total, filtered))}</p>
+  </div>
+  ${whatsOnSelectedTagsHtml(selectedRegions, selectedCategories)}`;
+}
+
 // The result card contract: the themed venue card (name as the single
 // link with the "View details" cue, meta line, clamped description,
 // category chips, Favorite + Add to Trip) for an event record. No website
@@ -8436,6 +8507,51 @@ function renderWhatsOnStyles() {
   body.whatson-page .whatson-custom-dates .cta.whatson-custom-go { margin: 0; }
   body.whatson-page .whatson-date-showing { margin: 10px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--ink); opacity: 0.8; }
   body.whatson-page .whatson-date-note { margin: 6px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--plum, #7a2e4a); font-weight: 700; }
+
+  /* ---- Simplified filter surface (2026-09-24) -----------------------------
+     Compact search + one horizontal category chip row + Regions/Date
+     popovers, replacing the twelve image tiles and four accordions that used
+     to sit above the results. All page-scoped to body.whatson-page; nothing
+     here can reach the homepage or any other page. Colours, radii and the
+     Nunito/weight conventions are the existing design system's. */
+  body.whatson-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  body.whatson-page .whatson-intro { margin-bottom: 14px; }
+
+  body.whatson-page .whatson-search { position: relative; margin: 0 0 12px; max-width: 520px; }
+  body.whatson-page .whatson-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(74,52,40,0.25); background: var(--paper); color: var(--ink); }
+  body.whatson-page .whatson-search-input::placeholder { color: rgba(42,32,25,0.55); }
+  /* The page draws its own clear button, so suppress the browser's native one. */
+  body.whatson-page .whatson-search-input::-webkit-search-cancel-button, body.whatson-page .whatson-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+  body.whatson-page .whatson-search-input:focus-visible { outline: 2px solid var(--teal, #2F6F73); outline-offset: 2px; }
+  body.whatson-page .whatson-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--ink); opacity: 0.6; padding: 6px 8px; }
+  body.whatson-page .whatson-search-clear[hidden] { display: none; }
+
+  body.whatson-page .whatson-cat-row { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; padding: 2px 0 8px; margin: 0 0 10px; }
+  body.whatson-page .whatson-cat-row::-webkit-scrollbar { height: 6px; }
+  body.whatson-page .whatson-cat-row::-webkit-scrollbar-thumb { background: rgba(74,52,40,0.2); border-radius: 999px; }
+  body.whatson-page .whatson-cat-chip { flex: 0 0 auto; white-space: nowrap; }
+  @media (min-width: 900px) { body.whatson-page .whatson-cat-row { flex-wrap: wrap; overflow: visible; } }
+
+  body.whatson-page .whatson-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  body.whatson-page .whatson-pop { position: relative; }
+  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(74,52,40,0.25); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
+  body.whatson-page .whatson-pop-btn:hover { background: rgba(224,169,78,0.18); }
+  body.whatson-page .whatson-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
+  body.whatson-page .whatson-pop-count[hidden] { display: none; }
+  body.whatson-page .whatson-pop-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 560px); max-height: 60vh; overflow-y: auto; background: var(--paper); border: 1px solid rgba(74,52,40,0.2); border-radius: 14px; box-shadow: 0 18px 40px -20px var(--shadow, rgba(42,32,25,0.5)); padding: 14px; }
+  body.whatson-page .whatson-pop-panel[hidden] { display: none; }
+  /* On phones the panel becomes a full-width sheet under the controls rather than a cramped popover. */
+  @media (max-width: 640px) {
+    body.whatson-page .whatson-controls { position: relative; }
+    body.whatson-page .whatson-pop { position: static; }
+    body.whatson-page .whatson-pop-panel { left: 0; right: 0; width: auto; min-width: 0; max-width: none; }
+  }
+  body.whatson-page .whatson-pop-panel .outdoor-step { margin: 0; }
+  body.whatson-page .whatson-date-compact { margin: 0; }
+
+  body.whatson-page .whatson-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
+  body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+  body.whatson-page .whatson-results-step { margin-top: 4px; }
 </style>`;
 }
 // The inline script: the Outdoors filter behaviour with the activity group
@@ -8456,7 +8572,12 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
   var INVENTORY = ${inventory ? 'true' : 'false'};
   var DATE = ${JSON.stringify(dateState).replace(/</g, '\\u003c')};
-  var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle')).filter(function(c){ return !c.hasAttribute('data-when'); });
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle')).filter(function(c){ return !c.hasAttribute('data-when') && !c.hasAttribute('data-category-all'); });
+  var allChip = document.querySelector('[data-category-all]');
+  var searchInput = document.getElementById('whatsOnSearch');
+  var searchClear = document.getElementById('whatsOnSearchClear');
+  var regionsCount = document.getElementById('whatsOnRegionsCount');
+  var searchTerm = '';
   var cards = Array.prototype.slice.call(document.querySelectorAll('#whatsOnResults > .venue-card'));
   var summary = document.getElementById('whatsOnResultsSummary');
   var showBtn = document.getElementById('whatsOnShowResults');
@@ -8465,7 +8586,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   var emptyInventory = document.getElementById('whatsOnEmptyInventory');
   var results = document.getElementById('whatsOnResults');
   var selectedBox = document.getElementById('whatsOnSelected');
-  var regionStatus = document.getElementById('whatsOnRegionStatus'), categoryStatus = document.getElementById('whatsOnCategoryStatus');
+  var regionStatus = document.getElementById('whatsOnRegionStatus');
   if (!chips.length) return;
   ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
@@ -8486,6 +8607,17 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
   function selected(kind){ return chips.filter(function(c){ return c.getAttribute('data-' + kind) && c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute('data-' + kind); }); }
   function cardData(card){ return { region: card.getAttribute('data-event-region'), cats: (card.getAttribute('data-event-categories') || '').split(',').filter(Boolean), valley: card.getAttribute('data-event-valley-wide') === '1' }; }
+  // Searchable text, built once per card: event name, region label, category
+  // labels and the meta/description already in the markup. No new data.
+  cards.forEach(function(card){
+    var d = cardData(card);
+    var meta = card.querySelector('.venue-meta'), desc = card.querySelector('.golf-desc');
+    var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.region] || '',
+                 d.cats.map(function(k){ return LABELS.categories[k] || k; }).join(' '),
+                 meta ? meta.textContent : '', desc ? desc.textContent : ''];
+    card.__wo = parts.join(' ').toLowerCase();
+  });
+  function cardMatchesSearch(card){ return !searchTerm || (card.__wo || '').indexOf(searchTerm) !== -1; }
   function cardMatches(d, regions, categories){ return matches(d.valley ? [] : regions, categories, d.region, d.cats); }
   var allRegionKeys = Object.keys(LABELS.regions);
   function updateChipCounts(regions, categories){
@@ -8526,11 +8658,15 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   function apply(historyMode){
     var regions = selected('region'), categories = selected('category');
     var shown = 0;
-    cards.forEach(function(card){ var d = cardData(card); var ok = cardMatches(d, regions, categories); card.hidden = !ok; if (ok) shown++; });
-    var total = cards.length, filtered = regions.length || categories.length;
+    cards.forEach(function(card){ var d = cardData(card); var ok = cardMatches(d, regions, categories) && cardMatchesSearch(card); card.hidden = !ok; if (ok) shown++; });
+    var total = cards.length, filtered = regions.length || categories.length || !!searchTerm;
+    // "All" is pressed exactly when no category is chosen.
+    if (allChip) allChip.setAttribute('aria-pressed', categories.length ? 'false' : 'true');
+    if (regionsCount) { regionsCount.textContent = regions.length ? (' \u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
+    if (searchClear) searchClear.hidden = !searchTerm;
     if (summary) summary.textContent = summaryText(shown, total, filtered);
     updateGroupHeaders(); updateChipCounts(regions, categories);
-    updateStepStatus(regionStatus, regions.length); updateStepStatus(categoryStatus, categories.length);
+    updateStepStatus(regionStatus, regions.length);
     renderSelected(regions, categories);
     if (showBtn) { showBtn.textContent = filtered ? ('Show ' + shown + ' result' + (shown === 1 ? '' : 's')) : 'Show all results'; showBtn.hidden = !INVENTORY; }
     if (clearBtn) clearBtn.hidden = !filtered;
@@ -8547,7 +8683,46 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   }
   function setPressed(kind, value, on){ chips.forEach(function(c){ if (c.getAttribute('data-' + kind) === value) c.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
   chips.forEach(function(chip){ chip.addEventListener('click', function(){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }); });
-  function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); }
+  function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); searchTerm = ''; if (searchInput) searchInput.value = ''; apply('push'); }
+  if (allChip) allChip.addEventListener('click', function(){
+    chips.forEach(function(c){ if (c.getAttribute('data-category')) c.setAttribute('aria-pressed', 'false'); });
+    apply('push');
+  });
+  if (searchInput) {
+    var searchTimer = null;
+    searchInput.addEventListener('input', function(){
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120);
+    });
+  }
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
+  var pops = Array.prototype.slice.call(document.querySelectorAll('.whatson-pop'));
+  function closePops(except){
+    pops.forEach(function(pop){
+      if (pop === except) return;
+      var b = pop.querySelector('.whatson-pop-btn'), pnl = pop.querySelector('.whatson-pop-panel');
+      if (b) b.setAttribute('aria-expanded', 'false');
+      if (pnl) pnl.hidden = true;
+      pop.classList.remove('is-open');
+    });
+  }
+  pops.forEach(function(pop){
+    var b = pop.querySelector('.whatson-pop-btn'), pnl = pop.querySelector('.whatson-pop-panel');
+    if (!b || !pnl) return;
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = b.getAttribute('aria-expanded') === 'true';
+      closePops(pop);
+      b.setAttribute('aria-expanded', open ? 'false' : 'true');
+      pnl.hidden = open;
+      pop.classList.toggle('is-open', !open);
+    });
+    pnl.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  if (pops.length) {
+    document.addEventListener('click', function(){ closePops(null); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
+  }
   if (clearBtn) clearBtn.addEventListener('click', clearAll);
   var emptyClear = document.getElementById('whatsOnNoResultsClear');
   if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
@@ -8661,21 +8836,14 @@ ${renderGolfHeaderHtml()}
     { name: "What's On" },
   ])}
   <h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro">Festivals on the lakeshore, live music in the vineyards, farmers’ markets, hockey nights and holiday lights — there is always something happening somewhere in the valley. Pick the communities you will be in and the kinds of things you want to do; leave both empty to see everything that is on.</p>
-  <section class="outdoor-step" aria-labelledby="whatsOnRegionsHeading">
-  <div class="outdoor-step-head"><h2 class="category-subsection-heading" id="whatsOnRegionsHeading">Choose Region(s)</h2><span class="outdoor-step-status" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span></div>
-  ${whatsOnRegionChipsHtml({ selectedRegions, counts: counts ? counts.regions : null })}
-  </section>
-  ${whatsOnCategoryGridHtml({ selectedCategories, counts: counts ? counts.categories : null })}
-  ${hasInventory ? whatsOnDateStepHtml({ window }) : ''}
-  <div class="outdoor-filter-actions">
-    <button type="button" class="cta outdoor-show-results" id="whatsOnShowResults"${hasInventory ? '' : ' hidden'}>${filtered ? `Show ${matching.length} result${matching.length === 1 ? '' : 's'}` : 'Show all results'}</button>
-    <button type="button" class="outdoor-clear-filters" id="whatsOnClearFilters"${filtered ? '' : ' hidden'}>Clear all</button>
-  </div>
-  <section class="outdoor-step outdoor-step-results" aria-labelledby="whatsOnResultsTop">
-  <h2 class="category-subsection-heading" id="whatsOnResultsTop">Results</h2>
-  <p class="outdoor-results-summary" id="whatsOnResultsSummary" aria-live="polite">${escapeHtml(whatsOnSummaryText(matching.length, events.length, filtered))}</p>
-  ${whatsOnSelectedTagsHtml(selectedRegions, selectedCategories)}
+  <p class="outdoor-intro whatson-intro">Festivals on the lakeshore, live music in the vineyards, farmers’ markets, hockey nights and holiday lights — there is always something happening somewhere in the valley.</p>
+  ${whatsOnSearchHtml()}
+  ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
+  ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory })}
+  <span class="visually-hidden" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span>
+  <section class="outdoor-step outdoor-step-results whatson-results-step" aria-labelledby="whatsOnResultsTop">
+  <h2 class="visually-hidden" id="whatsOnResultsTop">Results</h2>
+  ${whatsOnResultBarHtml(matching.length, events.length, filtered, selectedRegions, selectedCategories)}
   <div class="whatson-empty" id="whatsOnEmptyInventory"${hasInventory ? ' hidden' : ''}>
     <h3>We’re gathering what’s on.</h3>
     <p>Okanagan Roam is building its What’s On listings community by community. Your region and category choices are saved in the address bar, so this page is ready the moment the first events arrive — in the meantime, <a href="/outdoors">explore the outdoors</a> or <a href="/trip">start planning a trip</a>.</p>
