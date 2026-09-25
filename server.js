@@ -2801,9 +2801,18 @@ function resolveDiscoveryDestination(intent) {
     // beach). It is offered as "everything that matches" only when that is
     // true: when no Hidden Gem in the requested regions is a cafe, winery,
     // brewery, golf course or other type the page leaves out.
-    if (same(C, ['hidden_gem']) && !T.length && !F.length && !A.length && !Q.length && getSecretSpotVenues().length >= MIN_CATEGORY_VENUES) {
-      if (countHiddenGemsOutsideSecretSpots(R) > 0) return none('collection_broader_than_page');
+    if (same(C, ['hidden_gem']) && !T.length && !F.length && !A.length && !Q.length && getSecretSpotVenues().length >= MIN_CATEGORY_VENUES
+      && countHiddenGemsOutsideSecretSpots(R) === 0) {
       return { url: `/secret-spots${discoveryQueryString({ regions: R })}`, kind: 'secret-spots', reason: 'collection' };
+    }
+    // Every other Hidden Gems request -- the whole collection, a region whose
+    // gems include cafes, wineries or golf, a category ("wine and hidden
+    // gems") or one badge ("dog friendly hidden gems") -- goes to the full
+    // Hidden Gems page, but only when that page shows exactly the matching
+    // venues (see hiddenGemsPageDestination). Otherwise: no destination.
+    if (same(C, ['hidden_gem']) && !A.length && !Q.length) {
+      if (F.length <= 1 && isHiddenGemsPageEnabled()) return hiddenGemsPageDestination(intent);
+      if (!T.length && !F.length) return none('collection_broader_than_page');
     }
     if (same(C, ['local_favorite']) && !F.length && !A.length && !Q.length && getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES) {
       return { url: `/local-favorites${discoveryQueryString({ types: T, regions: R })}`, kind: 'local-favorites', reason: 'collection' };
@@ -10829,6 +10838,65 @@ function renderSecretSpotsPage(venues, filter = null) {
   }, venues, filter);
 }
 
+// ---------- Hidden Gems page (2026-09-25): /hidden-gems ----------
+//
+// The whole live 'hidden_gem' collection -- every type, not only the outdoor
+// and beach Secret Spots -- on the shared curated-collection page, with its
+// category and region filters. /hidden-gems/<badge> (e.g. /hidden-gems/
+// dog-friendly) narrows it to one badge; the badge sits in the path because
+// the shared page script rewrites the query string to types/regions only.
+// The venue list comes from selectDiscoveryVenues, the same selection
+// /api/discover uses, so the page and the API cannot disagree. Served only
+// while DISCOVERY_SEARCH or TRIP_PLANNER_V2 is on (the only features that
+// link here); with both off the path is the same 404 as before.
+const HIDDEN_GEM_FEATURE_BY_SLUG = Object.fromEntries(Object.keys(BADGE_LABELS).map((f) => [f.replace(/_/g, '-'), f]));
+function isHiddenGemsPageEnabled() {
+  return isDiscoverySearchEnabled() || isTripPlannerV2Enabled();
+}
+function hiddenGemsIntent({ types = [], regions = [], features = [] } = {}) {
+  return { mode: 'find', regions, types, features, collections: ['hidden_gem'], activities: [], cuisines: [], textTerms: [] };
+}
+function getHiddenGemCollectionVenues(feature = null) {
+  const picked = selectDiscoveryVenues(hiddenGemsIntent({ features: feature ? [feature] : [] }), Number.MAX_SAFE_INTEGER);
+  const ids = new Set(picked.items.map((x) => x.id));
+  return db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL ORDER BY name ASC').all()
+    .filter((v) => ids.has(v.id)).map(rowToVenue);
+}
+// A Hidden Gems destination only when the page would show exactly what the
+// request matches: the same venues, none lost and none added (e.g. a venue
+// that matches a category only through a secondary Food & Drink category
+// would be missing from the page's primary-type filter -> no destination).
+function hiddenGemsPageDestination(intent) {
+  const T = intent.types, R = intent.regions, F = intent.features;
+  const none = (reason) => ({ url: null, kind: null, reason });
+  const feature = F[0] || null;
+  const wanted = selectDiscoveryVenues(hiddenGemsIntent({ types: T, regions: R, features: F }), Number.MAX_SAFE_INTEGER);
+  if (!wanted.total) return none('no_matching_hidden_gems');
+  const shown = getHiddenGemCollectionVenues(feature).filter((v) => localFavouriteFilterMatches(T, R, v.type, v.region));
+  const a = new Set(wanted.items.map((x) => x.id));
+  if (shown.length !== a.size || !shown.every((v) => a.has(v.id))) return none('collection_page_mismatch');
+  const path = feature ? `/hidden-gems/${feature.replace(/_/g, '-')}` : '/hidden-gems';
+  return { url: `${path}${discoveryQueryString({ types: T, regions: R })}`, kind: 'hidden-gems', reason: 'collection' };
+}
+function renderHiddenGemsPage(venues, filter = null, feature = null) {
+  const badge = feature ? BADGE_LABELS[feature] : null;
+  const heading = badge ? `${badge.title} Hidden Gems` : 'Hidden Gems';
+  const which = !badge ? ''
+    : feature === 'dog_friendly'
+      ? ' This view shows only the ones with the Dog-Friendly badge or on the official dog-friendly beaches list.'
+      : ` This view shows only the ones with the ${escapeHtml(badge.title)} badge.`;
+  return renderCuratedCollectionPage({
+    path: feature ? `/hidden-gems/${feature.replace(/_/g, '-')}` : '/hidden-gems',
+    heading,
+    title: `${heading} in the Okanagan | Okanagan Roam`,
+    description: `${venues.length} ${badge ? `${badge.adj} ` : ''}places on Okanagan Roam's Hidden Gems list across the Okanagan Valley. Not a ranking.`,
+    introHtml: `Every place on Okanagan Roam&rsquo;s Hidden Gems list &mdash; caf&eacute;s, wineries, breweries, pubs, golf courses, parks and quieter beaches that are easy to miss. They are listed alphabetically, not ranked.${which}`,
+    searchLabel: 'Search hidden gems',
+    pluralNoun: 'hidden gems',
+    summaryLabel: 'hidden gem',
+  }, venues, filter);
+}
+
 // ---------- What's On (2026-09-22): page shell at /whats-on ----------
 //
 // The What's On counterpart to the Outdoors explorer: Choose Region(s) ->
@@ -14884,6 +14952,23 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // GET /hidden-gems[/<badge>] -- the full Hidden Gems collection (see
+    // renderHiddenGemsPage). Only while DISCOVERY_SEARCH or TRIP_PLANNER_V2
+    // is on; otherwise the request falls through exactly as before.
+    const hiddenGemsMatch = pathname.match(/^\/hidden-gems(?:\/([a-z-]+))?\/?$/);
+    if (hiddenGemsMatch && method === 'GET' && isHiddenGemsPageEnabled()) {
+      const slug = hiddenGemsMatch[1] || null;
+      const feature = slug ? HIDDEN_GEM_FEATURE_BY_SLUG[slug] || null : null;
+      const hgVenues = !slug || feature ? getHiddenGemCollectionVenues(feature) : [];
+      if (hgVenues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderHiddenGemsPage(hgVenues, parseLocalFavouritesFilterQuery(query), feature);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // GET /secret-spots -- Secret Spots (2026-09-25), the destination for the
     // homepage's Hidden Gems "Secret Spots" card. Same shape as /local-favorites.
     if (pathname === '/secret-spots' && method === 'GET') {
@@ -15398,6 +15483,9 @@ module.exports = {
   tripStartWeekday,
   okanaganClock,
   countHiddenGemsOutsideSecretSpots,
+  getHiddenGemCollectionVenues,
+  hiddenGemsPageDestination,
+  renderHiddenGemsPage,
   isDiscoverySearchEnabled,
   interpretDiscoveryText,
   resolveDiscoveryDestination,

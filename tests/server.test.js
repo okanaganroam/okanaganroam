@@ -9186,9 +9186,9 @@ test('Phase 2: Hero Search routing sends each example to an existing page', () =
   assert.equal(route('wineries Naramata').url, '/naramata/wineries');
   assert.equal(route('poutine').url, '/browse?q=poutine', 'a single free word keeps the visitor\'s own term on /browse\'s existing search');
   // The fixture's Hidden Gems include a cafe, restaurants and a winery, which
-  // /secret-spots (outdoor + beach only) does not list -- so no destination.
-  assert.equal(route('hidden gems').url, null);
-  assert.equal(route('hidden gems').reason, 'collection_broader_than_page');
+  // /secret-spots (outdoor + beach only) does not list -- so the full
+  // Hidden Gems page instead.
+  assert.equal(route('hidden gems').url, '/hidden-gems');
   assert.match(route('things to do with kids in Penticton').url, /^(\/guide\/penticton\/kid_friendly|\/browse\?regions=penticton&features=kid_friendly)$/);
   assert.equal(route('events this weekend').url, '/whats-on?when=this-weekend');
   assert.equal(route('markets this weekend').url, '/whats-on?when=this-weekend&categories=markets-fairs');
@@ -9495,7 +9495,7 @@ function withHiddenGemScopeFixtures(fn) {
   });
 }
 
-test('Hidden Gems link: a broader Hidden Gems result never links to /secret-spots as "everything that matches"', () => withHiddenGemScopeFixtures(() => {
+test('Hidden Gems link: a broader Hidden Gems result never links to /secret-spots as "everything that matches"', () => withDiscoveryFlag(undefined, () => withPlannerFlag(undefined, () => withHiddenGemScopeFixtures(() => {
   const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
   // Kelowna's Hidden Gems include a brewery and a golf course -> no destination.
   assert.ok(app.countHiddenGemsOutsideSecretSpots(['kelowna']) >= 2);
@@ -9510,7 +9510,7 @@ test('Hidden Gems link: a broader Hidden Gems result never links to /secret-spot
   assert.equal(plan.totalMatches, kelownaGems.length);
   const names = plan.recommendations.map((s) => s.venue.name);
   for (const n of ['HG Kelowna Park', 'HG Kelowna Brewery', 'HG Kelowna Golf']) assert.ok(names.includes(n), n);
-}));
+}))));
 
 test('Hidden Gems link: /secret-spots is still offered where it genuinely holds every Hidden Gem in scope', () => withHiddenGemScopeFixtures(() => {
   const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
@@ -9532,3 +9532,95 @@ test('Hidden Gems link: mixed requests never get a /secret-spots destination jus
     assert.ok(!plan.seeAll || !plan.seeAll.url.startsWith('/secret-spots'), q);
   }
 }));
+
+// ---- Hidden Gems page (2026-09-25): /hidden-gems ---------------------------
+// With DISCOVERY_SEARCH or TRIP_PLANNER_V2 on, Hidden Gems requests that
+// /secret-spots cannot fully represent go to /hidden-gems (the whole
+// collection on the shared curated page), but only when that page shows
+// exactly the venues the request matches. Flags off: the path is a 404 as
+// before and nothing links to it.
+function hgVisibleIds(html) {
+  return [...html.matchAll(/<li class="venue-card"( hidden)? data-venue-id="(\d+)"/g)].filter((m) => !m[1]).map((m) => Number(m[2]));
+}
+function hgApiIds(q) {
+  return app.runDiscovery(q, { limit: 60 }).results.items.map((x) => x.id);
+}
+
+test('Hidden Gems page: every Hidden Gems request lands on a page showing exactly its matches', () => withDiscoveryFlag('on', () => withHiddenGemScopeFixtures(async (v) => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  // Add a dog-friendly Kelowna gem (badge) so the one-badge path has a match.
+  db.prepare('UPDATE venues SET dog_friendly = 1 WHERE id = ?').run(v['HG Kelowna Park'].id);
+  const cases = {
+    'hidden gems': '/hidden-gems',
+    'secret spots': '/hidden-gems',
+    'hidden gems in Kelowna': '/hidden-gems?regions=kelowna',
+    'dog friendly hidden gems in Kelowna': '/hidden-gems/dog-friendly?regions=kelowna',
+    'hidden gem golf courses in Kelowna': '/hidden-gems?types=golf&regions=kelowna',
+  };
+  await withDiscoveryServer(async (base) => {
+    for (const [q, url] of Object.entries(cases)) {
+      assert.equal(route(q).url, url, q);
+      const res = await fetch(base + url);
+      assert.equal(res.status, 200, url);
+      const shown = hgVisibleIds(await res.text()).sort();
+      const api = hgApiIds(q).sort();
+      assert.ok(api.length > 0, q);
+      assert.deepEqual(shown, api, `${q}: page shows exactly the API's matches`);
+    }
+    // Hero Search redirect uses the same destination.
+    const r = await fetch(`${base}/browse?q=${encodeURIComponent('hidden gems in Kelowna')}`, { redirect: 'manual' });
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get('location'), '/hidden-gems?regions=kelowna');
+    // The badge view names its rule; unknown badges and paths are 404s.
+    const dog = await (await fetch(`${base}/hidden-gems/dog-friendly`)).text();
+    assert.match(dog, /<h1>Dog-Friendly Hidden Gems<\/h1>/);
+    assert.match(dog, /Dog-Friendly badge or on the official dog-friendly beaches list/);
+    assert.equal((await fetch(`${base}/hidden-gems/not-a-badge`)).status, 404);
+    assert.equal((await fetch(`${base}/hidden-gems/dog-friendly/extra`)).status, 404);
+  });
+})));
+
+test('Hidden Gems page: /secret-spots is kept where it holds everything; no matches or no parity means no destination', () => withDiscoveryFlag('on', () => withHiddenGemScopeFixtures(() => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  // Osoyoos gems are all outdoor/beach -> the existing Secret Spots link.
+  assert.equal(route('hidden gems in Osoyoos').url, '/secret-spots?regions=osoyoos');
+  // Combined intent is preserved and never collapses to a Hidden-Gems-only page.
+  assert.equal(route('hidden gem beaches in Osoyoos').url, '/hidden-gems?types=beach&regions=osoyoos');
+  assert.deepEqual(hgApiIds('hidden gem beaches in Osoyoos'), [db.prepare("SELECT id FROM venues WHERE slug = 'hg-osoyoos-beach'").get().id]);
+  // Nothing matches -> no destination (the visitor's own search is kept).
+  assert.equal(route('hidden gem wineries in Osoyoos').url, null);
+  assert.equal(route('hidden gem wineries in Osoyoos').reason, 'no_matching_hidden_gems');
+  // More than one badge is not something the page can show -> no destination.
+  assert.equal(route('dog friendly patio hidden gems in Kelowna').url, null);
+  // Other constraints the page cannot show (activities, text) -> no destination.
+  assert.equal(route('hidden gem hiking').url, null);
+})));
+
+test('Hidden Gems page: a category match through a secondary Food & Drink category has no destination (the page filters primary types)', () => withDiscoveryFlag('on', () => withHiddenGemScopeFixtures((v) => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  const meta = { reason: 'test', batch_id: 'test-hidden-gem-scope' };
+  // The Kelowna brewery gem is also listed as a restaurant (secondary category).
+  assert.equal(app.guardedCollectionMembershipUpdate('fd_restaurants', v['HG Kelowna Brewery'].id, 'add', null, meta).ok, true);
+  try {
+    assert.ok(hgApiIds('hidden gem restaurants in Kelowna').includes(v['HG Kelowna Brewery'].id), 'the API includes it');
+    assert.equal(route('hidden gem restaurants in Kelowna').url, null, 'the page could not show it, so no link');
+    assert.equal(route('hidden gem restaurants in Kelowna').reason, 'collection_page_mismatch');
+  } finally {
+    app.guardedCollectionMembershipUpdate('fd_restaurants', v['HG Kelowna Brewery'].id, 'remove', null, meta);
+  }
+})));
+
+test('Hidden Gems page: with both flags off the path is the old 404 and nothing links to it', () => withDiscoveryFlag(undefined, () => withPlannerFlag(undefined, () => withHiddenGemScopeFixtures(() => withDiscoveryServer(async (base) => {
+  assert.equal((await fetch(`${base}/hidden-gems`)).status, 404);
+  assert.equal((await fetch(`${base}/hidden-gems/dog-friendly`)).status, 404);
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  assert.equal(route('hidden gems').url, null);
+  assert.equal(route('hidden gems').reason, 'collection_broader_than_page');
+  assert.equal(route('wine and hidden gems').url, null);
+})))));
+
+test('Hidden Gems page: Build My Trip "See everything" links follow the same rule (planner on, discovery off)', () => withDiscoveryFlag(undefined, () => withPlannerFlag('1', () => withHiddenGemScopeFixtures(() => {
+  assert.deepEqual(app.runTripPlan({ text: 'hidden gems in Kelowna' }).seeAll, { url: '/hidden-gems?regions=kelowna' });
+  assert.deepEqual(app.runTripPlan({ text: 'hidden gems in Osoyoos' }).seeAll, { url: '/secret-spots?regions=osoyoos' });
+  assert.equal(app.runTripPlan({ text: 'Plan a relaxed 3-day trip around Kelowna with wine and hidden gems.' }).seeAll, null);
+}))));
