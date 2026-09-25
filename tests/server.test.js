@@ -9904,10 +9904,11 @@ function lyvValid(overrides = {}) {
   };
 }
 
-function lyvPost(base, body, { ip, origin = base, raw, cf } = {}) {
+// `ip` is sent as X-Real-IP, the header Railway's edge sets (and overwrites)
+// with the client's address in production.
+function lyvPost(base, body, { ip, origin = base, raw, headers: extra = {} } = {}) {
   lyvIp += 1;
-  const headers = { 'Content-Type': 'application/json', 'X-Forwarded-For': ip || `10.9.0.${lyvIp}` };
-  if (cf) headers['CF-Connecting-IP'] = cf;
+  const headers = { 'Content-Type': 'application/json', 'X-Real-IP': ip || `10.9.0.${lyvIp}`, ...extra };
   if (origin) headers.Origin = origin;
   return fetch(`${base}/api/venue-submissions`, { method: 'POST', headers, body: raw !== undefined ? raw : JSON.stringify(body) });
 }
@@ -10016,7 +10017,7 @@ test('List Your Venue: validation rejects missing, invalid and oversized fields 
   assert.equal(unknown.status, 400, 'unexpected keys are refused');
   const malformed = await lyvPost(base, null, { raw: '{"name":' });
   assert.equal(malformed.status, 400);
-  const notJson = await fetch(`${base}/api/venue-submissions`, { method: 'POST', headers: { 'Content-Type': 'text/plain', Origin: base, 'X-Forwarded-For': '10.9.9.1' }, body: 'hi' });
+  const notJson = await fetch(`${base}/api/venue-submissions`, { method: 'POST', headers: { 'Content-Type': 'text/plain', Origin: base, 'X-Real-IP': '10.9.9.1' }, body: 'hi' });
   assert.equal(notJson.status, 415);
   assert.equal(lyvSubmissionCount(), before + 1, 'only the valid 500-character submission was stored');
 }));
@@ -10049,7 +10050,7 @@ test('List Your Venue: same-origin protection', () => withDiscoveryServer(async 
   const before = lyvSubmissionCount();
   const cross = await lyvPost(base, lyvValid({ name: 'Cross Origin' }), { origin: 'https://evil.example' });
   assert.equal(cross.status, 403);
-  const crossFetch = await fetch(`${base}/api/venue-submissions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'cross-site', 'X-Forwarded-For': '10.9.9.2' }, body: JSON.stringify(lyvValid()) });
+  const crossFetch = await fetch(`${base}/api/venue-submissions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'cross-site', 'X-Real-IP': '10.9.9.2' }, body: JSON.stringify(lyvValid()) });
   assert.equal(crossFetch.status, 403);
   assert.equal(lyvSubmissionCount(), before);
   assert.equal(cross.headers.get('access-control-allow-origin'), null, 'no CORS grant on the public submission endpoint');
@@ -10067,36 +10068,30 @@ test('List Your Venue: per-IP rate limit (10 attempts an hour)', () => withDisco
   assert.equal(limited.status, 429);
   const other = await lyvPost(base, lyvValid({ name: 'Other Ip Cafe' }), { ip: '10.8.8.9' });
   assert.equal(other.status, 201, 'other addresses are unaffected');
-  const spoofed = await lyvPost(base, lyvValid({ name: 'Spoofed Cafe' }), { ip: `1.2.3.4, ${ip}` });
-  assert.equal(spoofed.status, 429, 'a client-supplied X-Forwarded-For prefix does not escape the limit');
+  const spoofed = await lyvPost(base, lyvValid({ name: 'Spoofed Cafe' }), { ip, headers: { 'X-Forwarded-For': '1.2.3.4' } });
+  assert.equal(spoofed.status, 429, 'a client-supplied X-Forwarded-For does not escape the limit');
 }));
 
-test('List Your Venue: behind Cloudflare the rate limit keys on CF-Connecting-IP, and only for real Cloudflare peers', () => withDiscoveryServer(async (base) => {
-  // Production: Railway appends the Cloudflare egress IP it saw, and those rotate.
-  const cfPeers = ['162.158.10.1', '172.70.20.2', '104.23.1.3', '108.162.200.4', '2400:cb00:2049::1'];
+test('List Your Venue: the rate limit keys on X-Real-IP; forged X-Forwarded-For and CF-Connecting-IP cannot bypass it', () => withDiscoveryServer(async (base) => {
+  // Production (verified 2026-09-25): Railway sets X-Real-IP to the visitor on
+  // both the Cloudflare and direct paths, while X-Forwarded-For carries rotating
+  // proxy addresses and CF-Connecting-IP is client-controlled on the direct path.
   const visitor = '203.0.113.50';
   for (let i = 0; i < 10; i++) {
-    const res = await lyvPost(base, lyvValid({ name: undefined }), { ip: cfPeers[i % cfPeers.length], cf: visitor });
+    const res = await lyvPost(base, lyvValid({ name: undefined }), {
+      ip: visitor,
+      headers: { 'X-Forwarded-For': `162.158.10.${i + 1}, 10.0.0.${i + 1}`, 'CF-Connecting-IP': `192.0.2.${i + 1}` },
+    });
     assert.equal(res.status, 400, `attempt ${i + 1} is processed normally`);
   }
-  const eleventh = await lyvPost(base, lyvValid({ name: 'Cf Limited Cafe' }), { ip: cfPeers[0], cf: visitor });
-  assert.equal(eleventh.status, 429, 'the same visitor is limited even though the Cloudflare egress IP rotated');
-  const spoofChain = await lyvPost(base, lyvValid({ name: 'Cf Spoofed Chain Cafe' }), { ip: `198.51.100.9, ${cfPeers[1]}`, cf: visitor });
-  assert.equal(spoofChain.status, 429, 'a client-supplied X-Forwarded-For prefix does not escape the limit');
-  const otherVisitor = await lyvPost(base, lyvValid({ name: 'Cf Other Visitor Cafe' }), { ip: cfPeers[2], cf: '203.0.113.51' });
-  assert.equal(otherVisitor.status, 201, 'a different visitor through the same Cloudflare IPs is not blocked');
-
-  // Not from Cloudflare (e.g. hitting the Railway domain directly): the
-  // header is ignored, so rotating a forged CF-Connecting-IP cannot bypass.
-  const direct = '198.51.100.77';
-  for (let i = 0; i < 10; i++) {
-    const res = await lyvPost(base, lyvValid({ name: undefined }), { ip: direct, cf: `192.0.2.${i + 1}` });
-    assert.equal(res.status, 400);
-  }
-  const forged = await lyvPost(base, lyvValid({ name: 'Forged Cf Cafe' }), { ip: direct, cf: '192.0.2.200' });
-  assert.equal(forged.status, 429, 'a forged CF-Connecting-IP from a non-Cloudflare peer is ignored');
-  const garbage = await lyvPost(base, lyvValid({ name: 'Garbage Cf Cafe' }), { ip: '162.158.99.99', cf: 'not-an-ip' });
-  assert.equal(garbage.status, 201, 'an invalid CF-Connecting-IP falls back to the peer address');
+  const eleventh = await lyvPost(base, lyvValid({ name: 'Real Ip Limited Cafe' }), { ip: visitor });
+  assert.equal(eleventh.status, 429, 'the same visitor is limited even though the other headers changed on every attempt');
+  const forgedXff = await lyvPost(base, lyvValid({ name: 'Forged Xff Cafe' }), { ip: visitor, headers: { 'X-Forwarded-For': '198.51.100.9' } });
+  assert.equal(forgedXff.status, 429, 'a forged X-Forwarded-For does not escape the limit');
+  const forgedCf = await lyvPost(base, lyvValid({ name: 'Forged Cf Cafe' }), { ip: visitor, headers: { 'CF-Connecting-IP': '198.51.100.10' } });
+  assert.equal(forgedCf.status, 429, 'a forged CF-Connecting-IP does not escape the limit');
+  const otherVisitor = await lyvPost(base, lyvValid({ name: 'Real Ip Other Visitor Cafe' }), { ip: '203.0.113.51' });
+  assert.equal(otherVisitor.status, 201, 'a different visitor is not blocked');
 }));
 
 test('List Your Venue: request body size limit', () => withDiscoveryServer(async (base) => {

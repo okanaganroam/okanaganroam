@@ -13455,36 +13455,17 @@ function venueSubmissionRateLimited(ip, now = Date.now()) {
   return recent.length > VENUE_SUBMISSION_RATE_LIMIT;
 }
 
-// The last X-Forwarded-For entry is the one Railway's proxy appended (the
-// address that actually connected to it); earlier entries are
-// client-supplied. In production that connecting address is Cloudflare,
-// whose egress IPs rotate, so for requests that genuinely arrive from a
-// Cloudflare IP the visitor is Cloudflare's CF-Connecting-IP instead.
-// CF-Connecting-IP is ignored on any request that did not come from
-// Cloudflare (e.g. straight to the Railway domain), so it can't be spoofed.
-// Ranges: https://www.cloudflare.com/ips/ (2026-09-25).
-const CLOUDFLARE_IP_RANGES = new (require('net').BlockList)();
-for (const cidr of [
-  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
-  '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
-  '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
-]) CLOUDFLARE_IP_RANGES.addSubnet(cidr.split('/')[0], Number(cidr.split('/')[1]), 'ipv4');
-for (const cidr of [
-  '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32',
-  '2a06:98c0::/29', '2c0f:f248::/32',
-]) CLOUDFLARE_IP_RANGES.addSubnet(cidr.split('/')[0], Number(cidr.split('/')[1]), 'ipv6');
-
-function isCloudflareIp(ip) {
-  const family = require('net').isIP(ip);
-  return family !== 0 && CLOUDFLARE_IP_RANGES.check(ip, family === 4 ? 'ipv4' : 'ipv6');
-}
-
+// The visitor's IP for the rate limit. Railway's edge sets X-Real-IP to the
+// client's address and overwrites any client-supplied value, on both the
+// Cloudflare path (where it resolves to the visitor, not Cloudflare) and the
+// direct *.up.railway.app path -- verified in production 2026-09-25.
+// X-Forwarded-For and CF-Connecting-IP are not used: Railway rewrites the
+// former with proxy addresses, and the latter is forgeable on the direct
+// path. Without X-Real-IP (local runs) the socket address is used.
 function requestClientIp(req) {
-  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',').pop().trim().replace(/^::ffff:/i, '');
-  const peer = forwarded || String(req.socket.remoteAddress || '').replace(/^::ffff:/i, '') || 'unknown';
-  const visitor = String(req.headers['cf-connecting-ip'] || '').trim();
-  if (isCloudflareIp(peer) && require('net').isIP(visitor)) return visitor;
-  return peer;
+  const realIp = String(req.headers['x-real-ip'] || '').trim();
+  if (require('net').isIP(realIp)) return realIp;
+  return req.socket.remoteAddress || 'unknown';
 }
 
 // Same-origin guard for the public POST. Browsers always send Origin on a
@@ -13730,47 +13711,7 @@ function sendSubmissionResponse(res, status, data, close = false) {
   res.end(JSON.stringify(data));
 }
 
-// TEMPORARY (2026-09-25): diagnostic for the submission rate-limit IP
-// source. Logs presence, salted hashes (random per-process salt, never
-// logged), and booleans only -- never a raw IP. To be removed.
-const LYV_IP_DIAG_SALT = crypto.randomBytes(16).toString('hex');
-function logVenueSubmissionIpDiagnostic(req) {
-  const net = require('net');
-  const clean = (v) => String(v || '').trim().replace(/^::ffff:/i, '');
-  const hash = (v) => crypto.createHash('sha256').update(`${LYV_IP_DIAG_SALT}:${v}`).digest('hex').slice(0, 10);
-  const privateRanges = new net.BlockList();
-  for (const [a, n] of [['10.0.0.0', 8], ['172.16.0.0', 12], ['192.168.0.0', 16], ['100.64.0.0', 10], ['127.0.0.0', 8]]) privateRanges.addSubnet(a, n, 'ipv4');
-  privateRanges.addSubnet('fc00::', 7, 'ipv6');
-  privateRanges.addSubnet('::1', 128, 'ipv6');
-  const probe = String(req.headers['x-lyv-diag-probe'] || '');
-  const describe = (raw) => {
-    const v = clean(raw);
-    if (!v) return { present: false };
-    const family = net.isIP(v);
-    return {
-      present: true,
-      hash: hash(v),
-      family,
-      cloudflare: family ? isCloudflareIp(v) : false,
-      private: family ? privateRanges.check(v, family === 4 ? 'ipv4' : 'ipv6') : false,
-      matchesProbe: probe ? crypto.createHash('sha256').update(v).digest('hex') === probe : null,
-    };
-  };
-  const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((e) => e.trim()).filter(Boolean);
-  console.log('[lyv-ip-diag] ' + JSON.stringify({
-    requestId: req.headers['x-railway-request-id'] || null,
-    host: req.headers.host,
-    xRealIp: describe(req.headers['x-real-ip']),
-    cfConnectingIp: describe(req.headers['cf-connecting-ip']),
-    xffCount: xff.length,
-    xff: xff.map(describe),
-    socket: describe(req.socket.remoteAddress),
-    currentKeyHash: hash(requestClientIp(req)),
-  }));
-}
-
 async function handleVenueSubmission(req, res) {
-  logVenueSubmissionIpDiagnostic(req);
   const generic = 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
   if (!isSameOriginSubmission(req)) {
     return sendSubmissionResponse(res, 403, { ok: false, error: 'Submissions are only accepted from the Okanagan Roam website.' });
