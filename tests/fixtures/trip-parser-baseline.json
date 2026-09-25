@@ -1,0 +1,2757 @@
+{
+ "_comment": "Byte-level baseline of the LEGACY trip parser (deterministicTripParserProvider + parseTripRequest), captured 2026-09-25 from commit 7e62fe6 before the shared discovery-intent layer was added. Phase 1 must not change a single output. Regenerate only with explicit approval of a planner behaviour change.",
+ "fixtures": [
+  {
+   "text": "   ",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": false,
+    "reason": "empty_text"
+   }
+  },
+  {
+   "text": "???",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "2 easy days around Vernon",
+   "provider": {
+    "raw": {
+     "region": "vernon",
+     "days": 2,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "vernon",
+     "days": 2,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "3 days in Kelowna with wine and a private helicopter tour",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "helicopter tour"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "helicopter tour"
+     ],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "3 days in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "3 relaxed days in Kelowna with wine and hidden gems",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "a 10 day trip to Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a 3-day Kelowna trip",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "a 5 amazing day trip",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": 5,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": 5,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a family friendly trip to Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "kid_friendly"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "kid_friendly"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a long weekend in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "a moderate pace trip to Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a moderate trip to Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": "moderate",
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": "moderate",
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a museum trip with wheelchair access",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "wheelchair"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "wheelchair"
+     ],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a relaxed 3-day Kelowna wine trip",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "a three day trip",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a trip around Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a trip to Kelowna with beaches and swimming",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "swimming",
+      "beaches"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "swimming",
+      "beaches"
+     ],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a trip to West Kelowna",
+   "provider": {
+    "raw": {
+     "region": "west-kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "west-kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a weekend in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "a wheelchair accessible trip to Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "wheelchair accessible"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "wheelchair accessible"
+     ],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "any request",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "asdkjfh qwepoiu zxcvb",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Big White for skiing",
+   "provider": {
+    "raw": {
+     "region": "big-white",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "big-white",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "breweries in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "brewery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "brewery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "cafes in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "cafe"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "cafe"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "cocktail bars in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "cocktail"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "cocktail"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "five days in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 5,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 5,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "for three days",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region"
+     ]
+    }
+   }
+  },
+  {
+   "text": "gibberish request",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Give me a packed 2 day trip in Vernon with golf and food.",
+   "provider": {
+    "raw": {
+     "region": "vernon",
+     "days": 2,
+     "interests": [
+      "restaurant",
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "packed",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "vernon",
+     "days": 2,
+     "interests": [
+      "restaurant",
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "packed",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "Give me three days of wine.",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region"
+     ]
+    }
+   }
+  },
+  {
+   "text": "give me three days of wine",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region"
+     ]
+    }
+   }
+  },
+  {
+   "text": "gluten free places in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "gluten_free"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "gluten_free"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "golf and food and cocktails in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "restaurant",
+      "cocktail",
+      "golf"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "restaurant",
+      "cocktail",
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "golfing in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "happy hour in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "happy_hour"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "happy_hour"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "hidden gems in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "I ate 3 apples that day",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "I want to visit some wineries",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Lake Country please",
+   "provider": {
+    "raw": {
+     "region": "lake-country",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "lake-country",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "my order was 3 items that day",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Naramata please",
+   "provider": {
+    "raw": {
+     "region": "naramata",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "naramata",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Okanagan Falls sounds nice",
+   "provider": {
+    "raw": {
+     "region": "okanagan-falls",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "okanagan-falls",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "one day in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 1,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 1,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "Plan 4 days around Osoyoos. I want affordable wineries and hidden gems.",
+   "provider": {
+    "raw": {
+     "region": "osoyoos",
+     "days": 4,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": "budget",
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "osoyoos",
+     "days": 4,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": "budget",
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "Plan me a 3 day Kelowna trip with wine and a private helicopter tour.",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "helicopter tour"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "helicopter tour"
+     ],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "Plan me a relaxed 3 relaxed days trip",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": 3,
+     "interests": [],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Plan me a relaxed 3-day trip around Kelowna with wine.",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "Plan something in Kelowna.",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "pubs in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "pub"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "pub"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "restaurants in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "restaurant"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "restaurant"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "something fun happening Saturday night in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "something fun happening",
+      "saturday night"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "something fun happening",
+      "saturday night"
+     ],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "something in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "somewhere with a patio in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "patio"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "patio"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Take me to Lake Country for three days. I have my dog and want a leisurely trip.",
+   "provider": {
+    "raw": {
+     "region": "lake-country",
+     "days": 3,
+     "interests": [],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "lake-country",
+     "days": 3,
+     "interests": [],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "the Kelowna area",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "three packed days of golf",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": 3,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "packed",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": 3,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "packed",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region"
+     ]
+    }
+   }
+  },
+  {
+   "text": "vegan options in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "vegan"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "vegan"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "wine and wineries and a wine tasting in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "wineries in Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "I'm looking for a relaxed weekend around Penticton with wineries and beaches.",
+   "provider": {
+    "raw": {
+     "region": "penticton",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "beaches"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "penticton",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "beaches"
+     ],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "A weekend in Penticton with food, golf and a slower pace",
+   "provider": {
+    "raw": {
+     "region": "penticton",
+     "days": null,
+     "interests": [
+      "restaurant",
+      "golf"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "penticton",
+     "days": null,
+     "interests": [
+      "restaurant",
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "2 days around Vernon with wineries and dog-friendly places",
+   "provider": {
+    "raw": {
+     "region": "vernon",
+     "days": 2,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "vernon",
+     "days": 2,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "Plan a relaxed 3-day trip around Kelowna with wine and hidden gems.",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": 3,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "relaxed",
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "Find me a great date night in Kelowna.",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Where can I get the best poutine in the Okanagan?",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Plan 3 days in Penticton with kids.",
+   "provider": {
+    "raw": {
+     "region": "penticton",
+     "days": 3,
+     "interests": [],
+     "amenities": [
+      "kid_friendly"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "penticton",
+     "days": 3,
+     "interests": [],
+     "amenities": [
+      "kid_friendly"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": []
+    }
+   }
+  },
+  {
+   "text": "What should I do in Vernon with my dog?",
+   "provider": {
+    "raw": {
+     "region": "vernon",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "vernon",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Find me a romantic winery and dinner.",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "What can we do around Penticton if it rains?",
+   "provider": {
+    "raw": {
+     "region": "penticton",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "penticton",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "Plan a golf weekend around Kelowna.",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "dog friendly",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "dog_friendly"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "beaches in Penticton",
+   "provider": {
+    "raw": {
+     "region": "penticton",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "beaches"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "penticton",
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "beaches"
+     ],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "golf Kelowna",
+   "provider": {
+    "raw": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "kelowna",
+     "days": null,
+     "interests": [
+      "golf"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "wineries in Naramata",
+   "provider": {
+    "raw": {
+     "region": "naramata",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "naramata",
+     "days": null,
+     "interests": [
+      "winery"
+     ],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "poutine",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "hidden gems",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [
+      "hidden_gem"
+     ],
+     "unsupported": [],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "things to do with kids in Penticton",
+   "provider": {
+    "raw": {
+     "region": "penticton",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "kid_friendly"
+     ],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": []
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": "penticton",
+     "days": null,
+     "interests": [],
+     "amenities": [
+      "kid_friendly"
+     ],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [],
+     "needs_clarification": [
+      "days"
+     ]
+    }
+   }
+  },
+  {
+   "text": "events this weekend",
+   "provider": {
+    "raw": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": null,
+     "budget": null,
+     "discovery": [],
+     "unsupported_terms": [
+      "events"
+     ]
+    },
+    "error": null
+   },
+   "parse": {
+    "ok": true,
+    "value": {
+     "region": null,
+     "days": null,
+     "interests": [],
+     "amenities": [],
+     "pace": "standard",
+     "budget": null,
+     "discovery": [],
+     "unsupported": [
+      "events"
+     ],
+     "needs_clarification": [
+      "region",
+      "days"
+     ]
+    }
+   }
+  }
+ ]
+}

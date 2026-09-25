@@ -2634,6 +2634,519 @@ function getKnownDiscoveryKinds() {
     .filter((kind) => !NON_DISCOVERY_COLLECTION_KINDS.has(kind));
 }
 
+// ---------- Shared discovery-intent taxonomy (Phase 1, 2026-09-25) ----------
+//
+// The ONLY bridge between discovery-intent.js (a pure interpreter with no
+// database access) and this app's real data. Every value handed to the
+// interpreter is read from the existing constants or the live database --
+// region slugs/labels, venue types, the badge features, the live editorial
+// collection kinds, the outdoor activities, the cuisines actually in use,
+// the budgets/paces the planner accepts, the What's On presets/categories,
+// and the active venues' id/name/region/type/slug for exact-name matching.
+// Read-only; not wired to any route yet (Hero Search / Build My Trip come in
+// later phases), so no page or API response changes.
+function buildDiscoveryTaxonomy() {
+  const liveKinds = db.prepare('SELECT DISTINCT kind FROM collections').all().map((r) => r.kind);
+  const cuisines = db.prepare(`
+    SELECT DISTINCT lower(trim(cuisine)) AS c FROM venues
+    WHERE redirect_to IS NULL AND cuisine IS NOT NULL AND trim(cuisine) != ''
+  `).all().map((r) => r.c);
+  const venues = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL')
+    .all()
+    .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
+  return {
+    regions: VALID_REGIONS.slice(),
+    regionLabels: { ...REGION_LABELS },
+    types: Object.keys(CATEGORY_SLUGS),
+    features: BOOL_FIELDS.slice(),
+    collections: liveKinds,
+    activities: OUTDOOR_ACTIVITIES.map((a) => a.slug),
+    cuisines,
+    budgets: TRIP_VALID_BUDGETS.slice(),
+    paces: TRIP_VALID_PACES.slice(),
+    datePresets: WHATSON_DATE_PRESETS.map((p) => p.key).filter((k) => k !== 'custom'),
+    eventCategories: WHATSON_CATEGORIES.map((c) => c.key),
+    venues,
+  };
+}
+
+// ---------- Discovery search (Phase 2, 2026-09-25) ----------
+//
+// Natural-language search on top of the Phase 1 interpreter:
+//
+//   text -> interpretDiscoveryQuery() -> DiscoveryIntent
+//        -> resolveDiscoveryDestination(): the EXISTING page that shows exactly
+//           that request (/{region}/{category}, /food-drink?..., /outdoors?...,
+//           /dog-friendly?..., /secret-spots, /guide/..., /whats-on?...,
+//           a venue page, or /browse pre-filtered with its own chips)
+//        -> selectDiscoveryVenues()/selectDiscoveryEvents(): the real records,
+//           ranked deterministically, for GET /api/discover
+//
+// Nothing here writes, calls an AI, or builds a second venue/event store:
+// candidates are read from the venues/collections/events tables through the
+// same helpers the pages use, and every URL is built from the record's own
+// region/type/slug. Everything is behind DISCOVERY_SEARCH (off by default):
+// with the flag off, /api/discover does not exist and /browse is unchanged.
+// Loaded lazily, on first use: with the flag off the module is never loaded,
+// and a copy of server.js running without it (the isolated child-process
+// tests copy only server.js/db.js) starts exactly as before.
+function discoveryIntentModule() {
+  return require('./discovery-intent');
+}
+
+function isDiscoverySearchEnabled() {
+  return /^(1|on|true|yes)$/i.test(String(process.env.DISCOVERY_SEARCH || '').trim());
+}
+
+// What /browse's own controls can express: its six type chips and its twelve
+// feature "stamp" chips (okanagan.html; data-filter names differ from the
+// column names). Anything else must go to a page that can show it.
+const BROWSE_TYPE_CHIPS = ['winery', 'brewery', 'restaurant', 'cocktail', 'cafe', 'pub'];
+const BROWSE_FEATURE_CHIP = {
+  dog_friendly: 'dog', gluten_free: 'gluten', great_groups: 'groups', happy_hour: 'happy_hour',
+  kid_friendly: 'kids', live_music: 'music', nonalcoholic: 'nonalc', patio: 'patio',
+  sports_tv: 'sports', vegan: 'vegan', vegetarian: 'vegetarian', lake_view: 'view',
+};
+const DISCOVERY_HUB_PAGES = { winery: '/wineries', golf: '/golf', beach: '/beaches', outdoor: '/outdoors' };
+const DISCOVERY_DEFAULT_LIMIT = 24;
+const DISCOVERY_MAX_LIMIT = 60;
+
+function interpretDiscoveryText(text) {
+  return discoveryIntentModule().interpretDiscoveryQuery(text, buildDiscoveryTaxonomy());
+}
+
+// "a=x,y&b=z" with each value URL-encoded but the list commas kept literal,
+// matching how every directory page writes its own filter URLs.
+function discoveryQueryString(params) {
+  const parts = [];
+  for (const [key, value] of Object.entries(params)) {
+    const list = Array.isArray(value) ? value : (value == null || value === '' ? [] : [value]);
+    if (list.length) parts.push(`${key}=${list.map((v) => encodeURIComponent(String(v))).join(',')}`);
+  }
+  return parts.length ? `?${parts.join('&')}` : '';
+}
+
+function discoveryVenueUrl(venue) {
+  return venue && REGION_LABELS[venue.region] && CATEGORY_SLUGS[venue.type] && venue.slug
+    ? `/${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}`
+    : null;
+}
+function discoveryEventUrl(event) {
+  return event && REGION_LABELS[event.region] && event.slug ? `/${event.region}/events/${event.slug}` : null;
+}
+
+// The What's On window for an intent's `when`: presets pass straight
+// through; "tomorrow" and a weekday become a one-day custom window computed
+// in the site's local civil time (the same helpers What's On uses).
+function discoveryWhatsOnWindowParams(when, now = new Date()) {
+  if (!when) return {};
+  if (when.preset) return { when: when.preset };
+  const today = todayLocal(now);
+  if (when.relative === 'tomorrow') { const d = addLocalDays(today, 1); return { when: 'custom', from: d, to: d }; }
+  if (when.weekday) {
+    const target = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(when.weekday);
+    if (target === -1) return {};
+    const d = addLocalDays(today, (target - localWeekday(today) + 7) % 7);
+    return { when: 'custom', from: d, to: d };
+  }
+  return {};
+}
+
+// Hero Search routing. Returns { url, kind } for a request an existing page
+// can show exactly, or { url: null, reason } -- in which case the caller keeps
+// today's behaviour. Deliberately conservative: anything the destination page
+// could not honestly reflect (an ambiguity, a conflict, an unsupported phrase,
+// a heuristic occasion, a budget, a date on a venue search, a trip plan)
+// returns no destination rather than silently dropping part of the request.
+function resolveDiscoveryDestination(intent) {
+  const none = (reason) => ({ url: null, kind: null, reason });
+  if (!intent) return none('no_intent');
+  if (intent.mode === 'navigate' && intent.exactVenue) {
+    const url = discoveryVenueUrl(intent.exactVenue);
+    return url ? { url, kind: 'venue', reason: 'exact_venue' } : none('venue_without_url');
+  }
+  if (intent.confidence === 'low') return none('low_confidence');
+  if (intent.ambiguities.length) return none('ambiguous');
+  if (intent.conflicts.length) return none('conflicting');
+  if (intent.unsupported.length) return none('unsupported');
+  if (intent.needs.length) return none('incomplete');
+  if (intent.mode === 'plan') return none('trip_request');
+
+  const R = intent.regions, F = intent.features, C = intent.collections, A = intent.activities;
+  const T = intent.types;
+  const Q = [...intent.cuisines, ...intent.textTerms];
+
+  if (intent.mode === 'events') {
+    if (Q.length) return none('event_text_search');
+    const w = discoveryWhatsOnWindowParams(intent.when);
+    return { url: `/whats-on${discoveryQueryString({ ...w, regions: R, categories: intent.eventCategories })}`, kind: 'events', reason: 'events' };
+  }
+  if (intent.occasion) return none('heuristic_occasion');
+  if (intent.budget) return none('budget_not_filterable');
+  if (intent.when) return none('date_on_venue_search');
+  if (Q.length > 1) return none('multiple_text_terms');
+
+  // Never route to a page that would 404: each destination is only offered
+  // when the page it points at currently has something to show.
+  const hasRegionCategory = (r, t) => getVenuesByRegionCategory(r, t).length >= MIN_CATEGORY_VENUES || RETAINED_EMPTY_CATEGORY_PAGES.has(`${r}/${t}`);
+  const hasRegion = (r) => Object.keys(getRegionCategoryCounts(r)).length > 0;
+  const hasHub = (t) => (t === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(t)).length >= MIN_CATEGORY_VENUES;
+  const subset = (list, allowed) => list.every((x) => allowed.includes(x));
+  const same = (list, expected) => list.length === expected.length && subset(list, expected);
+  const isFD = (t) => !!FD_CATEGORY_KIND_BY_TYPE[t];
+
+  // Curated collections go to their own pages.
+  if (C.length) {
+    // /secret-spots lists only the Hidden Gems that are places (outdoor and
+    // beach). It is offered as "everything that matches" only when that is
+    // true: when no Hidden Gem in the requested regions is a cafe, winery,
+    // brewery, golf course or other type the page leaves out.
+    if (same(C, ['hidden_gem']) && !T.length && !F.length && !A.length && !Q.length && getSecretSpotVenues().length >= MIN_CATEGORY_VENUES) {
+      if (countHiddenGemsOutsideSecretSpots(R) > 0) return none('collection_broader_than_page');
+      return { url: `/secret-spots${discoveryQueryString({ regions: R })}`, kind: 'secret-spots', reason: 'collection' };
+    }
+    if (same(C, ['local_favorite']) && !F.length && !A.length && !Q.length && getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES) {
+      return { url: `/local-favorites${discoveryQueryString({ types: T, regions: R })}`, kind: 'local-favorites', reason: 'collection' };
+    }
+    if (same(C, ['dog_friendly']) && same(T, ['beach']) && same(F, ['dog_friendly']) && !A.length && !Q.length) {
+      return { url: `/dog-friendly${discoveryQueryString({ types: [DOG_BEACH_TYPE_KEY], regions: R })}`, kind: 'dog-friendly', reason: 'collection' };
+    }
+    return none('collection_combination');
+  }
+  // Outdoor activities -> the Outdoors directory.
+  if (A.length) {
+    if (subset(T, ['outdoor']) && !F.length && !Q.length && hasHub('outdoor')) {
+      return { url: `/outdoors${discoveryQueryString({ regions: R, activities: A })}`, kind: 'outdoors', reason: 'activities' };
+    }
+    return none('activity_combination');
+  }
+  // Dog-friendly -> Dog Friendly Finds, which has its own type/feature chips.
+  if (F.includes('dog_friendly') && !Q.length) {
+    const others = F.filter((f) => f !== 'dog_friendly');
+    if (subset(others, [...DOG_HUB_FEATURE_KEYS]) && subset(T, [...DOG_HUB_TYPE_KEYS].filter((t) => t !== DOG_BEACH_TYPE_KEY))) {
+      return { url: `/dog-friendly${discoveryQueryString({ types: T, features: others, regions: R })}`, kind: 'dog-friendly', reason: 'feature' };
+    }
+  }
+  // One free-text word (e.g. "poutine") -> /browse's existing text search,
+  // with whatever /browse can also express applied through its own chips.
+  if (Q.length === 1) {
+    if (subset(T, BROWSE_TYPE_CHIPS) && subset(F, Object.keys(BROWSE_FEATURE_CHIP))) {
+      return { url: `/browse${discoveryQueryString({ types: T, regions: R, features: F, q: Q[0] })}`, kind: 'browse', reason: 'text_search' };
+    }
+    return none('text_search_combination');
+  }
+  // Structured requests, most specific existing page first.
+  if (R.length === 1 && T.length === 1 && !F.length && hasRegionCategory(R[0], T[0])) {
+    return { url: `/${R[0]}/${CATEGORY_SLUGS[T[0]]}`, kind: 'region-category', reason: 'structured' };
+  }
+  if (R.length === 1 && T.length === 1 && isFD(T[0]) && hasRegionCategory(R[0], T[0])) {
+    return { url: `/${R[0]}/${CATEGORY_SLUGS[T[0]]}${discoveryQueryString({ features: F })}`, kind: 'region-category', reason: 'structured' };
+  }
+  if (R.length === 1 && !T.length && !F.length && hasRegion(R[0])) {
+    return { url: `/${R[0]}`, kind: 'region', reason: 'structured' };
+  }
+  if (R.length === 1 && !T.length && F.length === 1
+    && listGuideCombos(MIN_GUIDE_VENUES).some((c) => c.region === R[0] && c.badge === F[0])) {
+    return { url: `/guide/${R[0]}/${F[0]}`, kind: 'guide', reason: 'structured' };
+  }
+  if (T.length && T.every(isFD)) {
+    return { url: `/food-drink${discoveryQueryString({ types: T, features: F, regions: R })}`, kind: 'food-drink', reason: 'structured' };
+  }
+  if (T.length === 1 && !R.length && !F.length && DISCOVERY_HUB_PAGES[T[0]] && hasHub(T[0])) {
+    return { url: DISCOVERY_HUB_PAGES[T[0]], kind: 'category', reason: 'structured' };
+  }
+  if (same(T, ['outdoor']) && !F.length && hasHub('outdoor')) {
+    return { url: `/outdoors${discoveryQueryString({ regions: R })}`, kind: 'outdoors', reason: 'structured' };
+  }
+  if ((T.length || R.length || F.length) && subset(T, BROWSE_TYPE_CHIPS) && subset(F, Object.keys(BROWSE_FEATURE_CHIP))) {
+    return { url: `/browse${discoveryQueryString({ types: T, regions: R, features: F })}`, kind: 'browse', reason: 'structured' };
+  }
+  return none('no_matching_page');
+}
+
+// Whole-word match of a term inside already-normalized text.
+function discoveryTextHas(normalized, term) {
+  return ` ${normalized} `.indexOf(` ${term} `) !== -1;
+}
+
+// Real venues for an intent, ranked deterministically. Constraints are hard
+// filters (region, type incl. secondary Food & Drink categories, every
+// requested feature, collections, activities, cuisine, every text term);
+// ranking is transparent: text relevance (name 3, cuisine 2, description 1
+// per term), then rating, then review count, then name and id. Heuristics
+// (occasion, budget) are NOT applied here -- they are reported back as not
+// applied. An intent with nothing to filter on returns no venues rather than
+// the whole directory.
+function selectDiscoveryVenues(intent, limit = DISCOVERY_DEFAULT_LIMIT) {
+  if (!intent) return { total: 0, items: [] };
+  if (intent.mode === 'navigate' && intent.exactVenue) {
+    const v = db.prepare('SELECT * FROM venues WHERE id = ? AND redirect_to IS NULL').get(intent.exactVenue.id);
+    return v ? { total: 1, items: [discoveryVenueItem(v, [])] } : { total: 0, items: [] };
+  }
+  if (intent.mode === 'events' || intent.mode === 'unknown') return { total: 0, items: [] };
+  const R = intent.regions, T = intent.types, F = intent.features, C = intent.collections, A = intent.activities;
+  const cuisines = intent.cuisines, terms = intent.textTerms;
+  if (!R.length && !T.length && !F.length && !C.length && !A.length && !cuisines.length && !terms.length) return { total: 0, items: [] };
+
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all();
+  const secondary = new Map();
+  for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) {
+    if (!T.includes(type)) continue;
+    for (const id of getCollectionVenueIds(kind)) { if (!secondary.has(id)) secondary.set(id, new Set()); secondary.get(id).add(type); }
+  }
+  const members = new Map();
+  const memberSet = (kind) => { if (!members.has(kind)) members.set(kind, getCollectionVenueIds(kind)); return members.get(kind); };
+  const activityKind = (slug) => (OUTDOOR_ACTIVITIES.find((a) => a.slug === slug) || {}).kind;
+
+  const scored = [];
+  for (const v of rows) {
+    if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
+    if (R.length && !R.includes(v.region)) continue;
+    if (T.length && !T.includes(v.type) && !(secondary.get(v.id) && T.some((t) => secondary.get(v.id).has(t)))) continue;
+    if (!F.every((f) => Number(v[f]) === 1 || (f === 'dog_friendly' && memberSet('dog_friendly').has(v.id)))) continue;
+    if (!C.every((c) => memberSet(c).has(v.id))) continue;
+    if (A.length && !A.some((a) => activityKind(a) && memberSet(activityKind(a)).has(v.id))) continue;
+    const cuisine = String(v.cuisine || '').toLowerCase().trim();
+    if (cuisines.length && !cuisines.includes(cuisine)) continue;
+    const name = discoveryIntentModule().normalizeDiscoveryText(v.name || '');
+    const cui = discoveryIntentModule().normalizeDiscoveryText(v.cuisine || '');
+    const desc = discoveryIntentModule().normalizeDiscoveryText(v.description || '');
+    let score = cuisines.length ? 2 : 0;
+    const matchedOn = [];
+    let ok = true;
+    for (const term of terms) {
+      const inName = discoveryTextHas(name, term), inCui = discoveryTextHas(cui, term), inDesc = discoveryTextHas(desc, term);
+      if (!inName && !inCui && !inDesc) { ok = false; break; }
+      score += (inName ? 3 : 0) + (inCui ? 2 : 0) + (inDesc ? 1 : 0);
+      matchedOn.push(`${term}:${[inName && 'name', inCui && 'cuisine', inDesc && 'description'].filter(Boolean).join('+')}`);
+    }
+    if (!ok) continue;
+    for (const f of F) matchedOn.push(`feature:${f}`);
+    for (const c of C) matchedOn.push(`collection:${c}`);
+    if (cuisines.length) matchedOn.push(`cuisine:${cuisine}`);
+    scored.push({ v, score, matchedOn });
+  }
+  scored.sort((a, b) => b.score - a.score
+    || (Number(b.v.rating) || 0) - (Number(a.v.rating) || 0)
+    || (Number(b.v.reviews) || 0) - (Number(a.v.reviews) || 0)
+    || String(a.v.name).localeCompare(String(b.v.name))
+    || a.v.id - b.v.id);
+  return { total: scored.length, items: scored.slice(0, limit).map((s) => discoveryVenueItem(s.v, s.matchedOn)) };
+}
+// Only fields the database already holds -- nothing computed or invented.
+function discoveryVenueItem(v, matchedOn) {
+  return {
+    id: v.id, name: v.name, region: v.region, type: v.type, url: discoveryVenueUrl(v),
+    rating: v.rating == null ? null : v.rating, reviews: v.reviews == null ? null : v.reviews,
+    price: v.price == null ? null : v.price, matchedOn,
+  };
+}
+
+// Real, scheduled events from the What's On data for an events intent.
+function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date()) {
+  if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
+  const win = resolveWhatsOnWindow(discoveryWhatsOnWindowParams(intent.when, now), now);
+  let events = filterWhatsOnEvents(getWhatsOnEvents(win), intent.regions, intent.eventCategories);
+  if (intent.textTerms.length) {
+    events = events.filter((e) => {
+      const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
+      return intent.textTerms.every((t) => discoveryTextHas(text, t));
+    });
+  }
+  const items = events.slice(0, limit).map((e) => ({
+    id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
+    categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '',
+  }));
+  return { total: events.length, items, window: { from: win.from, to: win.to, preset: win.preset } };
+}
+
+// What the request asked for that search does not apply (reported, never
+// silently dropped).
+function discoveryNotApplied(intent) {
+  const out = [];
+  if (!intent) return out;
+  if (intent.occasion) out.push({ field: 'occasion', value: intent.occasion, reason: 'heuristic_not_applied_to_search' });
+  if (intent.budget) out.push({ field: 'budget', value: intent.budget, reason: 'price_data_incomplete' });
+  if (intent.days !== null) out.push({ field: 'days', value: intent.days, reason: 'trip_planning_only' });
+  if (intent.pace) out.push({ field: 'pace', value: intent.pace, reason: 'trip_planning_only' });
+  if (intent.when && intent.mode !== 'events') out.push({ field: 'when', value: intent.when, reason: 'venue_hours_not_modelled' });
+  for (const u of intent.unsupported) out.push({ field: 'unsupported', value: u, reason: 'not_supported' });
+  return out;
+}
+
+function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() } = {}) {
+  const intent = interpretDiscoveryText(text);
+  const destination = resolveDiscoveryDestination(intent);
+  const venues = selectDiscoveryVenues(intent, limit);
+  const events = selectDiscoveryEvents(intent, limit, now);
+  return {
+    query: text,
+    intent,
+    destination,
+    results: intent.mode === 'events'
+      ? { kind: 'events', total: events.total, items: events.items, window: events.window }
+      : { kind: venues.total ? 'venues' : 'none', total: venues.total, items: venues.items },
+    notApplied: discoveryNotApplied(intent),
+  };
+}
+
+// ---------- Build My Trip planner (Phase 3, 2026-09-25) ----------
+//
+// natural language -> DiscoveryIntent (discovery-intent.js)
+//   -> verified venue facts read here from the database
+//   -> trip-planner.js: recommendations / an outing / a day-by-day plan, each
+//      stop with a "why this fits" built only from the request + verified data
+//   -> POST /api/trip/plan, rendered by the planner view on /trip
+//
+// Behind TRIP_PLANNER_V2 (off by default): with the flag off /trip,
+// /api/trip/parse and /api/trip/generate are exactly as before and
+// /api/trip/plan does not exist. No AI, no writes, no new data store.
+function isTripPlannerV2Enabled() {
+  return /^(1|on|true|yes)$/i.test(String(process.env.TRIP_PLANNER_V2 || '').trim());
+}
+// Loaded lazily for the same reason as the interpreter (see
+// discoveryIntentModule): server.js still starts without the file.
+function tripPlannerModule() {
+  return require('./trip-planner');
+}
+
+// Every active venue as a plain "fact" object carrying ONLY verified data:
+// the badge columns that are set, collection and activity memberships, the
+// secondary Food & Drink categories, the stored coordinates, rating, review
+// count, price level and cuisine, and normalized name/cuisine/description
+// text for whole-word matching. The planner can use nothing else.
+function buildTripPlannerFacts() {
+  const normalize = discoveryIntentModule().normalizeDiscoveryText;
+  const memberships = new Map();
+  const addMember = (id, key) => { if (!memberships.has(id)) memberships.set(id, { collections: [], activities: [], fdTypes: [] }); memberships.get(id)[key.kind].push(key.value); };
+  for (const kind of ['hidden_gem', 'local_favorite', 'dog_friendly']) for (const id of getCollectionVenueIds(kind)) addMember(id, { kind: 'collections', value: kind });
+  for (const a of OUTDOOR_ACTIVITIES) for (const id of getCollectionVenueIds(a.kind)) addMember(id, { kind: 'activities', value: a.slug });
+  for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) addMember(id, { kind: 'fdTypes', value: type });
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all();
+  const facts = [];
+  for (const v of rows) {
+    if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
+    const features = {};
+    for (const f of BOOL_FIELDS) if (Number(v[f]) === 1) features[f] = true;
+    const m = memberships.get(v.id) || { collections: [], activities: [], fdTypes: [] };
+    facts.push({
+      id: v.id, name: v.name, region: v.region, type: v.type, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      rating: v.rating == null ? null : Number(v.rating), reviews: v.reviews == null ? 0 : Number(v.reviews),
+      price: v.price == null ? null : Number(v.price), address: v.address || null,
+      lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
+      cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisineLabel: v.cuisine || null,
+      textName: normalize(v.name || ''), textCuisine: normalize(v.cuisine || ''), textDesc: normalize(v.description || ''),
+      features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
+      indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
+      hours: v.hours || null, // the stored JSON; parsed (never modified) by the planner
+    });
+  }
+  return facts;
+}
+
+function tripPlannerLabels() {
+  return {
+    regions: { ...REGION_LABELS },
+    types: Object.fromEntries(Object.entries(CATEGORY_LABELS).map(([t, l]) => [t, { singular: l.singular, plural: l.plural }])),
+    activities: Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a.label])),
+    features: Object.fromEntries(Object.entries(BADGE_LABELS).map(([f, l]) => [f, l.title])),
+    featureNouns: Object.fromEntries(Object.entries(BADGE_LABELS).map(([f, l]) => [f, l.noun])),
+    collections: { hidden_gem: 'Hidden Gems', local_favorite: 'Local Favourites', dog_friendly: 'dog-friendly beaches' },
+  };
+}
+
+const TRIP_PLAN_MAX_IDS = 200;
+const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|evening)$/;
+// Validates the POST /api/trip/plan body; returns { error } or { value }.
+function parseTripPlanBody(body) {
+  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned'];
+  const unexpected = Object.keys(body || {}).filter((k) => !allowed.includes(k));
+  if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
+  const text = body.text;
+  if (typeof text !== 'string' || !text.trim()) return { error: 'text is required and must be a non-empty string.' };
+  if (text.length > discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) return { error: `text must be at most ${discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH} characters.` };
+  const seed = body.seed === undefined ? 0 : body.seed;
+  if (!Number.isInteger(seed) || seed < 0 || seed > 1000000) return { error: 'seed must be an integer between 0 and 1000000.' };
+  const ids = (name) => {
+    const v = body[name];
+    if (v === undefined) return [];
+    if (!Array.isArray(v) || v.length > TRIP_PLAN_MAX_IDS || !v.every((x) => Number.isInteger(x) && x > 0)) return null;
+    return v;
+  };
+  const excludeVenueIds = ids('excludeVenueIds');
+  if (!excludeVenueIds) return { error: `excludeVenueIds must be an array of at most ${TRIP_PLAN_MAX_IDS} venue ids.` };
+  const avoidVenueIds = ids('avoidVenueIds');
+  if (!avoidVenueIds) return { error: `avoidVenueIds must be an array of at most ${TRIP_PLAN_MAX_IDS} venue ids.` };
+  let pinned = null;
+  if (body.pinned !== undefined) {
+    const p = body.pinned;
+    if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).length > 28
+      || !Object.entries(p).every(([k, v]) => TRIP_PLAN_PIN_RE.test(k) && Number.isInteger(v) && v > 0)) {
+      return { error: 'pinned must map "<day>-<daypart>" to a venue id.' };
+    }
+    pinned = p;
+  }
+  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned } };
+}
+
+// The weekday of day 1, only when the request names a date ("tonight",
+// "tomorrow", "Saturday", "this weekend"); computed in the site's local civil
+// time, the same way What's On resolves its windows. Otherwise null.
+function tripStartWeekday(when, now = new Date()) {
+  if (!when) return null;
+  const names = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const today = todayLocal(now);
+  if (when.preset === 'today') return names[localWeekday(today)];
+  if (when.relative === 'tomorrow') return names[localWeekday(addLocalDays(today, 1))];
+  if (when.weekday) return when.weekday.slice(0, 3);
+  if (when.preset === 'this-weekend') {
+    const wd = localWeekday(today);
+    return wd === 0 ? 'sun' : 'sat';
+  }
+  return null;
+}
+
+// The Okanagan wall clock at an instant: { weekday: 'thu', minutes: 1266 }
+// (21:06). Always America/Vancouver -- never the server's own timezone --
+// and `now` is injectable so tests can freeze it.
+const okanaganClockFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: OKANAGAN_TIME_ZONE, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+function okanaganClock(now = new Date()) {
+  const parts = Object.fromEntries(okanaganClockFormatter.formatToParts(now).map((x) => [x.type, x.value]));
+  return { weekday: parts.weekday.slice(0, 3).toLowerCase(), minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute) };
+}
+
+function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null }, now = new Date()) {
+  const intent = interpretDiscoveryText(text);
+  const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now) : null;
+  const plan = tripPlannerModule().planTrip({
+    intent,
+    facts: buildTripPlannerFacts(),
+    labels: tripPlannerLabels(),
+    seed,
+    excludeIds: excludeVenueIds,
+    avoidIds: avoidVenueIds,
+    pinned,
+    events: events ? events.items : null,
+    startWeekday: tripStartWeekday(intent.when, now),
+    clock: okanaganClock(now),
+  });
+  if (intent.mode === 'navigate' && intent.exactVenue) {
+    plan.venue = { id: intent.exactVenue.id, url: discoveryVenueUrl(intent.exactVenue) };
+  }
+  const destination = resolveDiscoveryDestination(intent);
+  plan.seeAll = destination.url ? { url: destination.url } : null;
+  if (events && events.window) plan.eventWindow = events.window;
+  plan.query = text;
+  plan.intent = {
+    mode: intent.mode, confidence: intent.confidence, regions: intent.regions, types: intent.types, features: intent.features,
+    collections: intent.collections, activities: intent.activities, foodTerms: intent.foodTerms, days: intent.days, pace: intent.pace,
+    budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities,
+  };
+  return plan;
+}
+
 // ---------- Temporary-condition advisories (2026-09-19) ----------
 // A venue's permanent, verified facts live in its description. Temporary
 // conditions -- a swimming advisory, a partial wildfire closure, a
@@ -10290,6 +10803,19 @@ function getSecretSpotVenues() {
     ORDER BY v.name ASC
   `).all(...SECRET_SPOT_TYPES).map(rowToVenue);
 }
+// Hidden Gems (in the given regions, or anywhere) that /secret-spots does
+// not list because their type is not a Secret Spot type.
+function countHiddenGemsOutsideSecretSpots(regions = []) {
+  const regionSql = regions.length ? ` AND v.region IN (${regions.map(() => '?').join(', ')})` : '';
+  const row = db.prepare(`
+    SELECT COUNT(DISTINCT v.id) AS n FROM venues v
+    JOIN collection_items ci ON ci.content_type = 'venue' AND ci.content_id = v.id
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE c.kind = 'hidden_gem' AND v.redirect_to IS NULL
+      AND v.type NOT IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')})${regionSql}
+  `).get(...SECRET_SPOT_TYPES, ...regions);
+  return row ? row.n : 0;
+}
 function renderSecretSpotsPage(venues, filter = null) {
   return renderCuratedCollectionPage({
     path: '/secret-spots',
@@ -11933,7 +12459,280 @@ function renderTripPlannerStyles() {
   </style>`;
 }
 
-function renderTripPlannerPage() {
+// ---------- Build My Trip planner view (Phase 3, TRIP_PLANNER_V2) ----------
+//
+// Replaces ONLY the conversational hero on /trip; the step-by-step wizard,
+// header, Trip tray and footer are unchanged and still work as before. Uses
+// the page's existing trip-conv-*/trip-day/trip-slot-* classes, so it reads
+// as the same Okanagan Roam page, plus a few scoped additions below. The
+// shared Favorite (.fav-btn[data-fav-name]) and Add to Trip
+// (.trip-btn[data-trip-name/-query/-region]) handlers in app.js pick the new
+// buttons up unchanged; app.js itself is not modified.
+const TRIP_PLANNER_V2_EXAMPLES = [
+  'Find me a great date night in Kelowna',
+  'Plan 3 days in Penticton with kids',
+  'Where can I get the best poutine in the Okanagan?',
+  'Plan a golf weekend around Kelowna',
+  'What can we do around Penticton if it rains?',
+];
+function renderTripPlannerV2HeroHtml() {
+  const chips = TRIP_PLANNER_V2_EXAMPLES.map((e) => `<button type="button" class="trip-conv-example-chip" data-plan-example>${escapeHtml(e)}</button>`).join('\n        ');
+  return `  <section class="trip-conv-hero trip-plan-hero" id="tripPlanHero">
+    <h1>Build Your Perfect Okanagan Trip</h1>
+    <p class="trip-conv-subtitle">Tell us what you&rsquo;re after &mdash; a date night, a family weekend, three days of wine &mdash; and we&rsquo;ll plan it from real Okanagan Roam places, with the reason each one fits.</p>
+
+    <form class="trip-conv-input-wrap" id="tripPlanForm">
+      <textarea id="tripPlanInput" class="trip-conv-textarea" rows="3" maxlength="500" aria-label="Describe the trip you want"
+        placeholder="Plan a relaxed 3-day trip around Kelowna with wine and hidden gems..."></textarea>
+      <button type="submit" class="app-btn trip-conv-submit-btn" id="tripPlanSubmitBtn">Plan My Trip</button>
+    </form>
+
+    <div class="trip-conv-examples">
+      <span class="trip-conv-examples-label">Or try one of these:</span>
+      <div class="trip-conv-example-chips">
+        ${chips}
+      </div>
+    </div>
+
+    <div id="tripPlanStatus" class="trip-conv-status" aria-live="polite"></div>
+
+    <button type="button" class="trip-conv-wizard-toggle" id="tripPlanWizardToggle" aria-expanded="false" aria-controls="tripWizardSection">Prefer to choose everything yourself? Plan it step by step</button>
+  </section>
+
+  <section id="tripPlanResult" class="trip-plan-result" hidden></section>
+`;
+}
+function renderTripPlannerV2Styles() {
+  return `<style>
+  /* Build My Trip planner view (Phase 3): additions only, on top of the
+     page's existing trip-conv/trip-day/trip-slot styles and tokens. */
+  .trip-plan-result { margin-top: 26px; }
+  .trip-plan-summary {
+    background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 14px;
+    padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 8px 20px -16px rgba(74,52,40,0.35);
+  }
+  .trip-plan-eyebrow { margin: 0 0 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-deep); }
+  .trip-plan-summary h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.35rem; color: var(--ink); margin: 0 0 10px; }
+  .trip-plan-overview { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .trip-plan-overview li { background: var(--sand-deep); color: var(--plum); font-weight: 700; font-size: 0.76rem; padding: 4px 11px; border-radius: 999px; }
+  .trip-plan-notes { margin: 12px 0 0; padding: 0; list-style: none; font-size: 0.8rem; color: var(--ink); opacity: 0.72; }
+  .trip-plan-notes li + li { margin-top: 4px; }
+  .trip-plan-section-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; color: var(--ink); margin: 22px 0 12px; }
+  .trip-plan-days .trip-day-slots, .trip-plan-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .trip-slot-why { margin: 4px 0 0; padding-left: 18px; font-size: 0.8rem; color: var(--ink); opacity: 0.82; }
+  .trip-slot-why li + li { margin-top: 2px; }
+  .trip-slot-caveats { margin: 2px 0 0; padding-left: 18px; font-size: 0.76rem; color: var(--plum-dark, #6B2C40); opacity: 0.85; font-style: italic; }
+  .trip-plan-see-all { display: inline-block; margin-top: 14px; font-weight: 800; font-size: 0.88rem; color: var(--teal-deep); text-decoration: none; }
+  .trip-plan-see-all:hover { text-decoration: underline; }
+  .trip-plan-empty { font-size: 0.92rem; color: var(--ink); }
+  </style>`;
+}
+function renderTripPlannerV2Script() {
+  return `<script>
+(function(){
+  var form = document.getElementById('tripPlanForm');
+  if (!form) return;
+  var input = document.getElementById('tripPlanInput');
+  var submitBtn = document.getElementById('tripPlanSubmitBtn');
+  var statusEl = document.getElementById('tripPlanStatus');
+  var resultEl = document.getElementById('tripPlanResult');
+  var wizardToggle = document.getElementById('tripPlanWizardToggle');
+  var wizard = document.getElementById('tripWizardSection');
+  var state = { text: '', seed: 0, exclude: [], last: null };
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
+  function setStatus(text, mode){ statusEl.textContent = text || ''; statusEl.className = 'trip-conv-status' + (mode ? ' is-' + mode : ''); }
+
+  function request(extra){
+    var body = { text: state.text, seed: state.seed, excludeVenueIds: state.exclude.slice(-200) };
+    for (var k in extra) body[k] = extra[k];
+    setStatus('Planning your trip\\u2026', 'loading');
+    submitBtn.disabled = true;
+    return fetch('/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        submitBtn.disabled = false;
+        if (!res.ok) { setStatus(res.j && res.j.error ? res.j.error : 'Something went wrong. Please try again.', 'error'); return; }
+        setStatus('');
+        state.last = res.j;
+        render(res.j);
+      })
+      .catch(function(){ submitBtn.disabled = false; setStatus('Something went wrong. Please try again.', 'error'); });
+  }
+
+  function metaLine(v){
+    var parts = [v.typeLabel];
+    if (v.rating != null) parts.push('\\u2605 ' + v.rating + (v.reviews ? ' (' + Number(v.reviews).toLocaleString('en-CA') + ')' : ''));
+    if (v.price) parts.push(new Array(v.price + 1).join('$'));
+    parts.push(v.regionLabel);
+    return parts.map(esc).join(' \\u00b7 ');
+  }
+  function card(stop, label, key){
+    if (!stop || !stop.venue) {
+      return '<div class="trip-slot-card"><div class="trip-slot-label">' + esc(label) + '</div><p class="trip-slot-empty">No suitable stop found for this part of the day.</p></div>';
+    }
+    var v = stop.venue, url = safeUrl(v.url);
+    var name = url ? '<a href="' + esc(url) + '">' + esc(v.name) + '</a>' : esc(v.name);
+    var why = (stop.why || []).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
+    var tripQuery = v.address ? (v.name + ', ' + v.address) : (v.name + ', ' + v.regionLabel + ', Okanagan Valley, BC');
+    return '<div class="trip-slot-card" data-venue-id="' + esc(v.id) + '">'
+      + (label ? '<div class="trip-slot-label">' + esc(label) + '</div>' : '')
+      + '<h4>' + name + '</h4>'
+      + '<div class="trip-slot-meta">' + metaLine(v) + '</div>'
+      + (why ? '<ul class="trip-slot-why" aria-label="Why this fits">' + why + '</ul>' : '')
+      + ((stop.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + stop.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
+      + '<div class="trip-slot-actions">'
+      + (url ? '<a class="trip-slot-view-link" href="' + esc(url) + '">View details</a>' : '')
+      + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>'
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery) + '" data-trip-region="' + esc(v.region) + '">Add to trip</button>'
+      + '<button type="button" class="trip-slot-remove-btn" data-replace-id="' + esc(v.id) + '"' + (key ? ' data-replace-key="' + esc(key) + '"' : '') + ' title="Remove this stop and suggest another">Replace</button>'
+      + '</div></div>';
+  }
+  function overviewChips(p){
+    var o = p.overview || {}, chips = [];
+    if (o.where) chips.push(o.where);
+    if (o.days) chips.push(o.days === 1 ? '1 day' : o.days + ' days');
+    if (o.pace) chips.push(o.pace.charAt(0).toUpperCase() + o.pace.slice(1) + ' pace');
+    (o.interests || []).forEach(function(i){ chips.push(i); });
+    if (o.occasion) chips.push(o.occasion.label);
+    return chips.length ? '<ul class="trip-plan-overview">' + chips.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '';
+  }
+  function render(p){
+    var html = '<div class="trip-plan-summary"><p class="trip-plan-eyebrow">Your Okanagan plan</p><h2>' + esc(p.summary) + '</h2>' + overviewChips(p);
+    if (p.notes && p.notes.length) html += '<ul class="trip-plan-notes">' + p.notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>';
+    html += '</div>';
+    var issues = [];
+    (p.unsupported || []).forEach(function(u){ issues.push('Not something Okanagan Roam can plan for yet: \\u201c' + u + '\\u201d.'); });
+    (p.warnings || []).forEach(function(w){ issues.push(w); });
+    if (issues.length) html += '<div class="trip-planner-warnings"><ul>' + issues.map(function(i){ return '<li>' + esc(i) + '</li>'; }).join('') + '</ul></div>';
+    var hasVenues = false;
+    if (p.kind === 'multi_day' || p.kind === 'day_plan') {
+      html += '<div class="trip-planner-result-header"><h2>Your itinerary</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Regenerate</button></div><div class="trip-plan-days">';
+      (p.days || []).forEach(function(d){
+        html += '<div class="trip-day"><h3>Day ' + esc(d.day) + (d.regionLabel ? ' \\u00b7 ' + esc(d.regionLabel) : '') + '</h3><div class="trip-day-slots">'
+          + d.stops.map(function(s){ return card(s, s.label, d.day + '-' + s.daypart); }).join('') + '</div></div>';
+        hasVenues = true;
+      });
+      html += '</div>';
+    } else if (p.kind === 'outing' && p.outing) {
+      html += '<div class="trip-planner-result-header"><h2>Your outing</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Regenerate</button></div>'
+        + '<div class="trip-plan-grid">' + p.outing.stops.map(function(s){ return card(s, s.label, null); }).join('') + '</div>';
+      if (p.outing.alternates && p.outing.alternates.length) html += '<h3 class="trip-plan-section-title">Other good options</h3><div class="trip-plan-grid">' + p.outing.alternates.map(function(s){ return card(s, '', null); }).join('') + '</div>';
+      hasVenues = true;
+    } else if (p.kind === 'recommendations' || p.kind === 'discover') {
+      var recs = p.recommendations || [];
+      if (recs.length) {
+        html += '<div class="trip-planner-result-header"><h2>Recommendations</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Show others</button></div>'
+          + '<div class="trip-plan-grid">' + recs.map(function(s){ return card(s, '', null); }).join('') + '</div>';
+        hasVenues = true;
+      }
+    } else if (p.kind === 'events') {
+      var ev = p.events || [];
+      html += '<h2 class="trip-plan-section-title">What\\u2019s on</h2>';
+      html += ev.length ? '<div class="trip-plan-grid">' + ev.map(function(e){
+          var u = safeUrl(e.url);
+          return '<div class="trip-slot-card"><div class="trip-slot-label">' + esc(e.dateLabel) + (e.time ? ' \\u00b7 ' + esc(e.time) : '') + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+            + (u ? '<div class="trip-slot-actions"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></div>' : '') + '</div>';
+        }).join('') + '</div>' : '<p class="trip-plan-empty">Nothing is listed for that yet.</p>';
+    } else if (p.kind === 'navigate' && p.venue && safeUrl(p.venue.url)) {
+      html += '<p class="trip-plan-empty">That\\u2019s a place on Okanagan Roam: <a class="trip-plan-see-all" href="' + esc(p.venue.url) + '">open its page \\u2192</a></p>';
+    } else {
+      html += '<p class="trip-plan-empty">Try naming a place and what you\\u2019d like to do \\u2014 for example \\u201cthree days in Kelowna with wineries and beaches\\u201d.</p>';
+    }
+    if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="trip-plan-see-all" href="' + esc(p.seeAll.url) + '">See everything that matches on Okanagan Roam \\u2192</a>';
+    resultEl.innerHTML = html;
+    resultEl.hidden = false;
+    if (window.__syncFavButtons) window.__syncFavButtons();
+    if (window.__syncTripButtons) window.__syncTripButtons();
+    if (hasVenues || p.kind === 'events') resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function currentPins(exceptKey){
+    var pins = {};
+    ((state.last && state.last.days) || []).forEach(function(d){
+      d.stops.forEach(function(s){ var k = d.day + '-' + s.daypart; if (s.venue && k !== exceptKey) pins[k] = s.venue.id; });
+    });
+    return pins;
+  }
+  function shownIds(){
+    var ids = [], p = state.last || {};
+    (p.days || []).forEach(function(d){ d.stops.forEach(function(s){ if (s.venue) ids.push(s.venue.id); }); });
+    ((p.outing && p.outing.stops) || []).forEach(function(s){ if (s.venue) ids.push(s.venue.id); });
+    (p.recommendations || []).forEach(function(s){ ids.push(s.venue.id); });
+    return ids.slice(0, 200);
+  }
+
+  resultEl.addEventListener('click', function(e){
+    var replace = e.target.closest ? e.target.closest('[data-replace-id]') : null;
+    if (replace) {
+      var id = Number(replace.getAttribute('data-replace-id'));
+      if (state.exclude.indexOf(id) === -1) state.exclude.push(id);
+      var key = replace.getAttribute('data-replace-key');
+      request(key ? { pinned: currentPins(key) } : {});
+      return;
+    }
+    if (e.target.closest && e.target.closest('[data-plan-regenerate]')) {
+      state.seed += 1;
+      request({ avoidVenueIds: shownIds() });
+    }
+  });
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var text = input.value.trim();
+    if (!text) { setStatus('Tell us what you\\u2019d like to do and where.', 'error'); return; }
+    state = { text: text, seed: 0, exclude: [], last: null };
+    request({});
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-plan-example]'), function(chip){
+    chip.addEventListener('click', function(){ input.value = chip.textContent; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
+  });
+  if (wizardToggle && wizard) wizardToggle.addEventListener('click', function(){
+    var open = wizard.style.display !== 'none';
+    wizard.style.display = open ? 'none' : '';
+    wizardToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+  });
+})();
+</script>`;
+}
+
+// The pre-Phase-3 conversational hero, verbatim (see renderTripPlannerPage):
+// with TRIP_PLANNER_V2 off the page is byte-identical to before.
+const TRIP_LEGACY_HERO_HTML = `  <section class="trip-conv-hero" id="tripConvHero">
+    <h1 data-i18n="trip.title">Build Your Perfect Okanagan Trip</h1>
+    <p class="trip-conv-subtitle" data-i18n="trip.conv.subtitle">Describe the trip you want in your own words, and we&rsquo;ll turn it into a real itinerary built from actual venues.</p>
+
+    <div class="trip-conv-input-wrap">
+      <textarea id="tripConvInput" class="trip-conv-textarea" rows="3"
+        data-i18n-placeholder="trip.conv.placeholder"
+        placeholder="Plan me a relaxed 3-day trip around Kelowna with wine, dog-friendly places and hidden gems..."></textarea>
+      <button type="button" class="app-btn trip-conv-submit-btn" id="tripConvSubmitBtn" data-i18n="trip.conv.submit">Plan My Trip</button>
+    </div>
+
+    <div class="trip-conv-examples">
+      <span class="trip-conv-examples-label" data-i18n="trip.conv.examplesLabel">Or try one of these:</span>
+      <div class="trip-conv-example-chips">
+        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example1">3 relaxed days in Kelowna with wine and hidden gems</button>
+        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example2">A weekend in Penticton with food, golf and a slower pace</button>
+        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example3">2 days around Vernon with wineries and dog-friendly places</button>
+      </div>
+    </div>
+
+    <div id="tripConvStatus" class="trip-conv-status" aria-live="polite"></div>
+
+    <div id="tripConvUnderstood" class="trip-conv-understood" style="display:none;">
+      <h2 data-i18n="trip.conv.understoodHeading">Here&rsquo;s what I understood</h2>
+      <div id="tripConvClarify" class="trip-conv-clarify" style="display:none;"></div>
+      <div id="tripConvChips" class="trip-conv-chips"></div>
+      <div id="tripConvUnsupported" class="trip-conv-unsupported" style="display:none;"></div>
+      <button type="button" class="app-btn trip-conv-generate-btn" id="tripConvGenerateBtn" data-i18n="trip.conv.generate" disabled>Generate My Trip</button>
+    </div>
+
+    <button type="button" class="trip-conv-wizard-toggle" id="tripConvWizardToggle" aria-expanded="false" aria-controls="tripWizardSection" data-i18n="trip.conv.wizardToggle">Prefer to choose everything yourself? Plan it step by step &rarr;</button>
+  </section>
+`;
+
+function renderTripPlannerPage(v2 = false) {
   const title = 'Build My Trip — Okanagan Roam';
   const description = 'Plan a real, day-by-day Okanagan trip from actual venues — choose your region, number of days, interests, and pace, and get an itinerary built entirely from real wineries, restaurants, cafes, and more. No invented places.';
   const canonical = 'https://okanaganroam.com/trip';
@@ -11998,7 +12797,7 @@ ${JSON.stringify(breadcrumb)}
 <link rel="stylesheet" href="/styles/tokens.css">
 <link rel="stylesheet" href="/styles/app.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-${renderTripPlannerStyles()}
+${renderTripPlannerStyles()}${v2 ? '\n' + renderTripPlannerV2Styles() : ''}
 </head>
 <body class="page-trip">
 ${tripTrayHtml}
@@ -12008,39 +12807,7 @@ ${headerHtml}
 <main class="trip-planner-main wrap" id="tripPlannerMain">
   <nav class="trip-planner-breadcrumb"><a href="/">Home</a> &rsaquo; Build My Trip</nav>
 
-  <section class="trip-conv-hero" id="tripConvHero">
-    <h1 data-i18n="trip.title">Build Your Perfect Okanagan Trip</h1>
-    <p class="trip-conv-subtitle" data-i18n="trip.conv.subtitle">Describe the trip you want in your own words, and we&rsquo;ll turn it into a real itinerary built from actual venues.</p>
-
-    <div class="trip-conv-input-wrap">
-      <textarea id="tripConvInput" class="trip-conv-textarea" rows="3"
-        data-i18n-placeholder="trip.conv.placeholder"
-        placeholder="Plan me a relaxed 3-day trip around Kelowna with wine, dog-friendly places and hidden gems..."></textarea>
-      <button type="button" class="app-btn trip-conv-submit-btn" id="tripConvSubmitBtn" data-i18n="trip.conv.submit">Plan My Trip</button>
-    </div>
-
-    <div class="trip-conv-examples">
-      <span class="trip-conv-examples-label" data-i18n="trip.conv.examplesLabel">Or try one of these:</span>
-      <div class="trip-conv-example-chips">
-        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example1">3 relaxed days in Kelowna with wine and hidden gems</button>
-        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example2">A weekend in Penticton with food, golf and a slower pace</button>
-        <button type="button" class="trip-conv-example-chip" data-i18n="trip.conv.example3">2 days around Vernon with wineries and dog-friendly places</button>
-      </div>
-    </div>
-
-    <div id="tripConvStatus" class="trip-conv-status" aria-live="polite"></div>
-
-    <div id="tripConvUnderstood" class="trip-conv-understood" style="display:none;">
-      <h2 data-i18n="trip.conv.understoodHeading">Here&rsquo;s what I understood</h2>
-      <div id="tripConvClarify" class="trip-conv-clarify" style="display:none;"></div>
-      <div id="tripConvChips" class="trip-conv-chips"></div>
-      <div id="tripConvUnsupported" class="trip-conv-unsupported" style="display:none;"></div>
-      <button type="button" class="app-btn trip-conv-generate-btn" id="tripConvGenerateBtn" data-i18n="trip.conv.generate" disabled>Generate My Trip</button>
-    </div>
-
-    <button type="button" class="trip-conv-wizard-toggle" id="tripConvWizardToggle" aria-expanded="false" aria-controls="tripWizardSection" data-i18n="trip.conv.wizardToggle">Prefer to choose everything yourself? Plan it step by step &rarr;</button>
-  </section>
-
+${v2 ? renderTripPlannerV2HeroHtml() : TRIP_LEGACY_HERO_HTML}
   <div id="tripWizardSection" style="display:none;">
     <div class="trip-planner-intro">
       <h2 data-i18n="trip.planner.title">Build My Trip</h2>
@@ -12103,7 +12870,7 @@ ${headerHtml}
 ${renderHomeFooterHTML(true)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="/scripts/app.js"></script>
+<script src="/scripts/app.js"></script>${v2 ? '\n' + renderTripPlannerV2Script() : ''}
 </body>
 </html>`;
 }
@@ -12345,14 +13112,40 @@ function renderHiddenElementsScript() {
 // filtering logic, just triggering the same real controls once on load.
 // Every lookup is null-guarded, so this is a harmless no-op if a param is
 // absent or a target element doesn't exist.
-function renderBrowsePrefillScript() {
+function renderBrowsePrefillScript(discoveryParams = false) {
+  // Discovery search (Phase 2): with DISCOVERY_SEARCH on, /browse also
+  // accepts ?regions= and ?features= and presses its OWN region chips and
+  // feature ("stamp") chips -- the same controls a visitor would click.
+  // With the flag off this function's output is byte-identical to before.
+  const discoveryVars = discoveryParams
+    ? `
+  var regions = params.get('regions');
+  var features = params.get('features');
+  var FEATURE_CHIP = ${JSON.stringify(BROWSE_FEATURE_CHIP)};`
+    : '';
+  const discoveryRun = discoveryParams
+    ? `
+    if (regions) {
+      var wantedRegions = regions.split(',');
+      document.querySelectorAll('.region-chip').forEach(function(chip){
+        if (chip.dataset.region !== 'all' && wantedRegions.indexOf(chip.dataset.region) !== -1 && chip.getAttribute('aria-pressed') !== 'true') chip.click();
+      });
+    }
+    if (features) {
+      var wantedChips = features.split(',').map(function(f){ return FEATURE_CHIP[f]; }).filter(Boolean);
+      document.querySelectorAll('.stamp-btn').forEach(function(btn){
+        if (wantedChips.indexOf(btn.dataset.filter) !== -1 && btn.getAttribute('aria-pressed') !== 'true') btn.click();
+      });
+    }
+    if (regions || features) document.dispatchEvent(new Event('wizard:showResults'));`
+    : '';
   return `
 <script>
 (function(){
   var params = new URLSearchParams(window.location.search);
   var types = params.get('types');
   var q = params.get('q');
-  var openMap = params.get('openMap');
+  var openMap = params.get('openMap');${discoveryVars}
   function run(){
     if (types) {
       var wanted = types.split(',');
@@ -12362,7 +13155,7 @@ function renderBrowsePrefillScript() {
         if (shouldBePressed !== isPressed) chip.click();
       });
       document.dispatchEvent(new Event('wizard:showResults'));
-    }
+    }${discoveryRun}
     if (q) {
       var input = document.getElementById('searchInput');
       var btn = document.getElementById('searchBtn');
@@ -12554,6 +13347,27 @@ const server = http.createServer(async (req, res) => {
     // matching wizard type chips, ?openMap=1 opens the interactive map —
     // see renderBrowsePrefillScript() below.
     if (pathname === '/browse' && method === 'GET') {
+      // Discovery search (Phase 2): the homepage Hero Search already submits
+      // to /browse?q=<text>. With DISCOVERY_SEARCH on, a request carrying ONLY
+      // q is interpreted and sent to the existing page that shows exactly that
+      // request; anything that cannot be routed safely falls through to the
+      // unchanged /browse below. Requests with any other parameter (including
+      // the pre-filtered /browse URLs this produces) are never intercepted.
+      if (isDiscoverySearchEnabled()) {
+        const keys = Object.keys(query);
+        if (keys.length === 1 && keys[0] === 'q' && typeof query.q === 'string' && query.q.trim()
+          && query.q.length <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
+          const destination = resolveDiscoveryDestination(interpretDiscoveryText(query.q));
+          // A single-word text search resolves to /browse?q=<word> -- exactly
+          // this request when the visitor already typed just that word. Never
+          // redirect a URL to itself; the unchanged /browse search handles it.
+          const selfTarget = destination.url === `/browse${discoveryQueryString({ q: query.q })}`;
+          if (destination.url && !selfTarget) {
+            res.writeHead(302, { Location: destination.url, 'Cache-Control': 'no-store' });
+            return res.end();
+          }
+        }
+      }
       if (fs.existsSync(SITE_PATH)) {
         let html = fs.readFileSync(SITE_PATH, 'utf8');
 
@@ -12623,7 +13437,7 @@ const server = http.createServer(async (req, res) => {
         const footer = renderGuideFooterHTML();
         const openNowScript = renderOpenNowScript();
         const hiddenElementsScript = renderHiddenElementsScript();
-        const prefillScript = renderBrowsePrefillScript();
+        const prefillScript = renderBrowsePrefillScript(isDiscoverySearchEnabled());
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n${prefillScript}\n</body>`)
           : html + footer + openNowScript + hiddenElementsScript + prefillScript;
@@ -13686,6 +14500,28 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, listVenues(query));
     }
 
+    // GET /api/discover?q=<text>&limit=<n> -- Discovery search, Phase 2
+    // (2026-09-25). Read-only: interprets the text into a validated intent
+    // and returns the existing page that shows it plus the real matching
+    // venue or event records. Behind DISCOVERY_SEARCH: with the flag off the
+    // route does not exist and the request falls through exactly as before.
+    if (pathname === '/api/discover' && method === 'GET' && isDiscoverySearchEnabled()) {
+      const q = typeof query.q === 'string' ? query.q : '';
+      if (!q.trim()) return sendJSON(res, 400, { error: 'q is required.' });
+      if (q.length > discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
+        return sendJSON(res, 400, { error: `q must be at most ${discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH} characters.` });
+      }
+      let limit = DISCOVERY_DEFAULT_LIMIT;
+      if (query.limit !== undefined) {
+        const n = Number(query.limit);
+        if (!Number.isInteger(n) || n < 1 || n > DISCOVERY_MAX_LIMIT) {
+          return sendJSON(res, 400, { error: `limit must be an integer between 1 and ${DISCOVERY_MAX_LIMIT}.` });
+        }
+        limit = n;
+      }
+      return sendJSON(res, 200, runDiscovery(q, { limit }));
+    }
+
 
     // GET /api/stats
     if (pathname === '/api/stats' && method === 'GET') {
@@ -13928,13 +14764,30 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, parsed.value);
     }
 
+    // POST /api/trip/plan -- Build My Trip planner (Phase 3). Read-only:
+    // interprets the request and returns recommendations, an outing or a
+    // day-by-day plan built only from verified venue data (or What's On
+    // events for an event request). Behind TRIP_PLANNER_V2: with the flag off
+    // the route does not exist and the request falls through as before.
+    if (pathname === '/api/trip/plan' && method === 'POST' && isTripPlannerV2Enabled()) {
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      const parsed = parseTripPlanBody(body);
+      if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
+      return sendJSON(res, 200, runTripPlan(parsed.value));
+    }
+
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
     // before the generic /:region catch-all below for the same reason
     // /events is (otherwise "trip" would be treated as an unrecognized
     // region and 404). Static markup only — the actual itinerary is
     // generated client-side via a POST to /api/trip/generate (Stage 1).
     if (pathname === '/trip' && method === 'GET') {
-      const html = renderTripPlannerPage();
+      const html = renderTripPlannerPage(isTripPlannerV2Enabled());
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(html);
     }
@@ -14536,6 +15389,23 @@ module.exports = {
   budgetMatchesPrice,
   getCollectionVenueIds,
   getKnownDiscoveryKinds,
+  buildDiscoveryTaxonomy,
+  isTripPlannerV2Enabled,
+  buildTripPlannerFacts,
+  tripPlannerLabels,
+  parseTripPlanBody,
+  runTripPlan,
+  tripStartWeekday,
+  okanaganClock,
+  countHiddenGemsOutsideSecretSpots,
+  isDiscoverySearchEnabled,
+  interpretDiscoveryText,
+  resolveDiscoveryDestination,
+  selectDiscoveryVenues,
+  selectDiscoveryEvents,
+  runDiscovery,
+  renderBrowsePrefillScript,
+  BROWSE_FEATURE_CHIP,
   isValidTripRegion,
   isValidTripDays,
   isValidTripInterest,

@@ -9019,3 +9019,516 @@ test('Destination pages: active-only category tabs, and food & drink category pa
     for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
 });
+
+// ---- Shared discovery-intent layer (Phase 1, 2026-09-25) ------------------
+//
+// The new interpreter exists ALONGSIDE the legacy trip parser; nothing is
+// wired to it yet. These tests lock in that the legacy parser is byte-for-
+// byte unchanged, that the taxonomy handed to the interpreter comes only
+// from existing constants and the database, and that the frozen homepage's
+// source files are untouched.
+const discovery = require('../discovery-intent.js');
+const TRIP_PARSER_BASELINE = require('./fixtures/trip-parser-baseline.json').fixtures;
+
+test('Phase 1: the legacy trip parser is byte-identical for all baseline fixtures', async () => {
+  assert.ok(TRIP_PARSER_BASELINE.length >= 80, 'baseline covers the existing parser fixtures, the /trip chips and the example prompts');
+  for (const fixture of TRIP_PARSER_BASELINE) {
+    assert.equal(JSON.stringify(app.deterministicTripParserProvider(fixture.text)), JSON.stringify(fixture.provider), `provider: ${JSON.stringify(fixture.text)}`);
+    assert.equal(JSON.stringify(await app.parseTripRequest(fixture.text)), JSON.stringify(fixture.parse), `parseTripRequest: ${JSON.stringify(fixture.text)}`);
+  }
+  // The approved decision: beaches, hiking and events stay "unsupported" in
+  // the legacy parser until a later phase deliberately changes the planner.
+  const legacy = await app.parseTripRequest("I'm looking for a relaxed weekend around Penticton with wineries and beaches.");
+  assert.ok(legacy.value.unsupported.includes('beaches'));
+});
+
+test('Phase 1: buildDiscoveryTaxonomy only exposes existing taxonomy and active venues', () => {
+  const t = app.buildDiscoveryTaxonomy();
+  assert.deepEqual([...t.regions].sort(), Object.keys(app.REGION_LABELS).sort());
+  for (const r of t.regions) assert.equal(t.regionLabels[r], app.REGION_LABELS[r]);
+  assert.deepEqual(t.types, Object.keys(app.CATEGORY_SLUGS));
+  assert.deepEqual(t.features, app.BOOL_FIELDS);
+  assert.deepEqual(t.budgets, app.TRIP_VALID_BUDGETS);
+  assert.deepEqual(t.paces, app.TRIP_VALID_PACES);
+  assert.deepEqual(t.activities, app.OUTDOOR_ACTIVITIES.map((a) => a.slug));
+  assert.deepEqual(t.eventCategories, app.WHATSON_CATEGORIES.map((c) => c.key));
+  assert.ok(t.datePresets.includes('this-weekend') && !t.datePresets.includes('custom'));
+  const liveKinds = db.prepare('SELECT DISTINCT kind FROM collections').all().map((r) => r.kind);
+  for (const k of t.collections) assert.ok(liveKinds.includes(k), k);
+  const activeIds = new Set(db.prepare('SELECT id FROM venues WHERE redirect_to IS NULL').all().map((r) => r.id));
+  assert.ok(t.venues.length > 0);
+  for (const v of t.venues) {
+    assert.ok(activeIds.has(v.id), `venue ${v.id} is active`);
+    assert.deepEqual(Object.keys(v).sort(), ['id', 'name', 'region', 'slug', 'type']);
+  }
+  for (const c of t.cuisines) assert.equal(c, c.toLowerCase().trim());
+});
+
+test('Phase 1: the interpreter with the real taxonomy never leaves the database', () => {
+  const t = app.buildDiscoveryTaxonomy();
+  const i = (q) => discovery.interpretDiscoveryQuery(q, t);
+  assert.deepEqual([i('Plan a relaxed 3-day trip around Kelowna with wine and hidden gems.').mode, i('Plan a relaxed 3-day trip around Kelowna with wine and hidden gems.').days], ['plan', 3]);
+  assert.deepEqual(i('restaurants in Kelowna').types, ['restaurant']);
+  assert.deepEqual(i('restaurants in Kelowna').regions, ['kelowna']);
+  assert.equal(i('events this weekend').mode, 'events');
+  assert.deepEqual(i('Where can I get the best poutine in the Okanagan?').textTerms, ['poutine']);
+  // An exact seeded venue name navigates to THAT database row.
+  const seeded = t.venues[0];
+  const nav = i(seeded.name);
+  if (nav.exactVenue) {
+    const row = db.prepare('SELECT id, region, type, slug FROM venues WHERE id = ?').get(nav.exactVenue.id);
+    assert.deepEqual(nav.exactVenue, { ...row });
+  } else {
+    assert.ok(nav.ambiguities.some((a) => a.options.includes(seeded.id)), 'a repeated name is reported as ambiguous');
+  }
+  // No output ever contains a venue id that is not a real, active row.
+  const activeIds = new Set(t.venues.map((v) => v.id));
+  for (const v of t.venues.slice(0, 50)) {
+    const r = i(v.name);
+    if (r.exactVenue) assert.ok(activeIds.has(r.exactVenue.id));
+    for (const a of r.ambiguities) for (const id of a.options) assert.ok(activeIds.has(id));
+  }
+});
+
+test('Phase 1: the frozen homepage source files are unchanged', () => {
+  const crypto = require('node:crypto');
+  const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
+  // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
+  // change must update these deliberately; nothing else may.
+  assert.equal(md5('okanagan.html'), '612fea997972e597fcad227f1c52a774', 'okanagan.html');
+  assert.equal(md5('public/styles/app.css'), 'bea5259dfdf95799b3cb84a0583e29b6', 'public/styles/app.css');
+  assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
+  assert.equal(md5('public/scripts/app.js'), 'f58983d39f3dda1365128d4b5974ff05', 'public/scripts/app.js (hero search handler + /browse search)');
+});
+
+// ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
+//
+// /api/discover and the Hero Search routing through /browse?q=. Everything is
+// behind DISCOVERY_SEARCH: with the flag off nothing changes (asserted
+// below); with it on, requests are routed only to existing pages and results
+// are only real, active records.
+function withDiscoveryFlag(value, fn) {
+  const before = process.env.DISCOVERY_SEARCH;
+  if (value === undefined) delete process.env.DISCOVERY_SEARCH; else process.env.DISCOVERY_SEARCH = value;
+  return Promise.resolve().then(fn).finally(() => {
+    if (before === undefined) delete process.env.DISCOVERY_SEARCH; else process.env.DISCOVERY_SEARCH = before;
+  });
+}
+// A private listener on an ephemeral port (never 3001), closed afterwards.
+async function withDiscoveryServer(fn) {
+  const http = require('node:http');
+  const srv = http.createServer((req, res) => app.server.emit('request', req, res));
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  try { return await fn(base); } finally {
+    // fetch() keeps connections alive; close them so the listener can shut down.
+    srv.closeAllConnections();
+    await new Promise((resolve) => srv.close(resolve));
+  }
+}
+
+test('Phase 2: the discovery flag is off by default', () => {
+  const saved = process.env.DISCOVERY_SEARCH;
+  delete process.env.DISCOVERY_SEARCH;
+  try { assert.equal(app.isDiscoverySearchEnabled(), false); } finally { if (saved !== undefined) process.env.DISCOVERY_SEARCH = saved; }
+  for (const v of ['on', 'true', '1', 'yes', 'ON']) { process.env.DISCOVERY_SEARCH = v; assert.equal(app.isDiscoverySearchEnabled(), true, v); }
+  for (const v of ['', 'off', '0', 'false', 'no']) { process.env.DISCOVERY_SEARCH = v; assert.equal(app.isDiscoverySearchEnabled(), false, v); }
+  if (saved === undefined) delete process.env.DISCOVERY_SEARCH; else process.env.DISCOVERY_SEARCH = saved;
+});
+
+test('Phase 2: with the flag off, /api/discover does not exist and /browse?q is untouched', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const api = await fetch(`${base}/api/discover?q=restaurants%20in%20Kelowna`);
+  assert.equal(api.status, 404);
+  const browse = await fetch(`${base}/browse?q=restaurants%20in%20Kelowna`, { redirect: 'manual' });
+  assert.equal(browse.status, 200, 'no redirect when the flag is off');
+  const html = await browse.text();
+  assert.ok(!html.includes("params.get('regions')"), 'the pre-fill script is the original one');
+  // The pre-fill script with the flag off is byte-identical to the pre-Phase-2 script.
+  const crypto = require('node:crypto');
+  assert.equal(crypto.createHash('md5').update(app.renderBrowsePrefillScript(false)).digest('hex'), '298f621bed7f7cf9548024b8d76bf569');
+  assert.equal(app.renderBrowsePrefillScript(), app.renderBrowsePrefillScript(false));
+})));
+
+// Fixture venues so every example's destination page really exists in the
+// throwaway test database (the resolver never routes to a page that would 404).
+function withDiscoveryRoutingFixtures(fn) {
+  const add = (name, region, type, slug) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, patio) VALUES (?, ?, ?, ?, ?, ?, 1)').run(name, region, type, slug, 'Discovery routing fixture.', 4.2);
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(slug, region);
+  };
+  const meta = { reason: 'test', batch_id: 'test-discovery-routing' };
+  const made = [
+    add('DR Penticton Beach', 'penticton', 'beach', 'dr-penticton-beach'),
+    add('DR Kelowna Golf', 'kelowna', 'golf', 'dr-kelowna-golf'),
+    add('DR Naramata Winery', 'naramata', 'winery', 'dr-naramata-winery'),
+    add('DR Kelowna Restaurant', 'kelowna', 'restaurant', 'dr-kelowna-restaurant'),
+    add('DR Peachland Trail', 'peachland', 'outdoor', 'dr-peachland-trail'),
+    add('DR Vernon Cafe', 'vernon', 'cafe', 'dr-vernon-cafe'),
+  ];
+  const byName = Object.fromEntries(made.map((v) => [v.name, v]));
+  const memberships = [
+    ['hidden_gem', byName['DR Peachland Trail'].id], ['activity_hiking', byName['DR Peachland Trail'].id],
+    ['activity_fishing', byName['DR Peachland Trail'].id], ['local_favorite', byName['DR Vernon Cafe'].id],
+  ];
+  for (const [kind, id] of memberships) assert.equal(app.guardedCollectionMembershipUpdate(kind, id, 'add', null, meta).ok, true, kind);
+  return Promise.resolve().then(fn).finally(() => {
+    for (const [kind, id] of memberships) app.guardedCollectionMembershipUpdate(kind, id, 'remove', null, meta);
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  });
+}
+
+test('Phase 2: Hero Search routing sends each example to an existing page', () => withDiscoveryFlag('on', () => withDiscoveryRoutingFixtures(() => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  assert.equal(route('restaurants in Kelowna').url, '/kelowna/restaurants');
+  assert.equal(route('dog friendly').url, '/dog-friendly');
+  assert.equal(route('beaches in Penticton').url, '/penticton/beaches');
+  assert.equal(route('golf Kelowna').url, '/kelowna/golf');
+  assert.equal(route('wineries Naramata').url, '/naramata/wineries');
+  assert.equal(route('poutine').url, '/browse?q=poutine', 'a single free word keeps the visitor\'s own term on /browse\'s existing search');
+  // The fixture's Hidden Gems include a cafe, restaurants and a winery, which
+  // /secret-spots (outdoor + beach only) does not list -- so no destination.
+  assert.equal(route('hidden gems').url, null);
+  assert.equal(route('hidden gems').reason, 'collection_broader_than_page');
+  assert.match(route('things to do with kids in Penticton').url, /^(\/guide\/penticton\/kid_friendly|\/browse\?regions=penticton&features=kid_friendly)$/);
+  assert.equal(route('events this weekend').url, '/whats-on?when=this-weekend');
+  assert.equal(route('markets this weekend').url, '/whats-on?when=this-weekend&categories=markets-fairs');
+  assert.equal(route('restaurants in Kelowna or Penticton').url, '/food-drink?types=restaurant&regions=kelowna,penticton');
+  assert.equal(route('hiking and fishing near Peachland').url, '/outdoors?regions=peachland&activities=hiking,fishing');
+  assert.equal(route('dog beaches').url, '/dog-friendly?types=dog-beach');
+  assert.equal(route('local favourites in Vernon').url, '/local-favorites?regions=vernon');
+  assert.equal(route('Kelowna').url, '/kelowna');
+  assert.equal(route('wineries').url, '/wineries');
+  assert.equal(route('patio restaurants in Kelowna').url, '/kelowna/restaurants?features=patio');
+  // Without a page to land on, nothing is routed.
+  assert.equal(route('beaches in Lumby').url, null, 'Lumby has no beach page in this fixture data');
+})));
+
+test('Phase 2: requests an existing page cannot show honestly are not routed', () => withDiscoveryFlag('on', () => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  const cases = {
+    'asdkjfh qwepoiu zxcvb': 'low_confidence',
+    'wheelchair accessible wineries': 'unsupported',
+    'cheap fine dining': 'conflicting',
+    'date night in Kelowna': 'heuristic_occasion',
+    'What can we do around Penticton if it rains?': 'heuristic_occasion',
+    'Plan 3 days in Penticton with kids.': 'trip_request',
+    'Find me a romantic winery and dinner.': 'incomplete',
+    'upscale restaurants in Kelowna': 'budget_not_filterable',
+    'restaurants tonight in Kelowna': 'date_on_venue_search',
+  };
+  for (const [q, reason] of Object.entries(cases)) {
+    const r = route(q);
+    assert.equal(r.url, null, q);
+    assert.equal(r.reason, reason, q);
+  }
+  // A name shared by two real venues is ambiguous, never guessed.
+  const add = db.prepare('INSERT INTO venues (name, region, type, slug, description) VALUES (?, ?, ?, ?, ?)');
+  add.run('Discovery Twin Lookout', 'vernon', 'outdoor', 'discovery-twin-lookout', 'Fixture.');
+  add.run('Discovery Twin Lookout', 'oliver', 'outdoor', 'discovery-twin-lookout', 'Fixture.');
+  try {
+    const twin = route('Discovery Twin Lookout');
+    assert.equal(twin.url, null);
+    assert.equal(twin.reason, 'ambiguous');
+    const narrowed = route('Discovery Twin Lookout Oliver');
+    assert.equal(narrowed.url, '/oliver/outdoors/discovery-twin-lookout', 'a region word narrows it to one real venue');
+  } finally {
+    db.prepare("DELETE FROM venues WHERE slug = 'discovery-twin-lookout'").run();
+  }
+  // A venue name inside a compound request never collapses to that venue.
+  const compound = route('Rotary Beach Park with my kids');
+  assert.equal(compound.url, null);
+  assert.notEqual(compound.kind, 'venue');
+}));
+
+test('Phase 2: exact venue names route to that venue\'s canonical page', () => withDiscoveryFlag('on', () => {
+  const t = app.buildDiscoveryTaxonomy();
+  const counts = new Map();
+  for (const v of t.venues) { const k = v.name.toLowerCase(); counts.set(k, (counts.get(k) || 0) + 1); }
+  const unique = t.venues.find((v) => counts.get(v.name.toLowerCase()) === 1);
+  const r = app.resolveDiscoveryDestination(app.interpretDiscoveryText(unique.name));
+  assert.equal(r.kind, 'venue');
+  assert.equal(r.url, `/${unique.region}/${app.CATEGORY_SLUGS[unique.type]}/${unique.slug}`);
+}));
+
+test('Phase 2: /api/discover returns only real, active records with canonical URLs', () => withDiscoveryFlag('on', () => {
+  const active = new Map(db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all().map((v) => [v.id, v]));
+  const queries = ['restaurants in Kelowna', 'dog friendly', 'golf Kelowna', 'wineries Naramata', 'poutine', 'hidden gems',
+    'things to do with kids in Penticton', 'Kelowna', 'patio restaurants and craft beer in Penticton with my dog', 'asdkjfh qwepoiu zxcvb'];
+  for (const q of queries) {
+    const out = app.runDiscovery(q, { limit: 60 });
+    assert.equal(out.query, q);
+    assert.ok(out.intent && out.destination && out.results && Array.isArray(out.notApplied), q);
+    assert.ok(out.results.items.length <= 60);
+    for (const item of out.results.items) {
+      const row = active.get(item.id);
+      assert.ok(row, `${q}: venue ${item.id} is a real, active row`);
+      assert.equal(item.name, row.name, `${q}: name comes from the database`);
+      assert.equal(item.url, `/${row.region}/${app.CATEGORY_SLUGS[row.type]}/${row.slug}`, `${q}: canonical URL`);
+      assert.equal(item.rating, row.rating == null ? null : row.rating);
+      assert.equal(item.price, row.price == null ? null : row.price);
+      assert.deepEqual(Object.keys(item).sort(), ['id', 'matchedOn', 'name', 'price', 'rating', 'region', 'reviews', 'type', 'url']);
+    }
+  }
+  // Structured constraints are honoured.
+  for (const item of app.runDiscovery('restaurants in Kelowna', { limit: 60 }).results.items) assert.equal(item.region, 'kelowna');
+  for (const item of app.runDiscovery('golf Kelowna', { limit: 60 }).results.items) assert.equal(active.get(item.id).type, 'golf');
+  // Gibberish finds nothing rather than the whole directory.
+  assert.equal(app.runDiscovery('asdkjfh qwepoiu zxcvb').results.total, 0);
+  // Deterministic.
+  assert.deepEqual(app.runDiscovery('restaurants in Kelowna'), app.runDiscovery('restaurants in Kelowna'));
+}));
+
+test('Phase 2: a text term must appear in the venue\'s own name, cuisine or description', () => withDiscoveryFlag('on', () => {
+  const insert = db.prepare('INSERT INTO venues (name, region, type, slug, description, rating) VALUES (?, ?, ?, ?, ?, ?)');
+  insert.run('Discovery Fixture Chip Shack', 'penticton', 'restaurant', 'discovery-fixture-chip-shack', 'Hand-cut fries and a proper poutine with squeaky curds.', 4.1);
+  insert.run('Discovery Fixture Salad Bar', 'penticton', 'restaurant', 'discovery-fixture-salad-bar', 'Salads and grain bowls. No fried food at all.', 4.9);
+  try {
+    const out = app.runDiscovery('poutine in Penticton', { limit: 60 });
+    const names = out.results.items.map((i) => i.name);
+    assert.ok(names.includes('Discovery Fixture Chip Shack'));
+    assert.ok(!names.includes('Discovery Fixture Salad Bar'), 'a higher rating never substitutes for a match');
+    const hit = out.results.items.find((i) => i.name === 'Discovery Fixture Chip Shack');
+    assert.deepEqual(hit.matchedOn, ['poutine:description']);
+    assert.deepEqual(out.intent.cuisines, [], 'no cuisine is invented for a dish word');
+  } finally {
+    db.prepare("DELETE FROM venues WHERE slug IN ('discovery-fixture-chip-shack', 'discovery-fixture-salad-bar')").run();
+  }
+}));
+
+test('Phase 2: event requests return What\'s On events, never venues', () => withDiscoveryFlag('on', () => {
+  for (const q of ['events this weekend', 'markets this weekend', 'concerts this week in Kelowna']) {
+    const out = app.runDiscovery(q, { limit: 60 });
+    assert.equal(out.intent.mode, 'events', q);
+    assert.equal(out.results.kind, 'events', q);
+    assert.match(out.destination.url, /^\/whats-on/, q);
+    for (const e of out.results.items) {
+      const row = db.prepare('SELECT id, slug, region, status FROM events WHERE id = ?').get(e.id);
+      assert.ok(row && row.status === 'scheduled', `${q}: event ${e.id} is real and scheduled`);
+      if (e.url) assert.equal(e.url, `/${row.region}/events/${row.slug}`);
+    }
+  }
+  assert.equal(app.selectDiscoveryVenues(app.interpretDiscoveryText('events this weekend')).total, 0);
+}));
+
+test('Phase 2: /api/discover over HTTP, and /browse?q redirects only when safe', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const ok = await fetch(`${base}/api/discover?q=${encodeURIComponent('restaurants in Kelowna')}&limit=5`);
+  assert.equal(ok.status, 200);
+  const body = await ok.json();
+  assert.equal(body.destination.url, '/kelowna/restaurants');
+  assert.ok(body.results.items.length <= 5);
+  assert.equal((await fetch(`${base}/api/discover`)).status, 400);
+  assert.equal((await fetch(`${base}/api/discover?q=%20%20`)).status, 400);
+  assert.equal((await fetch(`${base}/api/discover?q=x&limit=0`)).status, 400);
+  assert.equal((await fetch(`${base}/api/discover?q=x&limit=500`)).status, 400);
+  assert.equal((await fetch(`${base}/api/discover?q=${'a'.repeat(501)}`)).status, 400);
+  assert.equal((await fetch(`${base}/api/discover?q=x`, { method: 'POST' })).status, 404, 'read-only: GET only');
+
+  const redirect = await fetch(`${base}/browse?q=${encodeURIComponent('restaurants in Kelowna')}`, { redirect: 'manual' });
+  assert.equal(redirect.status, 302);
+  assert.equal(redirect.headers.get('location'), '/kelowna/restaurants');
+  const events = await fetch(`${base}/browse?q=${encodeURIComponent('events this weekend')}`, { redirect: 'manual' });
+  assert.equal(events.headers.get('location'), '/whats-on?when=this-weekend');
+  // Not routable -> today's /browse, unchanged.
+  for (const q of ['asdkjfh qwepoiu zxcvb', 'Rotary Beach Park', 'date night in Kelowna']) {
+    const res = await fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
+    assert.equal(res.status, 200, q);
+  }
+  // A destination that would currently 404 (e.g. no Secret Spots in this
+  // fixture data) is never offered.
+  assert.notEqual(app.resolveDiscoveryDestination(app.interpretDiscoveryText('hidden gems')).url === '/secret-spots' && app.getSecretSpotVenues().length === 0, true);
+  // Every query ends on a 200 page: no redirect loops, at most one hop.
+  for (const q of ['poutine', 'Poutine', 'best poutine in the Okanagan', 'restaurants in Kelowna', 'dog friendly', 'hidden gems',
+    'events this weekend', 'things to do with kids in Penticton', 'wineries Naramata', 'asdkjfh qwepoiu zxcvb']) {
+    let url = `${base}/browse?q=${encodeURIComponent(q)}`;
+    let hops = 0;
+    let res = await fetch(url, { redirect: 'manual' });
+    while (res.status === 302 && hops < 3) { hops++; url = new URL(res.headers.get('location'), base).href; res = await fetch(url, { redirect: 'manual' }); }
+    assert.equal(res.status, 200, `${q} ends on a page`);
+    assert.ok(hops <= 1, `${q}: ${hops} redirect(s)`);
+  }
+  assert.equal((await fetch(`${base}/browse?q=poutine`, { redirect: 'manual' })).status, 200, 'a one-word search is served in place, not redirected to itself');
+  // Any parameter other than q is never intercepted (so a routed /browse URL cannot loop).
+  for (const path of ['/browse?types=winery&q=wine', '/browse?regions=penticton&features=kid_friendly', '/browse?openMap=1', '/browse']) {
+    const res = await fetch(`${base}${path}`, { redirect: 'manual' });
+    assert.equal(res.status, 200, path);
+  }
+  // With the flag on, /browse carries the region/feature pre-fill.
+  const pre = await (await fetch(`${base}/browse?regions=penticton&features=kid_friendly`)).text();
+  assert.ok(pre.includes("params.get('regions')") && pre.includes('"kid_friendly":"kids"'));
+})));
+
+test('Phase 2: Build My Trip and the frozen homepage are untouched by discovery search', () => withDiscoveryFlag('on', async () => {
+  for (const fixture of TRIP_PARSER_BASELINE.slice(0, 20)) {
+    assert.equal(JSON.stringify(await app.parseTripRequest(fixture.text)), JSON.stringify(fixture.parse), fixture.text);
+  }
+  const hero = app.HIDDEN_GEM_EDITORIAL_CARDS.map((c) => c.href);
+  assert.deepEqual(hero, ['/dog-friendly', '/local-favorites', '/secret-spots']);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'discovery-intent.js'), 'utf8');
+  assert.ok(!/fetch\(|require\(['"]https?['"]\)|OPENAI|openai/.test(src), 'the interpreter makes no network or AI calls');
+}));
+
+// ---- Build My Trip planner (Phase 3, 2026-09-25) -----------------------------
+//
+// trip-planner.js behind TRIP_PLANNER_V2. With the flag off, /trip and the
+// legacy trip APIs are unchanged; with it on, /api/trip/plan returns plans
+// built only from real, active database venues.
+function withPlannerFlag(value, fn) {
+  const before = process.env.TRIP_PLANNER_V2;
+  if (value === undefined) delete process.env.TRIP_PLANNER_V2; else process.env.TRIP_PLANNER_V2 = value;
+  return Promise.resolve().then(fn).finally(() => {
+    if (before === undefined) delete process.env.TRIP_PLANNER_V2; else process.env.TRIP_PLANNER_V2 = before;
+  });
+}
+
+test('Phase 3: the planner flag is off by default and /trip is unchanged without it', () => withPlannerFlag(undefined, () => withDiscoveryServer(async (base) => {
+  assert.equal(app.isTripPlannerV2Enabled(), false);
+  const legacy = app.renderTripPlannerPage();
+  assert.equal(legacy, app.renderTripPlannerPage(false));
+  assert.match(legacy, /id="tripConvHero"/, 'the original conversational hero');
+  assert.doesNotMatch(legacy, /tripPlanForm|trip-plan-summary/);
+  const page = await (await fetch(`${base}/trip`)).text();
+  assert.equal(page, legacy, 'GET /trip serves the unchanged page');
+  const api = await fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Plan 3 days in Kelowna' }) });
+  assert.equal(api.status, 404, 'the route does not exist when the flag is off');
+})));
+
+test('Phase 3: with the flag on, /trip swaps only the hero; the wizard, tray and footer stay', () => withPlannerFlag('on', () => {
+  const v2 = app.renderTripPlannerPage(true);
+  const legacy = app.renderTripPlannerPage(false);
+  assert.match(v2, /id="tripPlanForm"/);
+  assert.doesNotMatch(v2, /id="tripConvHero"/, 'the old conversational hero is replaced, so app.js leaves it alone');
+  for (const id of ['tripWizardSection', 'tripPlannerForm', 'tripPlannerResult', 'tripRegenerateBtn']) assert.match(v2, new RegExp(`id="${id}"`), `${id} kept`);
+  assert.match(v2, /<script src="\/scripts\/app\.js"><\/script>/);
+  // Everything outside the hero section and the added style/script blocks is identical.
+  const strip = (html) => html.replace(/\n<style>\s*\/\* Build My Trip planner view[\s\S]*?<\/style>/, '').replace(/\n<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/, '')
+    .replace(/<section class="trip-conv-hero[\s\S]*?<\/section>\s*(<section id="tripPlanResult"[\s\S]*?<\/section>\s*)?/, '[HERO]');
+  assert.equal(strip(v2), strip(legacy));
+}));
+
+test('Phase 3: POST /api/trip/plan validates its input and never writes', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
+  const post = (body) => fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  const ok = await post({ text: 'Plan 2 days in Kelowna' });
+  assert.equal(ok.status, 200);
+  const body = await ok.json();
+  assert.ok(['multi_day', 'day_plan'].includes(body.kind));
+  for (const bad of [{}, { text: '' }, { text: 'x'.repeat(501) }, { text: 'x', seed: -1 }, { text: 'x', seed: 1.5 }, { text: 'x', excludeVenueIds: ['a'] },
+    { text: 'x', excludeVenueIds: new Array(201).fill(1) }, { text: 'x', pinned: { 'nine-morning': 1 } }, { text: 'x', pinned: { '1-morning': 'x' } }, { text: 'x', extra: 1 }]) {
+    assert.equal((await post(bad)).status, 400, JSON.stringify(bad).slice(0, 60));
+  }
+  assert.equal((await post('{not json')).status, 400);
+  const venuesBefore = db.prepare('SELECT COUNT(*) AS n FROM venues').get().n;
+  const itemsBefore = db.prepare('SELECT COUNT(*) AS n FROM collection_items').get().n;
+  await post({ text: 'Plan 3 days in Kelowna with wine', seed: 3, excludeVenueIds: [1], avoidVenueIds: [2], pinned: { '1-morning': 3 } });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venues').get().n, venuesBefore);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM collection_items').get().n, itemsBefore);
+})));
+
+test('Phase 3: plans from the real database are grounded in active venues', () => withPlannerFlag('on', () => {
+  const active = new Map(db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all().map((v) => [v.id, v]));
+  const prompts = ['Find me a great date night in Kelowna.', 'Where can I get the best poutine in the Okanagan?', 'Plan 3 days in Penticton with kids.',
+    'What should I do in Vernon with my dog?', 'Find me a romantic winery and dinner.', 'What can we do around Penticton if it rains?',
+    'Plan a golf weekend around Kelowna.', 'Plan a relaxed 3-day trip around Kelowna with wine and hidden gems.',
+    'Plan 5 days around the Okanagan with beaches, wineries and great food.', "What's happening in Penticton this weekend?"];
+  for (const q of prompts) {
+    const p = app.runTripPlan({ text: q });
+    assert.ok(typeof p.summary === 'string' && p.summary.length, q);
+    const stops = [...p.days.flatMap((d) => d.stops), ...(p.outing ? [...p.outing.stops, ...p.outing.alternates] : []), ...p.recommendations].filter((s) => s.venue);
+    for (const s of stops) {
+      const row = active.get(s.venue.id);
+      assert.ok(row, `${q}: venue ${s.venue.id} is a real, active row`);
+      assert.equal(s.venue.name, row.name);
+      assert.equal(s.venue.url, `/${row.region}/${app.CATEGORY_SLUGS[row.type]}/${row.slug}`);
+    }
+    for (const e of p.events || []) {
+      const row = db.prepare('SELECT id, status FROM events WHERE id = ?').get(e.id);
+      assert.ok(row && row.status === 'scheduled', `${q}: event ${e.id} is real`);
+    }
+    if (p.kind === 'events') assert.equal(stops.length, 0, 'an event request never returns venues');
+  }
+  // The legacy parser stays byte-identical with the planner flag on.
+  return Promise.all(TRIP_PARSER_BASELINE.slice(0, 20).map(async (f) => assert.equal(JSON.stringify(await app.parseTripRequest(f.text)), JSON.stringify(f.parse))));
+}));
+
+test('Phase 3: the planner and interpreter make no network or AI calls', () => {
+  for (const file of ['trip-planner.js', 'discovery-intent.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    assert.ok(!/fetch\(|require\(['"](https?|net|child_process)['"]\)|OPENAI|openai|XMLHttpRequest/.test(src), file);
+  }
+});
+
+// Phase 3.5: the planner's "tonight"/"right now" clock is the Okanagan wall
+// clock (America/Vancouver), never the machine's timezone.
+test('Phase 3.5: okanaganClock converts fixed instants to America/Vancouver weekday and minutes', () => {
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T04:06:00Z')), { weekday: 'thu', minutes: 21 * 60 + 6 });
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T03:30:00Z')), { weekday: 'thu', minutes: 20 * 60 + 30 });
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T01:00:00Z')), { weekday: 'thu', minutes: 18 * 60 });
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T07:30:00Z')), { weekday: 'fri', minutes: 30 });
+  // Independent of the process timezone.
+  const tz = process.env.TZ;
+  try { process.env.TZ = 'Asia/Bangkok'; assert.deepEqual(app.okanaganClock(new Date('2026-09-25T04:06:00Z')), { weekday: 'thu', minutes: 1266 }); }
+  finally { if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
+});
+
+// ---- Hidden Gems destination link (2026-09-25) ------------------------------
+// /secret-spots lists only the outdoor + beach Hidden Gems. The planner's
+// "See everything that matches on Okanagan Roam" link (and the Hero Search
+// destination) may point there only when that page really holds every Hidden
+// Gem in scope; otherwise there is no link. The Hidden Gem results themselves
+// are unchanged.
+function withHiddenGemScopeFixtures(fn) {
+  const meta = { reason: 'test', batch_id: 'test-hidden-gem-scope' };
+  const add = (name, region, type, slug) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating) VALUES (?, ?, ?, ?, ?, ?)').run(name, region, type, slug, 'Hidden gem scope fixture.', 4.5);
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(slug, region);
+  };
+  const made = [
+    add('HG Osoyoos Trail', 'osoyoos', 'outdoor', 'hg-osoyoos-trail'),
+    add('HG Osoyoos Beach', 'osoyoos', 'beach', 'hg-osoyoos-beach'),
+    add('HG Kelowna Park', 'kelowna', 'outdoor', 'hg-kelowna-park'),
+    add('HG Kelowna Brewery', 'kelowna', 'brewery', 'hg-kelowna-brewery'),
+    add('HG Kelowna Golf', 'kelowna', 'golf', 'hg-kelowna-golf'),
+  ];
+  for (const v of made) assert.equal(app.guardedCollectionMembershipUpdate('hidden_gem', v.id, 'add', null, meta).ok, true, v.name);
+  return Promise.resolve().then(() => fn(Object.fromEntries(made.map((v) => [v.name, v])))).finally(() => {
+    for (const v of made) app.guardedCollectionMembershipUpdate('hidden_gem', v.id, 'remove', null, meta);
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  });
+}
+
+test('Hidden Gems link: a broader Hidden Gems result never links to /secret-spots as "everything that matches"', () => withHiddenGemScopeFixtures(() => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  // Kelowna's Hidden Gems include a brewery and a golf course -> no destination.
+  assert.ok(app.countHiddenGemsOutsideSecretSpots(['kelowna']) >= 2);
+  assert.equal(route('hidden gems in Kelowna').url, null);
+  assert.equal(route('hidden gems in Kelowna').reason, 'collection_broader_than_page');
+  assert.equal(route('hidden gems').url, null, 'valley-wide Hidden Gems are broader than /secret-spots');
+  const plan = app.runTripPlan({ text: 'hidden gems in Kelowna' });
+  assert.equal(plan.seeAll, null, 'no "See everything that matches" link');
+  // The results themselves are untouched: every Kelowna Hidden Gem is still returned.
+  const gemIds = app.getHiddenGemVenueIds();
+  const kelownaGems = db.prepare("SELECT id FROM venues WHERE region = 'kelowna' AND redirect_to IS NULL").all().map((r) => r.id).filter((id) => gemIds.has(id));
+  assert.equal(plan.totalMatches, kelownaGems.length);
+  const names = plan.recommendations.map((s) => s.venue.name);
+  for (const n of ['HG Kelowna Park', 'HG Kelowna Brewery', 'HG Kelowna Golf']) assert.ok(names.includes(n), n);
+}));
+
+test('Hidden Gems link: /secret-spots is still offered where it genuinely holds every Hidden Gem in scope', () => withHiddenGemScopeFixtures(() => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  assert.equal(app.countHiddenGemsOutsideSecretSpots(['osoyoos']), 0);
+  assert.equal(route('hidden gems in Osoyoos').url, '/secret-spots?regions=osoyoos');
+  assert.equal(route('secret spots in Osoyoos').url, '/secret-spots?regions=osoyoos');
+  const plan = app.runTripPlan({ text: 'hidden gems in Osoyoos' });
+  assert.deepEqual(plan.seeAll, { url: '/secret-spots?regions=osoyoos' });
+  assert.deepEqual(plan.recommendations.map((s) => s.venue.name).sort(), ['HG Osoyoos Beach', 'HG Osoyoos Trail']);
+}));
+
+test('Hidden Gems link: mixed requests never get a /secret-spots destination just because hidden_gem is one intent', () => withHiddenGemScopeFixtures(() => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  for (const q of ['wine and hidden gems', 'wineries and hidden gems in Osoyoos', 'hidden gem beaches in Osoyoos', 'dog friendly hidden gems in Kelowna']) {
+    assert.notEqual(route(q).url && route(q).url.split('?')[0], '/secret-spots', q);
+  }
+  for (const q of ['Plan a relaxed 3-day trip around Kelowna with wine and hidden gems.', 'wine and hidden gems']) {
+    const plan = app.runTripPlan({ text: q });
+    assert.ok(!plan.seeAll || !plan.seeAll.url.startsWith('/secret-spots'), q);
+  }
+}));
