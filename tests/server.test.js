@@ -2585,11 +2585,11 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
   assert.equal(items[0].text, 'Food &amp; Drinks');
   assert.equal(items[0].href, '/food-drink', 'Food & Drinks points at the dedicated hub, matching the mood card and the Wine link below it');
   assert.ok(items[1].href === '/wineries', `Wine href unexpected: ${items[1].href}`);
-  assert.equal(items[2].href, '#exploreRegions');
+  assert.equal(items[2].href, '/beaches', 'footer Beaches goes to the Okanagan-wide /beaches page, matching the header (2026-09-25)');
   assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
   assert.equal(items[4].href, '/whats-on');
   assert.equal(items[5].href, '/outdoors', 'footer Outdoors link matches the Outdoors mood card once outdoor venues exist (2026-09-20)');
-  assert.equal(items[6].href, '#hiddenGems');
+  assert.equal(items[6].href, '/hidden-gems', 'footer Hidden Gems goes to the full /hidden-gems page, matching the header (2026-09-25)');
 });
 
 test('Home footer: Regions column lists ALL 20 real regions (none omitted), each a real /:region link', () => {
@@ -5997,7 +5997,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.match(html, /class="logo-wordmark">Okanagan<span class="logo-wordmark-accent"> Roam<\/span>/);
     assert.match(html, /<a class="app-btn" id="navTripBtn" href="\/trip">/);
     assert.doesNotMatch(html, /<button class="nav-search-btn"|<button class="lang-toggle"|<header class="top">/);
-    assert.match(html, /href="\/#hiddenGems"/);
+    assert.match(html, /<li><a href="\/hidden-gems" data-i18n="gems\.heading">Hidden Gems<\/a><\/li>/, 'footer Hidden Gems link');
     assert.match(html, /<main class="wrap-wide golf-main">[\s\S]*<\/main>/);
     // Site-wide floating Trip control: the homepage's own #tripTray fragment,
     // driven by the homepage's app.js (same as /trip) -- not a Golf copy.
@@ -6618,9 +6618,9 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.equal(homeAfter, homeBefore, 'FROZEN HOMEPAGE: further beach rows, an advisory and Hidden Gem / Local Favourite / Dog Friendly memberships must not change one byte of "/"');
     // Explicit no-Beaches-on-homepage assertions (independent of the byte check).
     assert.doesNotMatch(homeAfter, /href="\/kelowna\/beaches"|category-tile-beach|data-venue-category|venue-advisory|beach-page/);
-    assert.equal((withoutSiteHeader(homeAfter).match(/href="\/beaches"/g) || []).length, 1, 'exactly one /beaches link in the homepage body: the mood card');
+    assert.equal((withoutSiteHeader(homeAfter).match(/href="\/beaches"/g) || []).length, 2, 'exactly two /beaches links outside the header: the mood card and the footer Beaches link');
     assert.equal(((homeAfter.match(/<header id="top">[\s\S]*?<\/header>/) || [''])[0].match(/href="\/beaches"/g) || []).length, 1, 'and exactly one in the header: Things to Do');
-    assert.match(homeAfter, /<li><a href="#exploreRegions" data-i18n="mood\.beaches\.title">Beaches<\/a><\/li>/, 'the footer Beaches link is untouched');
+    assert.match(homeAfter, /<li><a href="\/beaches" data-i18n="mood\.beaches\.title">Beaches<\/a><\/li>/, 'the footer Beaches link points at /beaches (2026-09-25)');
     assert.doesNotMatch(homeAfter, /Homepage Beach One|Homepage Beach Two/);
 
     // Routes now live: wide page, regional page, venue page; sitemap gains exactly the beach URLs.

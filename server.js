@@ -5204,11 +5204,11 @@ function renderHomeFooterHTML(fromBrowse) {
         <ul>
           <li><a href="/food-drink" data-i18n="homeFooter.foodDrinks">Food &amp; Drinks</a></li>
           <li><a href="${wineHref}" data-i18n="mood.wine.title">Wine</a></li>
-          <li><a href="${exploreRegionsHref}" data-i18n="mood.beaches.title">Beaches</a></li>
+          <li><a href="/beaches" data-i18n="mood.beaches.title">Beaches</a></li>
           <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
           <li><a href="/whats-on" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
           <li><a href="${outdoorsHref}" data-i18n="mood.outdoors.title">Outdoors</a></li>
-          <li><a href="${hiddenGemsHref}" data-i18n="gems.heading">Hidden Gems</a></li>
+          <li><a href="/hidden-gems" data-i18n="gems.heading">Hidden Gems</a></li>
         </ul>
       </div>
       <div class="home-footer-col">
