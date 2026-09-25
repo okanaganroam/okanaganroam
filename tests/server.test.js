@@ -2051,20 +2051,20 @@ test('Reference redesign: Explore the Okanagan arrow icon is a plain glyph, not 
 // distinguishing modifier classes (.explore-all-link-heading /
 // .explore-all-link-mobile) that a real browser's CSS resolves.
 
-test('Explore All Okanagan Regions: renders exactly twice (heading copy + mobile-grid copy), both plain .discover-heading-link links to /browse (no new route), no bordered-tile treatment', () => {
+test('Explore All Okanagan Regions: renders exactly twice (heading copy + mobile-grid copy), both plain .discover-heading-link links to /destinations, no bordered-tile treatment', () => {
   const html = app.renderExploreRegionsHTML();
   const matches = Array.from(html.matchAll(/<a class="discover-heading-link explore-all-link explore-all-link-(heading|mobile)" href="([^"]*)" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>/g));
   assert.equal(matches.length, 2, 'expected exactly two "Explore All Okanagan Regions" links (a heading copy and a mobile-grid copy), both using the shared .discover-heading-link component');
   const variants = matches.map((m) => m[1]).sort();
   assert.deepEqual(variants, ['heading', 'mobile'], 'expected one heading-copy and one mobile-copy instance');
-  matches.forEach((m) => assert.equal(m[2], '/browse'));
+  matches.forEach((m) => assert.equal(m[2], '/destinations', 'retargeted from /browse to /destinations (2026-09-25)'));
   assert.doesNotMatch(html, /region-card-all/, 'the old bordered-tile treatment must be fully gone');
   const headingPos = html.indexOf('<h2 data-i18n="explore.heading">Explore by Destination</h2>');
   assert.ok(headingPos !== -1, 'expected the section heading to be i18n-wired');
   const headingLinkPos = html.indexOf('explore-all-link-heading');
   const gridPos = html.indexOf('class="region-card-grid"');
   assert.ok(headingPos < headingLinkPos && headingLinkPos < gridPos, 'expected the heading-copy link inside the heading row, before the card grid starts');
-  assert.match(html, /<div class="discover-heading discover-heading-split">\s*<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>\s*<a class="discover-heading-link explore-all-link explore-all-link-heading" href="\/browse" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>\s*<\/div>/, 'expected the same heading-row pattern used by Hidden Gems/Mood Cards');
+  assert.match(html, /<div class="discover-heading discover-heading-split">\s*<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>\s*<a class="discover-heading-link explore-all-link explore-all-link-heading" href="\/destinations" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>\s*<\/div>/, 'expected the same heading-row pattern used by Hidden Gems/Mood Cards');
 });
 
 test('Explore All Okanagan Regions: the destination-card grid contains the unchanged 6 real cards in their original order (still one aligned row at 480px+), plus the mobile-only copy of the link positioned AFTER Vernon (the last card)', () => {
@@ -8968,7 +8968,7 @@ test('Secret Spots: /secret-spots renders only the Hidden Gem places, with filte
 // /{region} shows only categories with active venues (redirects not
 // counted) as tabs + cards; /{region}/{food & drink category} is the
 // /food-drink directory scoped to one destination and one PRIMARY type.
-test('Destination pages: active-only category tabs, and food & drink category pages scoped to one region and one primary type', () => {
+test('Destination pages: every linked category tab has an active venue, and food & drink category pages scoped to one region and one primary type', () => {
   const add = (row) => {
     db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, patio, redirect_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(row.name, row.region, row.type, row.slug, row.description, 4.5, row.patio || 0, row.redirect_to || null);
@@ -9610,9 +9610,10 @@ test('Hidden Gems page: a category match through a secondary Food & Drink catego
   }
 })));
 
-test('Hidden Gems page: with both flags off the path is the old 404 and nothing links to it', () => withDiscoveryFlag(undefined, () => withPlannerFlag(undefined, () => withHiddenGemScopeFixtures(() => withDiscoveryServer(async (base) => {
-  assert.equal((await fetch(`${base}/hidden-gems`)).status, 404);
-  assert.equal((await fetch(`${base}/hidden-gems/dog-friendly`)).status, 404);
+test('Hidden Gems page: with both flags off the page is still served (destination pages link to it) but Discovery Search / Build My Trip do not link to it', () => withDiscoveryFlag(undefined, () => withPlannerFlag(undefined, () => withHiddenGemScopeFixtures(() => withDiscoveryServer(async (base) => {
+  assert.equal((await fetch(`${base}/hidden-gems`)).status, 200);
+  assert.equal((await fetch(`${base}/hidden-gems?regions=kelowna`)).status, 200);
+  assert.equal((await fetch(`${base}/hidden-gems/not-a-badge`)).status, 404);
   const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
   assert.equal(route('hidden gems').url, null);
   assert.equal(route('hidden gems').reason, 'collection_broader_than_page');
@@ -9624,3 +9625,121 @@ test('Hidden Gems page: Build My Trip "See everything" links follow the same rul
   assert.deepEqual(app.runTripPlan({ text: 'hidden gems in Osoyoos' }).seeAll, { url: '/secret-spots?regions=osoyoos' });
   assert.equal(app.runTripPlan({ text: 'Plan a relaxed 3-day trip around Kelowna with wine and hidden gems.' }).seeAll, null);
 }))));
+
+// ---- Destination categories + /destinations (2026-09-25) --------------------
+// Every destination page lists the same 14 categories in one fixed order.
+// A category with results links to the page showing exactly them; an empty
+// one stays visible as a non-link, aria-disabled pill/card.
+const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
+function destTabs(html) {
+  const nav = (html.match(/<nav class="category-region-selector region-category-tabs"[\s\S]*?<\/nav>/) || [''])[0];
+  return [...nav.matchAll(/<(a|span)( href="([^"]+)")?([^>]*)>([^<]+)<span class="outdoor-activity-count">(\d+)<\/span><\/\1>/g)]
+    .map((m) => ({ tag: m[1], href: m[3] ? m[3].replace(/&amp;/g, '&') : null, attrs: m[4], label: m[5].replace(/&rsquo;/g, '\u2019'), count: Number(m[6]) }));
+}
+function destRegions() {
+  return Object.keys(app.REGION_LABELS || {}).filter((r) => Object.keys(app.getRegionCategoryCounts(r)).length > 0);
+}
+
+test('Destination pages: every destination shows the same 14 categories in the approved order', () => {
+  const regions = destRegions();
+  assert.ok(regions.length > 0);
+  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
+  for (const r of regions) {
+    const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
+    const tabs = destTabs(html);
+    assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS, r);
+    // The cards list the same 14, grouped Food & Drink / Experiences / Discovery.
+    assert.match(html, /<h2 class="category-subsection-heading">Food &amp; Drink<\/h2>[\s\S]*<h2 class="category-subsection-heading">Experiences<\/h2>[\s\S]*<h2 class="category-subsection-heading">Discovery<\/h2>/, r);
+    assert.equal((html.match(/<li class="category-card/g) || []).length, 14, r);
+  }
+});
+
+test('Destination pages: counts and links come from existing data, filtered to the destination; empty categories are never links', () => withHiddenGemScopeFixtures(() => {
+  for (const r of destRegions()) {
+    const counts = app.getRegionCategoryCounts(r);
+    const cats = app.destinationCategories(r, counts);
+    const tabs = destTabs(app.renderRegionPage(r, counts, []));
+    const inRegion = (list) => list.filter((v) => v.region === r).length;
+    const expected = {
+      'whats-on': app.listUpcomingEventsForRegion(r, { limit: Number.MAX_SAFE_INTEGER }).length,
+      'dog-friendly': inRegion(app.getDogFriendlyHubVenues()),
+      'local-favourites': inRegion(app.getLocalFavouriteVenues()),
+      'hidden-gems': inRegion(app.getHiddenGemCollectionVenues()),
+    };
+    cats.forEach((c, i) => {
+      const want = c.type ? (counts[c.type] || 0) : expected[c.key];
+      assert.equal(c.count, want, `${r} ${c.key}`);
+      assert.equal(tabs[i].count, want, `${r} ${c.key} tab`);
+      if (want === 0) {
+        assert.equal(c.href, null, `${r} ${c.key}: empty -> no link`);
+        assert.equal(tabs[i].tag, 'span', `${r} ${c.key}`);
+        assert.match(tabs[i].attrs, /aria-disabled="true"/, `${r} ${c.key}`);
+      } else {
+        assert.equal(tabs[i].tag, 'a', `${r} ${c.key}`);
+        const href = c.type ? `/${r}/${app.CATEGORY_SLUGS[c.type]}` : null;
+        if (href) assert.equal(c.href, href);
+        if (c.key === 'dog-friendly') assert.equal(c.href, `/dog-friendly?regions=${r}`);
+        if (c.key === 'local-favourites') assert.equal(c.href, `/local-favorites?regions=${r}`);
+        if (c.key === 'hidden-gems') assert.equal(c.href, `/hidden-gems?regions=${r}`);
+        if (c.key === 'whats-on') assert.match(c.href, new RegExp(`^/whats-on\\?regions=${r}&when=custom&from=\\d{4}-\\d{2}-\\d{2}&to=\\d{4}-\\d{2}-\\d{2}$`));
+      }
+    });
+  }
+}));
+
+test('Destination pages: an empty category card is visible but not a link; a region category page keeps its active pill', () => {
+  // Find any destination with at least one empty category.
+  const r = destRegions().find((x) => app.destinationCategories(x, app.getRegionCategoryCounts(x)).some((c) => !c.href));
+  assert.ok(r, 'fixture data has a destination with an empty category');
+  const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
+  const empty = app.destinationCategories(r, app.getRegionCategoryCounts(r)).find((c) => !c.href);
+  assert.match(html, new RegExp(`<li class="category-card category-card-empty" aria-disabled="true">\\s*<h2>${empty.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;').replace(/\u2019/g, '&rsquo;')}</h2>\\s*<p class="venue-meta">None listed in `));
+  assert.match(html, /\.category-region-selector-empty \{/, 'the zero-state style ships with the page');
+});
+
+test('Destination pages: the Hidden Gems category reaches the right page whatever the flags; zero-result regions get no link', () => withDiscoveryFlag(undefined, () => withPlannerFlag(undefined, () => withHiddenGemScopeFixtures(() => withDiscoveryServer(async (base) => {
+  const kel = app.destinationCategories('kelowna', app.getRegionCategoryCounts('kelowna')).find((c) => c.key === 'hidden-gems');
+  const kelownaGems = app.getHiddenGemCollectionVenues().filter((v) => v.region === 'kelowna').map((v) => v.id).sort();
+  assert.equal(kel.count, kelownaGems.length);
+  assert.equal(kel.href, '/hidden-gems?regions=kelowna');
+  const res = await fetch(base + kel.href);
+  assert.equal(res.status, 200, 'served with both flags off');
+  const shown = [...(await res.text()).matchAll(/<li class="venue-card"( hidden)? data-venue-id="(\d+)"/g)].filter((m) => !m[1]).map((m) => Number(m[2])).sort();
+  assert.deepEqual(shown, kelownaGems, 'region filter shows exactly the Kelowna Hidden Gems');
+  // A destination with no Hidden Gems gets the disabled state, not a link.
+  const none = destRegions().find((r) => app.getHiddenGemCollectionVenues().every((v) => v.region !== r));
+  if (none) assert.equal(app.destinationCategories(none, app.getRegionCategoryCounts(none)).find((c) => c.key === 'hidden-gems').href, null, none);
+  // Discovery Search still does not link to it with its flag off.
+  assert.equal(app.resolveDiscoveryDestination(app.interpretDiscoveryText('hidden gems in Kelowna')).url, null);
+})))));
+
+test('/destinations: 200, every destination exactly once, each linking to its canonical page, no search directory', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/destinations`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /<h1>Choose Your Okanagan Destination<\/h1>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/destinations">/);
+  const links = [...html.matchAll(/<li class="category-card">\s*<h2><a href="\/([a-z-]+)">([^<]+)<\/a><\/h2>/g)].map((m) => [m[1], m[2]]);
+  const regions = destRegions();
+  assert.deepEqual(links.map((l) => l[0]).sort(), regions.slice().sort(), 'every destination with a page, once');
+  assert.equal(new Set(links.map((l) => l[0])).size, links.length, 'no duplicates');
+  for (const [slug, label] of links) assert.equal(label, app.REGION_LABELS[slug].replace(/&/g, '&amp;'));
+  for (const [slug] of links) assert.equal((await fetch(`${base}/${slug}`)).status, 200, slug);
+  assert.doesNotMatch(html, /id="searchInput"|class="venue-card"|type="search"/, 'no search box or venue listing');
+  assert.equal((await fetch(`${base}/destinations/`)).status, 200);
+  assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/destinations<\/loc>/);
+}));
+
+test('Destination routes: region and region/category pages still respond as before', () => withDiscoveryServer(async (base) => {
+  // A Food & Drink category page (golf/beach/outdoor region pages use their
+  // own themed layout without the destination tabs, unchanged).
+  const r = destRegions().find((x) => ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'cocktail', 'distillery'].some((t) => app.getRegionCategoryCounts(x)[t]));
+  const counts = app.getRegionCategoryCounts(r);
+  assert.equal((await fetch(`${base}/${r}`)).status, 200);
+  const type = ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'cocktail', 'distillery'].find((t) => counts[t]);
+  const page = await fetch(`${base}/${r}/${app.CATEGORY_SLUGS[type]}`);
+  assert.equal(page.status, 200);
+  const tabs = destTabs(await page.text());
+  assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS);
+  assert.equal((await fetch(`${base}/not-a-region`)).status, 404);
+}));

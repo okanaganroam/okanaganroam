@@ -4865,8 +4865,10 @@ function renderExploreRegionsHTML() {
   // the two is ever visible/in the a11y tree at a time.
   // Localization fix (2026-09-17): both copies of this link, and the
   // section heading, previously had no i18n key at all.
-  const exploreAllHeadingLink = '<a class="discover-heading-link explore-all-link explore-all-link-heading" href="/browse" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
-  const exploreAllMobileLink = '<a class="discover-heading-link explore-all-link explore-all-link-mobile" href="/browse" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
+  // Retargeted 2026-09-25 from /browse to /destinations (every region, then
+  // that region's page). Only the href changed.
+  const exploreAllHeadingLink = '<a class="discover-heading-link explore-all-link explore-all-link-heading" href="/destinations" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
+  const exploreAllMobileLink = '<a class="discover-heading-link explore-all-link explore-all-link-mobile" href="/destinations" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
   cardHtml.push(exploreAllMobileLink);
   const cards = cardHtml.join('\n');
 
@@ -7946,17 +7948,23 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
     { name: regionLabel, url: canonical },
   ]);
 
-  const categoryCards = regionCategoryTypes(categoryCounts)
-    .map((type) => {
-      const catSlug = CATEGORY_SLUGS[type];
-      const label = CATEGORY_LABELS[type];
-      return `
+  const categories = destinationCategories(region, categoryCounts);
+  const byKey = new Map(categories.map((c) => [c.key, c]));
+  const categoryCard = (c) => (c.href
+    ? `
       <li class="category-card">
-        <h2><a href="/${region}/${catSlug}">${escapeHtml(label.plural)}</a></h2>
-        <p class="venue-meta">${categoryCounts[type]} ${categoryCounts[type] === 1 ? label.singular.toLowerCase() : label.plural.toLowerCase()} in ${escapeHtml(regionLabel)}</p>
-      </li>`;
-    })
-    .join('\n');
+        <h2><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h2>
+        <p class="venue-meta">${c.count} ${c.count === 1 ? c.nounOne : c.nounMany} in ${escapeHtml(regionLabel)}</p>
+      </li>`
+    : `
+      <li class="category-card category-card-empty" aria-disabled="true">
+        <h2>${escapeHtml(c.label)}</h2>
+        <p class="venue-meta">None listed in ${escapeHtml(regionLabel)} yet</p>
+      </li>`);
+  const categorySections = DESTINATION_CATEGORY_GROUPS.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
+  <ul class="card-grid">
+    ${g.keys.map((k) => categoryCard(byKey.get(k))).join('\n')}
+  </ul>`).join('\n  ');
 
   // H1 Step 2 (2026-09-22): a short "Upcoming events in {Region}" block, built
   // from the same live predicate as the sitemap and the event-page block, so
@@ -7999,6 +8007,7 @@ ${upcomingEvents.map((e) => {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 ${renderOutdoorThemeStyles()}
+${renderDestinationCategoryStyles()}
 ${golfEngagementHeadHtml('fd', true)}
 </head>
 <body class="golf-page outdoor-page region-page">
@@ -8011,11 +8020,9 @@ ${renderGolfHeaderHtml()}
     { name: regionLabel },
   ])}
   <h1>${escapeHtml(regionLabel)}, BC</h1>
-  <p class="subtitle">${totalVenues} verified venues across ${categoryCards ? Object.keys(categoryCounts).length : 0} categories in ${escapeHtml(regionLabel)}.</p>
-  ${regionCategoryTabsHtml(region, categoryCounts, null)}
-  <ul class="card-grid">
-    ${categoryCards}
-  </ul>
+  <p class="subtitle">${totalVenues} verified venues across ${Object.keys(categoryCounts).length} categories in ${escapeHtml(regionLabel)}.</p>
+  ${regionCategoryTabsHtml(region, categoryCounts, null, categories)}
+  ${categorySections}
   ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
   <a class="cta" href="https://okanaganroam.com/">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
   </main>
@@ -8025,31 +8032,152 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
-// The categories a destination actually offers, in the order its page lists
-// them: every category with at least one active venue, largest first.
-function regionCategoryTypes(categoryCounts) {
-  return Object.keys(CATEGORY_SLUGS)
-    .filter((type) => categoryCounts[type] >= MIN_CATEGORY_VENUES)
-    .sort((a, b) => categoryCounts[b] - categoryCounts[a]);
+// Destination categories (2026-09-25): every destination page lists the
+// same 14 categories in one fixed order -- Food & Drink, then Experiences,
+// then Discovery. A category with results links to the page that shows
+// exactly them; a category with none stays visible but is not a link, so a
+// visitor is never sent to a page we know is empty. Counts come only from
+// existing data:
+//   venue types      -> active venues of that primary type (the same count
+//                       and the same /{region}/{category} page as before)
+//   What's On        -> the destination page's own upcoming-events rule
+//                       (listUpcomingEventsForRegion, incl. its minimum),
+//                       linked to What's On over the next year so every
+//                       counted event is on the page
+//   Dog-Friendly     -> the /dog-friendly hub list for the region
+//   Local Favourites -> the local_favorite collection for the region
+//   Hidden Gems      -> the hidden_gem collection for the region
+const DESTINATION_CATEGORY_GROUPS = [
+  { label: 'Food & Drink', keys: ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail'] },
+  { label: 'Experiences', keys: ['golf', 'beach', 'outdoor'] },
+  { label: 'Discovery', keys: ['whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems'] },
+];
+const DESTINATION_CATEGORY_ORDER = DESTINATION_CATEGORY_GROUPS.flatMap((g) => g.keys);
+const DESTINATION_DISCOVERY_LABELS = {
+  'whats-on': { plural: 'What\u2019s On', nounOne: 'upcoming event', nounMany: 'upcoming events' },
+  'dog-friendly': { plural: 'Dog-Friendly Finds', nounOne: 'dog-friendly find', nounMany: 'dog-friendly finds' },
+  'local-favourites': { plural: 'Local Favourites', nounOne: 'local favourite', nounMany: 'local favourites' },
+  'hidden-gems': { plural: 'Hidden Gems', nounOne: 'hidden gem', nounMany: 'hidden gems' },
+};
+const DESTINATION_EVENTS_WINDOW_DAYS = 365; // within What's On's MAX_CUSTOM_WINDOW_DAYS
+function destinationCategories(region, categoryCounts, now = new Date()) {
+  const inRegion = (list) => list.filter((v) => v.region === region).length;
+  const today = todayLocal(now);
+  const discovery = {
+    'whats-on': {
+      count: listUpcomingEventsForRegion(region, { limit: Number.MAX_SAFE_INTEGER, now }).length,
+      href: `/whats-on?regions=${encodeURIComponent(region)}&when=custom&from=${today}&to=${addLocalDays(today, DESTINATION_EVENTS_WINDOW_DAYS)}`,
+    },
+    'dog-friendly': { count: inRegion(getDogFriendlyHubVenues()), href: `/dog-friendly?regions=${encodeURIComponent(region)}` },
+    'local-favourites': { count: inRegion(getLocalFavouriteVenues()), href: `/local-favorites?regions=${encodeURIComponent(region)}` },
+    'hidden-gems': { count: inRegion(getHiddenGemCollectionVenues()), href: `/hidden-gems?regions=${encodeURIComponent(region)}` },
+  };
+  return DESTINATION_CATEGORY_ORDER.map((key) => {
+    if (CATEGORY_SLUGS[key]) {
+      const count = categoryCounts[key] || 0;
+      const l = CATEGORY_LABELS[key];
+      return { key, type: key, label: l.plural, nounOne: l.singular.toLowerCase(), nounMany: l.plural.toLowerCase(), count, href: count >= MIN_CATEGORY_VENUES ? `/${region}/${CATEGORY_SLUGS[key]}` : null };
+    }
+    const l = DESTINATION_DISCOVERY_LABELS[key];
+    const d = discovery[key];
+    return { key, type: null, label: l.plural, nounOne: l.nounOne, nounMany: l.nounMany, count: d.count, href: d.count > 0 ? d.href : null };
+  });
 }
 // The destination's category tabs: the existing pill selector
 // (.category-region-selector, the same control the Okanagan-wide category
-// pages and Outdoors use) with each category's active-venue count. On a
-// destination category page the current category is the static active pill.
-function regionCategoryTabsHtml(region, categoryCounts, currentType) {
-  const types = regionCategoryTypes(categoryCounts);
-  if (currentType && !types.includes(currentType)) types.push(currentType);
-  if (!types.length) return '';
-  const pills = types.map((type) => {
-    const label = escapeHtml(CATEGORY_LABELS[type].plural);
-    const count = `<span class="outdoor-activity-count">${categoryCounts[type] || 0}</span>`;
-    return type === currentType
-      ? `<span class="category-region-selector-active" aria-current="page">${label}${count}</span>`
-      : `<a href="/${region}/${CATEGORY_SLUGS[type]}">${label}${count}</a>`;
+// pages and Outdoors use) with every category's count, in the fixed order.
+// On a destination category page the current category is the static active
+// pill; an empty category is a non-link pill marked aria-disabled.
+function regionCategoryTabsHtml(region, categoryCounts, currentType, categories = null) {
+  const cats = categories || destinationCategories(region, categoryCounts);
+  const pills = cats.map((c) => {
+    const label = escapeHtml(c.label);
+    const count = `<span class="outdoor-activity-count">${c.count}</span>`;
+    if (c.type && c.type === currentType) return `<span class="category-region-selector-active" aria-current="page">${label}${count}</span>`;
+    if (!c.href) return `<span class="category-region-selector-empty" aria-disabled="true" title="None listed in ${escapeHtml(REGION_LABELS[region])} yet">${label}${count}</span>`;
+    return `<a href="${escapeHtml(c.href)}">${label}${count}</a>`;
   }).join('\n      ');
   return `<nav class="category-region-selector region-category-tabs" aria-label="${escapeHtml(REGION_LABELS[region])} categories">
       ${pills}
     </nav>`;
+}
+// ---------- /destinations (2026-09-25) ----------
+// "Choose Your Okanagan Destination": every destination whose /{region}
+// page renders, exactly once, grouped by the site's existing
+// FOOTER_REGION_GROUPS (Central / South / North / Ski resorts, then any
+// region not in a group). Each card links to the region's existing page.
+// Same shell and card styles as the destination pages; no search, no
+// filters, no venue listings.
+function destinationRegionEntries() {
+  const entries = [];
+  const placed = new Set();
+  const groups = FOOTER_REGION_GROUPS.map((g) => ({ label: g.label, regions: g.regions.filter((r) => REGION_LABELS[r]) }));
+  groups.forEach((g) => g.regions.forEach((r) => placed.add(r)));
+  const other = Object.keys(REGION_LABELS).filter((r) => !placed.has(r));
+  if (other.length) groups.push({ label: 'Other', regions: other });
+  for (const g of groups) {
+    const regions = g.regions.map((r) => {
+      const counts = getRegionCategoryCounts(r);
+      return { region: r, label: REGION_LABELS[r], venues: Object.values(counts).reduce((a, b) => a + b, 0), categories: Object.keys(counts).length };
+    }).filter((x) => x.categories > 0);
+    if (regions.length) entries.push({ label: g.label, regions });
+  }
+  return entries;
+}
+function renderDestinationsPage(entries = destinationRegionEntries()) {
+  const title = 'Okanagan Destinations | Okanagan Roam';
+  const description = 'Choose an Okanagan destination, from Enderby to Osoyoos and the ski resorts, and see its restaurants, wineries, beaches, outdoor places, events and more on Okanagan Roam.';
+  const canonical = 'https://okanaganroam.com/destinations';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Destinations', url: canonical },
+  ]);
+  const sections = entries.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
+  <ul class="card-grid">
+    ${g.regions.map((r) => `
+      <li class="category-card">
+        <h2><a href="/${r.region}">${escapeHtml(r.label)}</a></h2>
+        <p class="venue-meta">${r.venues} verified venue${r.venues === 1 ? '' : 's'} across ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}</p>
+      </li>`).join('\n')}
+  </ul>`).join('\n  ');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+${renderOutdoorThemeStyles()}
+${golfEngagementHeadHtml('fd', true)}
+</head>
+<body class="golf-page outdoor-page region-page destinations-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Destinations' },
+  ])}
+  <h1>Choose Your Okanagan Destination</h1>
+  <p class="subtitle">Every destination on Okanagan Roam, from Enderby to Osoyoos and the ski resorts. Pick one to see its restaurants, wineries, beaches, outdoor places, events and more.</p>
+  ${sections}
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+
+// The zero-results treatment for destination tabs and cards: the existing
+// pill/card shapes and navy text, dimmed and not interactive. Loaded only by
+// the destination hub and destination category pages.
+function renderDestinationCategoryStyles() {
+  return `<style>
+  body.golf-page .category-region-selector .category-region-selector-empty {
+    display: inline-block; background: transparent; color: var(--ref-navy); border: 1px dashed rgba(27,43,58,0.2);
+    border-radius: 999px; padding: 5px 12px; font-weight: 700; font-size: 0.8rem; opacity: 0.45; cursor: default;
+  }
+  .category-card.category-card-empty { opacity: 0.55; }
+  .category-card.category-card-empty h2 { color: inherit; }
+  </style>`;
 }
 
 // Short label for the "← All <X>" back-link on a category's single-
@@ -9698,6 +9826,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0 })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
+${renderDestinationCategoryStyles()}
 ${golfEngagementHeadHtml('fd', true)}
 </head>
 <body class="golf-page outdoor-page fd-page fd-scoped-page">
@@ -10847,8 +10976,8 @@ function renderSecretSpotsPage(venues, filter = null) {
 // the shared page script rewrites the query string to types/regions only.
 // The venue list comes from selectDiscoveryVenues, the same selection
 // /api/discover uses, so the page and the API cannot disagree. Served only
-// while DISCOVERY_SEARCH or TRIP_PLANNER_V2 is on (the only features that
-// link here); with both off the path is the same 404 as before.
+// by the destination pages whatever the flags; Discovery Search and Build My
+// Trip link here only while DISCOVERY_SEARCH or TRIP_PLANNER_V2 is on.
 const HIDDEN_GEM_FEATURE_BY_SLUG = Object.fromEntries(Object.keys(BADGE_LABELS).map((f) => [f.replace(/_/g, '-'), f]));
 function isHiddenGemsPageEnabled() {
   return isDiscoverySearchEnabled() || isTripPlannerV2Enabled();
@@ -10856,11 +10985,20 @@ function isHiddenGemsPageEnabled() {
 function hiddenGemsIntent({ types = [], regions = [], features = [] } = {}) {
   return { mode: 'find', regions, types, features, collections: ['hidden_gem'], activities: [], cuisines: [], textTerms: [] };
 }
+// Same rules as selectDiscoveryVenues for a Hidden Gems intent (active venue,
+// known region and type, hidden_gem membership, and for a badge the badge
+// column -- or, for dog_friendly, the dog-friendly collection), read
+// directly so pages that list Hidden Gems do not need the discovery
+// interpreter module. hiddenGemsPageDestination still compares this page's
+// venue IDs with the API's before any Discovery Search link points here.
 function getHiddenGemCollectionVenues(feature = null) {
-  const picked = selectDiscoveryVenues(hiddenGemsIntent({ features: feature ? [feature] : [] }), Number.MAX_SAFE_INTEGER);
-  const ids = new Set(picked.items.map((x) => x.id));
+  const memberOf = (kind) => getCollectionVenueIds(kind);
+  const gems = memberOf('hidden_gem');
+  const dogs = feature === 'dog_friendly' ? memberOf(DOG_FRIENDLY_COLLECTION_KIND) : null;
   return db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL ORDER BY name ASC').all()
-    .filter((v) => ids.has(v.id)).map(rowToVenue);
+    .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && gems.has(v.id))
+    .filter((v) => !feature || Number(v[feature]) === 1 || (dogs && dogs.has(v.id)))
+    .map(rowToVenue);
 }
 // A Hidden Gems destination only when the page would show exactly what the
 // request matches: the same venues, none lost and none added (e.g. a venue
@@ -13599,6 +13737,7 @@ const server = http.createServer(async (req, res) => {
         ...(getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES
           ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
           : []),
+        `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...(getSecretSpotVenues().length >= MIN_CATEGORY_VENUES
           ? [`  <url>\n    <loc>https://okanaganroam.com/secret-spots</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
           : []),
@@ -14952,11 +15091,20 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // GET /destinations -- "Choose Your Okanagan Destination" (2026-09-25),
+    // the target of the homepage's "Explore All Okanagan Regions" links.
+    if ((pathname === '/destinations' || pathname === '/destinations/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderDestinationsPage());
+    }
+
     // GET /hidden-gems[/<badge>] -- the full Hidden Gems collection (see
-    // renderHiddenGemsPage). Only while DISCOVERY_SEARCH or TRIP_PLANNER_V2
-    // is on; otherwise the request falls through exactly as before.
+    // renderHiddenGemsPage). Always served (2026-09-25): the destination
+    // pages' Hidden Gems category links here whatever the feature flags.
+    // Discovery Search and Build My Trip still only LINK here while their
+    // own flag is on (isHiddenGemsPageEnabled in the resolver).
     const hiddenGemsMatch = pathname.match(/^\/hidden-gems(?:\/([a-z-]+))?\/?$/);
-    if (hiddenGemsMatch && method === 'GET' && isHiddenGemsPageEnabled()) {
+    if (hiddenGemsMatch && method === 'GET') {
       const slug = hiddenGemsMatch[1] || null;
       const feature = slug ? HIDDEN_GEM_FEATURE_BY_SLUG[slug] || null : null;
       const hgVenues = !slug || feature ? getHiddenGemCollectionVenues(feature) : [];
@@ -15486,6 +15634,10 @@ module.exports = {
   getHiddenGemCollectionVenues,
   hiddenGemsPageDestination,
   renderHiddenGemsPage,
+  destinationCategories,
+  DESTINATION_CATEGORY_ORDER,
+  destinationRegionEntries,
+  renderDestinationsPage,
   isDiscoverySearchEnabled,
   interpretDiscoveryText,
   resolveDiscoveryDestination,
