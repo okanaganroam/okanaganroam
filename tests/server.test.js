@@ -10229,18 +10229,21 @@ const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
         <ul>
           <li><a href="/browse#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
+          <li><a href="/list-an-event">List an Event</a></li>
           <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
         </ul>`;
 
 test('Footer: "List your venue" points to /list-your-venue on every footer page; the rest of the footer is unchanged', () => withDiscoveryServer(async (base) => {
-  for (const page of ['/', '/browse', '/trip', '/destinations', '/kelowna/restaurants', '/kelowna/restaurants/test-trattoria', '/list-your-venue']) {
+  for (const page of ['/', '/browse', '/trip', '/destinations', '/kelowna/restaurants', '/kelowna/restaurants/test-trattoria', '/list-your-venue', '/list-an-event']) {
     const res = await fetch(base + page);
     assert.equal(res.status, 200, page);
     const html = await res.text();
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
     assert.ok(footer, `${page} renders the shared footer`);
-    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly App coming soon / List your venue / Contact`);
+    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly App coming soon / List your venue / List an Event / Contact`);
     assert.equal((footer[0].match(/href="\/list-your-venue"/g) || []).length, 1, page);
+    assert.equal((footer[0].match(/href="\/list-an-event"/g) || []).length, 1, `${page}: exactly one List an Event link`);
+    assert.equal((footer[0].match(/>List an Event</g) || []).length, 1, page);
     assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
     const cols = footer[0].match(/<div class="home-footer-col(?: home-footer-col-regions)?">\s*<h4 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
     assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions', 'homeFooter.socialMedia'], `${page}: same four columns in the same order`);
@@ -10627,5 +10630,5 @@ test('List an Event: the staging table is additive and nothing else was touched'
   assert.ok(!eventCols.includes('submission_id'), 'events schema unchanged');
   const header = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
   assert.doesNotMatch(header, /list-an-event/, 'no navigation link yet');
-  assert.doesNotMatch(app.renderHomeFooterHTML(), /list-an-event/, 'no footer link yet');
+  assert.equal((app.renderHomeFooterHTML().match(/<a href="\/list-an-event">List an Event<\/a>/g) || []).length, 1, 'the footer links to List an Event once');
 });
