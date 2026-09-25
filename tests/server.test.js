@@ -8962,3 +8962,60 @@ test('Secret Spots: /secret-spots renders only the Hidden Gem places, with filte
   const card = app.HIDDEN_GEM_EDITORIAL_CARDS.find((c) => c.title === 'Secret Spots');
   assert.equal(card.href, '/secret-spots');
 });
+
+// ---- Destination mini-directories (2026-09-25) ---------------------------
+//
+// /{region} shows only categories with active venues (redirects not
+// counted) as tabs + cards; /{region}/{food & drink category} is the
+// /food-drink directory scoped to one destination and one PRIMARY type.
+test('Destination pages: active-only category tabs, and food & drink category pages scoped to one region and one primary type', () => {
+  const add = (row) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, patio, redirect_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(row.name, row.region, row.type, row.slug, row.description, 4.5, row.patio || 0, row.redirect_to || null);
+    return db.prepare('SELECT * FROM venues WHERE slug = ?').get(row.slug);
+  };
+  const made = [];
+  try {
+    const cafe = add({ name: 'DD Fixture Cafe', region: 'apex', type: 'cafe', slug: 'dd-fixture-cafe', description: 'A fixture cafe.', patio: 1 }); made.push(cafe.id);
+    const other = add({ name: 'DD Fixture Other Region Cafe', region: 'baldy', type: 'cafe', slug: 'dd-fixture-other-cafe', description: 'Another region.' }); made.push(other.id);
+    const retired = add({ name: 'DD Fixture Retired Pub', region: 'apex', type: 'pub', slug: 'dd-fixture-retired-pub', description: 'Redirected.', redirect_to: cafe.id }); made.unshift(retired.id);
+    // Region page: counts exclude redirected rows; every tab has >= 1 active venue.
+    const counts = app.getRegionCategoryCounts('apex');
+    const activePubs = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE region = 'apex' AND type = 'pub' AND redirect_to IS NULL").get().n;
+    assert.equal(counts.pub || 0, activePubs, 'redirected venues are not counted');
+    const region = s6markup(app.renderRegionPage('apex', counts, []));
+    assert.match(region, /class="golf-page outdoor-page region-page"/, 'themed shell');
+    assert.match(region, /id="tripTray"/);
+    const tabs = [...region.matchAll(/<a href="\/apex\/([a-z-]+)">[^<]*<span class="outdoor-activity-count">(\d+)<\/span>/g)];
+    assert.ok(tabs.length > 0);
+    for (const [, slug, n] of tabs) assert.ok(Number(n) >= 1, `${slug} tab has an active venue`);
+    assert.match(region, /href="\/apex\/cafes">/);
+
+    // Scoped food & drink page: only this region + primary type.
+    const venues = app.getVenuesByRegionCategory('apex', 'cafe');
+    const html = app.renderFoodDrinkHubPage(venues, app.parseFoodDrinkFilterQuery({ features: 'patio', regions: 'baldy', types: 'pub' }), { region: 'apex', type: 'cafe', categoryCounts: counts });
+    const markup = s6markup(html);
+    assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/apex\/cafes">/);
+    assert.match(markup, /<title>Cafes in Apex, BC \| Okanagan Roam<\/title>/);
+    assert.match(markup, /<h1>Cafes in Apex, BC<\/h1>/);
+    assert.match(html, /"@type":"ItemList"/);
+    assert.match(markup, new RegExp(`data-venue-id="${cafe.id}"`));
+    assert.doesNotMatch(markup, new RegExp(`data-venue-id="${other.id}"`), 'another region never appears');
+    assert.doesNotMatch(markup, /id="fdRegionsBtn"/, 'no global Regions popover');
+    assert.doesNotMatch(markup, /data-fd-type=/, 'no global type chips');
+    assert.match(markup, /What are you looking for\?/);
+    assert.match(markup, /data-fd-feature="patio"/);
+    assert.match(markup, /id="fdSearch"/);
+    assert.match(markup, /class="category-region-selector-active" aria-current="page">Cafes/, 'current tab');
+    const feats = [...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]);
+    for (const k of feats) assert.ok(venues.some((v) => Number(v[k]) === 1), `${k} has at least one venue here`);
+    // Only the feature survives from the query; region/type params are ignored.
+    assert.match(markup, /id="fdResultsSummary" aria-live="polite">\d+ of \d+ places?</);
+
+    // An empty retained page keeps its 200 empty state.
+    const empty = s6markup(app.renderFoodDrinkHubPage([], null, { region: 'naramata', type: 'cocktail', categoryCounts: app.getRegionCategoryCounts('naramata') }));
+    assert.match(empty, /No cocktail lounges are listed in Naramata right now\./);
+  } finally {
+    for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});

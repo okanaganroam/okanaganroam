@@ -1389,9 +1389,11 @@ function backfillSlugs() {
 }
 
 function getRegionCategoryCounts(region) {
-  // { restaurant: 12, winery: 4, ... } for a region, only categories with >=1 venue
+  // { restaurant: 12, winery: 4, ... } for a region, only categories with >=1
+  // ACTIVE venue -- redirected (retired) rows are not counted (2026-09-25), so
+  // the destination page's numbers match the category pages they link to.
   return db
-    .prepare('SELECT type, COUNT(*) AS n FROM venues WHERE region = ? GROUP BY type')
+    .prepare('SELECT type, COUNT(*) AS n FROM venues WHERE region = ? AND redirect_to IS NULL GROUP BY type')
     .all(region)
     .filter((r) => CATEGORY_SLUGS[r.type]) // ignore any unexpected/unmapped type defensively
     .reduce((acc, r) => { acc[r.type] = r.n; return acc; }, {});
@@ -7422,9 +7424,7 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
     { name: regionLabel, url: canonical },
   ]);
 
-  const categoryCards = Object.keys(CATEGORY_SLUGS)
-    .filter((type) => categoryCounts[type] >= MIN_CATEGORY_VENUES)
-    .sort((a, b) => categoryCounts[b] - categoryCounts[a])
+  const categoryCards = regionCategoryTypes(categoryCounts)
     .map((type) => {
       const catSlug = CATEGORY_SLUGS[type];
       const label = CATEGORY_LABELS[type];
@@ -7467,27 +7467,67 @@ ${upcomingEvents.map((e) => {
       </div>`
     : '';
 
+  // Destination mini-directory (2026-09-25): the same themed shell as
+  // /food-drink and /local-favorites (homepage header, Trip tray, footer),
+  // with the destination's categories as pill tabs above the existing
+  // category cards. Every tab and card is a category with at least one
+  // active venue, linking to its /{region}/{category} page.
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb])}
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+${renderOutdoorThemeStyles()}
+${golfEngagementHeadHtml('fd', true)}
 </head>
-<body>
-  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+<body class="golf-page outdoor-page region-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel },
   ])}
   <h1>${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${totalVenues} verified venues across ${categoryCards ? Object.keys(categoryCounts).length : 0} categories in ${escapeHtml(regionLabel)}.</p>
+  ${regionCategoryTabsHtml(region, categoryCounts, null)}
   <ul class="card-grid">
     ${categoryCards}
   </ul>
   ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
   <a class="cta" href="https://okanaganroam.com/">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
+  </main>
   ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
 </body>
 </html>`;
+}
+
+// The categories a destination actually offers, in the order its page lists
+// them: every category with at least one active venue, largest first.
+function regionCategoryTypes(categoryCounts) {
+  return Object.keys(CATEGORY_SLUGS)
+    .filter((type) => categoryCounts[type] >= MIN_CATEGORY_VENUES)
+    .sort((a, b) => categoryCounts[b] - categoryCounts[a]);
+}
+// The destination's category tabs: the existing pill selector
+// (.category-region-selector, the same control the Okanagan-wide category
+// pages and Outdoors use) with each category's active-venue count. On a
+// destination category page the current category is the static active pill.
+function regionCategoryTabsHtml(region, categoryCounts, currentType) {
+  const types = regionCategoryTypes(categoryCounts);
+  if (currentType && !types.includes(currentType)) types.push(currentType);
+  if (!types.length) return '';
+  const pills = types.map((type) => {
+    const label = escapeHtml(CATEGORY_LABELS[type].plural);
+    const count = `<span class="outdoor-activity-count">${categoryCounts[type] || 0}</span>`;
+    return type === currentType
+      ? `<span class="category-region-selector-active" aria-current="page">${label}${count}</span>`
+      : `<a href="/${region}/${CATEGORY_SLUGS[type]}">${label}${count}</a>`;
+  }).join('\n      ');
+  return `<nav class="category-region-selector region-category-tabs" aria-label="${escapeHtml(REGION_LABELS[region])} categories">
+      ${pills}
+    </nav>`;
 }
 
 // Short label for the "← All <X>" back-link on a category's single-
@@ -8679,10 +8719,10 @@ function foodDrinkTypeChipsHtml(state = {}) {
 }
 // "What are you looking for?" -- the twelve verified feature columns, as
 // toggles inside a popover so the page does not become a wall of controls.
-function foodDrinkFeatureChipsHtml(state = {}) {
+function foodDrinkFeatureChipsHtml(state = {}, onlyKeys = null) {
   const selected = new Set(state.features || []);
   const counts = state.counts && state.counts.features ? state.counts.features : null;
-  const chips = FD_HUB_FEATURES.map((f) => {
+  const chips = FD_HUB_FEATURES.filter((f) => !onlyKeys || onlyKeys.includes(f.key)).map((f) => {
     const n = counts ? (counts[f.key] || 0) : null;
     return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-fd-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
@@ -8692,8 +8732,22 @@ function foodDrinkFeatureChipsHtml(state = {}) {
 // so the canonical 20-region list and its FOOTER_REGION_GROUPS grouping are
 // literally the same code the other directories use -- no second region
 // system, and it cannot drift.
-function foodDrinkFilterBarHtml(venues, state = {}) {
+function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null) {
   const nF = (state.features || []).length, nR = (state.regions || []).length;
+  // A destination category page (scopeFeatures set) offers only "What are you
+  // looking for?", with just the features that page's venues actually have --
+  // the region is fixed by the URL, so there is no Regions popover.
+  if (scopeFeatures) {
+    if (!scopeFeatures.length) return '';
+    return `<div class="fd-controls">
+    <div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">✨</span> What are you looking for?<span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
+      </div>
+    </div>
+  </div>`;
+  }
   const pop = (id, label, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` · ${escapeHtml(String(badge))}` : ''}</span></button>
       <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
@@ -9017,12 +9071,152 @@ function renderFoodDrinkHubScriptHtml() {
 </script>`;
 }
 
+// The card list, split into the first FD_PAGE_SIZE matching cards and an
+// inert <template> holding the rest (see the incremental-rendering note in
+// renderFoodDrinkHubPage). Shared by /food-drink and the destination
+// category pages so "Show more" works identically on both.
+function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion) {
+  const orderById = new Map(venues.map((v, i) => [v.id, i]));
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true })
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
+  const cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
+  const firstBatch = [], deferred = [];
+  for (const chunk of cardChunks) {
+    const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
+    if (matchIds.has(id) && firstBatch.length < FD_PAGE_SIZE) firstBatch.push(chunk);
+    else deferred.push(chunk);
+  }
+  return `<ul class="card-grid" id="fdResults"${firstBatch.length === 0 ? ' hidden' : ''}>
+    ${firstBatch.join('\n')}
+  </ul>
+  <div class="fd-more-row"><button type="button" class="fd-show-more" id="fdShowMore"${matchCount > firstBatch.length ? '' : ' hidden'}>Show more</button></div>
+  <template id="fdRest">${deferred.join('\n')}</template>`;
+}
+
+// ---------- Destination category pages (2026-09-25) ----------
+//
+// /{region}/{food & drink category} -- e.g. /kelowna/restaurants -- rendered
+// with the /food-drink directory's own search, "What are you looking for?"
+// popover, filter tags, Show more and client script, scoped to ONE
+// destination and ONE category. Inclusion is by the venue's PRIMARY type
+// (getVenuesByRegionCategory), never by a secondary fd_* membership, so a
+// venue appears on exactly one sibling tab. The global Regions popover and
+// type chips are not rendered (the URL fixes both); the destination's other
+// categories are offered as sibling tabs instead. Title, description,
+// canonical, H1, breadcrumb and ItemList are the ones renderCategoryPage
+// produced for these URLs, so the pages' SEO identity is unchanged.
+function renderFoodDrinkScopedPage(venues, filter, scope) {
+  const { region, type, categoryCounts, categoryGuidePages = [] } = scope;
+  const regionLabel = REGION_LABELS[region];
+  const catSlug = CATEGORY_SLUGS[type];
+  const label = CATEGORY_LABELS[type];
+  const path = `/${region}/${catSlug}`;
+
+  // Only primary type counts: every card answers to this page's category.
+  const catsById = new Map(venues.map((v) => [v.id, [v.type]]));
+  const featsById = foodDrinkFeaturesByVenue(venues);
+  // Features offered = the ones at least one venue here actually has.
+  const present = new Set();
+  for (const feats of featsById.values()) for (const k of feats) present.add(k);
+  const scopeFeatures = FD_HUB_FEATURES.map((x) => x.key).filter((k) => present.has(k));
+  const q = filter || { features: [] };
+  const f = { types: [], regions: [], features: (q.features || []).filter((k) => present.has(k)) };
+  const matching = filterFoodDrinkVenues(venues, f, catsById, featsById);
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = foodDrinkChipCounts(venues, f, catsById, featsById);
+  const filtered = f.features.length > 0;
+  const state = { types: [], features: f.features, regions: [], counts };
+
+  const title = `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
+  const description = venues.length === 0
+    ? `No ${label.plural.toLowerCase()} are currently listed in ${regionLabel}, BC. Browse everything else Okanagan Roam covers in ${regionLabel}.`
+    : `${venues.length} verified ${label.plural.toLowerCase()} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
+  const canonical = `https://okanaganroam.com${path}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: regionLabel, url: `https://okanaganroam.com/${region}` },
+    { name: label.plural, url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${region}/${catSlug}/${v.slug}`,
+      item: {
+        '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
+        name: v.name,
+        description: v.description || undefined,
+      },
+    })),
+  };
+  const payload = {};
+  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
+
+  const advisoryNotes = getAdvisoryNotes();
+  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false) : '';
+  const emptyHtml = venues.length === 0
+    ? `<p class="fd-no-results" id="fdNoResults">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`
+    : `<p class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(label.plural.toLowerCase())} here match that combination yet. <a href="${path}" id="fdNoResultsClear">Clear the filters</a> to see all of them.</p>`;
+  const guideLinks = categoryGuidePages.length
+    ? `<div class="related-section">
+        <h2>Filter ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</h2>
+        <p>${categoryGuidePages
+          .map((c) => `<a href="/guide/${c.region}/${c.badge}">${escapeHtml(BADGE_LABELS[c.badge].title)}</a>`)
+          .join(', ')}</p>
+      </div>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0 })}
+${renderOutdoorThemeStyles()}
+${renderFoodDrinkHubStyles()}
+${golfEngagementHeadHtml('fd', true)}
+</head>
+<body class="golf-page outdoor-page fd-page fd-scoped-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: regionLabel, href: `/${region}` },
+    { name: label.plural },
+  ])}
+  <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
+  ${regionCategoryTabsHtml(region, categoryCounts, type)}
+  ${venues.length ? foodDrinkSearchHtml() : ''}
+  ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures) : ''}
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
+  <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state)}
+  ${emptyHtml}
+  ${cardsHtml}
+  <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  ${guideLinks}
+  <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('fd', true)}
+  ${renderFoodDrinkHubScriptHtml()}
+</body>
+</html>`;
+}
+
 // The page. Same themed shell as the /wineries hub (homepage header, Trip
 // tray, app.css, name-as-link cards with the "View details" cue, Favorite /
 // Add to Trip) so the engagement contract is identical -- list cards carry
 // ONLY Favorite and Add to Trip; Website / Directions / Call stay on the
 // venue detail pages, which are untouched.
-function renderFoodDrinkHubPage(venues, filter = null) {
+function renderFoodDrinkHubPage(venues, filter = null, scope = null) {
+  if (scope) return renderFoodDrinkScopedPage(venues, filter, scope);
   const f = filter || { types: [], features: [], regions: [] };
   const catsById = foodDrinkCategoriesByVenue(venues);
   const featsById = foodDrinkFeaturesByVenue(venues);
@@ -9074,21 +9268,7 @@ function renderFoodDrinkHubPage(venues, filter = null) {
   // them, so every venue stays searchable and filterable and the count is
   // always "N of 850". data-fd-i keeps the canonical order stable no matter
   // which subset happens to be live.
-  const orderById = new Map(venues.map((v, i) => [v.id, i]));
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true })
-    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
-  const cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
-  const firstBatch = [], deferred = [];
-  for (const chunk of cardChunks) {
-    const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
-    if (matchIds.has(id) && firstBatch.length < FD_PAGE_SIZE) firstBatch.push(chunk);
-    else deferred.push(chunk);
-  }
-  const cardsHtml = `<ul class="card-grid" id="fdResults"${firstBatch.length === 0 ? ' hidden' : ''}>
-    ${firstBatch.join('\n')}
-  </ul>
-  <div class="fd-more-row"><button type="button" class="fd-show-more" id="fdShowMore"${matching.length > firstBatch.length ? '' : ' hidden'}>Show more</button></div>
-  <template id="fdRest">${deferred.join('\n')}</template>`;
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -13960,7 +14140,12 @@ const server = http.createServer(async (req, res) => {
           const categoryGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter(
             (c) => c.region === region && venues.some((v) => v[c.badge])
           );
-          const html = renderCategoryPage(region, type, venues, categoryGuidePages);
+          // Food & drink categories (2026-09-25) are destination mini-
+          // directories built on the /food-drink filters; wineries, golf,
+          // beaches and outdoors keep their existing page unchanged.
+          const html = FD_CATEGORY_KIND_BY_TYPE[type]
+            ? renderFoodDrinkHubPage(venues, parseFoodDrinkFilterQuery(query), { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
+            : renderCategoryPage(region, type, venues, categoryGuidePages);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
@@ -14253,6 +14438,8 @@ module.exports = {
   renderLocalFavouritesPage,
   getSecretSpotVenues,
   renderSecretSpotsPage,
+  renderFoodDrinkScopedPage,
+  regionCategoryTabsHtml,
   SECRET_SPOT_TYPES,
   renderLocalFavouritesStyles,
   renderLocalFavouritesScriptHtml,
