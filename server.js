@@ -5131,9 +5131,9 @@ const FOOTER_REGION_GROUPS = [
 //     same "best-stocked region for this type" href the mood cards
 //     compute (bestRegionForCategoryType, shared helper above). What's On
 //     -> /events, same as the mood card and the nav.
-//   About: App coming soon/List your venue -> /browse#app / /browse#list-venue
-//     (real anchors confirmed present on /browse's app-teaser/list-venue
-//     sections), Contact -> the existing mailto link
+//   About: App coming soon -> /browse#app (real anchor on /browse's
+//     app-teaser section), List your venue -> /list-your-venue (the
+//     submission page, 2026-09-25), Contact -> the existing mailto link
 //   Regions: ALL 20 real regions (FOOTER_REGION_GROUPS above), not a
 //     curated subset -- grouped exactly like the wizard's own region
 //     picker so a returning user recognizes the same four groups. This
@@ -5214,7 +5214,7 @@ function renderHomeFooterHTML(fromBrowse) {
         <h4 data-i18n="footer.about">About</h4>
         <ul>
           <li><a href="/browse#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
-          <li><a href="/browse#list-venue" data-i18n="footer.listVenue">List your venue</a></li>
+          <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
         </ul>
       </div>

@@ -2653,7 +2653,7 @@ test('Home footer: does not reuse or modify the header\'s shared .logo classes',
 test('Home footer: About and Social Media (renamed from Follow) column links/icons are unchanged from the previously approved design', () => {
   const html = app.renderHomeFooterHTML();
   assert.match(html, /<a href="\/browse#app" data-i18n="nav\.appComingSoon">App coming soon<\/a>/);
-  assert.match(html, /<a href="\/browse#list-venue" data-i18n="footer\.listVenue">List your venue<\/a>/);
+  assert.match(html, /<a href="\/list-your-venue" data-i18n="footer\.listVenue">List your venue<\/a>/);
   assert.match(html, /<a href="mailto:okanaganroam@gmail\.com" data-i18n="footer\.contact">Contact<\/a>/);
   assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
   assert.match(html, /icon-tiktok" href="https:\/\/www\.tiktok\.com\/@okanaganroam"/);
@@ -10222,3 +10222,47 @@ test('List Your Venue: the staging table is additive and the old /browse form is
   const html = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
   assert.match(html, /<form class="venue-form" id="venueForm">/);
 });
+
+// ---------- List Your Venue footer link (2026-09-25) ----------
+
+const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
+        <ul>
+          <li><a href="/browse#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
+          <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
+          <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
+        </ul>`;
+
+test('Footer: "List your venue" points to /list-your-venue on every footer page; the rest of the footer is unchanged', () => withDiscoveryServer(async (base) => {
+  for (const page of ['/', '/browse', '/trip', '/destinations', '/kelowna/restaurants', '/kelowna/restaurants/test-trattoria', '/list-your-venue']) {
+    const res = await fetch(base + page);
+    assert.equal(res.status, 200, page);
+    const html = await res.text();
+    const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
+    assert.ok(footer, `${page} renders the shared footer`);
+    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly App coming soon / List your venue / Contact`);
+    assert.equal((footer[0].match(/href="\/list-your-venue"/g) || []).length, 1, page);
+    assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
+    const cols = footer[0].match(/<div class="home-footer-col(?: home-footer-col-regions)?">\s*<h4 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
+    assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions', 'homeFooter.socialMedia'], `${page}: same four columns in the same order`);
+    // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
+    const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
+    assert.ok(header, page);
+    assert.doesNotMatch(header[0], /list-your-venue|list-venue|nav\.listVenue/, `${page}: header has no List Your Venue link`);
+  }
+}));
+
+test('Footer link change: the old /browse form, protected assets, the page and the sitemap are untouched', () => withDiscoveryServer(async (base) => {
+  const browse = await (await fetch(`${base}/browse`)).text();
+  assert.match(browse, /<section class="list-venue" id="list-venue">/, 'old /browse#list-venue section still present');
+  assert.match(browse, /<form class="venue-form" id="venueForm">/);
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
+  const crypto = require('node:crypto');
+  const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
+  assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d');
+  assert.equal(md5('public/scripts/app.js'), '533569598f250f4975fbab9fa2900da3');
+  assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
+  assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
+  const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+  assert.doesNotMatch(sitemap, /list-your-venue/, 'sitemap unchanged: the page is not listed');
+}));
