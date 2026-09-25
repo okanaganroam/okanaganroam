@@ -13730,7 +13730,47 @@ function sendSubmissionResponse(res, status, data, close = false) {
   res.end(JSON.stringify(data));
 }
 
+// TEMPORARY (2026-09-25): diagnostic for the submission rate-limit IP
+// source. Logs presence, salted hashes (random per-process salt, never
+// logged), and booleans only -- never a raw IP. To be removed.
+const LYV_IP_DIAG_SALT = crypto.randomBytes(16).toString('hex');
+function logVenueSubmissionIpDiagnostic(req) {
+  const net = require('net');
+  const clean = (v) => String(v || '').trim().replace(/^::ffff:/i, '');
+  const hash = (v) => crypto.createHash('sha256').update(`${LYV_IP_DIAG_SALT}:${v}`).digest('hex').slice(0, 10);
+  const privateRanges = new net.BlockList();
+  for (const [a, n] of [['10.0.0.0', 8], ['172.16.0.0', 12], ['192.168.0.0', 16], ['100.64.0.0', 10], ['127.0.0.0', 8]]) privateRanges.addSubnet(a, n, 'ipv4');
+  privateRanges.addSubnet('fc00::', 7, 'ipv6');
+  privateRanges.addSubnet('::1', 128, 'ipv6');
+  const probe = String(req.headers['x-lyv-diag-probe'] || '');
+  const describe = (raw) => {
+    const v = clean(raw);
+    if (!v) return { present: false };
+    const family = net.isIP(v);
+    return {
+      present: true,
+      hash: hash(v),
+      family,
+      cloudflare: family ? isCloudflareIp(v) : false,
+      private: family ? privateRanges.check(v, family === 4 ? 'ipv4' : 'ipv6') : false,
+      matchesProbe: probe ? crypto.createHash('sha256').update(v).digest('hex') === probe : null,
+    };
+  };
+  const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((e) => e.trim()).filter(Boolean);
+  console.log('[lyv-ip-diag] ' + JSON.stringify({
+    requestId: req.headers['x-railway-request-id'] || null,
+    host: req.headers.host,
+    xRealIp: describe(req.headers['x-real-ip']),
+    cfConnectingIp: describe(req.headers['cf-connecting-ip']),
+    xffCount: xff.length,
+    xff: xff.map(describe),
+    socket: describe(req.socket.remoteAddress),
+    currentKeyHash: hash(requestClientIp(req)),
+  }));
+}
+
 async function handleVenueSubmission(req, res) {
+  logVenueSubmissionIpDiagnostic(req);
   const generic = 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
   if (!isSameOriginSubmission(req)) {
     return sendSubmissionResponse(res, 403, { ok: false, error: 'Submissions are only accepted from the Okanagan Roam website.' });
