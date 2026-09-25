@@ -4140,6 +4140,9 @@ async function s6get(urlPath) {
   });
 }
 const s6markup = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '');
+// The shared site header (2026-09-25 navigation redesign) links every Things
+// to Do / Food & Drink page, so page-content assertions exclude it.
+const withoutSiteHeader = (html) => html.replace(/<header id="top">[\s\S]*?<\/header>/, '');
 const s6cards = (html) => [...s6markup(html).matchAll(/<li class="venue-card whatson-event-card" data-venue-id="event-(\d+)"[^>]*data-event-region="([a-z-]+)" data-event-categories="([a-z,-]*)"( data-event-valley-wide="1")?/g)].map((m) => ({ id: Number(m[1]), region: m[2], cats: m[3], valley: !!m[4] }));
 
 test('S6 #1/#20/#22: with zero publishable inventory /whats-on renders the approved empty state, noindex, no date step, hidden controls (isolated child, empty DB)', async () => {
@@ -6615,7 +6618,8 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.equal(homeAfter, homeBefore, 'FROZEN HOMEPAGE: further beach rows, an advisory and Hidden Gem / Local Favourite / Dog Friendly memberships must not change one byte of "/"');
     // Explicit no-Beaches-on-homepage assertions (independent of the byte check).
     assert.doesNotMatch(homeAfter, /href="\/kelowna\/beaches"|category-tile-beach|data-venue-category|venue-advisory|beach-page/);
-    assert.equal((homeAfter.match(/href="\/beaches"/g) || []).length, 1, 'exactly one /beaches link on the homepage: the mood card');
+    assert.equal((withoutSiteHeader(homeAfter).match(/href="\/beaches"/g) || []).length, 1, 'exactly one /beaches link in the homepage body: the mood card');
+    assert.equal(((homeAfter.match(/<header id="top">[\s\S]*?<\/header>/) || [''])[0].match(/href="\/beaches"/g) || []).length, 1, 'and exactly one in the header: Things to Do');
     assert.match(homeAfter, /<li><a href="#exploreRegions" data-i18n="mood\.beaches\.title">Beaches<\/a><\/li>/, 'the footer Beaches link is untouched');
     assert.doesNotMatch(homeAfter, /Homepage Beach One|Homepage Beach Two/);
 
@@ -7128,7 +7132,7 @@ test('Activity page + landing sections render once an activity reaches the thres
     assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-activity="hiking" aria-pressed="false">Hiking &amp; Trails<span class="outdoor-activity-count">4<\/span><\/button>/, 'the live activity is a compact filter chip carrying its count');
     assert.doesNotMatch(landing, /outdoors-guide-link|outdoors-guides/, 'the landing carries no Activity guides row');
     assert.match(app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking)), /<h1>Hiking &amp; Trails in the Okanagan<\/h1>/, 'the activity page itself is untouched and still renders');
-    assert.doesNotMatch(landing, /data-activity="viewpoints"|data-activity="camping"|href="\/outdoors\/(viewpoints|camping)"/, 'sub-threshold activities get no toggle and no link');
+    assert.doesNotMatch(withoutSiteHeader(landing), /data-activity="viewpoints"|data-activity="camping"|href="\/outdoors\/(viewpoints|camping)"/, 'sub-threshold activities get no toggle and no link');
     assert.equal((outdoorMarkupOnly(landing).match(/<li class="venue-card" /g) || []).length, all.length, 'every destination rendered once');
     // The per-venue activity map only carries live activities.
     const mapJson = JSON.parse(landing.match(/id="outdoorActivityMap">([\s\S]*?)<\/script>/)[1]);
@@ -7250,7 +7254,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     for (const p of Object.keys(before)) assert.equal(after[p], before[p], `${p} must be byte-identical after activity memberships exist`);
     assert.match(after['/'], /class="mood-card mood-card-outdoors" href="\/outdoors">/);
     assert.match(after['/'], /<li><a href="\/outdoors" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/);
-    assert.doesNotMatch(after['/'], /\/outdoors\/hiking|outdoor-activity/);
+    assert.doesNotMatch(withoutSiteHeader(after['/']), /\/outdoors\/hiking|outdoor-activity/);
 
     const act = await fetch(`${base}/outdoors/hiking`);
     assert.equal(act.status, 200);
@@ -7849,7 +7853,7 @@ test('Outdoors simplification: compact surface, no date control anywhere, activi
     // no guide markup, and no link from the landing to any activity page. The
     // nine activity pages themselves are untouched and still render.
     assert.doesNotMatch(markup, /outdoors-guides|outdoors-guide-link|Activity guides/, 'no Activity guides row');
-    assert.doesNotMatch(markup, /href="\/outdoors\/[a-z]+"/, 'the landing links to no /outdoors/<activity> page');
+    assert.doesNotMatch(withoutSiteHeader(markup), /href="\/outdoors\/[a-z]+"/, 'the landing links to no /outdoors/<activity> page');
     for (const slug of ['hiking', 'cycling']) {
       const act = app.OUTDOOR_ACTIVITY_BY_SLUG[slug];
       assert.ok(app.renderOutdoorActivityPage(act, app.getOutdoorActivityVenues(act)).includes(`<h1>${slug === 'hiking' ? 'Hiking &amp; Trails' : 'Cycling &amp; Biking'} in the Okanagan</h1>`), `/outdoors/${slug} still renders`);
@@ -9095,10 +9099,10 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), '612fea997972e597fcad227f1c52a774', 'okanagan.html');
-  assert.equal(md5('public/styles/app.css'), 'bea5259dfdf95799b3cb84a0583e29b6', 'public/styles/app.css');
+  assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d', 'okanagan.html (header navigation redesign 2026-09-25)');
+  assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
   assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
-  assert.equal(md5('public/scripts/app.js'), 'f58983d39f3dda1365128d4b5974ff05', 'public/scripts/app.js (hero search handler + /browse search)');
+  assert.equal(md5('public/scripts/app.js'), '533569598f250f4975fbab9fa2900da3', 'public/scripts/app.js (+11 EN/FR header labels 2026-09-25)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -9743,3 +9747,140 @@ test('Destination routes: region and region/category pages still respond as befo
   assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS);
   assert.equal((await fetch(`${base}/not-a-region`)).status, 404);
 }));
+
+// ---- Header navigation (2026-09-25 redesign) ---------------------------------
+// One shared header (okanagan.html <header id="top">) used by /, /browse,
+// /trip and every themed page. Exact items, order, URLs and i18n keys.
+const HEADER_SPEC = [
+  { label: 'Discover', key: 'nav.discover', items: [
+    ['/destinations', 'nav.destinations', 'Destinations'],
+    ['/dog-friendly', 'gems.dogFriendly.title', 'Dog-Friendly Finds'],
+    ['/local-favorites', 'gems.localFavourites.title', 'Local Favourites'],
+    ['/browse', 'nav.browseSearch', 'Browse &amp; Search'],
+    ['/browse?openMap=1', 'nav.map', 'Map'],
+  ] },
+  { href: '/hidden-gems', key: 'gems.heading', label: 'Hidden Gems' },
+  { label: 'Things to Do', key: 'nav.thingsToDo', items: [
+    ['/outdoors', 'mood.outdoors.title', 'Outdoors'],
+    ['/outdoors/hiking', 'nav.outdoor.hiking', 'Hiking &amp; Trails'],
+    ['/outdoors/viewpoints', 'nav.outdoor.viewpoints', 'Viewpoints'],
+    ['/outdoors/nature', 'nav.outdoor.nature', 'Nature &amp; Wildlife'],
+    ['/outdoors/cycling', 'nav.outdoor.cycling', 'Cycling &amp; Biking'],
+    ['/outdoors/winter', 'nav.outdoor.winter', 'Winter'],
+    ['/outdoors/adventure', 'nav.outdoor.adventure', 'Adventure'],
+    ['/outdoors/fishing', 'nav.outdoor.fishing', 'Fishing'],
+    ['/outdoors/camping', 'nav.outdoor.camping', 'Camping'],
+    ['/outdoors/water', 'nav.outdoor.water', 'Water Activities'],
+    ['/beaches', 'mood.beaches.title', 'Beaches'],
+    ['/golf', 'mood.golf.title', 'Golf'],
+  ] },
+  { label: 'Food &amp; Drink', key: 'mood.foodDrink.title', items: [
+    ['/food-drink', 'mood.foodDrink.title', 'Food &amp; Drink'],
+    ['/food-drink?types=restaurant', 'wizard.restaurants', 'Restaurants'],
+    ['/food-drink?types=cafe', 'wizard.cafes', 'Cafes'],
+    ['/food-drink?types=pub', 'wizard.pubsAndBars', 'Pubs &amp; Bars'],
+    ['/wineries', 'wizard.wineries', 'Wineries'],
+    ['/food-drink?types=brewery', 'wizard.breweries', 'Breweries'],
+    ['/food-drink?types=distillery', 'nav.distilleries', 'Distilleries'],
+    ['/food-drink?types=cocktail', 'wizard.cocktailLounges', 'Cocktail Lounges'],
+  ] },
+  { href: '/whats-on', key: 'mood.whatsOn.title', label: 'What\'s On' },
+  { href: '/trip', key: 'trip.buildMyTrip', label: 'Build My Trip', mobileOnly: true },
+];
+function parseNav(html) {
+  const header = (html.match(/<header id="top">[\s\S]*?<\/header>/) || [''])[0];
+  const ul = (header.match(/<ul class="nav-links" id="navLinks">([\s\S]*?)\n\s*<\/ul>/) || ['', ''])[1];
+  const items = ul.split(/\n\s*<li/).slice(1).map((li) => '<li' + li);
+  return { header, items: items.map((li) => {
+    if (/class="nav-dropdown"/.test(li)) {
+      const m = li.match(/<span data-i18n="([^"]+)">([^<]+)<\/span>/);
+      return { key: m[1], label: m[2], items: [...li.matchAll(/<a href="([^"]+)"(?: id="[^"]+")? data-i18n="([^"]+)">([^<]+)<\/a>/g)].map((x) => [x[1], x[2], x[3]]) };
+    }
+    const a = li.match(/<a href="([^"]+)" data-i18n="([^"]+)">([^<]+)<\/a>/);
+    return { href: a[1], key: a[2], label: a[3], mobileOnly: /class="nav-links-trip"/.test(li) };
+  }) };
+}
+
+test('Header: the exact approved items, order, URLs and i18n keys on /, /browse, /trip and themed pages', () => withDiscoveryServer(async (base) => {
+  const pages = {
+    '/': await (await fetch(`${base}/`)).text(),
+    '/browse': await (await fetch(`${base}/browse`)).text(),
+    '/trip': await (await fetch(`${base}/trip`)).text(),
+    '/destinations': await (await fetch(`${base}/destinations`)).text(),
+    themed: app.renderGolfHeaderHtml(),
+  };
+  for (const [name, html] of Object.entries(pages)) {
+    const nav = parseNav(html);
+    assert.deepEqual(nav.items.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: i.mobileOnly })),
+      HEADER_SPEC.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: !!i.mobileOnly })), name);
+    // The desktop Build My Trip button is still the header CTA.
+    assert.match(nav.header, /id="navTripBtn"/, `${name}: Build My Trip button`);
+    // Map keeps its id and existing behaviour target.
+    assert.match(nav.header, /<a href="\/browse\?openMap=1" id="navMapLink" data-i18n="nav\.map">Map<\/a>/, name);
+    // No duplicates; Hidden Gems top-level only; no Secret Spots, no top-level Golf/Map.
+    const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1]));
+    assert.equal(new Set(hrefs).size, hrefs.length, `${name}: no duplicate navigation targets`);
+    assert.doesNotMatch(nav.header, /secret-spots|#hiddenGems|#exploreRegions|#moodCards|#mapPanel|\/kelowna\//, `${name}: no stale targets`);
+  }
+}));
+
+test('Header: every header label is translated in both EN and FR (only the 11 new keys were added)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const en = src.slice(src.indexOf('  en: {'), src.indexOf('  fr: {'));
+  const fr = src.slice(src.indexOf('  fr: {'));
+  const keys = new Set(HEADER_SPEC.flatMap((i) => [i.key, ...(i.items || []).map((x) => x[1])]));
+  for (const k of keys) {
+    const re = new RegExp(`'${k.replace(/\./g, '\\.')}':`);
+    assert.match(en, re, `EN ${k}`);
+    assert.match(fr, re, `FR ${k}`);
+  }
+  for (const k of ['nav.destinations', 'nav.distilleries', 'nav.outdoor.hiking', 'nav.outdoor.viewpoints', 'nav.outdoor.nature', 'nav.outdoor.cycling', 'nav.outdoor.winter', 'nav.outdoor.adventure', 'nav.outdoor.fishing', 'nav.outdoor.camping', 'nav.outdoor.water']) {
+    assert.equal((src.match(new RegExp(`'${k.replace(/\./g, '\\.')}':`, 'g')) || []).length, 2, `${k}: exactly one EN + one FR entry`);
+  }
+});
+
+test('Header: the mobile-only Build My Trip row is hidden on desktop and shown in the mobile menu (two scoped app.css rules)', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'styles', 'app.css'), 'utf8');
+  const desktop = css.indexOf('.nav-links .nav-links-trip{ display:none; }');
+  const media = css.indexOf('@media (max-width: 940px)');
+  const mobile = css.indexOf('.nav-links .nav-links-trip{ display:block; }');
+  assert.ok(desktop !== -1 && desktop < media, 'hidden by default, before the mobile block');
+  assert.ok(mobile > media, 'shown inside the existing max-width: 940px block');
+  assert.equal((css.match(/nav-links-trip/g) || []).length, 2, 'exactly the two approved rules');
+});
+
+test('Header: every header destination is a live page whenever it has content (data-gated hubs 404 only when empty)', () => withDiscoveryServer(async (base) => {
+  // Hubs that answer 404 when their list is empty (same rule as before this
+  // redesign); every other header target must always answer 200.
+  const gated = {
+    '/dog-friendly': () => app.getDogFriendlyHubVenues().length,
+    '/local-favorites': () => app.getLocalFavouriteVenues().length,
+    '/hidden-gems': () => app.getHiddenGemCollectionVenues().length,
+    '/beaches': () => app.getVenuesByCategory('beach').length,
+    '/golf': () => app.getVenuesByCategory('golf').length,
+    '/wineries': () => app.getVenuesByCategory('winery').length,
+    '/outdoors': () => app.getOutdoorLandingVenues().length,
+  };
+  for (const item of HEADER_SPEC) {
+    for (const [href] of (item.items || [[item.href]])) {
+      const res = await fetch(base + href);
+      const activity = href.match(/^\/outdoors\/([a-z]+)$/);
+      if (activity) {
+        const live = app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG[activity[1]]).length >= 3;
+        assert.equal(res.status, live ? 200 : 404, href);
+      } else if (gated[href]) {
+        assert.equal(res.status, gated[href]() > 0 ? 200 : 404, href);
+      } else {
+        assert.equal(res.status, 200, href);
+      }
+    }
+  }
+}));
+
+test('Header: okanagan.html outside <header id="top"> is byte-identical to the approved homepage', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+  const outside = html.replace(/<header id="top">[\s\S]*?<\/header>/, '');
+  const crypto = require('node:crypto');
+  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), 'af6d2bf810dbd738f30f30eef68e38f7');
+  assert.match(html, /<a href="#top" class="logo"/, 'the logo keeps its in-page #top anchor on the homepage');
+});

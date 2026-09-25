@@ -110,32 +110,46 @@
       <li class="nav-dropdown">
         <span class="nav-link-label" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="nav.discover">Discover</span><span class="nav-link-caret">&#9662;</span></span>
         <div class="nav-dropdown-panel">
-          <a href="#moodCards" data-i18n="mood.heading">What are you in the mood for?</a>
-          <a href="#hiddenGems" data-i18n="gems.heading">Hidden Gems</a>
-          <a href="#exploreRegions" data-i18n="explore.heading">Explore the Okanagan</a>
-          <a href="#directory" data-i18n="nav.browseSearch">Browse &amp; Search</a>
+          <a href="/destinations" data-i18n="nav.destinations">Destinations</a>
+          <a href="/dog-friendly" data-i18n="gems.dogFriendly.title">Dog-Friendly Finds</a>
+          <a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a>
+          <a href="/browse" data-i18n="nav.browseSearch">Browse &amp; Search</a>
+          <a href="/browse?openMap=1" id="navMapLink" data-i18n="nav.map">Map</a>
         </div>
       </li>
-      <li><a href="#hiddenGems" data-i18n="gems.heading">Hidden Gems</a></li>
+      <li><a href="/hidden-gems" data-i18n="gems.heading">Hidden Gems</a></li>
       <li class="nav-dropdown">
         <span class="nav-link-label" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="nav.thingsToDo">Things to Do</span><span class="nav-link-caret">&#9662;</span></span>
         <div class="nav-dropdown-panel">
-          <a href="#exploreRegions" data-i18n="explore.heading">Explore the Okanagan</a>
-          <a href="/whats-on" data-i18n="mood.whatsOn.title">What's On</a>
-          <a href="/browse" data-i18n="mood.golf.title">Golf</a>
+          <a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a>
+          <a href="/outdoors/hiking" data-i18n="nav.outdoor.hiking">Hiking &amp; Trails</a>
+          <a href="/outdoors/viewpoints" data-i18n="nav.outdoor.viewpoints">Viewpoints</a>
+          <a href="/outdoors/nature" data-i18n="nav.outdoor.nature">Nature &amp; Wildlife</a>
+          <a href="/outdoors/cycling" data-i18n="nav.outdoor.cycling">Cycling &amp; Biking</a>
+          <a href="/outdoors/winter" data-i18n="nav.outdoor.winter">Winter</a>
+          <a href="/outdoors/adventure" data-i18n="nav.outdoor.adventure">Adventure</a>
+          <a href="/outdoors/fishing" data-i18n="nav.outdoor.fishing">Fishing</a>
+          <a href="/outdoors/camping" data-i18n="nav.outdoor.camping">Camping</a>
+          <a href="/outdoors/water" data-i18n="nav.outdoor.water">Water Activities</a>
+          <a href="/beaches" data-i18n="mood.beaches.title">Beaches</a>
+          <a href="/golf" data-i18n="mood.golf.title">Golf</a>
         </div>
       </li>
       <li class="nav-dropdown">
         <span class="nav-link-label" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="mood.foodDrink.title">Food &amp; Drink</span><span class="nav-link-caret">&#9662;</span></span>
         <div class="nav-dropdown-panel">
-          <a href="/kelowna/restaurants" data-i18n="wizard.restaurants">Restaurants</a>
-          <a href="/kelowna/wineries" data-i18n="wizard.wineries">Wineries</a>
-          <a href="/kelowna/breweries" data-i18n="wizard.breweries">Breweries</a>
-          <a href="/kelowna/cafes" data-i18n="wizard.cafes">Cafes</a>
+          <a href="/food-drink" data-i18n="mood.foodDrink.title">Food &amp; Drink</a>
+          <a href="/food-drink?types=restaurant" data-i18n="wizard.restaurants">Restaurants</a>
+          <a href="/food-drink?types=cafe" data-i18n="wizard.cafes">Cafes</a>
+          <a href="/food-drink?types=pub" data-i18n="wizard.pubsAndBars">Pubs &amp; Bars</a>
+          <a href="/wineries" data-i18n="wizard.wineries">Wineries</a>
+          <a href="/food-drink?types=brewery" data-i18n="wizard.breweries">Breweries</a>
+          <a href="/food-drink?types=distillery" data-i18n="nav.distilleries">Distilleries</a>
+          <a href="/food-drink?types=cocktail" data-i18n="wizard.cocktailLounges">Cocktail Lounges</a>
         </div>
       </li>
-      <li><a href="/browse" data-i18n="mood.golf.title">Golf</a></li>
-      <li><a href="#mapPanel" id="navMapLink" data-i18n="nav.map">Map</a></li>
+      <li><a href="/whats-on" data-i18n="mood.whatsOn.title">What's On</a></li>
+      <li class="nav-links-trip"><a href="/trip" data-i18n="trip.buildMyTrip">Build My Trip</a></li>
     </ul>
     <button class="nav-search-btn" id="navSearchBtn" type="button" aria-label="Search" data-i18n-aria="search.button">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
