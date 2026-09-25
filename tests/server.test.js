@@ -10266,3 +10266,366 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
   assert.doesNotMatch(sitemap, /list-your-venue/, 'sitemap unchanged: the page is not listed');
 }));
+
+// ---------- List an Event, Phase 1 (2026-09-25) ----------
+
+const laeSent = [];
+let laeIp = 0;
+const laeDay = (n) => app.addLocalDays(app.todayLocal(), n);
+const laeEventTables = () => ['events', 'event_occurrences', 'event_categories', 'event_enrichment_log']
+  .map((t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n).join('/');
+const laeSubmissionCount = () => db.prepare('SELECT COUNT(*) AS n FROM event_submissions').get().n;
+
+function laeValid(overrides = {}) {
+  return {
+    name: 'Lakeshore Jazz Evening', description: 'An evening of live jazz on the lakeshore with local musicians and food trucks.',
+    categories: ['live-music', 'nightlife'], region: 'penticton', venue_name: 'Okanagan Lake Park Bandshell',
+    start_date: laeDay(20), start_time: '19:00', end_time: '22:30',
+    event_url: 'lakeshorejazz.example.com/tickets', organizer_name: 'Lakeshore Jazz Society',
+    contact_name: 'Jamie Organizer', contact_email: 'jamie@example.com', consent: true,
+    company_website: '', started_at: Date.now() - 10000,
+    ...overrides,
+  };
+}
+
+function laePost(base, body, { ip, origin = base, raw, headers: extra = {} } = {}) {
+  laeIp += 1;
+  const headers = { 'Content-Type': 'application/json', 'X-Real-IP': ip || `10.7.0.${laeIp}`, ...extra };
+  if (origin) headers.Origin = origin;
+  return fetch(`${base}/api/event-submissions`, { method: 'POST', headers, body: raw !== undefined ? raw : JSON.stringify(body) });
+}
+
+function laeAdmin(base, pathName, body, token = LYV_TOKEN) {
+  return fetch(`${base}${pathName}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+async function laeWithTransport(fn) {
+  app.setVenueSubmissionTransport(async (payload) => { laeSent.push(payload); });
+  try { return await fn(); } finally { app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); }); }
+}
+
+test('List an Event: the page renders the form with the 12 What\'s On categories and 20 regions in the site shell', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/list-an-event`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /<h1>List an Event on Okanagan Roam<\/h1>/);
+  assert.match(html, /reviewed by a person before anything appears on What&rsquo;s On/);
+  assert.match(html, /<header id="top">/);
+  assert.equal((html.match(/name="categories" value="/g) || []).length, 12);
+  for (const c of app.WHATSON_CATEGORIES) assert.match(html, new RegExp(`name="categories" value="${c.key}"`));
+  for (const r of app.VENUE_SUBMISSION_REGIONS) assert.match(html, new RegExp(`<option value="${r}">`));
+  assert.match(html, new RegExp(`name="start_date" required min="${app.todayLocal()}"`));
+  assert.match(html, /name="company_website" tabindex="-1"/, 'honeypot');
+  assert.doesNotMatch(html, /name="(venue_id|status|image|image_url|source_url|source_type|address|phone|price)"/, 'no out-of-scope fields');
+  assert.doesNotMatch(html, /type="file"/, 'no uploads');
+}));
+
+test('List an Event: a valid submission is stored as pending, emailed, and creates no event', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  const tablesBefore = laeEventTables();
+  const publicBefore = await (await fetch(`${base}/api/events`)).text();
+  const sitemapBefore = await (await fetch(`${base}/sitemap.xml`)).text();
+  const res = await laePost(base, laeValid());
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.match(body.message, /will not appear on Okanagan Roam until we have reviewed it/);
+  const sub = app.getEventSubmission(body.id);
+  assert.equal(sub.status, 'pending');
+  assert.equal(sub.notify_status, 'sent');
+  assert.equal(sub.event_url, 'https://lakeshorejazz.example.com/tickets');
+  assert.deepEqual(sub.categories, ['live-music', 'nightlife']);
+  assert.equal(sub.start_date, laeDay(20));
+  assert.equal(sub.end_date, laeDay(20), 'end date defaults to the start date');
+  assert.equal(sub.start_time, '19:00');
+  assert.equal(sub.end_time, '22:30');
+  assert.equal(sub.all_day, 0);
+  assert.equal(sub.ends_next_day, 0);
+  assert.equal(sub.event_id, null);
+  assert.equal(laeEventTables(), tablesBefore, 'events, occurrences, categories and log untouched');
+  assert.equal(await (await fetch(`${base}/api/events`)).text(), publicBefore, 'public events API unchanged');
+  assert.equal(await (await fetch(`${base}/sitemap.xml`)).text(), sitemapBefore, 'sitemap unchanged');
+  const email = laeSent[laeSent.length - 1];
+  assert.match(email._subject, /^\[PENDING REVIEW\] Event submission #\d+: Lakeshore Jazz Evening$/);
+  assert.match(email.Status, /NOT been published/);
+  assert.equal(email['Submission ID'], String(body.id));
+  assert.equal(email.Region, 'Penticton');
+  assert.equal(email.Categories, 'Live Music, Nightlife');
+  assert.match(email.When, /7:00 pm to 10:30 pm \(Okanagan time\)$/);
+  assert.equal(email['Event website / tickets'], 'https://lakeshorejazz.example.com/tickets');
+  assert.equal(email._replyto, 'jamie@example.com');
+  for (const k of ['Submitted', 'Event name', 'Venue / location', 'Description', 'Organizer', 'Contact name', 'Contact email']) assert.ok(email[k], k);
+})));
+
+test('List an Event: validation rejects missing, invalid and out-of-scope input without writing anything', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  const before = laeSubmissionCount();
+  const tablesBefore = laeEventTables();
+  const cases = [
+    [{ name: undefined, description: undefined, categories: undefined, region: undefined, venue_name: undefined, start_date: undefined, start_time: undefined, event_url: undefined, organizer_name: undefined, contact_name: undefined, contact_email: undefined, consent: undefined },
+      ['name', 'description', 'categories', 'region', 'venue_name', 'start_date', 'start_time', 'event_url', 'organizer_name', 'contact_name', 'contact_email', 'consent']],
+    [{ categories: [] }, ['categories']],
+    [{ categories: ['live-music', 'nightlife', 'arts-culture', 'family-kids'] }, ['categories']],
+    [{ categories: ['raves'] }, ['categories']],
+    [{ categories: ['live-music', 'live-music'] }, ['categories']],
+    [{ categories: 'live-music' }, ['categories']],
+    [{ region: 'vancouver' }, ['region']],
+    [{ event_url: 'javascript:alert(1)' }, ['event_url']],
+    [{ event_url: 'ftp://example.com/x' }, ['event_url']],
+    [{ event_url: 'https://user:pass@example.com/' }, ['event_url']],
+    [{ event_url: 'not a url' }, ['event_url']],
+    [{ event_url: `https://example.com/${'x'.repeat(500)}` }, ['event_url']],
+    [{ contact_email: 'nope' }, ['contact_email']],
+    [{ consent: 'yes' }, ['consent']],
+    [{ description: 'x'.repeat(1001) }, ['description']],
+    [{ description: 'too short' }, ['description']],
+    [{ schedule_notes: 'n'.repeat(501) }, ['schedule_notes']],
+    [{ start_date: laeDay(-1) }, ['start_date']],
+    [{ start_date: '2027-02-29' }, ['start_date']],
+    [{ start_date: '2026/10/01' }, ['start_date']],
+    [{ start_date: laeDay(367) }, ['start_date']],
+    [{ end_date: laeDay(19) }, ['end_date']],
+    [{ end_date: laeDay(20 + 31) }, ['end_date']],
+    [{ start_time: '25:00' }, ['start_time']],
+    [{ start_time: '7pm' }, ['start_time']],
+    [{ end_time: '19:00' }, ['end_time']],
+    [{ start_time: undefined }, ['start_time']],
+    [{ all_day: true }, ['start_time']],
+    [{ all_day: 'yes' }, ['all_day']],
+  ];
+  for (const [overrides, fields] of cases) {
+    const res = await laePost(base, laeValid(overrides));
+    assert.equal(res.status, 400, JSON.stringify(overrides));
+    assert.deepEqual(Object.keys((await res.json()).errors).sort(), [...fields].sort(), JSON.stringify(overrides));
+  }
+  for (const extra of [{ venue_id: 1 }, { status: 'scheduled' }, { source_url: 'https://x.example' }, { image_url: 'https://x.example/a.jpg' }, { occurrences: [] }]) {
+    const res = await laePost(base, { ...laeValid(), ...extra });
+    assert.equal(res.status, 400, `unexpected key ${Object.keys(extra)[0]} is refused`);
+  }
+  assert.equal((await laePost(base, null, { raw: '{"name":' })).status, 400);
+  assert.equal(laeSubmissionCount(), before, 'nothing stored');
+  assert.equal(laeEventTables(), tablesBefore, 'no event writes');
+})));
+
+test('List an Event: date rules at their boundaries (today, 366 days, 31-day span, overnight, all-day)', () => {
+  const ok = (o) => app.validateEventSubmission(laeValid(o));
+  assert.deepEqual(ok({ start_date: laeDay(0) }).errors, {}, 'today is allowed');
+  assert.deepEqual(ok({ start_date: laeDay(366) }).errors, {}, '366 days ahead is allowed');
+  assert.deepEqual(ok({ end_date: laeDay(20 + 30) }).errors, {}, 'a 31-day span is allowed');
+  const overnight = ok({ start_time: '21:00', end_time: '01:00' });
+  assert.deepEqual(overnight.errors, {});
+  assert.equal(overnight.data.ends_next_day, 1, 'end before start on one day = ends after midnight');
+  const multiDay = ok({ end_date: laeDay(22), start_time: '10:00', end_time: '09:00' });
+  assert.deepEqual(multiDay.errors, {});
+  assert.equal(multiDay.data.ends_next_day, 0, 'multi-day ranges never set ends_next_day');
+  const multiSame = ok({ end_date: laeDay(21), start_time: '10:00', end_time: '10:00' });
+  assert.deepEqual(multiSame.errors, {}, 'same clock time on different days is fine');
+  const allDay = ok({ all_day: true, start_time: undefined, end_time: undefined });
+  assert.deepEqual(allDay.errors, {});
+  assert.equal(allDay.data.all_day, 1);
+  assert.equal(allDay.data.start_time, null);
+  const noEnd = ok({ end_time: undefined });
+  assert.deepEqual(noEnd.errors, {});
+  assert.equal(noEnd.data.end_time, null, 'end time is optional');
+  // The Okanagan calendar decides "today": at 23:30 Pacific on the 1st it is still the 1st.
+  const lateNight = new Date('2026-10-02T06:30:00Z');
+  assert.deepEqual(app.validateEventSubmission(laeValid({ start_date: '2026-10-01' }), lateNight).errors, {});
+  assert.ok(app.validateEventSubmission(laeValid({ start_date: '2026-09-30' }), lateNight).errors.start_date);
+});
+
+test('List an Event: honeypot, minimum fill time, same-origin and body-size protection', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  const before = laeSubmissionCount();
+  const sentBefore = laeSent.length;
+  const trap = await laePost(base, laeValid({ company_website: 'http://spam.example' }));
+  assert.equal(trap.status, 201);
+  assert.equal((await trap.json()).id, undefined);
+  assert.equal((await laePost(base, laeValid({ started_at: Date.now() - 500 }))).status, 400);
+  assert.equal((await laePost(base, laeValid({ started_at: undefined }))).status, 400);
+  assert.equal((await laePost(base, laeValid(), { origin: 'https://evil.example' })).status, 403);
+  const big = await laePost(base, laeValid({ description: 'x'.repeat(20000) }));
+  assert.equal(big.status, 413);
+  const notJson = await fetch(`${base}/api/event-submissions`, { method: 'POST', headers: { 'Content-Type': 'text/plain', Origin: base, 'X-Real-IP': '10.7.9.1' }, body: 'hi' });
+  assert.equal(notJson.status, 415);
+  assert.equal(laeSubmissionCount(), before, 'nothing stored');
+  assert.equal(laeSent.length, sentBefore, 'nothing emailed');
+})));
+
+test('List an Event: its own X-Real-IP rate limit (10/hour) is separate from List Your Venue', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  const ip = '203.0.113.80';
+  for (let i = 0; i < 10; i++) {
+    const res = await laePost(base, laeValid({ name: undefined }), { ip, headers: { 'X-Forwarded-For': `198.51.100.${i}`, 'CF-Connecting-IP': `192.0.2.${i}` } });
+    assert.equal(res.status, 400, `attempt ${i + 1}`);
+  }
+  assert.equal((await laePost(base, laeValid({ name: 'Limited Event' }), { ip })).status, 429);
+  assert.equal((await laePost(base, laeValid({ name: 'Forged Header Event' }), { ip, headers: { 'X-Forwarded-For': '1.2.3.4', 'CF-Connecting-IP': '5.6.7.8' } })).status, 429);
+  assert.equal((await laePost(base, laeValid({ name: 'Other Visitor Event' }), { ip: '203.0.113.81' })).status, 201, 'another visitor is unaffected');
+  // The same address is still free on List Your Venue.
+  const venue = await lyvPost(base, lyvValid({ name: 'Separate Counter Cafe' }), { ip });
+  assert.equal(venue.status, 201, 'the venue form keeps its own counter');
+})));
+
+test('List an Event: duplicate pending submissions are refused', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  assert.equal((await laePost(base, laeValid({ name: 'Twice Sent Market', contact_email: 'twice@example.com' }))).status, 201);
+  assert.equal((await laePost(base, laeValid({ name: 'twice sent market', contact_email: 'TWICE@example.com' }))).status, 409);
+  assert.equal((await laePost(base, laeValid({ name: 'Twice Sent Market', contact_email: 'twice@example.com', start_date: laeDay(27) }))).status, 201, 'a different date is a different submission');
+})));
+
+test('List an Event: email failure keeps the submission pending and publishes nothing', () => withDiscoveryServer(async (base) => {
+  const tablesBefore = laeEventTables();
+  app.setVenueSubmissionTransport(async () => { throw new Error('FormSubmit HTTP 500: provider detail'); });
+  const originalError = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args.join(' '));
+  let res;
+  try {
+    res = await laePost(base, laeValid({ name: 'Mail Outage Festival' }));
+  } finally {
+    console.error = originalError;
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+  }
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.doesNotMatch(JSON.stringify(body), /FormSubmit|provider/);
+  const sub = app.getEventSubmission(body.id);
+  assert.equal(sub.status, 'pending');
+  assert.equal(sub.notify_status, 'failed');
+  assert.ok(logged.some((l) => l.includes(`[event-submissions] notification for submission #${body.id} failed`)));
+  assert.equal(laeEventTables(), tablesBefore);
+}));
+
+test('List an Event: admin routes require the admin token', () => withDiscoveryServer(async (base) => {
+  assert.equal((await laeAdmin(base, '/admin/event-submissions', undefined, null)).status, 401);
+  assert.equal((await laeAdmin(base, '/admin/event-submissions', undefined, 'wrong')).status, 401);
+  assert.equal((await laeAdmin(base, '/admin/event-submissions/1/approve', { reviewer: 'x' }, null)).status, 401);
+  assert.equal((await laeAdmin(base, '/admin/event-submissions/1/reject', { reviewer: 'x' }, 'wrong')).status, 401);
+  const list = await laeAdmin(base, '/admin/event-submissions');
+  assert.equal(list.status, 200);
+  assert.ok((await list.json()).submissions.every((s) => s.status === 'pending'));
+}));
+
+test('List an Event: approval creates exactly one event through createEvent, visible on What\'s On; a second approval is 409', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  const created = await (await laePost(base, laeValid({ name: 'Approved Harvest Tasting', categories: ['wineries-wine-events'], region: 'oliver', venue_name: 'Oliver Community Hall', start_time: '21:00', end_time: '01:00' }))).json();
+  const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
+  const before = { events: count('events'), occ: count('event_occurrences'), cats: count('event_categories') };
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${created.id}/approve`, {})).status, 400, 'reviewer required');
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${created.id}/approve`, { reviewer: 'r', source_url: 'https://invented.example' })).status, 400, 'a reviewer cannot supply a source');
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${created.id}/approve`, { reviewer: 'r', overrides: { event_url: 'https://x.example' } })).status, 400);
+  assert.equal(count('events'), before.events);
+  const res = await laeAdmin(base, `/admin/event-submissions/${created.id}/approve`, { reviewer: 'test-admin' });
+  assert.equal(res.status, 200);
+  const out = await res.json();
+  assert.equal(out.submission.status, 'approved');
+  assert.equal(out.submission.event_id, out.event.id);
+  assert.equal(out.submission.reviewed_by, 'test-admin');
+  assert.equal(count('events'), before.events + 1);
+  assert.equal(count('event_occurrences'), before.occ + 1);
+  assert.equal(count('event_categories'), before.cats + 1);
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(out.event.id);
+  assert.equal(event.name, 'Approved Harvest Tasting');
+  assert.equal(event.slug, 'approved-harvest-tasting');
+  assert.equal(event.status, 'scheduled');
+  assert.equal(event.source_type, 'official_organizer');
+  assert.equal(event.source_name, 'Lakeshore Jazz Society');
+  assert.equal(event.source_url, 'https://lakeshorejazz.example.com/tickets');
+  assert.equal(event.website, 'https://lakeshorejazz.example.com/tickets');
+  assert.equal(event.venue_name_text, 'Oliver Community Hall');
+  assert.equal(event.venue_id, null);
+  assert.equal(event.event_confidence, 'medium');
+  assert.equal(event.image_url, null);
+  const occ = db.prepare('SELECT * FROM event_occurrences WHERE event_id = ?').all(out.event.id);
+  assert.equal(occ.length, 1);
+  assert.equal(occ[0].start_date, laeDay(20));
+  assert.equal(occ[0].start_time, '21:00');
+  assert.equal(occ[0].end_time, '01:00');
+  assert.equal(occ[0].ends_next_day, 1);
+  const log = db.prepare('SELECT field_name, batch_id, reviewed_by, source_ref FROM event_enrichment_log WHERE event_id = ?').all(out.event.id);
+  assert.deepEqual(log.map((l) => l.field_name).sort(), ['categories', 'create', 'occurrence']);
+  assert.ok(log.every((l) => l.batch_id === `event-submission-${created.id}` && l.reviewed_by === 'test-admin' && l.source_ref === `Approved event submission #${created.id}`));
+  const whatsOn = await (await fetch(`${base}/api/events?from=${laeDay(20)}&to=${laeDay(20)}`)).json();
+  assert.ok(JSON.stringify(whatsOn).includes('Approved Harvest Tasting'), 'visible on What\'s On once approved');
+  assert.equal((await fetch(`${base}/oliver/events/approved-harvest-tasting`)).status, 200);
+  const again = await laeAdmin(base, `/admin/event-submissions/${created.id}/approve`, { reviewer: 'test-admin' });
+  assert.equal(again.status, 409);
+  assert.equal(count('events'), before.events + 1, 'second approval creates nothing');
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${created.id}/reject`, { reviewer: 'x' })).status, 409);
+  assert.equal((await laeAdmin(base, '/admin/event-submissions/999999/approve', { reviewer: 'x' })).status, 404);
+})));
+
+test('List an Event: approval guards (exact and likely duplicates, venue_id, overrides, already-ended)', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  const count = () => db.prepare('SELECT COUNT(*) AS n FROM events').get().n;
+  // A published event to collide with.
+  const seeded = app.createEvent({
+    name: 'Summerland Fall Fair', region: 'summerland', description: 'Fixture.', source_type: 'municipal', source_name: 'District',
+    source_url: 'https://example.com/fair', venue_name_text: 'Memorial Park', categories: ['markets-fairs'],
+    occurrences: [{ start_date: laeDay(40), start_time: '10:00' }],
+  }, { reason: 'fixture', batch_id: 'lae-fixture' });
+  assert.ok(seeded.ok);
+  const exact = await (await laePost(base, laeValid({ name: 'Summerland Fall Fair', region: 'summerland', start_date: laeDay(40), start_time: '11:00', contact_email: 'fair@example.com' }))).json();
+  let before = count();
+  const exactRes = await laeAdmin(base, `/admin/event-submissions/${exact.id}/approve`, { reviewer: 'r' });
+  assert.equal(exactRes.status, 409);
+  assert.equal((await exactRes.json()).error, 'duplicate_event');
+  assert.equal(count(), before);
+  assert.equal(app.getEventSubmission(exact.id).status, 'pending', 'still pending after a refused approval');
+  const list = await (await laeAdmin(base, '/admin/event-submissions')).json();
+  assert.ok(list.submissions.find((s) => s.id === exact.id).possible_existing_events.length >= 1, 'duplicate surfaced to the reviewer');
+  const likely = await (await laePost(base, laeValid({ name: 'Fall Fair Summerland Family Day', region: 'summerland', venue_name: 'Memorial Park', start_date: laeDay(40), contact_email: 'fair2@example.com' }))).json();
+  const likelyRes = await laeAdmin(base, `/admin/event-submissions/${likely.id}/approve`, { reviewer: 'r' });
+  assert.equal(likelyRes.status, 409);
+  const likelyBody = await likelyRes.json();
+  assert.equal(likelyBody.error, 'possible_duplicate');
+  assert.equal(count(), before, 'likely duplicates are never silently published');
+  const acknowledged = await laeAdmin(base, `/admin/event-submissions/${likely.id}/approve`, { reviewer: 'r', reviewed_duplicates: likelyBody.detail.map((d) => d.event_id) });
+  assert.equal(acknowledged.status, 200, 'publishes once the reviewer acknowledges the candidates');
+  assert.equal(count(), before + 1);
+
+  const other = await (await laePost(base, laeValid({ name: 'Venue Mismatch Night', region: 'penticton', contact_email: 'vm@example.com' }))).json();
+  before = count();
+  const kelownaVenue = db.prepare("SELECT id FROM venues WHERE region = 'kelowna' AND redirect_to IS NULL LIMIT 1").get().id;
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${other.id}/approve`, { reviewer: 'r', venue_id: kelownaVenue })).status, 409, 'venue in another region');
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${other.id}/approve`, { reviewer: 'r', venue_id: 99999999 })).status, 404, 'unknown venue');
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${other.id}/approve`, { reviewer: 'r', venue_id: 'abc' })).status, 400);
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${other.id}/approve`, { reviewer: 'r', status: 'cancelled' })).status, 400);
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${other.id}/approve`, { reviewer: 'r', overrides: { categories: ['raves'] } })).status, 400);
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${other.id}/approve`, { reviewer: 'r', type: 'rave' })).status, 400);
+  assert.equal(count(), before, 'no guard failure writes anything');
+  assert.equal(app.getEventSubmission(other.id).status, 'pending');
+  const ok = await (await laeAdmin(base, `/admin/event-submissions/${other.id}/approve`, { reviewer: 'r', overrides: { name: 'Venue Match Night', categories: ['arts-culture'] }, type: 'concert' })).json();
+  assert.equal(ok.event.name, 'Venue Match Night');
+  assert.deepEqual(ok.categories, ['arts-culture']);
+
+  // A submission whose event has since ended cannot be approved.
+  const ended = await (await laePost(base, laeValid({ name: 'Ended Before Review', contact_email: 'late@example.com', start_date: laeDay(0) }))).json();
+  before = count();
+  const later = new Date(Date.now() + 3 * 86400000);
+  const late = app.approveEventSubmission(ended.id, { reviewer: 'r' }, later);
+  assert.equal(late.status, 409);
+  assert.equal(count(), before);
+})));
+
+test('List an Event: rejection creates no event and records the reason', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  const created = await (await laePost(base, laeValid({ name: 'Rejected Rave', contact_email: 'rej@example.com' }))).json();
+  const tablesBefore = laeEventTables();
+  const res = await laeAdmin(base, `/admin/event-submissions/${created.id}/reject`, { reviewer: 'test-admin', reason: 'Not an Okanagan event.' });
+  assert.equal(res.status, 200);
+  const { submission } = await res.json();
+  assert.equal(submission.status, 'rejected');
+  assert.equal(submission.rejection_reason, 'Not an Okanagan event.');
+  assert.equal(submission.reviewed_by, 'test-admin');
+  assert.equal(submission.event_id, null);
+  assert.equal(laeEventTables(), tablesBefore);
+  assert.equal((await laeAdmin(base, `/admin/event-submissions/${created.id}/approve`, { reviewer: 'x' })).status, 409);
+  assert.equal(laeEventTables(), tablesBefore);
+})));
+
+test('List an Event: the staging table is additive and nothing else was touched', () => {
+  const cols = db.prepare('PRAGMA table_info(event_submissions)').all().map((c) => c.name);
+  for (const c of ['id', 'status', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day', 'ends_next_day', 'event_url', 'organizer_name', 'contact_email', 'consent', 'reviewed_at', 'reviewed_by', 'rejection_reason', 'event_id', 'notify_status']) assert.ok(cols.includes(c), c);
+  assert.throws(() => db.prepare("INSERT INTO event_submissions (status, name, region, categories, description, venue_name, start_date, end_date, event_url, organizer_name, contact_name, contact_email, consent, consent_version) VALUES ('published','a','kelowna','[]','d','v','2030-01-02','2030-01-01','u','o','n','e',1,'v')").run(), /CHECK/);
+  const eventCols = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+  assert.ok(!eventCols.includes('submission_id'), 'events schema unchanged');
+  const header = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+  assert.doesNotMatch(header, /list-an-event/, 'no navigation link yet');
+  assert.doesNotMatch(app.renderHomeFooterHTML(), /list-an-event/, 'no footer link yet');
+});

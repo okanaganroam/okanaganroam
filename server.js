@@ -14095,6 +14095,667 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// ---------- List an Event, Phase 1 (2026-09-25) ----------
+//
+// The public event submission workflow, the event counterpart of List Your
+// Venue above (and built from its helpers, which are reused unchanged):
+//   GET  /list-an-event          -- the form
+//   POST /api/event-submissions  -- validate, spam checks, store as PENDING in
+//                                   event_submissions, then notify
+//                                   okanaganroam@gmail.com (same FormSubmit
+//                                   transport as venue submissions)
+//   GET  /admin/event-submissions             -- token-protected review list
+//   POST /admin/event-submissions/:id/approve -- creates the event via createEvent()
+//   POST /admin/event-submissions/:id/reject  -- publishes nothing
+//
+// A submission never touches events / event_occurrences / event_categories
+// until an admin approves it; approval goes through createEvent(), so every
+// existing event rule (categories, occurrences, venue rule, duplicate gate,
+// slug, audit log) applies unchanged. One date range per submission; no
+// recurrence is generated and no image is accepted.
+
+const EVENT_SUBMISSION_MAX_BODY_BYTES = 16 * 1024;
+const EVENT_SUBMISSION_RATE_LIMIT = 10; // POST attempts per IP ...
+const EVENT_SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000; // ... per hour (own counter, separate from venues)
+const EVENT_SUBMISSION_DUPLICATE_WINDOW_DAYS = 7;
+const EVENT_SUBMISSION_MAX_FUTURE_DAYS = 366; // latest allowed start date, from today
+const EVENT_SUBMISSION_MAX_SPAN_DAYS = 31; // a date range covers at most 31 calendar days
+const EVENT_SUBMISSION_CONSENT_VERSION = '2026-09-25';
+const EVENT_SUBMISSION_CONSENT_TEXT = 'I am authorized to submit this event, the details are accurate, and Okanagan Roam may review, edit and publish them. My contact details are only used to follow up about this event and are not published.';
+const EVENT_SUBMISSION_REGIONS = VENUE_SUBMISSION_REGIONS;
+const EVENT_SUBMISSION_TEXT_FIELDS = {
+  name: { label: 'Event name', required: true, min: 2, max: 120 },
+  description: { label: 'Description', required: true, min: 20, max: 1000, multiline: true },
+  venue_name: { label: 'Venue or location', required: true, min: 2, max: 120 },
+  organizer_name: { label: 'Organizer', required: true, min: 2, max: 120 },
+  contact_name: { label: 'Your name', required: true, min: 2, max: 100 },
+  schedule_notes: { label: 'Other dates or schedule notes', max: 500, multiline: true },
+};
+const EVENT_SUBMISSION_KEYS = new Set([
+  'name', 'description', 'categories', 'region', 'venue_name', 'start_date', 'end_date', 'start_time', 'end_time',
+  'all_day', 'event_url', 'organizer_name', 'schedule_notes', 'contact_name', 'contact_email', 'consent',
+  'company_website', 'started_at',
+]);
+
+const eventSubmissionAttempts = new Map(); // ip -> [timestamps]; independent of venueSubmissionAttempts
+function eventSubmissionRateLimited(ip, now = Date.now()) {
+  const recent = (eventSubmissionAttempts.get(ip) || []).filter((t) => now - t < EVENT_SUBMISSION_RATE_WINDOW_MS);
+  recent.push(now);
+  eventSubmissionAttempts.set(ip, recent);
+  if (eventSubmissionAttempts.size > 5000) {
+    for (const [key, times] of eventSubmissionAttempts) {
+      if (!times.some((t) => now - t < EVENT_SUBMISSION_RATE_WINDOW_MS)) eventSubmissionAttempts.delete(key);
+    }
+  }
+  return recent.length > EVENT_SUBMISSION_RATE_LIMIT;
+}
+
+// Validates a public event submission. Returns { data, errors }; errors map
+// each field to a message written for the organizer. Dates/times arrive as
+// the browser's native YYYY-MM-DD / HH:MM values and are kept as Okanagan
+// civil values, never converted. The resulting occurrence is also run
+// through the existing validateEventOccurrence() as a final gate.
+function validateEventSubmission(body, now = new Date()) {
+  const errors = {};
+  const data = {};
+  const present = (k) => body[k] !== undefined && body[k] !== null && body[k] !== '';
+
+  for (const [key, rule] of Object.entries(EVENT_SUBMISSION_TEXT_FIELDS)) {
+    if (!present(key)) {
+      if (rule.required) errors[key] = key === 'contact_name' ? 'Please enter your name.' : `Please enter the ${rule.label.toLowerCase()}.`;
+      continue;
+    }
+    if (typeof body[key] !== 'string') { errors[key] = `${rule.label} must be text.`; continue; }
+    const value = cleanSubmissionText(body[key], { multiline: !!rule.multiline });
+    if (!value && rule.required) { errors[key] = `Please enter the ${rule.label.toLowerCase()}.`; continue; }
+    if (rule.min && value.length < rule.min) { errors[key] = `${rule.label} needs at least ${rule.min} characters.`; continue; }
+    if (value.length > rule.max) { errors[key] = `${rule.label} can be at most ${rule.max} characters.`; continue; }
+    if (value) data[key] = value;
+  }
+
+  if (!present('categories')) {
+    errors.categories = 'Please choose at least one category.';
+  } else if (!Array.isArray(body.categories) || validateEventCategories(body.categories)) {
+    errors.categories = `Please choose 1 to ${EVENT_MAX_CATEGORIES} categories from the list.`;
+  } else data.categories = body.categories.slice();
+
+  if (!present('region')) errors.region = 'Please choose a region.';
+  else if (!EVENT_SUBMISSION_REGIONS.includes(body.region)) errors.region = 'Please choose one of the listed regions.';
+  else data.region = body.region;
+
+  if (!present('event_url')) {
+    errors.event_url = 'Please enter the event website or ticket link.';
+  } else {
+    const url = typeof body.event_url === 'string' && body.event_url.length <= 500 ? normalizeSubmissionWebsite(body.event_url) : null;
+    if (!url) errors.event_url = 'Please enter a valid website or ticket link, like https://example.com/event.';
+    else data.event_url = url;
+  }
+
+  if (!present('contact_email')) {
+    errors.contact_email = 'Please enter your email address.';
+  } else if (typeof body.contact_email !== 'string' || body.contact_email.trim().length > 254
+      || !SUBMISSION_EMAIL_PATTERN.test(body.contact_email.trim())) {
+    errors.contact_email = 'Please enter a valid email address, like name@example.com.';
+  } else data.contact_email = body.contact_email.trim();
+
+  if (body.consent !== true) errors.consent = 'Please confirm the statement above so we can review your event.';
+
+  // --- dates and times ---
+  if (body.all_day !== undefined && typeof body.all_day !== 'boolean') errors.all_day = 'All day must be yes or no.';
+  const allDay = body.all_day === true;
+  const today = todayLocal(now);
+  const startDate = present('start_date') ? parseLocalDate(body.start_date) : null;
+  if (!present('start_date')) errors.start_date = 'Please choose the event date.';
+  else if (!startDate) errors.start_date = 'Please enter a real date.';
+  else if (startDate < today) errors.start_date = 'The event date has already passed.';
+  else if (localDaysBetween(today, startDate) > EVENT_SUBMISSION_MAX_FUTURE_DAYS) errors.start_date = `Events can be submitted up to ${EVENT_SUBMISSION_MAX_FUTURE_DAYS} days ahead.`;
+
+  let endDate = startDate;
+  if (present('end_date')) {
+    endDate = parseLocalDate(body.end_date);
+    if (!endDate) errors.end_date = 'Please enter a real end date.';
+    else if (startDate && endDate < startDate) errors.end_date = 'The end date is before the start date.';
+    else if (startDate && localDaysBetween(startDate, endDate) >= EVENT_SUBMISSION_MAX_SPAN_DAYS) errors.end_date = `An event can span at most ${EVENT_SUBMISSION_MAX_SPAN_DAYS} days. Please list longer runs in the schedule notes.`;
+  }
+
+  const timeOk = (v) => typeof v === 'string' && LOCAL_TIME_PATTERN.test(v);
+  let startTime = null;
+  let endTime = null;
+  if (allDay) {
+    if (present('start_time') || present('end_time')) errors.start_time = 'An all-day event has no start or end time.';
+  } else {
+    if (!present('start_time')) errors.start_time = 'Please enter the start time, or tick All day.';
+    else if (!timeOk(body.start_time)) errors.start_time = 'Please enter a valid start time.';
+    else startTime = body.start_time;
+    if (present('end_time')) {
+      if (!timeOk(body.end_time)) errors.end_time = 'Please enter a valid end time.';
+      else endTime = body.end_time;
+    }
+    if (startTime && endTime && startTime === endTime && startDate && startDate === endDate) errors.end_time = 'The end time is the same as the start time.';
+  }
+
+  if (!Object.keys(errors).some((k) => ['start_date', 'end_date', 'start_time', 'end_time', 'all_day'].includes(k))) {
+    // A single-day event whose end time is earlier than its start time runs
+    // past midnight (e.g. 21:00-01:00) -- the existing ends_next_day flag.
+    const endsNextDay = startTime && endTime && startDate === endDate && endTime < startTime ? 1 : 0;
+    const occurrence = {
+      start_date: startDate, end_date: endDate, start_time: startTime, end_time: endTime,
+      all_day: allDay ? 1 : 0, ends_next_day: endsNextDay,
+    };
+    if (validateEventOccurrence(occurrence)) errors.start_date = 'Please check the event date and times.';
+    else Object.assign(data, occurrence);
+  }
+  return { data, errors };
+}
+
+function rowToEventSubmission(row) {
+  if (!row) return null;
+  return { ...row, consent: !!row.consent, categories: JSON.parse(row.categories || '[]') };
+}
+
+function getEventSubmission(id) {
+  return rowToEventSubmission(db.prepare('SELECT * FROM event_submissions WHERE id = ?').get(id));
+}
+
+// The occurrence createEvent() will receive for this submission.
+function eventSubmissionOccurrence(sub) {
+  return {
+    start_date: sub.start_date, end_date: sub.end_date, start_time: sub.start_time, end_time: sub.end_time,
+    all_day: sub.all_day, ends_next_day: sub.ends_next_day,
+  };
+}
+
+// Published events the existing duplicate rules flag for this submission
+// (read-only; shown to the reviewer, never blocks the organizer).
+function findExistingEventsForSubmission(sub) {
+  return findDuplicateEventCandidates({
+    name: sub.name, region: sub.region, venue_name_text: sub.venue_name, source_url: sub.event_url,
+    occurrences: [eventSubmissionOccurrence(sub)],
+  });
+}
+
+function formatSubmissionLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+    .format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+function formatSubmissionLocalTime(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+}
+
+function describeEventSubmissionWhen(sub) {
+  const dates = sub.end_date === sub.start_date
+    ? formatSubmissionLocalDate(sub.start_date)
+    : `${formatSubmissionLocalDate(sub.start_date)} to ${formatSubmissionLocalDate(sub.end_date)}`;
+  if (sub.all_day) return `${dates}, all day`;
+  const times = sub.end_time
+    ? `${formatSubmissionLocalTime(sub.start_time)} to ${formatSubmissionLocalTime(sub.end_time)}${sub.ends_next_day ? ' (ends after midnight)' : ''}`
+    : `starts ${formatSubmissionLocalTime(sub.start_time)}`;
+  return `${dates}, ${times} (Okanagan time)`;
+}
+
+function buildEventSubmissionEmail(sub) {
+  const payload = {
+    _subject: `[PENDING REVIEW] Event submission #${sub.id}: ${sub.name}`,
+    _template: 'table',
+    _captcha: 'false',
+    _replyto: sub.contact_email,
+    'Status': 'PENDING REVIEW. This event has NOT been published. Nothing appears on Okanagan Roam until it is approved.',
+    'Submission ID': String(sub.id),
+    'Submitted': formatSubmissionTimestamp(sub.submitted_at),
+    'Event name': sub.name,
+    'When': describeEventSubmissionWhen(sub),
+    'Region': REGION_LABELS[sub.region],
+    'Venue / location': sub.venue_name,
+    'Categories': sub.categories.map((k) => WHATSON_CATEGORY_BY_KEY[k].label).join(', '),
+    'Description': sub.description,
+    'Event website / tickets': sub.event_url,
+    'Organizer': sub.organizer_name,
+    'Contact name': sub.contact_name,
+    'Contact email': sub.contact_email,
+  };
+  if (sub.schedule_notes) payload['Other dates / schedule notes (not published)'] = sub.schedule_notes;
+  const existing = findExistingEventsForSubmission(sub);
+  if (existing.length) payload['Possible existing event'] = existing.map((e) => `${e.name} (event #${e.event_id}, ${e.rule})`).join('; ');
+  payload['How to review'] = `Approve or reject submission #${sub.id} with the admin token: GET /admin/event-submissions, then POST /admin/event-submissions/${sub.id}/approve or /reject.`;
+  return payload;
+}
+
+// Stored first, notified second, through the same transport as venue
+// submissions: a failed send leaves the submission pending with
+// notify_status 'failed' and is logged, never surfaced to the submitter.
+async function notifyEventSubmission(id) {
+  const sub = getEventSubmission(id);
+  try {
+    await venueSubmissionTransport(buildEventSubmissionEmail(sub));
+    db.prepare("UPDATE event_submissions SET notify_status = 'sent', notify_error = NULL, notified_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+    return true;
+  } catch (err) {
+    const message = String((err && err.message) || err).slice(0, 300);
+    db.prepare("UPDATE event_submissions SET notify_status = 'failed', notify_error = ? WHERE id = ?").run(message, id);
+    console.error(`[event-submissions] notification for submission #${id} failed (submission kept as pending): ${message}`);
+    return false;
+  }
+}
+
+async function handleEventSubmission(req, res) {
+  const generic = 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+  if (!isSameOriginSubmission(req)) {
+    return sendSubmissionResponse(res, 403, { ok: false, error: 'Submissions are only accepted from the Okanagan Roam website.' });
+  }
+  const ip = requestClientIp(req);
+  if (eventSubmissionRateLimited(ip)) {
+    return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions from your connection. Please try again in an hour, or email us at okanaganroam@gmail.com.' });
+  }
+  if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) {
+    return sendSubmissionResponse(res, 415, { ok: false, error: generic });
+  }
+  let body;
+  try {
+    body = await readLimitedJsonBody(req, EVENT_SUBMISSION_MAX_BODY_BYTES);
+  } catch (err) {
+    if (err.status === 413) {
+      return sendSubmissionResponse(res, 413, { ok: false, error: 'Your submission is too large. Please shorten it and try again.' }, true);
+    }
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !EVENT_SUBMISSION_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+
+  // Honeypot: answer like a success and store nothing.
+  if (body.company_website !== undefined && body.company_website !== '') {
+    return sendSubmissionResponse(res, 201, { ok: true });
+  }
+  const startedAt = Number(body.started_at);
+  const elapsed = Date.now() - startedAt;
+  if (!Number.isFinite(startedAt) || elapsed > VENUE_SUBMISSION_MAX_FORM_AGE_MS || elapsed < -60000) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'This form has expired. Please reload the page and submit again.' });
+  }
+  if (elapsed < VENUE_SUBMISSION_MIN_FILL_MS) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check your details and press Submit again.' });
+  }
+
+  const { data, errors } = validateEventSubmission(body);
+  if (Object.keys(errors).length) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
+  }
+
+  const duplicate = db.prepare(
+    `SELECT id FROM event_submissions WHERE status = 'pending' AND region = ? AND start_date = ?
+       AND LOWER(name) = LOWER(?) AND LOWER(contact_email) = LOWER(?)
+       AND submitted_at >= datetime('now', ?)`
+  ).get(data.region, data.start_date, data.name, data.contact_email, `-${EVENT_SUBMISSION_DUPLICATE_WINDOW_DAYS} days`);
+  if (duplicate) {
+    return sendSubmissionResponse(res, 409, { ok: false, error: 'We already have a pending submission for this event from this email address. We will be in touch after we review it.' });
+  }
+
+  const info = db.prepare(
+    `INSERT INTO event_submissions
+       (name, region, categories, description, venue_name, start_date, end_date, start_time, end_time, all_day, ends_next_day,
+        event_url, organizer_name, schedule_notes, contact_name, contact_email, consent, consent_version, ip_hash, user_agent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+  ).run(
+    data.name, data.region, JSON.stringify(data.categories), data.description, data.venue_name,
+    data.start_date, data.end_date, data.start_time, data.end_time, data.all_day, data.ends_next_day,
+    data.event_url, data.organizer_name, data.schedule_notes || null, data.contact_name, data.contact_email,
+    EVENT_SUBMISSION_CONSENT_VERSION,
+    crypto.createHash('sha256').update(`okanagan-roam-event-submission:${ip}`).digest('hex'),
+    String(req.headers['user-agent'] || '').slice(0, 300) || null
+  );
+  const id = Number(info.lastInsertRowid);
+  await notifyEventSubmission(id);
+  return sendSubmissionResponse(res, 201, {
+    ok: true,
+    id,
+    message: 'Thanks! Your event has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it, and we may email you with questions.',
+  });
+}
+
+// Approve: still pending -> createEvent() (the existing, fully validated
+// event writer with its own transaction and duplicate gate) -> record the
+// event id, reviewer and time. createEvent() and the status-guarded UPDATE
+// run synchronously back to back with no await between them, so nothing
+// can interleave. The event's website and provenance are always the
+// organizer's submitted link; the reviewer cannot supply a source.
+function approveEventSubmission(id, body, now = new Date()) {
+  const fail = (status, error, extra = {}) => ({ status, body: { error, ...extra } });
+  const allowed = new Set(['reviewer', 'overrides', 'venue_id', 'type', 'source_type', 'reviewed_duplicates']);
+  const unexpected = Object.keys(body).filter((k) => !allowed.has(k));
+  if (unexpected.length) return fail(400, `Unexpected field(s): ${unexpected.join(', ')}`);
+  const reviewer = validateReviewer(body.reviewer);
+  if (!reviewer) return fail(400, 'reviewer is required (1-80 characters).');
+  if (body.venue_id !== undefined && !(Number.isInteger(body.venue_id) && body.venue_id > 0)) return fail(400, 'venue_id must be a positive integer.');
+  if (body.type !== undefined && !EVENT_TYPES.includes(body.type)) return fail(400, `type must be one of ${EVENT_TYPES.join('|')}.`);
+  if (body.source_type !== undefined && !['official_organizer', 'official_venue'].includes(body.source_type)) return fail(400, 'source_type must be official_organizer or official_venue.');
+  if (body.reviewed_duplicates !== undefined && !(Array.isArray(body.reviewed_duplicates) && body.reviewed_duplicates.every((n) => Number.isInteger(n) && n > 0))) {
+    return fail(400, 'reviewed_duplicates must be an array of event ids.');
+  }
+
+  const sub = getEventSubmission(id);
+  if (!sub) return fail(404, 'Submission not found.');
+  if (sub.status !== 'pending') return fail(409, `Submission is already ${sub.status}.`, { event_id: sub.event_id });
+  if (sub.end_date < todayLocal(now)) return fail(409, 'This event has already ended; reject it instead.');
+
+  let overrides = {};
+  if (body.overrides !== undefined) {
+    const allowedOverrides = ['name', 'description', 'categories'];
+    if (!body.overrides || typeof body.overrides !== 'object' || Array.isArray(body.overrides)
+        || Object.keys(body.overrides).some((k) => !allowedOverrides.includes(k))) {
+      return fail(400, `overrides may only contain: ${allowedOverrides.join(', ')}`);
+    }
+    const o = body.overrides;
+    const errors = {};
+    for (const key of ['name', 'description']) {
+      if (o[key] === undefined) continue;
+      const rule = EVENT_SUBMISSION_TEXT_FIELDS[key];
+      const value = typeof o[key] === 'string' ? cleanSubmissionText(o[key], { multiline: !!rule.multiline }) : null;
+      if (!value || value.length < rule.min || value.length > rule.max) errors[key] = `${rule.label} must be ${rule.min}-${rule.max} characters.`;
+      else overrides[key] = value;
+    }
+    if (o.categories !== undefined) {
+      if (validateEventCategories(o.categories)) errors.categories = `1-${EVENT_MAX_CATEGORIES} known category keys.`;
+      else overrides.categories = o.categories.slice();
+    }
+    if (Object.keys(errors).length) return fail(400, 'Invalid overrides.', { errors });
+  }
+
+  const final = { ...sub, ...overrides };
+  const data = {
+    name: final.name,
+    region: sub.region,
+    description: final.description,
+    website: sub.event_url,
+    categories: final.categories,
+    occurrences: [eventSubmissionOccurrence(sub)],
+    status: 'scheduled',
+    event_confidence: 'medium',
+    source_type: body.source_type || 'official_organizer',
+    source_name: sub.organizer_name,
+    source_url: sub.event_url,
+  };
+  if (body.venue_id !== undefined) data.venue_id = body.venue_id;
+  else data.venue_name_text = sub.venue_name;
+  if (body.type !== undefined) data.type = body.type;
+  const meta = {
+    reason: `Approved event submission #${id}`,
+    batch_id: `event-submission-${id}`,
+    reviewed_by: reviewer,
+    reviewed_duplicates: body.reviewed_duplicates || [],
+  };
+
+  let result;
+  try {
+    result = createEvent(data, meta);
+  } catch (err) {
+    return fail(500, 'Approval failed and was rolled back; nothing was published.');
+  }
+  if (!result.ok) {
+    return fail(EVENT_WRITE_STATUS_MAP[result.reason] || 400, result.reason, { detail: result.detail });
+  }
+  db.prepare(
+    `UPDATE event_submissions SET status = 'approved', event_id = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
+       WHERE id = ? AND status = 'pending'`
+  ).run(result.event.id, reviewer, id);
+  return { status: 200, body: { submission: getEventSubmission(id), event: result.event, categories: result.categories, occurrences: result.occurrences, review: result.review } };
+}
+
+function rejectEventSubmission(id, body) {
+  const fail = (status, error) => ({ status, body: { error } });
+  const unexpected = Object.keys(body).filter((k) => !['reviewer', 'reason'].includes(k));
+  if (unexpected.length) return fail(400, `Unexpected field(s): ${unexpected.join(', ')}`);
+  const reviewer = validateReviewer(body.reviewer);
+  if (!reviewer) return fail(400, 'reviewer is required (1-80 characters).');
+  if (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.length > 500)) {
+    return fail(400, 'reason must be text of at most 500 characters.');
+  }
+  const sub = getEventSubmission(id);
+  if (!sub) return fail(404, 'Submission not found.');
+  const updated = db.prepare(
+    `UPDATE event_submissions SET status = 'rejected', rejection_reason = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
+       WHERE id = ? AND status = 'pending'`
+  ).run(body.reason ? cleanSubmissionText(body.reason, { multiline: true }) : null, reviewer, id);
+  if (updated.changes !== 1) return fail(409, `Submission is already ${sub.status}.`);
+  return { status: 200, body: { submission: getEventSubmission(id) } };
+}
+
+function listEventSubmissions(status) {
+  const rows = status === 'all'
+    ? db.prepare('SELECT * FROM event_submissions ORDER BY id DESC').all()
+    : db.prepare('SELECT * FROM event_submissions WHERE status = ? ORDER BY id DESC').all(status);
+  return rows.map(rowToEventSubmission).map((s) => ({
+    ...s,
+    possible_existing_events: s.status === 'pending' ? findExistingEventsForSubmission(s) : [],
+  }));
+}
+
+function renderListAnEventPage(now = new Date()) {
+  const title = 'List an Event | Okanagan Roam';
+  const description = 'Organizing a festival, concert, market, tasting or community event in the Okanagan? Send us the details and we will review them for What’s On.';
+  const canonical = 'https://okanaganroam.com/list-an-event';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'List an Event', url: canonical },
+  ]);
+  const today = todayLocal(now);
+  const maxDate = addLocalDays(today, EVENT_SUBMISSION_MAX_FUTURE_DAYS);
+  const option = (value, label) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
+  const regionOptions = EVENT_SUBMISSION_REGIONS.map((r) => option(r, REGION_LABELS[r])).join('');
+  const categoryChecks = WHATSON_CATEGORIES.map((c) => `
+            <label class="amenity-check"><input type="checkbox" name="categories" value="${c.key}"> ${escapeHtml(c.label)}</label>`).join('');
+  const field = (id, label, control, hint = '') => `<div class="form-field">
+          <label for="${id}">${label}</label>
+          ${control}${hint}
+          <p class="lyv-error" id="${id}Error" hidden></p>
+        </div>`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+${golfEngagementHeadHtml('fd', true)}
+<style>
+  body.list-event-page .list-venue { padding: 12px 0 40px; }
+  body.list-event-page .list-venue-head { margin-bottom: 28px; }
+  body.list-event-page .lyv-steps { max-width: 640px; margin: 0 auto 28px; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; counter-reset: lyv; }
+  body.list-event-page .lyv-steps li { background: var(--paper); border-radius: 14px; padding: 14px 16px; font-size: 0.88rem; color: rgba(42,32,25,0.75); counter-increment: lyv; }
+  body.list-event-page .lyv-steps li::before { content: counter(lyv); display: block; font-weight: 800; color: var(--ref-navy); margin-bottom: 4px; }
+  body.list-event-page .lyv-steps strong { color: var(--ink); }
+  body.list-event-page .form-field .lyv-hint { font-size: 0.78rem; color: rgba(42,32,25,0.62); margin-top: 6px; }
+  body.list-event-page .lyv-error { font-size: 0.8rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
+  body.list-event-page .form-field [aria-invalid="true"] { border-color: #C0392B; }
+  body.list-event-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 26px 0 12px; }
+  body.list-event-page .lyv-section-label:first-child { margin-top: 0; }
+  body.list-event-page .lyv-consent { display: flex; gap: 10px; align-items: flex-start; font-size: 0.88rem; font-weight: 600; line-height: 1.45; }
+  body.list-event-page .lyv-consent input { width: auto; margin-top: 3px; flex: none; }
+  body.list-event-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  body.list-event-page .lyv-form-error { display: none; background: rgba(192,57,43,0.07); border: 1.5px solid #C0392B; border-radius: 14px; padding: 14px 16px; margin-top: 16px; font-size: 0.9rem; }
+  body.list-event-page .lyv-form-error.show { display: block; }
+  body.list-event-page .venue-form-submit:disabled { opacity: 0.6; cursor: wait; }
+  body.list-event-page input:disabled { opacity: 0.5; }
+  @media (max-width: 640px) {
+    body.list-event-page .venue-form { padding: 24px 18px; }
+    body.list-event-page .form-row { grid-template-columns: 1fr; }
+    body.list-event-page .lyv-steps { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body class="golf-page list-event-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'List an Event' },
+  ])}
+  <section class="list-venue" id="list-an-event">
+    <div class="list-venue-head">
+      <span class="eyebrow">For event organizers</span>
+      <h1>List an Event on Okanagan Roam</h1>
+      <p>Organizing a festival, concert, market, tasting or community event in the Okanagan? Tell us about it below. Every submission is reviewed by a person before anything appears on What&rsquo;s On.</p>
+    </div>
+    <ol class="lyv-steps">
+      <li><strong>Send your event.</strong> It takes about five minutes.</li>
+      <li><strong>We review it.</strong> We check the details and may email you with questions.</li>
+      <li><strong>It goes live on What&rsquo;s On</strong> once it is approved. Nothing is published before then.</li>
+    </ol>
+    <form class="venue-form" id="laeForm" novalidate>
+      <p class="lyv-section-label">About the event</p>
+      <div class="form-row full">
+        ${field('laeName', 'Event name *', '<input type="text" id="laeName" name="name" required minlength="2" maxlength="120">')}
+      </div>
+      <div class="form-row full">
+        <div class="form-field">
+          <label id="laeCategoriesLabel">Categories * <span class="lyv-hint">(choose 1 to 3)</span></label>
+          <div class="amenity-check-grid" role="group" aria-labelledby="laeCategoriesLabel" id="laeCategories">${categoryChecks}
+          </div>
+          <p class="lyv-error" id="laeCategoriesError" hidden></p>
+        </div>
+      </div>
+      <div class="form-row full">
+        ${field('laeDescription', 'Description *', '<textarea id="laeDescription" name="description" required minlength="20" maxlength="1000" placeholder="What is happening, who is it for, and what should people know before they go?"></textarea>', '<p class="lyv-hint" id="laeDescriptionCount" aria-live="polite">1000 characters left</p>')}
+      </div>
+      <p class="lyv-section-label">Where</p>
+      <div class="form-row">
+        ${field('laeRegion', 'Region *', `<select id="laeRegion" name="region" required><option value="">Select one</option>${regionOptions}</select>`)}
+        ${field('laeVenueName', 'Venue or location *', '<input type="text" id="laeVenueName" name="venue_name" required minlength="2" maxlength="120" placeholder="e.g. Kelowna Community Theatre">')}
+      </div>
+      <p class="lyv-section-label">When (Okanagan time)</p>
+      <div class="form-row">
+        ${field('laeStartDate', 'Date *', `<input type="date" id="laeStartDate" name="start_date" required min="${today}" max="${maxDate}">`)}
+        ${field('laeEndDate', 'End date (multi-day events)', `<input type="date" id="laeEndDate" name="end_date" min="${today}" max="${addLocalDays(maxDate, EVENT_SUBMISSION_MAX_SPAN_DAYS - 1)}">`)}
+      </div>
+      <div class="form-row">
+        ${field('laeStartTime', 'Start time *', '<input type="time" id="laeStartTime" name="start_time" required>')}
+        ${field('laeEndTime', 'End time', '<input type="time" id="laeEndTime" name="end_time">', '<p class="lyv-hint">If it ends after midnight, just enter the end time.</p>')}
+      </div>
+      <div class="form-row full">
+        <div class="form-field">
+          <label class="lyv-consent"><input type="checkbox" id="laeAllDay" name="all_day"> <span>All-day event (no set times)</span></label>
+        </div>
+      </div>
+      <div class="form-row full">
+        ${field('laeScheduleNotes', 'Other dates or schedule notes', '<textarea id="laeScheduleNotes" name="schedule_notes" maxlength="500" placeholder="Repeats weekly? More dates? Tell us here and we will add them."></textarea>', '<p class="lyv-hint">For our review only. It is not published as written.</p>')}
+      </div>
+      <p class="lyv-section-label">Details</p>
+      <div class="form-row">
+        ${field('laeEventUrl', 'Event website or ticket link *', '<input type="url" id="laeEventUrl" name="event_url" required maxlength="500" placeholder="https://" autocomplete="url">')}
+        ${field('laeOrganizerName', 'Organizer *', '<input type="text" id="laeOrganizerName" name="organizer_name" required minlength="2" maxlength="120" autocomplete="organization">')}
+      </div>
+      <p class="lyv-section-label">Your contact details</p>
+      <div class="form-row">
+        ${field('laeContactName', 'Your name *', '<input type="text" id="laeContactName" name="contact_name" required minlength="2" maxlength="100" autocomplete="name">')}
+        ${field('laeContactEmail', 'Your email *', '<input type="email" id="laeContactEmail" name="contact_email" required maxlength="254" autocomplete="email">')}
+      </div>
+      <div class="lyv-hp" aria-hidden="true">
+        <label for="laeCompanyWebsite">Leave this field empty</label>
+        <input type="text" id="laeCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off">
+      </div>
+      <div class="form-row full">
+        <div class="form-field">
+          <label class="lyv-consent"><input type="checkbox" id="laeConsent" name="consent" required> <span>${escapeHtml(EVENT_SUBMISSION_CONSENT_TEXT)} *</span></label>
+          <p class="lyv-error" id="laeConsentError" hidden></p>
+        </div>
+      </div>
+      <button type="submit" class="venue-form-submit">Submit for review</button>
+      <p class="form-note">* Required. Submitting does not publish anything: we review every event first and will contact you by email.</p>
+      <div class="lyv-form-error" id="laeFormError" role="alert"></div>
+    </form>
+    <div class="venue-form form-success" id="laeSuccess" role="status" tabindex="-1"></div>
+    <noscript><p class="form-note">This form needs JavaScript. You can also email your event details to <a href="mailto:okanaganroam@gmail.com">okanaganroam@gmail.com</a>.</p></noscript>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script>
+(function(){
+  var form = document.getElementById('laeForm');
+  if (!form || !window.fetch) return;
+  var startedAt = Date.now();
+  var fields = { name: 'laeName', categories: 'laeCategories', description: 'laeDescription', region: 'laeRegion', venue_name: 'laeVenueName', start_date: 'laeStartDate', end_date: 'laeEndDate', start_time: 'laeStartTime', end_time: 'laeEndTime', schedule_notes: 'laeScheduleNotes', event_url: 'laeEventUrl', organizer_name: 'laeOrganizerName', contact_name: 'laeContactName', contact_email: 'laeContactEmail', consent: 'laeConsent' };
+  var desc = document.getElementById('laeDescription');
+  var count = document.getElementById('laeDescriptionCount');
+  var allDay = document.getElementById('laeAllDay');
+  var startTime = document.getElementById('laeStartTime');
+  var endTime = document.getElementById('laeEndTime');
+  var formError = document.getElementById('laeFormError');
+  var success = document.getElementById('laeSuccess');
+  var button = form.querySelector('button[type="submit"]');
+  var boxes = form.querySelectorAll('input[name="categories"]');
+  desc.addEventListener('input', function(){
+    var left = 1000 - desc.value.length;
+    count.textContent = left + (left === 1 ? ' character left' : ' characters left');
+  });
+  allDay.addEventListener('change', function(){
+    startTime.disabled = endTime.disabled = allDay.checked;
+    if (allDay.checked) { startTime.value = ''; endTime.value = ''; }
+  });
+  Array.prototype.forEach.call(boxes, function(box){
+    box.addEventListener('change', function(){
+      var checked = form.querySelectorAll('input[name="categories"]:checked').length;
+      Array.prototype.forEach.call(boxes, function(b){ b.disabled = !b.checked && checked >= 3; });
+    });
+  });
+  function clearErrors(){
+    Object.keys(fields).forEach(function(key){
+      var input = document.getElementById(fields[key]);
+      var msg = document.getElementById(fields[key] + 'Error');
+      input.removeAttribute('aria-invalid');
+      input.removeAttribute('aria-describedby');
+      if (msg) { msg.hidden = true; msg.textContent = ''; }
+    });
+    formError.classList.remove('show');
+    formError.textContent = '';
+  }
+  function showErrors(errors){
+    var first = null;
+    Object.keys(errors).forEach(function(key){
+      if (!fields[key]) return;
+      var input = document.getElementById(fields[key]);
+      var msg = document.getElementById(fields[key] + 'Error');
+      input.setAttribute('aria-invalid', 'true');
+      if (msg) { msg.textContent = errors[key]; msg.hidden = false; input.setAttribute('aria-describedby', msg.id); }
+      if (!first) first = input.matches('input, select, textarea') ? input : input.querySelector('input');
+    });
+    if (first) first.focus();
+  }
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    clearErrors();
+    var payload = { started_at: startedAt, company_website: document.getElementById('laeCompanyWebsite').value, consent: document.getElementById('laeConsent').checked, all_day: allDay.checked, categories: [] };
+    ['name', 'description', 'region', 'venue_name', 'start_date', 'end_date', 'start_time', 'end_time', 'schedule_notes', 'event_url', 'organizer_name', 'contact_name', 'contact_email'].forEach(function(key){
+      var value = document.getElementById(fields[key]).value.trim();
+      if (value) payload[key] = value;
+    });
+    if (allDay.checked) { delete payload.start_time; delete payload.end_time; }
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="categories"]:checked'), function(box){ payload.categories.push(box.value); });
+    button.disabled = true;
+    button.textContent = 'Submitting...';
+    fetch('/api/event-submissions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function(res){ return res.json().catch(function(){ return {}; }).then(function(body){ return { status: res.status, body: body }; }); })
+      .then(function(r){
+        if (r.status === 201 && r.body.ok) {
+          success.textContent = r.body.message || 'Thanks! Your event has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it.';
+          success.classList.add('show');
+          form.hidden = true;
+          success.focus();
+          return;
+        }
+        if (r.body.errors) showErrors(r.body.errors);
+        formError.textContent = r.body.error || 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+        formError.classList.add('show');
+      })
+      .catch(function(){ formError.textContent = 'Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at okanaganroam@gmail.com.'; formError.classList.add('show'); })
+      .then(function(){ button.disabled = false; button.textContent = 'Submit for review'; });
+  });
+})();
+</script>
+</body>
+</html>`;
+}
+
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   const { pathname, query } = parsed;
@@ -15828,6 +16489,38 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, result.status, result.body);
     }
 
+    // List an Event, Phase 1 (2026-09-25) -- see renderListAnEventPage
+    // and handleEventSubmission above.
+    if ((pathname === '/list-an-event' || pathname === '/list-an-event/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderListAnEventPage());
+    }
+    if (pathname === '/api/event-submissions' && method === 'POST') {
+      return await handleEventSubmission(req, res);
+    }
+    if (pathname === '/admin/event-submissions' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      const status = query.status || 'pending';
+      if (!['pending', 'approved', 'rejected', 'all'].includes(status)) {
+        return sendJSON(res, 400, { error: 'status must be pending, approved, rejected or all.' });
+      }
+      return sendJSON(res, 200, { status, submissions: listEventSubmissions(status) });
+    }
+    const eventSubmissionReviewMatch = pathname.match(/^\/admin\/event-submissions\/(\d+)\/(approve|reject)$/);
+    if (eventSubmissionReviewMatch && method === 'POST') {
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try {
+        body = await readLimitedJsonBody(req, EVENT_SUBMISSION_MAX_BODY_BYTES);
+      } catch (err) {
+        return sendJSON(res, err.status === 413 ? 413 : 400, { error: err.status === 413 ? 'Body too large.' : 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const id = Number(eventSubmissionReviewMatch[1]);
+      const result = eventSubmissionReviewMatch[2] === 'approve' ? approveEventSubmission(id, body) : rejectEventSubmission(id, body);
+      return sendJSON(res, result.status, result.body);
+    }
+
     // GET /destinations -- "Choose Your Okanagan Destination" (2026-09-25),
     // the target of the homepage's "Explore All Okanagan Regions" links.
     if ((pathname === '/destinations' || pathname === '/destinations/') && method === 'GET') {
@@ -16089,6 +16782,14 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   startServer,
+  // List an Event, Phase 1
+  renderListAnEventPage,
+  validateEventSubmission,
+  buildEventSubmissionEmail,
+  getEventSubmission,
+  approveEventSubmission,
+  EVENT_SUBMISSION_MAX_FUTURE_DAYS,
+  EVENT_SUBMISSION_MAX_SPAN_DAYS,
   // List Your Venue, Phase 1
   renderListYourVenuePage,
   validateVenueSubmission,

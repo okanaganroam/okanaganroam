@@ -597,4 +597,49 @@ CREATE TABLE IF NOT EXISTS venue_submissions (
 CREATE INDEX IF NOT EXISTS idx_venue_submissions_status ON venue_submissions(status, submitted_at);
 `);
 
+// List an Event, Phase 1 (2026-09-25): staging table for public event
+// submissions from /list-an-event -- the event counterpart of
+// venue_submissions above. A submission stays here until an admin approves
+// it; approval creates the real event through server.js's existing
+// createEvent() and records its id in event_id. The public form never
+// writes to events / event_occurrences / event_categories. Dates and times
+// are Okanagan civil values (YYYY-MM-DD / HH:MM), exactly like
+// event_occurrences. Additive and idempotent; nothing existing is altered.
+db.exec(`
+CREATE TABLE IF NOT EXISTS event_submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  name TEXT NOT NULL,
+  region TEXT NOT NULL,
+  categories TEXT NOT NULL,
+  description TEXT NOT NULL,
+  venue_name TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  start_time TEXT,
+  end_time TEXT,
+  all_day INTEGER NOT NULL DEFAULT 0 CHECK (all_day IN (0, 1)),
+  ends_next_day INTEGER NOT NULL DEFAULT 0 CHECK (ends_next_day IN (0, 1)),
+  event_url TEXT NOT NULL,
+  organizer_name TEXT NOT NULL,
+  schedule_notes TEXT,
+  contact_name TEXT NOT NULL,
+  contact_email TEXT NOT NULL,
+  consent INTEGER NOT NULL CHECK (consent = 1),
+  consent_version TEXT NOT NULL,
+  ip_hash TEXT,
+  user_agent TEXT,
+  submitted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notify_status TEXT NOT NULL DEFAULT 'pending' CHECK (notify_status IN ('pending', 'sent', 'failed')),
+  notify_error TEXT,
+  notified_at TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT,
+  event_id INTEGER REFERENCES events(id),
+  CHECK (end_date >= start_date)
+);
+CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(status, submitted_at);
+`);
+
 module.exports = db;
