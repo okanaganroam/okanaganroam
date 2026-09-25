@@ -560,4 +560,41 @@ for (const [slug, kind, title] of FD_CATEGORY_COLLECTIONS) {
   }
 }
 
+// List Your Venue, Phase 1 (2026-09-25): staging table for public venue
+// submissions from /list-your-venue. A submission lives here -- and ONLY
+// here -- until an admin approves it, at which point the real venue is
+// created through server.js's existing createVenue() and its id recorded
+// in venue_id. The public form never writes to `venues`. Additive and
+// idempotent like every other table above; nothing existing is altered.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  region TEXT NOT NULL,
+  description TEXT NOT NULL,
+  address TEXT,
+  website TEXT,
+  phone TEXT,
+  cuisine TEXT,
+  amenities TEXT NOT NULL DEFAULT '[]',
+  contact_name TEXT NOT NULL,
+  contact_email TEXT NOT NULL,
+  consent INTEGER NOT NULL CHECK (consent = 1),
+  consent_version TEXT NOT NULL,
+  ip_hash TEXT,
+  user_agent TEXT,
+  submitted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notify_status TEXT NOT NULL DEFAULT 'pending' CHECK (notify_status IN ('pending', 'sent', 'failed')),
+  notify_error TEXT,
+  notified_at TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT,
+  venue_id INTEGER REFERENCES venues(id)
+);
+CREATE INDEX IF NOT EXISTS idx_venue_submissions_status ON venue_submissions(status, submitted_at);
+`);
+
 module.exports = db;

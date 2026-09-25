@@ -13390,6 +13390,705 @@ function renderBrowsePrefillScript(discoveryParams = false) {
 </script>`;
 }
 
+// ---------- List Your Venue, Phase 1 (2026-09-25) ----------
+//
+// The public venue submission workflow:
+//   GET  /list-your-venue      -- the form (existing site shell, app.css form styles)
+//   POST /api/venue-submissions -- validate, spam checks, store as PENDING,
+//                                 then notify okanaganroam@gmail.com
+//   GET  /admin/venue-submissions            -- token-protected review list
+//   POST /admin/venue-submissions/:id/approve -- creates the venue via createVenue()
+//   POST /admin/venue-submissions/:id/reject  -- publishes nothing
+//
+// A submission is stored in venue_submissions (db.js) and never touches
+// `venues` until an admin approves it. The notification reuses the site's
+// existing FormSubmit relay (the one the old /browse form posts to), called
+// from the server after the row is stored so a failed send is recorded
+// instead of silently losing the submission. No API key or SMTP secret is
+// involved.
+
+const VENUE_SUBMISSION_NOTIFY_EMAIL = 'okanaganroam@gmail.com';
+const VENUE_SUBMISSION_NOTIFY_URL = `https://formsubmit.co/ajax/${VENUE_SUBMISSION_NOTIFY_EMAIL}`;
+const VENUE_SUBMISSION_MAX_BODY_BYTES = 16 * 1024;
+const VENUE_SUBMISSION_MIN_FILL_MS = 3000;
+const VENUE_SUBMISSION_MAX_FORM_AGE_MS = 24 * 60 * 60 * 1000;
+const VENUE_SUBMISSION_RATE_LIMIT = 10; // POST attempts per IP ...
+const VENUE_SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000; // ... per hour
+const VENUE_SUBMISSION_DUPLICATE_WINDOW_DAYS = 7;
+const VENUE_SUBMISSION_CONSENT_VERSION = '2026-09-25';
+const VENUE_SUBMISSION_CONSENT_TEXT = 'I am authorized to represent this business, the details are accurate, and Okanagan Roam may review, edit and publish them. My contact details are only used to follow up about this listing and are not published.';
+const VENUE_SUBMISSION_ORIGINS = new Set(['https://okanaganroam.com', 'https://www.okanaganroam.com']);
+// Canonical site taxonomy only: the venue types are CATEGORY_LABELS' keys,
+// the regions REGION_LABELS' keys, the features the existing badge columns.
+const VENUE_SUBMISSION_TYPES = Object.keys(CATEGORY_LABELS);
+const VENUE_SUBMISSION_REGIONS = Object.keys(REGION_LABELS)
+  .sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
+const VENUE_SUBMISSION_AMENITIES = BOOL_FIELDS.filter((f) => BADGE_LABELS[f]);
+const VENUE_SUBMISSION_TEXT_FIELDS = {
+  name: { label: 'Business / venue name', required: true, min: 2, max: 120 },
+  description: { label: 'Description', required: true, min: 20, max: 500 },
+  contact_name: { label: 'Your name', required: true, min: 2, max: 100 },
+  address: { label: 'Address', max: 200 },
+  cuisine: { label: 'Cuisine', max: 80 },
+};
+const VENUE_SUBMISSION_KEYS = new Set([
+  'name', 'type', 'region', 'description', 'contact_name', 'contact_email', 'consent',
+  'address', 'website', 'phone', 'cuisine', 'amenities', 'company_website', 'started_at',
+]);
+
+// Swapped out by the test suite so tests never send real email.
+let venueSubmissionTransport = sendVenueSubmissionViaFormSubmit;
+function setVenueSubmissionTransport(fn) {
+  venueSubmissionTransport = fn || sendVenueSubmissionViaFormSubmit;
+}
+
+const venueSubmissionAttempts = new Map(); // ip -> [timestamps]
+function venueSubmissionRateLimited(ip, now = Date.now()) {
+  const recent = (venueSubmissionAttempts.get(ip) || []).filter((t) => now - t < VENUE_SUBMISSION_RATE_WINDOW_MS);
+  recent.push(now);
+  venueSubmissionAttempts.set(ip, recent);
+  if (venueSubmissionAttempts.size > 5000) {
+    for (const [key, times] of venueSubmissionAttempts) {
+      if (!times.some((t) => now - t < VENUE_SUBMISSION_RATE_WINDOW_MS)) venueSubmissionAttempts.delete(key);
+    }
+  }
+  return recent.length > VENUE_SUBMISSION_RATE_LIMIT;
+}
+
+// The last X-Forwarded-For entry is the one Railway's proxy appended (the
+// address it actually saw); earlier entries are client-supplied.
+function requestClientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',').pop().trim();
+  return forwarded || req.socket.remoteAddress || 'unknown';
+}
+
+// Same-origin guard for the public POST. Browsers always send Origin on a
+// cross-site fetch POST; a request from our own page carries our origin
+// (production or whatever host served the page, e.g. localhost in dev).
+function isSameOriginSubmission(req) {
+  const origin = req.headers.origin;
+  if (origin) {
+    return VENUE_SUBMISSION_ORIGINS.has(origin)
+      || origin === `http://${req.headers.host}` || origin === `https://${req.headers.host}`;
+  }
+  return req.headers['sec-fetch-site'] !== 'cross-site';
+}
+
+// readBody() with a hard byte cap: anything over the limit is refused with
+// 413 rather than buffered.
+function readLimitedJsonBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const fail = (status, message) => {
+      const err = new Error(message);
+      err.status = status;
+      reject(err);
+    };
+    if (Number(req.headers['content-length']) > maxBytes) {
+      req.resume();
+      return fail(413, 'too_large');
+    }
+    const chunks = [];
+    let size = 0;
+    let done = false;
+    req.on('data', (chunk) => {
+      if (done) return;
+      size += chunk.length;
+      if (size > maxBytes) {
+        done = true;
+        return fail(413, 'too_large');
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (done) return;
+      done = true;
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null'));
+      } catch (_) {
+        fail(400, 'malformed');
+      }
+    });
+    req.on('error', () => { if (!done) { done = true; fail(400, 'malformed'); } });
+  });
+}
+
+// Plain text only: trims, collapses runs of spaces/tabs, strips control
+// characters (keeping newlines in the description). Everything is escaped
+// again wherever it is rendered.
+function cleanSubmissionText(value, { multiline = false } = {}) {
+  let s = String(value).normalize('NFC').replace(/\r\n?/g, '\n');
+  s = s.replace(multiline ? /[\u0000-\u0009\u000B-\u001F\u007F]/g : /[\u0000-\u001F\u007F]/g, ' ');
+  s = s.replace(/[ \t]+/g, ' ');
+  if (multiline) s = s.replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n');
+  return s.trim();
+}
+
+const SUBMISSION_EMAIL_PATTERN = /^[^\s@<>()[\],;:"]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
+
+function normalizeSubmissionWebsite(value) {
+  const raw = value.trim();
+  if (/\s/.test(raw)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
+  let parsed;
+  try { parsed = new URL(withScheme); } catch (_) { return null; }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+  if (parsed.username || parsed.password) return null;
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(parsed.hostname)) return null;
+  return parsed.href;
+}
+
+// Validates the public submission (or an admin's approval overrides when
+// `partial` is set). Returns { data, errors } where errors maps each field
+// to a message written for the business owner.
+function validateVenueSubmission(body, { partial = false } = {}) {
+  const errors = {};
+  const data = {};
+  const present = (k) => body[k] !== undefined && body[k] !== null && body[k] !== '';
+
+  for (const [key, rule] of Object.entries(VENUE_SUBMISSION_TEXT_FIELDS)) {
+    if (!present(key)) {
+      if (rule.required && !partial) errors[key] = `Please enter ${key === 'contact_name' ? 'your name' : `the ${rule.label.toLowerCase()}`}.`;
+      continue;
+    }
+    if (typeof body[key] !== 'string') { errors[key] = `${rule.label} must be text.`; continue; }
+    const value = cleanSubmissionText(body[key], { multiline: key === 'description' });
+    if (!value && rule.required) { errors[key] = `Please enter the ${rule.label.toLowerCase()}.`; continue; }
+    if (rule.min && value.length < rule.min) { errors[key] = `${rule.label} needs at least ${rule.min} characters.`; continue; }
+    if (value.length > rule.max) { errors[key] = `${rule.label} can be at most ${rule.max} characters.`; continue; }
+    if (value) data[key] = value;
+  }
+
+  if (!present('type')) {
+    if (!partial) errors.type = 'Please choose a venue type.';
+  } else if (!VENUE_SUBMISSION_TYPES.includes(body.type)) {
+    errors.type = 'Please choose one of the listed venue types.';
+  } else data.type = body.type;
+
+  if (!present('region')) {
+    if (!partial) errors.region = 'Please choose a region.';
+  } else if (!VENUE_SUBMISSION_REGIONS.includes(body.region)) {
+    errors.region = 'Please choose one of the listed regions.';
+  } else data.region = body.region;
+
+  if (!present('contact_email')) {
+    if (!partial) errors.contact_email = 'Please enter your email address.';
+  } else if (typeof body.contact_email !== 'string' || body.contact_email.trim().length > 254
+      || !SUBMISSION_EMAIL_PATTERN.test(body.contact_email.trim())) {
+    errors.contact_email = 'Please enter a valid email address, like name@example.com.';
+  } else data.contact_email = body.contact_email.trim();
+
+  if (present('website')) {
+    const website = typeof body.website === 'string' && body.website.length <= 300 ? normalizeSubmissionWebsite(body.website) : null;
+    if (!website) errors.website = 'Please enter a valid website address, like https://example.com.';
+    else data.website = website;
+  }
+
+  if (present('phone')) {
+    const phone = typeof body.phone === 'string' ? cleanSubmissionText(body.phone) : '';
+    const digits = phone.replace(/\D/g, '').length;
+    if (!/^[0-9+().\-\s]{7,40}$/.test(phone) || digits < 7 || digits > 15) {
+      errors.phone = 'Please enter a valid phone number, like 250-555-0123.';
+    } else data.phone = phone;
+  }
+
+  if (body.amenities !== undefined) {
+    if (!Array.isArray(body.amenities) || body.amenities.length > VENUE_SUBMISSION_AMENITIES.length
+        || !body.amenities.every((a) => VENUE_SUBMISSION_AMENITIES.includes(a))) {
+      errors.amenities = 'Please choose features from the list only.';
+    } else data.amenities = VENUE_SUBMISSION_AMENITIES.filter((a) => body.amenities.includes(a));
+  }
+
+  if (!partial && body.consent !== true) {
+    errors.consent = 'Please confirm the statement above so we can review your listing.';
+  }
+  return { data, errors };
+}
+
+function rowToVenueSubmission(row) {
+  if (!row) return null;
+  return { ...row, consent: !!row.consent, amenities: JSON.parse(row.amenities || '[]') };
+}
+
+function getVenueSubmission(id) {
+  return rowToVenueSubmission(db.prepare('SELECT * FROM venue_submissions WHERE id = ?').get(id));
+}
+
+// Live venues in the same region whose name matches, so the reviewer sees
+// a likely duplicate before approving. Name match only, case-insensitive.
+function findExistingVenuesForSubmission(name, region) {
+  return db.prepare(
+    'SELECT id, name, type, region, slug FROM venues WHERE region = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?)) AND redirect_to IS NULL'
+  ).all(region, name);
+}
+
+function formatSubmissionTimestamp(sqliteUtc) {
+  const date = new Date(`${String(sqliteUtc).replace(' ', 'T')}Z`);
+  if (Number.isNaN(date.getTime())) return String(sqliteUtc);
+  const local = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Vancouver', year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  }).format(date);
+  return `${local} (${sqliteUtc} UTC)`;
+}
+
+// The notification's fields, in reading order. FormSubmit renders each key
+// as a table row in the email; optional fields appear only when provided.
+function buildVenueSubmissionEmail(sub) {
+  const payload = {
+    _subject: `[PENDING REVIEW] Venue submission #${sub.id}: ${sub.name}`,
+    _template: 'table',
+    _captcha: 'false',
+    _replyto: sub.contact_email,
+    'Status': 'PENDING REVIEW. This venue has NOT been published. Nothing appears on Okanagan Roam until it is approved.',
+    'Submission ID': String(sub.id),
+    'Submitted': formatSubmissionTimestamp(sub.submitted_at),
+    'Venue name': sub.name,
+    'Venue type': CATEGORY_LABELS[sub.type].singular,
+    'Region': REGION_LABELS[sub.region],
+    'Description': sub.description,
+    'Contact name': sub.contact_name,
+    'Contact email': sub.contact_email,
+  };
+  if (sub.address) payload['Address'] = sub.address;
+  if (sub.website) payload['Website'] = sub.website;
+  if (sub.phone) payload['Phone'] = sub.phone;
+  if (sub.cuisine) payload['Cuisine'] = sub.cuisine;
+  if (sub.amenities.length) payload['Amenities / features (as claimed)'] = sub.amenities.map((a) => BADGE_LABELS[a].title).join(', ');
+  const existing = findExistingVenuesForSubmission(sub.name, sub.region);
+  if (existing.length) payload['Possible existing listing'] = existing.map((v) => `${v.name} (venue #${v.id}, ${v.type})`).join('; ');
+  payload['How to review'] = `Approve or reject submission #${sub.id} with the admin token: GET /admin/venue-submissions, then POST /admin/venue-submissions/${sub.id}/approve or /reject.`;
+  return payload;
+}
+
+async function sendVenueSubmissionViaFormSubmit(payload) {
+  const res = await fetch(VENUE_SUBMISSION_NOTIFY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Origin: 'https://okanaganroam.com',
+      Referer: 'https://okanaganroam.com/list-your-venue',
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10000),
+  });
+  let result = null;
+  try { result = await res.json(); } catch (_) { /* non-JSON reply is a failure below */ }
+  if (!res.ok || !result || String(result.success) !== 'true') {
+    throw new Error(`FormSubmit HTTP ${res.status}: ${String((result && result.message) || 'no JSON body').slice(0, 200)}`);
+  }
+}
+
+// Stored first, notified second: a failed send leaves the submission
+// pending with notify_status 'failed' (visible in the admin list) and is
+// logged, never surfaced to the submitter.
+async function notifyVenueSubmission(id) {
+  const sub = getVenueSubmission(id);
+  try {
+    await venueSubmissionTransport(buildVenueSubmissionEmail(sub));
+    db.prepare("UPDATE venue_submissions SET notify_status = 'sent', notify_error = NULL, notified_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+    return true;
+  } catch (err) {
+    const message = String((err && err.message) || err).slice(0, 300);
+    db.prepare("UPDATE venue_submissions SET notify_status = 'failed', notify_error = ? WHERE id = ?").run(message, id);
+    console.error(`[venue-submissions] notification for submission #${id} failed (submission kept as pending): ${message}`);
+    return false;
+  }
+}
+
+function sendSubmissionResponse(res, status, data, close = false) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    ...(close ? { Connection: 'close' } : {}),
+  });
+  res.end(JSON.stringify(data));
+}
+
+async function handleVenueSubmission(req, res) {
+  const generic = 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+  if (!isSameOriginSubmission(req)) {
+    return sendSubmissionResponse(res, 403, { ok: false, error: 'Submissions are only accepted from the Okanagan Roam website.' });
+  }
+  const ip = requestClientIp(req);
+  if (venueSubmissionRateLimited(ip)) {
+    return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions from your connection. Please try again in an hour, or email us at okanaganroam@gmail.com.' });
+  }
+  if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) {
+    return sendSubmissionResponse(res, 415, { ok: false, error: generic });
+  }
+  let body;
+  try {
+    body = await readLimitedJsonBody(req, VENUE_SUBMISSION_MAX_BODY_BYTES);
+  } catch (err) {
+    if (err.status === 413) {
+      return sendSubmissionResponse(res, 413, { ok: false, error: 'Your submission is too large. Please shorten it and try again.' }, true);
+    }
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !VENUE_SUBMISSION_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+
+  // Honeypot: a hidden field people never see. Anything in it is a bot;
+  // answer exactly like a success and store nothing.
+  if (body.company_website !== undefined && body.company_website !== '') {
+    return sendSubmissionResponse(res, 201, { ok: true });
+  }
+  const startedAt = Number(body.started_at);
+  const elapsed = Date.now() - startedAt;
+  if (!Number.isFinite(startedAt) || elapsed > VENUE_SUBMISSION_MAX_FORM_AGE_MS || elapsed < -60000) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'This form has expired. Please reload the page and submit again.' });
+  }
+  if (elapsed < VENUE_SUBMISSION_MIN_FILL_MS) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check your details and press Submit again.' });
+  }
+
+  const { data, errors } = validateVenueSubmission(body);
+  if (Object.keys(errors).length) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
+  }
+
+  const duplicate = db.prepare(
+    `SELECT id FROM venue_submissions WHERE status = 'pending' AND region = ?
+       AND LOWER(name) = LOWER(?) AND LOWER(contact_email) = LOWER(?)
+       AND submitted_at >= datetime('now', ?)`
+  ).get(data.region, data.name, data.contact_email, `-${VENUE_SUBMISSION_DUPLICATE_WINDOW_DAYS} days`);
+  if (duplicate) {
+    return sendSubmissionResponse(res, 409, { ok: false, error: 'We already have a pending submission for this venue from this email address. We will be in touch after we review it.' });
+  }
+
+  const info = db.prepare(
+    `INSERT INTO venue_submissions
+       (name, type, region, description, address, website, phone, cuisine, amenities,
+        contact_name, contact_email, consent, consent_version, ip_hash, user_agent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+  ).run(
+    data.name, data.type, data.region, data.description,
+    data.address || null, data.website || null, data.phone || null, data.cuisine || null,
+    JSON.stringify(data.amenities || []), data.contact_name, data.contact_email,
+    VENUE_SUBMISSION_CONSENT_VERSION,
+    crypto.createHash('sha256').update(`okanagan-roam-venue-submission:${ip}`).digest('hex'),
+    String(req.headers['user-agent'] || '').slice(0, 300) || null
+  );
+  const id = Number(info.lastInsertRowid);
+  await notifyVenueSubmission(id);
+  return sendSubmissionResponse(res, 201, {
+    ok: true,
+    id,
+    message: 'Thanks! Your venue has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it, and we may email you with questions.',
+  });
+}
+
+function requireAdminToken(req, res) {
+  if (!ENRICHMENT_ADMIN_TOKEN) {
+    sendJSON(res, 503, { error: 'Admin endpoints are not configured.' });
+    return false;
+  }
+  const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+  if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+    sendJSON(res, 401, { error: 'Unauthorized.' });
+    return false;
+  }
+  return true;
+}
+
+function validateReviewer(value) {
+  return typeof value === 'string' && value.trim().length >= 1 && value.trim().length <= 80 ? value.trim() : null;
+}
+
+// Approve: still pending -> createVenue() -> record venue_id, reviewer and
+// time, all in one transaction. The status guard in the UPDATE makes a
+// second approval (or an approval racing a rejection) a no-op that rolls
+// the venue insert back, so a submission can never create two venues.
+function approveVenueSubmission(id, body) {
+  const fail = (status, error, extra = {}) => ({ status, body: { error, ...extra } });
+  const allowed = new Set(['reviewer', 'overrides', 'include_amenities', 'allow_duplicate']);
+  const unexpected = Object.keys(body).filter((k) => !allowed.has(k));
+  if (unexpected.length) return fail(400, `Unexpected field(s): ${unexpected.join(', ')}`);
+  const reviewer = validateReviewer(body.reviewer);
+  if (!reviewer) return fail(400, 'reviewer is required (1-80 characters).');
+  if (body.include_amenities !== undefined && typeof body.include_amenities !== 'boolean') return fail(400, 'include_amenities must be a boolean.');
+  if (body.allow_duplicate !== undefined && typeof body.allow_duplicate !== 'boolean') return fail(400, 'allow_duplicate must be a boolean.');
+
+  const sub = getVenueSubmission(id);
+  if (!sub) return fail(404, 'Submission not found.');
+  if (sub.status !== 'pending') return fail(409, `Submission is already ${sub.status}.`, { venue_id: sub.venue_id });
+
+  let overrides = {};
+  if (body.overrides !== undefined) {
+    const allowedOverrides = ['name', 'type', 'region', 'description', 'address', 'website', 'phone', 'cuisine', 'amenities'];
+    if (!body.overrides || typeof body.overrides !== 'object' || Array.isArray(body.overrides)
+        || Object.keys(body.overrides).some((k) => !allowedOverrides.includes(k))) {
+      return fail(400, `overrides may only contain: ${allowedOverrides.join(', ')}`);
+    }
+    const { data, errors } = validateVenueSubmission(body.overrides, { partial: true });
+    if (Object.keys(errors).length) return fail(400, 'Invalid overrides.', { errors });
+    overrides = data;
+  }
+
+  const final = { ...sub, ...overrides };
+  const existing = findExistingVenuesForSubmission(final.name, final.region);
+  if (existing.length && body.allow_duplicate !== true) {
+    return fail(409, 'A live venue with this name already exists in this region. Pass allow_duplicate: true to create it anyway.', { existing });
+  }
+
+  const venueData = {
+    name: final.name, region: final.region, type: final.type, description: final.description,
+    address: final.address || null, website: final.website || null,
+    phone: final.phone || null, cuisine: final.cuisine || null,
+  };
+  // Amenity claims are the owner's own; they only become public badges
+  // when the reviewer opts in (or passes a verified list in overrides).
+  if (body.include_amenities === true || overrides.amenities) {
+    for (const a of final.amenities) venueData[a] = true;
+  }
+
+  let venue;
+  db.exec('BEGIN');
+  try {
+    venue = createVenue(venueData);
+    const updated = db.prepare(
+      `UPDATE venue_submissions SET status = 'approved', venue_id = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
+         WHERE id = ? AND status = 'pending'`
+    ).run(venue.id, reviewer, id);
+    if (updated.changes !== 1) throw Object.assign(new Error('Submission is no longer pending.'), { status: 409 });
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    return fail(err.status || 500, err.status ? err.message : 'Approval failed; nothing was published.');
+  }
+  // Same slug path every other venue takes (normally run at startup), so
+  // the new venue's page exists immediately.
+  try { backfillSlugs(); } catch (err) { console.error('[venue-submissions] slug backfill after approval failed:', err); }
+  return { status: 200, body: { submission: getVenueSubmission(id), venue: getVenue(venue.id) } };
+}
+
+function rejectVenueSubmission(id, body) {
+  const fail = (status, error) => ({ status, body: { error } });
+  const unexpected = Object.keys(body).filter((k) => !['reviewer', 'reason'].includes(k));
+  if (unexpected.length) return fail(400, `Unexpected field(s): ${unexpected.join(', ')}`);
+  const reviewer = validateReviewer(body.reviewer);
+  if (!reviewer) return fail(400, 'reviewer is required (1-80 characters).');
+  if (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.length > 500)) {
+    return fail(400, 'reason must be text of at most 500 characters.');
+  }
+  const sub = getVenueSubmission(id);
+  if (!sub) return fail(404, 'Submission not found.');
+  const updated = db.prepare(
+    `UPDATE venue_submissions SET status = 'rejected', rejection_reason = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
+       WHERE id = ? AND status = 'pending'`
+  ).run(body.reason ? cleanSubmissionText(body.reason, { multiline: true }) : null, reviewer, id);
+  if (updated.changes !== 1) return fail(409, `Submission is already ${sub.status}.`);
+  return { status: 200, body: { submission: getVenueSubmission(id) } };
+}
+
+function listVenueSubmissions(status) {
+  const rows = status === 'all'
+    ? db.prepare('SELECT * FROM venue_submissions ORDER BY id DESC').all()
+    : db.prepare('SELECT * FROM venue_submissions WHERE status = ? ORDER BY id DESC').all(status);
+  return rows.map(rowToVenueSubmission).map((s) => ({
+    ...s,
+    possible_existing_venues: s.status === 'pending' ? findExistingVenuesForSubmission(s.name, s.region) : [],
+  }));
+}
+
+function renderListYourVenuePage() {
+  const title = 'List Your Venue | Okanagan Roam';
+  const description = 'Own a restaurant, winery, cafe, brewery or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
+  const canonical = 'https://okanaganroam.com/list-your-venue';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'List Your Venue', url: canonical },
+  ]);
+  const option = (value, label) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
+  const typeOptions = VENUE_SUBMISSION_TYPES.map((t) => option(t, CATEGORY_LABELS[t].singular)).join('');
+  const regionOptions = VENUE_SUBMISSION_REGIONS.map((r) => option(r, REGION_LABELS[r])).join('');
+  const amenityChecks = VENUE_SUBMISSION_AMENITIES.map((a) => `
+            <label class="amenity-check"><input type="checkbox" name="amenities" value="${a}"> ${escapeHtml(BADGE_LABELS[a].title)}</label>`).join('');
+  const field = (id, label, control, hint = '') => `<div class="form-field">
+          <label for="${id}">${label}</label>
+          ${control}${hint}
+          <p class="lyv-error" id="${id}Error" hidden></p>
+        </div>`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+${golfEngagementHeadHtml('fd', true)}
+<style>
+  body.list-venue-page .list-venue { padding: 12px 0 40px; }
+  body.list-venue-page .list-venue-head { margin-bottom: 28px; }
+  body.list-venue-page .lyv-steps { max-width: 640px; margin: 0 auto 28px; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; counter-reset: lyv; }
+  body.list-venue-page .lyv-steps li { background: var(--paper); border-radius: 14px; padding: 14px 16px; font-size: 0.88rem; color: rgba(42,32,25,0.75); counter-increment: lyv; }
+  body.list-venue-page .lyv-steps li::before { content: counter(lyv); display: block; font-weight: 800; color: var(--ref-navy); margin-bottom: 4px; }
+  body.list-venue-page .lyv-steps strong { color: var(--ink); }
+  body.list-venue-page .form-field .lyv-hint { font-size: 0.78rem; color: rgba(42,32,25,0.62); margin-top: 6px; }
+  body.list-venue-page .lyv-error { font-size: 0.8rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
+  body.list-venue-page .form-field [aria-invalid="true"] { border-color: #C0392B; }
+  body.list-venue-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 26px 0 12px; }
+  body.list-venue-page .lyv-section-label:first-child { margin-top: 0; }
+  body.list-venue-page .lyv-consent { display: flex; gap: 10px; align-items: flex-start; font-size: 0.88rem; font-weight: 600; line-height: 1.45; }
+  body.list-venue-page .lyv-consent input { width: auto; margin-top: 3px; flex: none; }
+  body.list-venue-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  body.list-venue-page .lyv-form-error { display: none; background: rgba(192,57,43,0.07); border: 1.5px solid #C0392B; border-radius: 14px; padding: 14px 16px; margin-top: 16px; font-size: 0.9rem; }
+  body.list-venue-page .lyv-form-error.show { display: block; }
+  body.list-venue-page .venue-form-submit:disabled { opacity: 0.6; cursor: wait; }
+  @media (max-width: 640px) {
+    body.list-venue-page .venue-form { padding: 24px 18px; }
+    body.list-venue-page .form-row { grid-template-columns: 1fr; }
+    body.list-venue-page .lyv-steps { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body class="golf-page list-venue-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'List Your Venue' },
+  ])}
+  <section class="list-venue" id="list-your-venue">
+    <div class="list-venue-head">
+      <span class="eyebrow">For business owners</span>
+      <h1>List Your Venue on Okanagan Roam</h1>
+      <p>Own a restaurant, winery, cafe, brewery or other place visitors should know about? Tell us about it below. Every submission is reviewed by a person before anything appears on Okanagan Roam.</p>
+    </div>
+    <ol class="lyv-steps">
+      <li><strong>Send your details.</strong> It takes about five minutes.</li>
+      <li><strong>We review them.</strong> We check the details and may email you with questions.</li>
+      <li><strong>Your listing goes live</strong> once it is approved. Nothing is published before then.</li>
+    </ol>
+    <form class="venue-form" id="lyvForm" novalidate>
+      <p class="lyv-section-label">About the venue</p>
+      <div class="form-row full">
+        ${field('lyvName', 'Business / venue name *', '<input type="text" id="lyvName" name="name" required minlength="2" maxlength="120" autocomplete="organization">')}
+      </div>
+      <div class="form-row">
+        ${field('lyvType', 'Venue type *', `<select id="lyvType" name="type" required><option value="">Select one</option>${typeOptions}</select>`)}
+        ${field('lyvRegion', 'Region *', `<select id="lyvRegion" name="region" required><option value="">Select one</option>${regionOptions}</select>`)}
+      </div>
+      <div class="form-row full">
+        ${field('lyvDescription', 'Description *', '<textarea id="lyvDescription" name="description" required minlength="20" maxlength="500" placeholder="What makes it worth a visit? Food, drinks, views, atmosphere..."></textarea>', '<p class="lyv-hint" id="lyvDescriptionCount" aria-live="polite">500 characters left</p>')}
+      </div>
+      <div class="form-row">
+        ${field('lyvAddress', 'Address', '<input type="text" id="lyvAddress" name="address" maxlength="200" autocomplete="street-address">')}
+        ${field('lyvWebsite', 'Website', '<input type="url" id="lyvWebsite" name="website" maxlength="300" placeholder="https://" autocomplete="url">')}
+      </div>
+      <div class="form-row">
+        ${field('lyvPhone', 'Phone', '<input type="tel" id="lyvPhone" name="phone" maxlength="40" autocomplete="tel">')}
+        ${field('lyvCuisine', 'Cuisine (if applicable)', '<input type="text" id="lyvCuisine" name="cuisine" maxlength="80" placeholder="e.g. Italian, Thai, Farm-to-table">')}
+      </div>
+      <div class="form-row full">
+        <div class="form-field">
+          <label id="lyvAmenitiesLabel">Features that genuinely apply</label>
+          <p class="lyv-hint">Only check what is true. We verify features before showing them.</p>
+          <div class="amenity-check-grid" role="group" aria-labelledby="lyvAmenitiesLabel">${amenityChecks}
+          </div>
+        </div>
+      </div>
+      <p class="lyv-section-label">Your contact details</p>
+      <div class="form-row">
+        ${field('lyvContactName', 'Your name *', '<input type="text" id="lyvContactName" name="contact_name" required minlength="2" maxlength="100" autocomplete="name">')}
+        ${field('lyvContactEmail', 'Your email *', '<input type="email" id="lyvContactEmail" name="contact_email" required maxlength="254" autocomplete="email">')}
+      </div>
+      <div class="lyv-hp" aria-hidden="true">
+        <label for="lyvCompanyWebsite">Leave this field empty</label>
+        <input type="text" id="lyvCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off">
+      </div>
+      <div class="form-row full">
+        <div class="form-field">
+          <label class="lyv-consent"><input type="checkbox" id="lyvConsent" name="consent" required> <span>${escapeHtml(VENUE_SUBMISSION_CONSENT_TEXT)} *</span></label>
+          <p class="lyv-error" id="lyvConsentError" hidden></p>
+        </div>
+      </div>
+      <button type="submit" class="venue-form-submit">Submit for review</button>
+      <p class="form-note">* Required. Submitting does not publish anything: we review every venue first and will contact you by email.</p>
+      <div class="lyv-form-error" id="lyvFormError" role="alert"></div>
+    </form>
+    <div class="venue-form form-success" id="lyvSuccess" role="status" tabindex="-1"></div>
+    <noscript><p class="form-note">This form needs JavaScript. You can also email your venue details to <a href="mailto:okanaganroam@gmail.com">okanaganroam@gmail.com</a>.</p></noscript>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script>
+(function(){
+  var form = document.getElementById('lyvForm');
+  if (!form || !window.fetch) return;
+  var startedAt = Date.now();
+  var fields = { name: 'lyvName', type: 'lyvType', region: 'lyvRegion', description: 'lyvDescription', address: 'lyvAddress', website: 'lyvWebsite', phone: 'lyvPhone', cuisine: 'lyvCuisine', contact_name: 'lyvContactName', contact_email: 'lyvContactEmail', consent: 'lyvConsent' };
+  var desc = document.getElementById('lyvDescription');
+  var count = document.getElementById('lyvDescriptionCount');
+  var formError = document.getElementById('lyvFormError');
+  var success = document.getElementById('lyvSuccess');
+  var button = form.querySelector('button[type="submit"]');
+  desc.addEventListener('input', function(){
+    var left = 500 - desc.value.length;
+    count.textContent = left + (left === 1 ? ' character left' : ' characters left');
+  });
+  function clearErrors(){
+    Object.keys(fields).forEach(function(key){
+      var input = document.getElementById(fields[key]);
+      var msg = document.getElementById(fields[key] + 'Error');
+      input.removeAttribute('aria-invalid');
+      input.removeAttribute('aria-describedby');
+      if (msg) { msg.hidden = true; msg.textContent = ''; }
+    });
+    formError.classList.remove('show');
+    formError.textContent = '';
+  }
+  function showErrors(errors){
+    var first = null;
+    Object.keys(errors).forEach(function(key){
+      if (!fields[key]) return;
+      var input = document.getElementById(fields[key]);
+      var msg = document.getElementById(fields[key] + 'Error');
+      input.setAttribute('aria-invalid', 'true');
+      if (msg) { msg.textContent = errors[key]; msg.hidden = false; input.setAttribute('aria-describedby', msg.id); }
+      if (!first) first = input;
+    });
+    if (first) first.focus();
+  }
+  function showFormError(text){
+    formError.textContent = text;
+    formError.classList.add('show');
+  }
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    clearErrors();
+    var payload = { started_at: startedAt, company_website: document.getElementById('lyvCompanyWebsite').value, consent: document.getElementById('lyvConsent').checked, amenities: [] };
+    ['name', 'type', 'region', 'description', 'address', 'website', 'phone', 'cuisine', 'contact_name', 'contact_email'].forEach(function(key){
+      var value = document.getElementById(fields[key]).value.trim();
+      if (value) payload[key] = value;
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="amenities"]:checked'), function(box){ payload.amenities.push(box.value); });
+    button.disabled = true;
+    button.textContent = 'Submitting...';
+    fetch('/api/venue-submissions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function(res){ return res.json().catch(function(){ return {}; }).then(function(body){ return { status: res.status, body: body }; }); })
+      .then(function(r){
+        if (r.status === 201 && r.body.ok) {
+          success.textContent = r.body.message || 'Thanks! Your venue has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it.';
+          success.classList.add('show');
+          form.hidden = true;
+          success.focus();
+          return;
+        }
+        if (r.body.errors) showErrors(r.body.errors);
+        showFormError(r.body.error || 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.');
+      })
+      .catch(function(){ showFormError('Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at okanaganroam@gmail.com.'); })
+      .then(function(){ button.disabled = false; button.textContent = 'Submit for review'; });
+  });
+})();
+</script>
+</body>
+</html>`;
+}
+
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   const { pathname, query } = parsed;
@@ -15091,6 +15790,38 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
+    // and handleVenueSubmission above.
+    if ((pathname === '/list-your-venue' || pathname === '/list-your-venue/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderListYourVenuePage());
+    }
+    if (pathname === '/api/venue-submissions' && method === 'POST') {
+      return await handleVenueSubmission(req, res);
+    }
+    if (pathname === '/admin/venue-submissions' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      const status = query.status || 'pending';
+      if (!['pending', 'approved', 'rejected', 'all'].includes(status)) {
+        return sendJSON(res, 400, { error: 'status must be pending, approved, rejected or all.' });
+      }
+      return sendJSON(res, 200, { status, submissions: listVenueSubmissions(status) });
+    }
+    const submissionReviewMatch = pathname.match(/^\/admin\/venue-submissions\/(\d+)\/(approve|reject)$/);
+    if (submissionReviewMatch && method === 'POST') {
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try {
+        body = await readLimitedJsonBody(req, VENUE_SUBMISSION_MAX_BODY_BYTES);
+      } catch (err) {
+        return sendJSON(res, err.status === 413 ? 413 : 400, { error: err.status === 413 ? 'Body too large.' : 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const id = Number(submissionReviewMatch[1]);
+      const result = submissionReviewMatch[2] === 'approve' ? approveVenueSubmission(id, body) : rejectVenueSubmission(id, body);
+      return sendJSON(res, result.status, result.body);
+    }
+
     // GET /destinations -- "Choose Your Okanagan Destination" (2026-09-25),
     // the target of the homepage's "Explore All Okanagan Regions" links.
     if ((pathname === '/destinations' || pathname === '/destinations/') && method === 'GET') {
@@ -15352,6 +16083,15 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   startServer,
+  // List Your Venue, Phase 1
+  renderListYourVenuePage,
+  validateVenueSubmission,
+  buildVenueSubmissionEmail,
+  setVenueSubmissionTransport,
+  getVenueSubmission,
+  VENUE_SUBMISSION_TYPES,
+  VENUE_SUBMISSION_REGIONS,
+  VENUE_SUBMISSION_AMENITIES,
   server,
   slugify,
   escapeHtml,

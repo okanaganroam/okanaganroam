@@ -9884,3 +9884,317 @@ test('Header: okanagan.html outside <header id="top"> is byte-identical to the a
   assert.equal(crypto.createHash('md5').update(outside).digest('hex'), 'af6d2bf810dbd738f30f30eef68e38f7');
   assert.match(html, /<a href="#top" class="logo"/, 'the logo keeps its in-page #top anchor on the homepage');
 });
+
+// ---------- List Your Venue, Phase 1 (2026-09-25) ----------
+
+const LYV_TOKEN = 'test-fixture-admin-token';
+let lyvIp = 0;
+const lyvSent = [];
+app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+
+function lyvValid(overrides = {}) {
+  return {
+    name: 'Lakeside Test Kitchen', type: 'restaurant', region: 'kelowna',
+    description: 'Wood-fired pizza and local wine on a lakeside patio.',
+    contact_name: 'Pat Owner', contact_email: 'pat@example.com', consent: true,
+    address: '1 Test Way, Kelowna', website: 'lakesidetest.example.com', phone: '250-555-0199',
+    cuisine: 'Pizza', amenities: ['patio', 'dog_friendly'],
+    company_website: '', started_at: Date.now() - 10000,
+    ...overrides,
+  };
+}
+
+function lyvPost(base, body, { ip, origin = base, raw } = {}) {
+  lyvIp += 1;
+  const headers = { 'Content-Type': 'application/json', 'X-Forwarded-For': ip || `10.9.0.${lyvIp}` };
+  if (origin) headers.Origin = origin;
+  return fetch(`${base}/api/venue-submissions`, { method: 'POST', headers, body: raw !== undefined ? raw : JSON.stringify(body) });
+}
+
+function lyvAdmin(base, pathName, body, token = LYV_TOKEN) {
+  return fetch(`${base}${pathName}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+const lyvVenueCount = () => db.prepare('SELECT COUNT(*) AS n FROM venues').get().n;
+const lyvSubmissionCount = () => db.prepare('SELECT COUNT(*) AS n FROM venue_submissions').get().n;
+
+test('List Your Venue: the page renders the form with the canonical types, regions and features in the site shell', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/list-your-venue`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /<h1>List Your Venue on Okanagan Roam<\/h1>/);
+  assert.match(html, /reviewed by a person before anything appears/);
+  assert.match(html, /<header id="top">/, 'approved site header');
+  assert.match(html, /<link rel="stylesheet" href="\/styles\/app.css">/);
+  for (const t of app.VENUE_SUBMISSION_TYPES) assert.match(html, new RegExp(`<option value="${t}">`));
+  for (const r of app.VENUE_SUBMISSION_REGIONS) assert.match(html, new RegExp(`<option value="${r}">`));
+  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 10);
+  assert.equal(app.VENUE_SUBMISSION_REGIONS.length, 20);
+  for (const a of app.VENUE_SUBMISSION_AMENITIES) assert.match(html, new RegExp(`name="amenities" value="${a}"`));
+  assert.match(html, /name="company_website" tabindex="-1"/, 'honeypot');
+  assert.doesNotMatch(html, /id="venueForm"|formsubmit\.co/, 'not wired to the old /browse FormSubmit handler');
+  assert.equal(html.match(/<footer/g).length, 1);
+}));
+
+test('List Your Venue: a valid submission is stored as pending, emailed, and creates no venue', () => withDiscoveryServer(async (base) => {
+  const venuesBefore = lyvVenueCount();
+  const sentBefore = lyvSent.length;
+  const res = await lyvPost(base, lyvValid());
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.match(body.message, /will not appear on Okanagan Roam until we have reviewed it/);
+  const sub = app.getVenueSubmission(body.id);
+  assert.equal(sub.status, 'pending');
+  assert.equal(sub.notify_status, 'sent');
+  assert.equal(sub.website, 'https://lakesidetest.example.com/');
+  assert.deepEqual(sub.amenities, ['dog_friendly', 'patio']);
+  assert.equal(sub.consent, true);
+  assert.match(sub.ip_hash, /^[0-9a-f]{64}$/);
+  assert.equal(sub.venue_id, null);
+  assert.equal(lyvVenueCount(), venuesBefore, 'no venue created');
+  assert.equal(lyvSent.length, sentBefore + 1);
+  const email = lyvSent[lyvSent.length - 1];
+  assert.match(email._subject, /^\[PENDING REVIEW\] Venue submission #\d+: Lakeside Test Kitchen$/);
+  assert.match(email.Status, /NOT been published/);
+  assert.equal(email['Submission ID'], String(body.id));
+  assert.equal(email['Venue type'], 'Restaurant');
+  assert.equal(email['Region'], 'Kelowna');
+  assert.equal(email['Contact email'], 'pat@example.com');
+  assert.equal(email._replyto, 'pat@example.com');
+  for (const k of ['Submitted', 'Venue name', 'Description', 'Contact name', 'Address', 'Website', 'Phone', 'Cuisine', 'Amenities / features (as claimed)']) {
+    assert.ok(email[k], `email includes ${k}`);
+  }
+  const listed = await (await fetch(`${base}/api/venues?limit=5000`)).json();
+  assert.ok(!JSON.stringify(listed).includes('Lakeside Test Kitchen'), 'not in the public venues API');
+}));
+
+test('List Your Venue: optional fields are omitted from the email when not provided', () => {
+  const email = app.buildVenueSubmissionEmail({
+    id: 99, name: 'Plain Place', type: 'cafe', region: 'penticton', description: 'x'.repeat(30),
+    contact_name: 'A B', contact_email: 'a@example.com', submitted_at: '2026-09-25 18:00:00', amenities: [],
+  });
+  for (const k of ['Address', 'Website', 'Phone', 'Cuisine', 'Amenities / features (as claimed)']) assert.equal(email[k], undefined, k);
+  assert.match(email.Submitted, /2026-09-25 18:00:00 UTC/);
+});
+
+test('List Your Venue: validation rejects missing, invalid and oversized fields without storing', () => withDiscoveryServer(async (base) => {
+  const before = lyvSubmissionCount();
+  const cases = [
+    [{ name: undefined, description: undefined, contact_name: undefined, contact_email: undefined, type: undefined, region: undefined }, ['name', 'description', 'contact_name', 'contact_email', 'type', 'region']],
+    [{ consent: false }, ['consent']],
+    [{ contact_email: 'not-an-email' }, ['contact_email']],
+    [{ contact_email: 'a@b' }, ['contact_email']],
+    [{ website: 'javascript:alert(1)' }, ['website']],
+    [{ website: 'ftp://example.com' }, ['website']],
+    [{ website: 'not a url' }, ['website']],
+    [{ type: 'spa' }, ['type']],
+    [{ region: 'vancouver' }, ['region']],
+    [{ region: 'Naramata Bench' }, ['region']],
+    [{ description: 'x'.repeat(501) }, ['description']],
+    [{ description: 'too short' }, ['description']],
+    [{ name: 'n'.repeat(121) }, ['name']],
+    [{ phone: 'call me maybe' }, ['phone']],
+    [{ amenities: ['patio', 'helipad'] }, ['amenities']],
+    [{ name: { $gt: '' } }, ['name']],
+  ];
+  for (const [overrides, fields] of cases) {
+    const body = lyvValid(overrides);
+    const res = await lyvPost(base, body);
+    assert.equal(res.status, 400, JSON.stringify(overrides));
+    const json = await res.json();
+    assert.deepEqual(Object.keys(json.errors).sort(), [...fields].sort(), JSON.stringify(overrides));
+  }
+  const exact = await lyvPost(base, lyvValid({ description: 'd'.repeat(500), name: 'Exactly Five Hundred' }));
+  assert.equal(exact.status, 201, '500 characters is allowed');
+  const unknown = await lyvPost(base, { ...lyvValid(), rating: 5 });
+  assert.equal(unknown.status, 400, 'unexpected keys are refused');
+  const malformed = await lyvPost(base, null, { raw: '{"name":' });
+  assert.equal(malformed.status, 400);
+  const notJson = await fetch(`${base}/api/venue-submissions`, { method: 'POST', headers: { 'Content-Type': 'text/plain', Origin: base, 'X-Forwarded-For': '10.9.9.1' }, body: 'hi' });
+  assert.equal(notJson.status, 415);
+  assert.equal(lyvSubmissionCount(), before + 1, 'only the valid 500-character submission was stored');
+}));
+
+test('List Your Venue: submitted text is stored as plain text and escaped when rendered', () => {
+  const { data } = app.validateVenueSubmission(lyvValid({ name: '<script>alert(1)</script> Bar\u0000', description: 'Line one\r\n\r\n\r\n\r\nLine two with enough text <b>bold</b>' }));
+  assert.equal(data.name, '<script>alert(1)</script> Bar');
+  assert.equal(data.description, 'Line one\n\nLine two with enough text <b>bold</b>');
+  assert.equal(app.escapeHtml(data.name), '&lt;script&gt;alert(1)&lt;/script&gt; Bar');
+});
+
+test('List Your Venue: honeypot, minimum fill time and form expiry', () => withDiscoveryServer(async (base) => {
+  const before = lyvSubmissionCount();
+  const sentBefore = lyvSent.length;
+  const trap = await lyvPost(base, lyvValid({ company_website: 'http://spam.example' }));
+  assert.equal(trap.status, 201, 'bots get a success-shaped reply');
+  assert.equal((await trap.json()).id, undefined);
+  const fast = await lyvPost(base, lyvValid({ started_at: Date.now() - 500 }));
+  assert.equal(fast.status, 400);
+  assert.match((await fast.json()).error, /very quick/);
+  const stale = await lyvPost(base, lyvValid({ started_at: Date.now() - 25 * 60 * 60 * 1000 }));
+  assert.equal(stale.status, 400);
+  const missing = await lyvPost(base, lyvValid({ started_at: undefined }));
+  assert.equal(missing.status, 400);
+  assert.equal(lyvSubmissionCount(), before, 'nothing stored');
+  assert.equal(lyvSent.length, sentBefore, 'nothing emailed');
+}));
+
+test('List Your Venue: same-origin protection', () => withDiscoveryServer(async (base) => {
+  const before = lyvSubmissionCount();
+  const cross = await lyvPost(base, lyvValid({ name: 'Cross Origin' }), { origin: 'https://evil.example' });
+  assert.equal(cross.status, 403);
+  const crossFetch = await fetch(`${base}/api/venue-submissions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'cross-site', 'X-Forwarded-For': '10.9.9.2' }, body: JSON.stringify(lyvValid()) });
+  assert.equal(crossFetch.status, 403);
+  assert.equal(lyvSubmissionCount(), before);
+  assert.equal(cross.headers.get('access-control-allow-origin'), null, 'no CORS grant on the public submission endpoint');
+  const prod = await lyvPost(base, lyvValid({ name: 'Production Origin Cafe' }), { origin: 'https://okanaganroam.com' });
+  assert.equal(prod.status, 201);
+}));
+
+test('List Your Venue: per-IP rate limit (10 attempts an hour)', () => withDiscoveryServer(async (base) => {
+  const ip = '10.8.8.8';
+  for (let i = 0; i < 10; i++) {
+    const res = await lyvPost(base, lyvValid({ name: undefined }), { ip });
+    assert.equal(res.status, 400, `attempt ${i + 1} is processed`);
+  }
+  const limited = await lyvPost(base, lyvValid({ name: 'Rate Limited Cafe' }), { ip });
+  assert.equal(limited.status, 429);
+  const other = await lyvPost(base, lyvValid({ name: 'Other Ip Cafe' }), { ip: '10.8.8.9' });
+  assert.equal(other.status, 201, 'other addresses are unaffected');
+  const spoofed = await lyvPost(base, lyvValid({ name: 'Spoofed Cafe' }), { ip: `1.2.3.4, ${ip}` });
+  assert.equal(spoofed.status, 429, 'a client-supplied X-Forwarded-For prefix does not escape the limit');
+}));
+
+test('List Your Venue: request body size limit', () => withDiscoveryServer(async (base) => {
+  const before = lyvSubmissionCount();
+  const res = await lyvPost(base, lyvValid({ cuisine: 'x'.repeat(20000) }));
+  assert.equal(res.status, 413);
+  assert.match((await res.json()).error, /too large/);
+  assert.equal(lyvSubmissionCount(), before);
+}));
+
+test('List Your Venue: duplicate pending submissions are refused', () => withDiscoveryServer(async (base) => {
+  const first = await lyvPost(base, lyvValid({ name: 'Double Click Deli', contact_email: 'dup@example.com' }));
+  assert.equal(first.status, 201);
+  const again = await lyvPost(base, lyvValid({ name: 'double click deli', contact_email: 'DUP@example.com' }));
+  assert.equal(again.status, 409);
+  const otherRegion = await lyvPost(base, lyvValid({ name: 'Double Click Deli', contact_email: 'dup@example.com', region: 'vernon' }));
+  assert.equal(otherRegion.status, 201, 'a second location is a different submission');
+}));
+
+test('List Your Venue: email failure keeps the submission pending and publishes nothing', () => withDiscoveryServer(async (base) => {
+  const venuesBefore = lyvVenueCount();
+  app.setVenueSubmissionTransport(async () => { throw new Error('FormSubmit HTTP 500: provider exploded secret-detail'); });
+  const originalError = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args.join(' '));
+  let res;
+  try {
+    res = await lyvPost(base, lyvValid({ name: 'Mail Down Market' }));
+  } finally {
+    console.error = originalError;
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+  }
+  assert.equal(res.status, 201, 'the submission itself was received and stored');
+  const body = await res.json();
+  assert.doesNotMatch(JSON.stringify(body), /FormSubmit|provider|secret-detail/, 'no provider error reaches the public');
+  const sub = app.getVenueSubmission(body.id);
+  assert.equal(sub.status, 'pending');
+  assert.equal(sub.notify_status, 'failed');
+  assert.match(sub.notify_error, /FormSubmit HTTP 500/);
+  assert.ok(logged.some((l) => l.includes(`submission #${body.id} failed`)), 'failure logged');
+  assert.equal(lyvVenueCount(), venuesBefore);
+}));
+
+test('List Your Venue: admin routes require the admin token', () => withDiscoveryServer(async (base) => {
+  assert.equal((await lyvAdmin(base, '/admin/venue-submissions', undefined, null)).status, 401);
+  assert.equal((await lyvAdmin(base, '/admin/venue-submissions', undefined, 'wrong')).status, 401);
+  assert.equal((await lyvAdmin(base, '/admin/venue-submissions/1/approve', { reviewer: 'x' }, null)).status, 401);
+  assert.equal((await lyvAdmin(base, '/admin/venue-submissions/1/reject', { reviewer: 'x' }, 'wrong')).status, 401);
+  const list = await lyvAdmin(base, '/admin/venue-submissions');
+  assert.equal(list.status, 200);
+  const json = await list.json();
+  assert.ok(json.submissions.length > 0 && json.submissions.every((s) => s.status === 'pending'));
+  assert.equal((await lyvAdmin(base, '/admin/venue-submissions?status=bogus')).status, 400);
+}));
+
+test('List Your Venue: approval creates the venue exactly once through createVenue and records provenance', () => withDiscoveryServer(async (base) => {
+  const created = await (await lyvPost(base, lyvValid({ name: 'Approved Orchard Cafe', type: 'cafe', region: 'penticton' }))).json();
+  const venuesBefore = lyvVenueCount();
+  assert.equal((await lyvAdmin(base, `/admin/venue-submissions/${created.id}/approve`, {})).status, 400, 'reviewer required');
+  assert.equal(lyvVenueCount(), venuesBefore);
+  const res = await lyvAdmin(base, `/admin/venue-submissions/${created.id}/approve`, { reviewer: 'test-admin' });
+  assert.equal(res.status, 200);
+  const { submission, venue } = await res.json();
+  assert.equal(submission.status, 'approved');
+  assert.equal(submission.venue_id, venue.id);
+  assert.equal(submission.reviewed_by, 'test-admin');
+  assert.ok(submission.reviewed_at);
+  assert.equal(lyvVenueCount(), venuesBefore + 1);
+  assert.equal(venue.name, 'Approved Orchard Cafe');
+  assert.equal(venue.type, 'cafe');
+  assert.equal(venue.region, 'penticton');
+  assert.equal(venue.slug, 'approved-orchard-cafe');
+  assert.equal(venue.patio, false, 'claimed features are not published unless the reviewer opts in');
+  assert.equal((await fetch(`${base}/penticton/cafes/approved-orchard-cafe`)).status, 200, 'venue page exists immediately');
+  const again = await lyvAdmin(base, `/admin/venue-submissions/${created.id}/approve`, { reviewer: 'test-admin' });
+  assert.equal(again.status, 409);
+  assert.equal(lyvVenueCount(), venuesBefore + 1, 'second approval creates nothing');
+  const reject = await lyvAdmin(base, `/admin/venue-submissions/${created.id}/reject`, { reviewer: 'test-admin' });
+  assert.equal(reject.status, 409, 'an approved submission cannot be rejected');
+  assert.equal((await lyvAdmin(base, '/admin/venue-submissions/999999/approve', { reviewer: 'x' })).status, 404);
+}));
+
+test('List Your Venue: approval options (features opt-in, overrides, duplicate guard)', () => withDiscoveryServer(async (base) => {
+  const a = await (await lyvPost(base, lyvValid({ name: 'Feature Opt In Bistro', region: 'vernon' }))).json();
+  const approved = await (await lyvAdmin(base, `/admin/venue-submissions/${a.id}/approve`, { reviewer: 'r', include_amenities: true, overrides: { description: 'Edited by the reviewer before publishing.' } })).json();
+  assert.equal(approved.venue.patio, true);
+  assert.equal(approved.venue.dog_friendly, true);
+  assert.equal(approved.venue.description, 'Edited by the reviewer before publishing.');
+  // Test Trattoria is a live fixture venue in Kelowna.
+  const dup = await (await lyvPost(base, lyvValid({ name: 'Test Trattoria', contact_email: 'owner@trattoria.example' }))).json();
+  const venuesBefore = lyvVenueCount();
+  const badOverride = await lyvAdmin(base, `/admin/venue-submissions/${dup.id}/approve`, { reviewer: 'r', overrides: { rating: 5 } });
+  assert.equal(badOverride.status, 400, 'only submission fields can be overridden');
+  const badRegion = await lyvAdmin(base, `/admin/venue-submissions/${dup.id}/approve`, { reviewer: 'r', overrides: { region: 'vancouver' } });
+  assert.equal(badRegion.status, 400, 'overrides are validated like the public form');
+  const blocked = await lyvAdmin(base, `/admin/venue-submissions/${dup.id}/approve`, { reviewer: 'r' });
+  assert.equal(blocked.status, 409);
+  assert.equal((await blocked.json()).existing[0].name, 'Test Trattoria');
+  assert.equal(lyvVenueCount(), venuesBefore);
+  assert.equal(app.getVenueSubmission(dup.id).status, 'pending');
+  const list = await (await lyvAdmin(base, '/admin/venue-submissions')).json();
+  assert.ok(list.submissions.find((s) => s.id === dup.id).possible_existing_venues.length === 1, 'reviewer sees the likely duplicate');
+}));
+
+test('List Your Venue: rejection publishes nothing and records the reason', () => withDiscoveryServer(async (base) => {
+  const created = await (await lyvPost(base, lyvValid({ name: 'Rejected Roadhouse' }))).json();
+  const venuesBefore = lyvVenueCount();
+  const res = await lyvAdmin(base, `/admin/venue-submissions/${created.id}/reject`, { reviewer: 'test-admin', reason: 'Outside the Okanagan.' });
+  assert.equal(res.status, 200);
+  const { submission } = await res.json();
+  assert.equal(submission.status, 'rejected');
+  assert.equal(submission.rejection_reason, 'Outside the Okanagan.');
+  assert.equal(submission.reviewed_by, 'test-admin');
+  assert.ok(submission.reviewed_at);
+  assert.equal(submission.venue_id, null);
+  assert.equal(lyvVenueCount(), venuesBefore);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM venues WHERE name = 'Rejected Roadhouse'").get().n, 0);
+  assert.equal((await lyvAdmin(base, `/admin/venue-submissions/${created.id}/approve`, { reviewer: 'x' })).status, 409, 'a rejected submission cannot be approved');
+  assert.equal(lyvVenueCount(), venuesBefore);
+}));
+
+test('List Your Venue: the staging table is additive and the old /browse form is untouched', () => {
+  const cols = db.prepare('PRAGMA table_info(venue_submissions)').all().map((c) => c.name);
+  for (const c of ['id', 'status', 'contact_name', 'contact_email', 'consent', 'submitted_at', 'reviewed_at', 'reviewed_by', 'rejection_reason', 'venue_id', 'notify_status']) assert.ok(cols.includes(c), c);
+  assert.throws(() => db.prepare("INSERT INTO venue_submissions (status, name, type, region, description, contact_name, contact_email, consent, consent_version) VALUES ('published','a','cafe','kelowna','d','n','e',1,'v')").run(), /CHECK/);
+  const venueCols = db.prepare('PRAGMA table_info(venues)').all().map((c) => c.name);
+  assert.ok(!venueCols.includes('status'), 'venues table schema unchanged');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+  assert.match(html, /<form class="venue-form" id="venueForm">/);
+});
