@@ -773,6 +773,270 @@ function validateDiscoveryIntent(candidate, taxonomy, text) {
   return { intent: finalizeIntent(out, t), rejected };
 }
 
+// ---------- Build My Trip: multi-part requests (2026-09-26) ----------
+//
+// interpretTripComponents(text, taxonomy, baseIntent) splits a request into
+// itinerary COMPONENTS for the trip planner only -- interpretDiscoveryQuery()
+// and everything /api/discover returns are unchanged. "cafes and beaches" is a
+// cafe part and a beach part; "dinner and a hockey game" is a dinner part and
+// an event part. No part is ever required to satisfy another part.
+//
+// Constraint scoping, deterministic:
+//   - party words ("with my dog", "with the kids", "family") apply to every
+//     venue part (events are never checked for dogs or kids);
+//   - an adjective before a list ("dog friendly cafes and beaches") applies to
+//     each bare noun joined by and/or, and stops at a determiner ("dog
+//     friendly cafes and a winery" -> the cafes only);
+//   - an adjective after a list ("cafes and beaches that are dog friendly")
+//     applies to the venue parts of that list.
+// Routes: "from X to Y", "between X and Y", "on the way to Y". Places that are
+// not Okanagan Roam regions are reported as unknown, never guessed.
+//
+// Returns { multi, components, route, regions, party, when, unknownPlaces }.
+// multi is true only for a find/events request with two or more parts, or a
+// route with at least one part; everything else keeps today's planner path.
+const TRIP_EVENT_KINDS = [
+  { kind: 'hockey', phrases: ['hockey game', 'hockey games', 'hockey match', 'hockey night', 'junior hockey', 'hockey'], category: 'sports-recreation', terms: ['hockey'], noun: 'hockey game' },
+  { kind: 'concert', phrases: ['concert', 'concerts', 'gig', 'gigs', 'live show', 'live shows'], category: 'live-music', terms: [], noun: 'concert' },
+  { kind: 'live-music', phrases: ['live music', 'live band', 'live bands'], category: 'live-music', terms: [], noun: 'live music', venueFeature: 'live_music' },
+  { kind: 'festival', phrases: ['festival', 'festivals'], category: 'events-festivals', terms: [], noun: 'festival' },
+  { kind: 'market', phrases: ['farmers market', 'farmers markets', 'market', 'markets'], category: 'markets-fairs', terms: [], noun: 'market' },
+  { kind: 'show', phrases: ['theatre', 'theater', 'theatre show', 'play'], category: 'arts-culture', terms: [], noun: 'show' },
+  { kind: 'event', phrases: ['event', 'events', 'whats on', 'something happening', 'something on'], category: null, terms: [], noun: 'event' },
+];
+const TRIP_MEALS = {
+  breakfast: { types: ['cafe', 'restaurant'], daypart: 'morning' },
+  brunch: { types: ['cafe', 'restaurant'], daypart: 'morning' },
+  lunch: { types: ['restaurant'], daypart: 'midday' },
+  dinner: { types: ['restaurant'], daypart: 'evening' },
+  supper: { types: ['restaurant'], daypart: 'evening' },
+};
+const TRIP_DAYPARTS = {
+  morning: ['in the morning', 'this morning', 'morning'],
+  afternoon: ['during the day', 'in the day', 'daytime', 'in the daytime', 'by day', 'in the afternoon', 'this afternoon', 'afternoon'],
+  evening: ['at night', 'in the evening', 'this evening', 'evening', 'night', 'tonight'],
+};
+const TRIP_DOG_PARTY = ['dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pup', 'puppy', 'pets'];
+const TRIP_KID_PARTY = ['kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers'];
+const TRIP_LIST_JOINERS = new Set(['and', 'or']);
+const TRIP_DETERMINERS = new Set(['a', 'an', 'the', 'some', 'one']);
+const TRIP_CLAUSE_BREAKS = new Set(['then', 'after', 'afterwards', 'before', 'later', 'also', 'plus', 'followed']);
+const TRIP_ROUTE_FILLER = new Set(['driving', 'drive', 'heading', 'head', 'going', 'travelling', 'traveling', 'down', 'up', 'south', 'north', 'and', 'then', 'all', 'the', 'way', 'road', 'trip', 'on', 'over']);
+// The generic "activities" part: family-oriented places for a family request.
+const TRIP_ACTIVITY_TYPES = { family: ['beach', 'outdoor'], any: ['outdoor', 'beach'] };
+
+function tripPhraseTable(taxonomy) {
+  const t = normalizeTaxonomy(taxonomy);
+  const byPhrase = new Map(buildPhraseTable(taxonomy).map((e) => [e.phrase, { phrase: e.phrase, words: e.words, assign: e.assign.slice() }]));
+  const add = (phrase, field, value) => {
+    const p = normalizeDiscoveryText(phrase);
+    if (!p) return;
+    if (!byPhrase.has(p)) byPhrase.set(p, { phrase: p, words: p.split(' '), assign: [] });
+    const e = byPhrase.get(p);
+    if (!e.assign.some((a) => a.field === field && a.value === value)) e.assign.push({ field, value });
+  };
+  for (const k of TRIP_EVENT_KINDS) for (const p of k.phrases) add(p, 'tripEvent', k.kind);
+  for (const meal of Object.keys(TRIP_MEALS)) if (TRIP_MEALS[meal].types.every((ty) => t.types.includes(ty))) add(meal, 'tripMeal', meal);
+  for (const [part, phrases] of Object.entries(TRIP_DAYPARTS)) for (const p of phrases) add(p, 'tripDaypart', part);
+  return Array.from(byPhrase.values());
+}
+
+function findTripRoute(tokens, regionPhrase) {
+  const place = (words) => {
+    for (let n = Math.min(3, words.length); n >= 1; n--) {
+      const p = words.slice(0, n).join(' ');
+      if (regionPhrase.has(p)) return { slug: regionPhrase.get(p), used: n };
+    }
+    return null;
+  };
+  const unknownWord = (words) => {
+    const w = words.filter((x) => !STOPWORDS.has(x) && !TRIP_ROUTE_FILLER.has(x));
+    return w.length ? w.slice(0, 2).join(' ') : null;
+  };
+  const toTarget = (at) => {
+    const hit = place(tokens.slice(at, at + 3));
+    if (hit) return { slug: hit.slug, end: at + hit.used, unknown: null };
+    const u = unknownWord(tokens.slice(at, at + 2));
+    return { slug: null, end: at + (u ? u.split(' ').length : 0), unknown: u };
+  };
+  for (let i = 0; i < tokens.length; i++) {
+    const w = tokens[i];
+    if (w === 'from' || w === 'between') {
+      const joiner = w === 'from' ? 'to' : 'and';
+      const origin = place(tokens.slice(i + 1, i + 4));
+      let j = -1;
+      const scanFrom = i + 1 + (origin ? origin.used : 1);
+      for (let k = scanFrom; k < Math.min(tokens.length, scanFrom + 4); k++) {
+        if (tokens[k] === joiner) { j = k; break; }
+        if (!TRIP_ROUTE_FILLER.has(tokens[k])) break;
+      }
+      if (j === -1) continue;
+      const originUnknown = origin ? null : unknownWord(tokens.slice(i + 1, j));
+      const target = toTarget(j + 1);
+      if (!origin && !target.slug) continue; // e.g. "between meals and ..." -- not a route
+      return { from: origin ? origin.slug : null, to: target.slug, unknown: [originUnknown, target.unknown].filter(Boolean), start: i, end: Math.max(target.end, j + 1), via: w === 'from' ? 'from_to' : 'between' };
+    }
+    if (w === 'way' && tokens[i + 1] === 'to' && ['the', 'our', 'my', 'your'].includes(tokens[i - 1]) && ['on', 'along'].includes(tokens[i - 2])) {
+      const target = toTarget(i + 2);
+      return { from: null, to: target.slug, unknown: target.unknown ? [target.unknown] : [], start: i - 2, end: Math.max(target.end, i + 2), via: 'way_to' };
+    }
+  }
+  return null;
+}
+
+function interpretTripComponents(text, taxonomy, baseIntent) {
+  const t = normalizeTaxonomy(taxonomy);
+  const base = baseIntent || interpretDiscoveryQuery(text, taxonomy);
+  const out = { multi: false, components: [], route: null, regions: [], party: { dog: false, kids: false }, when: base.when || null, unknownPlaces: [] };
+  const normalized = normalizeDiscoveryText(text);
+  if (!normalized || base.exactVenue || !['find', 'events'].includes(base.mode)) return out;
+  const tokens = normalized.split(' ');
+  const table = tripPhraseTable(taxonomy);
+  const regionPhrase = new Map();
+  for (const e of table) for (const a of e.assign) if (a.field === 'region' && !regionPhrase.has(e.phrase)) regionPhrase.set(e.phrase, a.value);
+
+  const route = findTripRoute(tokens, regionPhrase);
+  if (route) out.unknownPlaces = route.unknown.slice();
+  const masked = tokens.map((tok, i) => (route && i >= route.start && i < route.end ? '\u0000' : tok));
+  const { accepted } = matchPhrases(masked, table);
+  const eventKinds = Object.fromEntries(TRIP_EVENT_KINDS.map((k) => [k.kind, k]));
+  const fieldsOf = (hit, f) => hit.assign.filter((a) => a.field === f).map((a) => a.value);
+  const createsComponent = (hit) => ['type', 'activity', 'tripEvent', 'tripMeal', 'cuisine'].some((f) => fieldsOf(hit, f).length)
+    || fieldsOf(hit, 'scope').includes('anything');
+  const between = (a, b) => tokens.slice(a, b).filter((x) => x !== '\u0000');
+
+  const comps = [];
+  let pending = [];          // pre-modifiers waiting for the next part
+  let distribute = null;     // pre-modifiers that continue across a bare and/or list
+  let listStart = 0;         // first part of the current coordinated list
+  let lastEnd = -1;
+  let pendingDaypart = null;
+  const applyMod = (c, m) => {
+    if (c.kind !== 'venue') return;
+    if (m.field === 'dog') c.dog = true;
+    else if (m.field === 'feature' && !c.features.includes(m.value)) c.features.push(m.value);
+    else if (m.field === 'collection' && !c.collections.includes(m.value)) c.collections.push(m.value);
+  };
+  const newComp = (hit, spec) => {
+    const gap = lastEnd < 0 ? [] : between(lastEnd, hit.start);
+    // A new part needs an and/or/then between it and the previous one;
+    // "rotary beach park" or "creek park waterfall trail" is ONE place.
+    const prev = comps[comps.length - 1];
+    if (prev && prev.kind === 'venue' && (spec.kind || 'venue') === 'venue' && !prev.meal && !spec.meal && !prev.generic && !spec.generic
+      && !gap.some((x) => TRIP_LIST_JOINERS.has(x) || TRIP_CLAUSE_BREAKS.has(x))) {
+      for (const ty of spec.types || []) if (!prev.types.includes(ty)) prev.types.push(ty);
+      for (const a of spec.activities || []) if (!prev.activities.includes(a)) prev.activities.push(a);
+      for (const q of spec.cuisines || []) if (!prev.cuisines.includes(q)) prev.cuisines.push(q);
+      lastEnd = hit.end;
+      return prev;
+    }
+    const c = { kind: 'venue', types: [], activities: [], features: [], collections: [], cuisines: [], dog: false, kids: false, meal: null, daypart: null, event: null, generic: false, phrase: hit.phrase, ...spec };
+    if (gap.some((x) => TRIP_CLAUSE_BREAKS.has(x)) || gap.some((x) => !TRIP_LIST_JOINERS.has(x) && !TRIP_DETERMINERS.has(x) && !STOPWORDS.has(x))) listStart = comps.length;
+    if (pending.length) { for (const m of pending) applyMod(c, m); distribute = pending; pending = []; }
+    else if (distribute && gap.length && gap.every((x) => TRIP_LIST_JOINERS.has(x))) { for (const m of distribute) applyMod(c, m); }
+    else distribute = null;
+    if (pendingDaypart && !c.daypart) { c.daypart = pendingDaypart; pendingDaypart = null; }
+    comps.push(c);
+    lastEnd = hit.end;
+    return c;
+  };
+  const modifier = (hitIndex, m) => {
+    const hit = accepted[hitIndex];
+    const next = accepted.slice(hitIndex + 1).find(createsComponent);
+    if (next && between(hit.end, next.start).every((x) => !TRIP_LIST_JOINERS.has(x) && !TRIP_CLAUSE_BREAKS.has(x) && !['that', 'which', 'are', 'is'].includes(x))) { pending.push(m); return; }
+    // "a winery with live music": a with/has phrase belongs to the nearest
+    // part; "cafes and beaches that are dog friendly" to the whole list.
+    const venueList = comps.slice(listStart).filter((c) => c.kind === 'venue');
+    const list = ['with', 'has', 'have', 'featuring', 'offering'].includes(tokens[hit.start - 1]) ? venueList.slice(-1) : venueList;
+    if (list.length) for (const c of list) applyMod(c, m);
+    else pending.push(m);
+  };
+
+  for (let h = 0; h < accepted.length; h++) {
+    const hit = accepted[h];
+    const tripEvent = fieldsOf(hit, 'tripEvent')[0];
+    const meal = fieldsOf(hit, 'tripMeal')[0] || (TRIP_MEALS[hit.phrase] ? hit.phrase : null);
+    const types = fieldsOf(hit, 'type');
+    const features = fieldsOf(hit, 'feature');
+    const regions = fieldsOf(hit, 'region');
+    if (regions.length) { out.regions.push(...regions); continue; }
+    if (fieldsOf(hit, 'occasion').includes('family')) out.party.kids = true;
+    if (tripEvent) {
+      const k = eventKinds[tripEvent];
+      const prevWord = tokens[hit.start - 1];
+      const nextHit = accepted[h + 1];
+      const beforeVenue = nextHit && nextHit.start === hit.end && fieldsOf(nextHit, 'type').length; // "live music bars"
+      if (k.venueFeature && (beforeVenue || (['with', 'has', 'have', 'featuring'].includes(prevWord) && comps.some((c) => c.kind === 'venue')))) {
+        modifier(h, { field: 'feature', value: k.venueFeature });
+        continue;
+      }
+      newComp(hit, { kind: 'event', event: { kind: k.kind, category: k.category && t.eventCategories.includes(k.category) ? k.category : null, terms: k.terms.slice(), noun: k.noun, venueFeature: k.venueFeature || null } });
+      continue;
+    }
+    if (meal) { newComp(hit, { types: TRIP_MEALS[meal].types.filter((ty) => t.types.includes(ty)), meal, daypart: TRIP_MEALS[meal].daypart }); continue; }
+    if (types.length) {
+      const c = newComp(hit, { types: uniq(types) });
+      if (features.includes('dog_friendly')) c.dog = true; // "dog beach"
+      continue;
+    }
+    const activities = fieldsOf(hit, 'activity');
+    if (activities.length) { newComp(hit, { types: ['outdoor'], activities: uniq(activities) }); continue; }
+    const cuisines = fieldsOf(hit, 'cuisine');
+    if (cuisines.length) {
+      const prev = comps[comps.length - 1];
+      if (prev && prev.kind === 'venue' && prev.types.includes('restaurant') && between(lastEnd, hit.start).length <= 1) { prev.cuisines.push(...cuisines); continue; }
+      newComp(hit, { types: ['restaurant'], cuisines: uniq(cuisines) });
+      continue;
+    }
+    if (fieldsOf(hit, 'scope').includes('anything')) { newComp(hit, { types: [], generic: true }); continue; }
+    const daypart = fieldsOf(hit, 'tripDaypart')[0] || fieldsOf(hit, 'daypart')[0];
+    if (daypart && !fieldsOf(hit, 'when').length) {
+      const prev = comps[comps.length - 1];
+      if (prev && !prev.daypartFromText) { prev.daypart = daypart; prev.daypartFromText = true; } else pendingDaypart = daypart;
+      continue;
+    }
+    if (features.length) {
+      for (const f of features) {
+        if (f === 'dog_friendly') { if (TRIP_DOG_PARTY.includes(hit.phrase)) out.party.dog = true; else modifier(h, { field: 'dog' }); }
+        else if (f === 'kid_friendly') { if (TRIP_KID_PARTY.includes(hit.phrase)) out.party.kids = true; else modifier(h, { field: 'feature', value: 'kid_friendly' }); }
+        else modifier(h, { field: 'feature', value: f });
+      }
+      continue;
+    }
+    for (const c of fieldsOf(hit, 'collection')) modifier(h, { field: 'collection', value: c });
+  }
+
+  // "things to do" alone is not a part; with another part it is the
+  // (family-oriented, when a family was mentioned) activities part.
+  let parts = comps.filter((c) => !c.generic || comps.some((o) => !o.generic));
+  for (const c of parts) if (c.generic) c.types = out.party.kids ? TRIP_ACTIVITY_TYPES.family.filter((ty) => t.types.includes(ty)) : TRIP_ACTIVITY_TYPES.any.filter((ty) => t.types.includes(ty));
+  // One part per venue type group: "coffee and a cafe" is one cafe part.
+  const seen = new Map();
+  parts = parts.filter((c) => {
+    if (c.kind !== 'venue' || c.generic || c.meal || c.activities.length || c.cuisines.length) return true;
+    const key = c.types.slice().sort().join(',');
+    if (!seen.has(key)) { seen.set(key, c); return true; }
+    const keep = seen.get(key);
+    keep.dog = keep.dog || c.dog;
+    for (const f of c.features) if (!keep.features.includes(f)) keep.features.push(f);
+    for (const k of c.collections) if (!keep.collections.includes(k)) keep.collections.push(k);
+    return false;
+  });
+  for (const c of parts) {
+    if (c.kind !== 'venue') continue;
+    if (out.party.dog) c.dog = true;
+    if (out.party.kids) c.kids = true;
+  }
+  for (const c of parts) delete c.daypartFromText;
+  out.components = parts;
+  out.regions = uniq(out.regions);
+  if (route && (route.from || route.to)) out.route = { from: route.from, to: route.to, via: route.via };
+  const venueParts = parts.filter((c) => c.kind === 'venue').length;
+  if (base.mode === 'events' && venueParts === 0) return { ...out, multi: false };
+  out.multi = out.route ? parts.length >= 1 : parts.length >= 2;
+  return out;
+}
+
 module.exports = {
   DISCOVERY_INTENT_VERSION,
   DISCOVERY_MAX_TEXT_LENGTH,
@@ -784,4 +1048,5 @@ module.exports = {
   buildPhraseTable,
   interpretDiscoveryQuery,
   validateDiscoveryIntent,
+  interpretTripComponents,
 };

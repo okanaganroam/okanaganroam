@@ -3297,8 +3297,69 @@ function getHoursProvenanceById(ids) {
   return map;
 }
 
+// Events for one event part of a multi-part trip request ("a hockey game",
+// "a concert"): the same What's On window, region and category helpers the
+// events request uses, narrowed by that part's own words. Soonest first.
+function selectTripEvents(component, regions, when, now = new Date()) {
+  const win = resolveWhatsOnWindow(discoveryWhatsOnWindowParams(when, now), now);
+  const ev = component.event || {};
+  let events = filterWhatsOnEvents(getWhatsOnEvents(win), regions || [], ev.category ? [ev.category] : []);
+  if (ev.terms && ev.terms.length) {
+    events = events.filter((e) => {
+      const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
+      return ev.terms.every((t) => discoveryTextHas(text, t));
+    });
+  }
+  return {
+    window: { from: win.from, to: win.to, preset: win.preset },
+    items: events.slice(0, 3).map((e) => ({
+      id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
+      categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '', startDate: e.startDate || null,
+    })),
+  };
+}
+
 function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null }, now = new Date()) {
-  const intent = interpretDiscoveryText(text);
+  const taxonomy = buildDiscoveryTaxonomy();
+  const intent = discoveryIntentModule().interpretDiscoveryQuery(text, taxonomy);
+  // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
+  // "dinner and a hockey game") are split into parts; anything else keeps
+  // the single-request path below, unchanged.
+  const trip = discoveryIntentModule().interpretTripComponents(text, taxonomy, intent);
+  if (trip.multi) {
+    const planner = tripPlannerModule();
+    const eventRegions = trip.route ? planner.routeRegions(trip.route.from, trip.route.to) : trip.regions;
+    let eventWindow = null;
+    const tripEvents = trip.components.map((c) => {
+      if (c.kind !== 'event') return null;
+      const sel = selectTripEvents(c, eventRegions, trip.when, now);
+      eventWindow = eventWindow || sel.window;
+      return sel.items;
+    });
+    const plan = planner.planTrip({
+      intent, trip, tripEvents,
+      facts: buildTripPlannerFacts(),
+      labels: tripPlannerLabels(),
+      seed,
+      excludeIds: excludeVenueIds,
+      avoidIds: avoidVenueIds,
+      startWeekday: tripStartWeekday(trip.when, now),
+      clock: okanaganClock(now),
+    });
+    plan.seeAll = null;
+    if (eventWindow) plan.eventWindow = eventWindow;
+    plan.query = text;
+    plan.trip = {
+      route: trip.route, unknownPlaces: trip.unknownPlaces, party: trip.party,
+      components: trip.components.map((c) => ({ kind: c.kind, types: c.types, meal: c.meal, dog: c.dog, kids: c.kids, event: c.event ? { kind: c.event.kind, category: c.event.category } : null })),
+    };
+    plan.intent = {
+      mode: intent.mode, confidence: intent.confidence, regions: intent.regions, types: intent.types, features: intent.features,
+      collections: intent.collections, activities: intent.activities, foodTerms: intent.foodTerms, days: intent.days, pace: intent.pace,
+      budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities,
+    };
+    return plan;
+  }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now) : null;
   const plan = tripPlannerModule().planTrip({
     intent,
@@ -13159,6 +13220,10 @@ function renderTripPlannerV2Styles() {
   .trip-plan-see-all { display: inline-block; margin-top: 14px; font-weight: 800; font-size: 0.88rem; color: var(--teal-deep); text-decoration: none; }
   .trip-plan-see-all:hover { text-decoration: underline; }
   .trip-plan-empty { font-size: 0.92rem; color: var(--ink); }
+  .trip-plan-route { margin: 0 0 12px; font-size: 0.86rem; font-weight: 700; color: var(--ink); opacity: 0.75; }
+  .trip-plan-experience { margin: 16px 0 4px; padding: 12px 16px; border-left: 3px solid var(--ref-gold, #C9A227); background: var(--paper); border-radius: 0 10px 10px 0; }
+  .trip-plan-experience p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--ink); }
+  .trip-plan-experience .trip-plan-eyebrow { margin-bottom: 4px; }
   </style>`;
 }
 function renderTripPlannerV2Script() {
@@ -13254,6 +13319,27 @@ function renderTripPlannerV2Script() {
         + '<div class="trip-plan-grid">' + p.outing.stops.map(function(s){ return card(s, s.label, null); }).join('') + '</div>';
       if (p.outing.alternates && p.outing.alternates.length) html += '<h3 class="trip-plan-section-title">Other good options</h3><div class="trip-plan-grid">' + p.outing.alternates.map(function(s){ return card(s, '', null); }).join('') + '</div>';
       hasVenues = true;
+    } else if (p.kind === 'itinerary' && p.itinerary) {
+      // Multi-part request: one ordered itinerary of venue and event stops.
+      var it = p.itinerary;
+      html += '<div class="trip-planner-result-header"><h2>Your itinerary</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Regenerate</button></div>';
+      if (it.route && it.route.regions && it.route.regions.length > 1) html += '<p class="trip-plan-route">' + it.route.regions.map(function(r){ return esc(r.label); }).join(' \u2192 ') + '</p>';
+      if ((it.stops || []).length) {
+        html += '<div class="trip-plan-grid">' + it.stops.map(function(s){
+          if (s.kind !== 'event') { hasVenues = true; return card(s, s.label, null); }
+          var e = s.event || {}, u = safeUrl(e.url);
+          return '<div class="trip-slot-card"><div class="trip-slot-label">' + esc(s.label) + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+            + '<div class="trip-slot-meta">' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</div>'
+            + ((s.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
+            + (u ? '<div class="trip-slot-actions"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></div>' : '') + '</div>';
+        }).join('') + '</div>';
+      } else {
+        html += '<p class="trip-plan-empty">Nothing on Okanagan Roam matches those parts yet.</p>';
+      }
+      if (p.experience && p.experience.text) html += '<div class="trip-plan-experience"><p class="trip-plan-eyebrow">' + esc(p.experience.title) + '</p><p>' + esc(p.experience.text) + '</p></div>';
+      var alts = [];
+      (it.stops || []).forEach(function(s){ (s.alternates || []).forEach(function(a){ alts.push(a); }); });
+      if (alts.length) html += '<h3 class="trip-plan-section-title">Other good options</h3><div class="trip-plan-grid">' + alts.map(function(a){ return card(a, '', null); }).join('') + '</div>';
     } else if (p.kind === 'recommendations' || p.kind === 'discover') {
       var recs = p.recommendations || [];
       if (recs.length) {

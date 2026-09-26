@@ -9450,6 +9450,80 @@ test('Phase 3: POST /api/trip/plan validates its input and never writes', () => 
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM collection_items').get().n, itemsBefore);
 })));
 
+// ---- Build My Trip multi-part itineraries (2026-09-26), end to end --------
+// runTripPlan() over the fixture database with real What's On events created
+// through app.createEvent() (and removed again). Pure planning rules are in
+// tests/trip-itinerary.test.js.
+test('Trip itinerary (server): dinner + a hockey game, a family activity + an event this weekend, venue and event in one plan', () => {
+  const meta = { reason: 'trip itinerary fixture', batch_id: 'test-trip-itinerary' };
+  const mk = (name, categories, date, start, extra = {}) => {
+    const r = app.createEvent({ name, region: 'kelowna', description: `${name} fixture.`, source_type: 'official_venue', source_name: 'Fixture Arena',
+      source_url: `https://example.com/${app.slugify(name)}`, venue_name_text: 'Fixture Arena', categories, occurrences: [{ start_date: date, start_time: start, end_time: '22:00' }], ...extra }, meta);
+    assert.equal(r.ok, true, JSON.stringify(r));
+    return r.event;
+  };
+  const now = new Date('2030-10-02T19:00:00Z'); // Wednesday 2030-10-02, Okanagan
+  const ids = [];
+  try {
+    ids.push(mk('TI Kelowna Rockets Hockey Game', ['sports-recreation'], '2030-10-04', '19:00').id);
+    ids.push(mk('TI Saturday Family Fair', ['family-kids'], '2030-10-05', '10:00').id);
+    ids.push(mk('TI Next Tuesday Fair', ['family-kids'], '2030-10-08', '10:00').id);
+    const hockey = app.runTripPlan({ text: 'I want to go for dinner and a hockey game.' }, now);
+    assert.equal(hockey.kind, 'itinerary');
+    assert.ok(!hockey.warnings.includes('No Okanagan Roam listings match every part of that request.'));
+    const [first, second] = hockey.itinerary.stops;
+    assert.equal(first.kind, 'venue');
+    assert.equal(db.prepare('SELECT type FROM venues WHERE id = ?').get(first.venue.id).type, 'restaurant');
+    assert.equal(second.kind, 'event');
+    assert.equal(second.event.name, 'TI Kelowna Rockets Hockey Game');
+    assert.equal(second.event.time, '7 pm');
+    assert.equal(second.timeKnown, true);
+    assert.match(hockey.experience.text, /before heading to the rink for a hockey night\. The game starts at 7 pm/);
+    assert.equal(hockey.seeAll, null);
+    assert.deepEqual(hockey.trip.components.map((c) => c.kind), ['venue', 'event']);
+    // "This weekend" is the event's window: an event that weekend, never next Tuesday's fair.
+    const family = app.runTripPlan({ text: 'family activities and an event this weekend' }, now);
+    assert.equal(family.kind, 'itinerary');
+    assert.equal(family.eventWindow.preset, 'this-weekend');
+    const ev = family.itinerary.stops.find((s) => s.kind === 'event');
+    assert.ok(ev, 'an event was chosen');
+    assert.notEqual(ev.event.name, 'TI Next Tuesday Fair');
+    assert.ok(ev.event.startDate >= family.eventWindow.from && ev.event.startDate <= family.eventWindow.to, JSON.stringify([ev.event.startDate, family.eventWindow]));
+    assert.equal(family.trip.party.kids, true);
+    // Events-only and single requests keep their own shape.
+    const eventsOnly = app.runTripPlan({ text: 'hockey events' }, now);
+    assert.equal(eventsOnly.kind, 'events');
+    assert.equal(eventsOnly.trip, undefined);
+    assert.ok(eventsOnly.events.some((e) => e.name === 'TI Kelowna Rockets Hockey Game'));
+    for (const q of ['dinner', 'dog friendly beaches', 'Find me a great date night in Kelowna.', 'Plan 3 days in Penticton with kids.']) {
+      const p = app.runTripPlan({ text: q }, now);
+      assert.notEqual(p.kind, 'itinerary', q);
+      assert.equal(p.trip, undefined, q);
+      assert.equal(p.itinerary, undefined, q);
+    }
+  } finally {
+    for (const id of ids) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
+});
+
+test('Trip itinerary (server): /api/discover is untouched by multi-part requests, and the /trip script renders itineraries', () => {
+  const r = app.runDiscovery('dog friendly cafes and beaches from Kelowna to Penticton');
+  assert.equal(r.trip, undefined);
+  assert.equal(r.intent.components, undefined);
+  assert.equal(r.intent.route, undefined);
+  const page = app.renderTripPlannerPage(true);
+  const scripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  for (const src of scripts) new Function(src); // parses
+  assert.ok(page.includes("p.kind === 'itinerary' && p.itinerary"));
+  assert.ok(page.includes('trip-plan-experience'));
+  assert.ok(page.includes('.trip-plan-experience {'));
+});
+
 test('Phase 3: plans from the real database are grounded in active venues', () => withPlannerFlag('on', () => {
   const active = new Map(db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all().map((v) => [v.id, v]));
   const prompts = ['Find me a great date night in Kelowna.', 'Where can I get the best poutine in the Okanagan?', 'Plan 3 days in Penticton with kids.',

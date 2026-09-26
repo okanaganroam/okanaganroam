@@ -1024,6 +1024,9 @@ function buildOverview(kind, ctx, days) {
 //   pinned: { "<day>-<daypart>": venueId } -- stops to keep when one stop is
 //           removed and replaced
 function planTrip(input) {
+  // Multi-part requests (input.trip from interpretTripComponents) get the
+  // itinerary path; every other request is planned exactly as before.
+  if (input && input.trip && input.trip.multi) return planItinerary(input);
   const { intent, facts = [], labels = {}, events = null } = input || {};
   const ctx = buildContext(intent || {}, labels, input);
   const kind = classifyPlanRequest(intent);
@@ -1093,6 +1096,344 @@ function planTrip(input) {
 }
 function uniqRegions(days) { return Array.from(new Set(days.map((d) => d.region).filter(Boolean))); }
 
+// ---------- multi-part itineraries (2026-09-26) ----------
+//
+// input.trip comes from discovery-intent.js interpretTripComponents(): a
+// request split into parts ("cafes and beaches", "dinner and a hockey game").
+// Each part is matched ON ITS OWN with the same eligible()/scoreVenue()/
+// requestedTimeFit() rules as a single request -- one listing is never asked
+// to satisfy two parts -- then the picks are ordered into one itinerary.
+// A part with no match is reported as missing; the other parts are kept.
+//
+// Routes use the Highway 97 order of the regions (north to south). Regions
+// off the highway join the route through the corridor region they are
+// reached from; no map service, and every stop is chosen by its region, so a
+// venue without stored coordinates is never excluded for that.
+const ROUTE_CORRIDOR = ['enderby', 'armstrong', 'vernon', 'lake-country', 'kelowna', 'west-kelowna', 'peachland', 'summerland', 'penticton', 'kaleden', 'okanagan-falls', 'oliver', 'osoyoos'];
+const ROUTE_OFF_CORRIDOR = { coldstream: 'vernon', lumby: 'vernon', silverstar: 'vernon', 'big-white': 'kelowna', naramata: 'penticton', apex: 'penticton', baldy: 'oliver' };
+function routeRegions(from, to) {
+  if (!from && !to) return [];
+  if (!from || !to || from === to) return [to || from];
+  const anchor = (r) => (ROUTE_CORRIDOR.includes(r) ? r : ROUTE_OFF_CORRIDOR[r]);
+  const a = anchor(from), b = anchor(to);
+  if (!a || !b) return Array.from(new Set([from, to]));
+  const ia = ROUTE_CORRIDOR.indexOf(a), ib = ROUTE_CORRIDOR.indexOf(b), step = ia <= ib ? 1 : -1;
+  const mid = [];
+  for (let i = ia; i !== ib + step; i += step) mid.push(ROUTE_CORRIDOR[i]);
+  return Array.from(new Set([from, ...mid, to]));
+}
+function routeDirection(from, to) {
+  const anchor = (r) => ROUTE_CORRIDOR.indexOf(ROUTE_CORRIDOR.includes(r) ? r : ROUTE_OFF_CORRIDOR[r]);
+  if (!from || !to) return null;
+  const a = anchor(from), b = anchor(to);
+  if (a === -1 || b === -1 || a === b) return null;
+  return a < b ? 'south' : 'north';
+}
+// When a part happens, if the request did not say.
+const ITIN_TYPE_DAYPART = { cafe: 'morning', golf: 'morning', outdoor: 'morning', beach: 'afternoon', winery: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
+const ITIN_DAYPART_RANK = { morning: 0, midday: 1, afternoon: 2, evening: 3 };
+// "Live music" with no listed event falls back to places whose verified
+// Live Music badge is set -- only venue types that carry that badge.
+const LIVE_MUSIC_VENUE_TYPES = ['pub', 'cocktail', 'brewery', 'restaurant', 'winery'];
+const ITIN_VENUE_NOUN = { cafe: 'coffee', restaurant: 'a meal', beach: 'some time on the beach', winery: 'a wine tasting', brewery: 'a craft beer', pub: 'a pub stop', cocktail: 'cocktails', distillery: 'a distillery tasting', outdoor: 'some time outdoors', golf: 'a round of golf' };
+// Event wording. `go` is used when the event is not the last, evening stop;
+// `finish` only when it is ("finish with" never describes a 10 am event).
+const ITIN_EVENT_WORDS = {
+  hockey: { lead: 'heading to the rink for a hockey night', go: 'head to the rink for the hockey game', finish: 'finish with a hockey night at the rink', short: 'game' },
+  concert: { lead: 'heading out for the concert', go: 'head to the concert', finish: 'finish with the concert', short: 'concert' },
+  'live-music': { lead: 'catching some live music', go: 'catch some live music', finish: 'finish with some live music', short: 'music' },
+};
+// Generic event kinds are described by the chosen event's own name.
+const ITIN_GENERIC_EVENTS = ['event', 'festival', 'market', 'show'];
+// One visitor-facing phrase per stop, from what that stop actually is.
+const ITIN_TYPE_VERB = {
+  cafe: 'stop for coffee', restaurant: 'sit down for a meal', beach: 'spend some time on the beach', winery: 'enjoy a wine tasting',
+  brewery: 'try a local craft beer', pub: 'stop in at a pub', cocktail: 'settle in for cocktails', distillery: 'enjoy a distillery tasting',
+  outdoor: 'spend some time outdoors', golf: 'play a round of golf',
+};
+const ITIN_MEAL_VERB = { breakfast: 'enjoy breakfast', brunch: 'enjoy brunch', lunch: 'stop for lunch', dinner: 'sit down for dinner', supper: 'sit down for supper' };
+const ITIN_ACTIVITY_VERB = {
+  hiking: 'enjoy a scenic hike', fishing: 'spend some time fishing', cycling: 'go for a bike ride', water: 'get out on the water',
+  viewpoints: 'take in the views from a lookout', nature: 'spend some time in nature', winter: 'enjoy some time in the snow',
+  camping: 'settle in at a campground', adventure: 'try something adventurous',
+};
+const ITIN_ACTIVITY_NOUN = {
+  hiking: 'a scenic hike', fishing: 'some fishing', cycling: 'a bike ride', water: 'time on the water', viewpoints: 'a lookout',
+  nature: 'time in nature', winter: 'time in the snow', camping: 'a campground stop', adventure: 'some adventure',
+};
+function parseEventStart(timeLabel) {
+  const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(String(timeLabel || '').trim());
+  if (!m) return null;
+  const h = Number(m[1]) % 12 + (m[3].toLowerCase() === 'pm' ? 12 : 0);
+  return h * 60 + Number(m[2] || 0);
+}
+function weekdayOfDate(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || ''));
+  if (!m) return null;
+  return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()];
+}
+function componentLabel(c, ctx) {
+  if (c.kind === 'event') return c.event.noun;
+  if (c.liveMusicFallback) return 'live music';
+  if (c.meal) return c.meal;
+  if (c.generic) return c.kids ? 'family activities' : 'activities';
+  if (c.cuisines && c.cuisines.length) return `${c.cuisines[0]} restaurants`;
+  if (c.activities && c.activities.length) return listText(c.activities.map((a) => activityLabel(ctx, a)));
+  return listText(c.types.map((t) => typeLabel(ctx, t).toLowerCase())).replace(/ and /, ' or ');
+}
+// The activity a stop was chosen for: the part's own activity, else (for an
+// outdoor place) one the venue is verifiably listed for; or null.
+function stopActivity(stop) {
+  return stop.activity && ITIN_ACTIVITY_VERB[stop.activity] ? stop.activity : null;
+}
+// Noun form, for the road-trip sentence ("stopping for coffee and ...").
+function venueNoun(stop) {
+  if (stop.component.liveMusicFallback) return 'some live music';
+  if (stop.component.meal) return stop.component.meal;
+  const act = stopActivity(stop);
+  if (act) return ITIN_ACTIVITY_NOUN[act];
+  return ITIN_VENUE_NOUN[stop.venue.type] || 'a stop';
+}
+function venueVerb(stop) {
+  if (stop.component.liveMusicFallback) return 'catch some live music';
+  if (stop.component.meal) return ITIN_MEAL_VERB[stop.component.meal] || 'sit down for a meal';
+  const act = stopActivity(stop);
+  if (act) return ITIN_ACTIVITY_VERB[act];
+  return ITIN_TYPE_VERB[stop.venue.type] || 'make a stop';
+}
+function verbList(stops) {
+  const phrases = [];
+  for (const s of stops) { const v = venueVerb(s); if (!phrases.includes(v)) phrases.push(v); }
+  if (phrases.length <= 1) return phrases.join('');
+  if (phrases.length === 2) return `${phrases[0]}, then ${phrases[1]}`;
+  return `${phrases.slice(0, -1).join(', then ')}, and ${phrases[phrases.length - 1]}`;
+}
+const cap = (t) => t.replace(/^./, (x) => x.toUpperCase());
+const theName = (name) => (/^the\s/i.test(name) ? name : `the ${name}`);
+// Two sentences at most, built only from the stops that were chosen.
+function buildExperience(stops, trip, route, ctx) {
+  const venues = stops.filter((s) => s.kind === 'venue');
+  const events = stops.filter((s) => s.kind === 'event');
+  if (!stops.length) return null;
+  const dog = venues.length > 0 && venues.every((s) => s.component.dog);
+  const kids = venues.some((s) => s.component.kids);
+  const sameTown = (list) => (list.length && list.every((s) => s.venue.region === list[0].venue.region) ? ` in ${list[0].venue.regionLabel}` : '');
+  if (route && venues.length) {
+    const nouns = [];
+    for (const s of venues) { const n = venueNoun(s); if (!nouns.includes(n)) nouns.push(n); }
+    const to = route.to ? regionLabel(ctx, route.to) : null;
+    const from = route.from ? regionLabel(ctx, route.from) : null;
+    const where = from && to ? `drive ${route.direction ? `${route.direction} ` : ''}from ${from} to ${to}` : `trip to ${to}`;
+    const s1 = `Enjoy an easygoing ${where}${dog ? ' with your dog' : ''}, stopping for ${listText(nouns)} along the way.`;
+    const s2 = dog ? 'Each stop is one Okanagan Roam lists as dog friendly, so your dog can come along.' : '';
+    return { title: 'Your Okanagan road trip', text: [s1, s2].filter(Boolean).join(' ') };
+  }
+  if (events.length) {
+    const e = events[0];
+    const idx = stops.indexOf(e);
+    const kind = e.component.event.kind;
+    const generic = ITIN_GENERIC_EVENTS.includes(kind) || !ITIN_EVENT_WORDS[kind];
+    const words = generic
+      ? { lead: `heading to ${theName(e.event.name)}`, go: `head to ${theName(e.event.name)}`, finish: `finish at ${theName(e.event.name)}` }
+      : ITIN_EVENT_WORDS[kind];
+    const before = venues.filter((s) => stops.indexOf(s) < idx);
+    const after = venues.filter((s) => stops.indexOf(s) > idx);
+    const lastAndEvening = idx === stops.length - 1 && e.daypart === 'evening';
+    const family = kids ? ' with the family' : '';
+    const meal = before.find((s) => s.component.meal || s.venue.type === 'restaurant');
+    let s1, s2 = '';
+    if (meal && lastAndEvening) {
+      const town = meal.venue.region === e.event.region ? ` in ${meal.venue.regionLabel}` : '';
+      const mealWord = meal.component.meal || 'meal';
+      s1 = `Start with ${meal.component.meal || 'a meal'}${town} before ${words.lead}.`;
+      s2 = e.timeKnown
+        ? `${generic ? 'It' : `The ${words.short}`} starts at ${e.event.time}, so there’s time for an unhurried ${mealWord} first.`
+        : `Start times vary, so check the event page before you settle on a ${mealWord} time.`;
+    } else if (before.length) {
+      const next = lastAndEvening ? `${words.finish} in the evening` : `${words.go}${e.timeKnown ? ` at ${e.event.time}` : ''}`;
+      s1 = `${cap(verbList(before))}${family}, then ${next}.`;
+    } else {
+      const at = generic ? theName(e.event.name) : `the ${words.short}`;
+      const start = `Start ${e.daypart === 'morning' ? 'the day ' : ''}at ${at}${e.timeKnown ? ` (${e.event.time})` : ''}`;
+      s1 = after.length ? `${start}, then ${verbList(after)}${family}.` : `${start}.`;
+    }
+    if (!e.timeKnown && !s2) s2 = 'Times vary, so check the event page for the schedule.';
+    return { title: e.daypart === 'evening' ? 'Your Okanagan evening' : 'Your Okanagan day', text: [s1, s2].filter(Boolean).join(' ') };
+  }
+  if (venues.length < 2) return null; // a description is for a combination
+  const s1 = `${cap(verbList(venues))}${sameTown(venues)}${kids ? ', with plenty for the kids' : ''}.`;
+  const s2 = dog ? 'Every stop is listed as dog friendly, so your dog can come along.' : '';
+  return { title: 'Your Okanagan day', text: [s1, s2].filter(Boolean).join(' ') };
+}
+
+function planItinerary(input) {
+  const { intent = {}, facts = [], labels = {}, trip, tripEvents = [] } = input;
+  const baseCtx = buildContext({ ...intent, regions: [] }, labels, input);
+  const route = trip.route ? { from: trip.route.from, to: trip.route.to, direction: routeDirection(trip.route.from, trip.route.to) } : null;
+  const regions = route ? routeRegions(route.from, route.to) : (trip.regions || []).slice();
+  const routeIndex = new Map(regions.map((r, i) => [r, i]));
+  const result = {
+    kind: 'itinerary', summary: '', overview: null, days: [], recommendations: [], outing: null, events: [],
+    itinerary: null, experience: null, notes: [], warnings: [], unsupported: intent.unsupported || [], needs: [],
+  };
+  for (const place of trip.unknownPlaces || []) result.warnings.push(`“${place}” isn’t a place Okanagan Roam covers, so it wasn’t used for the route.`);
+  if (route && !route.from && route.to) result.notes.push(`No starting point was given, so the stops are in ${regionLabel(baseCtx, route.to)}.`);
+  const whereText = route && route.from && route.to
+    ? `along the way from ${regionLabel(baseCtx, route.from)} to ${regionLabel(baseCtx, route.to)}`
+    : regions.length ? `in ${listText(regions.map((r) => regionLabel(baseCtx, r)))}` : 'in the Okanagan';
+
+  // Events first: the event anchors when and where the rest of the evening happens.
+  const parts = trip.components.map((c, i) => ({ c: { ...c }, i }));
+  const stops = [];
+  let anchor = null;
+  for (const p of parts) {
+    if (p.c.kind !== 'event') continue;
+    const e = (tripEvents[p.i] || [])[0];
+    if (e) {
+      const start = parseEventStart(e.time);
+      const daypart = start == null ? (['hockey', 'concert', 'live-music'].includes(p.c.event.kind) ? 'evening' : (p.c.daypart || null)) : start < 12 * 60 ? 'morning' : start < 17 * 60 ? 'afternoon' : 'evening';
+      const stop = {
+        kind: 'event', component: p.c, index: p.i, label: p.c.event.noun.replace(/^./, (x) => x.toUpperCase()), daypart,
+        event: { ...e, regionLabel: regionLabel(baseCtx, e.region) }, timeKnown: start != null, start,
+        caveats: start != null ? [] : ['Start times vary — check the event page before you plan around it'],
+      };
+      stops.push(stop);
+      if (!anchor) anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(e.startDate), daypart };
+    } else if (p.c.event.venueFeature) {
+      // No listed event: the verified venue badge stands in, when places have it.
+      p.c = { ...p.c, kind: 'venue', types: LIVE_MUSIC_VENUE_TYPES.slice(), features: [p.c.event.venueFeature], activities: [], collections: [], cuisines: [], liveMusicFallback: true };
+      result.notes.push('No live-music event is listed for those dates, so places with a verified Live Music badge are suggested instead.');
+    } else {
+      result.warnings.push(`No ${p.c.event.noun} is listed on What’s On for those dates, so the rest of the plan is shown.`);
+    }
+  }
+
+  // One community per outing (as buildOuting does) when the request named no
+  // town and no route: later parts prefer the community of the event, or of
+  // the first stop chosen, and fall back to the valley only when that
+  // community has no match for them. Explicit geography is never overridden.
+  const explicitGeography = !!route || regions.length > 0;
+  let community = !explicitGeography && anchor && anchor.region ? { region: anchor.region, from: 'event' } : null;
+  const used = new Set();
+  for (const p of parts) {
+    const c = p.c;
+    if (c.kind !== 'venue') continue;
+    const pairWithEvent = anchor && (c.meal === 'dinner' || c.meal === 'supper' || (!c.daypart && c.types.includes('restaurant')) || c.daypart === 'evening');
+    const daypart = pairWithEvent ? 'evening' : (c.daypart || null);
+    const when = pairWithEvent ? { daypart: 'evening' } : trip.when ? { ...trip.when, ...(daypart ? { daypart } : {}) } : daypart ? { daypart } : null;
+    const ci = {
+      regions, types: c.types, activities: c.activities || [], collections: c.collections || [], features: c.features || [],
+      foodTerms: (c.cuisines || []).map((q) => ({ term: q, cuisine: q })), party: { dog: !!c.dog, kids: !!c.kids },
+      occasion: null, when, superlative: false,
+    };
+    const ctx = buildContext(ci, labels, { ...input, startWeekday: pairWithEvent && anchor.weekday ? anchor.weekday : input.startWeekday });
+    const scored = [];
+    for (const v of facts) {
+      if (used.has(v.id) || !regionOk(v, ctx) || !eligible(v, ctx, true)) continue;
+      if (c.generic && !c.types.includes(v.type)) continue;
+      const s = scoreVenue(v, ctx);
+      const t = requestedTimeFit(v, ctx);
+      if (t && t.skip) continue;
+      let score = s.score + (t ? t.score : 0);
+      const reasons = s.reasons.concat(t ? t.reasons : []);
+      if (pairWithEvent && anchor.region && v.region === anchor.region) { score += 12; reasons.push({ code: 'near_event', text: `In ${regionLabel(ctx, v.region)}, where the event is`, weight: 12 }); }
+      if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
+      scored.push({ v, score, reasons, caveats: t ? t.caveats : [] });
+    }
+    scored.sort(compareScored);
+    const label = componentLabel(c, ctx);
+    let pool = scored;
+    if (community) {
+      const inTown = scored.filter((x) => x.v.region === community.region);
+      if (inTown.length) {
+        pool = inTown;
+        for (const x of inTown) {
+          if (!x.reasons.some((r) => r.code === 'near_event')) {
+            x.reasons.push({ code: 'community', text: community.from === 'event' ? `In ${regionLabel(ctx, x.v.region)}, where the event is` : `In ${regionLabel(ctx, x.v.region)}, close to your other stops`, weight: 3 });
+          }
+        }
+      } else if (scored.length) {
+        result.notes.push(`No ${label} matched in ${regionLabel(ctx, community.region)}, so that stop is in ${regionLabel(ctx, scored[0].v.region)}.`);
+      }
+    }
+    const pick = pool[0];
+    if (!pick) {
+      result.warnings.push(`No ${c.dog && !/dog/.test(label) ? 'dog-friendly ' : ''}${label} matched ${whereText}, so the rest of the plan is shown.`);
+      continue;
+    }
+    used.add(pick.v.id);
+    if (!explicitGeography && !community) community = { region: pick.v.region, from: 'stop' };
+    const extra = route ? [{ code: 'route', text: `In ${regionLabel(ctx, pick.v.region)}, on the way`, weight: 1 }] : regionReason(pick.v, ctx);
+    const alternates = pool.slice(1).filter((s) => !used.has(s.v.id)).slice(0, 2);
+    for (const a of alternates) used.add(a.v.id);
+    stops.push({
+      kind: 'venue', component: c, index: p.i, label: label.replace(/^./, (x) => x.toUpperCase()), daypart: daypart || ITIN_TYPE_DAYPART[pick.v.type] || 'afternoon', timed: !!daypart,
+      activity: (c.activities || []).find((a) => (pick.v.activities || []).includes(a))
+        || (pick.v.type === 'outdoor' ? (pick.v.activities || []).find((a) => ITIN_ACTIVITY_VERB[a]) : null) || null,
+      ...stopFrom(pick.v, pick, extra, ctx),
+      alternates: alternates.map((a) => stopFrom(a.v, a, [], ctx)),
+    });
+  }
+
+  // Order: along the route for a road trip; otherwise by clock time. An
+  // event with a stated start is placed at that time; a stop the visitor gave
+  // no time for goes before an evening event and after a daytime one; a venue
+  // goes before an event at the same time, then parts stay as asked.
+  const lat = (s) => (s.venue && s.venue.latitude != null ? s.venue.latitude : null);
+  const firstEvent = stops.find((s) => s.kind === 'event' && s.start != null);
+  const windowStart = (part) => (SLOT_WINDOWS[part] ? SLOT_WINDOWS[part].from : 13 * 60);
+  const clockOf = (s) => {
+    if (s.kind === 'event') return s.start != null ? s.start : s.daypart ? windowStart(s.daypart) : 24 * 60;
+    if (s.timed || !firstEvent) return windowStart(s.daypart);
+    return firstEvent.start >= 17 * 60 ? firstEvent.start - 1 : firstEvent.start + 1;
+  };
+  stops.sort((a, b) => {
+    if (route && a.kind === 'venue' && b.kind === 'venue') {
+      const ra = routeIndex.get(a.venue.region) ?? 99, rb = routeIndex.get(b.venue.region) ?? 99;
+      if (ra !== rb) return ra - rb;
+      const la = lat(a), lb = lat(b);
+      if (la != null && lb != null && la !== lb) return route.direction === 'north' ? la - lb : lb - la;
+      return a.index - b.index;
+    }
+    const ta = clockOf(a), tb = clockOf(b);
+    if (ta !== tb) return ta - tb;
+    if (a.kind !== b.kind) return a.kind === 'venue' ? -1 : 1;
+    return a.index - b.index;
+  });
+
+  const publicStop = (s) => {
+    const base = { kind: s.kind, label: s.label, daypart: s.daypart, component: s.index };
+    if (s.kind === 'event') return { ...base, event: s.event, timeKnown: s.timeKnown, caveats: s.caveats };
+    // (timed / start are internal ordering hints and stay server-side.)
+    return { ...base, venue: s.venue, reasons: s.reasons, why: s.why, caveats: s.caveats, alternates: s.alternates };
+  };
+  result.itinerary = {
+    stops: stops.map(publicStop),
+    route: route ? { ...route, fromLabel: route.from ? regionLabel(baseCtx, route.from) : null, toLabel: route.to ? regionLabel(baseCtx, route.to) : null, regions: regions.map((r) => ({ slug: r, label: regionLabel(baseCtx, r) })) } : null,
+  };
+  result.events = stops.filter((s) => s.kind === 'event').map((s) => s.event);
+  result.experience = buildExperience(stops, trip, route, { ...baseCtx, regions });
+
+  // Summary + overview, from what was asked.
+  const partLabels = trip.components.map((c) => {
+    const l = componentLabel(c, baseCtx);
+    return c.kind === 'event' && l !== 'live music' ? article(l) : l;
+  });
+  const allDog = trip.components.filter((c) => c.kind === 'venue').every((c) => c.dog) && trip.components.some((c) => c.kind === 'venue' && c.dog);
+  const listed = listText(partLabels);
+  const where = route && route.from && route.to ? ` from ${regionLabel(baseCtx, route.from)} to ${regionLabel(baseCtx, route.to)}` : route && route.to ? ` on the way to ${regionLabel(baseCtx, route.to)}` : regions.length ? ` in ${listText(regions.map((r) => regionLabel(baseCtx, r)))}` : '';
+  const when = trip.when && trip.when.preset === 'this-weekend' ? ' this weekend' : '';
+  result.summary = `${allDog ? 'Dog-friendly ' : ''}${allDog ? listed : listed.replace(/^./, (x) => x.toUpperCase())}${where}${when}.`.replace(/^Dog-friendly (.)/, (m, c) => `Dog-friendly ${c.toLowerCase()}`);
+  result.overview = {
+    where: route && route.from && route.to ? `${regionLabel(baseCtx, route.from)} → ${regionLabel(baseCtx, route.to)}` : regions.length ? listText(regions.map((r) => regionLabel(baseCtx, r))) : 'the Okanagan',
+    regions: regions.map((r) => ({ slug: r, label: regionLabel(baseCtx, r) })),
+    days: null, pace: null, interests: partLabels, occasion: null, budget: null,
+  };
+  if (trip.party && trip.party.dog && stops.some((s) => s.kind === 'event')) result.notes.push('Events aren’t checked for dogs; the dog-friendly requirement applies to the places.');
+  if (stops.some((s) => s.kind === 'venue')) result.notes.push('Stops are checked against each venue’s listed hours on Okanagan Roam where it has them; hours can change, so check before you go.');
+  return result;
+}
+
 function liveNote(live) {
   const day = WEEKDAY_NAMES[live.weekday];
   const when = live.win.from >= 1440 ? `${day} night, from ${clockText(live.win.from)}` : `${day} from ${clockText(live.win.from)}`;
@@ -1128,4 +1469,7 @@ module.exports = {
   regionCentroids,
   planTrip,
   haversineKm,
+  routeRegions,
+  routeDirection,
+  parseEventStart,
 };
