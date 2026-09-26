@@ -9547,10 +9547,189 @@ test('hours.js status on the Okanagan clock: Pacific Time, daylight-saving chang
 test('hours.js Phase 1 is foundation only: guarded load, no page, route or planner uses it yet', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /const hoursModule = \(\(\) => \{ try \{ return require\('\.\/hours\.js'\); \} catch \(e\) \{ return null; \} \}\)\(\);/, 'guarded require, like golf-data.js');
-  assert.equal((src.match(/hoursModule/g) || []).length, 4, 'declared once and used only inside venueHoursStatusAt');
+  assert.equal((src.match(/hoursModule\.statusAt/g) || []).length, 1, 'open/closed status is computed only inside venueHoursStatusAt');
   assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 2, 'defined and exported, never called by the app');
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /hours\.js/, 'Build My Trip keeps parseVenueHours');
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /statusAt|hours\.js/, '/browse keeps its own logic');
+});
+
+// ---- Hours provenance (Open Now Phase 2) ------------------------------------
+// hours_source / hours_checked_at: two nullable TEXT columns added by db.js,
+// written only by guardedHoursVerifyUpdate() (no route), never backfilled.
+test('hours provenance: two nullable TEXT columns with no default; every existing row is NULL', () => {
+  const cols = Object.fromEntries(db.prepare('PRAGMA table_info(venues)').all().map((c) => [c.name, c]));
+  for (const name of ['hours_source', 'hours_checked_at']) {
+    assert.ok(cols[name], `${name} exists`);
+    assert.equal(cols[name].type, 'TEXT', name);
+    assert.equal(cols[name].notnull, 0, `${name} is nullable`);
+    assert.equal(cols[name].dflt_value, null, `${name} has no default`);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venues WHERE hours_source IS NOT NULL OR hours_checked_at IS NOT NULL').get().n, 0, 'nothing backfilled');
+  // The public venue shape is unchanged: provenance is not in rowToVenue().
+  const any = db.prepare('SELECT id FROM venues WHERE redirect_to IS NULL LIMIT 1').get();
+  const v = app.getVenue(any.id);
+  assert.equal('hours_source' in v, false);
+  assert.equal('hours_checked_at' in v, false);
+});
+
+test('hours provenance migration: adds the columns to an existing database without touching its rows, and re-runs as a no-op', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-hours-provenance-'));
+  try {
+    fs.copyFileSync(path.join(__dirname, '..', 'db.js'), path.join(tempDir, 'db.js'));
+    const dbFile = path.join(tempDir, 'okanagan.db');
+    fs.copyFileSync(path.join(__dirname, '..', 'okanagan.db'), dbFile);
+    const { DatabaseSync } = require('node:sqlite');
+    // Recreate the pre-Phase-2 shape: same rows, no provenance columns.
+    const legacy = new DatabaseSync(dbFile);
+    legacy.exec('ALTER TABLE venues DROP COLUMN hours_source');
+    legacy.exec('ALTER TABLE venues DROP COLUMN hours_checked_at');
+    legacy.prepare("UPDATE venues SET hours = ? WHERE id = (SELECT MIN(id) FROM venues)").run('{"mon":[["16:00","25:00"]],"tue":null}');
+    const before = legacy.prepare('SELECT id, hours FROM venues ORDER BY id').all();
+    legacy.close();
+    const runDbJs = () => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ['--no-warnings', '-e', "require('./db.js')"], { cwd: tempDir, stdio: ['ignore', 'pipe', 'pipe'] });
+      let err = '';
+      child.stderr.on('data', (c) => { err += c; });
+      child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`db.js exited ${code}: ${err}`))));
+    });
+    await runDbJs();
+    await runDbJs();
+    const after = new DatabaseSync(dbFile);
+    const cols = after.prepare('PRAGMA table_info(venues)').all().filter((c) => c.name === 'hours_source' || c.name === 'hours_checked_at');
+    assert.deepEqual(cols.map((c) => [c.name, c.type, c.notnull, c.dflt_value]), [['hours_source', 'TEXT', 0, null], ['hours_checked_at', 'TEXT', 0, null]], 'added once, nullable, no default');
+    assert.deepEqual(after.prepare('SELECT id, hours FROM venues ORDER BY id').all(), before, 'no row added, removed or re-written; hours byte-identical (incl. "25:00")');
+    assert.equal(after.prepare('SELECT COUNT(*) AS n FROM venues WHERE hours_source IS NOT NULL OR hours_checked_at IS NOT NULL').get().n, 0);
+    after.close();
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('guardedHoursVerifyUpdate: a valid verification records hours, source and date, audited, without changing the public venue shape', () => {
+  const now = new Date('2026-09-26T19:00:00Z');
+  const original = '{"mon":[["11:00","21:00"]],"tue":[["11:00","21:00"]]}';
+  const id = Number(db.prepare("INSERT INTO venues (name, region, type, hours) VALUES ('Hours Provenance Fixture', 'kelowna', 'restaurant', ?)").run(original).lastInsertRowid);
+  try {
+    const week = { mon: null, tue: [], wed: [['11:00', '14:00'], ['17:00', '22:00']], thu: [['7:00', '15:00']], fri: [['16:00', '25:00']], sat: [['18:00', '02:00']], sun: [['00:00', '24:00']] };
+    const meta = { reason: 'checked against the official website', batch_id: 'hours-test-1' };
+    const r = app.guardedHoursVerifyUpdate(id, original, { hours: week, hours_source: 'official_website', hours_checked_at: '2026-09-26' }, meta, now);
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.deepEqual(r.changedFields, ['hours', 'hours_source', 'hours_checked_at']);
+    const row = db.prepare('SELECT hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id);
+    assert.equal(row.hours, JSON.stringify(week), 'stored in the existing format, mon..sun, period strings as given');
+    assert.equal(row.hours_source, 'official_website');
+    assert.equal(row.hours_checked_at, '2026-09-26');
+    const logs = db.prepare("SELECT field_name, old_value, new_value, source, source_ref, confidence, batch_id FROM venue_enrichment_log WHERE venue_id = ? ORDER BY id").all(id);
+    assert.deepEqual(logs.map((l) => l.field_name), ['hours', 'hours_source', 'hours_checked_at']);
+    assert.equal(logs[0].old_value, original);
+    assert.equal(logs[1].old_value, null);
+    for (const l of logs) {
+      assert.equal(l.source, 'official_website');
+      assert.equal(l.source_ref, meta.reason);
+      assert.equal(l.confidence, 'high');
+      assert.equal(l.batch_id, 'hours-test-1');
+    }
+    // Re-verifying the same hours later only moves the date (one audit row).
+    const again = app.guardedHoursVerifyUpdate(id, row.hours, { hours: JSON.stringify(week), hours_source: 'official_website', hours_checked_at: '2026-09-26' }, meta, now);
+    assert.deepEqual(again.changedFields, []);
+    const later = app.guardedHoursVerifyUpdate(id, row.hours, { hours: week, hours_source: 'official_website', hours_checked_at: '2026-09-26' }, { reason: 'recheck', batch_id: 'hours-test-2' }, new Date('2026-12-01T19:00:00Z'));
+    assert.deepEqual(later.changedFields, []);
+    const moved = app.guardedHoursVerifyUpdate(id, row.hours, { hours: week, hours_source: 'venue_phone', hours_checked_at: '2026-11-30' }, { reason: 'phoned', batch_id: 'hours-test-3' }, new Date('2026-12-01T19:00:00Z'));
+    assert.deepEqual(moved.changedFields, ['hours_source', 'hours_checked_at']);
+    // The stored hours still read correctly through hours.js / the venue page data.
+    assert.equal(app.venueHoursStatusAt(db.prepare('SELECT hours FROM venues WHERE id = ?').get(id).hours, new Date('2026-09-27T08:30:00Z')).state, 'open', 'Sat 18:00-02:00 at Sun 01:30');
+    const v = app.getVenue(id);
+    assert.equal('hours_source' in v, false);
+    assert.equal('hours_checked_at' in v, false);
+  } finally {
+    db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('guardedHoursVerifyUpdate: invalid hours, source, date or meta are rejected and nothing is written', () => {
+  const now = new Date('2026-09-26T19:00:00Z');
+  const original = '{"mon":[["11:00","21:00"]]}';
+  const id = Number(db.prepare("INSERT INTO venues (name, region, type, hours) VALUES ('Hours Reject Fixture', 'kelowna', 'cafe', ?)").run(original).lastInsertRowid);
+  const full = (over) => ({ mon: [['09:00', '17:00']], tue: [['09:00', '17:00']], wed: [['09:00', '17:00']], thu: [['09:00', '17:00']], fri: [['09:00', '17:00']], sat: null, sun: null, ...over });
+  const good = { hours: full({}), hours_source: 'official_website', hours_checked_at: '2026-09-25' };
+  const meta = { reason: 'r', batch_id: 'b' };
+  try {
+    const cases = [
+      [{ ...good, hours: 'not json' }, 'invalid_hours'],
+      [{ ...good, hours: '[1,2]' }, 'invalid_hours'],
+      [{ ...good, hours: null }, 'invalid_hours'],
+      [{ ...good, hours: '' }, 'invalid_hours'],
+      [{ ...good, hours: { mon: [['09:00', '17:00']] } }, 'invalid_hours'],
+      [{ ...good, hours: full({ holiday: null }) }, 'invalid_hours'],
+      [{ ...good, hours: full({ mon: '9-5' }) }, 'invalid_hours'],
+      [{ ...good, hours: full({ mon: [['9am', '5pm']] }) }, 'invalid_hours'],
+      [{ ...good, hours: full({ mon: [['09:00']] }) }, 'invalid_hours'],
+      [{ ...good, hours: full({ mon: [['25:00', '26:00']] }) }, 'invalid_hours'],
+      [{ ...good, hours: full({ mon: [['10:00', '35:00']] }) }, 'invalid_hours'],
+      [{ ...good, hours: full({ mon: [['09:00', '12:00'], ['bad', '17:00']] }) }, 'invalid_hours'],
+      [{ ...good, hours_source: undefined }, 'invalid_source'],
+      [{ ...good, hours_source: 'initial_import' }, 'invalid_source'],
+      [{ ...good, hours_source: 'Official Website' }, 'invalid_source'],
+      [{ ...good, hours_checked_at: undefined }, 'invalid_checked_at'],
+      [{ ...good, hours_checked_at: '2026-09-27' }, 'invalid_checked_at'],
+      [{ ...good, hours_checked_at: '2026-02-30' }, 'invalid_checked_at'],
+      [{ ...good, hours_checked_at: '26/09/2026' }, 'invalid_checked_at'],
+      [{ ...good, hours_checked_at: '2026-09-25T10:00' }, 'invalid_checked_at'],
+    ];
+    for (const [verified, reason] of cases) {
+      const r = app.guardedHoursVerifyUpdate(id, original, verified, meta, now);
+      assert.equal(r.ok, false, JSON.stringify(verified));
+      assert.equal(r.reason, reason, JSON.stringify(verified));
+    }
+    for (const badMeta of [undefined, {}, { reason: 'r' }, { batch_id: 'b' }, { reason: '  ', batch_id: 'b' }]) {
+      assert.equal(app.guardedHoursVerifyUpdate(id, original, good, badMeta, now).reason, 'invalid_meta');
+    }
+    // Stale expected hours: nothing written, live value reported.
+    const stale = app.guardedHoursVerifyUpdate(id, '{"mon":null}', good, meta, now);
+    assert.deepEqual(stale, { ok: false, reason: 'mismatch', live: { hours: original } });
+    assert.equal(app.guardedHoursVerifyUpdate(999999999, null, good, meta, now).reason, 'venue_not_found');
+    const row = db.prepare('SELECT hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id);
+    assert.deepEqual({ ...row }, { hours: original, hours_source: null, hours_checked_at: null }, 'every rejection left the row untouched');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_enrichment_log WHERE venue_id = ?').get(id).n, 0, 'and wrote no audit rows');
+    // A redirected (retired) venue is refused.
+    const target = db.prepare('SELECT id FROM venues WHERE redirect_to IS NULL AND id != ? LIMIT 1').get(id).id;
+    db.prepare('UPDATE venues SET redirect_to = ? WHERE id = ?').run(target, id);
+    assert.equal(app.guardedHoursVerifyUpdate(id, original, good, meta, now).reason, 'venue_redirected');
+    // A venue with no hours yet can be verified with expected NULL.
+    db.prepare('UPDATE venues SET redirect_to = NULL, hours = NULL WHERE id = ?').run(id);
+    assert.equal(app.guardedHoursVerifyUpdate(id, original, good, meta, now).reason, 'mismatch');
+    assert.equal(app.guardedHoursVerifyUpdate(id, null, good, meta, now).ok, true);
+  } finally {
+    db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('hours provenance: absent/NULL provenance is harmless, and hours changed through the plain API path drop stale provenance', () => {
+  const now = new Date('2026-09-26T19:00:00Z');
+  const week = '{"mon":[["09:00","17:00"]],"tue":[["09:00","17:00"]],"wed":[["09:00","17:00"]],"thu":[["09:00","17:00"]],"fri":[["09:00","17:00"]],"sat":null,"sun":null}';
+  const id = Number(db.prepare("INSERT INTO venues (name, region, type, hours) VALUES ('Hours Plain Path Fixture', 'kelowna', 'pub', ?)").run(week).lastInsertRowid);
+  const prov = () => ({ ...db.prepare('SELECT hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id) });
+  try {
+    // Never verified: NULL provenance, status and venue data work as before.
+    assert.deepEqual(prov(), { hours: week, hours_source: null, hours_checked_at: null });
+    assert.equal(app.venueHoursStatusAt(week, new Date('2026-09-28T17:00:00Z')).state, 'open');
+    app.updateVenue(id, { hours: '{"mon":null}' });
+    assert.deepEqual(prov(), { hours: '{"mon":null}', hours_source: null, hours_checked_at: null }, 'NULL stays NULL');
+    app.updateVenue(id, { hours: week });
+    // Verified, then edited elsewhere: unrelated edits and identical hours keep it...
+    assert.equal(app.guardedHoursVerifyUpdate(id, week, { hours: week, hours_source: 'google_business_profile', hours_checked_at: '2026-09-26' }, { reason: 'r', batch_id: 'b' }, now).ok, true);
+    app.updateVenue(id, { phone: '250-555-0199' });
+    app.updateVenue(id, { hours: week });
+    assert.deepEqual(prov(), { hours: week, hours_source: 'google_business_profile', hours_checked_at: '2026-09-26' });
+    // ...but different hours written without verification clear it.
+    app.updateVenue(id, { hours: '{"mon":[["10:00","16:00"]]}' });
+    assert.deepEqual(prov(), { hours: '{"mon":[["10:00","16:00"]]}', hours_source: null, hours_checked_at: null });
+  } finally {
+    db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
 });
 
 // ---- Hidden Gems destination link (2026-09-25) ------------------------------

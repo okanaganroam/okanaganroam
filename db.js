@@ -648,6 +648,20 @@ CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(sta
 // that reviewed file changes. Nothing here touches the venues table. The
 // require is guarded so a copy of the app without golf-data.js (e.g. the
 // isolated homepage tests) starts exactly as before.
+// --- Hours provenance (2026-09-26, Open Now Phase 2; additive, nullable) ---
+// Where a venue's `hours` value came from and the Okanagan date it was last
+// verified, written only by server.js guardedHoursVerifyUpdate() (which also
+// logs to venue_enrichment_log). NULL -- every existing row, since nothing is
+// backfilled -- means "not yet verified through this system", never
+// "verified closed" or "verified correct". Same check-then-ALTER pattern as
+// the SEO columns above, so re-running it on any DB is a no-op.
+const venueColsForHours = db.prepare(`PRAGMA table_info(venues)`).all().map((c) => c.name);
+for (const col of ['hours_source', 'hours_checked_at']) {
+  if (!venueColsForHours.includes(col)) {
+    db.exec(`ALTER TABLE venues ADD COLUMN ${col} TEXT`);
+  }
+}
+
 try {
   require('./golf-data.js').initGolfData(db);
 } catch (e) {

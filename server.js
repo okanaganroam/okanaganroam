@@ -284,8 +284,14 @@ function updateVenue(id, data) {
 
   const setClause = cols.map((f) => `${f} = ?`).join(', ');
   const values = cols.map((f) => (BOOL_FIELDS.includes(f) ? (data[f] ? 1 : 0) : data[f]));
+  // Hours provenance (Open Now Phase 2): hours changed through this plain,
+  // unaudited path are no longer the hours that were verified, so any
+  // recorded hours_source / hours_checked_at is cleared with them. A no-op
+  // for rows that were never verified (NULL stays NULL).
+  const hoursChanged = cols.includes('hours') && (data.hours === null ? null : String(data.hours)) !== existing.hours;
+  const provenanceClear = hoursChanged ? ', hours_source = NULL, hours_checked_at = NULL' : '';
 
-  db.prepare(`UPDATE venues SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(
+  db.prepare(`UPDATE venues SET ${setClause}${provenanceClear}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(
     ...values,
     id
   );
@@ -690,6 +696,117 @@ function guardedPhoneCorrectUpdate(id, expectedCurrentPhone, correctedPhone, met
         // ROLLBACK itself failing means there's nothing left to roll back --
         // safe to ignore, since the original error is what matters to the caller.
       }
+    }
+    throw err;
+  }
+}
+
+// ---------- Open Now Phase 2 (2026-09-26): audited, verified hours write ----------
+//
+// A SEPARATE, standalone code path, like guardedPhoneCorrectUpdate() above.
+// It is the only writer of hours_source / hours_checked_at (db.js), and it is
+// deliberately NOT wired to any HTTP route yet -- like guardedEnrichUpdate(),
+// it is tested infrastructure for a later, separately approved phase.
+//
+// It records that a venue's hours were checked against a named kind of
+// source on an Okanagan calendar date, and may correct the hours in the same
+// step. Before anything is written:
+//   - the hours must be a complete week in the site's existing format -- all
+//     seven day keys and nothing else, each null / [] (closed) or a list of
+//     ["HH:MM","HH:MM"] periods that hours.js reads as open. A verified week
+//     never leaves a day unknown;
+//   - hours_source must be one of HOURS_SOURCES;
+//   - hours_checked_at must be a real 'YYYY-MM-DD' date, not after today in
+//     the Okanagan (todayLocal);
+//   - reason and batch_id are required, as on every audited path.
+// The UPDATE is guarded on the caller's expected current hours (NULL-safe via
+// SQLite IS), checked atomically in the statement itself, so a stale caller
+// changes nothing. Redirected (retired) venues are refused. One
+// venue_enrichment_log row per changed column, in the same transaction.
+//
+// Returns one of:
+//   { ok: false, reason: 'invalid_hours' | 'invalid_source' | 'invalid_checked_at' | 'invalid_meta' | 'hours_module_unavailable', detail }
+//   { ok: false, reason: 'venue_not_found' | 'venue_redirected' }
+//   { ok: false, reason: 'mismatch', live: { hours } }   -- expected_current_hours didn't match; nothing written
+//   { ok: true, changedFields: [...], hours, hours_source, hours_checked_at }
+const HOURS_SOURCES = ['official_website', 'google_business_profile', 'venue_social_media', 'venue_phone', 'venue_owner', 'in_person'];
+
+// The site's stored hours format, strictly: returns { ok: true, json } with
+// the week re-serialised in mon..sun order (period strings kept exactly as
+// given), or { ok: false, detail }.
+function validateVerifiedHours(input) {
+  if (!hoursModule) return { ok: false, detail: 'hours.js is not available' };
+  let obj = input;
+  if (typeof input === 'string') {
+    try { obj = JSON.parse(input); } catch (e) { return { ok: false, detail: 'hours is not valid JSON' }; }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { ok: false, detail: 'hours must be an object keyed by day' };
+  const days = hoursModule.HOURS_WEEKDAYS;
+  const extra = Object.keys(obj).filter((k) => !days.includes(k));
+  if (extra.length) return { ok: false, detail: `unexpected key(s): ${extra.join(', ')}` };
+  const missing = days.filter((d) => !Object.prototype.hasOwnProperty.call(obj, d));
+  if (missing.length) return { ok: false, detail: `missing day(s): ${missing.join(', ')}` };
+  const parsed = hoursModule.parseHours(obj);
+  const unknown = days.filter((d) => parsed.days[d].status === 'unknown');
+  if (unknown.length) return { ok: false, detail: `malformed day(s): ${unknown.join(', ')}` };
+  const week = {};
+  for (const d of days) week[d] = obj[d];
+  return { ok: true, json: JSON.stringify(week) };
+}
+
+function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now = new Date()) {
+  if (!hoursModule) return { ok: false, reason: 'hours_module_unavailable', detail: 'hours.js is not available' };
+  const v = verified || {};
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  const checked = validateVerifiedHours(v.hours);
+  if (!checked.ok) return { ok: false, reason: 'invalid_hours', detail: checked.detail };
+  if (!HOURS_SOURCES.includes(v.hours_source)) {
+    return { ok: false, reason: 'invalid_source', detail: `hours_source must be one of: ${HOURS_SOURCES.join(', ')}` };
+  }
+  if (!parseLocalDate(v.hours_checked_at) || v.hours_checked_at > todayLocal(now)) {
+    return { ok: false, reason: 'invalid_checked_at', detail: 'hours_checked_at must be a real YYYY-MM-DD date, not in the future' };
+  }
+
+  const existing = db.prepare('SELECT id, redirect_to, hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id);
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+
+  const next = { hours: checked.json, hours_source: v.hours_source, hours_checked_at: v.hours_checked_at };
+  const expected = expectedCurrentHours === undefined ? null : expectedCurrentHours;
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const info = db
+      .prepare(
+        `UPDATE venues SET hours = ?, hours_source = ?, hours_checked_at = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND redirect_to IS NULL AND hours IS ?`
+      )
+      .run(next.hours, next.hours_source, next.hours_checked_at, id, expected);
+    if (info.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      const live = db.prepare('SELECT hours FROM venues WHERE id = ?').get(id);
+      return { ok: false, reason: 'mismatch', live: { hours: live ? live.hours : null } };
+    }
+    const changedFields = ['hours', 'hours_source', 'hours_checked_at'].filter((f) => existing[f] !== next[f]);
+    const logStmt = db.prepare(
+      `INSERT INTO venue_enrichment_log
+         (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+       VALUES (?, ?, ?, ?, ?, ?, 'high', ?, 0, ?)`
+    );
+    for (const f of changedFields) {
+      logStmt.run(id, f, existing[f] === null ? null : String(existing[f]), next[f], next.hours_source, m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
+    }
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changedFields, ...next };
+  } catch (err) {
+    if (txOpen) {
+      try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ }
     }
     throw err;
   }
@@ -17236,6 +17353,10 @@ module.exports = {
   tripStartWeekday,
   okanaganClock,
   venueHoursStatusAt,
+  HOURS_SOURCES,
+  validateVerifiedHours,
+  guardedHoursVerifyUpdate,
+  updateVenue,
   countHiddenGemsOutsideSecretSpots,
   getHiddenGemCollectionVenues,
   hiddenGemsPageDestination,
