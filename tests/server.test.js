@@ -6101,6 +6101,29 @@ test('Beach venue page: hero carries the <h1>, header opens with "Beach · Regio
   assert.match(beach, /"@type":"Beach"/);
 });
 
+// Hub intros (2026-09-26): Wine, Beaches and Golf carry a short description
+// directly under the H1, styled like the .outdoor-intro line Food & Drink,
+// What's On and Outdoors use; the count subtitle stays right after it.
+test('Wine, Beaches and Golf hubs render their intro directly under the H1; other pages do not', () => {
+  const intros = {
+    winery: 'Discover the Okanagan\u2019s renowned wine country, from intimate family-run wineries to celebrated estates, cellar doors and vineyard experiences across the valley.',
+    beach: 'Find your perfect place to swim, relax and soak up the Okanagan sun, with beaches and lakeside spots stretching from the North Okanagan to Osoyoos.',
+    golf: 'Tee off among some of the Okanagan\u2019s most scenic courses, with championship layouts, relaxed local courses and golf experiences for every level.',
+  };
+  for (const [type, text] of Object.entries(intros)) {
+    const html = app.renderCategoryAllRegionsPage(type, app.getVenuesByCategory(type));
+    const esc = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(html, new RegExp(`</h1>\\s*<p class="hub-intro">${esc}</p>\\s*<p class="subtitle">`), `${type}: intro sits between the H1 and the count subtitle`);
+    assert.match(html, /<style>body\.golf-page \.hub-intro \{/, `${type}: intro style loaded`);
+    assert.equal((html.match(/class="hub-intro"/g) || []).length, 1, `${type}: exactly one intro`);
+  }
+  // Outdoors keeps its own intro; regional pages get none.
+  const outdoors = app.renderCategoryAllRegionsPage('outdoor', app.getOutdoorLandingVenues ? app.getOutdoorLandingVenues() : app.getVenuesByCategory('outdoor'));
+  assert.doesNotMatch(outdoors, /hub-intro/);
+  assert.doesNotMatch(app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []), /hub-intro/);
+  assert.doesNotMatch(app.renderCategoryPage('kelowna', 'beach', app.getVenuesByRegionCategory('kelowna', 'beach'), []), /hub-intro/);
+});
+
 // Okanagan-wide listing cards (2026-09-20): the meta line leads with the
 // venue's community (REGION_LABELS[venue.region]) so identically named
 // venues in different communities are distinguishable; regional listings

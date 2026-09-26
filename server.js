@@ -9165,6 +9165,19 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// Short visitor-facing intro under the H1 on the Wine, Beaches and Golf hubs
+// (2026-09-26), matching the one Food & Drink, What's On and Outdoors carry.
+// Same look as their .outdoor-intro: those three hubs don't load the outdoor
+// theme (and must not carry its classes -- see the Outdoors Phase 2
+// regression test), so .hub-intro repeats that one rule's declarations for
+// them only. The count subtitle below it is unchanged.
+const HUB_INTRO_TEXT = {
+  winery: 'Discover the Okanagan\u2019s renowned wine country, from intimate family-run wineries to celebrated estates, cellar doors and vineyard experiences across the valley.',
+  beach: 'Find your perfect place to swim, relax and soak up the Okanagan sun, with beaches and lakeside spots stretching from the North Okanagan to Osoyoos.',
+  golf: 'Tee off among some of the Okanagan\u2019s most scenic courses, with championship layouts, relaxed local courses and golf experiences for every level.',
+};
+const HUB_INTRO_STYLE = '<style>body.golf-page .hub-intro { font-size: 1.04rem; line-height: 1.65; max-width: 68ch; color: var(--ink); opacity: 0.85; margin: -8px 0 22px; }</style>';
+
 // GET /:category — Okanagan-wide category listing (2026-09-19; currently
 // golf only, see ALL_REGIONS_CATEGORIES). Mirrors renderCategoryPage()
 // above, minus everything that assumes a single region: no region
@@ -9297,7 +9310,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0 })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
-${golfEngagementHeadHtml(type, hubThemed)}
+${golfEngagementHeadHtml(type, hubThemed)}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
   ${hubThemed ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
@@ -9306,7 +9319,7 @@ ${golfEngagementHeadHtml(type, hubThemed)}
     { name: label.plural },
   ])}
   <h1>${escapeHtml(heading)}</h1>
-  ${isOutdoorLanding ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
+  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
   ${outdoorDirectoryHeading}${cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
