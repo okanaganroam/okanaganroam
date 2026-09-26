@@ -6040,9 +6040,11 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.match(html, /body\.golf-page \.venue-card \.card-links \{ display: none; \}/);
     assert.doesNotMatch(html, /getElementById\('navHamburger'\)/, 'no duplicate nav handlers alongside app.js');
   }
+  // Batch 4A (2026-09-27): Food & Drink VENUE pages now use the themed shell
+  // (see the Batch 4A tests); their listings and winery venue pages do not.
   const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
-  const restaurantVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
-  for (const html of [restaurants, restaurantVenue]) {
+  const wineryVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
+  for (const html of [restaurants, wineryVenue]) {
     assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js"><\/script>/);
     assert.match(html, /<header class="top">/);
     assert.match(html, /<body>/);
@@ -6076,14 +6078,17 @@ test('Golf venue page: hero is the title treatment, header does not repeat it, i
 test('Golf theme keeps the shared footer links visible (golf and beach pages)', () => {
   const golf = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
   const beach = app.renderVenuePage(app.findVenueBySlug('kelowna', 'beach', 'test-beach-park'), [], [], []);
+  // Batch 4A: Food & Drink venue pages share the themed shell, so the rule
+  // applies to them too; winery venue pages stay unthemed.
   const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  const winery = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
   const rule = /body\.golf-page \.home-footer-col a, body\.golf-page \.home-footer-region-group a \{ color: rgba\(245,243,237,0\.78\); \}/;
-  for (const html of [golf, beach]) {
+  for (const html of [golf, beach, restaurant]) {
     assert.match(html, /body\.golf-page a \{ color: var\(--ref-navy\); \}/);
     assert.match(html, rule, 'footer link colour restated inside the golf theme');
     assert.match(html, /<footer class="home-footer">/);
   }
-  assert.doesNotMatch(restaurant, rule);
+  assert.doesNotMatch(winery, rule);
 });
 
 test('Golf "At a glance" card renders only curated facts, escaped, in a dl grid; empty for other categories', () => {
@@ -6181,15 +6186,21 @@ test('All-regions category cards show their community; regional category cards d
   assert.doesNotMatch(restaurants, /<p class="venue-meta">Kelowna(?: &middot;|<)/);
 });
 
-test('REGRESSION: themed venue polish is confined to golf and beach venue pages (restaurant pages and listings unchanged)', () => {
+test('REGRESSION: themed venue polish is confined to themed-shell venue pages (winery pages and listings unchanged)', () => {
+  // Batch 4A (2026-09-27): Food & Drink venue pages use the themed shell, so
+  // they get the hero polish -- but never the golf-only content.
   const restaurantVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
-  assert.doesNotMatch(restaurantVenue, /golf-glance|At a glance|Hero: same per-type gradient|venue-hero-type">Indoor Golf</);
+  const restaurantMarkup = restaurantVenue.replace(/<style>[\s\S]*?<\/style>/g, '');
+  assert.match(restaurantVenue, /<style>\s*\/\* Hero: same per-type gradient/);
+  assert.doesNotMatch(restaurantMarkup, /golf-glance|At a glance|venue-hero-type">Indoor Golf</);
+  const wineryVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
+  assert.doesNotMatch(wineryVenue, /golf-glance|At a glance|Hero: same per-type gradient|venue-hero-type">Indoor Golf</);
   // Batch 3 (2026-09-26): long website URLs now wrap on every detail page via
   // the shared .detail-row rule (the Golf pages already had their own); the
   // rest of the Golf venue polish stays confined to the themed pages.
-  assert.match(restaurantVenue, /\.detail-row a \{ overflow-wrap: anywhere; \}/);
-  assert.match(restaurantVenue, /<div class="venue-header">\s*<h1>Test /, 'non-themed pages keep the <h1> in the header');
-  assert.match(restaurantVenue, /<span class="venue-hero-name">/);
+  assert.match(wineryVenue, /\.detail-row a \{ overflow-wrap: anywhere; \}/);
+  assert.match(wineryVenue, /<div class="venue-header">\s*<h1>Test /, 'non-themed pages keep the <h1> in the header');
+  assert.match(wineryVenue, /<span class="venue-hero-name">/);
   const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
   const beachRows = app.getVenuesByRegionCategory('kelowna', 'beach');
   for (const html of [app.renderCategoryPage('kelowna', 'golf', golfRows, []), app.renderCategoryAllRegionsPage('golf', golfRows), app.renderCategoryPage('kelowna', 'beach', beachRows, []), app.renderCategoryAllRegionsPage('beach', beachRows)]) {
@@ -6202,6 +6213,95 @@ test('REGRESSION: non-Golf venue pages carry no data-track attributes, analytics
   const html = app.renderVenuePage(venue, [], [], []);
   assert.doesNotMatch(html, /data-track=|googletagmanager|window\.trackEvent|venue_view|outbound_click/);
   assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>/);
+});
+
+// ==== Batch 4A (2026-09-27): Food & Drink venue pages use the themed shell ====
+//
+// Restaurant, cafe, pub, brewery, cocktail lounge and distillery VENUE pages
+// move from the old siteHeader() shell to the existing themed shell (site
+// header + navigation, Trip tray, <main>, app.css / app.js, body.golf-page,
+// hero title). Shell only: SEO head, content, CTAs and links are unchanged;
+// no Favorite / Add to Trip, analytics or data-track; listings and winery
+// pages are untouched.
+const BATCH4A_FD_TYPES = ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery'];
+const batch4aVenue = (type) => ({ ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), type });
+
+test('Batch 4A: the venue-shell predicate covers exactly the themed types plus the six Food & Drink types', () => {
+  assert.deepEqual([...app.THEMED_VENUE_SHELL_TYPES].sort(), [...BATCH4A_FD_TYPES].sort());
+  for (const t of [...BATCH4A_FD_TYPES, 'golf', 'beach', 'outdoor']) assert.equal(app.usesThemedVenueShell(t), true, t);
+  assert.equal(app.usesThemedVenueShell('winery'), false, 'winery venue pages stay frozen');
+  // The listing / card predicate is unchanged.
+  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'outdoor']);
+  for (const t of BATCH4A_FD_TYPES) assert.equal(app.usesThemedCategoryLayout(t), false, t);
+});
+
+test('Batch 4A: every Food & Drink venue page renders the themed shell with one hero <h1>', () => {
+  for (const type of BATCH4A_FD_TYPES) {
+    const html = app.renderVenuePage(batch4aVenue(type), [], [], []);
+    const label = app.CATEGORY_LABELS[type].singular;
+    assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/, type);
+    assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), `${type}: app.css before the inline SEO CSS`);
+    assert.match(html, /body\.golf-page \{/, type);
+    assert.match(html, /<style>\s*\/\* Hero: same per-type gradient/, `${type}: venue hero polish`);
+    assert.match(html, new RegExp(`<body class="golf-page ${type}-page">`), type);
+    assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/, type);
+    assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${type}: tray precedes the header`);
+    assert.match(html, /<header id="top">/, type);
+    assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, `${type}: old shell header gone`);
+    assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1, `${type}: one <main>`);
+    assert.ok(html.indexOf('<main ') < html.indexOf('<nav class="breadcrumb"') && html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${type}: content inside <main>, footer after`);
+    assert.equal((html.match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1, type);
+    assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${type}: exactly one <h1>`);
+    assert.match(html, new RegExp(`<div class="venue-hero venue-hero-fallback venue-hero-${type}">\\s*<span class="venue-hero-type">${label}</span>\\s*<h1>Test Trattoria</h1>\\s*</div>`), `${type}: hero carries the title`);
+    assert.match(html, /<div class="venue-header">\s*<p class="venue-at-a-glance">/, `${type}: header does not repeat the name`);
+    assert.doesNotMatch(html.replace(/<style>[\s\S]*?<\/style>/g, ''), /venue-hero-name/, `${type}: duplicate hero name removed`);
+  }
+});
+
+test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; no Favorite / Add to Trip, analytics or tracking', () => {
+  for (const type of BATCH4A_FD_TYPES) {
+    const venue = batch4aVenue(type);
+    const html = app.renderVenuePage(venue, [], [], []);
+    const label = app.CATEGORY_LABELS[type];
+    const slug = app.CATEGORY_SLUGS[type];
+    const canonical = `https://okanaganroam.com/kelowna/${slug}/test-trattoria`;
+    const title = `Test Trattoria — ${label.singular} in Kelowna, BC | Okanagan Roam`;
+    const head = html.split('</head>')[0];
+    assert.equal((head.match(/<title>/g) || []).length, 1);
+    assert.ok(head.includes(`<title>${title}</title>`), `${type}: title`);
+    assert.ok(head.includes('<meta name="description" content="A fixture restaurant used only by the automated test suite.">'), `${type}: meta description`);
+    assert.ok(head.includes(`<link rel="canonical" href="${canonical}">`), `${type}: canonical`);
+    assert.ok(head.includes(`<meta property="og:url" content="${canonical}">`), `${type}: og:url`);
+    assert.doesNotMatch(head, /name="robots"/, `${type}: indexable, as before`);
+    const ld = [...head.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
+    assert.equal(ld.length, 2, `${type}: breadcrumb + LocalBusiness JSON-LD`);
+    assert.equal(ld[0]['@type'], 'BreadcrumbList');
+    assert.deepEqual(ld[0].itemListElement.map((i) => i.item), ['https://okanaganroam.com/', 'https://okanaganroam.com/kelowna', `https://okanaganroam.com/kelowna/${slug}`, canonical]);
+    assert.equal(ld[1]['@type'], app.SCHEMA_TYPE_MAP[type] || 'LocalBusiness');
+    assert.equal(ld[1].url, canonical);
+    assert.match(html, new RegExp(`<nav class="breadcrumb"[^>]*>[\\s\\S]*?<a href="/kelowna/${slug}">${label.plural}</a>[\\s\\S]*?Test Trattoria[\\s\\S]*?</nav>`), `${type}: breadcrumb nav`);
+    // Content and CTAs unchanged.
+    assert.match(html, /<p class="venue-description">A fixture restaurant used only by the automated test suite\.<\/p>/);
+    assert.match(html, /<div class="venue-cta-row">\s*<a class="cta secondary" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.888,-119\.496" rel="nofollow noopener" target="_blank">Get Directions<\/a>\s*<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>\s*<\/div>/, `${type}: CTA row unchanged`);
+    assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
+    assert.match(html, /<h2>Good to Know<\/h2>/);
+    // No Favorite / Add to Trip, analytics or tracking.
+    const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '');
+    assert.doesNotMatch(markup, /class="[^"]*\b(fav-btn|trip-btn|card-action)\b|data-venue-category=|data-venue-id=|data-surface=/, `${type}: no Favorite / Add to Trip`);
+    assert.doesNotMatch(html, /googletagmanager|gtag\(|window\.trackEvent|venue_view|outbound_click|data-track=/, `${type}: no analytics`);
+    assert.doesNotMatch(markup, /okanaganFavorites/, `${type}: no standalone engagement script`);
+  }
+});
+
+test('Batch 4A: winery venue pages keep the old shell and their standalone Favorite / Add to Trip controls', () => {
+  const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
+  assert.match(html, /<body>/);
+  assert.match(html, /<header class="top">\s*<a class="brand" href="https:\/\/okanaganroam\.com\/">Okanagan Roam<\/a>\s*<a href="https:\/\/okanaganroam\.com\/">Explore the full directory →<\/a>/);
+  assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<main |<script src="\/scripts\/app\.js">|googletagmanager|Hero: same per-type gradient/);
+  assert.match(html, /<span class="venue-hero-name">Test Winery<\/span>/);
+  assert.match(html, /<div class="venue-header">\s*<h1>Test Winery<\/h1>/);
+  assert.match(html, /data-venue-category="winery"/);
+  assert.match(html, /okanaganFavorites/, 'standalone engagement script still present');
 });
 
 // ==== Golf card Favorite + Add to Trip (2026-09-19, Golf only) ===========
@@ -6587,10 +6687,13 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
   assert.doesNotMatch(card, /data-venue-category|venue-card-link|venue-card-cue|card-actions|golf-desc|venue-advisory/);
   assert.match(card, /<h2><a href="\/kelowna\/restaurants\/test-trattoria">Test Trattoria<\/a><\/h2>/);
   const markupOnly = (html) => html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '');
+  // Batch 4A (2026-09-27): the venue page uses the themed shell (golf-page
+  // theme, app.css, tray, app.js) but still no beach theme, advisory,
+  // Favorite / Add to Trip or tracking markup.
   const page = app.renderVenuePage(trattoria, [], [], []);
-  assert.match(page, /<body>/);
-  assert.doesNotMatch(page, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<script src="\/scripts\/app\.js">|Beach page theme|\.venue-advisory \{/);
-  assert.doesNotMatch(markupOnly(page), /golf-page|beach-page|venue-advisory|data-venue-category|data-track=/);
+  assert.match(page, /<body class="golf-page restaurant-page">/);
+  assert.doesNotMatch(page, /Beach page theme|\.venue-advisory \{/);
+  assert.doesNotMatch(markupOnly(page), /beach-page|venue-advisory|data-venue-category|data-track=/);
   const category = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
   assert.match(category, /<body>/);
   assert.doesNotMatch(category, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<script src="\/scripts\/app\.js">|Beach page theme/);
@@ -6972,9 +7075,14 @@ test('REGRESSION (Outdoors): Golf and Beach pages carry no outdoor theme or mark
   }
   // The beach theme block is byte-identical to its pre-Outdoors form (derived from the same golf rules).
   assert.match(app.renderBeachThemeStyles(), /^<style>\n  \/\* Beach page theme \(2026-09-19\)/);
+  // Batch 4A (2026-09-27): restaurant venue pages use the shared golf-page
+  // shell but never the outdoor theme; winery venue pages stay unthemed.
   const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
   assert.doesNotMatch(restaurant, /Outdoor page theme/);
-  assert.doesNotMatch(outdoorMarkupOnly(restaurant), /golf-page|outdoor-page|data-venue-category/);
+  assert.doesNotMatch(outdoorMarkupOnly(restaurant), /outdoor-page|data-venue-category/);
+  const winery = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
+  assert.doesNotMatch(winery, /Outdoor page theme/);
+  assert.doesNotMatch(outdoorMarkupOnly(winery), /golf-page|outdoor-page/);
 });
 
 test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and after outdoor venues exist; /beaches and /golf unchanged; routes, sitemap and trip API behave (isolated child process)', async () => {
@@ -7272,8 +7380,14 @@ test('REGRESSION (Outdoors Phase 2): Golf/Beach wide pages keep their heading an
   }
   assert.doesNotMatch(golf, /outdoor-page|Outdoor page theme/);
   assert.doesNotMatch(beach, /outdoor-page|Outdoor page theme/);
+  // Batch 4A (2026-09-27): the restaurant venue page now carries the site
+  // header, whose navigation links to /outdoors/*, so only its page content
+  // (<main>) is checked for outdoor discovery sections and links.
   const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
-  assert.doesNotMatch(restaurant, /outdoor-activity|outdoor-intro|\/outdoors\//);
+  const restaurantMain = restaurant.slice(restaurant.indexOf('<main '), restaurant.indexOf('</main>'));
+  assert.ok(restaurantMain.length > 0);
+  assert.doesNotMatch(restaurantMain, /outdoor-activity|outdoor-intro|\/outdoors\//);
+  assert.doesNotMatch(outdoorMarkupOnly(restaurant), /outdoor-activity|outdoor-intro/);
 });
 
 test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a live activity page change nothing on "/", /beaches, /golf, /browse, /trip; activity route, sitemap and 404s behave (isolated child process)', async () => {

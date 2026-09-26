@@ -1196,6 +1196,19 @@ function usesEngagementControls(type) {
   return usesThemedCategoryLayout(type) || ENGAGEMENT_ONLY_TYPES.has(type);
 }
 
+// Types whose individual VENUE pages use the themed page shell (Batch 4A,
+// 2026-09-27): the site header and navigation, Trip tray, <main>, app.css /
+// app.js, the body.golf-page theme and the hero title. Food & Drink venue
+// pages join the themed types here. Shell only: this set is consulted by
+// renderVenuePage() alone, so their listings and cards are unchanged, and
+// it adds no Favorite / Add to Trip controls, analytics or data-track
+// attributes (those stay on usesEngagementControls() /
+// usesThemedCategoryLayout()). Wineries stay out (frozen 2026-09-23).
+const THEMED_VENUE_SHELL_TYPES = new Set(['cafe', 'restaurant', 'pub', 'brewery', 'cocktail', 'distillery']);
+function usesThemedVenueShell(type) {
+  return usesThemedCategoryLayout(type) || THEMED_VENUE_SHELL_TYPES.has(type);
+}
+
 // Categories that exist as venue pages but are deliberately NOT offered
 // by the Build My Trip planner yet (interest chips on /trip, the
 // `interests` field of POST /api/trip/generate, the LLM/deterministic
@@ -12448,7 +12461,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // and the header below no longer repeats it. No golf or beach venue has
   // an image_url today; if one ever does, the photo hero renders and the
   // <h1> falls back into the header.
-  const themedHeroTitle = usesThemedCategoryLayout(venue.type) && !venue.image_url;
+  const themedShell = usesThemedVenueShell(venue.type);
+  const themedHeroTitle = themedShell && !venue.image_url;
   const imageHtml = venue.image_url
     ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>`
     : themedHeroTitle
@@ -12584,11 +12598,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !usesThemedCategoryLayout(venue.type) ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !usesThemedCategoryLayout(venue.type) ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type)}
 </head>
-<body${themedBodyClassAttr(venue.type)}>
-  ${usesThemedCategoryLayout(venue.type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+<body${themedBodyClassAttr(venue.type, themedShell)}>
+  ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${venue.region}` },
@@ -12614,9 +12628,9 @@ ${golfEngagementHeadHtml(venue.type)}
   ${nearbyHtml}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
   <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
-  ${usesThemedCategoryLayout(venue.type) ? '</main>' : ''}
+  ${themedShell ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
-  ${usesThemedCategoryLayout(venue.type) ? GOLF_APP_SCRIPT_TAG : ''}
+  ${themedShell ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfVenueEngagementScriptHtml(venue)}
 </body>
 </html>`;
@@ -17622,6 +17636,8 @@ module.exports = {
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
+  THEMED_VENUE_SHELL_TYPES,
+  usesThemedVenueShell,
   themedBodyClassAttr,
   TRIP_PLANNER_EXCLUDED_TYPES,
   TRIP_INTEREST_TYPES,
