@@ -9156,7 +9156,13 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d', 'okanagan.html (header navigation redesign 2026-09-25)');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
   assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
-  assert.equal(md5('public/scripts/app.js'), '533569598f250f4975fbab9fa2900da3', 'public/scripts/app.js (+11 EN/FR header labels 2026-09-25)');
+  // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
+  // fetches the full venue list (/api/venues?limit=5000, ~2 MB) on pages
+  // without the /browse #venueGrid -- including the homepage, which never used
+  // it. Verified before this hash was updated: homepage HTML, DOM after
+  // scripts and after interactions, network (minus that one request), console
+  // and screenshots unchanged at 390px and 1280px.
+  assert.equal(md5('public/scripts/app.js'), 'db7b8c66f1cd176b3be54bc0f760cc6b', 'public/scripts/app.js (Batch 2: venue list fetched only by /browse, 2026-09-26)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -10808,7 +10814,9 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d');
-  assert.equal(md5('public/scripts/app.js'), '533569598f250f4975fbab9fa2900da3');
+  // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
+  // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
+  assert.equal(md5('public/scripts/app.js'), 'db7b8c66f1cd176b3be54bc0f760cc6b');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();

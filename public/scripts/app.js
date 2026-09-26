@@ -999,20 +999,34 @@ function renderVenueCards(venues){
 
 async function loadVenuesAndInit(){
   var grid = document.getElementById('venueGrid');
-  try {
-    var res = await fetch(API_BASE + '/api/venues?limit=5000');
-    if (!res.ok) throw new Error('API responded with ' + res.status);
-    var data = await res.json();
-    window.__allVenues = data.venues;
-    renderVenueCards(data.venues);
-    applyOpenStatusToHeroAndFeatured(data.venues);
-  } catch (err) {
-    console.error('Could not load venues from the API:', err);
-    if (grid) {
+  // The full venue list (~2 MB) is only needed where it is rendered: the
+  // /browse results grid (#venueGrid). Every other page that loads this
+  // script -- the homepage, the hubs, themed venue pages, /trip -- has
+  // server-rendered content and nothing that reads this data
+  // (applyOpenStatusToHeroAndFeatured's .hero-scene/.featured-card targets
+  // and the spotlight banner exist on no page), so it is not fetched there
+  // (2026-09-26). The init blocks below still run on every page, after the
+  // document has been parsed -- the same place in the page's script order
+  // they ran in when they followed the fetch.
+  if (grid) {
+    try {
+      var res = await fetch(API_BASE + '/api/venues?limit=5000');
+      if (!res.ok) throw new Error('API responded with ' + res.status);
+      var data = await res.json();
+      window.__allVenues = data.venues;
+      renderVenueCards(data.venues);
+      applyOpenStatusToHeroAndFeatured(data.venues);
+    } catch (err) {
+      console.error('Could not load venues from the API:', err);
       grid.innerHTML = '<p style="grid-column:1/-1; text-align:center; padding:40px; color:rgba(42,32,25,0.7);">' +
         'Couldn\u2019t load venues. Make sure the Okanagan Roam API is running at ' + API_BASE + ' (see /okanagan-backend/README.md).' +
         '</p>';
     }
+  } else {
+    await new Promise(function(resolve){
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', resolve, { once: true });
+      else resolve();
+    });
   }
 
   // These run regardless of whether the venue fetch succeeded, so the
@@ -3540,7 +3554,9 @@ document.addEventListener('click', function(e){
     try { history.pushState(null, '', '#' + id); } catch (err) {}
   }
 
-  if (window.__allVenues) {
+  // Only the /browse venue grid loads (and grows the page) asynchronously;
+  // everywhere else the layout is already final, so scroll straight away.
+  if (window.__allVenues || !document.getElementById('venueGrid')) {
     doScroll();
   } else {
     // Venues haven't loaded yet — wait briefly rather than scrolling to a
