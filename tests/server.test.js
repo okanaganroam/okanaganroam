@@ -9478,7 +9478,7 @@ test('Trip itinerary (server): dinner + a hockey game, a family activity + an ev
     assert.equal(second.event.name, 'TI Kelowna Rockets Hockey Game');
     assert.equal(second.event.time, '7 pm');
     assert.equal(second.timeKnown, true);
-    assert.match(hockey.experience.text, /before heading to the rink for a hockey night\. The game starts at 7 pm/);
+    assert.match(hockey.experience.text, /then head to the rink for the hockey game\. The game starts at 7 pm/);
     assert.equal(hockey.seeAll, null);
     assert.deepEqual(hockey.trip.components.map((c) => c.kind), ['venue', 'event']);
     // "This weekend" is the event's window: an event that weekend, never next Tuesday's fair.
@@ -9540,6 +9540,28 @@ test('Trip itinerary (server): "live music" / "concert at night" pick a real eve
       db.prepare('DELETE FROM events WHERE id = ?').run(id);
     }
   }
+});
+
+test('Trip itinerary (server): the trip season comes from the Okanagan (America/Vancouver) date, never the UTC date', () => {
+  // 05:00 UTC on Dec 1 is still Nov 30 in the Okanagan; 09:00 UTC is Dec 1.
+  assert.equal(app.tripPlanDate(null, new Date('2030-12-01T05:00:00Z')), '2030-11-30');
+  assert.equal(app.tripPlanDate(null, new Date('2030-12-01T09:00:00Z')), '2030-12-01');
+  const wed = new Date('2030-10-02T19:00:00Z'); // Wednesday 2030-10-02, Okanagan
+  assert.equal(app.tripPlanDate({ preset: 'today' }, wed), '2030-10-02');
+  assert.equal(app.tripPlanDate({ relative: 'tomorrow' }, wed), '2030-10-03');
+  assert.equal(app.tripPlanDate({ weekday: 'saturday' }, wed), '2030-10-05');
+  assert.equal(app.tripPlanDate({ weekday: 'wednesday' }, wed), '2030-10-02');
+  assert.equal(app.tripPlanDate({ preset: 'this-weekend' }, wed), '2030-10-05');
+  assert.equal(app.tripPlanDate({ preset: 'this-weekend' }, new Date('2030-10-06T19:00:00Z')), '2030-10-06', 'on a Sunday, this weekend is today');
+  const nov = app.runTripPlan({ text: 'Beach and coffee in Kelowna.' }, new Date('2030-12-01T05:00:00Z'));
+  assert.equal(nov.kind, 'itinerary');
+  assert.deepEqual(nov.season, { date: '2030-11-30', season: 'fall', month: 'November' });
+  const dec = app.runTripPlan({ text: 'Beach and coffee in Kelowna.' }, new Date('2030-12-01T09:00:00Z'));
+  assert.deepEqual(dec.season, { date: '2030-12-01', season: 'winter', month: 'December' });
+  // The planner facts carry the seasonal inputs, read only.
+  const facts = app.buildTripPlannerFacts();
+  assert.ok(facts.every((f) => 'advisory' in f && 'dogNote' in f && Array.isArray(f.golfSeasons)));
+  assert.ok(!nov.experience || nov.experience.title === 'What to expect');
 });
 
 test('Trip itinerary (server): /api/discover is untouched by multi-part requests, and the /trip script renders itineraries', () => {

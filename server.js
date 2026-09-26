@@ -3162,6 +3162,9 @@ function buildTripPlannerFacts() {
   for (const a of OUTDOOR_ACTIVITIES) for (const id of getCollectionVenueIds(a.kind)) addMember(id, { kind: 'activities', value: a.slug });
   for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) addMember(id, { kind: 'fdTypes', value: type });
   const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all();
+  const advisories = getAdvisoryNotesWithDates();
+  const dogNotes = getDogFriendlyNotes();
+  const golfWindows = getGolfRateWindows();
   const facts = [];
   for (const v of rows) {
     if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
@@ -3178,9 +3181,52 @@ function buildTripPlannerFacts() {
       features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
       hours: v.hours || null, // the stored JSON; parsed (never modified) by the planner
+      // Seasonal inputs (read only by the multi-part itinerary planner): the
+      // venue's current advisory note, its dog-beach access note, and a golf
+      // course's published rate windows.
+      advisory: advisories.get(v.id) || null,
+      dogNote: dogNotes.get(v.id) || null,
+      golfSeasons: v.type === 'golf' ? (golfWindows.get(`${v.region}/${v.slug}`) || []) : [],
     });
   }
   return facts;
+}
+
+// venue id -> { note, addedAt } for the advisory collection (the most recent
+// note wins, as on venue pages).
+function getAdvisoryNotesWithDates() {
+  const map = new Map();
+  for (const r of db.prepare(`
+    SELECT ci.content_id AS id, ci.note AS note, ci.created_at AS added_at
+    FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE c.kind = ? AND ci.content_type = 'venue'
+    ORDER BY ci.created_at ASC, ci.rowid ASC
+  `).all(ADVISORY_COLLECTION_KIND)) map.set(r.id, { note: r.note || '', addedAt: r.added_at || null });
+  return map;
+}
+// 'region/slug' -> [{ label, from: 'MM-DD', to: 'MM-DD' }]: the dated rate
+// windows a course publishes (golf_green_fees.valid_from / valid_to, from a
+// published or dynamic fee set). Empty when golf data is not loaded.
+function getGolfRateWindows() {
+  const map = new Map();
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT f.venue_key, f.season_label, f.valid_from, f.valid_to
+      FROM golf_green_fees f JOIN golf_fee_sets s ON s.venue_key = f.venue_key
+      WHERE s.status IN ('published', 'dynamic') AND f.valid_from IS NOT NULL AND f.valid_to IS NOT NULL
+      ORDER BY f.venue_key, f.position
+    `).all();
+  } catch (e) { rows = []; }
+  for (const r of rows) {
+    if (!parseLocalDate(r.valid_from) || !parseLocalDate(r.valid_to)) continue;
+    const w = { label: r.season_label ? String(r.season_label).replace(/\s*\(.*\)\s*$/, '').trim().toLowerCase() : null, from: r.valid_from.slice(5), to: r.valid_to.slice(5) };
+    if (!map.has(r.venue_key)) map.set(r.venue_key, []);
+    const list = map.get(r.venue_key);
+    if (!list.some((x) => x.from === w.from && x.to === w.to)) list.push(w);
+  }
+  return map;
 }
 
 function tripPlannerLabels() {
@@ -3243,6 +3289,21 @@ function tripStartWeekday(when, now = new Date()) {
     return wd === 0 ? 'sun' : 'sat';
   }
   return null;
+}
+
+// The Okanagan calendar date ('YYYY-MM-DD') a trip is for, for its season:
+// today, tomorrow, the next named weekday (today included), or the coming
+// Saturday for "this weekend" (today on a weekend); otherwise today. Always
+// the America/Vancouver date (todayLocal), never UTC.
+function tripPlanDate(when, now = new Date()) {
+  const today = todayLocal(now);
+  if (!when) return today;
+  if (when.relative === 'tomorrow') return addLocalDays(today, 1);
+  const names = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const wd = localWeekday(today);
+  if (when.weekday && names.includes(when.weekday.slice(0, 3))) return addLocalDays(today, (names.indexOf(when.weekday.slice(0, 3)) - wd + 7) % 7);
+  if (when.preset === 'this-weekend') return wd === 0 || wd === 6 ? today : addLocalDays(today, 6 - wd);
+  return today;
 }
 
 // The Okanagan wall clock at an instant: { weekday: 'thu', minutes: 1266 }
@@ -3347,6 +3408,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       avoidIds: avoidVenueIds,
       startWeekday: tripStartWeekday(trip.when, now),
       clock: okanaganClock(now),
+      tripDate: tripPlanDate(trip.when, now),
     });
     plan.seeAll = null;
     if (eventWindow) plan.eventWindow = eventWindow;
@@ -17600,6 +17662,7 @@ module.exports = {
   parseTripPlanBody,
   runTripPlan,
   tripStartWeekday,
+  tripPlanDate,
   okanaganClock,
   venueHoursStatusAt,
   openNowEligibility,

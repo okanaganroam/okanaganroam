@@ -132,9 +132,9 @@ test('request 1: Kelowna -> Penticton with a dog: a dog-friendly cafe AND a dog-
   assert.ok(!stops.some((s) => ['Vernon Dog Cafe', 'Naramata Dog Cafe', 'Osoyoos Dog Beach'].includes(s.venue.name)), 'off-corridor places are not used');
   assert.ok(!plan.warnings.includes(NO_MATCH_ALL));
   assert.ok(!JSON.stringify(plan.itinerary).includes('driving'), '"driving" is never a search term');
-  assert.equal(plan.experience.title, 'Your Okanagan road trip');
+  assert.equal(plan.experience.title, 'What to expect');
   assert.match(plan.experience.text, /^Enjoy an easygoing drive south from Kelowna to Penticton with your dog, stopping for some time on the beach and coffee along the way\./, 'stops are named in travel order: Peachland beach, then Summerland cafe');
-  assert.ok(sentences(plan.experience.text) <= 2);
+  assert.ok(sentences(plan.experience.text) <= 3);
   assert.equal(plan.summary, 'Dog-friendly cafes and beaches from Kelowna to Penticton.');
 });
 
@@ -152,8 +152,8 @@ test('request 2: dinner and a hockey game: dinner in the event’s region, befor
   assert.equal(second.timeKnown, true);
   assert.deepEqual(second.caveats, []);
   assert.deepEqual(plan.warnings, []);
-  assert.equal(plan.experience.title, 'Your Okanagan evening');
-  assert.equal(plan.experience.text, 'Start with dinner in Summerland before heading to the rink for a hockey night. The game starts at 7 pm, so there’s time for an unhurried dinner first.');
+  assert.equal(plan.experience.title, 'What to expect');
+  assert.equal(plan.experience.text, 'Start with a relaxed dinner in Summerland, then head to the rink for the hockey game. The game starts at 7 pm, so there’s time to enjoy dinner first.');
   assert.equal(plan.summary, 'Dinner and a hockey game.');
 });
 
@@ -189,7 +189,7 @@ test('beach during the day and a concert at night: a daytime beach, then the eve
   assert.equal(a.venue.type, 'beach');
   assert.equal(b.kind, 'event');
   assert.equal(b.daypart, 'evening', '8 pm');
-  assert.equal(plan.experience.text, 'Spend some time on the beach, then finish with the concert in the evening.');
+  assert.equal(plan.experience.text, 'Spend some time on the beach during the day, then stay in Kelowna for an evening concert. The concert starts at 8 pm, so the day flows easily into the evening.');
 });
 
 test('family activities and an event this weekend: the family preference applies to the activity, the event keeps the weekend', () => {
@@ -210,7 +210,7 @@ test('cafe and beach: two parts, never one listing that is both', () => {
   assert.deepEqual(trip.components.map((c) => c.types), [['cafe'], ['beach']]);
   const types = venueStops(plan).map((s) => s.venue.type).sort();
   assert.deepEqual(types, ['beach', 'cafe']);
-  assert.equal(plan.experience.text, 'Stop for coffee, then spend some time on the beach in Kelowna.');
+  assert.equal(plan.experience.text, 'Stop for coffee first, then spend some time on the beach. Both stops are in Kelowna, keeping the outing simple.');
 });
 
 test('a part with no match is reported on its own; the rest of the itinerary is kept', () => {
@@ -276,10 +276,10 @@ test('event start times: parsed only from a stated clock time', () => {
 });
 
 // ---- the experience description --------------------------------------------
-test('experience: at most two sentences, only the chosen parts, and none for a single stop', () => {
+test('experience: at most three sentences, only the chosen parts, and none for a single stop', () => {
   for (const [q, ev] of [['dinner and a hockey game', { hockey: [HOCKEY_7PM] }], ['cafe and beach in Kelowna', {}], ['wine tasting and live music', { 'live-music': [CONCERT] }]]) {
     const { plan } = run(q, ev);
-    assert.ok(plan.experience && sentences(plan.experience.text) <= 2, q);
+    assert.ok(plan.experience && sentences(plan.experience.text) <= 3, q);
   }
   const { plan } = run('dog friendly cafes and a distillery in Summerland');
   assert.equal(plan.experience, null, 'one stop is not a combination');
@@ -340,31 +340,32 @@ test('fix 1: explicit geography wins -- a route or a named town is never replace
 });
 
 test('fix 2: every selected activity is named -- hiking + fishing, cafe + beach, dinner + hockey, winery + live music', () => {
-  assert.equal(run('hiking and fishing near Peachland').plan.experience.text, 'Enjoy a scenic hike, then spend some time fishing in Peachland.');
-  assert.equal(run('cafe and beach in Kelowna').plan.experience.text, 'Stop for coffee, then spend some time on the beach in Kelowna.');
+  assert.equal(run('hiking and fishing near Peachland').plan.experience.text, 'Enjoy a scenic hike first, then spend some time fishing. Both stops are in Peachland, keeping the outing simple.');
+  assert.equal(run('cafe and beach in Kelowna').plan.experience.text, 'Stop for coffee first, then spend some time on the beach. Both stops are in Kelowna, keeping the outing simple.');
   assert.equal(run('dinner and a hockey game', { hockey: [HOCKEY_7PM] }).plan.experience.text,
-    'Start with dinner in Summerland before heading to the rink for a hockey night. The game starts at 7 pm, so there’s time for an unhurried dinner first.');
-  assert.equal(run('wine tasting and live music', { 'live-music': [CONCERT] }).plan.experience.text, 'Enjoy a wine tasting, then finish with some live music in the evening.');
+    'Start with a relaxed dinner in Summerland, then head to the rink for the hockey game. The game starts at 7 pm, so there’s time to enjoy dinner first.');
+  assert.equal(run('wine tasting and live music', { 'live-music': [CONCERT] }).plan.experience.text,
+    'Enjoy a wine tasting during the day, then stay in Kelowna for some live music in the evening. The music starts at 8 pm, so the day flows easily into the evening.');
   // Without an event, the live-music stop is named for what it is.
-  assert.equal(run('wine tasting and live music').plan.experience.text, 'Enjoy a wine tasting, then catch some live music in Kelowna.');
+  assert.equal(run('wine tasting and live music').plan.experience.text, 'Enjoy a wine tasting first, then catch some live music. Both stops are in Kelowna, keeping the outing simple.');
 });
 
 test('fix 3: a generic event is named, placed at its real time, and only "finished with" when it is the evening close', () => {
   // Morning event (10 am): it comes first; no "finish with".
   const morning = run('family activities and an event this weekend', { event: [FAMILY_EVENT] }).plan;
   assert.deepEqual(morning.itinerary.stops.map((s) => s.kind), ['event', 'venue']);
-  assert.equal(morning.experience.text, 'Start the day at the Harvest Family Fair (10 am), then spend some time in nature with the family.');
+  assert.equal(morning.experience.text, 'Start the day at the Harvest Family Fair (10 am), then spend some time in nature with the family. Both stops are in Kelowna, so the day stays easy to manage.');
   assert.ok(!/finish/i.test(morning.experience.text));
   // Evening event (7 pm): the day's stop first, the named event as the close.
   const evening = run('cafes and an event', { event: [EVENING_EVENT] }).plan;
   assert.deepEqual(evening.itinerary.stops.map((s) => s.kind), ['venue', 'event']);
-  assert.equal(evening.experience.text, 'Stop for coffee, then finish at the Autumn Lantern Walk in the evening.');
-  assert.equal(evening.experience.title, 'Your Okanagan evening');
+  assert.equal(evening.experience.text, 'Stop for coffee during the day, then stay in Kelowna for the Autumn Lantern Walk in the evening. It starts at 7 pm, so the day flows easily into the evening.');
+  assert.equal(evening.experience.title, 'What to expect');
   // "Times vary": named, no time stated, no "finish with".
   const vary = run('cafes and an event', { event: [VARY_EVENT] }).plan;
-  assert.equal(vary.experience.text, 'Stop for coffee, then head to the Night Market Series. Times vary, so check the event page for the schedule.');
+  assert.equal(vary.experience.text, 'Stop for coffee, then head to the Night Market Series. Both stops are in Kelowna, keeping the day simple. Times vary, so check the event page for the schedule.');
   assert.ok(!/finish/i.test(vary.experience.text) && !/\d\s?(am|pm)/.test(vary.experience.text));
-  for (const p of [morning, evening, vary]) assert.ok(sentences(p.experience.text) <= 2);
+  for (const p of [morning, evening, vary]) assert.ok(sentences(p.experience.text) <= 3);
 });
 
 // ---- event intent fix (2026-09-26): event kind + requested time of day -------
@@ -396,7 +397,7 @@ test('"Wine tasting and live music": a real music performance, never the musical
   assert.equal(ev.event.name, 'Jeff Piattelli Live');
   assert.ok(!plan.itinerary.stops.some((s) => s.kind === 'event' && /Junie/.test(s.event.name)));
   assert.equal(venueStops(plan)[0].venue.type, 'winery');
-  assert.equal(plan.experience.text, 'Start with some live music at 3 pm, then enjoy a wine tasting.');
+  assert.equal(plan.experience.text, 'Start with some live music at 3 pm, then enjoy a wine tasting. Both stops are in Kelowna, so the day stays easy to manage.');
   assert.ok(!/at the music/.test(plan.experience.text));
 });
 
@@ -407,7 +408,7 @@ test('"Beach during the day and a concert at night": the concert is an evening o
   const ev = plan.itinerary.stops[1];
   assert.equal(ev.event.name, 'Live Music: Papa Wheely @The Hub on Martin');
   assert.equal(ev.daypart, 'evening');
-  assert.equal(plan.experience.text, 'Spend some time on the beach, then finish with the concert in the evening.');
+  assert.equal(plan.experience.text, 'Spend some time on the beach during the day, then stay in Penticton for an evening concert. The concert starts at 9 pm, so the day flows easily into the evening.');
   // Only daytime music on offer: reported honestly, the beach is kept.
   const noNight = run('Beach during the day and a concert at night.', { concert: [JUNIE, DAY_SET] }).plan;
   assert.deepEqual(noNight.itinerary.stops.map((s) => s.kind), ['venue']);

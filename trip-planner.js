@@ -1136,15 +1136,6 @@ const ITIN_DAYPART_RANK = { morning: 0, midday: 1, afternoon: 2, evening: 3 };
 // Live Music badge is set -- only venue types that carry that badge.
 const LIVE_MUSIC_VENUE_TYPES = ['pub', 'cocktail', 'brewery', 'restaurant', 'winery'];
 const ITIN_VENUE_NOUN = { cafe: 'coffee', restaurant: 'a meal', beach: 'some time on the beach', winery: 'a wine tasting', brewery: 'a craft beer', pub: 'a pub stop', cocktail: 'cocktails', distillery: 'a distillery tasting', outdoor: 'some time outdoors', golf: 'a round of golf' };
-// Event wording. `go` is used when the event is not the last, evening stop;
-// `finish` only when it is ("finish with" never describes a 10 am event).
-const ITIN_EVENT_WORDS = {
-  hockey: { lead: 'heading to the rink for a hockey night', go: 'head to the rink for the hockey game', finish: 'finish with a hockey night at the rink', first: 'Start at the rink with the hockey game', short: 'game' },
-  concert: { lead: 'heading out for the concert', go: 'head to the concert', finish: 'finish with the concert', first: 'Start with the concert', short: 'concert' },
-  'live-music': { lead: 'catching some live music', go: 'catch some live music', finish: 'finish with some live music', first: 'Start with some live music', short: 'music' },
-};
-// Generic event kinds are described by the chosen event's own name.
-const ITIN_GENERIC_EVENTS = ['event', 'festival', 'market', 'show'];
 // One visitor-facing phrase per stop, from what that stop actually is.
 const ITIN_TYPE_VERB = {
   cafe: 'stop for coffee', restaurant: 'sit down for a meal', beach: 'spend some time on the beach', winery: 'enjoy a wine tasting',
@@ -1201,73 +1192,164 @@ function venueVerb(stop) {
   if (act) return ITIN_ACTIVITY_VERB[act];
   return ITIN_TYPE_VERB[stop.venue.type] || 'make a stop';
 }
-function verbList(stops) {
-  const phrases = [];
-  for (const s of stops) { const v = venueVerb(s); if (!phrases.includes(v)) phrases.push(v); }
-  if (phrases.length <= 1) return phrases.join('');
-  if (phrases.length === 2) return `${phrases[0]}, then ${phrases[1]}`;
-  return `${phrases.slice(0, -1).join(', then ')}, and ${phrases[phrases.length - 1]}`;
-}
 const cap = (t) => t.replace(/^./, (x) => x.toUpperCase());
 // "the Harvest Family Fair", "the Autumn Lantern Walk" -- but a title that is
 // not a kind of event ("Skillful") keeps its name bare.
 const EVENT_NOUN_RE = /\b(fair|festival|market|walk|series|show|concert|parade|tournament|night|games?|tour|exhibition|celebration|fest|expo|gala|party|jam|classic)\b/i;
 const theName = (name) => (/^the\s/i.test(name) || !EVENT_NOUN_RE.test(name) ? name : `the ${name}`);
-// Two sentences at most, built only from the stops that were chosen.
-function buildExperience(stops, trip, route, ctx) {
+// "What to expect" (2026-09-26): one to three sentences, built only from the
+// stops that were chosen -- their kinds and order, the part of the day, their
+// towns, the event's own listed name and stated start time, the visitor's dog
+// and kids words, a stop's current advisory, and the season when it changed
+// the plan. No distances, travel times, weather, opening status or detail the
+// stops do not carry; a part that found no match is never described.
+const EXPERIENCE_TITLE = 'What to expect';
+const EXPERIENCE_MAX_SENTENCES = 3;
+const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
+function townOf(s) {
+  if (s.kind === 'venue') return s.venue.regionLabel || null;
+  return s.event.valleyWide ? null : (s.event.regionLabel || null);
+}
+// Event wording: `go` (from the previous stop), `to` (after "head to <town>
+// for"), `evening` (after daytime stops), `first` (opening the plan with it),
+// `short` (subject of "... starts at 7 pm").
+function eventWords(e) {
+  const kind = e.component.event.kind;
+  if (kind === 'hockey') return { go: 'head to the rink for the hockey game', to: 'the hockey game', evening: 'an evening hockey game', first: 'Start at the rink with the hockey game', short: 'The game' };
+  if (kind === 'concert') return { go: 'head out for the concert', to: 'the concert', evening: 'an evening concert', first: 'Start with the concert', short: 'The concert' };
+  if (kind === 'live-music') return { go: 'catch some live music', to: 'some live music', evening: 'some live music in the evening', first: 'Start with some live music', short: 'The music' };
+  const n = theName(e.event.name);
+  return { generic: true, name: n, go: `head to ${n}`, to: n, evening: `${n} in the evening`, first: `Start at ${n}`, short: 'It' };
+}
+// A beach out of the swimming season is described as the lakeside stop it is.
+function expVerb(s) {
+  const f = s.seasonFlags || {};
+  if (s.venue.type === 'beach' && !stopActivity(s) && f.beachOff) return s.swimPart ? 'spend some time by the lake' : 'take a walk along the beach';
+  return venueVerb(s);
+}
+function expVerbList(list) {
+  const phrases = [];
+  for (const s of list) { const v = expVerb(s); if (!phrases.includes(v)) phrases.push(v); }
+  if (phrases.length <= 1) return phrases.join('');
+  if (phrases.length === 2) return `${phrases[0]}, then ${phrases[1]}`;
+  return `${phrases.slice(0, -1).join(', then ')}, and ${phrases[phrases.length - 1]}`;
+}
+// "then head to Penticton to ..." only when the next stops move town.
+function thenClause(list, fromTown) {
+  const t = townOf(list[0]);
+  const same = list.every((s) => townOf(s) === t);
+  return same && t && fromTown && t !== fromTown ? `then head to ${t} to ${expVerbList(list)}` : `then ${expVerbList(list)}`;
+}
+// The one seasonal sentence, only when the season changed the plan.
+function seasonLine(stops, season) {
+  if (!season) return '';
+  const m = season.monthName;
+  const has = (k) => stops.some((s) => s.seasonFlags && s.seasonFlags[k]);
+  if (has('swimOff')) return `Lake swimming here is a summer activity, so in ${m} the beach is planned as a lakeside stop rather than a swim.`;
+  if (has('waterOff')) return `Water activities here are mostly a summer activity, so check with the operator before you plan around it in ${m}.`;
+  if (has('snowOff')) return `Snow activities here run in winter, so check what’s operating in ${m} before you go.`;
+  if (has('golfCheck')) return `Outdoor golf here is seasonal, so check the course is open in ${m} before you go.`;
+  if (has('campingOff')) return `Many campgrounds here are seasonal, so check it’s open in ${m} before you go.`;
+  if (has('beachOff')) return `In ${m} the beach is a lakeside walk rather than a swim.`;
+  if (has('snowIn')) return `It’s ${m}, so the plan leans into the winter season.`;
+  return '';
+}
+// Sentences by priority -- the flow, a stated start time, then an advisory,
+// the season and the dog -- kept to three, then read back in plan order.
+function composeExperience(title, flow, timing, geo, stops, venues, season) {
+  const adv = venues.find((s) => s.advisory);
+  const dog = venues.length > 0 && venues.every((s) => s.component.dog);
+  const candidates = [
+    { rank: 0, text: flow },
+    { rank: 1, text: timing },
+    { rank: 2, text: adv ? `${adv.venue.name} has a current advisory on Okanagan Roam, so read the note on its card before you go.` : '' },
+    { rank: 3, text: seasonLine(stops, season) },
+    { rank: 4, text: dog ? (venues.length > 1 ? 'Every place on the plan is listed as dog friendly, so your dog can come along.' : 'It’s listed as dog friendly, so your dog can come along.') : '' },
+    { rank: 5, text: geo },
+  ].filter((x) => x.text);
+  const kept = candidates.slice(0, EXPERIENCE_MAX_SENTENCES);
+  const order = [0, 5, 1, 2, 3, 4];
+  kept.sort((a, b) => order.indexOf(a.rank) - order.indexOf(b.rank));
+  return { title, text: kept.map((x) => x.text).join(' ') };
+}
+function buildExperience(stops, trip, route, ctx, season) {
+  if (!stops.length) return null;
   const venues = stops.filter((s) => s.kind === 'venue');
   const events = stops.filter((s) => s.kind === 'event');
-  if (!stops.length) return null;
-  const dog = venues.length > 0 && venues.every((s) => s.component.dog);
-  const kids = venues.some((s) => s.component.kids);
-  const sameTown = (list) => (list.length && list.every((s) => s.venue.region === list[0].venue.region) ? ` in ${list[0].venue.regionLabel}` : '');
+  const family = venues.some((s) => s.component.kids) ? ' with the family' : '';
+  const towns = Array.from(new Set(stops.map(townOf)));
+  const oneTown = towns.length === 1 && towns[0] ? towns[0] : null;
+  const together = (n) => (n === 2 ? 'Both stops are' : `All ${COUNT_WORDS[n] || n} stops are`);
   if (route && venues.length) {
     const nouns = [];
-    for (const s of venues) { const n = venueNoun(s); if (!nouns.includes(n)) nouns.push(n); }
+    for (const s of venues) { const n = expVerb(s) !== venueVerb(s) ? expVerb(s).replace(/^(spend|take) /, '') : venueNoun(s); if (!nouns.includes(n)) nouns.push(n); }
     const to = route.to ? regionLabel(ctx, route.to) : null;
     const from = route.from ? regionLabel(ctx, route.from) : null;
     const where = from && to ? `drive ${route.direction ? `${route.direction} ` : ''}from ${from} to ${to}` : `trip to ${to}`;
-    const s1 = `Enjoy an easygoing ${where}${dog ? ' with your dog' : ''}, stopping for ${listText(nouns)} along the way.`;
-    const s2 = dog ? 'Each stop is one Okanagan Roam lists as dog friendly, so your dog can come along.' : '';
-    return { title: 'Your Okanagan road trip', text: [s1, s2].filter(Boolean).join(' ') };
+    const dog = venues.every((s) => s.component.dog);
+    const flow = `Enjoy an easygoing ${where}${dog ? ' with your dog' : ''}, stopping for ${listText(nouns)} along the way.`;
+    const geo = venues.length > 1 && towns.length > 1 ? `The stops follow the road in order, from ${towns[0]} to ${towns[towns.length - 1]}.` : '';
+    return composeExperience(EXPERIENCE_TITLE, flow, '', geo, stops, venues, season);
   }
   if (events.length) {
     const e = events[0];
     const idx = stops.indexOf(e);
-    const kind = e.component.event.kind;
-    const generic = ITIN_GENERIC_EVENTS.includes(kind) || !ITIN_EVENT_WORDS[kind];
-    const words = generic
-      ? { lead: `heading to ${theName(e.event.name)}`, go: `head to ${theName(e.event.name)}`, finish: `finish at ${theName(e.event.name)}` }
-      : ITIN_EVENT_WORDS[kind];
+    const W = eventWords(e);
+    const time = e.timeKnown ? e.event.time : null;
+    const eTown = townOf(e);
     const before = venues.filter((s) => stops.indexOf(s) < idx);
     const after = venues.filter((s) => stops.indexOf(s) > idx);
     const lastAndEvening = idx === stops.length - 1 && e.daypart === 'evening';
-    const family = kids ? ' with the family' : '';
-    const meal = before.find((s) => s.component.meal || s.venue.type === 'restaurant');
-    let s1, s2 = '';
-    if (meal && lastAndEvening) {
-      const town = meal.venue.region === e.event.region ? ` in ${meal.venue.regionLabel}` : '';
-      const mealWord = meal.component.meal || 'meal';
-      s1 = `Start with ${meal.component.meal || 'a meal'}${town} before ${words.lead}.`;
-      s2 = e.timeKnown
-        ? `${generic ? 'It' : `The ${words.short}`} starts at ${e.event.time}, so there’s time for an unhurried ${mealWord} first.`
-        : `Start times vary, so check the event page before you settle on a ${mealWord} time.`;
-    } else if (before.length) {
-      const next = lastAndEvening ? `${words.finish} in the evening` : `${words.go}${e.timeKnown ? ` at ${e.event.time}` : ''}`;
-      s1 = `${cap(verbList(before))}${family}, then ${next}.`;
+    const title = EXPERIENCE_TITLE;
+    let flow, timing = '', geo = '';
+    if (lastAndEvening && before.length) {
+      const prevTown = townOf(before[before.length - 1]);
+      const moveTo = eTown && prevTown && eTown !== prevTown ? eTown : null;
+      const meal = before.length === 1 && (before[0].component.meal || before[0].venue.type === 'restaurant') ? before[0] : null;
+      if (meal) {
+        const mealWord = meal.component.meal || 'meal';
+        flow = `Start with a relaxed ${mealWord}${prevTown ? ` in ${prevTown}` : ''}, then ${moveTo ? `head to ${moveTo} for ${W.to}` : W.go}.`;
+        timing = time ? `${W.short} starts at ${time}, so there’s time to enjoy ${meal.component.meal || 'the meal'} first.` : `Start times vary, so check the event page before you settle on a ${mealWord} time.`;
+      } else {
+        const daytime = before.every((s) => s.daypart !== 'evening');
+        const lead = before.length === 1 ? `${cap(expVerb(before[0]))}${family}${daytime ? ' during the day' : ''}` : `${cap(expVerbList(before))}${family}`;
+        const next = moveTo ? `head to ${moveTo} for ${W.evening}` : eTown && prevTown ? `stay in ${eTown} for ${W.evening}` : `finish with ${W.evening}`;
+        flow = `${lead}, then ${next}.`;
+        timing = time ? `${W.short} starts at ${time}, so the day flows easily into the evening.` : 'Times vary, so check the event page for the schedule.';
+      }
+    } else if (!before.length) {
+      const at = time ? (W.generic ? ` (${time})` : ` at ${time}`) : '';
+      const start = W.generic ? `Start ${e.daypart === 'morning' ? 'the day ' : ''}at ${W.name}${at}` : `${W.first}${at}`;
+      flow = after.length ? `${start}${!oneTown && eTown ? ` in ${eTown}` : ''}, ${thenClause(after, eTown)}${family}.` : `${start}${eTown ? ` in ${eTown}` : ''}.`;
+      if (!time) timing = 'Times vary, so check the event page for the schedule.';
+      if (oneTown && after.length) geo = `${together(stops.length)} in ${oneTown}, so the day stays easy to manage.`;
     } else {
-      const start = generic
-        ? `Start ${e.daypart === 'morning' ? 'the day ' : ''}at ${theName(e.event.name)}${e.timeKnown ? ` (${e.event.time})` : ''}`
-        : `${words.first}${e.timeKnown ? ` at ${e.event.time}` : ''}`;
-      s1 = after.length ? `${start}, then ${verbList(after)}${family}.` : `${start}.`;
+      const prevTown = townOf(before[before.length - 1]);
+      const moveTo = eTown && prevTown && eTown !== prevTown ? eTown : null;
+      const go = moveTo ? `head to ${moveTo} for ${W.to}` : W.go;
+      flow = `${cap(expVerbList(before))}${family}, then ${go}${time ? ` at ${time}` : ''}${after.length ? `, and ${expVerbList(after)} afterwards` : ''}.`;
+      if (!time) timing = 'Times vary, so check the event page for the schedule.';
+      if (oneTown) geo = `${together(stops.length)} in ${oneTown}, keeping the day simple.`;
     }
-    if (!e.timeKnown && !s2) s2 = 'Times vary, so check the event page for the schedule.';
-    return { title: e.daypart === 'evening' ? 'Your Okanagan evening' : 'Your Okanagan day', text: [s1, s2].filter(Boolean).join(' ') };
+    return composeExperience(title, flow, timing, geo, stops, venues, season);
   }
   if (venues.length < 2) return null; // a description is for a combination
-  const s1 = `${cap(verbList(venues))}${sameTown(venues)}${kids ? ', with plenty for the kids' : ''}.`;
-  const s2 = dog ? 'Every stop is listed as dog friendly, so your dog can come along.' : '';
-  return { title: 'Your Okanagan day', text: [s1, s2].filter(Boolean).join(' ') };
+  let flow, geo = '';
+  if (oneTown) {
+    flow = venues.length === 2 ? `${cap(expVerb(venues[0]))} first, then ${expVerb(venues[1])}${family}.` : `${cap(expVerbList(venues))}${family}.`;
+    geo = venues.length === 2 ? `${together(2)} in ${oneTown}, keeping the outing simple.` : `${together(venues.length)} in ${oneTown}, so there’s no need to move between towns.`;
+  } else {
+    const parts = [];
+    let prev = null;
+    venues.forEach((s, i) => {
+      const t = townOf(s);
+      if (i === 0) parts.push(`${cap(expVerb(s))}${t ? ` in ${t}` : ''}`);
+      else parts.push(t && t !== prev ? `head to ${t} to ${expVerb(s)}` : expVerb(s));
+      prev = t || prev;
+    });
+    flow = `${parts.join(', then ')}${family}.`;
+  }
+  return composeExperience(EXPERIENCE_TITLE, flow, '', geo, stops, venues, season);
 }
 
 // Which listed events can stand for an event part. What's On categories are
@@ -1307,6 +1389,156 @@ function chooseTripEvent(candidates, kind, part) {
   return { event: unknown || null };
 }
 
+// ---------- seasons and advisories (itineraries only, 2026-09-26) ----------
+//
+// input.tripDate is the Okanagan calendar date of the trip ('YYYY-MM-DD'),
+// resolved by the server in America/Vancouver -- never UTC -- or, when the
+// plan is built around a listed event, that event's own date. Every seasonal
+// rule is SOFT: it moves the ranking and adds a hedged "check before you go"
+// caveat; nothing is left out for the season alone. Rules are keyed on the
+// venue TYPE and its curated activity memberships, never on its name, and a
+// place listed for a year-round activity (hiking, nature, viewpoints) is
+// never treated as seasonal-only because it is also in a winter or water
+// collection. Golf uses each course's own published rate windows. Only a
+// current advisory that states an evacuation order or a closure takes a
+// place out. The single-request planner above never sees any of this.
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SEASON_BY_MONTH = [null, 'winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'fall', 'fall', 'fall', 'winter'];
+// In season / shoulder by month (anything else is off season).
+const SEASON_WINDOWS = {
+  water: { in: [6, 7, 8, 9], shoulder: [5, 10] }, // swimming, paddling, beach days
+  snow: { in: [12, 1, 2, 3], shoulder: [11, 4] }, // skiing, snowshoeing, skating
+  golf: { in: [5, 6, 7, 8, 9], shoulder: [3, 4, 10, 11] },
+  camping: { in: [5, 6, 7, 8, 9], shoulder: [4, 10] },
+};
+const YEAR_ROUND_ACTIVITIES = ['hiking', 'nature', 'viewpoints'];
+// Beach words that ask for the water itself, not just the shore.
+const SWIM_PHRASES = ['swim', 'swimming', 'swimming spot', 'swimming spots', 'swim spot', 'lake day'];
+// An advisory note that clearly says a place is unavailable.
+const ADVISORY_CLOSED_RE = /\b(evacuation order|temporarily closed|closed until|closed for the season|is closed|are closed)\b/i;
+const ADVISORY_MAX_AGE_DAYS = 365;
+const DOG_NOTE_SEASONAL_RE = /\b(season|seasonal|seasonally|summer|winter|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i;
+
+function seasonStatus(cat, month) {
+  const w = SEASON_WINDOWS[cat];
+  return w.in.includes(month) ? 'in' : w.shoulder.includes(month) ? 'shoulder' : 'off';
+}
+function tripSeason(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || ''));
+  if (!m) return null;
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return null;
+  return {
+    date: dateStr, month, md: `${m[2]}-${m[3]}`, monthName: MONTH_NAMES[month - 1], season: SEASON_BY_MONTH[month],
+    water: seasonStatus('water', month), snow: seasonStatus('snow', month), golf: seasonStatus('golf', month), camping: seasonStatus('camping', month),
+  };
+}
+// What a part asks for, seasonally.
+function partSeasonIntent(c) {
+  const acts = c.activities || [];
+  const types = c.types || [];
+  return {
+    swim: types.includes('beach') && SWIM_PHRASES.includes(c.phrase),
+    water: acts.includes('water'),
+    snow: acts.includes('winter'),
+    camping: acts.includes('camping'),
+    // "things to do", or an outdoor part with no named activity: the season picks.
+    open: !!c.generic || (types.includes('outdoor') && !acts.length),
+  };
+}
+function yearRoundBasis(v, ctx) {
+  const acts = (v.activities || []).filter((a) => YEAR_ROUND_ACTIVITIES.includes(a));
+  if (acts.length) return `Also listed for ${listText(acts.map((a) => activityLabel(ctx, a)))}`;
+  if (textHas(v.textDesc, 'year round')) return 'Its description mentions “year-round”';
+  return null;
+}
+function mdInWindow(md, from, to) { return from <= to ? md >= from && md <= to : md >= from || md <= to; }
+function mdText(md) {
+  const [mm, dd] = md.split('-').map(Number);
+  return `${MONTH_NAMES[mm - 1].slice(0, 3)} ${dd}`;
+}
+const SEASON_CAVEATS = {
+  swim: (m) => `Lake swimming here is a summer activity, so in ${m} this is suggested as a lakeside stop`,
+  water: (m) => `Water activities here are mostly a summer activity — check with the operator before you plan around it in ${m}`,
+  snow: (m) => `Snow activities here run in winter — check what’s operating in ${m} before you go`,
+  camping: (m) => `Many campgrounds here are seasonal — check it’s open in ${m} before you go`,
+  golf: (m) => `Outdoor golf here is seasonal — check the course is open in ${m} before you go`,
+};
+// Seasonal relevance of venue v for part c: { score, reasons, caveats, flags }.
+function seasonFit(v, c, season, ctx) {
+  const out = { score: 0, reasons: [], caveats: [], flags: {} };
+  if (!season) return out;
+  const it = partSeasonIntent(c);
+  const acts = v.activities || [];
+  const m = season.monthName;
+  const add = (w, text) => { out.score += w; if (text) out.reasons.push({ code: 'season', text, weight: Math.max(w, 1) }); };
+  const waterPlace = v.type === 'beach' || acts.includes('water');
+  if (waterPlace && season.water === 'off') {
+    const basis = yearRoundBasis(v, ctx);
+    if (basis) add(6, `${basis} — a good fit for ${m}`);
+    else if (it.open) add(-12, null);
+    else if (it.swim || it.water) add(-8, null);
+    else add(-2, null);
+    if (it.swim && v.type === 'beach') { out.caveats.push(SEASON_CAVEATS.swim(m)); out.flags.swimOff = true; }
+    if (it.water && acts.includes('water')) { out.caveats.push(SEASON_CAVEATS.water(m)); out.flags.waterOff = true; }
+    if (v.type === 'beach') out.flags.beachOff = true;
+  }
+  if (acts.includes('winter')) {
+    const snowOnly = acts.every((a) => a === 'winter');
+    if (season.snow === 'in' && it.open) { add(8, `Listed for ${activityLabel(ctx, 'winter')} — in season in ${m}`); out.flags.snowIn = true; }
+    if (season.snow === 'off') {
+      if (it.snow) { out.caveats.push(SEASON_CAVEATS.snow(m)); out.flags.snowOff = true; } else if (snowOnly) add(-12, null);
+    }
+  }
+  if (acts.includes('camping') && season.camping === 'off') {
+    if (it.camping) { out.caveats.push(SEASON_CAVEATS.camping(m)); out.flags.campingOff = true; } else if (acts.every((a) => a === 'camping')) add(-8, null);
+  }
+  if (v.type === 'golf') {
+    if (v.indoorGolf) {
+      if (season.golf === 'off') add(16, `An indoor golf / simulator venue — suits a ${m} round`);
+    } else {
+      const windows = v.golfSeasons || [];
+      const covered = windows.find((w) => mdInWindow(season.md, w.from, w.to));
+      if (covered) add(6, `Its published ${covered.label ? `${covered.label} ` : ''}rates run ${mdText(covered.from)} – ${mdText(covered.to)}`);
+      else {
+        if (season.golf === 'off') add(-12, null);
+        else if (season.golf === 'shoulder' && windows.length) add(-4, null);
+        if (season.golf !== 'in') { out.caveats.push(SEASON_CAVEATS.golf(m)); out.flags.golfCheck = true; }
+      }
+    }
+  }
+  return out;
+}
+// A current advisory (the curated 'advisory' collection note) for venue v:
+// { skip } when the note says it is under an evacuation order or closed;
+// otherwise the note itself as a caveat, and a ranking cost only when the
+// advisory bears on this part (a swimming advisory on a swim part) and is
+// not stale. The wording is the note's own first sentence, never reworded.
+function advisoryExcerpt(note) {
+  const clean = String(note || '').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+  const first = (clean.match(/^.*?[.!?](\s|$)/) || [clean])[0].trim();
+  return first.length > 200 ? `${first.slice(0, 197).replace(/\s+\S*$/, '')}…` : first;
+}
+function advisoryFit(v, c, season) {
+  const a = v.advisory;
+  if (!a || !a.note) return null;
+  if (ADVISORY_CLOSED_RE.test(a.note)) return { skip: true };
+  let stale = false;
+  if (season && /^\d{4}-\d{2}-\d{2}/.test(a.addedAt || '')) {
+    const age = (Date.parse(season.date) - Date.parse(a.addedAt.slice(0, 10))) / 86400000;
+    stale = age > ADVISORY_MAX_AGE_DAYS;
+  }
+  const it = partSeasonIntent(c);
+  let score = 0;
+  if (!stale && /\bswim/i.test(a.note) && v.type === 'beach') score = it.swim ? -15 : -3;
+  return { skip: false, score, caveat: `Advisory on Okanagan Roam: ${advisoryExcerpt(a.note)}` };
+}
+// A dog-beach's own seasonal access rule, verbatim, for a dog part.
+function dogSeasonCaveat(v, c) {
+  if (!c.dog || !v.dogNote || !(v.collections || []).includes('dog_friendly')) return null;
+  return DOG_NOTE_SEASONAL_RE.test(v.dogNote) ? `Dog access: ${String(v.dogNote).trim()}` : null;
+}
+
 function planItinerary(input) {
   const { intent = {}, facts = [], labels = {}, trip, tripEvents = [] } = input;
   const baseCtx = buildContext({ ...intent, regions: [] }, labels, input);
@@ -1341,7 +1573,7 @@ function planItinerary(input) {
         caveats: start != null ? [] : [wantPart ? `Its start time isn’t listed, so it may not be in the ${wantPart === 'evening' ? 'evening' : 'daytime'} — check the event page` : 'Start times vary — check the event page before you plan around it'],
       };
       stops.push(stop);
-      if (!anchor) anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(e.startDate), daypart };
+      if (!anchor) anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(e.startDate), daypart, date: e.startDate || null };
     } else if (p.c.event.venueFeature) {
       // No listed event: the verified venue badge stands in, when places have it.
       p.c = { ...p.c, kind: 'venue', types: LIVE_MUSIC_VENUE_TYPES.slice(), features: [p.c.event.venueFeature], activities: [], collections: [], cuisines: [], liveMusicFallback: true };
@@ -1351,6 +1583,10 @@ function planItinerary(input) {
       result.warnings.push(`No ${p.c.event.noun} is listed on What’s On${when} for those dates, so the rest of the plan is shown.`);
     }
   }
+
+  // The season of the trip: the chosen event's own date, else the trip date.
+  const season = tripSeason((anchor && anchor.date) || input.tripDate);
+  let seasonRanked = false;
 
   // One community per outing (as buildOuting does) when the request named no
   // town and no route: later parts prefer the community of the event, or of
@@ -1372,17 +1608,24 @@ function planItinerary(input) {
     };
     const ctx = buildContext(ci, labels, { ...input, startWeekday: pairWithEvent && anchor.weekday ? anchor.weekday : input.startWeekday });
     const scored = [];
+    const closedByAdvisory = [];
     for (const v of facts) {
       if (used.has(v.id) || !regionOk(v, ctx) || !eligible(v, ctx, true)) continue;
       if (c.generic && !c.types.includes(v.type)) continue;
       const s = scoreVenue(v, ctx);
       const t = requestedTimeFit(v, ctx);
       if (t && t.skip) continue;
-      let score = s.score + (t ? t.score : 0);
-      const reasons = s.reasons.concat(t ? t.reasons : []);
+      const adv = advisoryFit(v, c, season);
+      if (adv && adv.skip) { closedByAdvisory.push({ v, score: s.score }); continue; }
+      const sf = seasonFit(v, c, season, ctx);
+      if (sf.score) seasonRanked = true;
+      let score = s.score + (t ? t.score : 0) + sf.score + (adv ? adv.score : 0);
+      const reasons = s.reasons.concat(t ? t.reasons : [], sf.reasons);
       if (pairWithEvent && anchor.region && v.region === anchor.region) { score += 12; reasons.push({ code: 'near_event', text: `In ${regionLabel(ctx, v.region)}, where the event is`, weight: 12 }); }
       if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
-      scored.push({ v, score, reasons, caveats: t ? t.caveats : [] });
+      const dogCaveat = dogSeasonCaveat(v, c);
+      const caveats = (t ? t.caveats : []).concat(sf.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : []);
+      scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv });
     }
     scored.sort(compareScored);
     const label = componentLabel(c, ctx);
@@ -1401,6 +1644,13 @@ function planItinerary(input) {
       }
     }
     const pick = pool[0];
+    // Say so when a place that would otherwise have ranked first was left
+    // out because its advisory says it is closed or under an evacuation order.
+    const bestClosed = closedByAdvisory
+      .filter((x) => (pool === scored || x.v.region === community.region) && (!pick || x.score > pick.base))
+      .sort((x, y) => y.score - x.score)[0];
+    const closedNote = bestClosed ? `${bestClosed.v.name} was left out: its current advisory on Okanagan Roam says it isn’t available.` : null;
+    if (closedNote && !result.notes.includes(closedNote)) result.notes.push(closedNote);
     if (!pick) {
       result.warnings.push(`No ${c.dog && !/dog/.test(label) ? 'dog-friendly ' : ''}${label} matched ${whereText}, so the rest of the plan is shown.`);
       continue;
@@ -1416,6 +1666,7 @@ function planItinerary(input) {
         || (pick.v.type === 'outdoor' ? (pick.v.activities || []).find((a) => ITIN_ACTIVITY_VERB[a]) : null) || null,
       ...stopFrom(pick.v, pick, extra, ctx),
       alternates: alternates.map((a) => stopFrom(a.v, a, [], ctx)),
+      seasonFlags: pick.seasonFlags || {}, advisory: pick.advisory, swimPart: partSeasonIntent(c).swim,
     });
   }
 
@@ -1456,7 +1707,11 @@ function planItinerary(input) {
     route: route ? { ...route, fromLabel: route.from ? regionLabel(baseCtx, route.from) : null, toLabel: route.to ? regionLabel(baseCtx, route.to) : null, regions: regions.map((r) => ({ slug: r, label: regionLabel(baseCtx, r) })) } : null,
   };
   result.events = stops.filter((s) => s.kind === 'event').map((s) => s.event);
-  result.experience = buildExperience(stops, trip, route, { ...baseCtx, regions });
+  result.experience = buildExperience(stops, trip, route, { ...baseCtx, regions }, season);
+  result.season = season ? { date: season.date, season: season.season, month: season.monthName } : null;
+  if (season && (seasonRanked || stops.some((s) => s.seasonFlags && Object.keys(s.seasonFlags).length))) {
+    result.notes.push(`Planned for ${season.monthName} (Okanagan time): seasonal activities such as swimming, paddling, skiing, camping and outdoor golf are ranked for the time of year, and nothing is left out for the season alone.`);
+  }
 
   // Summary + overview, from what was asked.
   const partLabels = trip.components.map((c) => {
