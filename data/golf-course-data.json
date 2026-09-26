@@ -1,0 +1,2668 @@
+{
+ "version": 1,
+ "verified_on": "2026-09-26",
+ "currency": "CAD",
+ "about": "Reviewed golf data for Okanagan Roam golf-course pages. Every green fee is copied from the course's official website (source_url) on the date shown; nothing is estimated. The comparison rate is each course's standard adult rate for its standard round (9 or 18 holes), at prime time in peak season, as published. Course maps are links to the club's own pages only (rights_status link_only); nothing is copied or hosted.",
+ "courses": {
+  "armstrong/overlander-golf-event-centre": {
+   "name": "The Overlander Golf & Event Centre",
+   "profile": {
+    "holes": 9,
+    "par": 29,
+    "course_format": "executive",
+    "access": "public",
+    "source_url": "https://theoverlander.ca/",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "not_published",
+    "source_url": "https://theoverlander.ca/all-things-golf",
+    "verified_at": "2026-09-26",
+    "note": "The official site has a Rates section but lists no green fees (checked 2026-09-26)."
+   }
+  },
+  "enderby/mabel-lake-golf-country-club": {
+   "name": "Mabel Lake Golf & Country Club",
+   "profile": {
+    "holes": 9,
+    "par": 36,
+    "course_format": "regulation",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "unverified",
+    "source_url": "https://mabellakegolf.com/golf-course/",
+    "verified_at": "2026-09-26",
+    "note": "The official site refused automated access (HTTP 403) on 2026-09-26; rates need a manual check."
+   }
+  },
+  "kaleden/st-andrews-by-the-lake-golf-resort": {
+   "name": "St. Andrews by the Lake",
+   "profile": {
+    "holes": 9,
+    "par": 32,
+    "course_format": "mid_length",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://standrewsbythelake.com/green-fees-rates/",
+    "verification": "official rates page, read via page-reader (direct requests blocked)",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_tax",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 42,
+      "price_basis": "fixed",
+      "comparison": true
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 63,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "twilight",
+      "holes": null,
+      "amount": 31,
+      "price_basis": "fixed",
+      "time_window": "Daily after 2:30 pm"
+     },
+     {
+      "category": "replay",
+      "holes": 9,
+      "amount": 23,
+      "price_basis": "fixed",
+      "conditions": "Back fee"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 25,
+      "price_basis": "fixed",
+      "conditions": "Ages 6-16"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 35,
+      "price_basis": "fixed",
+      "conditions": "Ages 6-16"
+     }
+    ]
+   },
+   "facilities": {
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kaleden/twin-lakes-golf-course": {
+   "name": "Twin Lakes Golf Course",
+   "profile": {
+    "holes": 18,
+    "par": null,
+    "course_format": "regulation",
+    "source_url": "https://twinlakesgolfresort.com/course-details/",
+    "source_note": "Official: 18-hole regulation length; par not stated"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://twinlakesgolfresort.com/ratesyearly-passes/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_tax",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 89,
+      "price_basis": "fixed",
+      "comparison": true,
+      "season_label": "May 15 - October",
+      "time_window": "Prime time Fri-Sun, 7 am-12 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "season_label": "April - October",
+      "time_window": "Prime time Mon-Thu, 7 am-12 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 47,
+      "price_basis": "fixed",
+      "time_window": "Open-4 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 40,
+      "price_basis": "fixed",
+      "time_window": "4 pm-close"
+     },
+     {
+      "category": "replay",
+      "holes": null,
+      "amount": 35,
+      "price_basis": "fixed",
+      "conditions": "Same-day replay, 9 or 18"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_tour",
+     "url": "https://twinlakesgolfresort.com/course-tour/",
+     "label": "Course tour (hole photos)",
+     "owner": "Twin Lakes Golf Course",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ]
+  },
+  "kelowna/black-mountain-golf-club": {
+   "name": "Black Mountain Golf Club",
+   "profile": {
+    "holes": 18,
+    "par": 71,
+    "course_format": "regulation",
+    "access": "public",
+    "yardage": 6400,
+    "source_url": "https://blackmountaingolf.ca/",
+    "source_note": "Official: 18-hole, par-71, 6,400 yards"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://blackmountaingolf.ca/golf/rates/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_tax",
+    "note": "Power carts included in all green fees.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 149,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_cart": true,
+      "season_label": "Peak season",
+      "valid_from": "2026-04-17",
+      "valid_to": "2026-10-12",
+      "time_window": "Open-twilight"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 100,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Peak season",
+      "valid_from": "2026-04-17",
+      "valid_to": "2026-10-12"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 82,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Peak season",
+      "valid_from": "2026-04-17",
+      "valid_to": "2026-10-12",
+      "time_window": "After 5 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 82,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Peak season",
+      "valid_from": "2026-04-17",
+      "valid_to": "2026-10-12"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 95,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Shoulder season (open-Apr 16, Oct 13-close)",
+      "time_window": "Open-twilight"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 85,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Shoulder season (open-Apr 16, Oct 13-close)"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 50,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Shoulder season (open-Apr 16, Oct 13-close)"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_map",
+     "url": "https://blackmountaingolf.ca/course/",
+     "label": "Course map & hole-by-hole tour",
+     "owner": "Black Mountain Golf Club (Melcor Developments)",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/gallaghers-canyon-canyon-course": {
+   "name": "Gallagher's Canyon - Canyon Course",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "source_url": "https://gallagherscanyon.com/",
+    "source_note": "Official: par 72, 18-hole championship course"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://gallagherscanyon.com/golf_course/rates",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "plus_tax",
+    "note": "Power cart included unless stated; green fees include use of the practice facility. Twilight rates are starting rates that vary with demand.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 200,
+      "price_basis": "from",
+      "comparison": true,
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 115,
+      "price_basis": "from",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 85,
+      "price_basis": "from",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "conditions": "Double twilight"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 65,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "After 5 pm or on standby"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 70,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "season_label": "Peak season (May-September)"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 150,
+      "price_basis": "from",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season (April & October)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 100,
+      "price_basis": "from",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season (April & October)"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 52.5,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "season_label": "Shoulder season (April & October)"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/gallaghers-canyon-pinnacle-course": {
+   "name": "Gallagher's Canyon - Pinnacle Course",
+   "profile": {
+    "holes": 9,
+    "par": 32,
+    "course_format": "mid_length",
+    "access": "semi_private",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://gallagherscanyon.com/golf_course/rates",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "plus_tax",
+    "note": "Green fees include use of the practice facility; power cart extra ($26 per seat).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 55,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_range": true,
+      "walking": true,
+      "season_label": "Daily rate"
+     },
+     {
+      "category": "replay",
+      "holes": 9,
+      "amount": 33,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "walking": true,
+      "conditions": "Additional 9 holes, same day"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/kelowna-driving-range-mini-golf": {
+   "name": "Kelowna Driving Range & Mini Golf",
+   "profile": {
+    "holes": null,
+    "par": null,
+    "course_format": "practice_facility",
+    "access": "public",
+    "source_url": "https://www.kelownadrivingrange.com/",
+    "source_note": "Official: driving range, Toptracer bays and 18-hole mini golf; no golf course"
+   },
+   "fees": {
+    "status": "not_applicable",
+    "verified_at": "2026-09-26",
+    "note": "Practice facility: range and mini-golf prices, not green fees."
+   }
+  },
+  "kelowna/kelowna-golf-country-club": {
+   "name": "Kelowna Golf & Country Club",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "private",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "private",
+    "source_url": "https://kelownagolfandcountryclub.com/",
+    "verified_at": "2026-09-26",
+    "note": "Private, members-only club; no public green fee."
+   }
+  },
+  "kelowna/kelowna-springs-golf-club": {
+   "name": "Kelowna Springs Golf Club",
+   "profile": {
+    "holes": 9,
+    "par": null,
+    "course_format": null,
+    "source_note": "Official: 9-hole course (play twice for 18); par not stated"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.kelownasprings.com/golf/rates",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "unstated",
+    "note": "9-hole green fees, time-banded; riding rates include a power cart.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 47,
+      "price_basis": "fixed",
+      "comparison": true,
+      "walking": true,
+      "season_label": "Summer season",
+      "valid_from": "2026-06-25",
+      "valid_to": "2026-09-07",
+      "time_window": "AM-10 am"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 60,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Summer season",
+      "valid_from": "2026-06-25",
+      "valid_to": "2026-09-07",
+      "time_window": "AM-10 am, riding"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 45,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Summer season",
+      "valid_from": "2026-06-25",
+      "valid_to": "2026-09-07",
+      "time_window": "From 10 am"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 42,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Summer season",
+      "valid_from": "2026-06-25",
+      "valid_to": "2026-09-07",
+      "time_window": "From 2 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 39,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Summer season",
+      "valid_from": "2026-06-25",
+      "valid_to": "2026-09-07",
+      "time_window": "From 4 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 38,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Summer season",
+      "valid_from": "2026-06-25",
+      "valid_to": "2026-09-07",
+      "time_window": "First 2 hours of play"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 47,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Fall season",
+      "valid_from": "2026-09-08",
+      "valid_to": "2026-10-13",
+      "time_window": "AM"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 37,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Fall season",
+      "valid_from": "2026-09-08",
+      "valid_to": "2026-10-13",
+      "time_window": "From 2 pm"
+     },
+     {
+      "category": "replay",
+      "holes": 9,
+      "amount": 30,
+      "price_basis": "fixed",
+      "conditions": "Any time of day, all season"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://www.kelownasprings.com/golf/scorecard",
+     "label": "Scorecard",
+     "owner": "Kelowna Springs Golf Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ]
+  },
+  "kelowna/michaelbrook-golf-course": {
+   "name": "Michaelbrook Golf Course",
+   "profile": {
+    "holes": 18,
+    "par": 63,
+    "course_format": "mid_length",
+    "access": "public",
+    "source_url": "https://www.michaelbrook.ca/rates-fees/",
+    "source_note": "Official: par 63, mid-length"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.michaelbrook.ca/rates-fees/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "included",
+    "note": "Power carts extra ($20 per seat for 18 holes).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 52,
+      "price_basis": "fixed",
+      "comparison": true,
+      "walking": true
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 45,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "After 2 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 42,
+      "price_basis": "fixed",
+      "walking": true
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 35,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "After 2 pm"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 39,
+      "price_basis": "fixed",
+      "conditions": "18 and under"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 29,
+      "price_basis": "fixed",
+      "conditions": "18 and under"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://www.michaelbrook.ca/scorecard/",
+     "label": "Scorecard",
+     "owner": "Michaelbrook Golf Course",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/mission-creek-golf-club": {
+   "name": "Mission Creek Golf Club",
+   "profile": {
+    "holes": 18,
+    "par": 61,
+    "course_format": "executive",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://missioncreekgolfclub.com/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "included",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 51,
+      "price_basis": "fixed",
+      "comparison": true,
+      "conditions": "Adults 19+"
+     },
+     {
+      "category": "senior",
+      "holes": 18,
+      "amount": 49,
+      "price_basis": "fixed",
+      "conditions": "55+, Mon-Fri excluding holidays"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 30,
+      "price_basis": "fixed",
+      "conditions": "18 and under"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 44,
+      "price_basis": "fixed",
+      "conditions": "Time varies during season"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 40,
+      "price_basis": "fixed",
+      "conditions": "Adults 19+"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 25,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 34,
+      "price_basis": "fixed"
+     }
+    ]
+   },
+   "facilities": {
+    "putting_green": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/orchard-greens-golf-club": {
+   "name": "Orchard Greens Golf Club",
+   "profile": {
+    "holes": 9,
+    "par": 32,
+    "course_format": "mid_length",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.orchardgreens.com/pro-shop/rates/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "included",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 36,
+      "price_basis": "fixed",
+      "comparison": true
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 50,
+      "price_basis": "fixed",
+      "conditions": "Play the 9 twice"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 18,
+      "price_basis": "fixed",
+      "conditions": "15 and under"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 34,
+      "price_basis": "fixed",
+      "conditions": "15 and under"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://www.orchardgreens.com/play/scorecard/",
+     "label": "Scorecard",
+     "owner": "Orchard Greens Golf Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/shadow-ridge-golf-club": {
+   "name": "Shadow Ridge Golf Club",
+   "profile": {
+    "holes": null,
+    "par": 71,
+    "course_format": null,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass); hole count not confirmed"
+   },
+   "fees": {
+    "status": "unverified",
+    "source_url": "https://shadowridgekelowna.com/",
+    "verified_at": "2026-09-26",
+    "note": "The official site did not respond on 2026-09-26; rates need a manual check."
+   }
+  },
+  "kelowna/sunset-ranch-golf-country-club": {
+   "name": "Sunset Ranch Golf & Country Club",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "yardage": 6500,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://sunsetranchbc.com/rates-fees/",
+    "verification": "official rates image on the club's rates page, read and transcribed",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_tax",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 129,
+      "price_basis": "fixed",
+      "comparison": true,
+      "season_label": "Peak season",
+      "valid_from": "2026-05-01",
+      "valid_to": "2026-09-30",
+      "time_window": "Open-2 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 99,
+      "price_basis": "fixed",
+      "season_label": "Peak season",
+      "valid_from": "2026-05-01",
+      "valid_to": "2026-09-30",
+      "time_window": "2-4 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "season_label": "Peak season",
+      "valid_from": "2026-05-01",
+      "valid_to": "2026-09-30",
+      "time_window": "After 4 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 99,
+      "price_basis": "fixed",
+      "season_label": "Shoulder season (Mar 1-Apr 30, Oct 1-close)",
+      "time_window": "Open-2 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "season_label": "Shoulder season (Mar 1-Apr 30, Oct 1-close)",
+      "time_window": "2-4 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 79,
+      "price_basis": "fixed",
+      "time_window": "Open-2 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 69,
+      "price_basis": "fixed",
+      "time_window": "2-4 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 9,
+      "amount": 59,
+      "price_basis": "fixed",
+      "time_window": "After 4 pm"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://sunsetranchbc.com/scorecard/",
+     "label": "Scorecard",
+     "owner": "Sunset Ranch Golf & Country Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": false,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/harvest-golf-club": {
+   "name": "The Harvest Golf Club",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "yardage": 7109,
+    "source_url": "https://harvestgolf.com/golf/course/",
+    "source_note": "Official: 18-hole, 7,109 yards; par from Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://harvestgolf.com/golf/rates-specials/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_tax",
+    "note": "High season May 1 - October (end date to be announced).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 200,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May 1 - October)",
+      "valid_from": "2026-05-01",
+      "time_window": "Primetime, dawn-4 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 130,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May 1 - October)",
+      "valid_from": "2026-05-01",
+      "time_window": "4-6 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 110,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May 1 - October)",
+      "valid_from": "2026-05-01",
+      "time_window": "After 6 pm"
+     },
+     {
+      "category": "resident",
+      "holes": 18,
+      "amount": 120,
+      "price_basis": "fixed",
+      "season_label": "High season",
+      "conditions": "Green fee only; proof of residence; book 7 days or less ahead"
+     },
+     {
+      "category": "replay",
+      "holes": 18,
+      "amount": 120,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "conditions": "Second round, same day"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 90,
+      "price_basis": "fixed",
+      "season_label": "High season",
+      "conditions": "Under 19; green fee only"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 170,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season",
+      "time_window": "Primetime"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 105,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season",
+      "time_window": "4-6 pm"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_map",
+     "url": "https://harvestgolf.com/golf/course-map-scorecard/",
+     "label": "Course map & scorecard",
+     "owner": "The Harvest Golf Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/okanagan-golf-club-bear-course": {
+   "name": "The Okanagan Golf Club - Bear Course",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "yardage": 6852,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://okanagangolfclub.com/golf_course/rates",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "plus_tax",
+    "note": "One published rate card covers both the Bear and Quail courses; carts and warm-up balls included unless stated.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 200,
+      "price_basis": "from",
+      "comparison": true,
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May-September)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 125,
+      "price_basis": "from",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May-September)"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 105,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May-September)",
+      "conditions": "Sunset rate"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 75,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "High season (May-September)"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 180,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Low season (March-April & October)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 115,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Low season (March-April & October)"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 65,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Low season (March-April & October)"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/okanagan-golf-club-quail-course": {
+   "name": "The Okanagan Golf Club - Quail Course",
+   "profile": {
+    "holes": 18,
+    "par": 71,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "yardage": 6576,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://okanagangolfclub.com/golf_course/rates",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "plus_tax",
+    "note": "One published rate card covers both the Bear and Quail courses; carts and warm-up balls included unless stated.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 200,
+      "price_basis": "from",
+      "comparison": true,
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May-September)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 125,
+      "price_basis": "from",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May-September)"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 105,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "High season (May-September)",
+      "conditions": "Sunset rate"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 75,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "High season (May-September)"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 180,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Low season (March-April & October)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 115,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Low season (March-April & October)"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 65,
+      "price_basis": "fixed",
+      "walking": true,
+      "season_label": "Low season (March-April & October)"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "kelowna/tower-ranch-golf-country-club": {
+   "name": "Tower Ranch Golf & Country Club",
+   "profile": {
+    "holes": 18,
+    "par": null,
+    "course_format": "regulation",
+    "access": "public",
+    "source_url": "https://www.golftowerranch.com/course-overview/",
+    "source_note": "Official: 18-hole course; par not stated"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.golftowerranch.com/rates/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_gst",
+    "note": "Cart-mandatory course: all rates include a shared power cart.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 199,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_cart": true,
+      "season_label": "In-season (May-September)"
+     },
+     {
+      "category": "replay",
+      "holes": 18,
+      "amount": 109,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "In-season (May-September)",
+      "conditions": "Same day"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 159,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "In-season (May-September)",
+      "time_window": "3-4:59 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 129,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "In-season (May-September)",
+      "time_window": "5-6:59 pm",
+      "conditions": "Double twilight"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 109,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "In-season (May-September)",
+      "time_window": "After 4 pm"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 99,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "In-season (May-September)",
+      "conditions": "18 and under"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 159,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Shoulder season (April & October)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 109,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Shoulder season (April & October)",
+      "time_window": "3-4:59 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 89,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "season_label": "Shoulder season (April & October)",
+      "time_window": "After 4 pm"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_tour",
+     "url": "https://www.golftowerranch.com/course-overview/",
+     "label": "Course overview & flyover",
+     "owner": "Tower Ranch Golf & Country Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ]
+  },
+  "lumby/coldstream-golf-course": {
+   "name": "Coldstream Golf Course",
+   "profile": {
+    "holes": 9,
+    "par": 36,
+    "course_format": "regulation",
+    "access": "public",
+    "yardage": 2715,
+    "source_url": "https://coldstreamgolfcourse.com/",
+    "source_note": "Official: 9 holes, 2,715 yards, par 36"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://coldstreamgolfcourse.com/services-and-fees/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "unstated",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 16,
+      "price_basis": "fixed",
+      "comparison": true
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 22,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "other",
+      "holes": null,
+      "amount": 10,
+      "price_basis": "fixed",
+      "conditions": "Golf in the rain"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://coldstreamgolfcourse.com/score-card/",
+     "label": "Scorecard",
+     "owner": "Coldstream Golf Course",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "oliver/fairview-mountain-golf-club": {
+   "name": "Fairview Mountain Golf Club",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://fairviewmountain.com/rates",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "unstated",
+    "note": "Half-cart rates are extra ($20 for 18 holes).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 121,
+      "price_basis": "fixed",
+      "comparison": true,
+      "time_window": "Open-1:59 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 95,
+      "price_basis": "fixed",
+      "time_window": "2-3:59 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 55,
+      "price_basis": "fixed",
+      "time_window": "4 pm-close",
+      "conditions": "Beat the Heat twilight"
+     },
+     {
+      "category": "replay",
+      "holes": 18,
+      "amount": 58,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 60,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 67,
+      "price_basis": "fixed",
+      "time_window": "After 1 pm"
+     },
+     {
+      "category": "other",
+      "holes": 36,
+      "amount": 180,
+      "price_basis": "fixed",
+      "conditions": "Regular 36, all day"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "oliver/nkmip-canyon-desert-golf-course": {
+   "name": "Nk'Mip Canyon Desert Golf Course",
+   "profile": {
+    "holes": 18,
+    "par": null,
+    "course_format": "regulation",
+    "source_note": "Official rates list 18-hole rounds; par not stated"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://nkmipcanyon.ca/rates/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "unstated",
+    "note": "Rates include use of the driving range before the round. Regular rates shown; group rates also published.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 109,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_range": true,
+      "season_label": "April 1 to close",
+      "valid_from": "2026-04-01"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 59,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "season_label": "April 1 to close",
+      "valid_from": "2026-04-01"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 76,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "season_label": "April 1 to close",
+      "valid_from": "2026-04-01",
+      "time_window": "After 2 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 51,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "season_label": "April 1 to close",
+      "valid_from": "2026-04-01",
+      "time_window": "After 4 pm"
+     },
+     {
+      "category": "other",
+      "holes": 36,
+      "amount": 159,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "season_label": "April 1 to close",
+      "valid_from": "2026-04-01"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 76,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "season_label": "Open to March 31",
+      "valid_to": "2026-03-31"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://nkmipcanyon.ca/scorecard/",
+     "label": "Scorecard",
+     "owner": "Nk'Mip Canyon Desert Golf Course",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ]
+  },
+  "osoyoos/osoyoos-golf-club-park-meadows": {
+   "name": "Osoyoos Golf Club - Park Meadows",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "public",
+    "yardage": 6300,
+    "source_url": "https://golfosoyoos.com/golf/",
+    "source_note": "Official: just over 6,300 yards, par 72/73"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://golfosoyoos.com/golf/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "unstated",
+    "note": "All rates include a shared golf cart and warm-up range balls.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 139,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "Open-11:59 am"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 125,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "12-1:59 pm, matinee"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 105,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "2-3:59 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 85,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "4 pm-dusk"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 84,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "After 1 pm"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "conditions": "Under 12, with an adult"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 99,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season (March, April, October)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season (March, April, October)"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://golfosoyoos.com/golf/",
+     "label": "Scorecards (both courses)",
+     "owner": "Osoyoos Golf Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "osoyoos/osoyoos-golf-club-desert-gold": {
+   "name": "Osoyoos Golf Club - Desert Gold",
+   "profile": {
+    "holes": 18,
+    "par": 71,
+    "course_format": "regulation",
+    "access": "public",
+    "yardage": 6500,
+    "source_url": "https://golfosoyoos.com/golf/",
+    "source_note": "Official: 6,500 yards, par 71, 18 holes"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://golfosoyoos.com/golf/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "unstated",
+    "note": "All rates include a shared golf cart and warm-up range balls.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 148,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "Open-11:59 am"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 132,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "12-1:59 pm, matinee"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 110,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "2-3:59 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 89,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "time_window": "4 pm-dusk"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Peak season (May-September)",
+      "conditions": "Under 12, with an adult"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 105,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season (March, April, October)"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 81,
+      "price_basis": "fixed",
+      "includes_cart": true,
+      "includes_range": true,
+      "season_label": "Shoulder season (March, April, October)"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://golfosoyoos.com/golf/",
+     "label": "Scorecards (both courses)",
+     "owner": "Osoyoos Golf Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "osoyoos/sonora-dunes-golf-course": {
+   "name": "Sonora Dunes Golf Course",
+   "profile": {
+    "holes": 9,
+    "par": 36,
+    "course_format": "regulation",
+    "source_url": "https://sonoradunes.com/hole-by-hole/",
+    "source_note": "Official hole-by-hole: 9 holes, par 36"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://sonoradunes.com/rates/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "plus_tax",
+    "note": "Power carts extra ($20 per seat for 9 holes).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 47.5,
+      "price_basis": "fixed",
+      "comparison": true
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 80.75,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 15,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 29.5,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 30,
+      "price_basis": "fixed",
+      "time_window": "After 1 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 50,
+      "price_basis": "fixed",
+      "time_window": "After 1 pm"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_map",
+     "url": "https://sonoradunes.com/hole-by-hole/",
+     "label": "Course map & hole-by-hole",
+     "owner": "Sonora Dunes Golf Course",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "penticton/penticton-golf-country-club": {
+   "name": "Penticton Golf & Country Club",
+   "profile": {
+    "holes": 18,
+    "par": 70,
+    "course_format": "regulation",
+    "access": "public",
+    "source_note": "Official: 18-hole course; par from Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.pentictongolf.ca/golf/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "plus_tax",
+    "note": "Power carts extra ($42 for 18 holes).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 99,
+      "price_basis": "fixed",
+      "comparison": true
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "time_window": "After 2 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 55,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "junior",
+      "holes": null,
+      "amount": 55,
+      "price_basis": "fixed",
+      "conditions": "18 and under"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "penticton/pine-hills-golf-club": {
+   "name": "Pine Hills Golf Club",
+   "profile": {
+    "holes": 9,
+    "par": 27,
+    "course_format": "executive",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "unverified",
+    "source_url": "https://pinehillsgolfclub.ca/",
+    "verified_at": "2026-09-26",
+    "note": "The official site's security certificate had expired on 2026-09-26; rates need a manual check."
+   }
+  },
+  "penticton/skaha-meadows-golf-course": {
+   "name": "Skaha Meadows Golf Course",
+   "profile": {
+    "holes": 9,
+    "par": 35,
+    "course_format": "regulation",
+    "access": "public",
+    "yardage": 2435,
+    "source_url": "https://www.skahameadowsgolf.ca/course-layout",
+    "source_note": "Official: six par 4s, one par 5, two par 3s; 2,435 yards"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.skahameadowsgolf.ca/course-rates-memberships",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "unstated",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 40,
+      "price_basis": "fixed",
+      "comparison": true
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 57,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 23,
+      "price_basis": "fixed",
+      "conditions": "Teen, 13-18"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 33,
+      "price_basis": "fixed",
+      "conditions": "Teen, 13-18"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 18,
+      "price_basis": "fixed",
+      "conditions": "12 and under"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 26,
+      "price_basis": "fixed",
+      "conditions": "12 and under"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_map",
+     "url": "https://www.skahameadowsgolf.ca/course-layout",
+     "label": "Course layout",
+     "owner": "Skaha Meadows Golf Course",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "putting_green": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "penticton/wow-golf-club": {
+   "name": "WOW Golf Club",
+   "profile": {
+    "holes": 9,
+    "par": 34,
+    "course_format": "regulation",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "not_published",
+    "source_url": "https://wowgolfclub.com/",
+    "verified_at": "2026-09-26",
+    "note": "No green fees listed on the official site (checked 2026-09-26)."
+   }
+  },
+  "summerland/sumac-ridge-golf-country-club": {
+   "name": "Sumac Ridge Golf & Country Club",
+   "profile": {
+    "holes": 9,
+    "par": 28,
+    "course_format": "executive",
+    "access": "public",
+    "source_url": "https://sumacridgegolf.ca/",
+    "source_note": "Official: 9 holes, par 28"
+   },
+   "fees": {
+    "status": "not_published",
+    "source_url": "https://sumacridgegolf.ca/",
+    "verified_at": "2026-09-26",
+    "note": "No green fees listed on the official site (checked 2026-09-26)."
+   }
+  },
+  "summerland/summerland-golf-country-club": {
+   "name": "Summerland Golf & Country Club",
+   "profile": {
+    "holes": 18,
+    "par": null,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "source_note": "Official: 18-hole course; par not stated"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.summerlandgolf.com/rates/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_gst",
+    "note": "Prices include use of the driving range before the round.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 103.81,
+      "price_basis": "fixed",
+      "comparison": true,
+      "includes_range": true,
+      "time_window": "Open-3:29 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 88.1,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "time_window": "After 3:30 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 66.67,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "time_window": "Open-2:59 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 47.62,
+      "price_basis": "fixed",
+      "includes_range": true,
+      "time_window": "After 3 pm"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "scorecard",
+     "url": "https://www.summerlandgolf.com/scorecard/",
+     "label": "Scorecard & course flyover",
+     "owner": "Summerland Golf & Country Club",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ]
+  },
+  "vernon/hillview-golf-course": {
+   "name": "Hillview Golf Course",
+   "profile": {
+    "holes": 18,
+    "par": 56,
+    "course_format": "executive",
+    "source_url": "https://www.hillviewgolf.ca/",
+    "source_note": "Official: Vernon's only 18-hole executive course; par from Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "not_published",
+    "source_url": "https://www.hillviewgolf.ca/",
+    "verified_at": "2026-09-26",
+    "note": "No green fees listed on the official site; booking system only (checked 2026-09-26)."
+   }
+  },
+  "vernon/predator-ridge-predator-course": {
+   "name": "Predator Ridge - Predator Course",
+   "profile": {
+    "holes": 18,
+    "par": 71,
+    "course_format": "regulation",
+    "access": "resort",
+    "yardage": 7034,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.predatorridge.com/golf/green-fees/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_tax",
+    "note": "One published rate card covers both courses. No rates are published for after September 27, 2026.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 300,
+      "price_basis": "fixed",
+      "comparison": true,
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Daily guest"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 175,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 120,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Under 18, shared cart with adult"
+     },
+     {
+      "category": "replay",
+      "holes": 18,
+      "amount": 150,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Advance booking"
+     },
+     {
+      "category": "other",
+      "holes": 18,
+      "amount": 250,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Resort accommodation guest"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 255,
+      "price_basis": "fixed",
+      "season_label": "Prime spring",
+      "valid_from": "2026-05-01",
+      "valid_to": "2026-05-31",
+      "conditions": "Daily guest"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 200,
+      "price_basis": "fixed",
+      "season_label": "Spring season",
+      "valid_from": "2026-04-08",
+      "valid_to": "2026-04-30",
+      "conditions": "Daily guest"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_map",
+     "url": "https://www.predatorridge.com/golf/predator-course/",
+     "label": "Course map, scorecard & hole flyovers",
+     "owner": "Predator Ridge",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "vernon/predator-ridge-ridge-course": {
+   "name": "Predator Ridge - Ridge Course",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "resort",
+    "yardage": 7128,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://www.predatorridge.com/golf/green-fees/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_tax",
+    "note": "One published rate card covers both courses. No rates are published for after September 27, 2026.",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 300,
+      "price_basis": "fixed",
+      "comparison": true,
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Daily guest"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 175,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 120,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Under 18, shared cart with adult"
+     },
+     {
+      "category": "replay",
+      "holes": 18,
+      "amount": 150,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Advance booking"
+     },
+     {
+      "category": "other",
+      "holes": 18,
+      "amount": 250,
+      "price_basis": "fixed",
+      "season_label": "Prime season",
+      "valid_from": "2026-06-01",
+      "valid_to": "2026-09-27",
+      "conditions": "Resort accommodation guest"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 255,
+      "price_basis": "fixed",
+      "season_label": "Prime spring",
+      "valid_from": "2026-05-01",
+      "valid_to": "2026-05-31",
+      "conditions": "Daily guest"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 200,
+      "price_basis": "fixed",
+      "season_label": "Spring season",
+      "valid_from": "2026-04-08",
+      "valid_to": "2026-04-30",
+      "conditions": "Daily guest"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_map",
+     "url": "https://www.predatorridge.com/golf/ridge-course/",
+     "label": "Course map, scorecard & hole flyovers",
+     "owner": "Predator Ridge",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ],
+   "facilities": {
+    "driving_range": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "vernon/spallumcheen-golf-country-club-championship-course": {
+   "name": "Spallumcheen Golf & Country Club - Championship Course",
+   "profile": {
+    "holes": 18,
+    "par": 71,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "yardage": 6423,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://spallumcheengolf.com/rates/",
+    "verification": "official rates image on the club's rates page, read and transcribed",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "unstated",
+    "note": "All prices are walking; half-cart rental extra ($25 for 18 holes).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 119,
+      "price_basis": "fixed",
+      "comparison": true,
+      "walking": true,
+      "time_window": "7-11:30 am"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 105,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "11:30 am-1 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 89,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "1-2:30 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 79,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "2:30-4 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 59,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "4-6 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 74,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "Open-7 am"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 60,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "Open-4 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 40,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "4-6 pm"
+     },
+     {
+      "category": "other",
+      "holes": null,
+      "amount": 25,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "6 pm-close",
+      "conditions": "Twilight; not guaranteed to finish 18 holes"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "short_game": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  },
+  "vernon/spallumcheen-golf-country-club-executive-course": {
+   "name": "Spallumcheen Golf & Country Club - Executive Course",
+   "profile": {
+    "holes": 9,
+    "par": null,
+    "course_format": "executive",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass); par not stated"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://spallumcheengolf.com/rates/",
+    "verification": "official rates image on the club's rates page, read and transcribed",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "unstated",
+    "note": "All prices are walking; half-cart rental extra ($15).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 38,
+      "price_basis": "fixed",
+      "comparison": true,
+      "walking": true,
+      "time_window": "7:30 am-5 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 25,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "Open-7:30 am"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 30,
+      "price_basis": "fixed",
+      "walking": true,
+      "time_window": "5 pm-close"
+     }
+    ]
+   }
+  },
+  "vernon/rise-golf-course": {
+   "name": "The Rise Golf Course",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "public",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "dynamic",
+    "source_url": "https://theriseresort.ca/golf/rates-specials/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": true,
+    "tax": "plus_gst",
+    "note": "Regular peak and shoulder rates are dynamic and not published; only these fixed rates are listed.",
+    "rates": [
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 119,
+      "price_basis": "fixed",
+      "time_window": "Daily after 4 pm"
+     },
+     {
+      "category": "super_twilight",
+      "holes": 18,
+      "amount": 99,
+      "price_basis": "fixed",
+      "time_window": "Daily after 5 pm"
+     },
+     {
+      "category": "senior",
+      "holes": 18,
+      "amount": 109,
+      "price_basis": "fixed",
+      "conditions": "55+, Tuesdays only, booked 30 days or less ahead"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 75,
+      "price_basis": "fixed",
+      "conditions": "Under 19, with a full-paying adult"
+     },
+     {
+      "category": "replay",
+      "holes": 18,
+      "amount": 120,
+      "price_basis": "fixed",
+      "conditions": "Same day, call to book"
+     }
+    ]
+   },
+   "media": [
+    {
+     "kind": "course_map",
+     "url": "https://theriseresort.ca/golf/hole-by-hole/",
+     "label": "Course map & hole-by-hole",
+     "owner": "The Rise Resort",
+     "rights_status": "link_only",
+     "verified_at": "2026-09-26"
+    }
+   ]
+  },
+  "vernon/vernon-golf-country-club": {
+   "name": "Vernon Golf & Country Club",
+   "profile": {
+    "holes": 18,
+    "par": 72,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass); hole count from course listing"
+   },
+   "fees": {
+    "status": "not_published",
+    "source_url": "https://vernongolf.com/",
+    "verified_at": "2026-09-26",
+    "note": "No green fees listed on the official site; public tee sheet only (checked 2026-09-26)."
+   }
+  },
+  "west-kelowna/shannon-lake-golf-club": {
+   "name": "Shannon Lake Golf Club",
+   "profile": {
+    "holes": 18,
+    "par": 70,
+    "course_format": "regulation",
+    "access": "semi_private",
+    "yardage": 6294,
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass)"
+   },
+   "fees": {
+    "status": "unverified",
+    "source_url": "https://shannonlakegolf.com/",
+    "verified_at": "2026-09-26",
+    "note": "The official site refused automated access (HTTP 403) on 2026-09-26; rates need a manual check."
+   }
+  },
+  "west-kelowna/two-eagles-golf-course-academy": {
+   "name": "Two Eagles Golf Course & Academy",
+   "profile": {
+    "holes": 18,
+    "par": 65,
+    "course_format": "mid_length",
+    "access": "public",
+    "source_url": "https://twoeaglesgolf.com/",
+    "source_note": "Official: par 65, just over 5,000 yards"
+   },
+   "fees": {
+    "status": "published",
+    "source_url": "https://twoeaglesgolf.com/rates/",
+    "verification": "official rates page, read verbatim",
+    "verified_at": "2026-09-26",
+    "season_year": 2026,
+    "season_year_stated": false,
+    "tax": "unstated",
+    "note": "Power carts extra ($21 per seat for 18 holes).",
+    "rates": [
+     {
+      "category": "standard",
+      "holes": 18,
+      "amount": 69,
+      "price_basis": "fixed",
+      "comparison": true,
+      "time_window": "Prime time, before 1:59 pm"
+     },
+     {
+      "category": "twilight",
+      "holes": 18,
+      "amount": 57,
+      "price_basis": "fixed",
+      "time_window": "After 2 pm"
+     },
+     {
+      "category": "standard",
+      "holes": 9,
+      "amount": 39,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "twilight",
+      "holes": 9,
+      "amount": 34,
+      "price_basis": "fixed"
+     },
+     {
+      "category": "junior",
+      "holes": 18,
+      "amount": 30,
+      "price_basis": "fixed",
+      "conditions": "Ages 3-18"
+     },
+     {
+      "category": "junior",
+      "holes": 9,
+      "amount": 20,
+      "price_basis": "fixed",
+      "conditions": "Ages 3-18"
+     }
+    ]
+   },
+   "facilities": {
+    "driving_range": true,
+    "putting_green": true,
+    "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
+   }
+  }
+ },
+ "value_index": {
+  "season_year": 2026,
+  "reference_fees": {
+   "championship_18": 149,
+   "short_18": 52,
+   "nine_hole": 41
+  },
+  "note": "Fixed 2026 reference green fees: the median verified 2026 standard green fee of the rated courses in each group (18-hole championship, 18-hole executive/mid-length, 9-hole), checked 2026-09-26. Not recalculated when courses are added; set again for each new season."
+ }
+}

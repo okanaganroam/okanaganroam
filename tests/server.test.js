@@ -10632,3 +10632,160 @@ test('List an Event: the staging table is additive and nothing else was touched'
   assert.doesNotMatch(header, /list-an-event/, 'no navigation link yet');
   assert.equal((app.renderHomeFooterHTML().match(/<a href="\/list-an-event">List an Event<\/a>/g) || []).length, 1, 'the footer links to List an Event once');
 });
+
+// ---- Golf data (2026-09-26): verified green fees, price sort, course-map links ----
+// Fixture golf venues use REAL region/slug keys so the reviewed data file
+// (loaded by db.js at startup) attaches to them. Appended last, so no
+// earlier test sees these rows.
+const golfFixtures = (() => {
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    const ins = db.prepare(`INSERT INTO venues (name, region, type, price, description, website, slug)
+      VALUES (@name, @region, @type, @price, @description, @website, @slug)`);
+    for (const row of [
+      { name: 'Skaha Meadows Golf Course', region: 'penticton', type: 'golf', price: 2, slug: 'skaha-meadows-golf-course', website: 'https://skahameadowsgolf.ca/', description: 'A 9-hole course.' },
+      { name: 'Penticton Golf & Country Club', region: 'penticton', type: 'golf', price: null, slug: 'penticton-golf-country-club', website: 'https://pentictongolf.ca/', description: 'An 18-hole course.' },
+      { name: 'Penticton Golf Club Restaurant', region: 'penticton', type: 'restaurant', price: 2, slug: 'penticton-golf-country-club', website: null, description: 'Clubhouse dining.' },
+      { name: 'Pine Hills Golf Club', region: 'penticton', type: 'golf', price: null, slug: 'pine-hills-golf-club', website: null, description: 'A 9-hole executive course.' },
+      { name: 'Kelowna Driving Range & Mini Golf', region: 'kelowna', type: 'golf', price: null, slug: 'kelowna-driving-range-mini-golf', website: null, description: 'A driving range and mini golf.' },
+    ]) ins.run(row);
+  };
+})();
+
+test('Golf data: the region golf page shows verified green fees and sorts by price (low-high, high-low), unpriced courses last, default order unchanged', () => {
+  golfFixtures();
+  const venues = app.getVenuesByRegionCategory('penticton', 'golf');
+  const page = (sort) => app.renderCategoryPage('penticton', 'golf', venues, [], { golfSort: sort, today: '2026-09-26' });
+  const order = (html) => [...html.split('Penticton Golf Courses</h2>')[1].matchAll(/venue-card-name">([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(order(page('price-asc')), ['Skaha Meadows Golf Course', 'Penticton Golf &amp; Country Club', 'Pine Hills Golf Club']);
+  assert.deepEqual(order(page('price-desc')), ['Penticton Golf &amp; Country Club', 'Skaha Meadows Golf Course', 'Pine Hills Golf Club']);
+  assert.deepEqual(order(page('recommended')), order(app.renderCategoryPage('penticton', 'golf', venues, [])), 'default order is the existing order');
+  const asc = page('price-asc');
+  assert.match(asc, /<span class="golf-fee-price">\$40<\/span> <span class="golf-fee-detail">· 9 holes<\/span>/);
+  assert.match(asc, /<span class="golf-fee-price">\$99<\/span> <span class="golf-fee-detail">· 18 holes · plus tax<\/span>/);
+  assert.match(asc, /Green fees not yet verified/);
+  assert.match(asc, /<nav class="category-region-selector golf-sort" aria-label="Sort golf courses">/);
+  assert.match(asc, /<a href="\/penticton\/golf\?sort=price-desc" rel="nofollow">Price: high to low<\/a>/);
+  assert.match(asc, /Golf data \(2026-09-26\)/, 'golf data styles loaded on golf pages');
+  assert.match(asc, /<body class="golf-page">/);
+});
+
+test('Golf data: the golf venue page shows green fees and the official course-map link, and never the legacy $$ price level', () => {
+  golfFixtures();
+  const skaha = app.findVenueBySlug('penticton', 'golf', 'skaha-meadows-golf-course');
+  assert.equal(skaha.price, 2, 'the stored price level is untouched');
+  const page = app.renderVenuePage(skaha, [], [], []);
+  assert.doesNotMatch(page, /<span class="label">Price<\/span>/);
+  assert.doesNotMatch(page, /"priceRange"/);
+  assert.doesNotMatch(page.replace(/<style>[\s\S]*?<\/style>/g, ''), /\$\$/);
+  assert.match(page, /"@type":"GolfCourse"/);
+  assert.match(page, /<div class="venue-section golf-fees" id="green-fees">/);
+  assert.match(page, /<div class="venue-section golf-map-callout">[\s\S]*href="https:\/\/www\.skahameadowsgolf\.ca\/course-layout" rel="nofollow noopener" target="_blank">View course map ↗<\/a>/);
+  assert.doesNotMatch(page, /<img[^>]*skahameadowsgolf/);
+  assert.doesNotMatch(page, /AggregateRating/);
+});
+
+test('Golf data: a clubhouse restaurant sharing a golf slug gets no golf data and keeps its own price level', () => {
+  golfFixtures();
+  const restaurant = app.findVenueBySlug('penticton', 'restaurant', 'penticton-golf-country-club');
+  const page = app.renderVenuePage(restaurant, [], [], []);
+  assert.match(page, /<span class="label">Price<\/span><span>\$\$<\/span>/);
+  assert.match(page, /"priceRange":"\$\$"/);
+  assert.doesNotMatch(page, /golf-fee|golf-map|Green fees|Golf data \(2026-09-26\)/);
+});
+
+test('Golf data: the driving range is listed under "Driving Ranges & Practice", not "Golf Courses", and labelled as such', () => {
+  golfFixtures();
+  const html = app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []);
+  const [courses, rest] = html.split('Kelowna Driving Ranges &amp; Practice</h2>');
+  assert.ok(rest, 'practice subsection rendered');
+  assert.doesNotMatch(courses, /Kelowna Driving Range &amp; Mini Golf/);
+  assert.match(rest.split('<h2 class="category-subsection-heading">')[0], /Kelowna Driving Range &amp; Mini Golf/);
+  assert.match(html, /Kelowna Indoor Golf &amp; Simulators/, 'the simulator split is unchanged');
+  const range = app.findVenueBySlug('kelowna', 'golf', 'kelowna-driving-range-mini-golf');
+  const page = app.renderVenuePage(range, [], [], []);
+  assert.match(page, /<span class="venue-hero-type">Driving Range &amp; Practice<\/span>/);
+  assert.doesNotMatch(page, /id="green-fees"/);
+});
+
+test('Golf data: /api/venues output is unchanged (no new fields, stored price level intact)', () => {
+  golfFixtures();
+  const res = app.listVenues({ type: 'golf', region: 'penticton' });
+  const skaha = res.venues.find((v) => v.slug === 'skaha-meadows-golf-course');
+  assert.equal(skaha.price, 2);
+  const expected = ['id', 'created_at', 'updated_at', 'name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description', 'description_fr', 'hours', 'address', 'website', 'image_url', 'slug', 'latitude', 'longitude', 'redirect_to'];
+  for (const k of Object.keys(skaha)) assert.ok(!/golf|fee|green|comparison|course_/.test(k), `unexpected field ${k}`);
+  for (const k of expected) assert.ok(k in skaha, `field ${k} still present`);
+});
+
+test('Golf data: non-golf listings and venue pages carry no green-fee, sort or course-map markup', () => {
+  golfFixtures();
+  const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), [], { golfSort: 'price-asc' });
+  assert.doesNotMatch(restaurants, /golf-sort|golf-fee|golf-map|Golf data \(2026-09-26\)/);
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  assert.doesNotMatch(app.venueCardHtml(trattoria), /golf-fee/);
+  assert.doesNotMatch(app.renderVenuePage(trattoria, [], [], []), /golf-fee|golf-map|Golf data \(2026-09-26\)/);
+  const beaches = app.renderCategoryPage('kelowna', 'beach', app.getVenuesByRegionCategory('kelowna', 'beach'), [], { golfSort: 'price-asc' });
+  assert.doesNotMatch(beaches, /golf-sort|golf-fee|Golf data \(2026-09-26\)/);
+});
+
+test('Golf data: /golf and /penticton/golf honour ?sort= over HTTP, unknown values fall back, and the homepage carries nothing new (isolated child process)', async () => {
+  golfFixtures();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-golf-data-'));
+  const projectRoot = path.join(__dirname, '..');
+  for (const f of ['server.js', 'db.js', 'golf-data.js', 'okanagan.html', 'okanagan.db']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  fs.mkdirSync(path.join(tempDir, 'data'));
+  fs.copyFileSync(path.join(projectRoot, 'data', 'golf-course-data.json'), path.join(tempDir, 'data', 'golf-course-data.json'));
+  const port = 3611;
+  const child = require('node:child_process').spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
+  const get = async (p) => { const r = await fetch(`http://localhost:${port}${p}`); return { status: r.status, text: await r.text() }; };
+  try {
+    let ready = false;
+    for (let i = 0; i < 100 && !ready; i++) {
+      try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready, 'child server started');
+    const names = (html, heading) => [...html.split(`${heading}</h2>`)[1].split('<h2 class="category-subsection-heading">')[0].matchAll(/venue-card-name">([^<]+)</g)].map((m) => m[1]);
+    const desc = await get('/penticton/golf?sort=price-desc');
+    assert.equal(desc.status, 200);
+    assert.deepEqual(names(desc.text, 'Penticton Golf Courses'), ['Penticton Golf &amp; Country Club', 'Skaha Meadows Golf Course', 'Pine Hills Golf Club']);
+    assert.match(desc.text, /aria-current="true">Price: high to low</);
+    const wide = await get('/golf?sort=price-asc');
+    assert.equal(wide.status, 200);
+    const wideNames = names(wide.text, 'Golf Courses');
+    assert.ok(wideNames.indexOf('Skaha Meadows Golf Course') < wideNames.indexOf('Penticton Golf &amp; Country Club'));
+    assert.ok(wideNames.indexOf('Penticton Golf &amp; Country Club') < wideNames.indexOf('Pine Hills Golf Club'));
+    const bogus = await get('/golf?sort=%3Cscript%3Ealert(1)%3C%2Fscript%3E');
+    const plain = await get('/golf');
+    assert.equal(bogus.status, 200);
+    assert.deepEqual(names(bogus.text, 'Golf Courses'), names(plain.text, 'Golf Courses'));
+    assert.doesNotMatch(bogus.text, /alert\(1\)/, 'the sort value is never reflected into the page');
+    assert.match(plain.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/golf">/);
+    const home = await get('/');
+    assert.equal(home.status, 200);
+    assert.doesNotMatch(home.text, /golf-fee|golf-sort|golf-map|Green fees|Golf data \(2026-09-26\)/);
+  } finally {
+    child.kill();
+  }
+});
+
+test('Golf Value Index: cards and course pages show the index or "Value index unavailable"; non-golf pages and JSON-LD carry nothing', () => {
+  golfFixtures();
+  const html = app.renderCategoryPage('penticton', 'golf', app.getVenuesByRegionCategory('penticton', 'golf'), []);
+  assert.match(html, /<p class="golf-value">Okanagan Roam Value Index: 54\/100 · Good value<\/p>/, 'Skaha Meadows (9-hole group)');
+  assert.match(html, /<p class="golf-value">Okanagan Roam Value Index: 85\/100 · Excellent value<\/p>/, 'Penticton G&CC (18-hole championship group)');
+  assert.match(html, /<p class="golf-value golf-value-none">Value index unavailable<\/p>/, 'Pine Hills (unverified fees)');
+  const skaha = app.renderVenuePage(app.findVenueBySlug('penticton', 'golf', 'skaha-meadows-golf-course'), [], [], []);
+  assert.match(skaha, /<div class="venue-section golf-value-section" id="value-index">/);
+  assert.match(skaha, /Based on 2026 rates · Checked Sep 26, 2026/);
+  assert.match(skaha, /Driving range: not documented/);
+  assert.doesNotMatch(skaha, /AggregateRating|ratingValue|★/);
+  const range = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'kelowna-driving-range-mini-golf'), [], [], []);
+  assert.doesNotMatch(range.replace(/<style>[\s\S]*?<\/style>/g, ''), /golf-value|Value Index|Value index/, 'practice facilities are never rated (golf CSS may load, no index markup)');
+  const restaurant = app.renderVenuePage(app.findVenueBySlug('penticton', 'restaurant', 'penticton-golf-country-club'), [], [], []);
+  assert.doesNotMatch(restaurant, /golf-value|Value Index|Value index/);
+  const fixtureCourse = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
+  assert.doesNotMatch(fixtureCourse, /golf-value|Value index/, 'a golf venue with no data shows nothing new');
+});

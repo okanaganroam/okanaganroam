@@ -4,6 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+// Golf course data (2026-09-26): verified green fees, course profiles and
+// links to official course maps -- golf pages only. Guarded like db.js so a
+// copy of the app without golf-data.js renders exactly as before.
+const golfData = (() => { try { return require('./golf-data.js'); } catch (e) { return null; } })();
+function golfDetailsFor(venues) {
+  return golfData ? golfData.getGolfDetails(db, venues) : new Map();
+}
 
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
@@ -7761,7 +7768,7 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // the Golf rules, see renderBeachThemeStyles) plus, when the page
   // carries one, the advisory-notice styles. Golf pages' head is
   // byte-identical to before.
-  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false } = opts;
+  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false, golfDataStyles = false } = opts;
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
@@ -7780,7 +7787,7 @@ ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.strin
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/tokens.css">
-${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${outdoorTheme ? '\n' + renderOutdoorThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}`;
+${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${outdoorTheme ? '\n' + renderOutdoorThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}${golfDataStyles && golfData ? '\n' + golfData.GOLF_DATA_CSS : ''}`;
 }
 
 function siteHeader(rightLinkHref, rightLinkText) {
@@ -7864,7 +7871,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '' } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -7931,7 +7938,7 @@ function venueCardHtml(venue, opts = {}) {
   return `
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
-        <p class="venue-meta">${meta}</p>
+        <p class="venue-meta">${meta}</p>${golfFeeHtml ? '\n        ' + golfFeeHtml : ''}
         ${desc}${advisoryHtml}${dogNoteHtml}
         <p class="chips">${editorialChips}${badgeChipsHtml(venue)}</p>${cardActions}
       </li>`;
@@ -8209,8 +8216,17 @@ function isIndoorGolfVenue(venue) {
 // so the same helper produces "Golf Courses" and "Kelowna Golf Courses"
 // without a separate code path per page type. A subsection is omitted
 // entirely when it would be empty, rather than rendering an empty grid.
-function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, localFavouriteIds = new Set(), advisoryNotes = new Map(), dogFriendlyNotes = new Map(), cardOpts = {}) {
-  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null })).join('\n');
+function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, localFavouriteIds = new Set(), advisoryNotes = new Map(), dogFriendlyNotes = new Map(), cardOpts = {}, golfOpts = {}) {
+  // golfOpts (golf only, 2026-09-26): { details, sort, basePath, today } from
+  // golf-data.js -- adds verified green-fee lines, a price sort for the
+  // courses subsection, and a "Driving Ranges & Practice" subsection.
+  const golfDetails = golfOpts.details || new Map();
+  const golfFee = (v) => {
+    if (!golfData || type !== 'golf') return '';
+    const d = golfDetails.get(`${v.region}/${v.slug}`);
+    return [golfData.golfCardFeeHtml(d, golfOpts.today), golfData.golfCardValueHtml(d, golfOpts.today)].filter(Boolean).join('\n        ');
+  };
+  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
 
   if (type !== 'golf') {
     return `<ul class="card-grid">
@@ -8218,14 +8234,27 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   </ul>`;
   }
 
-  const courses = venues.filter((v) => !isIndoorGolfVenue(v));
+  const isPractice = (v) => !!(golfData && golfData.isPracticeFacility(golfDetails.get(`${v.region}/${v.slug}`)));
+  const listedCourses = venues.filter((v) => !isIndoorGolfVenue(v) && !isPractice(v));
+  const practice = venues.filter((v) => !isIndoorGolfVenue(v) && isPractice(v));
   const indoor = venues.filter((v) => isIndoorGolfVenue(v));
+  const sort = golfOpts.sort || 'recommended';
+  const courses = golfData ? golfData.sortGolfCourses(listedCourses, golfDetails, sort, golfOpts.today) : listedCourses;
+  const sortNav = (golfData && golfOpts.basePath && listedCourses.length > 1 && golfData.hasSortablePrices(listedCourses, golfDetails, golfOpts.today))
+    ? '\n  ' + golfData.golfSortNavHtml(golfOpts.basePath, sort)
+    : '';
   const prefix = headingPrefix ? `${escapeHtml(headingPrefix)} ` : '';
   let html = '';
   if (courses.length) {
-    html += `<h2 class="category-subsection-heading">${prefix}Golf Courses</h2>
+    html += `<h2 class="category-subsection-heading">${prefix}Golf Courses</h2>${sortNav}
   <ul class="card-grid">
     ${cardHtml(courses)}
+  </ul>`;
+  }
+  if (practice.length) {
+    html += `<h2 class="category-subsection-heading">${prefix}Driving Ranges &amp; Practice</h2>
+  <ul class="card-grid">
+    ${cardHtml(practice)}
   </ul>`;
   }
   if (indoor.length) {
@@ -8238,7 +8267,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
 }
 
 // GET /:region/:category — category page within a region
-function renderCategoryPage(region, type, venues, categoryGuidePages) {
+function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {}) {
   const regionLabel = REGION_LABELS[region];
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
@@ -8278,7 +8307,9 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   // controls without any visual change (see usesEngagementControls).
   const engagement = usesEngagementControls(type);
   const engagementOnly = engagement && !usesThemedCategoryLayout(type);
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { actions: engagement });
+  const golfDetails = type === 'golf' ? golfDetailsFor(venues) : new Map();
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { actions: engagement },
+    type === 'golf' ? { details: golfDetails, sort: opts.golfSort, basePath: `/${region}/${catSlug}`, today: opts.today } : {});
 
   // Back-link to the Okanagan-wide page, only for categories that
   // actually have one (ALL_REGIONS_CATEGORIES) -- every other category
@@ -8299,7 +8330,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0 })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, golfDataStyles: golfDetails.size > 0 })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type)}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -9070,7 +9101,7 @@ ${renderGolfHeaderHtml()}
 // hidden non-matching cards, the summary and the selected-filter tags --
 // before any script runs (and without scripting). Ignored for every
 // other category. Omitted = nothing selected = today's landing markup.
-function renderCategoryAllRegionsPage(type, venues, filter = null) {
+function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
   // Themed presentation for this hub only (see HUB_ONLY_THEMED_TYPES).
@@ -9174,16 +9205,18 @@ function renderCategoryAllRegionsPage(type, venues, filter = null) {
   // outside it carry `hidden`, the list itself is hidden when nothing
   // matches) so the first paint, a no-script visitor and the client script
   // all agree; every card is still in the markup for the script to toggle.
+  const golfDetails = type === 'golf' ? golfDetailsFor(venues) : new Map();
   const cardsHtml = isOutdoorLanding
     ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed })
         .replace('<ul class="card-grid">', `<ul class="card-grid" id="outdoorResults"${outdoorMatching.length === 0 ? ' hidden' : ''}>`)
         .replace(/<li class="venue-card" data-venue-id="(\d+)"([^>]*)>/g, (m, id, rest) => (outdoorMatchIds.has(Number(id)) ? m : `<li class="venue-card" data-venue-id="${id}"${rest} hidden>`))
-    : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed });
+    : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed },
+      type === 'golf' ? { details: golfDetails, sort: opts.golfSort, basePath: `/${catSlug}`, today: opts.today } : {});
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0 })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
 ${golfEngagementHeadHtml(type, hubThemed)}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
@@ -11785,7 +11818,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     geo: (venue.latitude && venue.longitude) ? { '@type': 'GeoCoordinates', latitude: venue.latitude, longitude: venue.longitude } : undefined,
     image: venue.image_url || undefined,
     sameAs: normalizeWebsiteUrl(venue.website) || undefined,
-    priceRange: venue.price ? '$'.repeat(venue.price) : undefined,
+    // Golf (2026-09-26): the legacy price level is not a green fee, so it is
+    // never shown on golf pages; verified green fees are shown instead.
+    priceRange: (venue.price && venue.type !== 'golf') ? '$'.repeat(venue.price) : undefined,
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
     aggregateRating: (venue.rating && venue.reviews) ? {
       '@type': 'AggregateRating',
@@ -11829,7 +11864,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // line and the Good to Know Type row), using the same isIndoorGolfVenue()
   // split the /golf directory already uses; the JSON-LD @type stays
   // GolfCourse and every other category keeps label.singular.
-  const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? 'Indoor Golf' : label.singular;
+  const golfDetail = venue.type === 'golf' ? golfDetailsFor([venue]).get(`${venue.region}/${venue.slug}`) : undefined;
+  const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? 'Indoor Golf'
+    : (golfData && golfData.isPracticeFacility(golfDetail)) ? 'Driving Range & Practice' : label.singular;
 
   const detailRows = [
     ['Type', venue.type === 'golf' ? golfKindLabel : label.singular],
@@ -11838,7 +11875,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.address ? ['Address', escapeHtml(venue.address)] : null,
     venue.phone ? ['Phone', `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
     venue.website ? ['Website', `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
-    venue.price ? ['Price', '$'.repeat(venue.price)] : null,
+    (venue.price && venue.type !== 'golf') ? ['Price', '$'.repeat(venue.price)] : null,
     (venue.rating && venue.reviews) ? ['Rating', `${venue.rating}\u2605 (${venue.reviews} reviews)`] : (venue.rating ? ['Rating', `${venue.rating}\u2605`] : null),
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
@@ -11869,7 +11906,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const atAGlanceParts = [
     venue.type === 'golf' ? golfKindLabel : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
-    venue.price ? '$'.repeat(venue.price) : null,
+    (venue.price && venue.type !== 'golf') ? '$'.repeat(venue.price) : null,
     venue.rating ? `${venue.rating}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
   ].filter(Boolean).join(' &middot; ');
 
@@ -11909,6 +11946,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
   const golfGlanceHtml = golfAtAGlanceHtml(venue);
+  // Golf data (2026-09-26): link to the club's own course map/scorecard page
+  // and the verified green fees ('' when there is no data for this course).
+  const golfMapHtml = golfData && golfDetail ? golfData.golfCourseMapHtml(golfDetail) : '';
+  const golfFeesHtml = golfData && golfDetail ? golfData.golfFeesSectionHtml(golfDetail) : '';
+  const golfValueHtml = golfData && golfDetail ? golfData.golfValueSectionHtml(golfDetail) : '';
 
   // One bulk lookup for all related+nearby cards together (reusing the
   // existing getHiddenGemVenueIds(), not a new query) -- O(1) Set lookups
@@ -11980,7 +12022,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !usesThemedCategoryLayout(venue.type) ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: usesThemedCategoryLayout(venue.type), beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail })}${usesThemedCategoryLayout(venue.type) ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !usesThemedCategoryLayout(venue.type) ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type)}
 </head>
 <body${themedBodyClassAttr(venue.type)}>
@@ -11998,7 +12040,7 @@ ${golfEngagementHeadHtml(venue.type)}
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
   <p class="venue-description">${escapeHtml(venue.description || '')}</p>${venueAdvisoryHtml}
-  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}
+  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}
   <div class="venue-section venue-key-info">
     <h2>Good to Know</h2>
     ${detailRows}
@@ -16663,7 +16705,7 @@ const server = http.createServer(async (req, res) => {
           // beaches and outdoors keep their existing page unchanged.
           const html = FD_CATEGORY_KIND_BY_TYPE[type]
             ? renderFoodDrinkHubPage(venues, parseFoodDrinkFilterQuery(query), { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
-            : renderCategoryPage(region, type, venues, categoryGuidePages);
+            : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended' });
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
@@ -16700,7 +16742,7 @@ const server = http.createServer(async (req, res) => {
       if (venues.length >= MIN_CATEGORY_VENUES) {
         // /outdoors?regions=..&activities=.. renders pre-filtered (see
         // parseOutdoorFilterQuery); other categories ignore the query.
-        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null);
+        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended' });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }

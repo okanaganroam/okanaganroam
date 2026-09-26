@@ -642,4 +642,16 @@ CREATE TABLE IF NOT EXISTS event_submissions (
 CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(status, submitted_at);
 `);
 
+// --- Golf course data (2026-09-26) -----------------------------------------
+// Additive golf_* tables (verified green fees, course profiles, links to
+// official course maps), rebuilt from data/golf-course-data.json only when
+// that reviewed file changes. Nothing here touches the venues table. The
+// require is guarded so a copy of the app without golf-data.js (e.g. the
+// isolated homepage tests) starts exactly as before.
+try {
+  require('./golf-data.js').initGolfData(db);
+} catch (e) {
+  if (e.code !== 'MODULE_NOT_FOUND') console.error('[golf-data] not loaded:', e.message);
+}
+
 module.exports = db;
