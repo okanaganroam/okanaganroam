@@ -11,6 +11,12 @@ const golfData = (() => { try { return require('./golf-data.js'); } catch (e) { 
 function golfDetailsFor(venues) {
   return golfData ? golfData.getGolfDetails(db, venues) : new Map();
 }
+// Canonical opening hours (2026-09-26, Open Now Phase 1): parsing and the
+// open/closed/unknown status for venues.hours live in hours.js. Nothing uses
+// it yet -- venue pages, structured data, /browse and the trip planner keep
+// their own hours logic. Guarded like golf-data.js so a copy of the app
+// without hours.js (e.g. the isolated homepage tests) starts exactly as before.
+const hoursModule = (() => { try { return require('./hours.js'); } catch (e) { return null; } })();
 
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
@@ -3131,6 +3137,13 @@ const okanaganClockFormatter = new Intl.DateTimeFormat('en-US', {
 function okanaganClock(now = new Date()) {
   const parts = Object.fromEntries(okanaganClockFormatter.formatToParts(now).map((x) => [x.type, x.value]));
   return { weekday: parts.weekday.slice(0, 3).toLowerCase(), minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute) };
+}
+
+// A venue's listed-hours status at an instant on the Okanagan wall clock
+// (okanaganClock above -- the one timezone path), via hours.js. null when
+// hours.js is not present. Not called by any page or route yet.
+function venueHoursStatusAt(hoursRaw, now = new Date()) {
+  return hoursModule ? hoursModule.statusAt(hoursModule.parseHours(hoursRaw), okanaganClock(now)) : null;
 }
 
 function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null }, now = new Date()) {
@@ -17222,6 +17235,7 @@ module.exports = {
   runTripPlan,
   tripStartWeekday,
   okanaganClock,
+  venueHoursStatusAt,
   countHiddenGemsOutsideSecretSpots,
   getHiddenGemCollectionVenues,
   hiddenGemsPageDestination,

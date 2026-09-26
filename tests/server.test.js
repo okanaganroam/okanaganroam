@@ -9496,6 +9496,63 @@ test('Phase 3.5: okanaganClock converts fixed instants to America/Vancouver week
   finally { if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
 });
 
+// ---- Canonical opening hours (hours.js, Open Now Phase 1) --------------------
+// venueHoursStatusAt() = hours.js status on the okanaganClock() wall clock --
+// the site's one America/Vancouver path, so offsets come from the runtime's
+// IANA data and are never hard-coded here. Instants below are UTC. The
+// transitions used are ones that data contains: the last fall-back (Sun
+// 2025-11-02, 02:00 PDT -> 01:00 PST) and the spring-forward (Sun 2026-03-08,
+// 02:00 PST -> 03:00 PDT). (tzdata 2026c keeps British Columbia on UTC-7 after
+// that, so no later fall-back is asserted.)
+test('hours.js status on the Okanagan clock: Pacific Time, daylight-saving changes, any process timezone', () => {
+  const H = JSON.stringify({ sat: [['18:00', '02:00']], sun: null, mon: [['09:00', '17:00']] });
+  const s = (iso) => app.venueHoursStatusAt(H, new Date(iso)).state;
+  // Summer (PDT, UTC-7): Monday 09:00 local is 16:00Z.
+  assert.equal(s('2026-09-28T15:59:00Z'), 'closed');
+  assert.equal(s('2026-09-28T16:00:00Z'), 'open');
+  assert.equal(s('2026-09-28T23:59:00Z'), 'open');
+  assert.equal(s('2026-09-29T00:00:00Z'), 'closed', 'Monday 17:00 PDT');
+  // Winter (PST, UTC-8): Monday 2026-01-05 09:00 local is 17:00Z.
+  assert.equal(s('2026-01-05T16:59:00Z'), 'closed');
+  assert.equal(s('2026-01-05T17:00:00Z'), 'open');
+  // Spring forward, Sat 2026-03-07 18:00-02:00: 01:59 PST is open; the next
+  // minute is 03:00 PDT (02:00 never happens), already closed.
+  assert.equal(s('2026-03-08T09:59:00Z'), 'open');
+  assert.equal(s('2026-03-08T10:00:00Z'), 'closed');
+  // The Monday after: 09:00 PDT is 16:00Z.
+  assert.equal(s('2026-03-09T15:59:00Z'), 'closed');
+  assert.equal(s('2026-03-09T16:00:00Z'), 'open');
+  // Fall back, Sat 2025-11-01 18:00-02:00: 01:30 happens twice (PDT, then
+  // PST) and is open both times; 02:00 PST closes.
+  assert.equal(s('2025-11-02T08:30:00Z'), 'open');
+  assert.equal(s('2025-11-02T09:30:00Z'), 'open');
+  assert.equal(s('2025-11-02T10:00:00Z'), 'closed');
+  // Local midnight, not UTC midnight: Saturday 23:30 PDT is Sunday 06:30Z.
+  assert.equal(s('2026-09-27T06:30:00Z'), 'open');
+  assert.deepEqual(app.venueHoursStatusAt(H, new Date('2026-09-27T06:30:00Z')).closesAt, { weekday: 'sun', minutes: 120 });
+  // The process timezone never matters.
+  const tz = process.env.TZ;
+  try {
+    for (const zone of ['UTC', 'Asia/Bangkok', 'America/New_York']) {
+      process.env.TZ = zone;
+      assert.equal(s('2026-09-28T16:00:00Z'), 'open', zone);
+      assert.equal(s('2025-11-02T09:30:00Z'), 'open', zone);
+    }
+  } finally { if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
+  // Unknown stays unknown on the real clock too.
+  assert.equal(app.venueHoursStatusAt(null, new Date('2026-09-28T16:00:00Z')).state, 'unknown');
+  assert.equal(app.venueHoursStatusAt(JSON.stringify({ tue: [['09:00', '17:00']] }), new Date('2026-09-28T16:00:00Z')).state, 'unknown', 'Monday not listed');
+});
+
+test('hours.js Phase 1 is foundation only: guarded load, no page, route or planner uses it yet', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /const hoursModule = \(\(\) => \{ try \{ return require\('\.\/hours\.js'\); \} catch \(e\) \{ return null; \} \}\)\(\);/, 'guarded require, like golf-data.js');
+  assert.equal((src.match(/hoursModule/g) || []).length, 4, 'declared once and used only inside venueHoursStatusAt');
+  assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 2, 'defined and exported, never called by the app');
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /hours\.js/, 'Build My Trip keeps parseVenueHours');
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /statusAt|hours\.js/, '/browse keeps its own logic');
+});
+
 // ---- Hidden Gems destination link (2026-09-25) ------------------------------
 // /secret-spots lists only the outdoor + beach Hidden Gems. The planner's
 // "See everything that matches on Okanagan Roam" link (and the Hero Search
