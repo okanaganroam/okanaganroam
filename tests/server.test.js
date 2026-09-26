@@ -11665,3 +11665,108 @@ test('Batch 3: long website URLs wrap inside detail rows on every detail page (d
   assert.match(restaurant, /\.detail-row > span:not\(\.label\) \{ min-width: 0; \}/);
   assert.match(restaurant, /\.detail-row a \{ overflow-wrap: anywhere; \}/);
 });
+
+// ==== Batch A (2026-09-27): server performance, output-equivalent ==========
+//
+// P-002 collection_items index, P-003 count queries, P-004 / K-003 derived
+// theme CSS built once, P-005 one grouped guide-count query. Each test pins
+// the new path to the exact result of the code it replaced.
+
+test('Batch A (P-002): collection_items has the (content_type, content_id, collection_id) index, and membership lookups use it', () => {
+  const idx = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_collection_items_content'").get();
+  assert.ok(idx, 'index exists');
+  assert.match(idx.sql, /ON collection_items\(content_type, content_id, collection_id\)/);
+  const plan = db.prepare(`EXPLAIN QUERY PLAN SELECT v.id FROM venues v WHERE v.redirect_to IS NULL AND EXISTS (
+    SELECT 1 FROM collection_items ci JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'hidden_gem')`).all().map((r) => r.detail).join(' | ');
+  assert.match(plan, /SEARCH ci USING (COVERING )?INDEX idx_collection_items_content/);
+  // Re-running the migration is a no-op on a database that already has it.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_collection_items_content ON collection_items(content_type, content_id, collection_id);');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'idx_collection_items_content'").get().n, 1);
+});
+
+test('Batch A (P-002): per-venue outdoor activity slugs keep membership (rowid) order, exactly as the pre-index table scan produced', () => {
+  const venues = app.getVenuesByCategory('outdoor').slice(0, 200);
+  const live = app.listLiveOutdoorActivities();
+  const kindToSlug = Object.fromEntries(live.map((a) => [a.kind, a.slug]));
+  const legacy = new Map();
+  if (venues.length && live.length) {
+    const rows = db.prepare(`SELECT ci.content_id AS id, c.kind AS kind FROM collection_items ci NOT INDEXED
+      JOIN collections c ON c.id = ci.collection_id
+      WHERE ci.content_type = 'venue' AND ci.content_id IN (${venues.map(() => '?').join(', ')})`).all(...venues.map((v) => v.id));
+    for (const r of rows) {
+      const slug = kindToSlug[r.kind];
+      if (!slug) continue;
+      if (!legacy.has(r.id)) legacy.set(r.id, []);
+      if (!legacy.get(r.id).includes(slug)) legacy.get(r.id).push(slug);
+    }
+  }
+  assert.deepEqual([...app.getOutdoorActivitySlugsByVenue(venues)], [...legacy]);
+});
+
+test('Batch A (P-003): every count query equals the length of the list it replaced, per region and site-wide', () => {
+  // Temporary memberships across many regions and types so the comparison is not vacuous.
+  const ensure = (kind) => {
+    const slug = `batch-a-test-${kind}`;
+    db.prepare("INSERT OR IGNORE INTO collections (slug, kind, title) VALUES (?, ?, 'Batch A test')").run(slug, kind);
+    return db.prepare('SELECT id FROM collections WHERE slug = ?').get(slug).id;
+  };
+  const kinds = { local_favorite: ensure('local_favorite'), [app.DOG_FRIENDLY_COLLECTION_KIND]: ensure(app.DOG_FRIENDLY_COLLECTION_KIND), hidden_gem: ensure('hidden_gem') };
+  const sample = db.prepare('SELECT id FROM venues ORDER BY id').all().map((r) => r.id).filter((_, i) => i % 7 === 0);
+  const add = db.prepare("INSERT INTO collection_items (collection_id, content_type, content_id, position) VALUES (?, 'venue', ?, 0)");
+  sample.forEach((id, i) => add.run(Object.values(kinds)[i % 3], id));
+  try {
+    const now = new Date();
+    for (const region of Object.keys(app.REGION_LABELS)) {
+      const inRegion = (list) => list.filter((v) => v.region === region).length;
+      assert.equal(app.countUpcomingEventsForRegion(region, now), app.listUpcomingEventsForRegion(region, { limit: Number.MAX_SAFE_INTEGER, now }).length, `events ${region}`);
+      assert.equal(app.countDogFriendlyHubVenues(region), inRegion(app.getDogFriendlyHubVenues()), `dog ${region}`);
+      assert.equal(app.countLocalFavouriteVenues(region), inRegion(app.getLocalFavouriteVenues()), `local fav ${region}`);
+      assert.equal(app.countHiddenGemCollectionVenues(region), inRegion(app.getHiddenGemCollectionVenues()), `hidden gem ${region}`);
+    }
+    assert.equal(app.countDogFriendlyHubVenues(), app.getDogFriendlyHubVenues().length);
+    assert.equal(app.countLocalFavouriteVenues(), app.getLocalFavouriteVenues().length);
+    assert.equal(app.countHiddenGemCollectionVenues(), app.getHiddenGemCollectionVenues().length);
+    assert.equal(app.countSecretSpotVenues(), app.getSecretSpotVenues().length);
+    assert.equal(app.countFoodDrinkHubVenues(), app.getFoodDrinkHubVenues().length);
+    assert.equal(app.countOutdoorLandingVenues(), app.getOutdoorLandingVenues().length);
+    for (const type of Object.keys(app.CATEGORY_SLUGS)) assert.equal(app.countVenuesByCategory(type), app.getVenuesByCategory(type).length, type);
+    assert.ok(app.countLocalFavouriteVenues() > 0 && app.countDogFriendlyHubVenues() > 0 && app.countHiddenGemCollectionVenues() > 0, 'comparison covers non-zero counts');
+    // The destination tabs carry exactly the list-derived counts.
+    const region = 'kelowna';
+    const tabs = Object.fromEntries(app.destinationCategories(region, app.getRegionCategoryCounts(region), now).map((c) => [c.key, c.count]));
+    assert.equal(tabs['local-favourites'], app.getLocalFavouriteVenues().filter((v) => v.region === region).length);
+    assert.equal(tabs['dog-friendly'], app.getDogFriendlyHubVenues().filter((v) => v.region === region).length);
+    assert.equal(tabs['hidden-gems'], app.getHiddenGemCollectionVenues().filter((v) => v.region === region).length);
+  } finally {
+    db.prepare(`DELETE FROM collection_items WHERE collection_id IN (${Object.values(kinds).map(() => '?').join(', ')})`).run(...Object.values(kinds));
+    db.prepare("DELETE FROM collections WHERE slug LIKE 'batch-a-test-%'").run();
+  }
+});
+
+test('Batch A (P-004 / K-003): derived theme CSS is built once per process and is byte-identical to a fresh build', () => {
+  for (const [render, build] of [[app.renderBeachThemeStyles, app.buildBeachThemeStyles], [app.renderOutdoorThemeStyles, app.buildOutdoorThemeStyles], [app.renderWhatsOnStyles, app.buildWhatsOnStyles]]) {
+    const first = render();
+    assert.equal(first, build(), `${render.name}: identical bytes to the per-request build`);
+    assert.equal(render(), first);
+    assert.equal(typeof render.css, 'string', `${render.name}: cached on the function after first use`);
+    assert.equal(render.css, first);
+  }
+  assert.match(app.renderBeachThemeStyles(), /\[data-venue-category="beach"\]/);
+  assert.match(app.renderOutdoorThemeStyles(), /\[data-venue-category="outdoor"\]/);
+  assert.match(app.renderWhatsOnStyles(), /\[data-venue-category="whatson"\]/);
+});
+
+test('Batch A (P-005): listGuideCombos equals the per-region, per-badge COUNT queries it replaced, in the same order', () => {
+  for (const min of [1, app.MIN_GUIDE_VENUES]) {
+    const legacy = [];
+    for (const region of Object.keys(app.REGION_LABELS)) {
+      for (const badge of app.BOOL_FIELDS) {
+        const n = db.prepare(`SELECT COUNT(*) AS n FROM venues WHERE region = ? AND ${badge} = 1 AND redirect_to IS NULL`).get(region).n;
+        if (n >= min) legacy.push({ region, badge, count: n });
+      }
+    }
+    assert.deepEqual(app.listGuideCombos(min), legacy, `minCount ${min}`);
+  }
+  assert.ok(app.listGuideCombos(1).length > 0, 'fixture has badge combos');
+});

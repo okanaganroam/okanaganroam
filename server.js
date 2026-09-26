@@ -4864,13 +4864,21 @@ function listGuideCombos(minCount) {
   // One row per region+badge combo that clears the venue-count threshold,
   // computed live from the DB so the guide/sitemap list grows automatically
   // as more venues get badges — no hardcoded list to fall out of date.
+  // Batch A (2026-09-27, P-005): one grouped query for every region x badge
+  // count (it was one COUNT query per pair, ~240 per call, on every venue
+  // page). Same predicate (badge = 1, not redirected), same region/badge
+  // iteration order and the same { region, badge, count } output.
+  const sums = BOOL_FIELDS.map((b) => `SUM(CASE WHEN ${b} = 1 THEN 1 ELSE 0 END) AS ${b}`).join(', ');
+  const byRegion = new Map(db
+    .prepare(`SELECT region, ${sums} FROM venues WHERE redirect_to IS NULL GROUP BY region`)
+    .all()
+    .map((r) => [r.region, r]));
   const combos = [];
   for (const region of Object.keys(REGION_LABELS)) {
+    const row = byRegion.get(region);
     for (const badge of BOOL_FIELDS) {
-      const row = db
-        .prepare(`SELECT COUNT(*) AS n FROM venues WHERE region = ? AND ${badge} = 1 AND redirect_to IS NULL`)
-        .get(region);
-      if (row.n >= minCount) combos.push({ region, badge, count: row.n });
+      const n = row ? Number(row[badge]) || 0 : 0;
+      if (n >= minCount) combos.push({ region, badge, count: n });
     }
   }
   return combos;
@@ -7047,7 +7055,14 @@ function deriveBeachRulesFromGolfCss(cssText, type = 'beach') {
     .map((rule) => rule.replace(/\[data-venue-category="golf"\]/g, `[data-venue-category="${type}"]`).trim())
     .join('\n  ');
 }
+// Batch A (2026-09-27, P-004 / K-003): the derived theme blocks are pure
+// functions of constant CSS (SEO_PAGE_CSS and the Golf theme text), so each
+// is built once per process on first use and the same string is returned on
+// every later request -- identical bytes, no per-request regex work.
 function renderBeachThemeStyles() {
+  return renderBeachThemeStyles.css || (renderBeachThemeStyles.css = buildBeachThemeStyles());
+}
+function buildBeachThemeStyles() {
   const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
   return `<style>
   /* Beach page theme (2026-09-19): the Golf rules above, re-keyed to the beach card attribute. */
@@ -7061,6 +7076,9 @@ function renderBeachThemeStyles() {
 // system either. Emitted only on outdoor pages (see pageHead's outdoorTheme),
 // so Golf and Beach output is byte-identical to before this was added.
 function renderOutdoorThemeStyles() {
+  return renderOutdoorThemeStyles.css || (renderOutdoorThemeStyles.css = buildOutdoorThemeStyles());
+}
+function buildOutdoorThemeStyles() {
   const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
   return `<style>
   /* Outdoor page theme (2026-09-20): the Golf rules above, re-keyed to the outdoor card attribute. */
@@ -8437,17 +8455,111 @@ const DESTINATION_DISCOVERY_LABELS = {
   'hidden-gems': { plural: 'Hidden Gems', nounOne: 'hidden gem', nounMany: 'hidden gems' },
 };
 const DESTINATION_EVENTS_WINDOW_DAYS = 365; // within What's On's MAX_CUSTOM_WINDOW_DAYS
+
+// Batch A (2026-09-27, P-003): counts for the destination tabs and the
+// /categories directory, which only ever needed a number but loaded whole
+// venue / event lists (with per-row enrichment) to take .length. Each
+// function below is the COUNT(*) form of the list function named beside it,
+// with exactly the same WHERE clause and filters, and an optional region
+// (the old callers filtered the full list by v.region === region). The list
+// functions themselves are unchanged for their other callers.
+function countVenueRows(where, params, region) {
+  const regionClause = region == null ? '' : ' AND v.region = ?';
+  return db.prepare(`SELECT COUNT(*) AS n FROM venues v WHERE ${where}${regionClause}`)
+    .get(...params, ...(region == null ? [] : [region])).n;
+}
+// = listUpcomingEventsForRegion(region, { limit: MAX }).length (same
+// predicate; that function returns [] below MIN_REGION_EVENTS).
+function countUpcomingEventsForRegion(region, now = new Date()) {
+  const today = todayLocal(now);
+  const n = db.prepare(`SELECT COUNT(*) AS n FROM events e
+      WHERE e.region = ?
+        AND e.status = 'scheduled'
+        AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
+        AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}`)
+    .get(region, today).n;
+  return n < MIN_REGION_EVENTS ? 0 : n;
+}
+// = getDogFriendlyHubVenues()
+function countDogFriendlyHubVenues(region = null) {
+  return countVenueRows(`v.redirect_to IS NULL AND (
+      v.dog_friendly = 1
+      OR EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON c.id = ci.collection_id
+        WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = ?
+      )
+    )`, [DOG_FRIENDLY_COLLECTION_KIND], region);
+}
+// = getLocalFavouriteVenues()
+function countLocalFavouriteVenues(region = null) {
+  return countVenueRows(`v.redirect_to IS NULL AND EXISTS (
+      SELECT 1 FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id
+      WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'local_favorite'
+    )`, [], region);
+}
+// = getHiddenGemCollectionVenues() (no feature): hidden_gem members, not
+// redirected, whose region and type are known (REGION_LABELS / CATEGORY_SLUGS).
+function countHiddenGemCollectionVenues(region = null) {
+  const regions = Object.keys(REGION_LABELS), types = Object.keys(CATEGORY_SLUGS);
+  return countVenueRows(`v.redirect_to IS NULL
+      AND v.region IN (${regions.map(() => '?').join(', ')})
+      AND v.type IN (${types.map(() => '?').join(', ')})
+      AND EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON c.id = ci.collection_id
+        WHERE c.kind = 'hidden_gem' AND ci.content_type = 'venue' AND ci.content_id = v.id
+      )`, [...regions, ...types], region);
+}
+// = getSecretSpotVenues()
+function countSecretSpotVenues() {
+  return countVenueRows(`v.redirect_to IS NULL AND v.type IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')}) AND EXISTS (
+      SELECT 1 FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id
+      WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'hidden_gem'
+    )`, [...SECRET_SPOT_TYPES], null);
+}
+// = getFoodDrinkHubVenues()
+function countFoodDrinkHubVenues() {
+  return countVenueRows(`v.redirect_to IS NULL AND (
+      v.type IN (${FOOD_DRINK_TYPES.map(() => '?').join(', ')})
+      OR EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON c.id = ci.collection_id
+        WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind IN (${FD_CATEGORY_COLLECTION_KINDS.map(() => '?').join(', ')})
+      )
+    )`, [...FOOD_DRINK_TYPES, ...FD_CATEGORY_COLLECTION_KINDS], null);
+}
+// = getVenuesByCategory(type)
+function countVenuesByCategory(type) {
+  return countVenueRows('v.type = ? AND v.redirect_to IS NULL', [type], null);
+}
+// = getOutdoorLandingVenues()
+function countOutdoorLandingVenues() {
+  const liveKinds = listLiveOutdoorActivities().map((a) => a.kind);
+  const others = OUTDOOR_ACTIVITY_VENUE_TYPES.filter((t) => t !== 'outdoor');
+  if (!liveKinds.length || !others.length) return countVenuesByCategory('outdoor');
+  return countVenueRows(`v.redirect_to IS NULL AND (
+      v.type = 'outdoor'
+      OR (v.type IN (${others.map(() => '?').join(', ')}) AND v.id IN (
+        SELECT ci.content_id FROM collection_items ci
+        JOIN collections c ON c.id = ci.collection_id
+        WHERE ci.content_type = 'venue' AND c.kind IN (${liveKinds.map(() => '?').join(', ')})
+      ))
+    )`, [...others, ...liveKinds], null);
+}
+
 function destinationCategories(region, categoryCounts, now = new Date()) {
-  const inRegion = (list) => list.filter((v) => v.region === region).length;
   const today = todayLocal(now);
   const discovery = {
     'whats-on': {
-      count: listUpcomingEventsForRegion(region, { limit: Number.MAX_SAFE_INTEGER, now }).length,
+      count: countUpcomingEventsForRegion(region, now),
       href: `/whats-on?regions=${encodeURIComponent(region)}&when=custom&from=${today}&to=${addLocalDays(today, DESTINATION_EVENTS_WINDOW_DAYS)}`,
     },
-    'dog-friendly': { count: inRegion(getDogFriendlyHubVenues()), href: `/dog-friendly?regions=${encodeURIComponent(region)}` },
-    'local-favourites': { count: inRegion(getLocalFavouriteVenues()), href: `/local-favorites?regions=${encodeURIComponent(region)}` },
-    'hidden-gems': { count: inRegion(getHiddenGemCollectionVenues()), href: `/hidden-gems?regions=${encodeURIComponent(region)}` },
+    'dog-friendly': { count: countDogFriendlyHubVenues(region), href: `/dog-friendly?regions=${encodeURIComponent(region)}` },
+    'local-favourites': { count: countLocalFavouriteVenues(region), href: `/local-favorites?regions=${encodeURIComponent(region)}` },
+    'hidden-gems': { count: countHiddenGemCollectionVenues(region), href: `/hidden-gems?regions=${encodeURIComponent(region)}` },
   };
   return DESTINATION_CATEGORY_ORDER.map((key) => {
     if (CATEGORY_SLUGS[key]) {
@@ -8553,26 +8665,27 @@ ${renderGolfHeaderHtml()}
 // Taglines reuse CATEGORY_TAGLINES and the Hidden Gems card blurbs where
 // they exist.
 function categoryDirectoryEntries() {
-  const has = (list) => list.length >= MIN_CATEGORY_VENUES;
+  // Batch A (P-003): counts, not whole lists (see countVenueRows above).
+  const has = (count) => count >= MIN_CATEGORY_VENUES;
   const typeEntry = (type, href) => ({ label: CATEGORY_LABELS[type].plural, href, tagline: CATEGORY_TAGLINES[type] || null });
-  const foodDrink = has(getFoodDrinkHubVenues()) ? [
+  const foodDrink = has(countFoodDrinkHubVenues()) ? [
     { label: 'All Food & Drink', href: '/food-drink', tagline: 'Every restaurant, cafe, pub, brewery, distillery and lounge in one place.' },
     ...FOOD_DRINK_TYPES.map((t) => typeEntry(t, `/food-drink?types=${t}`)),
   ] : [];
-  if (has(getVenuesByCategory('winery'))) foodDrink.push(typeEntry('winery', `/${CATEGORY_SLUGS.winery}`));
+  if (has(countVenuesByCategory('winery'))) foodDrink.push(typeEntry('winery', `/${CATEGORY_SLUGS.winery}`));
   const cocktail = foodDrink.find((e) => e.href === '/food-drink?types=cocktail');
   if (cocktail) cocktail.tagline = 'Cocktail bars and lounges for an evening out.';
 
   const experiences = [];
-  if (has(getVenuesByCategory('golf'))) experiences.push(typeEntry('golf', `/${CATEGORY_SLUGS.golf}`));
-  if (has(getVenuesByCategory('beach'))) experiences.push(typeEntry('beach', `/${CATEGORY_SLUGS.beach}`));
-  if (has(getOutdoorLandingVenues())) experiences.push({ label: 'Outdoors', href: `/${CATEGORY_SLUGS.outdoor}`, tagline: 'Parks, trails, viewpoints and ski hills across the valley.' });
+  if (has(countVenuesByCategory('golf'))) experiences.push(typeEntry('golf', `/${CATEGORY_SLUGS.golf}`));
+  if (has(countVenuesByCategory('beach'))) experiences.push(typeEntry('beach', `/${CATEGORY_SLUGS.beach}`));
+  if (has(countOutdoorLandingVenues())) experiences.push({ label: 'Outdoors', href: `/${CATEGORY_SLUGS.outdoor}`, tagline: 'Parks, trails, viewpoints and ski hills across the valley.' });
 
   const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.' }];
-  if (has(getDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.' });
-  if (has(getLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.' });
-  if (has(getHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.' });
-  if (has(getSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.' });
+  if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.' });
+  if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.' });
+  if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.' });
+  if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.' });
 
   return [
     { label: 'Food & Drink', categories: foodDrink },
@@ -8948,7 +9061,11 @@ function getOutdoorActivitySlugsByVenue(venues) {
     SELECT ci.content_id AS id, c.kind AS kind FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
     WHERE ci.content_type = 'venue' AND ci.content_id IN (${placeholders})
+    ORDER BY ci.rowid
   `).all(...venues.map((v) => v.id));
+  // ORDER BY ci.rowid (Batch A): each venue's slugs keep membership order.
+  // Without it the order followed the query plan, which the collection_items
+  // index (P-002) changed; this is the order the table scan always produced.
   for (const r of rows) {
     const slug = kindToSlug[r.kind];
     if (!slug) continue;
@@ -11982,7 +12099,11 @@ function whatsOnOnlySelectors(cssText) {
     return kept.length ? `\n  ${kept.join(', ')} {${body}}` : '';
   }).replace(/\n\s*\n/g, '\n');
 }
+// Built once per process, like the Beach and Outdoor blocks (Batch A, P-004).
 function renderWhatsOnStyles() {
+  return renderWhatsOnStyles.css || (renderWhatsOnStyles.css = buildWhatsOnStyles());
+}
+function buildWhatsOnStyles() {
   const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
   return `<style>
   /* What's On page (2026-09-22): the Golf card rules re-keyed to the What's On card attribute. */
@@ -17823,6 +17944,17 @@ module.exports = {
   renderDestinationsPage,
   renderCategoriesPage,
   categoryDirectoryEntries,
+  countUpcomingEventsForRegion,
+  countDogFriendlyHubVenues,
+  countLocalFavouriteVenues,
+  countHiddenGemCollectionVenues,
+  countSecretSpotVenues,
+  countFoodDrinkHubVenues,
+  countVenuesByCategory,
+  countOutdoorLandingVenues,
+  buildBeachThemeStyles,
+  buildOutdoorThemeStyles,
+  buildWhatsOnStyles,
   isDiscoverySearchEnabled,
   interpretDiscoveryText,
   resolveDiscoveryDestination,

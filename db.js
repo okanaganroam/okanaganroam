@@ -402,6 +402,18 @@ CREATE TABLE IF NOT EXISTS collection_items (
 );
 `);
 
+// Batch A (2026-09-27, P-002): the read pattern the note above anticipated
+// now exists. Every collection-membership test is a correlated
+// `EXISTS (SELECT 1 FROM collection_items ci ... WHERE ci.content_type =
+// 'venue' AND ci.content_id = v.id ...)` evaluated once per venue row, which
+// scanned the whole table for each venue. One covering index for that
+// lookup (content_type, content_id, then collection_id for the join to
+// collections). Index only: no table, column or row changes; IF NOT EXISTS
+// makes it safe on every startup and on a database that already has it.
+db.exec(`
+CREATE INDEX IF NOT EXISTS idx_collection_items_content ON collection_items(content_type, content_id, collection_id);
+`);
+
 // --- Phase 2 Sprint 3 Final: Hidden Gems controlled population -----------
 // Idempotent data seed, following the exact same "check first, then
 // insert only if missing" discipline already used for schema migrations
