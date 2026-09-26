@@ -1139,9 +1139,9 @@ const ITIN_VENUE_NOUN = { cafe: 'coffee', restaurant: 'a meal', beach: 'some tim
 // Event wording. `go` is used when the event is not the last, evening stop;
 // `finish` only when it is ("finish with" never describes a 10 am event).
 const ITIN_EVENT_WORDS = {
-  hockey: { lead: 'heading to the rink for a hockey night', go: 'head to the rink for the hockey game', finish: 'finish with a hockey night at the rink', short: 'game' },
-  concert: { lead: 'heading out for the concert', go: 'head to the concert', finish: 'finish with the concert', short: 'concert' },
-  'live-music': { lead: 'catching some live music', go: 'catch some live music', finish: 'finish with some live music', short: 'music' },
+  hockey: { lead: 'heading to the rink for a hockey night', go: 'head to the rink for the hockey game', finish: 'finish with a hockey night at the rink', first: 'Start at the rink with the hockey game', short: 'game' },
+  concert: { lead: 'heading out for the concert', go: 'head to the concert', finish: 'finish with the concert', first: 'Start with the concert', short: 'concert' },
+  'live-music': { lead: 'catching some live music', go: 'catch some live music', finish: 'finish with some live music', first: 'Start with some live music', short: 'music' },
 };
 // Generic event kinds are described by the chosen event's own name.
 const ITIN_GENERIC_EVENTS = ['event', 'festival', 'market', 'show'];
@@ -1209,7 +1209,10 @@ function verbList(stops) {
   return `${phrases.slice(0, -1).join(', then ')}, and ${phrases[phrases.length - 1]}`;
 }
 const cap = (t) => t.replace(/^./, (x) => x.toUpperCase());
-const theName = (name) => (/^the\s/i.test(name) ? name : `the ${name}`);
+// "the Harvest Family Fair", "the Autumn Lantern Walk" -- but a title that is
+// not a kind of event ("Skillful") keeps its name bare.
+const EVENT_NOUN_RE = /\b(fair|festival|market|walk|series|show|concert|parade|tournament|night|games?|tour|exhibition|celebration|fest|expo|gala|party|jam|classic)\b/i;
+const theName = (name) => (/^the\s/i.test(name) || !EVENT_NOUN_RE.test(name) ? name : `the ${name}`);
 // Two sentences at most, built only from the stops that were chosen.
 function buildExperience(stops, trip, route, ctx) {
   const venues = stops.filter((s) => s.kind === 'venue');
@@ -1253,8 +1256,9 @@ function buildExperience(stops, trip, route, ctx) {
       const next = lastAndEvening ? `${words.finish} in the evening` : `${words.go}${e.timeKnown ? ` at ${e.event.time}` : ''}`;
       s1 = `${cap(verbList(before))}${family}, then ${next}.`;
     } else {
-      const at = generic ? theName(e.event.name) : `the ${words.short}`;
-      const start = `Start ${e.daypart === 'morning' ? 'the day ' : ''}at ${at}${e.timeKnown ? ` (${e.event.time})` : ''}`;
+      const start = generic
+        ? `Start ${e.daypart === 'morning' ? 'the day ' : ''}at ${theName(e.event.name)}${e.timeKnown ? ` (${e.event.time})` : ''}`
+        : `${words.first}${e.timeKnown ? ` at ${e.event.time}` : ''}`;
       s1 = after.length ? `${start}, then ${verbList(after)}${family}.` : `${start}.`;
     }
     if (!e.timeKnown && !s2) s2 = 'Times vary, so check the event page for the schedule.';
@@ -1264,6 +1268,43 @@ function buildExperience(stops, trip, route, ctx) {
   const s1 = `${cap(verbList(venues))}${sameTown(venues)}${kids ? ', with plenty for the kids' : ''}.`;
   const s2 = dog ? 'Every stop is listed as dog friendly, so your dog can come along.' : '';
   return { title: 'Your Okanagan day', text: [s1, s2].filter(Boolean).join(' ') };
+}
+
+// Which listed events can stand for an event part. What's On categories are
+// broad (a children's musical, a museum tour or a hockey game can all carry
+// "live-music"), so a concert / live-music part also reads the event's NAME:
+// a clear music performance, or a listing filed only under live music,
+// qualifies; a musical, theatre, comedy, talk, workshop, film, tour of a
+// place, a "vs" game, or a family-kids arts listing does not.
+const MUSIC_NAME_RE = /\b(live music|live band|concert|concerts|band|quartet|trio|duo|jazz|symphony|orchestra|orchestral|choir|chamber music|tribute|singer|songwriter|acoustic|open mic|jam|gig|dj|sessions?|unplugged|recital|live)\b/;
+const NOT_MUSIC_NAME_RE = /\b(musical|theatre|theater|play|comedy|comedian|talks?|workshop|film|films|movie|acrobatics|burlesque|ghost tours?|architecture|lecture|vs|versus|hockey|tours? of|canal tour|trail tour)\b/;
+function normalizeText(t) {
+  return String(t).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function eventSuitsKind(e, kind) {
+  if (kind !== 'concert' && kind !== 'live-music') return true;
+  const name = normalizeText(e.name || '');
+  const cats = e.categories || [];
+  if (NOT_MUSIC_NAME_RE.test(name)) return false;
+  if (cats.includes('family-kids') && cats.includes('arts-culture')) return false;
+  return MUSIC_NAME_RE.test(name) || (cats.length === 1 && cats[0] === 'live-music');
+}
+// A stated start fits a requested time of day: the evening is 17:00 on (and
+// the small hours); the daytime is 05:00-17:00.
+function startFitsPart(start, part) {
+  if (!part) return true;
+  if (part === 'evening') return start >= 17 * 60 || start < 5 * 60;
+  return start >= 5 * 60 && start < 17 * 60;
+}
+// First suitable event, soonest first: a stated start in the requested time of
+// day; failing that, one whose start is not listed (never assumed to fit, and
+// flagged); never one whose stated start contradicts the request.
+function chooseTripEvent(candidates, kind, part) {
+  const suitable = candidates.filter((e) => eventSuitsKind(e, kind));
+  const known = suitable.find((e) => { const st = parseEventStart(e.time); return st != null && startFitsPart(st, part); });
+  if (known) return { event: known };
+  const unknown = suitable.find((e) => parseEventStart(e.time) == null);
+  return { event: unknown || null };
 }
 
 function planItinerary(input) {
@@ -1288,14 +1329,16 @@ function planItinerary(input) {
   let anchor = null;
   for (const p of parts) {
     if (p.c.kind !== 'event') continue;
-    const e = (tripEvents[p.i] || [])[0];
+    const wantPart = p.c.daypart || (trip.when && trip.when.daypart) || null;
+    const choice = chooseTripEvent(tripEvents[p.i] || [], p.c.event.kind, wantPart);
+    const e = choice.event;
     if (e) {
       const start = parseEventStart(e.time);
       const daypart = start == null ? (['hockey', 'concert', 'live-music'].includes(p.c.event.kind) ? 'evening' : (p.c.daypart || null)) : start < 12 * 60 ? 'morning' : start < 17 * 60 ? 'afternoon' : 'evening';
       const stop = {
-        kind: 'event', component: p.c, index: p.i, label: p.c.event.noun.replace(/^./, (x) => x.toUpperCase()), daypart,
+        kind: 'event', component: p.c, index: p.i, label: p.c.event.noun.replace(/^./, (x) => x.toUpperCase()), daypart: wantPart && start == null ? wantPart : daypart,
         event: { ...e, regionLabel: regionLabel(baseCtx, e.region) }, timeKnown: start != null, start,
-        caveats: start != null ? [] : ['Start times vary — check the event page before you plan around it'],
+        caveats: start != null ? [] : [wantPart ? `Its start time isn’t listed, so it may not be in the ${wantPart === 'evening' ? 'evening' : 'daytime'} — check the event page` : 'Start times vary — check the event page before you plan around it'],
       };
       stops.push(stop);
       if (!anchor) anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(e.startDate), daypart };
@@ -1304,7 +1347,8 @@ function planItinerary(input) {
       p.c = { ...p.c, kind: 'venue', types: LIVE_MUSIC_VENUE_TYPES.slice(), features: [p.c.event.venueFeature], activities: [], collections: [], cuisines: [], liveMusicFallback: true };
       result.notes.push('No live-music event is listed for those dates, so places with a verified Live Music badge are suggested instead.');
     } else {
-      result.warnings.push(`No ${p.c.event.noun} is listed on What’s On for those dates, so the rest of the plan is shown.`);
+      const when = wantPart === 'evening' ? ' for the evening' : wantPart ? ' for the daytime' : '';
+      result.warnings.push(`No ${p.c.event.noun} is listed on What’s On${when} for those dates, so the rest of the plan is shown.`);
     }
   }
 
@@ -1469,6 +1513,8 @@ module.exports = {
   regionCentroids,
   planTrip,
   haversineKm,
+  eventSuitsKind,
+  chooseTripEvent,
   routeRegions,
   routeDirection,
   parseEventStart,

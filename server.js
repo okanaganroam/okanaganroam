@@ -3312,7 +3312,9 @@ function selectTripEvents(component, regions, when, now = new Date()) {
   }
   return {
     window: { from: win.from, to: win.to, preset: win.preset },
-    items: events.slice(0, 3).map((e) => ({
+    // The planner picks from these (event kind, requested time of day), so pass
+    // enough of the soonest to find a fitting one.
+    items: events.slice(0, 40).map((e) => ({
       id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
       categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '', startDate: e.startDate || null,
     })),

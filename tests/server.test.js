@@ -9511,6 +9511,37 @@ test('Trip itinerary (server): dinner + a hockey game, a family activity + an ev
   }
 });
 
+test('Trip itinerary (server): "live music" / "concert at night" pick a real evening music performance, never a daytime children’s musical', () => {
+  const meta = { reason: 'trip event intent fixture', batch_id: 'test-trip-event-intent' };
+  const mk = (name, categories, start) => {
+    const r = app.createEvent({ name, region: 'kelowna', description: `${name} fixture.`, source_type: 'official_venue', source_name: 'Fixture Hall',
+      source_url: `https://example.com/${app.slugify(name)}`, venue_name_text: 'Fixture Hall', categories, occurrences: [{ start_date: '2030-10-05', start_time: start, end_time: '23:00' }] }, meta);
+    assert.equal(r.ok, true, JSON.stringify(r));
+    return r.event.id;
+  };
+  const now = new Date('2030-10-02T19:00:00Z');
+  const ids = [];
+  try {
+    ids.push(mk('TI Junie B Jones The Musical', ['live-music', 'arts-culture', 'family-kids'], '10:00'));
+    ids.push(mk('TI Evening Jazz Quartet', ['live-music'], '20:00'));
+    for (const q of ['Wine tasting and live music.', 'Beach during the day and a concert at night.']) {
+      const p = app.runTripPlan({ text: q }, now);
+      assert.equal(p.kind, 'itinerary', q);
+      const ev = p.itinerary.stops.find((s) => s.kind === 'event');
+      assert.ok(ev, q);
+      assert.equal(ev.event.name, 'TI Evening Jazz Quartet', q);
+      assert.ok(!/at the music/.test((p.experience && p.experience.text) || ''), q);
+    }
+  } finally {
+    for (const id of ids) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
+});
+
 test('Trip itinerary (server): /api/discover is untouched by multi-part requests, and the /trip script renders itineraries', () => {
   const r = app.runDiscovery('dog friendly cafes and beaches from Kelowna to Penticton');
   assert.equal(r.trip, undefined);

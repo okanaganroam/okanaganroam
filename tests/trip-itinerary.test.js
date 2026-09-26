@@ -366,3 +366,71 @@ test('fix 3: a generic event is named, placed at its real time, and only "finish
   assert.ok(!/finish/i.test(vary.experience.text) && !/\d\s?(am|pm)/.test(vary.experience.text));
   for (const p of [morning, evening, vary]) assert.ok(sentences(p.experience.text) <= 2);
 });
+
+// ---- event intent fix (2026-09-26): event kind + requested time of day -------
+// Fixtures modelled on real What's On listings: the live-music category also
+// holds a children's musical, a museum tour and a hockey game.
+const JUNIE = { id: 911, name: 'Junie B. Jones The Musical', region: 'kelowna', url: '/kelowna/events/junie', valleyWide: false, categories: ['live-music', 'arts-culture', 'family-kids'], dateLabel: 'Sat Sep 26 + 3 more dates', time: '10 am', startDate: '2026-09-26' };
+const TOUR = { id: 912, name: 'Culture Days - Architecture through the Ages: Downtown Vernon Tour', region: 'vernon', url: '/vernon/events/tour', valleyWide: false, categories: ['live-music', 'arts-culture'], dateLabel: 'Sat Sep 26', time: '1 pm', startDate: '2026-09-26' };
+const HOCKEY_VS = { id: 913, name: 'Kelowna Chiefs vs Sicamous Eagles', region: 'kelowna', url: '/kelowna/events/chiefs', valleyWide: false, categories: ['sports-recreation', 'live-music'], dateLabel: 'Sat Sep 26', time: '7 pm', startDate: '2026-09-26' };
+const DAY_SET = { id: 914, name: 'Jeff Piattelli Live', region: 'kelowna', url: '/kelowna/events/piattelli', valleyWide: false, categories: ['live-music', 'wineries-wine-events'], dateLabel: 'Sun Sep 27', time: '3 pm', startDate: '2026-09-27' };
+const NIGHT_SET = { id: 915, name: 'Live Music: Papa Wheely @The Hub on Martin', region: 'penticton', url: '/penticton/events/papa-wheely', valleyWide: false, categories: ['live-music'], dateLabel: 'Sat Sep 26', time: '9 pm', startDate: '2026-09-26' };
+const UNKNOWN_SET = { id: 916, name: 'Friday Jazz Nights', region: 'kelowna', url: '/kelowna/events/jazz', valleyWide: false, categories: ['live-music'], dateLabel: 'Fridays in October', time: 'Times vary', startDate: '2026-10-02' };
+const MUSIC_POOL = [JUNIE, TOUR, HOCKEY_VS, DAY_SET, NIGHT_SET]; // soonest first, as the server passes them
+
+test('event kind: a children’s musical, a museum tour or a "vs" game is never "live music" or a "concert"', () => {
+  for (const e of [JUNIE, TOUR, HOCKEY_VS]) {
+    assert.equal(tp.eventSuitsKind(e, 'live-music'), false, e.name);
+    assert.equal(tp.eventSuitsKind(e, 'concert'), false, e.name);
+  }
+  for (const e of [DAY_SET, NIGHT_SET, UNKNOWN_SET, CONCERT, { name: 'Orchestral Rock Odyssey', categories: ['live-music'] }, { name: 'Coverboy', categories: ['live-music'] }]) {
+    assert.equal(tp.eventSuitsKind(e, 'live-music'), true, e.name);
+  }
+  assert.equal(tp.eventSuitsKind({ name: 'Comedy Night: Henry Sir', categories: ['live-music', 'arts-culture', 'nightlife'] }, 'live-music'), false);
+  assert.equal(tp.eventSuitsKind(HOCKEY_VS, 'hockey'), true, 'other event kinds are unaffected');
+});
+
+test('"Wine tasting and live music": a real music performance, never the musical; natural wording', () => {
+  const { plan } = run('Wine tasting and live music.', { 'live-music': MUSIC_POOL });
+  const ev = plan.itinerary.stops.find((s) => s.kind === 'event');
+  assert.equal(ev.event.name, 'Jeff Piattelli Live');
+  assert.ok(!plan.itinerary.stops.some((s) => s.kind === 'event' && /Junie/.test(s.event.name)));
+  assert.equal(venueStops(plan)[0].venue.type, 'winery');
+  assert.equal(plan.experience.text, 'Start with some live music at 3 pm, then enjoy a wine tasting.');
+  assert.ok(!/at the music/.test(plan.experience.text));
+});
+
+test('"Beach during the day and a concert at night": the concert is an evening one, after the beach; a 10 am musical never qualifies', () => {
+  const { plan } = run('Beach during the day and a concert at night.', { concert: MUSIC_POOL });
+  const kinds = plan.itinerary.stops.map((s) => s.kind);
+  assert.deepEqual(kinds, ['venue', 'event'], 'beach by day, then the concert');
+  const ev = plan.itinerary.stops[1];
+  assert.equal(ev.event.name, 'Live Music: Papa Wheely @The Hub on Martin');
+  assert.equal(ev.daypart, 'evening');
+  assert.equal(plan.experience.text, 'Spend some time on the beach, then finish with the concert in the evening.');
+  // Only daytime music on offer: reported honestly, the beach is kept.
+  const noNight = run('Beach during the day and a concert at night.', { concert: [JUNIE, DAY_SET] }).plan;
+  assert.deepEqual(noNight.itinerary.stops.map((s) => s.kind), ['venue']);
+  assert.deepEqual(noNight.warnings, ['No concert is listed on What’s On for the evening for those dates, so the rest of the plan is shown.']);
+  // A listing without a stated start is a last resort, flagged, with no time invented.
+  const unknown = run('Beach during the day and a concert at night.', { concert: [JUNIE, DAY_SET, UNKNOWN_SET] }).plan;
+  const u = unknown.itinerary.stops.find((s) => s.kind === 'event');
+  assert.equal(u.event.name, 'Friday Jazz Nights');
+  assert.equal(u.timeKnown, false);
+  assert.match(u.caveats[0], /start time isn’t listed, so it may not be in the evening/);
+  assert.ok(!/\d\s?(am|pm)/.test(unknown.experience.text));
+});
+
+test('"tonight" also asks for an evening event; daytime language asks for a daytime one', () => {
+  const tonight = run('dinner and a concert tonight', { concert: MUSIC_POOL }).plan;
+  assert.equal(tonight.itinerary.stops.find((s) => s.kind === 'event').event.name, 'Live Music: Papa Wheely @The Hub on Martin');
+  const daytime = run('cafes and a concert during the day', { concert: [NIGHT_SET, DAY_SET] }).plan;
+  assert.equal(daytime.itinerary.stops.find((s) => s.kind === 'event').event.name, 'Jeff Piattelli Live');
+});
+
+test('event names read naturally: "the" only before names that are a kind of event', () => {
+  const skill = { ...FAMILY_EVENT, id: 917, name: 'Skillful', time: 'Times vary', dateLabel: 'Jun 13 – Oct 25' };
+  const { plan } = run('family activities and an event this weekend', { event: [skill] });
+  assert.match(plan.experience.text, /head to Skillful\./);
+  assert.ok(!/the Skillful/.test(plan.experience.text));
+});
