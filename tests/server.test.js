@@ -1852,6 +1852,37 @@ test('render404Page returns a 404-flavored page for an unknown path', () => {
   assert.match(html, /404|not found/i);
 });
 
+// Mobile 404 (2026-09-26): readable at phone width, inside the approved
+// themed shell (the homepage's own header, Trip tray and footer), with the
+// original wording, noindex, and no canonical/og:url.
+test('render404Page: mobile viewport, themed site shell, landmarks, original wording, noindex, no canonical', () => {
+  const html = app.render404Page('/nonexistent/path');
+  assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0">/);
+  assert.match(html, /<title>Page Not Found \| Okanagan Roam<\/title>/);
+  assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.doesNotMatch(html, /rel="canonical"/, 'a 404 must not declare a canonical URL');
+  assert.doesNotMatch(html, /og:url/);
+  assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/, 'the approved homepage stylesheet');
+  assert.match(html, /<body class="golf-page not-found-page">/);
+  assert.match(html, /<main class="wrap-wide golf-main not-found-main">/);
+  assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one H1');
+  assert.match(html, /<h1>Page not found<\/h1>/);
+  assert.match(html, /We couldn't find a venue or page at that address\./);
+  assert.match(html, /<a class="app-btn" href="https:\/\/okanaganroam\.com\/">Back to Okanagan Roam<\/a>/);
+  assert.match(html, /min-height: 44px/, 'the back link is a 44px tap target');
+  assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/, 'app.js drives the shared header menu and Trip tray');
+  assert.doesNotMatch(html, /font-family:-apple-system/, 'the old unstyled system-font page is gone');
+});
+
+test('pageHead: a string canonical renders exactly as before; null omits canonical and og:url', () => {
+  const withCanonical = app.pageHead('T', 'D', 'https://okanaganroam.com/x', []);
+  assert.match(withCanonical, /<meta name="description" content="D">\n<link rel="canonical" href="https:\/\/okanaganroam\.com\/x">\n<meta property="og:type"/);
+  assert.match(withCanonical, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/og-image\.png">\n<meta property="og:url" content="https:\/\/okanaganroam\.com\/x">\n<meta name="twitter:card"/);
+  const noCanonical = app.pageHead('T', 'D', null, [], { noindex: true });
+  assert.doesNotMatch(noCanonical, /rel="canonical"|og:url/);
+  assert.match(noCanonical, /<meta name="description" content="D">\n<meta name="robots" content="noindex">\n<meta property="og:type"/);
+});
+
 // ==== Design Sprint 4 (Visual & Editorial Polish) ==========================
 
 // Content-model change (2026-09-17): the Hidden Gems homepage section is

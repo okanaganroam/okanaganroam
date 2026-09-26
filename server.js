@@ -8063,13 +8063,11 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
-<link rel="canonical" href="${canonical}">
-${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">
+${canonical === null ? '' : `<link rel="canonical" href="${canonical}">\n`}${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:image" content="https://okanaganroam.com/og-image.png">
-<meta property="og:url" content="${canonical}">
-<meta name="twitter:card" content="summary_large_image">
+${canonical === null ? '' : `<meta property="og:url" content="${canonical}">\n`}<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
 ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.stringify(block)}\n</script>`).join('\n')}
@@ -13660,19 +13658,33 @@ ${renderHomeFooterHTML(true)}
 </html>`;
 }
 
+// Mobile 404 (2026-09-26): the page had no viewport meta (phones laid it
+// out at ~980px) and no site shell. It now uses the same themed shell as
+// /categories -- the homepage's own header, Trip tray and footer (read,
+// never modified) plus app.css -- with the original wording, a 404 status,
+// noindex and no canonical. The back link reuses the homepage's .app-btn
+// navy pill; the two scoped rules only centre the message and give that
+// link a 44px tap target.
 function render404Page(pathname) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Page Not Found | Okanagan Roam</title>
-<meta name="robots" content="noindex">
-<style>body{font-family:-apple-system,sans-serif;max-width:600px;margin:80px auto;text-align:center;color:#1f2933;}a{color:#0b6e4f;}</style>
+${pageHead('Page Not Found | Okanagan Roam', "We couldn't find a venue or page at that address.", null, [], { noindex: true, golfTheme: true })}
+<style>
+  body.golf-page .not-found-main { text-align: center; padding-top: 56px; padding-bottom: 88px; }
+  body.golf-page .not-found-main a.app-btn { min-height: 44px; padding: 10px 24px; text-decoration: none; }
+</style>
 </head>
-<body>
-  <h1>Page not found</h1>
-  <p>We couldn't find a venue or page at that address.</p>
-  <a href="https://okanaganroam.com/">Back to Okanagan Roam</a>
+<body class="golf-page not-found-page">
+  ${renderGolfTripTrayHtml()}
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main not-found-main">
+    <h1>Page not found</h1>
+    <p>We couldn't find a venue or page at that address.</p>
+    <a class="app-btn" href="https://okanaganroam.com/">Back to Okanagan Roam</a>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
 </body>
 </html>`;
 }
@@ -13703,6 +13715,40 @@ function renderOpenNowScript(opts) {
   // only gates ensureButton(), nothing else, keeping the change to the
   // smallest safe surface.
   const showButton = !(opts && opts.showButton === false);
+  // /browse filter fix (2026-09-26): app.js's applyFilters() owns each card's
+  // inline display (search, type, feature, region, price, cuisine and
+  // favourites -- the map reads that same inline style). The old apply()
+  // below wrote display = '' on EVERY card whenever Open Now was off, and it
+  // ran after any DOM mutation -- including applyFilters() writing the result
+  // count -- so every filtered-out card came straight back. On /browse
+  // Open Now now only ever hides closed cards while it is on, and hands the
+  // rest back to applyFilters(). The homepage (showButton: false, no cards)
+  // keeps the previous script byte-for-byte.
+  const applyJs = showButton
+    ? `  function apply(){
+    if (!active) return;
+    var cards = D.querySelectorAll('.venue-card');
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      if (card.style.display === 'none') continue;
+      if (!card.querySelector('.open-status-open')) card.style.display = 'none';
+    }
+  }
+
+  function refilter(){
+    if (typeof window.__applyFilters === 'function') { window.__applyFilters(); return; }
+    var cards = D.querySelectorAll('.venue-card');
+    for (var i = 0; i < cards.length; i++) cards[i].style.display = '';
+  }`
+    : `  function apply(){
+    var cards = D.querySelectorAll('.venue-card');
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      if (!active) { card.style.display = ''; continue; }
+      var isOpen = card.querySelector('.open-status-open');
+      card.style.display = isOpen ? '' : 'none';
+    }
+  }`;
   return `
 <script>
 (function(){
@@ -13711,15 +13757,7 @@ function renderOpenNowScript(opts) {
   var active = false;
   var scheduled = false;
 
-  function apply(){
-    var cards = D.querySelectorAll('.venue-card');
-    for (var i = 0; i < cards.length; i++) {
-      var card = cards[i];
-      if (!active) { card.style.display = ''; continue; }
-      var isOpen = card.querySelector('.open-status-open');
-      card.style.display = isOpen ? '' : 'none';
-    }
-  }
+${applyJs}
 
   function scheduleApply(){
     if (scheduled) return;
@@ -13755,7 +13793,8 @@ function renderOpenNowScript(opts) {
       active = !active;
       btn.setAttribute('aria-pressed', String(active));
       btn.style.background = active ? '#0b6e4f' : '#fff';
-      btn.style.color = active ? '#fff' : '#0b6e4f';
+      btn.style.color = active ? '#fff' : '#0b6e4f';${showButton ? `
+      refilter();` : ''}
       apply();
     });
     D.body.appendChild(btn);
