@@ -4834,8 +4834,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Wine mood-card tests above). No dangling in-page anchors left behind.
   assert.doesNotMatch(homepageBody, /href="#directory"/, 'no homepage link should still point at the removed #directory anchor');
   assert.match(homepageBody, /class="hidden-gem-card" href="\/browse"/, 'Hidden Gems editorial cards must link into the real directory at /browse');
-  assert.match(homepageBody, /discover-heading-link" href="\/browse"[^>]*>View all hidden gems/, '"View all hidden gems" must link to /browse');
-  assert.match(homepageBody, /discover-heading-link" href="\/browse"[^>]*>Explore all categories/, '"Explore all categories" must link to /browse');
+  assert.match(homepageBody, /discover-heading-link" href="\/hidden-gems"[^>]*>View all hidden gems/, '"View all hidden gems" must link to the dedicated \/hidden-gems page');
+  assert.match(homepageBody, /discover-heading-link" href="\/categories"[^>]*>Explore all categories/, '"Explore all categories" must link to the dedicated \/categories page');
   assert.match(homepageBody, /Browse &amp; Search<\/a>/, 'header dropdown "Browse & Search" label must still read the same');
   const headerBrowseLink = homepageBody.match(/<a href="([^"]*)"[^>]*>Browse &amp; Search<\/a>/);
   assert.ok(headerBrowseLink && headerBrowseLink[1] === '/browse', 'header "Browse & Search" link must point at /browse now that the wizard lives there');
@@ -8831,7 +8831,7 @@ test('Dog Friendly Finds: the homepage Hidden Gems card now opens /dog-friendly,
   assert.equal(app.HIDDEN_GEM_EDITORIAL_CARDS[0].blurb, 'Patios and trails where your dog belongs.');
   assert.match(section, /<span data-i18n="gems.dogFriendly.title">Dog-Friendly Finds<\/span>/);
   assert.match(section, /id="hiddenGems"/);
-  assert.match(rendered, /class="discover-heading-link" href="\/browse" data-i18n="gems.viewAll"/);
+  assert.match(rendered, /class="discover-heading-link" href="\/hidden-gems" data-i18n="gems.viewAll"/);
   assert.equal((section.match(/class="hidden-gem-card"/g) || []).length, 3);
   // The dog_friendly boolean the frozen homepage's SEO counts are built from
   // is NOT touched by any of this.
@@ -9733,6 +9733,34 @@ test('/destinations: 200, every destination exactly once, each linking to its ca
   assert.equal((await fetch(`${base}/destinations/`)).status, 200);
   assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/destinations<\/loc>/);
 }));
+
+test('/categories: 200, each visitor-facing category once, linking to its own existing page (never /browse)', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/categories`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /<h1>Explore All Categories<\/h1>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/categories">/);
+  const links = [...html.matchAll(/<li class="category-card">\s*<h2><a href="([^"]+)">([^<]+)<\/a><\/h2>/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+  const expected = app.categoryDirectoryEntries().flatMap((g) => g.categories.map((c) => c.href));
+  assert.deepEqual(links, expected, 'renders exactly the directory entries, in order');
+  assert.ok(links.length >= 5, 'lists the real categories');
+  assert.equal(new Set(links).size, links.length, 'no duplicates');
+  for (const href of ['/food-drink', '/wineries', '/golf', '/beaches', '/whats-on', '/hidden-gems']) assert.ok(links.includes(href), href);
+  for (const href of links) {
+    assert.doesNotMatch(href, /^\/browse/, `${href} must not send visitors to the search engine`);
+    assert.equal((await fetch(`${base}${href}`)).status, 200, href);
+  }
+  assert.doesNotMatch(html, /id="searchInput"|class="venue-card"|type="search"/, 'no search box, filters or venue listing');
+  assert.match(html, /<footer/, 'shared footer present');
+  assert.equal((await fetch(`${base}/categories/`)).status, 200);
+}));
+
+test('Homepage heading links: "View all hidden gems" -> /hidden-gems, "Explore all categories" -> /categories', () => {
+  const gems = app.renderHiddenGemsHomepageHTML();
+  const mood = app.renderMoodCardsHTML();
+  assert.match(gems, /<a class="discover-heading-link" href="\/hidden-gems" data-i18n="gems\.viewAll">View all hidden gems &rarr;<\/a>/);
+  assert.match(mood, /<a class="discover-heading-link" href="\/categories" data-i18n="mood\.exploreAll">Explore all categories &rarr;<\/a>/);
+});
 
 test('Destination routes: region and region/category pages still respond as before', () => withDiscoveryServer(async (base) => {
   // A Food & Drink category page (golf/beach/outdoor region pages use their

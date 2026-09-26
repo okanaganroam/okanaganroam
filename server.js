@@ -4747,7 +4747,7 @@ function renderHiddenGemsHomepageHTML() {
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
       <h2><span data-i18n="gems.heading">Hidden Gems</span> <span class="discover-subtitle" data-i18n="gems.subtitle">Less crowds. More Okanagan.</span></h2>
-      <a class="discover-heading-link" href="#directory" data-i18n="gems.viewAll">View all hidden gems &rarr;</a>
+      <a class="discover-heading-link" href="/hidden-gems" data-i18n="gems.viewAll">View all hidden gems &rarr;</a>
     </div>
     <div class="discover-grid hidden-gem-grid">${cards}</div>
   </div>
@@ -5094,7 +5094,7 @@ function renderMoodCardsHTML() {
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
       <h2 data-i18n="mood.heading">What are you in the mood for?</h2>
-      <a class="discover-heading-link" href="#directory" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>
+      <a class="discover-heading-link" href="/categories" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>
     </div>
     <div class="mood-card-grid">${cardsHtml}</div>
   </div>
@@ -8167,6 +8167,86 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>Choose Your Okanagan Destination</h1>
   <p class="subtitle">Every destination on Okanagan Roam, from Enderby to Osoyoos and the ski resorts. Pick one to see its restaurants, wineries, beaches, outdoor places, events and more.</p>
+  ${sections}
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+
+// ---------- All Categories page (2026-09-26): /categories ----------
+// The destination for the homepage's "Explore all categories" link: a plain
+// directory of the site's visitor-facing categories, grouped the same way as
+// DESTINATION_CATEGORY_GROUPS, each linking to that category's existing page
+// (never /browse). Food & Drink types open the /food-drink hub pre-filtered
+// with its own ?types= chips. A category whose page would 404 today (no
+// venues yet) is left out, using the same getters and minimum as its route.
+// Taglines reuse CATEGORY_TAGLINES and the Hidden Gems card blurbs where
+// they exist.
+function categoryDirectoryEntries() {
+  const has = (list) => list.length >= MIN_CATEGORY_VENUES;
+  const typeEntry = (type, href) => ({ label: CATEGORY_LABELS[type].plural, href, tagline: CATEGORY_TAGLINES[type] || null });
+  const foodDrink = has(getFoodDrinkHubVenues()) ? [
+    { label: 'All Food & Drink', href: '/food-drink', tagline: 'Every restaurant, cafe, pub, brewery, distillery and lounge in one place.' },
+    ...FOOD_DRINK_TYPES.map((t) => typeEntry(t, `/food-drink?types=${t}`)),
+  ] : [];
+  if (has(getVenuesByCategory('winery'))) foodDrink.push(typeEntry('winery', `/${CATEGORY_SLUGS.winery}`));
+  const cocktail = foodDrink.find((e) => e.href === '/food-drink?types=cocktail');
+  if (cocktail) cocktail.tagline = 'Cocktail bars and lounges for an evening out.';
+
+  const experiences = [];
+  if (has(getVenuesByCategory('golf'))) experiences.push(typeEntry('golf', `/${CATEGORY_SLUGS.golf}`));
+  if (has(getVenuesByCategory('beach'))) experiences.push(typeEntry('beach', `/${CATEGORY_SLUGS.beach}`));
+  if (has(getOutdoorLandingVenues())) experiences.push({ label: 'Outdoors', href: `/${CATEGORY_SLUGS.outdoor}`, tagline: 'Parks, trails, viewpoints and ski hills across the valley.' });
+
+  const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.' }];
+  if (has(getDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.' });
+  if (has(getLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.' });
+  if (has(getHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.' });
+  if (has(getSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.' });
+
+  return [
+    { label: 'Food & Drink', categories: foodDrink },
+    { label: 'Experiences', categories: experiences },
+    { label: 'Discovery', categories: discovery },
+  ].filter((g) => g.categories.length > 0);
+}
+
+function renderCategoriesPage(entries = categoryDirectoryEntries()) {
+  const title = 'Explore All Categories | Okanagan Roam';
+  const description = 'Browse every Okanagan Roam category, from restaurants, cafes and wineries to golf, beaches, the outdoors, events and hidden gems.';
+  const canonical = 'https://okanaganroam.com/categories';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'All Categories', url: canonical },
+  ]);
+  const sections = entries.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
+  <ul class="card-grid">
+    ${g.categories.map((c) => `
+      <li class="category-card">
+        <h2><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h2>${c.tagline ? `
+        <p class="venue-meta">${escapeHtml(c.tagline)}</p>` : ''}
+      </li>`).join('\n')}
+  </ul>`).join('\n  ');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+${renderOutdoorThemeStyles()}
+${golfEngagementHeadHtml('fd', true)}
+</head>
+<body class="golf-page outdoor-page region-page categories-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'All Categories' },
+  ])}
+  <h1>Explore All Categories</h1>
+  <p class="subtitle">Everything Okanagan Roam covers, in one place. Pick a category to see the places, events and collections in it across the valley.</p>
   ${sections}
   </main>
   ${renderHomeFooterHTML(true)}
@@ -16572,6 +16652,14 @@ const server = http.createServer(async (req, res) => {
       return res.end(renderDestinationsPage());
     }
 
+    // GET /categories -- All Categories (2026-09-26), the destination for the
+    // homepage's "Explore all categories" link. A fixed route before the
+    // broad region pattern below, like /destinations.
+    if ((pathname === '/categories' || pathname === '/categories/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderCategoriesPage());
+    }
+
     // GET /hidden-gems[/<badge>] -- the full Hidden Gems collection (see
     // renderHiddenGemsPage). Always served (2026-09-25): the destination
     // pages' Hidden Gems category links here whatever the feature flags.
@@ -17129,6 +17217,8 @@ module.exports = {
   DESTINATION_CATEGORY_ORDER,
   destinationRegionEntries,
   renderDestinationsPage,
+  renderCategoriesPage,
+  categoryDirectoryEntries,
   isDiscoverySearchEnabled,
   interpretDiscoveryText,
   resolveDiscoveryDestination,
