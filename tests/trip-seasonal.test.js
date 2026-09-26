@@ -327,3 +327,62 @@ test('experience 10: no invented facts -- no distances, drive times, weather, op
     for (const s of stops(plan).filter((x) => x.kind === 'event' && !x.timeKnown)) assert.equal(times.length, 0, q);
   }
 });
+
+// ---- multi-day events: the attendance date (2026-09-26) ----------------------
+// A multi-day listing carries its run's first day (startDate) and last day
+// (endDate). Season and the paired dinner's hours use the day the visitor
+// attends: the later of the trip date and the first day, capped at the last.
+// Local fixtures only; the shared FACTS above are unchanged.
+const closedAllWeek = { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] };
+const SAT_SUPPER = { ...fact({ name: 'Vernon Saturday Supper Club', region: 'vernon', type: 'restaurant', rating: 4.8 }), hours: JSON.stringify({ ...closedAllWeek, sat: [['17:00', '22:00']] }) };
+const FRI_FISH = { ...fact({ name: 'Vernon Friday Fish House', region: 'vernon', type: 'restaurant', rating: 4.7 }), hours: JSON.stringify({ ...closedAllWeek, fri: [['17:00', '22:00']] }) };
+const TUE_GRILL = { ...fact({ name: 'Vernon Tuesday Grill', region: 'vernon', type: 'restaurant', rating: 4.6 }), hours: JSON.stringify({ ...closedAllWeek, tue: [['17:00', '22:00']] }) };
+const MULTI_FACTS = FACTS.concat([SAT_SUPPER, FRI_FISH, TUE_GRILL]);
+function runMulti(q, date, events) {
+  const intent = d.interpretDiscoveryQuery(q, TAXONOMY);
+  const trip = d.interpretTripComponents(q, TAXONOMY, intent);
+  const tripEvents = trip.components.map((c) => (c.kind === 'event' ? (events[c.event.kind] || []) : null));
+  return tp.planTrip({ intent, trip, tripEvents, facts: MULTI_FACTS, labels: LABELS, tripDate: date });
+}
+const dinnerOf = (p) => venueStops(p).find((s) => s.venue.type === 'restaurant');
+
+test('multi-day 1: a run already in progress is attended on the trip date (season and the dinner’s weekday)', () => {
+  // Harvest Festival runs Tue Sep 22 – Wed Sep 30; the visitor plans for Saturday Sep 26.
+  const fest = ev({ id: 811, name: 'Vernon Harvest Festival', region: 'vernon', categories: ['events-festivals'], dateLabel: 'Sep 22 – 30', time: '6 pm', startDate: '2026-09-22', endDate: '2026-09-30' });
+  const p = runMulti('dinner and a festival in Vernon', '2026-09-26', { festival: [fest] });
+  assert.equal(p.season.date, '2026-09-26', 'not the run’s first day (Sep 22)');
+  assert.equal(dinnerOf(p).venue.name, 'Vernon Saturday Supper Club', 'dinner is checked against Saturday hours');
+  assert.ok(dinnerOf(p).reasons.some((r) => r.text === 'Listed hours Saturday: 17:00–22:00'));
+  assert.ok(!names(p).includes('Vernon Tuesday Grill'), 'the run’s first weekday (Tuesday) is not used');
+  assert.ok(names(p).includes('Vernon Harvest Festival'));
+  // Undated planning is today's Okanagan date; a run that starts later is attended on its first day.
+  const later = ev({ ...fest, id: 812, startDate: '2026-10-06', endDate: '2026-10-10' }); // Tue Oct 6 – Sat Oct 10
+  const q = runMulti('dinner and a festival in Vernon', '2026-09-26', { festival: [later] });
+  assert.equal(q.season.date, '2026-10-06');
+  assert.equal(dinnerOf(q).venue.name, 'Vernon Tuesday Grill');
+  // No trip date at all: the first day, exactly as before.
+  assert.equal(runMulti('dinner and a festival in Vernon', undefined, { festival: [fest] }).season.date, '2026-09-22');
+});
+
+test('multi-day 2: a run crossing a season boundary uses the season of the visit, in ranking and wording', () => {
+  // Holiday Lights run Fri Nov 20 – Tue Jan 5; the visit is Saturday Dec 19.
+  const lights = ev({ id: 813, name: 'Vernon Holiday Lights', region: 'vernon', categories: ['events-festivals'], dateLabel: 'Nov 20 – Jan 5', time: '5 pm', startDate: '2026-11-20', endDate: '2027-01-05' });
+  const golf = runMulti('golf and a festival in Vernon', '2026-12-19', { festival: [lights] });
+  assert.equal(golf.season.month, 'December', 'not November, the run’s first month');
+  assert.equal(venueStops(golf).find((s) => s.venue.type === 'golf').venue.name, 'Vernon Sim Lounge', 'deep winter prefers indoor golf');
+  assert.ok(!/November/.test(golf.experience.text) && !golf.notes.some((n) => /November/.test(n)));
+  const things = runMulti('things to do and a festival in Vernon', '2026-12-19', { festival: [lights] });
+  assert.match(things.experience.text, /It’s December, so the plan leans into the winter season\./);
+  // Planned for after the run ends: capped to its last day (January).
+  assert.equal(runMulti('golf and a festival in Vernon', '2027-01-20', { festival: [lights] }).season.date, '2027-01-05');
+});
+
+test('multi-day 3: a Friday-only listing picked for "this weekend" is attended on the Friday', () => {
+  // The server resolves "this weekend" to Saturday Oct 3; the listing is Friday Oct 2 only.
+  const fri = ev({ id: 814, name: 'Vernon Friday Night Market', region: 'vernon', categories: ['events-festivals'], dateLabel: 'Fri Oct 2', time: '5 pm', startDate: '2026-10-02', endDate: '2026-10-02' });
+  const p = runMulti('dinner and a festival this weekend', '2026-10-03', { festival: [fri] });
+  assert.equal(p.season.date, '2026-10-02', 'capped to the day it runs');
+  assert.equal(dinnerOf(p).venue.name, 'Vernon Friday Fish House', 'dinner is checked against Friday hours');
+  assert.ok(!names(p).includes('Vernon Saturday Supper Club'));
+  assert.match(p.experience.text, /The Vernon Friday Night Market|Vernon Friday Night Market/);
+});

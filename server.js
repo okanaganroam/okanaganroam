@@ -3378,6 +3378,7 @@ function selectTripEvents(component, regions, when, now = new Date()) {
     items: events.slice(0, 40).map((e) => ({
       id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
       categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '', startDate: e.startDate || null,
+      endDate: e.endDate || null, // a multi-day run's last day, for the attendance date
     })),
   };
 }

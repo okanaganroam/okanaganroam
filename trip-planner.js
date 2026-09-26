@@ -1539,6 +1539,22 @@ function dogSeasonCaveat(v, c) {
   return DOG_NOTE_SEASONAL_RE.test(v.dogNote) ? `Dog access: ${String(v.dogNote).trim()}` : null;
 }
 
+// The day the visitor attends an event: the later of the trip date and the
+// listing's first day, never past its last day. A multi-day run that began
+// last week is attended on the trip date; a Friday-only listing picked for
+// "this weekend" (trip date Saturday) is attended on the Friday. With no trip
+// date, the listing's first day, as before.
+function eventAttendanceDate(e, tripDate) {
+  const iso = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(String(x || '')) ? x : null);
+  const start = iso(e.startDate);
+  const end = iso(e.endDate);
+  const trip = iso(tripDate);
+  if (!start) return null;
+  let date = trip && trip > start ? trip : start;
+  if (end && date > end) date = end;
+  return date;
+}
+
 function planItinerary(input) {
   const { intent = {}, facts = [], labels = {}, trip, tripEvents = [] } = input;
   const baseCtx = buildContext({ ...intent, regions: [] }, labels, input);
@@ -1573,7 +1589,10 @@ function planItinerary(input) {
         caveats: start != null ? [] : [wantPart ? `Its start time isn’t listed, so it may not be in the ${wantPart === 'evening' ? 'evening' : 'daytime'} — check the event page` : 'Start times vary — check the event page before you plan around it'],
       };
       stops.push(stop);
-      if (!anchor) anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(e.startDate), daypart, date: e.startDate || null };
+      if (!anchor) {
+        const date = eventAttendanceDate(e, input.tripDate);
+        anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(date), daypart, date };
+      }
     } else if (p.c.event.venueFeature) {
       // No listed event: the verified venue badge stands in, when places have it.
       p.c = { ...p.c, kind: 'venue', types: LIVE_MUSIC_VENUE_TYPES.slice(), features: [p.c.event.venueFeature], activities: [], collections: [], cuisines: [], liveMusicFallback: true };
