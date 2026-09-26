@@ -9544,10 +9544,11 @@ test('hours.js status on the Okanagan clock: Pacific Time, daylight-saving chang
   assert.equal(app.venueHoursStatusAt(JSON.stringify({ tue: [['09:00', '17:00']] }), new Date('2026-09-28T16:00:00Z')).state, 'unknown', 'Monday not listed');
 });
 
-test('hours.js Phase 1 is foundation only: guarded load, no page, route or planner uses it yet', () => {
+test('hours.js scope: guarded load; used only by venueHoursStatusAt() and the Food & Drink Open Now -- never by Build My Trip or /browse', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /const hoursModule = \(\(\) => \{ try \{ return require\('\.\/hours\.js'\); \} catch \(e\) \{ return null; \} \}\)\(\);/, 'guarded require, like golf-data.js');
-  assert.equal((src.match(/hoursModule\.statusAt/g) || []).length, 1, 'open/closed status is computed only inside venueHoursStatusAt');
+  assert.equal((src.match(/hoursModule\.statusAt/g) || []).length, 2, 'status is computed only in venueHoursStatusAt and foodDrinkOpenNowInfo');
+  assert.equal((src.match(/renderFoodDrinkHubScriptHtml\(\{ openNow: true \}\)/g) || []).length, 1, 'the browser status runs on the /food-drink hub only');
   assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 2, 'defined and exported, never called by the app');
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /hours\.js/, 'Build My Trip keeps parseVenueHours');
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /statusAt|hours\.js/, '/browse keeps its own logic');
@@ -9729,6 +9730,105 @@ test('hours provenance: absent/NULL provenance is harmless, and hours changed th
   } finally {
     db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
     db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+// ---- Open Now on the Food & Drink hub (2026-09-26) ---------------------------
+test('Open Now eligibility: verified provenance within the Food & Drink freshness window, no advisory -- everything else is ineligible', () => {
+  const now = new Date('2026-09-26T19:00:00Z'); // Okanagan date 2026-09-26
+  const hours = '{"mon":[["09:00","17:00"]]}';
+  const ok = { hours_source: 'official_website', hours_checked_at: '2026-09-20' };
+  const e = (venue, prov, extra = {}) => app.openNowEligibility(venue, prov, { now, ...extra });
+  assert.equal(app.OPEN_NOW_MAX_CHECK_AGE_DAYS.food_drink, 180);
+  assert.deepEqual(e({ hours: null }, ok), { eligible: false, reason: 'no_hours' });
+  assert.deepEqual(e({ hours }, undefined), { eligible: false, reason: 'unverified' });
+  assert.deepEqual(e({ hours }, { hours_source: null, hours_checked_at: null }), { eligible: false, reason: 'unverified' });
+  assert.deepEqual(e({ hours }, { hours_source: 'initial_import', hours_checked_at: '2026-09-20' }), { eligible: false, reason: 'unverified' });
+  assert.deepEqual(e({ hours }, { hours_source: 'official_website', hours_checked_at: '2026-02-30' }), { eligible: false, reason: 'unverified' });
+  assert.deepEqual(e({ hours }, { ...ok, hours_checked_at: '2026-03-30' }), { eligible: true, reason: 'ok' }, 'exactly 180 days old');
+  assert.deepEqual(e({ hours }, { ...ok, hours_checked_at: '2026-03-29' }), { eligible: false, reason: 'stale' }, '181 days old');
+  assert.deepEqual(e({ hours }, { ...ok, hours_checked_at: '2026-09-27' }), { eligible: false, reason: 'stale' }, 'a future check date is not trusted');
+  assert.deepEqual(e({ hours }, ok, { hasAdvisory: true }), { eligible: false, reason: 'advisory' });
+  assert.deepEqual(e({ hours }, ok), { eligible: true, reason: 'ok' });
+});
+
+test('Open Now on /food-drink: honest per-card status on the Okanagan clock, and an Open now filter that only shows proven-open verified venues', () => {
+  const pool = app.getFoodDrinkHubVenues();
+  const picks = pool.slice(0, 7).map((v) => v.id);
+  const saved = picks.map((id) => db.prepare('SELECT id, hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id));
+  const W = (r) => JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, r])));
+  const [A, B, C, D, E, F, G] = picks;
+  const setRow = (id, hours, src, chk) => db.prepare('UPDATE venues SET hours = ?, hours_source = ?, hours_checked_at = ? WHERE id = ?').run(hours, src, chk, id);
+  try {
+    setRow(A, W([['11:00', '21:00']]), 'official_website', '2026-09-20');           // normal
+    setRow(B, W([['18:00', '02:00']]), 'official_website', '2026-09-20');           // overnight
+    setRow(C, W([['16:00', '25:00']]), 'official_website', '2026-09-20');           // past-midnight notation
+    setRow(D, W([['03:30', '23:00']]), 'official_website', '2026-09-20');           // early opening
+    setRow(E, '{"mon":[["09:00","17:00"]],"tue":[["09:00","17:00"]]}', 'venue_phone', '2026-09-20'); // Friday not listed
+    setRow(F, W([['11:00', '21:00']]), 'official_website', '2026-01-01');           // stale
+    setRow(G, W([['00:00', '24:00']]), null, null);                                 // never verified
+    const venues = app.getFoodDrinkHubVenues();
+    const none = { types: [], features: [], regions: [] };
+    const render = (iso, f = none) => app.renderFoodDrinkHubPage(venues, f, null, new Date(iso));
+    const statusOf = (html, id) => { const m = html.match(new RegExp(`data-venue-id="${id}"[\\s\\S]*?<p class="fd-open-status" data-fd-open="(\\w+)">([^<]*)</p>`)); return m ? [m[1], m[2]] : null; };
+    // Friday 13:00 PDT
+    const fri = render('2026-09-25T20:00:00Z');
+    assert.deepEqual(statusOf(fri, A), ['open', 'Open now · Closes 9 PM']);
+    assert.deepEqual(statusOf(fri, B), ['closed', 'Closed · Opens 6 PM']);
+    assert.deepEqual(statusOf(fri, C), ['closed', 'Closed · Opens 4 PM']);
+    assert.deepEqual(statusOf(fri, D), ['open', 'Open now · Closes 11 PM']);
+    assert.deepEqual(statusOf(fri, E), ['unknown', 'Hours not listed for today'], 'an unlisted day is unknown, never "Closed"');
+    const card = (html, id) => (html.match(new RegExp(`<li class="venue-card" data-fd-i="\\d+" data-venue-id="${id}"[\\s\\S]*?</li>`)) || [''])[0];
+    assert.ok(card(fri, F) && !card(fri, F).includes('fd-open-status'), 'stale check: no status line at all');
+    assert.ok(card(fri, G) && !card(fri, G).includes('fd-open-status'), '24-hour listing without provenance: no status, never claimed open');
+    // Unverified venues never carry a Closed status and never ship hours to the browser.
+    const data = JSON.parse(fri.match(/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/)[1]);
+    assert.ok(data[String(A)].h && data[String(B)].h && data[String(E)].h);
+    assert.equal(data[String(F)].h, undefined);
+    assert.equal(data[String(G)].h, undefined);
+    assert.equal((fri.match(/<p class="fd-open-status"/g) || []).length, 5, 'only the five eligible venues carry a status line');
+    assert.ok(!fri.includes('Hours not verified') && !/data-fd-open="unverified"/.test(fri));
+    // After midnight: Saturday 01:30 PDT -- Friday night's overnight venue is open.
+    const sat = render('2026-09-26T08:30:00Z');
+    assert.deepEqual(statusOf(sat, B), ['open', 'Open now · Closes 2 AM']);
+    assert.deepEqual(statusOf(sat, A), ['closed', 'Closed · Opens 11 AM']);
+    assert.deepEqual(statusOf(render('2026-09-26T07:30:00Z'), C), ['open', 'Open now · Closes 1 AM'], '"25:00" at Saturday 00:30');
+    assert.deepEqual(statusOf(render('2026-09-26T11:00:00Z'), D), ['open', 'Open now · Closes 11 PM'], 'the 03:30 opening at 04:00');
+    // The filter: only proven-open, verified venues; counts and summary follow.
+    const onFri = render('2026-09-25T20:00:00Z', { ...none, openNow: true });
+    const live = (html) => [...html.split('<template id="fdRest">')[0].matchAll(/<li class="venue-card" data-fd-i="\d+" data-venue-id="(\d+)"/g)].map((m) => Number(m[1])).sort((x, y) => x - y);
+    assert.deepEqual(live(onFri), [A, D].sort((x, y) => x - y));
+    assert.match(onFri, new RegExp(`id="fdResultsSummary"[^>]*>2 of ${venues.length} places<`));
+    assert.match(onFri, /id="fdOpenNow" data-fd-open-now aria-pressed="true">[\s\S]*?id="fdOpenNowCount">2</);
+    assert.match(onFri, /data-fd-remove-open="now"/, 'removable Open now tag');
+    assert.match(fri, /id="fdOpenNow" data-fd-open-now aria-pressed="false">[\s\S]*?id="fdOpenNowCount">2</, 'the toggle shows how many are open');
+    // AND with the existing groups, over the same set.
+    const regionA = venues.find((v) => v.id === A).region;
+    const inRegion = venues.filter((v) => v.region === regionA && [A, D].includes(v.id)).length;
+    const both = render('2026-09-25T20:00:00Z', { types: [], features: [], regions: [regionA], openNow: true });
+    assert.match(both, new RegExp(`id="fdResultsSummary"[^>]*>${inRegion} of ${venues.length} places<`));
+    // Open now off: the existing filters behave exactly as before.
+    const plainIds = live(render('2026-09-25T20:00:00Z'));
+    assert.equal(plainIds.length, Math.min(app.FD_PAGE_SIZE, venues.length));
+    assert.match(fri, new RegExp(`id="fdResultsSummary"[^>]*>${venues.length} places<`));
+    // The note and the hub-only script pieces.
+    assert.ok(fri.includes('<p class="fd-open-note">Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.</p>'));
+    assert.ok(fri.includes('function hoursStatusLabel(') && fri.includes('function okanaganClock(') && fri.includes("q.push('open=now')"));
+  } finally {
+    for (const r of saved) db.prepare('UPDATE venues SET hours = ?, hours_source = ?, hours_checked_at = ? WHERE id = ?').run(r.hours, r.hours_source, r.hours_checked_at, r.id);
+  }
+});
+
+test('Open Now is /food-drink only: destination category pages carry none of it, and the browser clock equals okanaganClock()', () => {
+  const v = app.getFoodDrinkHubVenues().find((x) => ['restaurant', 'cafe', 'pub'].includes(x.type));
+  const scoped = app.renderFoodDrinkHubPage(app.getVenuesByRegionCategory(v.region, v.type), { types: [], features: [], regions: [] }, { region: v.region, type: v.type, categoryCounts: app.getRegionCategoryCounts(v.region) });
+  for (const needle of ['fd-open-status', 'fdOpenNow', 'fd-open-note', 'hoursStatusLabel', 'open=now', 'data-fd-remove-open']) assert.ok(!scoped.includes(needle), needle);
+  // The page script builds okanaganClock() from the same function and options.
+  const vm = require('node:vm');
+  const ctx = { Intl };
+  vm.runInNewContext(`var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(app.OKANAGAN_CLOCK_FORMAT)}); ${app.okanaganClock.toString()}`, ctx);
+  for (const iso of ['2026-09-25T04:06:00Z', '2026-09-26T08:30:00Z', '2026-01-05T17:00:00Z', '2025-11-02T09:30:00Z', '2026-03-08T10:00:00Z']) {
+    assert.deepEqual(JSON.parse(JSON.stringify(ctx.okanaganClock(new Date(iso)))), app.okanaganClock(new Date(iso)), iso);
   }
 });
 

@@ -195,9 +195,57 @@ function statusAt(parsed, clock) {
   };
 }
 
+// ---- Wording (Open Now, 2026-09-26) ----
+// Clock minutes (0-1439) as a 12-hour time: 540 -> "9 AM", 1290 -> "9:30 PM",
+// 0 -> "12 AM", 720 -> "12 PM".
+function formatClockMinutes(minutes) {
+  const m = ((minutes % 1440) + 1440) % 1440;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM');
+}
+
+// The one visitor-facing line for a statusAt() result at `clock`:
+//   { state: 'open' | 'closed' | 'unknown', text }
+// Only states the listing actually proves: an unknown day says so, it is
+// never worded as closed.
+function hoursStatusLabel(status, clock) {
+  const DAY_NAMES = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
+  const when = (at) => {
+    if (at.weekday === clock.weekday) return formatClockMinutes(at.minutes);
+    if (at.weekday === shiftWeekday(clock.weekday, 1)) return 'tomorrow ' + formatClockMinutes(at.minutes);
+    return DAY_NAMES[at.weekday] + ' ' + formatClockMinutes(at.minutes);
+  };
+  if (!status || status.state === 'unknown') return { state: 'unknown', text: 'Hours not listed for today' };
+  if (status.state === 'open') {
+    if (!status.closesAt) return { state: 'open', text: 'Open 24 hours' };
+    // A close in the small hours of the next day reads as a plain time ("Closes 2 AM").
+    const next = shiftWeekday(clock.weekday, 1);
+    const closes = (status.closesAt.weekday === clock.weekday || (status.closesAt.weekday === next && status.closesAt.minutes < 6 * 60))
+      ? formatClockMinutes(status.closesAt.minutes)
+      : when(status.closesAt);
+    return { state: 'open', text: 'Open now · Closes ' + closes };
+  }
+  const lead = status.closedToday ? 'Closed today' : 'Closed';
+  return { state: 'closed', text: status.opensAt ? lead + ' · Opens ' + when(status.opensAt) : (status.closedToday ? 'Closed today' : 'Closed now') };
+}
+
+// The same functions as browser source, for pages that recompute the status
+// live (the Food & Drink hub). Built from the functions themselves, so the
+// server and the browser can never read hours differently.
+const HOURS_CLIENT_SRC = [
+  `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES};`,
+  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, isOpenAllDay, shiftWeekday,
+    validClock, resolveClose, nextOpening, statusAt, formatClockMinutes, hoursStatusLabel].map((fn) => fn.toString()),
+].join('\n');
+
 module.exports = {
   HOURS_WEEKDAYS: WEEKDAYS,
+  HOURS_CLIENT_SRC,
   hoursTimeToMinutes,
   parseHours,
   statusAt,
+  formatClockMinutes,
+  hoursStatusLabel,
 };

@@ -229,3 +229,64 @@ test('status: every stored production shape seen in the audit is read without th
     }
   }
 });
+
+// ---- wording + browser copy (Open Now on /food-drink) ------------------------
+
+const label = (hours, weekday, hhmm) => {
+  const c = at(weekday, hhmm);
+  return h.hoursStatusLabel(h.statusAt(h.parseHours(typeof hours === 'string' ? hours : J(hours)), c), c);
+};
+
+test('wording: 12-hour clock times', () => {
+  assert.equal(h.formatClockMinutes(0), '12 AM');
+  assert.equal(h.formatClockMinutes(210), '3:30 AM');
+  assert.equal(h.formatClockMinutes(720), '12 PM');
+  assert.equal(h.formatClockMinutes(1260), '9 PM');
+  assert.equal(h.formatClockMinutes(1290), '9:30 PM');
+  assert.equal(h.formatClockMinutes(1439), '11:59 PM');
+});
+
+test('wording: open, closed, overnight, early opening, 24 hours and unknown', () => {
+  const H = { mon: [['11:00', '21:00']], tue: [['11:00', '21:00']], wed: null, thu: [['11:00', '21:00']] };
+  assert.deepEqual(label(H, 'mon', '12:00'), { state: 'open', text: 'Open now · Closes 9 PM' });
+  assert.deepEqual(label(H, 'mon', '09:00'), { state: 'closed', text: 'Closed · Opens 11 AM' });
+  assert.deepEqual(label(H, 'mon', '21:00'), { state: 'closed', text: 'Closed · Opens tomorrow 11 AM' });
+  assert.deepEqual(label(H, 'wed', '12:00'), { state: 'closed', text: 'Closed today · Opens tomorrow 11 AM' });
+  assert.deepEqual(label(H, 'tue', '22:00'), { state: 'closed', text: 'Closed · Opens Thu 11 AM' });
+  // Overnight and past-midnight notation: the close after midnight is a plain time.
+  const late = { sat: [['18:00', '02:00']], sun: null, fri: [['16:00', '25:00']] };
+  assert.deepEqual(label(late, 'sat', '23:00'), { state: 'open', text: 'Open now · Closes 2 AM' });
+  assert.deepEqual(label(late, 'sun', '01:30'), { state: 'open', text: 'Open now · Closes 2 AM' });
+  assert.deepEqual(label(late, 'fri', '23:59'), { state: 'open', text: 'Open now · Closes 1 AM' });
+  assert.deepEqual(label(late, 'sat', '00:59').state, 'open');
+  // Early opening.
+  assert.deepEqual(label({ mon: [['03:30', '23:00']] }, 'mon', '04:00'), { state: 'open', text: 'Open now · Closes 11 PM' });
+  assert.deepEqual(label({ mon: [['03:30', '23:00']] }, 'mon', '03:00'), { state: 'closed', text: 'Closed · Opens 3:30 AM' });
+  // 24 hours all week; a 24-hour run that ends names its day.
+  assert.deepEqual(label(every([['00:00', '24:00']]), 'wed', '12:00'), { state: 'open', text: 'Open 24 hours' });
+  assert.deepEqual(label({ fri: [['00:00', '24:00']], sat: [['00:00', '24:00']], sun: [['00:00', '18:00']] }, 'fri', '09:00'), { state: 'open', text: 'Open now · Closes Sun 6 PM' });
+  // Unknown is never worded as closed.
+  assert.deepEqual(label({ tue: [['09:00', '17:00']] }, 'mon', '12:00'), { state: 'unknown', text: 'Hours not listed for today' });
+  assert.deepEqual(label(null, 'mon', '12:00'), { state: 'unknown', text: 'Hours not listed for today' });
+  assert.deepEqual(h.hoursStatusLabel(null, at('mon', '12:00')).state, 'unknown');
+});
+
+test('browser copy (HOURS_CLIENT_SRC) reads every minute of the week exactly like the module', () => {
+  const vm = require('node:vm');
+  const ctx = {};
+  vm.runInNewContext(h.HOURS_CLIENT_SRC, ctx);
+  const samples = [
+    { mon: [['11:00', '14:00'], ['17:00', '22:00']], tue: null, wed: [], thu: [['18:00', '02:00']], fri: [['16:00', '25:00']], sat: [['03:30', '23:00']], sun: [['00:00', '24:00']] },
+    every([['00:00', '24:00']]),
+    { mon: [['9:00', '17:00']] },
+  ];
+  for (const s of samples) {
+    const a = h.parseHours(J(s));
+    const b = ctx.parseHours(J(s));
+    assert.deepEqual(JSON.parse(JSON.stringify(b)), a);
+    for (const d of DAYS) for (let m = 0; m < 1440; m += 7) {
+      const c = { weekday: d, minutes: m };
+      assert.deepEqual(JSON.parse(JSON.stringify(ctx.hoursStatusLabel(ctx.statusAt(b, c), c))), h.hoursStatusLabel(h.statusAt(a, c), c), `${d} ${m}`);
+    }
+  }
+});

@@ -3248,9 +3248,10 @@ function tripStartWeekday(when, now = new Date()) {
 // The Okanagan wall clock at an instant: { weekday: 'thu', minutes: 1266 }
 // (21:06). Always America/Vancouver -- never the server's own timezone --
 // and `now` is injectable so tests can freeze it.
-const okanaganClockFormatter = new Intl.DateTimeFormat('en-US', {
-  timeZone: OKANAGAN_TIME_ZONE, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-});
+// The formatter options are a named constant so a page script can build the
+// identical clock in the browser (the Food & Drink Open Now status).
+const OKANAGAN_CLOCK_FORMAT = { timeZone: OKANAGAN_TIME_ZONE, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+const okanaganClockFormatter = new Intl.DateTimeFormat('en-US', OKANAGAN_CLOCK_FORMAT);
 function okanaganClock(now = new Date()) {
   const parts = Object.fromEntries(okanaganClockFormatter.formatToParts(now).map((x) => [x.type, x.value]));
   return { weekday: parts.weekday.slice(0, 3).toLowerCase(), minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute) };
@@ -3261,6 +3262,39 @@ function okanaganClock(now = new Date()) {
 // hours.js is not present. Not called by any page or route yet.
 function venueHoursStatusAt(hoursRaw, now = new Date()) {
   return hoursModule ? hoursModule.statusAt(hoursModule.parseHours(hoursRaw), okanaganClock(now)) : null;
+}
+
+// ---------- Open Now eligibility (2026-09-26) ----------
+// A venue may carry an open/closed claim ONLY when its hours were verified
+// through guardedHoursVerifyUpdate() (an allowlisted hours_source and a real
+// hours_checked_at) recently enough, and it has no temporary-condition
+// advisory. Everything else -- no hours, never verified, a stale check, an
+// advisory -- gets the neutral "Hours not verified", never "Closed".
+// The freshness window lives only here, keyed by the page that applies it, so
+// adopting the wider policy later (wineries, resort villages) is a change to
+// this table, not to page code.
+const OPEN_NOW_MAX_CHECK_AGE_DAYS = { food_drink: 180 };
+// -> { eligible: boolean, reason: 'ok' | 'no_hours' | 'unverified' | 'stale' | 'advisory' }
+function openNowEligibility(venue, provenance, opts = {}) {
+  const { policy = 'food_drink', now = new Date(), hasAdvisory = false } = opts;
+  if (!venue || !venue.hours) return { eligible: false, reason: 'no_hours' };
+  const p = provenance || {};
+  if (!HOURS_SOURCES.includes(p.hours_source) || !parseLocalDate(p.hours_checked_at)) return { eligible: false, reason: 'unverified' };
+  const today = todayLocal(now);
+  const age = localDateToDayNumber(today) - localDateToDayNumber(p.hours_checked_at);
+  if (age < 0 || age > OPEN_NOW_MAX_CHECK_AGE_DAYS[policy]) return { eligible: false, reason: 'stale' };
+  if (hasAdvisory) return { eligible: false, reason: 'advisory' };
+  return { eligible: true, reason: 'ok' };
+}
+// Provenance is deliberately not part of rowToVenue() (the public venue
+// shape is unchanged), so pages that need it read it here.
+function getHoursProvenanceById(ids) {
+  const wanted = new Set(ids);
+  const map = new Map();
+  for (const r of db.prepare('SELECT id, hours_source, hours_checked_at FROM venues WHERE hours_source IS NOT NULL').all()) {
+    if (wanted.has(r.id)) map.set(r.id, { hours_source: r.hours_source, hours_checked_at: r.hours_checked_at });
+  }
+  return map;
 }
 
 function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null }, now = new Date()) {
@@ -9605,6 +9639,62 @@ const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered
     return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' ' + noun);
   }`;
 
+// ---------- Open Now on the Food & Drink hub (2026-09-26) ----------
+// Per-venue status for /food-drink: eligible venues (openNowEligibility) get
+// hours.js's open/closed status on the Okanagan clock; every other venue gets
+// NO status line at all (owner decision 2026-09-26) -- never "Closed", and it
+// is never counted as open. The page script recomputes the eligible venues'
+// status live in the browser with the same hours.js functions, so the
+// render-time status here is the no-script / first-paint value.
+const FD_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
+function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date()) {
+  const byId = new Map();
+  const openIds = new Set();
+  const provenance = getHoursProvenanceById(venues.map((v) => v.id));
+  const clock = okanaganClock(now);
+  for (const v of venues) {
+    const e = openNowEligibility(v, provenance.get(v.id), { policy: 'food_drink', now, hasAdvisory: advisoryNotes.has(v.id) });
+    if (!e.eligible || !hoursModule) {
+      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null });
+      continue;
+    }
+    const parsed = hoursModule.parseHours(v.hours);
+    const label = hoursModule.hoursStatusLabel(hoursModule.statusAt(parsed, clock), clock);
+    byId.set(v.id, { eligible: true, reason: 'ok', state: label.state, text: label.text, hours: JSON.parse(v.hours) });
+    if (label.state === 'open') openIds.add(v.id);
+  }
+  return { byId, openIds };
+}
+function foodDrinkOpenNowToggleHtml(on, count) {
+  return `<button type="button" class="fd-pop-btn fd-open-toggle" id="fdOpenNow" data-fd-open-now aria-pressed="${on ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">🕒</span> Open now<span class="outdoor-activity-count" id="fdOpenNowCount">${count}</span></button>`;
+}
+// Emitted only by the /food-drink hub, so the destination category pages
+// (which share renderFoodDrinkHubStyles) are unchanged.
+function renderFoodDrinkOpenNowStyles() {
+  return `<style>
+  /* The toggle is a filter, not a popover. Pressed, it takes this page's
+     selected-chip treatment (navy fill + the teal ring the type chips use)
+     so it never reads as an open panel; hover on the pressed state goes
+     navy-deep like the selected tags. */
+  body.fd-page .fd-open-toggle[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--teal, #2A6B67); }
+  body.fd-page .fd-open-toggle[aria-pressed="true"]:hover { background: var(--ref-navy-deep, #101B24); border-color: var(--ref-navy-deep, #101B24); }
+  body.fd-page .fd-open-toggle .outdoor-activity-count { margin-left: 2px; }
+  body.fd-page .fd-open-toggle[aria-pressed="true"] .outdoor-activity-count { opacity: 0.8; }
+  body.fd-page .fd-open-note { margin: -2px 0 14px; font-family: 'Nunito', sans-serif; font-size: 0.8rem; line-height: 1.45; color: var(--ink); opacity: 0.7; max-width: 64ch; text-wrap: pretty; }
+  /* Card status line: one cluster with the meta line (4px under it), then
+     the meta line's own 10px before the description. The .venue-card
+     selector outranks the golf theme's ".venue-card p" sizing. Filled dot =
+     open, hollow dot = closed, no dot when today's hours are not listed. */
+  body.fd-page .venue-card .fd-open-status { display: flex; align-items: center; gap: 7px; margin: -6px 0 10px; font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; line-height: 1.3; color: var(--ink); opacity: 1; }
+  body.fd-page .venue-card .fd-open-status::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="closed"] { opacity: 0.78; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"] { opacity: 0.6; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"]::before { display: none; }
+</style>`;
+}
+
 function foodDrinkSearchHtml() {
   return `<div class="fd-search">
     <label class="visually-hidden" for="fdSearch">Search food and drink</label>
@@ -9674,8 +9764,9 @@ function foodDrinkSelectedTagsHtml(state = {}) {
   const t = (state.types || []).map((x) => tag('type', x, FD_HUB_LABEL_BY_TYPE[x] || x));
   const f = (state.features || []).map((x) => tag('feature', x, FD_HUB_LABEL_BY_FEATURE[x] || x));
   const r = (state.regions || []).map((x) => tag('region', x, REGION_LABELS[x] || x));
-  const any = t.length + f.length + r.length > 0;
-  return `<div class="outdoor-selected" id="fdSelected"${any ? '' : ' hidden'}>${row('Types', t)}${row('Looking for', f)}${row('Regions', r)}${any ? '<button type="button" class="outdoor-selected-clear" id="fdSelectedClear">Clear all</button>' : ''}</div>`;
+  const o = state.openNow ? [tag('open', 'now', 'Open now')] : [];
+  const any = t.length + f.length + r.length + o.length > 0;
+  return `<div class="outdoor-selected" id="fdSelected"${any ? '' : ' hidden'}>${row('Types', t)}${row('Looking for', f)}${row('Regions', r)}${row('Hours', o)}${any ? '<button type="button" class="outdoor-selected-clear" id="fdSelectedClear">Clear all</button>' : ''}</div>`;
 }
 function foodDrinkResultBarHtml(summary, state) {
   return `<div class="fd-resultbar">
@@ -9765,7 +9856,10 @@ function renderFoodDrinkHubStyles() {
 // (toggle chips, filter the already-rendered cards, keep the selection in the
 // URL, pushState/popstate, Clear all) with this page's three groups and its
 // own client-side search. No network, no framework.
-function renderFoodDrinkHubScriptHtml() {
+function renderFoodDrinkHubScriptHtml(opts = {}) {
+  // Open Now (hub only): every addition below is '' unless opts.openNow, so the
+  // destination category pages that share this script are byte-identical.
+  const O = (code) => (opts.openNow && hoursModule ? code : '');
   const labels = {
     regions: { ...REGION_LABELS },
     types: { ...FD_HUB_LABEL_BY_TYPE },
@@ -9805,7 +9899,38 @@ function renderFoodDrinkHubScriptHtml() {
   ${FD_HUB_FILTER_CLIENT_PREDICATE_SRC}
   ${FD_HUB_SUMMARY_CLIENT_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
-  // Searchable text per card, built once from data already in the markup:
+${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser reads
+  // hours exactly as the server does, on the America/Vancouver clock.
+  var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(OKANAGAN_CLOCK_FORMAT)});
+  ${okanaganClock.toString()}
+  ${hoursModule ? hoursModule.HOURS_CLIENT_SRC : ''}
+  var openToggle = document.getElementById('fdOpenNow');
+  var openCountEl = document.getElementById('fdOpenNowCount');
+  var openOn = false;
+  var OPEN_IDS = {};
+  function refreshOpen(){
+    var clock = okanaganClock(new Date());
+    OPEN_IDS = {};
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-venue-id'), d = DATA[id];
+      if (!d || !d.h) return;
+      var label = hoursStatusLabel(statusAt(parseHours(d.h), clock), clock);
+      if (label.state === 'open') OPEN_IDS[id] = true;
+      var el = card.querySelector('.fd-open-status');
+      if (el) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+    });
+  }
+  function paintOpenCount(types, features, regions){
+    if (!openCountEl) return;
+    var n = 0;
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-venue-id'), d = DATA[id] || { c: [], f: [], r: '' };
+      if (OPEN_IDS[id] && fdMatches(types, features, regions, d.c, d.f, d.r)) n++;
+    });
+    openCountEl.textContent = String(n);
+  }
+  refreshOpen();
+`)}  // Searchable text per card, built once from data already in the markup:
   // name, community label, the labels of its categories and features, and
   // the meta/description lines. No new data is shipped for search.
   cards.forEach(function(card){
@@ -9837,7 +9962,8 @@ function renderFoodDrinkHubScriptHtml() {
   function updateCounts(types, features, regions){
     var tC = {}, fC = {}, rC = {};
     cards.forEach(function(card){
-      var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
+      var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };${O(`
+      if (openOn && !OPEN_IDS[card.getAttribute('data-venue-id')]) return;`)}
       if (fdMatches([], features, regions, d.c, d.f, d.r)) d.c.forEach(function(t){ tC[t] = (tC[t] || 0) + 1; });
       if (fdMatches(types, features, [], d.c, d.f, d.r)) rC[d.r] = (rC[d.r] || 0) + 1;
       if (fdMatches(types, [], regions, d.c, d.f, d.r)) d.f.forEach(function(k){ fC[k] = (fC[k] || 0) + 1; });
@@ -9847,12 +9973,13 @@ function renderFoodDrinkHubScriptHtml() {
   }
   function renderSelected(types, features, regions){
     if (!selectedBox) return;
-    var any = types.length || features.length || regions.length;
+    var any = types.length || features.length || regions.length${O(' || openOn')};
     function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-fd-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
     function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
     var html = row('Types', types.map(function(v){ return tag('type', v, LABELS.types[v] || v); }))
       + row('Looking for', features.map(function(v){ return tag('feature', v, LABELS.features[v] || v); }))
-      + row('Regions', regions.map(function(v){ return tag('region', v, LABELS.regions[v] || v); }));
+      + row('Regions', regions.map(function(v){ return tag('region', v, LABELS.regions[v] || v); }))${O(`
+      + (openOn ? row('Hours', [tag('open', 'now', 'Open now')]) : '')`)};
     if (any) html += '<button type="button" class="outdoor-selected-clear" id="fdSelectedClear">Clear all</button>';
     selectedBox.innerHTML = html;
     selectedBox.hidden = !any;
@@ -9861,14 +9988,15 @@ function renderFoodDrinkHubScriptHtml() {
     var q = [];
     if (types.length) q.push('types=' + types.join(','));
     if (features.length) q.push('features=' + features.join(','));
-    if (regions.length) q.push('regions=' + regions.join(','));
+    if (regions.length) q.push('regions=' + regions.join(','));${O(`
+    if (openOn) q.push('open=now');`)}
     return q.length ? '?' + q.join('&') : '';
   }
   function apply(historyMode){
     var types = pressed(typeChips, 'data-fd-type'), features = pressed(featureChips, 'data-fd-feature'), regions = pressed(regionChips, 'data-region');
     var matches = cards.filter(function(card){
       var d = DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '' };
-      return fdMatches(types, features, regions, d.c, d.f, d.r) && (!searchTerm || (card.__fd || '').indexOf(searchTerm) !== -1);
+      return fdMatches(types, features, regions, d.c, d.f, d.r)${O(" && (!openOn || !!OPEN_IDS[card.getAttribute('data-venue-id')])")} && (!searchTerm || (card.__fd || '').indexOf(searchTerm) !== -1);
     });
     var shown = matches.length;
     // Only the current page of MATCHING cards goes into the render tree; the
@@ -9883,14 +10011,16 @@ function renderFoodDrinkHubScriptHtml() {
       showMore.hidden = visible.length >= shown;
       showMore.textContent = 'Show more (' + visible.length + ' of ' + shown + ')';
     }
-    var total = cards.length, filtered = types.length || features.length || regions.length || !!searchTerm;
+    var total = cards.length, filtered = types.length || features.length || regions.length || !!searchTerm${O(' || openOn')};
     if (allChip) allChip.setAttribute('aria-pressed', types.length ? 'false' : 'true');
     if (featuresCount) { featuresCount.textContent = features.length ? (' \\u00b7 ' + features.length) : ''; featuresCount.hidden = features.length === 0; }
     if (regionsCount) { regionsCount.textContent = regions.length ? (' \\u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
     if (searchClear) searchClear.hidden = !searchTerm;
     if (summary) summary.textContent = fdSummaryText(shown, total, filtered);
     applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
-    updateGroupHeaders(); updateCounts(types, features, regions); renderSelected(types, features, regions);
+    updateGroupHeaders(); updateCounts(types, features, regions); renderSelected(types, features, regions);${O(`
+    if (openToggle) openToggle.setAttribute('aria-pressed', openOn ? 'true' : 'false');
+    paintOpenCount(types, features, regions);`)}
     if (empty) empty.hidden = shown !== 0;
     if (results) results.hidden = shown === 0;
     var next = window.location.pathname + queryFor(types, features, regions) + window.location.hash;
@@ -9904,7 +10034,8 @@ function renderFoodDrinkHubScriptHtml() {
   [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
   function clearAll(){
     [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
-    searchTerm = ''; if (searchInput) searchInput.value = '';
+    searchTerm = ''; if (searchInput) searchInput.value = '';${O(`
+    openOn = false;`)}
     page = 1;
     apply('push');
   }
@@ -9916,7 +10047,8 @@ function renderFoodDrinkHubScriptHtml() {
   if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } page = 1; apply('none'); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
-    if (t.id === 'fdSelectedClear') { clearAll(); return; }
+    if (t.id === 'fdSelectedClear') { clearAll(); return; }${O(`
+    if (t.getAttribute('data-fd-remove-open')) { openOn = false; page = 1; apply('push'); return; }`)}
     var map = [['data-fd-remove-type', typeChips, 'data-fd-type'], ['data-fd-remove-feature', featureChips, 'data-fd-feature'], ['data-fd-remove-region', regionChips, 'data-region']];
     for (var i = 0; i < map.length; i++) {
       var v = t.getAttribute(map[i][0]);
@@ -9961,7 +10093,8 @@ function renderFoodDrinkHubScriptHtml() {
       var pre = { t: (params.get('types') || '').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
       typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-fd-type')) !== -1 ? 'true' : 'false'); });
       featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-fd-feature')) !== -1 ? 'true' : 'false'); });
-      regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
+      regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });${O(`
+      openOn = params.get('open') === 'now';`)}
     } catch (e) {}
   }
   function openGroupsForSelection(){
@@ -9973,7 +10106,15 @@ function renderFoodDrinkHubScriptHtml() {
   }
   window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); page = 1; apply('none'); });
   readUrlIntoChips();
-  openGroupsForSelection();
+  openGroupsForSelection();${O(`
+  if (openToggle) openToggle.addEventListener('click', function(){ openOn = !openOn; page = 1; apply('push'); });
+  // The clock moves: re-read every minute; the list itself only re-filters
+  // while Open now is on.
+  setInterval(function(){
+    refreshOpen();
+    if (openOn) { apply('none'); return; }
+    paintOpenCount(pressed(typeChips, 'data-fd-type'), pressed(featureChips, 'data-fd-feature'), pressed(regionChips, 'data-region'));
+  }, 60000);`)}
   apply('replace');
 })();
 </script>`;
@@ -9983,11 +10124,19 @@ function renderFoodDrinkHubScriptHtml() {
 // inert <template> holding the rest (see the incremental-rendering note in
 // renderFoodDrinkHubPage). Shared by /food-drink and the destination
 // category pages so "Show more" works identically on both.
-function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion) {
+function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion, openStatusById = null) {
   const orderById = new Map(venues.map((v, i) => [v.id, i]));
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
-  const cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
+  let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
+  // Open Now (hub only): one status line directly under each card's meta line.
+  if (openStatusById) {
+    cardChunks = cardChunks.map((chunk) => {
+      const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
+      if (!st || !st.eligible) return chunk;
+      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
+    });
+  }
   const firstBatch = [], deferred = [];
   for (const chunk of cardChunks) {
     const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
@@ -10124,16 +10273,23 @@ ${renderGolfHeaderHtml()}
 // Add to Trip) so the engagement contract is identical -- list cards carry
 // ONLY Favorite and Add to Trip; Website / Directions / Call stay on the
 // venue detail pages, which are untouched.
-function renderFoodDrinkHubPage(venues, filter = null, scope = null) {
+function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new Date()) {
   if (scope) return renderFoodDrinkScopedPage(venues, filter, scope);
   const f = filter || { types: [], features: [], regions: [] };
+  const openNow = !!f.openNow;
   const catsById = foodDrinkCategoriesByVenue(venues);
   const featsById = foodDrinkFeaturesByVenue(venues);
-  const matching = filterFoodDrinkVenues(venues, f, catsById, featsById);
+  const advisoryNotes = getAdvisoryNotes();
+  // Open Now: an extra AND group. Unknown / unverified venues are never "open",
+  // so they drop out when it is on; the chip counts are taken over the same set.
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now);
+  const pool = openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
+  const matching = filterFoodDrinkVenues(pool, f, catsById, featsById);
   const matchIds = new Set(matching.map((v) => v.id));
-  const counts = foodDrinkChipCounts(venues, f, catsById, featsById);
-  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0;
-  const state = { types: f.types, features: f.features, regions: f.regions, counts };
+  const counts = foodDrinkChipCounts(pool, f, catsById, featsById);
+  const openCount = filterFoodDrinkVenues(venues.filter((v) => openInfo.openIds.has(v.id)), f, catsById, featsById).length;
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0 || openNow;
+  const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow };
 
   const heading = 'Food & Drink in the Okanagan';
   const title = `${heading} | Okanagan Roam`;
@@ -10155,11 +10311,14 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null) {
       item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
     })),
   };
-  // id -> { c: categories, f: features, r: region } for the client script.
+  // id -> { c: categories, f: features, r: region } for the client script,
+  // plus h: the verified weekly hours of Open Now-eligible venues only.
   const payload = {};
-  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
-
-  const advisoryNotes = getAdvisoryNotes();
+  for (const v of venues) {
+    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
+    const st = openInfo.byId.get(v.id);
+    if (st && st.eligible) payload[String(v.id)].h = st.hours;
+  }
   // Incremental rendering (2026-09-24). Putting all 850 cards in the render
   // tree cost ~2.0-3.2s of style+layout before the page was interactive
   // (measured: domInteractive 2054ms local / 3157ms live, 18,024-23,855 DOM
@@ -10177,7 +10336,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null) {
   // them, so every venue stays searchable and filterable and the count is
   // always "N of 850". data-fd-i keeps the canonical order stable no matter
   // which subset happens to be live.
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true);
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -10185,6 +10344,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
+${renderFoodDrinkOpenNowStyles()}
 ${golfEngagementHeadHtml('fd', true)}
 </head>
 <body class="golf-page outdoor-page fd-page">
@@ -10197,7 +10357,8 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-intro fd-intro">Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley&rsquo;s best dining rooms &mdash; every restaurant, caf&eacute;, pub, cocktail lounge and brewery Okanagan Roam has verified.</p>
   ${foodDrinkSearchHtml()}
   ${foodDrinkTypeChipsHtml(state)}
-  ${foodDrinkFilterBarHtml(venues, state)}
+  ${foodDrinkFilterBarHtml(venues, state).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
+  <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state)}
@@ -10209,7 +10370,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
-  ${renderFoodDrinkHubScriptHtml()}
+  ${renderFoodDrinkHubScriptHtml({ openNow: true })}
 </body>
 </html>`;
 }
@@ -16687,7 +16848,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/food-drink' && method === 'GET') {
       const fdVenues = getFoodDrinkHubVenues();
       if (fdVenues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderFoodDrinkHubPage(fdVenues, parseFoodDrinkFilterQuery(query));
+        const html = renderFoodDrinkHubPage(fdVenues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now' });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -17353,6 +17514,10 @@ module.exports = {
   tripStartWeekday,
   okanaganClock,
   venueHoursStatusAt,
+  openNowEligibility,
+  OPEN_NOW_MAX_CHECK_AGE_DAYS,
+  foodDrinkOpenNowInfo,
+  OKANAGAN_CLOCK_FORMAT,
   HOURS_SOURCES,
   validateVerifiedHours,
   guardedHoursVerifyUpdate,
