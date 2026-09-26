@@ -4532,11 +4532,81 @@ test('Batch 4B Events: head, noindex and analytics are unchanged; text keeps a 7
   assert.doesNotMatch(venue, /event-page/);
 });
 
-test('Batch 4B Events: guide pages are not part of this batch and keep the old shell', () => {
-  const guide = app.renderGuidePage('kelowna', 'patio', app.getVenuesByRegionCategory('kelowna', 'restaurant'));
-  assert.match(guide, /<body>/);
-  assert.match(guide, /<header class="top">/);
-  assert.doesNotMatch(guide, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<main |<script src="\/scripts\/app\.js">|golf-page|event-page/);
+// ---- Batch 4B Guides (2026-09-27): guide pages use the themed shell --------
+//
+// Shell only: site header + navigation, Trip tray, <main>, app.css / app.js,
+// body.golf-page theme (every card -- golf, winery, the rest -- takes the
+// themed card treatment). Golf cards keep Favorite / Add to Trip with
+// app.js's canonical labels plus the existing golf card script ("Read more",
+// aria-pressed). Plain cards gain no actions. Head and content unchanged.
+const batch4bGuideVenues = () => [
+  ...app.getVenuesByRegionCategory('kelowna', 'restaurant'),
+  ...app.getVenuesByRegionCategory('kelowna', 'winery'),
+  ...app.getVenuesByRegionCategory('kelowna', 'golf'),
+];
+
+test('Batch 4B Guides: guide pages render the themed shell around unchanged content', () => {
+  const venues = batch4bGuideVenues();
+  const html = app.renderGuidePage('kelowna', 'patio', venues);
+  assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
+  assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), 'app.css before the inline SEO CSS');
+  assert.match(html, /body\.golf-page \{/);
+  assert.match(html, /<body class="golf-page guide-page">/);
+  assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/);
+  assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), 'tray precedes the header');
+  assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, 'old shell header gone');
+  assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1);
+  const main = html.slice(html.indexOf('<main '), html.indexOf('</main>'));
+  assert.ok(main.includes('<nav class="breadcrumb">') && main.includes('<h1>Patio Venues in Kelowna, BC</h1>') && main.includes('<ul class="card-grid">') && main.includes('<a class="cta" href="/kelowna">See all of Kelowna on Okanagan Roam</a>'), 'page content inside <main>');
+  assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), 'footer after <main>');
+  assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
+  assert.equal((main.match(/<li class="venue-card"/g) || []).length, venues.length, 'every venue still listed');
+  // Head unchanged: title, canonical, indexable, ItemList covering every venue, no analytics.
+  const head = html.split('</head>')[0];
+  assert.match(head, /<title>Patio Venues in Kelowna, BC \| Okanagan Roam<\/title>/);
+  assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guide\/kelowna\/patio">/);
+  assert.doesNotMatch(head, /name="robots"/);
+  const ld = [...head.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
+  assert.deepEqual(ld.map((b) => b['@type']), ['BreadcrumbList', 'ItemList']);
+  assert.equal(ld[1].itemListElement.length, venues.length);
+  assert.doesNotMatch(html, /googletagmanager|gtag\(|window\.trackEvent =|data-track=/, 'no analytics');
+});
+
+test('Batch 4B Guides: golf cards keep Favorite / Add to Trip with canonical labels and the existing card script; other cards gain no actions', () => {
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const heart = appJs.match(/var HEART_OUTLINE = '([^']+)';/)[1];
+  const html = app.renderGuidePage('kelowna', 'patio', batch4bGuideVenues());
+  const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
+  const cards = markup.match(/<li class="venue-card"[^>]*>[\s\S]*?<\/li>/g);
+  const golf = cards.filter((c) => /data-venue-category="golf"/.test(c));
+  const others = cards.filter((c) => !/data-venue-category=/.test(c));
+  assert.ok(golf.length >= 1 && others.length >= 2, 'fixture mixes golf and plain cards');
+  assert.equal(golf.length + others.length, cards.length, 'only golf cards carry a data-venue-category');
+  for (const c of golf) {
+    assert.match(c, /<div class="card-actions">/);
+    assert.ok(c.includes(`${heart} Favorite</button>`) && c.includes('\u{1F9F3} Add to trip</button>'), 'canonical labels');
+    assert.match(c, /class="card-action fav-btn" data-fav-name="[^"]+" aria-pressed="false"/);
+    assert.match(c, /class="golf-desc"[\s\S]*class="desc-toggle"/, 'Read more markup present');
+  }
+  for (const c of others) assert.doesNotMatch(c, /card-actions|fav-btn|trip-btn|golf-desc/, 'plain and winery cards gain no actions');
+  assert.ok(others.some((c) => /<p class="venue-meta">winery/.test(c)), 'winery cards are listed as plain cards');
+  assert.doesNotMatch(html, /&#9825; Favorite|&#65291; Add to Trip/, 'no standalone labels');
+  // Scripts: app.js exactly once, then the existing golf card script (Read more + aria-pressed hand-off).
+  assert.equal((html.match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1);
+  const appAt = html.indexOf('<script src="/scripts/app.js"></script>');
+  const cardScriptAt = html.indexOf(`document.querySelectorAll('.venue-card[data-venue-category="golf"]')`);
+  assert.ok(appAt > 0 && cardScriptAt > appAt, 'card script follows app.js, so it takes its hand-off branch');
+  assert.ok(html.includes(app.golfCardEngagementScriptHtml('golf')), 'the existing golf card script, not a copy');
+  assert.match(html, /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{/);
+});
+
+test('Batch 4B Guides: winery venue and region pages keep their own presentation', () => {
+  const venue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
+  assert.match(venue, /<body>/);
+  assert.match(venue, /<header class="top">/);
+  assert.doesNotMatch(venue, /guide-page|golf-page|<script src="\/scripts\/app\.js">/);
+  const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
+  assert.doesNotMatch(region, /guide-page|golf-page|<script src="\/scripts\/app\.js">/);
 });
 
 // ---- /events index (2026-09-17, replaces the homepage's Happening Soon) --
@@ -11578,7 +11648,7 @@ test('Batch 3: canonical labels equal what app.js renders, on pages that load ap
   assert.ok(canonical.includes(`aria-label="Favorite Batch Three Cafe">${heart} Favorite</button>`), 'Favorite = app.js HEART_OUTLINE + "Favorite"');
   assert.ok(canonical.includes('aria-label="Add Batch Three Cafe to trip">\u{1F9F3} Add to trip</button>'), 'Add to trip = app.js label');
   assert.doesNotMatch(canonical, /&#9825;|&#65291;/);
-  // Pages without app.js (winery region / venue pages, guide pages) keep the standalone labels exactly.
+  // Pages without app.js (winery region / venue pages) keep the standalone labels exactly.
   const standalone = app.venueCardHtml({ ...venue, type: 'winery' }, { actions: true });
   assert.match(standalone, /aria-label="Favorite Batch Three Cafe">&#9825; Favorite<\/button>/);
   assert.match(standalone, /aria-label="Add Batch Three Cafe to trip">&#65291; Add to Trip<\/button>/);

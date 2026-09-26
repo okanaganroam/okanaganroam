@@ -4905,7 +4905,14 @@ function renderGuidePage(region, badge, venues) {
 
   const hiddenGemIds = getHiddenGemVenueIds();
   const localFavouriteIds = getCollectionVenueIds('local_favorite');
-  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id) })).join('\n');
+  // Batch 4B Guides (2026-09-27): the page uses the themed shell (site
+  // header + navigation, Trip tray, <main>, app.css / app.js, body.golf-page
+  // theme), so every card -- golf, winery and the rest -- takes the themed
+  // card treatment. Only golf cards carry Favorite / Add to Trip (unchanged);
+  // they render app.js's canonical labels, and the existing golf card script
+  // adds "Read more" and mirrors aria-pressed. Winery venue pages and the
+  // winery region pages are separate templates and are not affected.
+  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true })).join('\n');
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -4929,10 +4936,13 @@ function renderGuidePage(region, badge, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList])}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true })}
 </head>
-<body>
-  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+<body class="golf-page guide-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${region}` },
@@ -4945,7 +4955,10 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList])}
     ${cards}
   </ul>
   <a class="cta" href="/${region}">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
+  </main>
   ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('golf')}
 </body>
 </html>`;
 }
@@ -6916,8 +6929,8 @@ const APP_TRIP_LABEL_HTML = '\u{1F9F3} Add to trip';
 // The Favorite / Add to Trip buttons themselves, shared by the listing
 // card (surface "category_card") and the venue page CTA row ("venue_page").
 // appLabels: the page loads app.js, so use its canonical labels. Pages that
-// run the standalone script instead (winery region / venue pages, guide
-// pages) keep their own labels unchanged.
+// run the standalone script instead (winery region / venue pages) keep
+// their own labels unchanged.
 function golfFavTripButtonsHtml(venue, opts = {}) {
   const tripQuery = `${venue.name}, ${REGION_LABELS[venue.region] || venue.region}, Okanagan Valley, BC`;
   const favLabel = opts.appLabels ? APP_FAV_LABEL_HTML : '&#9825; Favorite';
