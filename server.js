@@ -6608,6 +6608,11 @@ const SEO_PAGE_CSS = `
     color: var(--ink); opacity: 0.58; min-width: 100px; font-weight: 700;
     font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px;
   }
+  /* A long unbroken website URL wraps inside its row instead of pushing the
+     page wider than a phone screen (Batch 3, 2026-09-26; the Golf pages
+     already had this). Display only -- the link and its text are unchanged. */
+  .detail-row > span:not(.label) { min-width: 0; }
+  .detail-row a { overflow-wrap: anywhere; }
 
   .cta {
     display: inline-block; margin-top: 28px; margin-right: 10px;
@@ -6887,12 +6892,25 @@ function golfFavTripScriptBody(type = 'golf') {
   }`;
 }
 
+// Canonical Favorite / Add to Trip labels (Batch 3, 2026-09-26): exactly what
+// app.js's own sync renders (public/scripts/app.js -- HEART_OUTLINE +
+// t('card.favorite'), t('trip.addToTrip')), so pages that load app.js paint
+// the final English label at first render instead of swapping it once the
+// script runs; app.js still applies French and the pressed states.
+const APP_FAV_HEART_OUTLINE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
+const APP_FAV_LABEL_HTML = `${APP_FAV_HEART_OUTLINE} Favorite`;
+const APP_TRIP_LABEL_HTML = '\u{1F9F3} Add to trip';
 // The Favorite / Add to Trip buttons themselves, shared by the listing
 // card (surface "category_card") and the venue page CTA row ("venue_page").
-function golfFavTripButtonsHtml(venue) {
+// appLabels: the page loads app.js, so use its canonical labels. Pages that
+// run the standalone script instead (winery region / venue pages, guide
+// pages) keep their own labels unchanged.
+function golfFavTripButtonsHtml(venue, opts = {}) {
   const tripQuery = `${venue.name}, ${REGION_LABELS[venue.region] || venue.region}, Okanagan Valley, BC`;
-  return `<button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(venue.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(venue.name)}">&#9825; Favorite</button>
-          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(venue.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(venue.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(venue.name)} to trip">&#65291; Add to Trip</button>`;
+  const favLabel = opts.appLabels ? APP_FAV_LABEL_HTML : '&#9825; Favorite';
+  const tripLabel = opts.appLabels ? APP_TRIP_LABEL_HTML : '&#65291; Add to Trip';
+  return `<button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(venue.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(venue.name)}">${favLabel}</button>
+          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(venue.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(venue.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(venue.name)} to trip">${tripLabel}</button>`;
 }
 
 // ---------- Golf page theme (2026-09-19, Golf pages only) ----------
@@ -7385,6 +7403,12 @@ function renderGolfThemeStyles() {
   body.golf-page .venue-card[data-venue-category="golf"] .chips:not(:empty),
   body.golf-page .venue-card[data-venue-category="golf"] .card-actions { border-top-color: rgba(27,43,58,0.1); }
   body.golf-page .venue-card[data-venue-category="golf"] .card-actions { margin-top: auto; padding-top: 12px; }
+  /* Batch 3: with badge chips the row is still bottom-anchored (see "Listing
+     cards on every themed page" below); the 8px gap under the chips that the
+     row's top margin used to give becomes top padding, so the tallest card in
+     a grid row keeps it. Re-keyed to Beach / Outdoor / What's On like the
+     rules around it. */
+  body.golf-page .venue-card[data-venue-category="golf"] > .chips:not(:empty) + .card-actions { margin-top: auto; padding-top: 8px; }
   /* Favorite / Add to Trip pills use the homepage REDESIGN button rules
      (app.css), not the pre-redesign wizard .fav-btn/.trip-btn tan pill:
        resting  = .lang-toggle        (transparent, 1px rgba(27,43,58,0.2), --ref-navy text)
@@ -7411,6 +7435,36 @@ function renderGolfThemeStyles() {
   body.golf-page .venue-card[data-venue-category="golf"] .card-action:focus-visible,
   body.golf-page .venue-cta-row .card-action:focus-visible,
   body.golf-page .desc-toggle:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+
+  /* Listing cards on every themed page (Batch 3, 2026-09-26). Not keyed on a
+     venue category, so the Beach / Outdoor / What's On re-keying above does
+     not copy them.
+     1. The Favorite / Add to Trip row sits at the bottom of the card, so the
+        rows line up across a grid row whatever the description length. The
+        second selector (0,5,1) outranks the category rules that reset the
+        top margin to 8px when the card has badge chips (0,5,0).
+     2. Every themed listing uses the Golf pill above (same values), not the
+        pre-redesign tan .fav-btn/.trip-btn pill from app.css.
+     3. On phones those two buttons and "Read more" are 44px tap targets. */
+  body.golf-page .venue-card > .card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: auto; }
+  body.golf-page .venue-card > .chips:not(:empty) + .card-actions { margin-top: auto; }
+  body.golf-page .venue-card .card-actions .card-action {
+    display: inline-flex; align-items: center; gap: 5px; margin: 0;
+    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); text-decoration: none;
+    border-radius: 999px; padding: 5px 12px; cursor: pointer; width: fit-content;
+    transition: background 0.15s;
+  }
+  body.golf-page .venue-card .card-actions .card-action:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.golf-page .venue-card .card-actions .fav-btn.is-fav { background: var(--ref-navy); color: var(--paper); border-color: var(--ref-navy); }
+  body.golf-page .venue-card .card-actions .fav-btn.is-fav:hover { background: var(--ref-navy-deep); color: var(--paper); }
+  body.golf-page .venue-card .card-actions .trip-btn.in-trip { background: var(--teal); color: var(--paper); border-color: var(--teal); }
+  body.golf-page .venue-card .card-actions .trip-btn.in-trip:hover { background: var(--teal-deep); color: var(--paper); }
+  body.golf-page .venue-card .card-actions .card-action:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+  @media (max-width: 560px) {
+    body.golf-page .venue-card .card-actions .card-action,
+    body.golf-page .venue-card .desc-toggle { min-height: 44px; }
+  }
 
   /* Venue page: CTAs use the homepage button system (.app-btn navy pill,
      outline secondary), with Favorite / Add to Trip alongside. */
@@ -8159,7 +8213,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '' } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -8206,7 +8260,7 @@ function venueCardHtml(venue, opts = {}) {
   const cardActions = actions
     ? `
         <div class="card-actions">
-          ${golfFavTripButtonsHtml(venue)}
+          ${golfFavTripButtonsHtml(venue, { appLabels })}
         </div>`
     : '';
   // Defensive: never show the badge for a retired/redirected venue, even
@@ -8676,7 +8730,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   const engagement = usesEngagementControls(type);
   const engagementOnly = engagement && !usesThemedCategoryLayout(type);
   const golfDetails = type === 'golf' ? golfDetailsFor(venues) : new Map();
-  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { actions: engagement },
+  const cardsHtml = renderCategoryCardsHtml(type, venues, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { actions: engagement, appLabels: usesThemedCategoryLayout(type) },
     type === 'golf' ? { details: golfDetails, sort: opts.golfSort, basePath: `/${region}/${catSlug}`, today: opts.today } : {});
 
   // Back-link to the Okanagan-wide page, only for categories that
@@ -9421,7 +9475,7 @@ function renderOutdoorActivityPage(activity, venues) {
   };
   const hiddenGemIds = getHiddenGemVenueIds();
   const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = renderCategoryCardsHtml('outdoor', venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true });
+  const cardsHtml = renderCategoryCardsHtml('outdoor', venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, appLabels: true });
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9588,10 +9642,10 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   // all agree; every card is still in the markup for the script to toggle.
   const golfDetails = type === 'golf' ? golfDetailsFor(venues) : new Map();
   const cardsHtml = isOutdoorLanding
-    ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed })
+    ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed, appLabels: hubThemed })
         .replace('<ul class="card-grid">', `<ul class="card-grid" id="outdoorResults"${outdoorMatching.length === 0 ? ' hidden' : ''}>`)
         .replace(/<li class="venue-card" data-venue-id="(\d+)"([^>]*)>/g, (m, id, rest) => (outdoorMatchIds.has(Number(id)) ? m : `<li class="venue-card" data-venue-id="${id}"${rest} hidden>`))
-    : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed },
+    : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed, appLabels: hubThemed },
       type === 'golf' ? { details: golfDetails, sort: opts.golfSort, basePath: `/${catSlug}`, today: opts.today } : {});
 
   return `<!DOCTYPE html>
@@ -10250,7 +10304,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
 // category pages so "Show more" works identically on both.
 function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion, openStatusById = null) {
   const orderById = new Map(venues.map((v, i) => [v.id, i]));
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
   let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
   // Open Now (hub only): one status line directly under each card's meta line.
@@ -11052,7 +11106,7 @@ function renderDogHubPage(venues, filter = null) {
   // style+layout; this one is an order of magnitude smaller, closer to
   // /outdoors (196 cards, fast), so batching would add moving parts and cost
   // the page its "everything is in the HTML" simplicity for no measured win.
-  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, dogNotes, { showRegion: true, themed: true, dogNoteInline: true })
+  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, dogNotes, { showRegion: true, themed: true, dogNoteInline: true, appLabels: true })
     .replace('<ul class="card-grid">', `<ul class="card-grid" id="dogResults"${matching.length === 0 ? ' hidden' : ''}>`)
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card"${matchIds.has(Number(id)) ? '' : ' hidden'} data-venue-id="${id}"`);
 
@@ -11416,7 +11470,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
   for (const v of venues) payload[String(v.id)] = { t: v.type, r: v.region };
 
   const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true })
+  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true })
     .replace('<ul class="card-grid">', `<ul class="card-grid" id="lfResults"${matching.length === 0 ? ' hidden' : ''}>`)
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card"${matchIds.has(Number(id)) ? '' : ' hidden'} data-venue-id="${id}"`);
 
@@ -11870,8 +11924,8 @@ function whatsOnEventCardHtml(ev) {
         <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>` : ''}
         <p class="chips">${chips}</p>
         <div class="card-actions">
-          <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(ev.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(ev.name)}">&#9825; Favorite</button>
-          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(ev.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(ev.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(ev.name)} to trip">&#65291; Add to Trip</button>
+          <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(ev.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(ev.name)}">${APP_FAV_LABEL_HTML}</button>
+          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(ev.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(ev.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(ev.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
         </div>
       </li>`;
 }
@@ -12441,7 +12495,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>Call</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
-    usesEngagementControls(venue.type) ? golfFavTripButtonsHtml(venue) : null,
+    usesEngagementControls(venue.type) ? golfFavTripButtonsHtml(venue, { appLabels: usesThemedCategoryLayout(venue.type) }) : null,
   ].filter(Boolean).join('\n  ');
   const ctaRowAttrs = usesEngagementControls(venue.type)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`

@@ -6183,7 +6183,11 @@ test('All-regions category cards show their community; regional category cards d
 
 test('REGRESSION: themed venue polish is confined to golf and beach venue pages (restaurant pages and listings unchanged)', () => {
   const restaurantVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
-  assert.doesNotMatch(restaurantVenue, /golf-glance|At a glance|Hero: same per-type gradient|overflow-wrap: anywhere|venue-hero-type">Indoor Golf</);
+  assert.doesNotMatch(restaurantVenue, /golf-glance|At a glance|Hero: same per-type gradient|venue-hero-type">Indoor Golf</);
+  // Batch 3 (2026-09-26): long website URLs now wrap on every detail page via
+  // the shared .detail-row rule (the Golf pages already had their own); the
+  // rest of the Golf venue polish stays confined to the themed pages.
+  assert.match(restaurantVenue, /\.detail-row a \{ overflow-wrap: anywhere; \}/);
   assert.match(restaurantVenue, /<div class="venue-header">\s*<h1>Test /, 'non-themed pages keep the <h1> in the header');
   assert.match(restaurantVenue, /<span class="venue-hero-name">/);
   const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
@@ -6455,8 +6459,9 @@ test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when p
   const cta = html.match(/<div class="venue-cta-row"([^>]*)>([\s\S]*?)<\/div>/);
   assert.ok(cta, 'CTA row must render');
   assert.match(cta[1], /data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="venue_page"/);
-  const order = ['Visit Website', 'Get Directions', 'Favorite', 'Add to Trip'].map((t) => cta[2].indexOf(t));
-  assert.ok(order.every((i) => i >= 0), 'Visit Website, Get Directions, Favorite, Add to Trip all present');
+  // Batch 3: themed venue pages render the canonical app.js labels ("Favorite", "Add to trip").
+  const order = ['Visit Website', 'Get Directions', 'Favorite', 'Add to trip'].map((t) => cta[2].indexOf(t));
+  assert.ok(order.every((i) => i >= 0), 'Visit Website, Get Directions, Favorite, Add to trip all present');
   assert.deepEqual([...order].sort((a, c) => a - c), order, 'CTA order: Visit Website, Get Directions, Favorite, Add to Trip');
   assert.doesNotMatch(cta[2], />Call</, 'no Call button when phone is null');
   assert.match(cta[2], /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.86,-119\.49"/, 'Get Directions uses the verified coordinates');
@@ -6473,7 +6478,7 @@ test('Beach venue page with no address, coordinates, website or phone: Get Direc
   assert.ok(cta);
   assert.doesNotMatch(cta[1], /Get Directions|Visit Website|>Call<|google\.com\/maps|tel:/);
   assert.match(cta[1], /Favorite/);
-  assert.match(cta[1], /Add to Trip/);
+  assert.match(cta[1], /Add to trip/); // Batch 3: canonical app.js label on themed venue pages
   assert.doesNotMatch(html, /"geo":/);
   assert.doesNotMatch(html, /venue-location/);
   // Vernon fixture: coordinates but no address -> Get Directions from coordinates only, no address row.
@@ -6805,7 +6810,7 @@ test('Beach venue CTA rules: Get Directions from coordinates OR a verified addre
   assert.match(coordsOnly, /query=49\.9,-119\.5/);
   const nothing = ctaOf({ ...base, address: null, latitude: null, longitude: null, website: null, phone: null });
   assert.doesNotMatch(nothing, /Get Directions|Visit Website|>Call</);
-  assert.match(nothing, /Favorite/); assert.match(nothing, /Add to Trip/);
+  assert.match(nothing, /Favorite/); assert.match(nothing, /Add to trip/); // Batch 3: canonical app.js label
   const full = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://storymaps.arcgis.com/stories/ae662360d11c44c6a8edb3bf2eb315d3', phone: '+1 250-555-0199' });
   assert.match(full, /href="https:\/\/storymaps\.arcgis\.com\/stories\/ae662360d11c44c6a8edb3bf2eb315d3" rel="nofollow noopener" target="_blank" data-track="website">Visit Website</);
   assert.match(full, /query=49\.9,-119\.5/, 'coordinates win over the address for directions');
@@ -11341,4 +11346,61 @@ test('Golf Value Index: cards and course pages show the index or "Value index un
   assert.doesNotMatch(restaurant, /golf-value|Value Index|Value index/);
   const fixtureCourse = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
   assert.doesNotMatch(fixtureCourse, /golf-value|Value index/, 'a golf venue with no data shows nothing new');
+});
+
+// ---- Batch 3 (2026-09-26): card action rows, canonical buttons, tap targets, URL wrapping ----
+test('Batch 3: themed listing cards anchor the Favorite / Add to Trip row to the card bottom, even with badge chips', () => {
+  const css = app.renderGolfThemeStyles();
+  assert.match(css, /body\.golf-page \.venue-card > \.card-actions \{ display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: auto; \}/);
+  // 0,5,1 -- outranks the 0,5,0 category rules that set margin-top: 8px after non-empty chips.
+  assert.match(css, /body\.golf-page \.venue-card > \.chips:not\(:empty\) \+ \.card-actions \{ margin-top: auto; \}/);
+  // The new rules are not keyed on a venue category, so the Beach / Outdoor / What's On re-keying does not duplicate them.
+  assert.doesNotMatch(css.match(/Listing cards on every themed page[\s\S]*?@media \(max-width: 560px\)/)[0], /data-venue-category/);
+  // Golf-keyed (re-keyed to Beach / Outdoor / What's On): the 8px gap under badge chips survives as top padding,
+  // so the tallest card in a grid row keeps its spacing and card heights are unchanged.
+  assert.match(css, /body\.golf-page \.venue-card\[data-venue-category="golf"\] > \.chips:not\(:empty\) \+ \.card-actions \{ margin-top: auto; padding-top: 8px; \}/);
+  const beachRows = app.getVenuesByRegionCategory('kelowna', 'beach');
+  assert.ok(app.renderCategoryPage('kelowna', 'beach', beachRows, []).includes('body.golf-page .venue-card[data-venue-category="beach"] > .chips:not(:empty) + .card-actions { margin-top: auto; padding-top: 8px; }'));
+});
+
+test('Batch 3: every themed listing uses the Golf outlined navy pill; 44px card buttons and "Read more" on phones', () => {
+  const css = app.renderGolfThemeStyles();
+  const pill = css.match(/body\.golf-page \.venue-card \.card-actions \.card-action \{([^}]*)\}/);
+  assert.ok(pill, 'shared themed pill rule');
+  assert.match(pill[1], /background: transparent; color: var\(--ref-navy\); border: 1px solid rgba\(27,43,58,0\.2\)/);
+  assert.match(pill[1], /border-radius: 999px; padding: 5px 12px/);
+  assert.match(css, /body\.golf-page \.venue-card \.card-actions \.fav-btn\.is-fav \{ background: var\(--ref-navy\); color: var\(--paper\); border-color: var\(--ref-navy\); \}/);
+  assert.match(css, /body\.golf-page \.venue-card \.card-actions \.trip-btn\.in-trip \{ background: var\(--teal\); color: var\(--paper\); border-color: var\(--teal\); \}/);
+  assert.match(css, /@media \(max-width: 560px\) \{\s*body\.golf-page \.venue-card \.card-actions \.card-action,\s*body\.golf-page \.venue-card \.desc-toggle \{ min-height: 44px; \}\s*\}/);
+  // Themed hubs carry the rules (golfTheme head); the app.css tan pill is left untouched.
+  const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
+  assert.ok(app.renderCategoryAllRegionsPage('golf', golfRows).includes('body.golf-page .venue-card > .card-actions {'));
+});
+
+test('Batch 3: canonical labels equal what app.js renders, on pages that load app.js; standalone-script pages keep theirs', () => {
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const heart = appJs.match(/var HEART_OUTLINE = '([^']+)';/)[1];
+  assert.match(appJs, /'card\.favorite': 'Favorite',/);
+  assert.match(appJs, /'trip\.addToTrip': '\\ud83e\\uddf3 Add to trip',/);
+  const venue = { id: 99001, name: 'Batch Three Cafe', region: 'kelowna', type: 'cafe', slug: 'batch-three-cafe', description: 'A test cafe.', rating: 4.5 };
+  const canonical = app.venueCardHtml(venue, { actions: true, themed: true, appLabels: true });
+  assert.ok(canonical.includes(`aria-label="Favorite Batch Three Cafe">${heart} Favorite</button>`), 'Favorite = app.js HEART_OUTLINE + "Favorite"');
+  assert.ok(canonical.includes('aria-label="Add Batch Three Cafe to trip">\u{1F9F3} Add to trip</button>'), 'Add to trip = app.js label');
+  assert.doesNotMatch(canonical, /&#9825;|&#65291;/);
+  // Pages without app.js (winery region / venue pages, guide pages) keep the standalone labels exactly.
+  const standalone = app.venueCardHtml({ ...venue, type: 'winery' }, { actions: true });
+  assert.match(standalone, /aria-label="Favorite Batch Three Cafe">&#9825; Favorite<\/button>/);
+  assert.match(standalone, /aria-label="Add Batch Three Cafe to trip">&#65291; Add to Trip<\/button>/);
+  // What's On cards (the page loads app.js) use the canonical labels.
+  const ev = app.whatsOnEventCardHtml({ id: 7, name: 'Batch Three Market', slug: 'batch-three-market', region: 'kelowna', categories: [], dateLabel: 'Sat Oct 3', time: '9 am', description: 'x' });
+  assert.ok(ev.includes(`${heart} Favorite</button>`) && ev.includes('\u{1F9F3} Add to trip</button>'));
+  // Accessible names and data attributes are unchanged.
+  assert.match(canonical, /class="card-action fav-btn" data-fav-name="Batch Three Cafe" aria-pressed="false"/);
+  assert.match(canonical, /class="card-action trip-btn" data-trip-name="Batch Three Cafe" data-trip-query="Batch Three Cafe, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" aria-pressed="false"/);
+});
+
+test('Batch 3: long website URLs wrap inside detail rows on every detail page (display only)', () => {
+  const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  assert.match(restaurant, /\.detail-row > span:not\(\.label\) \{ min-width: 0; \}/);
+  assert.match(restaurant, /\.detail-row a \{ overflow-wrap: anywhere; \}/);
 });
