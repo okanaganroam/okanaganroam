@@ -12666,6 +12666,13 @@ const EVENT_SCHEMA_TYPE_MAP = {
 // computed from the process clock, never invented. Legacy rows with no
 // occurrence rows (only the Phase 1 fixtures) fall back to their stored
 // span text and get NO Event JSON-LD.
+// Batch 4B (2026-09-27): the page now uses the themed shell (site header +
+// navigation, Trip tray, <main>, app.css / app.js, body.golf-page theme)
+// instead of siteHeader(). app.js loads BEFORE the page's inline
+// Favorite / Add to Trip script, so that script takes its hand-off branch
+// (app.js owns state and labels; the script mirrors aria-pressed). The
+// buttons render app.js's canonical labels. Head, content, noindex for
+// expired events and analytics (none) are unchanged.
 const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 function formatLocalDateLong(dateStr, { year = true, weekday = true } = {}) {
@@ -12799,8 +12806,8 @@ ${occurrences.map((o) => {
   const tripQuery = `${full.name}, ${regionLabel}, Okanagan Valley, BC`;
   const actionsHtml = `
   <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}" data-surface="event_page">
-    <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(full.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(full.name)}">&#9825; Favorite</button>
-    <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(full.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(full.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(full.name)} to trip">&#65291; Add to Trip</button>
+    <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(full.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(full.name)}">${APP_FAV_LABEL_HTML}</button>
+    <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(full.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(full.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(full.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
   </div>`;
   const pageCtx = JSON.stringify({ event_id: full.id, event_name: full.name, event_region: full.region, surface: 'event_page' }).replace(/</g, '\\u003c');
   const actionsScript = `<script>
@@ -12836,8 +12843,13 @@ ${related.map((r) => {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { noindex: expired })}
+${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { noindex: expired, golfTheme: true })}
 <style>
+  /* Batch 4B (2026-09-27): the event page uses the themed shell, whose
+     <main> is full width; its running text keeps a readable measure (the
+     same 72ch the themed venue description uses). Phones are unaffected. */
+  body.golf-page.event-page .golf-main > p,
+  body.golf-page.event-page .golf-main > .detail-row { max-width: 72ch; }
   .event-actions { margin: 4px 0 18px; }
   .event-actions .card-action { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid #cfd8dc; background: #fff; color: #1b2a33; font: inherit; font-size: 0.95rem; cursor: pointer; }
   .event-actions .card-action.is-fav, .event-actions .card-action.in-trip { background: var(--teal, #2A6B67); border-color: var(--teal, #2A6B67); color: var(--paper, #fff); }
@@ -12855,8 +12867,11 @@ ${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boole
   .event-related-all { margin: 0 0 20px; font-size: 0.95rem; }
 </style>
 </head>
-<body>
-  ${siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+<body class="golf-page event-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${full.region}` },
@@ -12873,7 +12888,9 @@ ${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boole
   ${attribution}
   ${relatedHtml}
   <a class="cta" href="/${full.region}">Explore all of ${escapeHtml(regionLabel)}</a>
+  </main>
   ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
   ${actionsScript}
 </body>
 </html>`;

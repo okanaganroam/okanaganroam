@@ -4462,6 +4462,83 @@ test('renderEventPage links to the host venue when venue_id is set', () => {
   assert.match(html, new RegExp(`href="/kelowna/${app.CATEGORY_SLUGS.restaurant}/test-trattoria"`));
 });
 
+// ---- Batch 4B Events (2026-09-27): event pages use the themed shell -------
+//
+// Shell only: site header + navigation, Trip tray, <main>, app.css / app.js,
+// body.golf-page theme and a 72ch text measure. Head, content, noindex and
+// the Favorite / Add to Trip contract are unchanged; the buttons render
+// app.js's canonical labels because app.js now owns them.
+const batch4bEventPages = () => [
+  ['active', app.renderEventPage(app.findEventBySlug('kelowna', 'test-future-festival'), testVenue)],
+  ['expired', app.renderEventPage(app.findEventBySlug('kelowna', 'test-past-market'), null)],
+  ['recurring', app.renderEventPage(app.findEventBySlug('kelowna', 'test-weekly-market'), null)],
+];
+
+test('Batch 4B Events: every event page renders the themed shell around unchanged content', () => {
+  for (const [kind, html] of batch4bEventPages()) {
+    assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/, kind);
+    assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), `${kind}: app.css before the inline SEO CSS`);
+    assert.match(html, /body\.golf-page \{/, kind);
+    assert.match(html, /<body class="golf-page event-page">/, kind);
+    assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/, kind);
+    assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${kind}: tray precedes the header`);
+    assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, `${kind}: old shell header gone`);
+    assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1, `${kind}: one <main>`);
+    const main = html.slice(html.indexOf('<main '), html.indexOf('</main>'));
+    assert.ok(main.includes('<nav class="breadcrumb">') && main.includes('<h1>') && main.includes('class="venue-cta-row event-actions"') && main.includes('<a class="cta" href="/kelowna">Explore all of Kelowna</a>'), `${kind}: page content inside <main>`);
+    assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${kind}: footer after <main>`);
+    assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${kind}: exactly one <h1>`);
+    assert.match(html, /<p class="subtitle">Event(?: series)? in Kelowna, BC/, kind);
+  }
+});
+
+test('Batch 4B Events: app.js loads before the inline Favorite / Add to Trip script, which hands off to it; buttons use the canonical labels', () => {
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const heart = appJs.match(/var HEART_OUTLINE = '([^']+)';/)[1];
+  for (const [kind, html] of batch4bEventPages()) {
+    assert.equal((html.match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1, kind);
+    const appAt = html.indexOf('<script src="/scripts/app.js"></script>');
+    const inlineAt = html.indexOf('var pageCtx');
+    assert.ok(appAt > 0 && inlineAt > appAt, `${kind}: app.js precedes the inline script, so its hand-off branch runs`);
+    assert.match(html, /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{/, `${kind}: hand-off branch present`);
+    assert.match(html, /var HOLDER = '\[data-venue-category="whatson"\]';/, kind);
+    const row = html.match(/<div class="venue-cta-row event-actions"[^>]*>([\s\S]*?)<\/div>/);
+    assert.ok(row, kind);
+    assert.match(row[0], /data-venue-category="whatson" data-venue-id="event-\d+" data-venue-region="kelowna" data-venue-name="[^"]+" data-surface="event_page"/, `${kind}: holder attributes unchanged`);
+    assert.ok(row[1].includes(`aria-pressed="false" aria-label="Favorite `) && row[1].includes(`">${heart} Favorite</button>`), `${kind}: Favorite = app.js HEART_OUTLINE + "Favorite"`);
+    assert.ok(row[1].includes('\u{1F9F3} Add to trip</button>'), `${kind}: Add to trip = app.js label`);
+    assert.match(row[1], /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" aria-pressed="false"/, `${kind}: trip data unchanged`);
+    assert.doesNotMatch(row[1], /&#9825;|&#65291;/, `${kind}: no standalone labels`);
+  }
+});
+
+test('Batch 4B Events: head, noindex and analytics are unchanged; text keeps a 72ch measure on the event page only', () => {
+  const pages = Object.fromEntries(batch4bEventPages());
+  for (const [kind, html] of Object.entries(pages)) {
+    const head = html.split('</head>')[0];
+    assert.equal((head.match(/<title>/g) || []).length, 1, kind);
+    assert.match(head, /<title>Test [^<]+ — Event in Kelowna, BC \| Okanagan Roam<\/title>/, kind);
+    assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/events\/test-[a-z-]+">/, kind);
+    assert.match(head, /<meta property="og:url" content="https:\/\/okanaganroam\.com\/kelowna\/events\/test-[a-z-]+">/, kind);
+    assert.match(head, /"@type":"BreadcrumbList"/, kind);
+    assert.doesNotMatch(html, /googletagmanager|gtag\(|window\.trackEvent =|data-track=/, `${kind}: no analytics`);
+    assert.match(html, /body\.golf-page\.event-page \.golf-main > p,\s*body\.golf-page\.event-page \.golf-main > \.detail-row \{ max-width: 72ch; \}/, `${kind}: 72ch measure`);
+  }
+  assert.doesNotMatch(pages.active, /name="robots"/, 'active event stays indexable');
+  assert.match(pages.expired, /<meta name="robots" content="noindex">/, 'expired event stays noindex');
+  assert.match(pages.active, /"@type":"Event"/);
+  // The event-page rules and marker stay on event pages.
+  const venue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  assert.doesNotMatch(venue, /event-page/);
+});
+
+test('Batch 4B Events: guide pages are not part of this batch and keep the old shell', () => {
+  const guide = app.renderGuidePage('kelowna', 'patio', app.getVenuesByRegionCategory('kelowna', 'restaurant'));
+  assert.match(guide, /<body>/);
+  assert.match(guide, /<header class="top">/);
+  assert.doesNotMatch(guide, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<main |<script src="\/scripts\/app\.js">|golf-page|event-page/);
+});
+
 // ---- /events index (2026-09-17, replaces the homepage's Happening Soon) --
 
 test('eventCardHtml links to the real individual event page and shows its date/region', () => {
