@@ -11806,9 +11806,10 @@ function tripRenderHarness(text = 'Plan 2 days in Kelowna with golf') {
   const page = app.renderTripPlannerPage(true);
   const script = page.match(/<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/)[0];
   const src = script.slice(script.indexOf('  function esc(s)'), script.indexOf('  function currentPins('));
-  const resultEl = { innerHTML: '', hidden: true, setAttribute() {}, removeAttribute() {}, scrollIntoView() {}, querySelector() { return null; } };
+  const resultEl = { innerHTML: '', hidden: true, setAttribute() {}, removeAttribute() {}, scrollIntoView() {}, querySelector() { return null; }, querySelectorAll() { return []; } };
+  const stubDoc = { addEventListener() {}, getElementById() { return null; } };
   const run = new Function('state', 'resultEl', 'statusEl', 'submitBtn', 'window', 'document', `${src}; return render;`);
-  const render = run({ text, seed: 0, exclude: [], last: null }, resultEl, { textContent: '', className: '' }, {}, {}, {});
+  const render = run({ text, seed: 0, exclude: [], last: null }, resultEl, { textContent: '', className: '' }, {}, { addEventListener() {} }, stubDoc);
   return (plan) => { render(plan, false); return resultEl.innerHTML; };
 }
 const tripVenue = (id, name, type = 'golf') => ({ id, name, type, typeLabel: 'Golf Course', region: 'kelowna', regionLabel: 'Kelowna', url: `/kelowna/golf/v${id}`, rating: 4.5, reviews: 10, price: null });
@@ -11836,7 +11837,7 @@ test('Phase 2 /trip: request, headline, "What to expect", chips, context line, c
   // Card: two reasons visible, the third behind "More reasons"; every existing control is kept.
   assert.match(html, /<ul class="trip-slot-why" aria-label="Why this fits"><li>Reason A<\/li><li>Reason B<\/li><\/ul><details class="trip-slot-more"><summary>More reasons<\/summary><ul class="trip-slot-why"><li>Reason C<\/li><\/ul><\/details>/);
   assert.match(html, /<button type="button" class="fav-btn" data-fav-name="Club One">Favorite<\/button>/);
-  assert.match(html, /<button type="button" class="trip-btn" data-trip-name="Club One" data-trip-query="Club One, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna">Add to trip<\/button>/);
+  assert.match(html, /<button type="button" class="trip-btn" data-trip-name="Club One" data-trip-query="Club One, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-plan-stop>Add to trip<\/button>/, 'a plan stop (Phase 3 marks it for the whole-trip action)');
   assert.match(html, /<a class="trip-slot-view-link" href="\/kelowna\/golf\/v1">View details<\/a>/);
   assert.match(html, /class="trip-slot-remove-btn" data-replace-id="1" data-replace-key="1-morning" aria-label="Replace Club One with another suggestion"/);
   assert.match(html, /<ul class="trip-slot-caveats" aria-label="Good to know"><li>Check the day you go<\/li><\/ul>/);
@@ -11874,4 +11875,161 @@ test('Phase 2 /trip: recommendations keep "Show others"; empty results have no R
   assert.doesNotMatch(phase2Rules, /plum|#6B2C40|107,\s*44,\s*64/i, 'no plum/maroon in the new result styles');
   for (const rule of phase2Rules.split('}').filter((r) => r.includes('{'))) assert.match(rule.split('{')[0], /\.trip-plan-result|^\s*@media|^\s*$/, `scoped: ${rule.split('{')[0].trim()}`);
   assert.match(phase2Css, /@media \(max-width: 560px\)[\s\S]*min-height: 44px/);
+});
+
+// ==== Build My Trip Phase 3 (2026-09-27): "Add whole trip to My Trip" =========
+// Runs the real whole-trip functions from the /trip script against a small
+// fake page whose Add to trip buttons behave like app.js's own handler:
+// toggle by name, de-duplicated, and no add past MAX_STOPS (10).
+function wholeTripHarness(stopNames, initialTrip = []) {
+  const page = app.renderTripPlannerPage(true);
+  const script = page.match(/<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/)[0];
+  const src = script.slice(script.indexOf('  function esc(s)'), script.indexOf('  function currentPins('));
+  const app_ = { trip: initialTrip.slice(), capMessages: 0, clicks: [] };
+  const mkClassList = () => { const set = new Set(); return { add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c), toggle: (c, on) => (on ? set.add(c) : set.delete(c)) }; };
+  let buttons = [];
+  const sync = () => buttons.forEach((b) => b.classList.toggle('in-trip', app_.trip.includes(b.name)));
+  const mkButton = (name) => {
+    const b = { name, classList: mkClassList(), getAttribute: (a) => (a === 'data-trip-name' ? name : null) };
+    b.click = () => {
+      app_.clicks.push(name);
+      if (app_.trip.includes(name)) app_.trip = app_.trip.filter((n) => n !== name);
+      else if (app_.trip.length >= 10) app_.capMessages += 1;
+      else app_.trip.push(name);
+      sync();
+    };
+    return b;
+  };
+  const setPlan = (names) => { buttons = names.map(mkButton); sync(); };
+  setPlan(stopNames);
+  const attrs = {};
+  const addAllBtn = { textContent: '', setAttribute: (k, v) => { attrs[k] = v; }, getAttribute: (k) => attrs[k] };
+  const viewBtn = { hidden: true };
+  const status = { textContent: '' };
+  const count = { get textContent() { return String(app_.trip.length); } };
+  const resultEl = {
+    innerHTML: '', hidden: false, setAttribute() {}, removeAttribute() {}, scrollIntoView() {},
+    querySelector: (sel) => (sel === '[data-plan-add-all]' ? addAllBtn : sel === '[data-plan-view-trip]' ? viewBtn : null),
+    querySelectorAll: (sel) => (sel === '.trip-btn[data-plan-stop]' ? buttons : []),
+  };
+  const doc = { addEventListener() {}, getElementById: (id) => (id === 'tripTrayCount' ? count : id === 'tripPlanAddAllStatus' ? status : null) };
+  const win = { addEventListener() {}, localStorage: { getItem: () => JSON.stringify(app_.trip.map((n) => ({ name: n }))) } };
+  const run = new Function('state', 'resultEl', 'statusEl', 'submitBtn', 'window', 'document', 'setTimeout', `${src}; return { addWholeTrip, refreshAddAll, addAllState, TRIP_MAX_STOPS };`);
+  const fns = run({ text: 'x', seed: 0, exclude: [], last: null }, resultEl, { textContent: '', className: '' }, {}, win, doc, (fn) => fn());
+  fns.refreshAddAll();
+  return { ...fns, app: app_, attrs, addAllBtn, viewBtn, status, setPlan, sync, remove: (name) => { app_.trip = app_.trip.filter((n) => n !== name); sync(); fns.refreshAddAll(); } };
+}
+const others = (n, prefix = 'Other') => Array.from({ length: n }, (_, i) => `${prefix} ${i + 1}`);
+
+test('Phase 3 whole trip: every stop is added in plan order, the tray count and button update, and the result is announced', () => {
+  const h = wholeTripHarness(['Cafe A', 'Winery B', 'Jazz Night (event)', 'Dinner C']);
+  assert.equal(h.addAllBtn.textContent, 'Add whole trip to My Trip');
+  assert.equal(h.attrs['aria-disabled'], 'false');
+  h.addWholeTrip();
+  assert.deepEqual(h.app.trip, ['Cafe A', 'Winery B', 'Jazz Night (event)', 'Dinner C'], 'events are stops too; plan order kept');
+  assert.equal(h.status.textContent, 'Added 4 stops to My Trip.');
+  assert.equal(h.addAllBtn.textContent, '✓ Whole trip in My Trip');
+  assert.equal(h.attrs['data-state'], 'added');
+  assert.equal(h.attrs['aria-disabled'], 'true');
+  assert.equal(h.viewBtn.hidden, false, '"View My Trip" appears');
+});
+
+test('Phase 3 whole trip: stops already in My Trip are kept (never clicked) and only the missing ones are added', () => {
+  const h = wholeTripHarness(['A', 'B', 'C', 'D'], ['B', 'Kept 1', 'D']);
+  assert.equal(h.addAllBtn.textContent, 'Add the remaining 2 stops to My Trip');
+  h.addWholeTrip();
+  assert.deepEqual(h.app.trip, ['B', 'Kept 1', 'D', 'A', 'C']);
+  assert.deepEqual(h.app.clicks, ['A', 'C'], 'B and D were not clicked, so they cannot be removed');
+  assert.equal(h.status.textContent, 'Added 2 stops to My Trip. 2 were already there.');
+});
+
+test('Phase 3 whole trip: when every stop is already in My Trip, nothing is clicked and the visitor is told so', () => {
+  const h = wholeTripHarness(['A', 'B', 'C'], ['A', 'B', 'C']);
+  assert.equal(h.attrs['data-state'], 'added');
+  h.addWholeTrip();
+  assert.deepEqual(h.app.clicks, []);
+  assert.deepEqual(h.app.trip, ['A', 'B', 'C']);
+  assert.equal(h.status.textContent, 'All 3 stops are already in My Trip — nothing new was added.');
+});
+
+test('Phase 3 whole trip: more stops than room -- adds what fits, reports added and not added, never trips the 10-stop limit', () => {
+  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(8));
+  h.addWholeTrip();
+  assert.equal(h.app.trip.length, 10);
+  assert.deepEqual(h.app.trip.slice(8), ['A', 'B']);
+  assert.equal(h.app.capMessages, 0, 'no click is made once My Trip is full');
+  assert.equal(h.status.textContent, 'Added 2 stops to My Trip. 2 stops couldn’t be added because My Trip holds up to 10 stops — remove some to make room.');
+  assert.equal(h.attrs['data-state'], 'full');
+  assert.equal(h.addAllBtn.textContent, 'My Trip is full');
+});
+
+test('Phase 3 whole trip: exactly reaching 10 stops, and trying again when already at 10', () => {
+  const exact = wholeTripHarness(['A', 'B', 'C', 'D'], others(6));
+  exact.addWholeTrip();
+  assert.equal(exact.app.trip.length, 10);
+  assert.equal(exact.status.textContent, 'Added 4 stops to My Trip.');
+  assert.equal(exact.attrs['data-state'], 'added');
+  const full = wholeTripHarness(['A', 'B'], others(10));
+  assert.equal(full.attrs['data-state'], 'full');
+  assert.equal(full.attrs['aria-disabled'], 'true');
+  full.addWholeTrip();
+  assert.deepEqual(full.app.clicks, []);
+  assert.equal(full.app.trip.length, 10);
+  assert.equal(full.status.textContent, 'My Trip is full (10 stops), so nothing new was added. Remove a stop from My Trip to make room.');
+});
+
+test('Phase 3 whole trip: duplicate stop names are added once', () => {
+  const h = wholeTripHarness(['Same Place', 'Same Place', 'Other']);
+  h.addWholeTrip();
+  assert.deepEqual(h.app.trip, ['Same Place', 'Other']);
+  assert.equal(h.status.textContent, 'Added 2 stops to My Trip.');
+});
+
+test('Phase 3 whole trip: removing a tray stop or adding one individually recalculates the room; Regenerate keeps My Trip intact', () => {
+  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(7));
+  h.addWholeTrip();
+  assert.deepEqual(h.app.trip.slice(7), ['A', 'B', 'C']);
+  assert.equal(h.attrs['data-state'], 'full');
+  h.remove('Other 1');                                   // tray remove
+  assert.equal(h.addAllBtn.textContent, 'Add the remaining 1 stop to My Trip');
+  h.addWholeTrip();
+  assert.ok(h.app.trip.includes('D'));
+  assert.equal(h.status.textContent, 'Added 1 stop to My Trip. 3 were already there.');
+  h.remove('Other 2');
+  h.remove('A');                                         // individual toggle off, then on again
+  h.addWholeTrip();
+  assert.ok(h.app.trip.includes('A'));
+  // Regenerate: a new plan's stops; My Trip keeps everything, overlapping names are not duplicated.
+  const before = h.app.trip.slice();
+  h.setPlan(['D', 'New 1', 'New 2']);
+  h.refreshAddAll();
+  h.addWholeTrip();
+  assert.deepEqual(h.app.trip.slice(0, before.length), before, 'nothing already in My Trip is removed or reordered');
+  assert.equal(h.app.trip.filter((n) => n === 'D').length, 1, 'no duplicate');
+  assert.equal(h.app.trip.length, Math.min(10, before.length + 2));
+});
+
+test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip and the plan-stop markers render where they should', () => {
+  const render = tripRenderHarness('coffee then jazz in Naramata');
+  const itin = render({
+    kind: 'itinerary', summary: 'Cafes and live music in Naramata.', overview: { where: 'Naramata' }, notes: [], warnings: [], unsupported: [],
+    itinerary: { route: null, stops: [
+      { kind: 'venue', label: 'Cafes', venue: tripVenue(2, 'Bean', 'cafe'), why: [], caveats: [], alternates: [{ venue: tripVenue(3, 'Other Bean', 'cafe'), why: [], caveats: [] }] },
+      { kind: 'event', label: 'Live music', event: { name: 'Jazz Night', region: 'naramata', regionLabel: 'Naramata', url: '/naramata/events/jazz', dateLabel: 'Fri', time: '7 pm' } },
+    ] },
+  });
+  assert.match(itin, /<button type="button" class="app-btn trip-plan-add-all" data-plan-add-all aria-describedby="tripPlanAddAllStatus">Add whole trip to My Trip<\/button>/);
+  assert.match(itin, /<p id="tripPlanAddAllStatus" class="trip-plan-add-all-status" role="status" aria-live="polite"><\/p>/);
+  assert.match(itin, /<button type="button" class="trip-plan-view-trip" data-plan-view-trip hidden>View My Trip<\/button>/);
+  assert.match(itin, /class="trip-btn" data-trip-name="Jazz Night" data-trip-query="Jazz Night, Naramata, Okanagan Valley, BC" data-trip-region="naramata" data-plan-stop>Add to trip<\/button>/, 'events can be added like on their own pages');
+  assert.match(itin, /data-trip-name="Bean"[^>]*data-plan-stop>/, 'a plan stop');
+  assert.match(itin, /data-trip-name="Other Bean"[^>]*data-trip-region="kelowna">Add to trip/, 'alternates are not part of the whole trip');
+  assert.doesNotMatch(itin.match(/<button[^>]*data-plan-add-all[^>]*>/)[0], /trip-btn|fav-btn|data-plan-regenerate|data-replace-id/, 'never mistaken for a card control');
+  assert.ok(itin.indexOf('data-plan-add-all') < itin.indexOf('data-plan-regenerate'), 'primary action first');
+  const recs = render({ kind: 'discover', summary: 'x', overview: {}, notes: [], warnings: [], unsupported: [], recommendations: [{ venue: tripVenue(4, 'Solo', 'cafe'), why: [], caveats: [] }] });
+  assert.doesNotMatch(recs, /data-plan-add-all|data-plan-stop/, 'a list of ideas is not a trip');
+  // The page's limit matches the tray's own limit in app.js (unchanged).
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(appJs, /var MAX_STOPS = 10;/);
+  assert.equal(wholeTripHarness([]).TRIP_MAX_STOPS, 10);
 });

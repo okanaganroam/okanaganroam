@@ -13573,7 +13573,29 @@ function renderTripPlannerV2Styles() {
   .trip-plan-result .trip-slot-actions .trip-slot-remove-btn[aria-busy="true"] { opacity: 0.6; }
   .trip-plan-result .trip-slot-card-event .trip-slot-secondary { margin-left: 0; }
   .trip-plan-result button:focus-visible, .trip-plan-result a:focus-visible, .trip-plan-result summary:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+  /* Phase 3 (2026-09-27): "Add whole trip to My Trip" is the primary action
+     (navy; teal once the whole trip is in My Trip; muted when My Trip is full),
+     Regenerate the secondary one; the status line announces the result. */
+  .trip-plan-result .trip-plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
+  .trip-plan-result .trip-plan-add-all { background: var(--ref-navy); color: var(--ref-white, #fff); font-size: 0.86rem; padding: 10px 18px; }
+  .trip-plan-result .trip-plan-add-all:hover { background: var(--ref-navy-deep); }
+  .trip-plan-result .trip-plan-add-all[data-state="added"] { background: var(--teal); color: var(--paper); cursor: default; }
+  .trip-plan-result .trip-plan-add-all[data-state="full"] { background: rgba(27,43,58,0.08); color: var(--ref-navy); cursor: not-allowed; }
+  .trip-plan-result .trip-planner-regen-btn { background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.25); }
+  .trip-plan-result .trip-planner-regen-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  .trip-plan-result .trip-planner-regen-btn.is-loading::before { border-color: rgba(27,43,58,0.25); border-top-color: var(--ref-navy); }
+  .trip-plan-result .trip-plan-add-all-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 10px 0 0; }
+  .trip-plan-result .trip-plan-add-all-status { margin: 0; font-size: 0.88rem; font-weight: 700; line-height: 1.5; color: var(--teal-deep); max-width: 72ch; }
+  .trip-plan-result .trip-plan-add-all-status:empty { display: none; }
+  .trip-plan-result .trip-plan-view-trip {
+    background: none; border: 0; padding: 4px 2px; font: inherit; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy);
+    text-decoration: underline; text-underline-offset: 3px; cursor: pointer; display: inline-flex; align-items: center; box-sizing: border-box;
+  }
+  .trip-plan-result .trip-plan-view-trip[hidden] { display: none; }
   @media (max-width: 560px) {
+    .trip-plan-result .trip-plan-actions { flex-direction: column; align-items: stretch; margin-left: 0; }
+    .trip-plan-result .trip-plan-add-all { justify-content: center; min-height: 44px; }
+    .trip-plan-result .trip-plan-view-trip { min-height: 44px; }
     .trip-plan-result .trip-plan-summary { padding: 18px 16px 14px; }
     .trip-plan-result .trip-plan-summary-footer { flex-direction: column; align-items: stretch; }
     .trip-plan-result .trip-plan-details { flex: 0 0 auto; }
@@ -13650,7 +13672,7 @@ function renderTripPlannerV2Script() {
     parts.push(v.regionLabel);
     return parts.map(esc).join(' \\u00b7 ');
   }
-  function card(stop, label, key){
+  function card(stop, label, key, planStop){
     if (!stop || !stop.venue) {
       return '<div class="trip-slot-card"><div class="trip-slot-label">' + esc(label) + '</div><p class="trip-slot-empty">No suitable stop found for this part of the day.</p></div>';
     }
@@ -13670,7 +13692,7 @@ function renderTripPlannerV2Script() {
       + ((stop.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + stop.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
       + '<div class="trip-slot-actions">'
       + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>'
-      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery) + '" data-trip-region="' + esc(v.region) + '">Add to trip</button>'
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery) + '" data-trip-region="' + esc(v.region) + '"' + (planStop ? ' data-plan-stop' : '') + '>Add to trip</button>'
       + '<span class="trip-slot-secondary">'
       + (url ? '<a class="trip-slot-view-link" href="' + esc(url) + '">View details</a>' : '')
       + '<button type="button" class="trip-slot-remove-btn" data-replace-id="' + esc(v.id) + '"' + (key ? ' data-replace-key="' + esc(key) + '"' : '') + ' aria-label="Replace ' + esc(v.name) + ' with another suggestion" title="Remove this stop and suggest another">Replace</button>'
@@ -13696,6 +13718,9 @@ function renderTripPlannerV2Script() {
     var regen = null;
     if (p.kind === 'multi_day' || p.kind === 'day_plan' || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary)) regen = 'Regenerate';
     else if ((p.kind === 'recommendations' || p.kind === 'discover') && (p.recommendations || []).length) regen = 'Show others';
+    // Phase 3: plans that are a trip (days, an outing, an itinerary) can be
+    // added to My Trip in one go.
+    var wholeTrip = p.kind === 'multi_day' || p.kind === 'day_plan' || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary && (p.itinerary.stops || []).length > 0);
     var contextNotes = p.contextNotes || [];
     var detailNotes = (p.notes || []).filter(function(n){ return contextNotes.indexOf(n) === -1; });
     var html = '<div class="trip-plan-summary">'
@@ -13705,12 +13730,15 @@ function renderTripPlannerV2Script() {
     if (p.experience && p.experience.text) html += experienceHtml(p);
     html += overviewChips(p);
     if (contextNotes.length) html += '<ul class="trip-plan-context">' + contextNotes.map(li).join('') + '</ul>';
-    if (regen || detailNotes.length) {
+    if (regen || detailNotes.length || wholeTrip) {
       html += '<div class="trip-plan-summary-footer">';
       if (detailNotes.length) html += '<details class="trip-plan-details"><summary>How this plan was made</summary><ul class="trip-plan-notes">' + detailNotes.map(li).join('') + '</ul></details>';
+      html += '<div class="trip-plan-actions">';
+      if (wholeTrip) html += '<button type="button" class="app-btn trip-plan-add-all" data-plan-add-all aria-describedby="tripPlanAddAllStatus">Add whole trip to My Trip</button>';
       if (regen) html += '<button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>' + regen + '</button>';
-      html += '</div>';
+      html += '</div></div>';
     }
+    if (wholeTrip) html += '<div class="trip-plan-add-all-feedback"><p id="tripPlanAddAllStatus" class="trip-plan-add-all-status" role="status" aria-live="polite"></p><button type="button" class="trip-plan-view-trip" data-plan-view-trip hidden>View My Trip</button></div>';
     html += '</div>';
     var issues = [];
     (p.unsupported || []).forEach(function(u){ issues.push('Not something Okanagan Roam can plan for yet: \\u201c' + u + '\\u201d.'); });
@@ -13721,13 +13749,13 @@ function renderTripPlannerV2Script() {
       html += '<div class="trip-plan-days">';
       (p.days || []).forEach(function(d){
         html += '<div class="trip-day"><h3>Day ' + esc(d.day) + (d.regionLabel ? ' \\u00b7 ' + esc(d.regionLabel) : '') + '</h3><div class="trip-day-slots">'
-          + d.stops.map(function(s){ return card(s, s.label, d.day + '-' + s.daypart); }).join('') + '</div></div>';
+          + d.stops.map(function(s){ return card(s, s.label, d.day + '-' + s.daypart, true); }).join('') + '</div></div>';
         hasVenues = true;
       });
       html += '</div>';
     } else if (p.kind === 'outing' && p.outing) {
       html += '<h3 class="trip-plan-section-title">Your outing</h3>'
-        + '<div class="trip-plan-grid">' + p.outing.stops.map(function(s){ return card(s, s.label, null); }).join('') + '</div>';
+        + '<div class="trip-plan-grid">' + p.outing.stops.map(function(s){ return card(s, s.label, null, true); }).join('') + '</div>';
       if (p.outing.alternates && p.outing.alternates.length) html += '<h3 class="trip-plan-section-title">Other good options</h3><div class="trip-plan-grid">' + p.outing.alternates.map(function(s){ return card(s, '', null); }).join('') + '</div>';
       hasVenues = true;
     } else if (p.kind === 'itinerary' && p.itinerary) {
@@ -13738,12 +13766,14 @@ function renderTripPlannerV2Script() {
       if (it.route && it.route.regions && it.route.regions.length > 1) html += '<p class="trip-plan-route">' + it.route.regions.map(function(r){ return esc(r.label); }).join(' \u2192 ') + '</p>';
       if ((it.stops || []).length) {
         html += '<div class="trip-plan-grid">' + it.stops.map(function(s){
-          if (s.kind !== 'event') { hasVenues = true; return card(s, s.label, null); }
+          if (s.kind !== 'event') { hasVenues = true; return card(s, s.label, null, true); }
           var e = s.event || {}, u = safeUrl(e.url);
           return '<div class="trip-slot-card trip-slot-card-event"><div class="trip-slot-label">' + esc(s.label) + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + '<div class="trip-slot-meta">' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</div>'
             + ((s.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + s.caveats.map(li).join('') + '</ul>' : '')
-            + (u ? '<div class="trip-slot-actions"><span class="trip-slot-secondary"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></span></div>' : '') + '</div>';
+            + '<div class="trip-slot-actions">'
+            + (e.name ? '<button type="button" class="trip-btn" data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '" data-plan-stop>Add to trip</button>' : '')
+            + (u ? '<span class="trip-slot-secondary"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></span>' : '') + '</div></div>';
         }).join('') + '</div>';
       } else {
         html += '<p class="trip-plan-empty">Nothing on Okanagan Roam matches those parts yet.</p>';
@@ -13777,10 +13807,94 @@ function renderTripPlannerV2Script() {
     resultEl.hidden = false;
     if (window.__syncFavButtons) window.__syncFavButtons();
     if (window.__syncTripButtons) window.__syncTripButtons();
+    refreshAddAll();
     if (hasVenues || p.kind === 'events') resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     var title = resultEl.querySelector('.trip-plan-title');
     if (focusTitle && title) { try { title.focus({ preventScroll: true }); } catch (err) { title.focus(); } }
   }
+
+  // ---- Phase 3 (2026-09-27): "Add whole trip to My Trip" ----
+  // Uses each plan stop's own Add to trip button, so app.js keeps doing the
+  // storage, de-duplication, tray and pressed state exactly as for a single
+  // click. A stop already in My Trip is never clicked (that would remove it),
+  // and nothing is clicked once My Trip is full.
+  var TRIP_MAX_STOPS = 10; // the tray's own limit (MAX_STOPS in /scripts/app.js); not changed here
+  function tripSize(){
+    var c = document.getElementById('tripTrayCount');
+    var n = c ? parseInt(c.textContent, 10) : NaN;
+    if (!isNaN(n)) return n;
+    try { var t = JSON.parse(window.localStorage.getItem('okanaganTrip') || '[]'); return Array.isArray(t) ? t.length : 0; } catch (err) { return 0; }
+  }
+  function planStopButtons(){
+    var seen = {}, out = [];
+    Array.prototype.forEach.call(resultEl.querySelectorAll('.trip-btn[data-plan-stop]'), function(b){
+      var n = b.getAttribute('data-trip-name');
+      if (!n || seen[n]) return;
+      seen[n] = true;
+      out.push(b);
+    });
+    return out;
+  }
+  function stopsText(n){ return n === 1 ? '1 stop' : n + ' stops'; }
+  function addAllState(){
+    var stops = planStopButtons();
+    var missing = stops.filter(function(b){ return !b.classList.contains('in-trip'); }).length;
+    var room = Math.max(0, TRIP_MAX_STOPS - tripSize());
+    return { total: stops.length, missing: missing, room: room, state: !stops.length ? 'empty' : !missing ? 'added' : !room ? 'full' : 'ready' };
+  }
+  function refreshAddAll(){
+    var btn = resultEl.querySelector('[data-plan-add-all]');
+    if (!btn) return;
+    var st = addAllState();
+    var label = st.state === 'added' ? '\\u2713 Whole trip in My Trip'
+      : st.state === 'full' ? 'My Trip is full'
+      : st.missing < st.total ? 'Add the remaining ' + stopsText(st.missing) + ' to My Trip'
+      : 'Add whole trip to My Trip';
+    btn.textContent = label;
+    btn.setAttribute('data-state', st.state);
+    btn.setAttribute('aria-disabled', st.state === 'ready' ? 'false' : 'true');
+  }
+  function announce(text){
+    var s = document.getElementById('tripPlanAddAllStatus');
+    if (!s) return;
+    s.textContent = '';
+    setTimeout(function(){ s.textContent = text; }, 40);
+  }
+  function stateMessage(st){
+    if (st.state === 'added') return (st.total === 1 ? 'This stop is' : 'All ' + st.total + ' stops are') + ' already in My Trip \\u2014 nothing new was added.';
+    if (st.state === 'full') return 'My Trip is full (' + TRIP_MAX_STOPS + ' stops), so nothing new was added. Remove a stop from My Trip to make room.';
+    return '';
+  }
+  function addWholeTrip(){
+    var st = addAllState();
+    if (st.state !== 'ready') { announce(stateMessage(st) || 'There are no stops in this plan to add.'); return; }
+    var added = 0, already = 0, noRoom = 0, failed = 0;
+    planStopButtons().forEach(function(b){
+      if (b.classList.contains('in-trip')) { already += 1; return; }
+      if (tripSize() >= TRIP_MAX_STOPS) { noRoom += 1; return; }
+      var before = tripSize();
+      b.click();
+      if (b.classList.contains('in-trip') || tripSize() > before) added += 1; else failed += 1;
+    });
+    refreshAddAll();
+    var msg = 'Added ' + stopsText(added) + ' to My Trip.';
+    if (already) msg += ' ' + (already === 1 ? '1 was' : already + ' were') + ' already there.';
+    if (noRoom) msg += ' ' + stopsText(noRoom) + ' couldn\\u2019t be added because My Trip holds up to ' + TRIP_MAX_STOPS + ' stops \\u2014 remove some to make room.';
+    if (failed) msg += ' ' + stopsText(failed) + ' couldn\\u2019t be added. Please try again.';
+    announce(msg);
+    var view = resultEl.querySelector('[data-plan-view-trip]');
+    if (view && added) view.hidden = false;
+  }
+  function openTripTray(){
+    var toggle = document.getElementById('tripTrayToggle'), panel = document.getElementById('tripTrayPanel');
+    if (toggle && panel && !panel.classList.contains('open')) toggle.click();
+  }
+  // Any change to My Trip elsewhere (a card's Add to trip, a tray remove,
+  // Clear trip) recalculates the button once app.js has handled the click.
+  document.addEventListener('click', function(e){
+    if (e.target.closest && e.target.closest('.trip-btn, .trip-remove, #tripClearBtn')) setTimeout(refreshAddAll, 0);
+  });
+  window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganTrip') refreshAddAll(); });
 
   function currentPins(exceptKey){
     var pins = {};
@@ -13802,6 +13916,10 @@ function renderTripPlannerV2Script() {
   }
 
   resultEl.addEventListener('click', function(e){
+    var addAll = e.target.closest ? e.target.closest('[data-plan-add-all]') : null;
+    if (addAll) { addWholeTrip(); return; }
+    var viewTrip = e.target.closest ? e.target.closest('[data-plan-view-trip]') : null;
+    if (viewTrip) { openTripTray(); return; }
     var replace = e.target.closest ? e.target.closest('[data-replace-id]') : null;
     if (replace) {
       var id = Number(replace.getAttribute('data-replace-id'));
