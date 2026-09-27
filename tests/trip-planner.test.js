@@ -815,3 +815,81 @@ test('hours: closing times written past midnight ("25:00", "26:30") are read as 
   assert.deepEqual(recNames(q), ['XT Late Pub']);
   assert.ok(recBy(q, 'XT Late Pub').reasons.some((r) => r.text === 'Listed hours Thursday: 12:00–02:00'));
 });
+
+// ---- trip overview: headline + "What to expect" for day plans and outings (2026-09-27, Build My Trip Phase 1)
+// Built only from the plan's own stops and the visitor's words; itineraries keep their own text.
+const planStops = (p) => (p.outing ? p.outing.stops : p.days.flatMap((x) => x.stops)).filter((s) => s.venue);
+const OVERVIEW_BANNED = /\b(perfect|atmosphere|award|awards|award-winning|always open|open now|best in|great|stunning|guaranteed|must-see|world[- ]class|scenic|amazing|beautiful|heuristic)\b/i;
+const OVERVIEW_SEASONAL = /\b(swim|swimming|paddl\w*|summer|winter|snow|warm|sunny|weather|season\w*)\b/i;
+const WORD_COUNTS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, a: 1, an: 1 };
+
+test('Phase 1 overview: 2-day golf plan is named from its days, region and golf theme, and counts its real stops', () => {
+  for (const q of ['Plan a golf weekend around Kelowna.', 'Plan a relaxed 2-day golf getaway in Kelowna']) {
+    const p = plan(q);
+    assert.equal(p.kind, 'multi_day');
+    const golf = planStops(p).filter((s) => s.venue.type === 'golf').length;
+    assert.ok(golf >= 1, `${q}: plan includes golf`);
+    assert.match(p.headline, new RegExp(`^A (relaxed )?${p.days.length}-day Kelowna golf getaway$`), p.headline);
+    assert.equal(/relaxed/.test(p.headline), /relaxed/.test(q), `${q}: pace word only when asked`);
+    assert.equal(p.experience.title, 'What to expect');
+    assert.match(p.experience.text, golf === 1 ? /\bA round of golf\b|\ba round of golf\b/ : new RegExp(`\\b${['', 'one', 'two', 'three', 'four', 'five', 'six'][golf]} rounds of golf\\b`, 'i'));
+    assert.match(p.experience.text, /, all in Kelowna\./);
+  }
+});
+
+test('Phase 1 overview: 3 days with kids reads as a family trip; phrases add up to exactly the planned stops', () => {
+  const p = plan('Plan 3 days in Penticton with kids.');
+  assert.match(p.headline, /^A 3-day Penticton .*with the family$/);
+  const stops = planStops(p);
+  const first = p.experience.text.split(/(?<=\.)\s/)[0].replace(/, (all in|across) .*$/, '');
+  const parts = first.split(/, | and /);
+  const total = parts.reduce((n, part) => n + (WORD_COUNTS[part.trim().split(' ')[0].toLowerCase()] || 0), 0);
+  assert.equal(total, stops.length, `"${first}" counts ${total}, plan has ${stops.length}`);
+});
+
+test('Phase 1 overview: a date night outing is named for the occasion; Lake View is only claimed for venues that have the badge', () => {
+  const p = plan('Find me a great date night in Kelowna.');
+  assert.equal(p.kind, 'outing');
+  assert.equal(p.headline, 'A date night in Kelowna');
+  const stops = planStops(p);
+  const lake = stops.filter((s) => byId.get(s.venue.id).features.lake_view);
+  if (!lake.length) assert.doesNotMatch(p.experience.text, /Lake View/);
+  else if (lake.length === stops.length) assert.match(p.experience.text, lake.length === 1 ? new RegExp(`${lake[0].venue.name} has the Lake View badge`) : /Every stop has the Lake View badge/);
+  else assert.match(p.experience.text, /the Lake View badge/);
+});
+
+test('Phase 1 overview: a dog-friendly day plan says so only when every stop is listed as dog friendly', () => {
+  const p = plan('Plan one day in Vernon with my dog');
+  assert.equal(p.kind, 'day_plan');
+  assert.match(p.headline, /^A one-day Vernon .*with your dog$/);
+  const allDog = planStops(p).every((s) => { const f = byId.get(s.venue.id); return f.features.dog_friendly || f.collections.includes('dog_friendly'); });
+  assert.equal(/listed as dog friendly/.test(p.experience.text), allDog);
+});
+
+test('Phase 1 overview: facts only -- no quality adjectives, seasonal or implementation words, on every example', () => {
+  for (const q of EXAMPLES.concat(['Plan 3 days in Penticton with beaches', 'Plan one day in Osoyoos', 'date night in Kelowna tonight'])) {
+    const p = plan(q, { startWeekday: /tonight/.test(q) ? 'fri' : null });
+    if (p.kind === 'multi_day' || p.kind === 'day_plan' || p.kind === 'outing') {
+      for (const t of [p.headline, p.experience.text]) {
+        assert.ok(t && t.length < 220, `${q}: concise`);
+        assert.doesNotMatch(t, OVERVIEW_BANNED, `${q}: "${t}"`);
+        assert.doesNotMatch(t, OVERVIEW_SEASONAL, `${q}: no seasonal claim (day plans are not season-aware): "${t}"`);
+        assert.doesNotMatch(t, /\bAn one\b|\bundefined\b|\bnull\b/, `${q}: "${t}"`);
+      }
+      assert.ok(p.experience.text.split(/(?<=\.)\s/).length <= 2, `${q}: at most two sentences`);
+      for (const r of (planStops(p).map((s) => s.venue.regionLabel))) assert.ok(p.headline.includes(r) || p.experience.text.includes(r) || /Okanagan/.test(p.headline), `${q}: region ${r} named`);
+    } else {
+      assert.ok(!('headline' in p) && !('experience' in p), `${q} (${p.kind}): no overview on this kind`);
+    }
+  }
+});
+
+test('Phase 1 overview: adding it changes nothing else in the plan (same picks, notes, reasons)', () => {
+  for (const q of EXAMPLES) {
+    const p = plan(q);
+    const copy = { ...p }; delete copy.headline; delete copy.experience;
+    const again = plan(q); delete again.headline; delete again.experience;
+    assert.deepEqual(copy, again);
+    assert.ok(Object.keys(copy).every((k) => ['kind', 'summary', 'overview', 'days', 'recommendations', 'outing', 'events', 'notes', 'warnings', 'unsupported', 'needs', 'totalMatches'].includes(k)), `${q}: only the two new fields were added`);
+  }
+});

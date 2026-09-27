@@ -465,3 +465,10 @@ test('Batch B: Regenerate on an itinerary keeps its parts and event stops and ch
   assert.equal(venueStops(regenerated).length, venueStops(noEvent).length, 'no stop is dropped');
   assert.equal(venueStops(regenerated).find((s) => s.label === 'Live music').venue.name, 'Kelowna Music Pub', 'the only live-music place stays');
 });
+
+test('Phase 1 overview: multi-part itineraries keep their own "What to expect" and get no headline', () => {
+  const p = run('wine tasting and live music', { 'live-music': [CONCERT] }).plan;
+  assert.equal(p.kind, 'itinerary');
+  assert.ok(!('headline' in p));
+  assert.equal(p.experience.title, 'What to expect');
+});

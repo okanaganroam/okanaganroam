@@ -1037,6 +1037,88 @@ function buildOverview(kind, ctx, days) {
   };
 }
 
+// ---------- trip overview for day plans and outings (2026-09-27) ----------
+//
+// `headline`: a short name for the generated plan ("A relaxed 2-day Kelowna
+// golf getaway"). `experience`: { title: 'What to expect', text } -- one or two
+// sentences about what the plan holds. Built ONLY from facts already in the
+// plan: the chosen stops' types, regions and parts of the day, the Lake View
+// and dog-friendly facts on those venues, and the visitor's own words (days,
+// pace, occasion, kids, dog). No adjectives about quality, no seasonal,
+// distance, weather or opening claims. Multi-part itineraries keep their own
+// "What to expect" (buildExperience) unchanged.
+// Theme word for the headline when a requested or dominant stop type has one.
+const OVERVIEW_THEME = { golf: 'golf', winery: 'wine', brewery: 'craft beer', distillery: 'distillery', beach: 'beach', outdoor: 'outdoors', cafe: 'cafe', cocktail: 'cocktail' };
+// [one, many] noun phrases per stop type; restaurants are named by meal.
+const OVERVIEW_NOUNS = {
+  golf: ['a round of golf', 'rounds of golf'], winery: ['a winery visit', 'winery visits'], cafe: ['a coffee stop', 'coffee stops'],
+  brewery: ['a craft brewery', 'craft breweries'], pub: ['a pub stop', 'pub stops'], cocktail: ['a cocktail bar', 'cocktail bars'],
+  distillery: ['a distillery tasting', 'distillery tastings'], beach: ['a beach stop', 'beach stops'], outdoor: ['an outdoor stop', 'outdoor stops'],
+};
+// Outing and multi-day nouns for an occasion the visitor named.
+const OVERVIEW_OUTING_NOUN = { date_night: 'date night', romantic: 'romantic evening', celebration: 'celebration', group_getaway: 'group night out', adults: 'adults-only evening' };
+const OVERVIEW_TRIP_NOUN = { relaxing: 'getaway', romantic: 'romantic getaway', celebration: 'celebration', group_getaway: 'group getaway', adventure: 'adventure trip', adults: 'adults-only trip' };
+// "A one-day ..." (the article helper would say "an" before any vowel).
+const overviewArticle = (phrase) => (/^one\b/i.test(phrase) ? `A ${phrase}` : article(phrase, true));
+const OVERVIEW_MEALS = { morning: ['breakfast', 'breakfasts'], midday: ['a lunch', 'lunches'], afternoon: ['a lunch', 'lunches'], evening: ['a dinner', 'dinners'] };
+function overviewStops(result) {
+  if (result.outing) return result.outing.stops.filter((s) => s.venue);
+  return result.days.flatMap((d) => d.stops.filter((s) => s.venue));
+}
+function overviewCount(n, [one, many]) {
+  if (n === 1) return one;
+  return `${COUNT_WORDS[n] || n} ${many}`;
+}
+function buildPlanOverview(kind, result, ctx, facts) {
+  const stops = overviewStops(result);
+  if (!stops.length) return { headline: null, experience: null };
+  const byId = new Map(facts.map((v) => [v.id, v]));
+  const factOf = (s) => byId.get(s.venue.id) || null;
+  const towns = Array.from(new Set(stops.map((s) => s.venue.regionLabel).filter(Boolean)));
+  const where = towns.length === 1 ? towns[0] : towns.length === 2 ? `${towns[0]} and ${towns[1]}` : 'Okanagan';
+  // Theme: a requested type the plan actually includes, else a non-food type
+  // that makes up at least half of the stops.
+  const counts = {};
+  for (const s of stops) counts[s.venue.type] = (counts[s.venue.type] || 0) + 1;
+  const requested = Object.keys(OVERVIEW_THEME).filter((t) => ctx.types.has(t) && counts[t]);
+  const dominant = Object.keys(OVERVIEW_THEME).filter((t) => t !== 'cafe' && counts[t] * 2 >= stops.length).sort((a, b) => counts[b] - counts[a]);
+  const themeType = requested.length === 1 ? requested[0] : (requested.length === 0 && dominant.length ? dominant[0] : null);
+  const theme = themeType ? OVERVIEW_THEME[themeType] : null;
+  const pace = ctx.pace === 'relaxed' ? 'relaxed' : ctx.pace === 'packed' ? 'full' : null;
+  const party = ctx.kids ? ' with the family' : ctx.dog ? ' with your dog' : '';
+  let headline;
+  if (kind === 'outing') {
+    const noun = (ctx.occasion && OVERVIEW_OUTING_NOUN[ctx.occasion]) || 'outing';
+    headline = `${overviewArticle(noun)} in ${where}${party}`;
+  } else {
+    const days = result.days.length;
+    const length = days === 1 ? 'one-day' : `${days}-day`;
+    const noun = theme && days > 1 ? 'getaway' : ((ctx.occasion && OVERVIEW_TRIP_NOUN[ctx.occasion]) || 'trip');
+    headline = `${overviewArticle([pace, length, where, theme, noun].filter(Boolean).join(' '))}${party}`;
+  }
+  // What the plan holds, counted from the stops: restaurants by meal, the
+  // rest by type, in order of first appearance.
+  const phrases = new Map();
+  for (const s of stops) {
+    let key, forms;
+    if (s.venue.type === 'restaurant') { const meal = OVERVIEW_MEALS[s.daypart] || ['a meal', 'meals']; key = `meal:${meal[1]}`; forms = meal; }
+    else { key = s.venue.type; forms = OVERVIEW_NOUNS[s.venue.type] || ['a stop', 'stops']; }
+    if (!phrases.has(key)) phrases.set(key, { forms, n: 0 });
+    phrases.get(key).n += 1;
+  }
+  const list = Array.from(phrases.values()).map((p) => overviewCount(p.n, p.forms));
+  const placeText = towns.length === 1 ? `, all in ${towns[0]}` : towns.length > 1 ? `, across ${listText(towns)}` : '';
+  const sentences = [`${cap(listText(list))}${placeText}.`];
+  // One optional second sentence, from facts on the chosen venues.
+  const venues = stops.map(factOf).filter(Boolean);
+  const dogOk = (v) => v.features.dog_friendly || v.collections.includes('dog_friendly');
+  const lake = stops.filter((s) => { const v = factOf(s); return v && v.features.lake_view; }).map((s) => s.venue.name);
+  if (ctx.dog && venues.length === stops.length && venues.every(dogOk)) sentences.push(stops.length > 1 ? 'Every stop is listed as dog friendly, so your dog can come along.' : 'It’s listed as dog friendly, so your dog can come along.');
+  else if (lake.length === 1) sentences.push(`${lake[0]} has the Lake View badge.`);
+  else if (lake.length > 1) sentences.push(`${lake.length === stops.length ? 'Every stop has' : `${cap(COUNT_WORDS[lake.length] || String(lake.length))} of the stops have`} the Lake View badge.`);
+  return { headline, experience: { title: EXPERIENCE_TITLE, text: sentences.join(' ') } };
+}
+
 // ---------- entry point ----------
 //
 // planTrip({ intent, facts, labels, seed, excludeIds, avoidIds, pinned, events })
@@ -1090,6 +1172,7 @@ function planTrip(input) {
     const routeRegions = uniqRegions(plan.days);
     if (!ctx.regions.length && routeRegions.length > 1) result.notes.push(`No single region was given, so the plan moves through ${listText(routeRegions.map((r) => regionLabel(ctx, r)))} from north to south.`);
     scheduleNotes(result, ctx);
+    Object.assign(result, buildPlanOverview(kind, result, ctx, facts));
     return result;
   }
   if (kind === 'outing') {
@@ -1098,6 +1181,7 @@ function planTrip(input) {
     result.overview = buildOverview(kind, ctx, null);
     if (!ctx.regions.length) result.notes.push('No region was given, so these stops were chosen in the same community, anywhere in the valley.');
     scheduleNotes(result, ctx);
+    Object.assign(result, buildPlanOverview(kind, result, ctx, facts));
     return result;
   }
   const rec = buildRecommendations(facts, ctx);
