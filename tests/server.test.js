@@ -4512,7 +4512,7 @@ test('Batch 4B Events: app.js loads before the inline Favorite / Add to Trip scr
   }
 });
 
-test('Batch 4B Events: head, noindex and analytics are unchanged; text keeps a 72ch measure on the event page only', () => {
+test('Batch 4B Events: head and noindex are unchanged (GA4 tag since Measurement Phase A); text keeps a 72ch measure on the event page only', () => {
   const pages = Object.fromEntries(batch4bEventPages());
   for (const [kind, html] of Object.entries(pages)) {
     const head = html.split('</head>')[0];
@@ -4521,7 +4521,10 @@ test('Batch 4B Events: head, noindex and analytics are unchanged; text keeps a 7
     assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/events\/test-[a-z-]+">/, kind);
     assert.match(head, /<meta property="og:url" content="https:\/\/okanaganroam\.com\/kelowna\/events\/test-[a-z-]+">/, kind);
     assert.match(head, /"@type":"BreadcrumbList"/, kind);
-    assert.doesNotMatch(html, /googletagmanager|gtag\(|window\.trackEvent =|data-track=/, `${kind}: no analytics`);
+    // Measurement Phase A (2026-09-27): the GA4 tag, labelled page_type "event"; still no tracked links.
+    assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, `${kind}: one GA4 tag`);
+    assert.ok(head.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'event' });"), `${kind}: page_type event`);
+    assert.doesNotMatch(html, /data-track=/, `${kind}: no tracked links`);
     assert.match(html, /body\.golf-page\.event-page \.golf-main > p,\s*body\.golf-page\.event-page \.golf-main > \.detail-row \{ max-width: 72ch; \}/, `${kind}: 72ch measure`);
   }
   assert.doesNotMatch(pages.active, /name="robots"/, 'active event stays indexable');
@@ -4561,7 +4564,7 @@ test('Batch 4B Guides: guide pages render the themed shell around unchanged cont
   assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), 'footer after <main>');
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.equal((main.match(/<li class="venue-card"/g) || []).length, venues.length, 'every venue still listed');
-  // Head unchanged: title, canonical, indexable, ItemList covering every venue, no analytics.
+  // Head unchanged: title, canonical, indexable, ItemList covering every venue (plus the GA4 tag since Measurement Phase A).
   const head = html.split('</head>')[0];
   assert.match(head, /<title>Patio Venues in Kelowna, BC \| Okanagan Roam<\/title>/);
   assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guide\/kelowna\/patio">/);
@@ -4569,7 +4572,10 @@ test('Batch 4B Guides: guide pages render the themed shell around unchanged cont
   const ld = [...head.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
   assert.deepEqual(ld.map((b) => b['@type']), ['BreadcrumbList', 'ItemList']);
   assert.equal(ld[1].itemListElement.length, venues.length);
-  assert.doesNotMatch(html, /googletagmanager|gtag\(|window\.trackEvent =|data-track=/, 'no analytics');
+  // Measurement Phase A (2026-09-27): the GA4 tag, labelled page_type "guide"; still no tracked links.
+  assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, 'one GA4 tag');
+  assert.ok(head.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'guide' });"), 'page_type guide');
+  assert.doesNotMatch(html, /data-track=/, 'no tracked links');
 });
 
 test('Batch 4B Guides: golf cards keep Favorite / Add to Trip with canonical labels and the existing card script; other cards gain no actions', () => {
@@ -6099,7 +6105,7 @@ test('Golf category pages (region + Okanagan-wide) carry the GA4 snippet, trackE
   const allHtml = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory ? app.getVenuesByCategory('golf') : kelownaGolf);
   for (const html of [regionHtml, allHtml]) {
     assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
-    assert.match(html, /gtag\('config', 'G-J312FGJPSC'\)/);
+    assert.match(html, /gtag\('config', 'G-J312FGJPSC', \{ page_type: '(category|hub)' \}\)/);
     assert.match(html, /window\.trackEvent = function\(name, params\)/);
     assert.match(html, /\.venue-card\[data-venue-category="golf"\]/);
     assert.match(html, /'description_expand'/);
@@ -6111,10 +6117,12 @@ test('Golf category pages (region + Okanagan-wide) carry the GA4 snippet, trackE
   assert.match(regionHtml, /<h2 class="category-subsection-heading">Kelowna Indoor Golf &amp; Simulators<\/h2>/);
 });
 
-test('REGRESSION: non-Golf category pages get no analytics snippet or engagement script', () => {
+test('REGRESSION: non-Golf category pages get the GA4 tag (Measurement Phase A) but no golf engagement script', () => {
   const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
   const html = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
-  assert.doesNotMatch(html, /googletagmanager|window\.trackEvent|description_expand|venue_impression|data-venue-category="golf" data-venue-name/);
+  assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
+  assert.ok(html.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'category' });"));
+  assert.doesNotMatch(html, /description_expand|venue_impression|data-venue-category="golf" data-venue-name/);
 });
 
 test('Golf venue page tags website/directions/phone links with data-track and ships the venue engagement script', () => {
@@ -6355,10 +6363,12 @@ test('REGRESSION: themed venue polish is confined to themed-shell venue pages (w
   }
 });
 
-test('REGRESSION: non-Golf venue pages carry no data-track attributes, analytics snippet, or engagement script', () => {
+test('REGRESSION: non-Golf venue pages carry the GA4 tag (Measurement Phase A) but no data-track attributes or engagement script', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'); // has phone, address, coords
   const html = app.renderVenuePage(venue, [], [], []);
-  assert.doesNotMatch(html, /data-track=|googletagmanager|window\.trackEvent|venue_view|outbound_click/);
+  assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
+  assert.ok(html.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'venue' });"));
+  assert.doesNotMatch(html, /data-track=|venue_view|outbound_click/);
   assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>/);
 });
 
@@ -6405,7 +6415,7 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
   }
 });
 
-test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; no Favorite / Add to Trip, analytics or tracking', () => {
+test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; no Favorite / Add to Trip or tracking (GA4 tag since Measurement Phase A)', () => {
   for (const type of BATCH4A_FD_TYPES) {
     const venue = batch4aVenue(type);
     const html = app.renderVenuePage(venue, [], [], []);
@@ -6432,10 +6442,12 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.match(html, /<div class="venue-cta-row">\s*<a class="cta secondary" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.888,-119\.496" rel="nofollow noopener" target="_blank">Get Directions<\/a>\s*<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>\s*<\/div>/, `${type}: CTA row unchanged`);
     assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
     assert.match(html, /<h2>Good to Know<\/h2>/);
-    // No Favorite / Add to Trip, analytics or tracking.
+    // No Favorite / Add to Trip or tracking. Measurement Phase A (2026-09-27) adds only the GA4 tag.
     const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '');
     assert.doesNotMatch(markup, /class="[^"]*\b(fav-btn|trip-btn|card-action)\b|data-venue-category=|data-venue-id=|data-surface=/, `${type}: no Favorite / Add to Trip`);
-    assert.doesNotMatch(html, /googletagmanager|gtag\(|window\.trackEvent|venue_view|outbound_click|data-track=/, `${type}: no analytics`);
+    assert.equal((head.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, `${type}: one GA4 tag`);
+    assert.ok(head.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'venue' });"), `${type}: page_type venue`);
+    assert.doesNotMatch(html, /venue_view|outbound_click|data-track=/, `${type}: no engagement events or tracked links`);
     assert.doesNotMatch(markup, /okanaganFavorites/, `${type}: no standalone engagement script`);
   }
 });
@@ -6444,7 +6456,11 @@ test('Batch 4A: winery venue pages keep the old shell and their standalone Favor
   const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
   assert.match(html, /<body>/);
   assert.match(html, /<header class="top">\s*<a class="brand" href="https:\/\/okanaganroam\.com\/">Okanagan Roam<\/a>\s*<a href="https:\/\/okanaganroam\.com\/">Explore the full directory →<\/a>/);
-  assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<main |<script src="\/scripts\/app\.js">|googletagmanager|Hero: same per-type gradient/);
+  assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<main |<script src="\/scripts\/app\.js">|Hero: same per-type gradient/);
+  // Measurement Phase A (2026-09-27): the GA4 tag only; links stay untracked.
+  assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
+  assert.ok(html.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'venue' });"));
+  assert.doesNotMatch(html, /data-track=/);
   assert.match(html, /<span class="venue-hero-name">Test Winery<\/span>/);
   assert.match(html, /<div class="venue-header">\s*<h1>Test Winery<\/h1>/);
   assert.match(html, /data-venue-category="winery"/);
@@ -12032,4 +12048,104 @@ test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
   assert.match(appJs, /var MAX_STOPS = 10;/);
   assert.equal(wholeTripHarness([]).TRIP_MAX_STOPS, 10);
+});
+
+// ==== Measurement Phase A (2026-09-27): GA4 on every public server template ====
+//
+// Every public server-rendered template loads the one existing GA4 tag and
+// labels its hits with a fixed page_type, passed as a 'config' parameter
+// (the only form GA4 actually transmits for a custom parameter).
+// No new events, no engagement scripts, no tracked links. The homepage and
+// /browse serve okanagan.html and are untouched.
+const GA4_TAG_RE = /<script async src="https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC"><\/script>/g;
+const ga4Check = (html, pageType, label) => {
+  const head = html.split('</head>')[0];
+  assert.equal((html.match(GA4_TAG_RE) || []).length, 1, `${label}: exactly one GA4 loader`);
+  assert.equal((html.match(/gtag\('config', 'G-J312FGJPSC'/g) || []).length, 1, `${label}: exactly one config`);
+  assert.equal((html.match(/window\.trackEvent = function\(name, params\)/g) || []).length, 1, `${label}: exactly one trackEvent wrapper`);
+  assert.equal((html.match(/page_type: '[a-z_]+'/g) || []).length, 1, `${label}: exactly one page_type`);
+  assert.ok(head.includes(`gtag('js', new Date());\n  gtag('config', 'G-J312FGJPSC', { page_type: '${pageType}' });`), `${label}: page_type ${pageType} as a config parameter, inside <head>`);
+  assert.doesNotMatch(html, /gtag\('set'/, `${label}: no gtag(set)`);
+};
+
+test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'trip', 'venue']);
+  for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
+  for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
+});
+
+test('Measurement Phase A: every venue type, event, guide, winery category and golf/outdoor template carries one GA4 tag with the right page_type', () => {
+  for (const type of ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery', 'golf']) {
+    const venue = type === 'winery' ? app.findVenueBySlug('kelowna', 'winery', 'test-winery')
+      : type === 'golf' ? app.findVenueBySlug('kelowna', 'golf', 'test-golf-course')
+      : { ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), type };
+    ga4Check(app.renderVenuePage(venue, [], [], []), 'venue', `venue:${type}`);
+  }
+  for (const [kind, html] of batch4bEventPages()) ga4Check(html, 'event', `event:${kind}`);
+  ga4Check(app.renderGuidePage('kelowna', 'patio', batch4bGuideVenues()), 'guide', 'guide');
+  ga4Check(app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []), 'category', 'category:winery');
+  ga4Check(app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []), 'category', 'category:golf');
+  ga4Check(app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf')), 'hub', 'hub:golf');
+  ga4Check(app.renderTripPlannerPage(false), 'trip', 'trip v1');
+  ga4Check(app.renderTripPlannerPage(true), 'trip', 'trip v2');
+  ga4Check(app.render404Page('/no/such/page'), 'not_found', '404');
+});
+
+test('Measurement Phase A: GA4 adds no tracked links, engagement scripts or visitor-supplied values', () => {
+  // Pages that had no engagement markup before still have none.
+  const fd = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+  assert.doesNotMatch(fd, /data-track=|venue_view|outbound_click|okanaganFavorites/);
+  for (const [, html] of batch4bEventPages()) assert.doesNotMatch(html, /data-track=|event_view|venue_view/);
+  const trip = app.renderTripPlannerPage(true);
+  for (const name of ['trip_plan_start', 'trip_plan_complete', 'trip_plan_regenerate', 'add_whole_trip', 'open_my_trip', 'listing_submit', 'event_view'])
+    assert.ok(!trip.includes(name) && !fd.includes(name), `${name} is a later phase`);
+  // The analytics block never echoes the request path (404 of an attacker-shaped URL).
+  const nf = app.render404Page("/%3Cscript%3E'x");
+  const block = nf.slice(nf.indexOf('<script async src="https://www.googletagmanager.com'), nf.indexOf('</head>'));
+  assert.doesNotMatch(block, /%3C|<script>'x|\/%3Cscript/);
+});
+
+test('Measurement Phase A: the homepage and /browse still serve okanagan.html\'s own GA4 snippet, unchanged, with no page_type (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4a-'));
+  const projectRoot = path.join(__dirname, '..');
+  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
+  const port = 3597;
+  const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
+  const get = async (p) => { const r = await fetch(`http://localhost:${port}${p}`); return { status: r.status, text: await r.text() }; };
+  try {
+    let ready = false;
+    for (let i = 0; i < 100 && !ready; i++) {
+      try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready, 'child server started');
+    const siteHtml = fs.readFileSync(path.join(projectRoot, 'okanagan.html'), 'utf8');
+    const snippet = siteHtml.slice(siteHtml.indexOf('<!-- Google Analytics (GA4) -->'), siteHtml.indexOf('</head>'));
+    assert.ok(snippet.length > 100, 'okanagan.html snippet found');
+    for (const p of ['/', '/browse']) {
+      const r = await get(p);
+      assert.equal(r.status, 200, p);
+      assert.ok(r.text.includes(snippet), `${p}: okanagan.html's own snippet, byte-for-byte`);
+      assert.equal((r.text.match(GA4_TAG_RE) || []).length, 1, `${p}: one GA4 loader`);
+      assert.doesNotMatch(r.text, /page_type/, `${p}: no page_type`);
+    }
+    // Routed server templates, end to end.
+    const routes = { '/kelowna': 'region', '/destinations': 'hub', '/categories': 'hub', '/wineries': 'hub', '/food-drink': 'hub', '/dog-friendly': 'hub', '/hidden-gems': 'hub', '/whats-on': 'hub',
+      '/kelowna/restaurants': 'category', '/kelowna/wineries': 'category', '/trip': 'trip', '/list-your-venue': 'listing_form', '/list-an-event': 'listing_form', '/no-such-page': 'not_found' };
+    // Which fixture pages exist depends on the rows earlier tests left in the
+    // copied DB, so a listing route that 404s here must be tagged not_found;
+    // every 200 must carry its own page_type.
+    let ok = 0;
+    for (const [p, t] of Object.entries(routes)) {
+      const r = await get(p);
+      if (t === 'not_found') assert.equal(r.status, 404, p);
+      assert.ok(r.status === 200 || r.status === 404, `${p}: ${r.status}`);
+      ga4Check(r.text, r.status === 200 ? t : 'not_found', p);
+      if (r.status === 200) ok++;
+    }
+    assert.ok(ok >= 8, `most routed templates rendered (${ok})`);
+  } finally {
+    child.kill('SIGKILL');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });

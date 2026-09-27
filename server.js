@@ -4945,6 +4945,7 @@ function renderGuidePage(region, badge, venues) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true })}
+${renderAnalyticsHeadHtml('guide')}
 </head>
 <body class="golf-page guide-page">
   ${renderGolfTripTrayHtml()}
@@ -6793,15 +6794,30 @@ const SEO_PAGE_CSS = `
 // Golf category and Golf venue pages only, so venue-level engagement
 // (impressions, description expansions, website/phone/directions clicks)
 // lands in the existing GA4 property rather than a second system.
+// (Since Measurement Phase A the tag itself is on every public server
+// template -- see GA4_PAGE_TYPES below; the golf-era engagement scripts
+// keep their original scope.)
 const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 
-function renderAnalyticsHeadHtml() {
+// GA4 page-type coverage (Measurement Phase A, 2026-09-27). Every public
+// server-rendered template now loads the tag above and labels its hits with
+// a page_type, passed as a 'config' parameter: GA4 then attaches it to the
+// automatic page_view and to every later event from this tag (verified on
+// the wire; a separate gtag('set') is NOT transmitted for custom params).
+// Values are fixed strings from this set -- never derived from the URL or
+// from anything a visitor typed. The
+// homepage and /browse are not server templates (they serve okanagan.html
+// unchanged) and are untouched by this.
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'listing_form', 'not_found']);
+
+function renderAnalyticsHeadHtml(pageType) {
+  if (!GA4_PAGE_TYPES.has(pageType)) throw new Error(`renderAnalyticsHeadHtml: unknown page_type "${pageType}"`);
   return `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){ dataLayer.push(arguments); }
   gtag('js', new Date());
-  gtag('config', '${GA4_MEASUREMENT_ID}');
+  gtag('config', '${GA4_MEASUREMENT_ID}', { page_type: '${pageType}' });
   window.trackEvent = function(name, params){
     try {
       if (typeof gtag === 'function') gtag('event', name, params || {});
@@ -6810,8 +6826,8 @@ function renderAnalyticsHeadHtml() {
 </script>`;
 }
 
-function golfEngagementHeadHtml(type, themed = usesThemedCategoryLayout(type)) {
-  return themed ? renderAnalyticsHeadHtml() : '';
+function golfEngagementHeadHtml(type, themed = usesThemedCategoryLayout(type), pageType) {
+  return themed ? renderAnalyticsHeadHtml(pageType) : '';
 }
 
 // Shared Favorite / Add to Trip behaviour for Golf pages (2026-09-19).
@@ -8403,7 +8419,7 @@ ${upcomingEvents.map((e) => {
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 ${renderOutdoorThemeStyles()}
 ${renderDestinationCategoryStyles()}
-${golfEngagementHeadHtml('fd', true)}
+${golfEngagementHeadHtml('fd', true, 'region')}
 </head>
 <body class="golf-page outdoor-page region-page">
   ${renderGolfTripTrayHtml()}
@@ -8634,7 +8650,7 @@ function renderDestinationsPage(entries = destinationRegionEntries()) {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 ${renderOutdoorThemeStyles()}
-${golfEngagementHeadHtml('fd', true)}
+${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page region-page destinations-page">
   ${renderGolfTripTrayHtml()}
@@ -8715,7 +8731,7 @@ function renderCategoriesPage(entries = categoryDirectoryEntries()) {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 ${renderOutdoorThemeStyles()}
-${golfEngagementHeadHtml('fd', true)}
+${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page region-page categories-page">
   ${renderGolfTripTrayHtml()}
@@ -8892,7 +8908,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, golfDataStyles: golfDetails.size > 0 })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
-${golfEngagementHeadHtml(type)}
+${golfEngagementHeadHtml(type, true, 'category')}
 </head>
 <body${themedBodyClassAttr(type)}>
   ${usesThemedCategoryLayout(type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
@@ -9623,7 +9639,7 @@ function renderOutdoorActivityPage(activity, venues) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, outdoorTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
-${golfEngagementHeadHtml('outdoor')}
+${golfEngagementHeadHtml('outdoor', true, 'category')}
 </head>
 <body${themedBodyClassAttr('outdoor')}>
   ${renderGolfTripTrayHtml()}
@@ -9795,7 +9811,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0 })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
-${golfEngagementHeadHtml(type, hubThemed)}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
+${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
   ${hubThemed ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
@@ -10555,7 +10571,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: t
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
-${golfEngagementHeadHtml('fd', true)}
+${golfEngagementHeadHtml('fd', true, 'category')}
 </head>
 <body class="golf-page outdoor-page fd-page fd-scoped-page">
   ${renderGolfTripTrayHtml()}
@@ -10666,7 +10682,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: t
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
-${golfEngagementHeadHtml('fd', true)}
+${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page fd-page">
   ${renderGolfTripTrayHtml()}
@@ -11259,7 +11275,7 @@ function renderDogHubPage(venues, filter = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${renderOutdoorThemeStyles()}
 ${renderDogHubStyles()}
-${golfEngagementHeadHtml('dog', true)}
+${golfEngagementHeadHtml('dog', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page dog-page">
   ${renderGolfTripTrayHtml()}
@@ -11623,7 +11639,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
 ${renderOutdoorThemeStyles()}
 ${renderLocalFavouritesStyles()}
-${golfEngagementHeadHtml('lf', true)}
+${golfEngagementHeadHtml('lf', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page lf-page">
   ${renderGolfTripTrayHtml()}
@@ -12460,7 +12476,7 @@ function renderWhatsOnPage(filter = null) {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, outdoorTheme: true, noindex: !hasInventory })}
 ${renderWhatsOnStyles()}
-${renderAnalyticsHeadHtml()}
+${renderAnalyticsHeadHtml('hub')}
 </head>
 <body class="golf-page outdoor-page whatson-page">
   ${renderGolfTripTrayHtml()}
@@ -12733,7 +12749,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !usesThemedCategoryLayout(venue.type) ? '\n' + renderEngagementControlStyles() : ''}
-${golfEngagementHeadHtml(venue.type)}
+${golfEngagementHeadHtml(venue.type, true, 'venue')}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
@@ -12978,6 +12994,7 @@ ${related.map((r) => {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { noindex: expired, golfTheme: true })}
+${renderAnalyticsHeadHtml('event')}
 <style>
   /* Batch 4B (2026-09-27): the event page uses the themed shell, whose
      <main> is full width; its running text keeps a readable measure (the
@@ -14057,6 +14074,7 @@ ${JSON.stringify(breadcrumb)}
 <link rel="stylesheet" href="/styles/app.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 ${renderTripPlannerStyles()}${v2 ? '\n' + renderTripPlannerV2Styles() : ''}
+${renderAnalyticsHeadHtml('trip')}
 </head>
 <body class="page-trip">
 ${tripTrayHtml}
@@ -14146,6 +14164,7 @@ function render404Page(pathname) {
 <html lang="en">
 <head>
 ${pageHead('Page Not Found | Okanagan Roam', "We couldn't find a venue or page at that address.", null, [], { noindex: true, golfTheme: true })}
+${renderAnalyticsHeadHtml('not_found')}
 <style>
   body.golf-page .not-found-main { text-align: center; padding-top: 56px; padding-bottom: 88px; }
   body.golf-page .not-found-main a.app-btn { min-height: 44px; padding: 10px 24px; text-decoration: none; }
@@ -15015,7 +15034,7 @@ function renderListYourVenuePage() {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
-${golfEngagementHeadHtml('fd', true)}
+${golfEngagementHeadHtml('fd', true, 'listing_form')}
 <style>
   body.list-venue-page .list-venue { padding: 12px 0 40px; }
   body.list-venue-page .list-venue-head { margin-bottom: 28px; }
@@ -15648,7 +15667,7 @@ function renderListAnEventPage(now = new Date()) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
-${golfEngagementHeadHtml('fd', true)}
+${golfEngagementHeadHtml('fd', true, 'listing_form')}
 <style>
   body.list-event-page .list-venue { padding: 12px 0 40px; }
   body.list-event-page .list-venue-head { margin-bottom: 28px; }
@@ -18124,6 +18143,9 @@ module.exports = {
   FD_HUB_TYPES,
   FD_PAGE_SIZE,
   golfCardEngagementScriptHtml,
+  // Measurement Phase A
+  renderAnalyticsHeadHtml,
+  GA4_PAGE_TYPES,
   FD_HUB_FEATURES,
   getFoodDrinkHubVenues,
   parseFoodDrinkFilterQuery,
