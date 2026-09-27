@@ -435,3 +435,33 @@ test('event names read naturally: "the" only before names that are a kind of eve
   assert.match(plan.experience.text, /head to Skillful\./);
   assert.ok(!/the Skillful/.test(plan.experience.text));
 });
+
+// ---- Batch B (2026-09-27, T-H1): Regenerate on a multi-part itinerary -------
+// The /trip client now sends the itinerary's venue stops as avoidVenueIds on
+// Regenerate (as it already did for day plans and outings). The planner keeps
+// the itinerary itself -- the same parts, in the same order, and the same
+// event stops -- and suggests other places where there are any; avoid is a
+// ranking penalty, so a part with a single match keeps it rather than going
+// empty.
+test('Batch B: Regenerate on an itinerary keeps its parts and event stops and changes the places it can', () => {
+  const q = 'wine tasting and live music';
+  const intent = d.interpretDiscoveryQuery(q, TAXONOMY);
+  const trip = d.interpretTripComponents(q, TAXONOMY, intent);
+  const tripEvents = trip.components.map((c) => (c.kind === 'event' ? [CONCERT] : null));
+  const first = tp.planTrip({ intent, trip, tripEvents, facts: FACTS, labels: LABELS, seed: 0 });
+  const shown = first.itinerary.stops.filter((s) => s.kind !== 'event' && s.venue).map((s) => s.venue.id);
+  assert.ok(shown.length >= 1);
+  const again = tp.planTrip({ intent, trip, tripEvents, facts: FACTS, labels: LABELS, seed: 1, avoidIds: shown });
+  assert.equal(again.kind, 'itinerary');
+  assert.deepEqual(again.itinerary.stops.map((s) => [s.kind, s.label]), first.itinerary.stops.map((s) => [s.kind, s.label]), 'same parts, same order');
+  assert.deepEqual(again.itinerary.stops.filter((s) => s.kind === 'event').map((s) => s.event.id), [CONCERT.id], 'the event stop is kept');
+  const winery = (p) => p.itinerary.stops.find((s) => s.kind === 'venue').venue;
+  assert.notEqual(winery(again).id, winery(first).id, 'another winery is suggested');
+  assert.equal(winery(again).type, 'winery', 'still answers the same part');
+  // A part with a single possible match keeps its stop instead of going empty.
+  const noEvent = run(q).plan;
+  const avoidAll = venueStops(noEvent).map((s) => s.venue.id);
+  const regenerated = tp.planTrip({ intent, trip, tripEvents: trip.components.map(() => null), facts: FACTS, labels: LABELS, seed: 1, avoidIds: avoidAll });
+  assert.equal(venueStops(regenerated).length, venueStops(noEvent).length, 'no stop is dropped');
+  assert.equal(venueStops(regenerated).find((s) => s.label === 'Live music').venue.name, 'Kelowna Music Pub', 'the only live-music place stays');
+});

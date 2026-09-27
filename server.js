@@ -13504,7 +13504,7 @@ function renderTripPlannerV2Styles() {
   .trip-plan-empty { font-size: 0.92rem; color: var(--ink); }
   .trip-plan-route { margin: 0 0 12px; font-size: 0.86rem; font-weight: 700; color: var(--ink); opacity: 0.75; }
   .trip-plan-experience { margin: 16px 0 4px; padding: 12px 16px; border-left: 3px solid var(--ref-gold, #C9A227); background: var(--paper); border-radius: 0 10px 10px 0; }
-  .trip-plan-experience p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--ink); }
+  .trip-plan-experience p:not(.trip-plan-eyebrow) { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--ink); }
   .trip-plan-experience .trip-plan-eyebrow { margin-bottom: 4px; }
   </style>`;
 }
@@ -13661,6 +13661,10 @@ function renderTripPlannerV2Script() {
     var ids = [], p = state.last || {};
     (p.days || []).forEach(function(d){ d.stops.forEach(function(s){ if (s.venue) ids.push(s.venue.id); }); });
     ((p.outing && p.outing.stops) || []).forEach(function(s){ if (s.venue) ids.push(s.venue.id); });
+    // Batch B (T-H1): a multi-part itinerary's venue stops count as shown too,
+    // so Regenerate asks for other places, as it does for every other plan.
+    // Event stops are not venues and are kept by the planner.
+    ((p.itinerary && p.itinerary.stops) || []).forEach(function(s){ if (s.kind !== 'event' && s.venue) ids.push(s.venue.id); });
     (p.recommendations || []).forEach(function(s){ ids.push(s.venue.id); });
     return ids.slice(0, 200);
   }

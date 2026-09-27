@@ -11770,3 +11770,32 @@ test('Batch A (P-005): listGuideCombos equals the per-region, per-badge COUNT qu
   }
   assert.ok(app.listGuideCombos(1).length > 0, 'fixture has badge combos');
 });
+
+// ==== Batch B (2026-09-27): Build My Trip correctness =======================
+test('Batch B (T-H1): the /trip Regenerate treats an itinerary\'s venue stops as shown (events excluded), like every other plan', () => {
+  const page = app.renderTripPlannerPage(true);
+  const src = page.match(/function shownIds\(\)\{[\s\S]*?\n  \}/);
+  assert.ok(src, 'shownIds() is on the planner page');
+  const shownIdsFor = (plan) => new Function('state', `${src[0]}; return shownIds();`)({ last: plan });
+  const itinerary = { kind: 'itinerary', itinerary: { stops: [
+    { kind: 'venue', label: 'Wineries', venue: { id: 11 } },
+    { kind: 'event', label: 'Live music', event: { id: 901, name: 'Concert' } },
+    { kind: 'venue', label: 'Dinner', venue: { id: 12 } },
+  ] } };
+  assert.deepEqual(shownIdsFor(itinerary), [11, 12]);
+  // The other plan kinds are unchanged.
+  assert.deepEqual(shownIdsFor({ kind: 'multi_day', days: [{ day: 1, stops: [{ venue: { id: 1 } }, { venue: null }, { venue: { id: 2 } }] }] }), [1, 2]);
+  assert.deepEqual(shownIdsFor({ kind: 'outing', outing: { stops: [{ venue: { id: 3 } }] } }), [3]);
+  assert.deepEqual(shownIdsFor({ kind: 'discover', recommendations: [{ venue: { id: 4 } }] }), [4]);
+  // Regenerate still sends them as avoidVenueIds with a new seed.
+  assert.match(page, /state\.seed \+= 1;\s*request\(\{ avoidVenueIds: shownIds\(\) \}\);/);
+});
+
+test('Batch B (K-007): the experience eyebrow keeps its eyebrow typography (not overridden by the paragraph rule)', () => {
+  const page = app.renderTripPlannerPage(true);
+  assert.match(page, /\.trip-plan-eyebrow \{ margin: 0 0 4px; font-size: 0\.72rem; font-weight: 800; letter-spacing: 0\.06em; text-transform: uppercase; color: var\(--teal-deep\); \}/);
+  assert.match(page, /\.trip-plan-experience p:not\(\.trip-plan-eyebrow\) \{ margin: 0; font-size: 0\.92rem; line-height: 1\.55; color: var\(--ink\); \}/);
+  assert.doesNotMatch(page, /\.trip-plan-experience p \{/, 'no bare paragraph rule left to outrank the eyebrow');
+  // The eyebrow markup itself is unchanged.
+  assert.match(page, /'<div class="trip-plan-experience"><p class="trip-plan-eyebrow">' \+ esc\(p\.experience\.title\) \+ '<\/p><p>' \+ esc\(p\.experience\.text\) \+ '<\/p><\/div>'/);
+});

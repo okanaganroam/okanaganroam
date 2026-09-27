@@ -68,6 +68,25 @@ const OCCASION_LABELS = {
   celebration: 'celebration', group_getaway: 'group getaway', relaxing: 'relaxing getaway', adventure: 'adventure', adults: 'adults-only trip',
 };
 const OCCASION_DEFAULT_PACE = { relaxing: 'relaxed', adventure: 'packed' };
+// Visitor-facing notes for an occasion (Batch B, 2026-09-27). The discovery
+// module's own notes (intent.heuristics, also returned by /api/discover) are
+// written for developers ("Heuristic: ..."); plans show these instead. Same
+// honesty: each says what the picks are based on, and which badge is the
+// one Okanagan Roam verifies, without implementation words.
+const OCCASION_VISITOR_NOTES = {
+  date_night: 'Picked with a date night in mind, based on each place\u2019s type, badges and description.',
+  romantic: 'Picked with romance in mind, based on each place\u2019s type, badges and description.',
+  rainy_day: 'Indoor kinds of places come first. Okanagan Roam doesn\u2019t track the weather or confirm that a place is indoors, so check before you go.',
+  family: 'Family-friendly places come first. Kid-Friendly is the badge Okanagan Roam verifies.',
+  celebration: 'Restaurants, lounges, wineries and group-friendly places come first for a celebration.',
+  group_getaway: 'Wineries, breweries, lounges and group-friendly places come first for a group trip.',
+  relaxing: 'A slower pace, with wineries, cafes, beaches and scenic outdoor stops first.',
+  adventure: 'Active outdoor stops come first: adventure, hiking, cycling and water.',
+  adults: 'An adults-only trip, so wineries, breweries and lounges are welcome.',
+};
+function visitorNote(h) {
+  return (h && h.field === 'occasion' && OCCASION_VISITOR_NOTES[h.value]) || h.note;
+}
 const KIDS_EXCLUDED_TYPES = ['cocktail', 'pub', 'distillery'];
 const ROMANCE_WORDS = ['romantic', 'intimate', 'candlelit', 'candle lit', 'date night', 'sunset', 'cozy', 'cosy'];
 
@@ -527,7 +546,9 @@ function occasionScore(v, ctx, add) {
   const o = ctx.scoringOccasion;
   if (!o) return;
   const label = OCCASION_LABELS[o];
-  const tag = ` (${label} heuristic)`;
+  // Batch B: no implementation label on the visitor-facing reason; the plan's
+  // note says what the occasion ranking is based on.
+  const tag = '';
   if ((OCCASION_TYPES[o] || []).includes(v.type)) add('occasion', 10, `${article(typeLabel(ctx, v.type, 'singular').toLowerCase(), true)} suits ${article(label)}${tag}`);
   if (o === 'date_night' || o === 'romantic') {
     if (v.features.lake_view) add('occasion', 10, 'Has the Lake View badge');
@@ -544,7 +565,7 @@ function occasionScore(v, ctx, add) {
     if (acts.length) add('occasion', 6, `Listed for ${listText(acts.map((a) => activityLabel(ctx, a)))}${tag}`);
   } else if (o === 'rainy_day') {
     if (v.indoorGolf) add('occasion', 8, 'Described as an indoor golf / simulator venue');
-    else add('occasion', 6, 'An indoor venue type (rainy-day heuristic — not verified as indoors)');
+    else add('occasion', 6, 'Usually an indoor kind of place (not confirmed as indoors)');
   } else if (o === 'celebration' || o === 'group_getaway') {
     if (v.features.great_groups) add('occasion', 8, 'Has the Great for Groups badge');
     if (v.features.live_music) add('occasion', 4, 'Has the Live Music badge');
@@ -1039,12 +1060,12 @@ function planTrip(input) {
     recommendations: [],
     outing: null,
     events: [],
-    notes: heuristics.map((h) => h.note),
+    notes: heuristics.map(visitorNote),
     warnings: [],
     unsupported: (intent && intent.unsupported) || [],
     needs: (intent && intent.needs) || [],
   };
-  if (ctx.kids && !ctx.occasion) result.notes.push('Heuristic: because you mentioned kids, family-oriented places (beaches and parks listed for nature, viewpoints, water, hiking or adventure) are favoured. Only the Kid-Friendly badge is a verified venue attribute.');
+  if (ctx.kids && !ctx.occasion) result.notes.push('Because you mentioned kids, family-friendly places come first, including beaches and parks listed for nature, viewpoints, water, hiking or adventure. Kid-Friendly is the badge Okanagan Roam verifies.');
   if (kind === 'unknown' || kind === 'navigate') {
     result.summary = buildSummary('unknown', ctx, null);
     return result;

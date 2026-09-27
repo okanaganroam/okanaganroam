@@ -153,12 +153,17 @@ test('explanations only cite verified data', () => {
     }
   }
 });
-test('heuristic occasions are always labelled as heuristics', () => {
+// Batch B (2026-09-27): occasion ranking is still explained (never stated as
+// a verified fact), in visitor wording rather than implementation terms.
+test('occasion picks are explained in visitor wording, never as verified facts or with implementation words', () => {
   for (const q of ['Find me a great date night in Kelowna.', 'What can we do around Penticton if it rains?', 'Plan 3 days in Penticton with kids.', 'girls weekend in Penticton']) {
     const p = plan(q);
-    assert.ok(p.notes.some((n) => /^Heuristic:/.test(n)), `${q}: carries a heuristic note`);
-    for (const s of allStops(p)) for (const r of s.reasons) if (/suits (a|an) /.test(r.text)) assert.match(r.text, /heuristic\)$/, r.text);
+    assert.ok(p.notes.some((n) => /in mind, based on each place\u2019s type, badges and description|come first/.test(n)), `${q}: carries a note saying what the picks are based on`);
+    const texts = [...p.notes, ...p.warnings];
+    for (const s of allStops(p)) texts.push(...s.why, ...s.reasons.map((r) => r.text));
+    for (const t of texts) assert.doesNotMatch(t, /heuristic/i, `${q}: "${t}"`);
   }
+  assert.ok(plan('Plan 3 days in Penticton with kids.').notes.some((n) => /Kid-Friendly is the badge Okanagan Roam verifies/.test(n)), 'kids: says which badge is verified');
 });
 
 // ---- the examples ----------------------------------------------------------
@@ -213,7 +218,7 @@ test('romantic winery and dinner: a winery then a restaurant close together', ()
   assert.equal(a.region, b.region, 'the two stops are in the same community');
   assert.ok(p.notes.some((n) => /No region was given/.test(n)));
 });
-test('rainy day: never a beach, trail or outdoor golf course; indoor is a labelled heuristic', () => {
+test('rainy day: never a beach, trail or outdoor golf course; indoor is explained, not claimed', () => {
   const p = plan('What can we do around Penticton if it rains?');
   for (const s of allStops(p)) {
     const f = byId.get(s.venue.id);
@@ -221,7 +226,7 @@ test('rainy day: never a beach, trail or outdoor golf course; indoor is a labell
     if (f.type === 'golf') assert.ok(f.indoorGolf, f.name);
     assert.ok(s.why.some((w) => /indoor/i.test(w)));
   }
-  assert.ok(p.notes.some((n) => /does not track weather/.test(n)));
+  assert.ok(p.notes.some((n) => /doesn\u2019t track the weather or confirm that a place is indoors/.test(n)));
 });
 test('golf weekend: 2 days, one real round each morning, dining around it', () => {
   const p = plan('Plan a golf weekend around Kelowna.');
@@ -502,7 +507,8 @@ test('wording: no unsupported claims anywhere; heuristics are never stated as fa
     for (const t of texts) {
       const unquoted = t.replace(/“[^”]*”/g, '');
       assert.ok(!banned.test(unquoted), `${q}: "${t}"`);
-      if (/\bromantic\b/i.test(unquoted)) assert.match(unquoted, /romantic outing|heuristic/i, `${q}: "romantic" is only the request or a labelled heuristic: "${t}"`);
+      if (/\bromantic\b/i.test(unquoted)) assert.match(unquoted, /romantic outing/i, `${q}: "romantic" is only the request: "${t}"`);
+      assert.doesNotMatch(t, /heuristic/i, `${q}: no implementation words shown to visitors: "${t}"`);
     }
   }
 });
