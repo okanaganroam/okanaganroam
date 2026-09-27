@@ -1148,6 +1148,11 @@ function planTrip(input) {
     needs: (intent && intent.needs) || [],
   };
   if (ctx.kids && !ctx.occasion) result.notes.push('Because you mentioned kids, family-friendly places come first, including beaches and parks listed for nature, viewpoints, water, hiking or adventure. Kid-Friendly is the badge Okanagan Roam verifies.');
+  // Build My Trip Phase 2 (2026-09-27): the notes about what the visitor asked
+  // for (occasion, kids) that /trip shows up front; every other note is
+  // secondary detail. The same strings stay in `notes`.
+  result.contextNotes = heuristics.filter((h) => h.field === 'occasion').map(visitorNote)
+    .concat(ctx.kids && !ctx.occasion ? [result.notes[result.notes.length - 1]] : []);
   if (kind === 'unknown' || kind === 'navigate') {
     result.summary = buildSummary('unknown', ctx, null);
     return result;

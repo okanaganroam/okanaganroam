@@ -13506,6 +13506,82 @@ function renderTripPlannerV2Styles() {
   .trip-plan-experience { margin: 16px 0 4px; padding: 12px 16px; border-left: 3px solid var(--ref-gold, #C9A227); background: var(--paper); border-radius: 0 10px 10px 0; }
   .trip-plan-experience p:not(.trip-plan-eyebrow) { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--ink); }
   .trip-plan-experience .trip-plan-eyebrow { margin-bottom: 4px; }
+  /* Phase 2 (2026-09-27): result hierarchy. Scoped to .trip-plan-result and
+     built from tokens.css only (navy, teal, gold, cream, paper, ink): the
+     summary card leads with the request, the generated headline and "What to
+     expect"; secondary notes and extra reasons are collapsed; each stop has
+     one action row with the site's navy pill buttons. No plum in this view. */
+  .trip-plan-result .trip-plan-summary { padding: 22px 24px 18px; }
+  .trip-plan-result .trip-plan-request { margin: 0 0 4px; font-size: 0.84rem; color: var(--ink); opacity: 0.7; overflow-wrap: anywhere; }
+  .trip-plan-result .trip-plan-summary h2.trip-plan-title { font-size: clamp(1.4rem, 2.6vw, 1.8rem); line-height: 1.2; color: var(--ref-navy); margin: 0 0 12px; }
+  .trip-plan-result .trip-plan-title:focus { outline: none; }
+  .trip-plan-result .trip-plan-title:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; border-radius: 4px; }
+  .trip-plan-result .trip-plan-summary .trip-plan-experience { margin: 0 0 14px; padding: 2px 0 2px 14px; background: transparent; border-radius: 0; }
+  .trip-plan-result .trip-plan-summary .trip-plan-experience p:not(.trip-plan-eyebrow) { font-size: 1rem; line-height: 1.6; max-width: 68ch; }
+  .trip-plan-result .trip-plan-overview li { background: rgba(42,107,103,0.1); color: var(--teal-deep); }
+  .trip-plan-result .trip-plan-context { list-style: none; margin: 12px 0 0; padding: 0; font-size: 0.88rem; line-height: 1.5; color: var(--ink); max-width: 72ch; }
+  .trip-plan-result .trip-plan-context li { position: relative; padding-left: 16px; }
+  .trip-plan-result .trip-plan-context li + li { margin-top: 4px; }
+  .trip-plan-result .trip-plan-context li::before { content: ''; position: absolute; left: 0; top: 0.55em; width: 7px; height: 7px; border-radius: 50%; background: var(--ref-gold); }
+  .trip-plan-result .trip-plan-summary-footer { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(74,52,40,0.10); }
+  .trip-plan-result .trip-plan-details { flex: 1 1 260px; min-width: 0; }
+  .trip-plan-result .trip-plan-details summary, .trip-plan-result .trip-slot-more summary {
+    cursor: pointer; font-weight: 700; color: var(--ref-navy); display: inline-flex; align-items: center; gap: 6px; border-radius: 4px;
+  }
+  .trip-plan-result .trip-plan-details summary, .trip-plan-result .trip-slot-more summary { list-style: none; }
+  .trip-plan-result .trip-plan-details summary::-webkit-details-marker, .trip-plan-result .trip-slot-more summary::-webkit-details-marker { display: none; }
+  .trip-plan-result .trip-plan-details summary::after, .trip-plan-result .trip-slot-more summary::after {
+    content: '\\25BE'; font-size: 0.9em; line-height: 1; transition: transform 0.15s ease;
+  }
+  .trip-plan-result details[open] > summary::after { transform: rotate(180deg); }
+  .trip-plan-result .trip-plan-details summary { font-size: 0.86rem; padding: 6px 0; }
+  .trip-plan-result .trip-plan-details .trip-plan-notes { margin: 6px 0 0; max-width: 72ch; }
+  .trip-plan-result .trip-planner-regen-btn { background: var(--ref-navy); color: var(--ref-white, #fff); font-size: 0.84rem; padding: 10px 18px; }
+  .trip-plan-result .trip-planner-regen-btn:hover { background: var(--ref-navy-deep); }
+  .trip-plan-result .trip-plan-section-title { margin: 26px 0 12px; }
+  .trip-plan-result .trip-plan-summary + .trip-plan-days, .trip-plan-result .trip-planner-warnings + .trip-plan-days { margin-top: 22px; }
+  .trip-plan-result .trip-plan-inline-error {
+    background: #FBF0DC; border: 1px solid #E3C88A; border-radius: 10px; padding: 10px 14px; margin: 0 0 14px;
+    font-size: 0.9rem; font-weight: 700; color: var(--ink);
+  }
+  .trip-plan-result .trip-plan-empty { background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px; padding: 14px 16px; }
+  .trip-plan-result .trip-slot-card { border-radius: 14px; padding: 16px 18px; gap: 6px; }
+  .trip-plan-result .trip-slot-card h4 { font-size: 1.08rem; color: var(--ref-navy); }
+  .trip-plan-result .trip-slot-why { opacity: 0.85; }
+  .trip-plan-result .trip-slot-more { font-size: 0.8rem; color: var(--ink); }
+  .trip-plan-result .trip-slot-more summary { font-size: 0.78rem; padding: 2px 0; }
+  .trip-plan-result .trip-slot-more .trip-slot-why { margin-top: 4px; }
+  .trip-plan-result .trip-slot-caveats {
+    list-style: none; margin: 4px 0 0; padding: 7px 10px; border-radius: 8px; background: rgba(217,164,65,0.12);
+    color: var(--ink); opacity: 1; font-style: normal; font-size: 0.76rem; line-height: 1.45;
+  }
+  .trip-plan-result .trip-slot-caveats li + li { margin-top: 3px; }
+  .trip-plan-result .trip-slot-actions { align-items: center; gap: 8px; padding-top: 10px; }
+  .trip-plan-result .trip-slot-actions .fav-btn, .trip-plan-result .trip-slot-actions .trip-btn {
+    display: inline-flex; align-items: center; gap: 5px; background: transparent; color: var(--ref-navy);
+    border: 1px solid rgba(27,43,58,0.2); border-radius: 999px; padding: 6px 12px; font-size: 0.78rem; font-weight: 700; line-height: 1.2;
+  }
+  .trip-plan-result .trip-slot-actions .fav-btn:hover, .trip-plan-result .trip-slot-actions .trip-btn:hover { background: rgba(27,43,58,0.06); }
+  .trip-plan-result .trip-slot-actions .fav-btn.is-fav { background: var(--ref-navy); color: var(--paper); border-color: var(--ref-navy); }
+  .trip-plan-result .trip-slot-actions .trip-btn.in-trip { background: var(--teal); color: var(--paper); border-color: var(--teal); }
+  .trip-plan-result .trip-slot-secondary { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; }
+  .trip-plan-result .trip-slot-actions .trip-slot-view-link, .trip-plan-result .trip-slot-actions .trip-slot-remove-btn {
+    background: none; border: 0; border-radius: 4px; padding: 4px 2px; font-size: 0.78rem; font-weight: 700; color: var(--ref-navy);
+    text-decoration: underline; text-underline-offset: 3px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; box-sizing: border-box;
+  }
+  .trip-plan-result .trip-slot-actions .trip-slot-view-link:hover, .trip-plan-result .trip-slot-actions .trip-slot-remove-btn:hover { background: none; color: var(--teal-deep); }
+  .trip-plan-result .trip-slot-actions .trip-slot-remove-btn[aria-busy="true"] { opacity: 0.6; }
+  .trip-plan-result .trip-slot-card-event .trip-slot-secondary { margin-left: 0; }
+  .trip-plan-result button:focus-visible, .trip-plan-result a:focus-visible, .trip-plan-result summary:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+  @media (max-width: 560px) {
+    .trip-plan-result .trip-plan-summary { padding: 18px 16px 14px; }
+    .trip-plan-result .trip-plan-summary-footer { flex-direction: column; align-items: stretch; }
+    .trip-plan-result .trip-plan-details { flex: 0 0 auto; }
+    .trip-plan-result .trip-planner-regen-btn { width: 100%; justify-content: center; }
+    .trip-plan-result .trip-slot-actions .fav-btn, .trip-plan-result .trip-slot-actions .trip-btn,
+    .trip-plan-result .trip-slot-actions .trip-slot-view-link, .trip-plan-result .trip-slot-actions .trip-slot-remove-btn,
+    .trip-plan-result .trip-planner-regen-btn, .trip-plan-result .trip-plan-details summary, .trip-plan-result .trip-slot-more summary { min-height: 44px; }
+  }
   </style>`;
 }
 function renderTripPlannerV2Script() {
@@ -13528,18 +13604,43 @@ function renderTripPlannerV2Script() {
   function request(extra){
     var body = { text: state.text, seed: state.seed, excludeVenueIds: state.exclude.slice(-200) };
     for (var k in extra) body[k] = extra[k];
+    // Phase 2: the button that was pressed (Regenerate / Replace) shows the
+    // loading state itself, where the visitor is looking.
+    var trigger = state.trigger || null;
+    state.trigger = null;
+    var focusTitle = !trigger || trigger.hasAttribute('data-plan-regenerate');
     setStatus('Planning your trip\\u2026', 'loading');
     submitBtn.disabled = true;
+    resultEl.setAttribute('aria-busy', 'true');
+    if (trigger) { trigger.disabled = true; trigger.classList.add('is-loading'); trigger.setAttribute('aria-busy', 'true'); }
+    function done(){
+      submitBtn.disabled = false;
+      resultEl.removeAttribute('aria-busy');
+      if (trigger) { trigger.disabled = false; trigger.classList.remove('is-loading'); trigger.removeAttribute('aria-busy'); }
+    }
+    function fail(msg){
+      done();
+      setStatus(msg, 'error');
+      if (trigger && !resultEl.hidden) {
+        var old = resultEl.querySelector('.trip-plan-inline-error');
+        if (old) old.parentNode.removeChild(old);
+        var note = document.createElement('p');
+        note.className = 'trip-plan-inline-error';
+        note.setAttribute('role', 'alert');
+        note.textContent = msg;
+        resultEl.insertBefore(note, resultEl.firstChild);
+      }
+    }
     return fetch('/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
-        submitBtn.disabled = false;
-        if (!res.ok) { setStatus(res.j && res.j.error ? res.j.error : 'Something went wrong. Please try again.', 'error'); return; }
+        if (!res.ok) { fail(res.j && res.j.error ? res.j.error : 'Something went wrong. Please try again.'); return; }
+        done();
         setStatus('');
         state.last = res.j;
-        render(res.j);
+        render(res.j, focusTitle);
       })
-      .catch(function(){ submitBtn.disabled = false; setStatus('Something went wrong. Please try again.', 'error'); });
+      .catch(function(){ fail('Something went wrong. Please try again.'); });
   }
 
   function metaLine(v){
@@ -13555,41 +13656,69 @@ function renderTripPlannerV2Script() {
     }
     var v = stop.venue, url = safeUrl(v.url);
     var name = url ? '<a href="' + esc(url) + '">' + esc(v.name) + '</a>' : esc(v.name);
-    var why = (stop.why || []).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
+    // Phase 2: two reasons up front; any others stay one tap away.
+    var reasons = (stop.why || []).map(function(w){ return '<li>' + esc(w) + '</li>'; });
+    var why = reasons.slice(0, 2).join('');
+    var moreWhy = reasons.slice(2).join('');
     var tripQuery = v.address ? (v.name + ', ' + v.address) : (v.name + ', ' + v.regionLabel + ', Okanagan Valley, BC');
     return '<div class="trip-slot-card" data-venue-id="' + esc(v.id) + '">'
       + (label ? '<div class="trip-slot-label">' + esc(label) + '</div>' : '')
       + '<h4>' + name + '</h4>'
       + '<div class="trip-slot-meta">' + metaLine(v) + '</div>'
       + (why ? '<ul class="trip-slot-why" aria-label="Why this fits">' + why + '</ul>' : '')
+      + (moreWhy ? '<details class="trip-slot-more"><summary>More reasons</summary><ul class="trip-slot-why">' + moreWhy + '</ul></details>' : '')
       + ((stop.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + stop.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
       + '<div class="trip-slot-actions">'
-      + (url ? '<a class="trip-slot-view-link" href="' + esc(url) + '">View details</a>' : '')
       + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>'
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery) + '" data-trip-region="' + esc(v.region) + '">Add to trip</button>'
-      + '<button type="button" class="trip-slot-remove-btn" data-replace-id="' + esc(v.id) + '"' + (key ? ' data-replace-key="' + esc(key) + '"' : '') + ' title="Remove this stop and suggest another">Replace</button>'
-      + '</div></div>';
+      + '<span class="trip-slot-secondary">'
+      + (url ? '<a class="trip-slot-view-link" href="' + esc(url) + '">View details</a>' : '')
+      + '<button type="button" class="trip-slot-remove-btn" data-replace-id="' + esc(v.id) + '"' + (key ? ' data-replace-key="' + esc(key) + '"' : '') + ' aria-label="Replace ' + esc(v.name) + ' with another suggestion" title="Remove this stop and suggest another">Replace</button>'
+      + '</span></div></div>';
   }
   function overviewChips(p){
     var o = p.overview || {}, chips = [];
     if (o.where) chips.push(o.where);
     if (o.days) chips.push(o.days === 1 ? '1 day' : o.days + ' days');
-    if (o.pace) chips.push(o.pace.charAt(0).toUpperCase() + o.pace.slice(1) + ' pace');
+    if (o.pace && o.pace !== 'standard') chips.push(o.pace.charAt(0).toUpperCase() + o.pace.slice(1) + ' pace');
     (o.interests || []).forEach(function(i){ chips.push(i); });
     if (o.occasion) chips.push(o.occasion.label);
     return chips.length ? '<ul class="trip-plan-overview">' + chips.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '';
   }
-  function render(p){
-    var html = '<div class="trip-plan-summary"><p class="trip-plan-eyebrow">Your Okanagan plan</p><h2>' + esc(p.summary) + '</h2>' + overviewChips(p);
-    if (p.notes && p.notes.length) html += '<ul class="trip-plan-notes">' + p.notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>';
+  // Phase 2 (2026-09-27): one summary card -- request, generated headline,
+  // "What to expect", fact chips, the visitor's own context line, then the
+  // secondary notes (collapsed) and Regenerate -- followed by the plan itself.
+  function experienceHtml(p){
+    return '<div class="trip-plan-experience"><p class="trip-plan-eyebrow">' + esc(p.experience.title) + '</p><p>' + esc(p.experience.text) + '</p></div>';
+  }
+  function render(p, focusTitle){
+    var li = function(t){ return '<li>' + esc(t) + '</li>'; };
+    var regen = null;
+    if (p.kind === 'multi_day' || p.kind === 'day_plan' || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary)) regen = 'Regenerate';
+    else if ((p.kind === 'recommendations' || p.kind === 'discover') && (p.recommendations || []).length) regen = 'Show others';
+    var contextNotes = p.contextNotes || [];
+    var detailNotes = (p.notes || []).filter(function(n){ return contextNotes.indexOf(n) === -1; });
+    var html = '<div class="trip-plan-summary">'
+      + '<p class="trip-plan-eyebrow">Your Okanagan plan</p>'
+      + (state.text ? '<p class="trip-plan-request">You asked for \\u201c' + esc(state.text) + '\\u201d</p>' : '')
+      + '<h2 class="trip-plan-title" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>';
+    if (p.experience && p.experience.text) html += experienceHtml(p);
+    html += overviewChips(p);
+    if (contextNotes.length) html += '<ul class="trip-plan-context">' + contextNotes.map(li).join('') + '</ul>';
+    if (regen || detailNotes.length) {
+      html += '<div class="trip-plan-summary-footer">';
+      if (detailNotes.length) html += '<details class="trip-plan-details"><summary>How this plan was made</summary><ul class="trip-plan-notes">' + detailNotes.map(li).join('') + '</ul></details>';
+      if (regen) html += '<button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>' + regen + '</button>';
+      html += '</div>';
+    }
     html += '</div>';
     var issues = [];
     (p.unsupported || []).forEach(function(u){ issues.push('Not something Okanagan Roam can plan for yet: \\u201c' + u + '\\u201d.'); });
     (p.warnings || []).forEach(function(w){ issues.push(w); });
-    if (issues.length) html += '<div class="trip-planner-warnings"><ul>' + issues.map(function(i){ return '<li>' + esc(i) + '</li>'; }).join('') + '</ul></div>';
+    if (issues.length) html += '<div class="trip-planner-warnings"><ul>' + issues.map(li).join('') + '</ul></div>';
     var hasVenues = false;
     if (p.kind === 'multi_day' || p.kind === 'day_plan') {
-      html += '<div class="trip-planner-result-header"><h2>Your itinerary</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Regenerate</button></div><div class="trip-plan-days">';
+      html += '<div class="trip-plan-days">';
       (p.days || []).forEach(function(d){
         html += '<div class="trip-day"><h3>Day ' + esc(d.day) + (d.regionLabel ? ' \\u00b7 ' + esc(d.regionLabel) : '') + '</h3><div class="trip-day-slots">'
           + d.stops.map(function(s){ return card(s, s.label, d.day + '-' + s.daypart); }).join('') + '</div></div>';
@@ -13597,45 +13726,46 @@ function renderTripPlannerV2Script() {
       });
       html += '</div>';
     } else if (p.kind === 'outing' && p.outing) {
-      html += '<div class="trip-planner-result-header"><h2>Your outing</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Regenerate</button></div>'
+      html += '<h3 class="trip-plan-section-title">Your outing</h3>'
         + '<div class="trip-plan-grid">' + p.outing.stops.map(function(s){ return card(s, s.label, null); }).join('') + '</div>';
       if (p.outing.alternates && p.outing.alternates.length) html += '<h3 class="trip-plan-section-title">Other good options</h3><div class="trip-plan-grid">' + p.outing.alternates.map(function(s){ return card(s, '', null); }).join('') + '</div>';
       hasVenues = true;
     } else if (p.kind === 'itinerary' && p.itinerary) {
       // Multi-part request: one ordered itinerary of venue and event stops.
+      // Its "What to expect" now sits in the summary card above.
       var it = p.itinerary;
-      html += '<div class="trip-planner-result-header"><h2>Your itinerary</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Regenerate</button></div>';
+      html += '<h3 class="trip-plan-section-title">Your itinerary</h3>';
       if (it.route && it.route.regions && it.route.regions.length > 1) html += '<p class="trip-plan-route">' + it.route.regions.map(function(r){ return esc(r.label); }).join(' \u2192 ') + '</p>';
       if ((it.stops || []).length) {
         html += '<div class="trip-plan-grid">' + it.stops.map(function(s){
           if (s.kind !== 'event') { hasVenues = true; return card(s, s.label, null); }
           var e = s.event || {}, u = safeUrl(e.url);
-          return '<div class="trip-slot-card"><div class="trip-slot-label">' + esc(s.label) + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+          return '<div class="trip-slot-card trip-slot-card-event"><div class="trip-slot-label">' + esc(s.label) + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + '<div class="trip-slot-meta">' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</div>'
-            + ((s.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + (u ? '<div class="trip-slot-actions"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></div>' : '') + '</div>';
+            + ((s.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + s.caveats.map(li).join('') + '</ul>' : '')
+            + (u ? '<div class="trip-slot-actions"><span class="trip-slot-secondary"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></span></div>' : '') + '</div>';
         }).join('') + '</div>';
       } else {
         html += '<p class="trip-plan-empty">Nothing on Okanagan Roam matches those parts yet.</p>';
       }
-      if (p.experience && p.experience.text) html += '<div class="trip-plan-experience"><p class="trip-plan-eyebrow">' + esc(p.experience.title) + '</p><p>' + esc(p.experience.text) + '</p></div>';
-      var alts = [];
-      (it.stops || []).forEach(function(s){ (s.alternates || []).forEach(function(a){ alts.push(a); }); });
-      if (alts.length) html += '<h3 class="trip-plan-section-title">Other good options</h3><div class="trip-plan-grid">' + alts.map(function(a){ return card(a, '', null); }).join('') + '</div>';
+      (it.stops || []).forEach(function(s){
+        if (!(s.alternates || []).length) return;
+        html += '<h3 class="trip-plan-section-title">Other options for ' + esc(String(s.label || '').toLowerCase()) + '</h3><div class="trip-plan-grid">' + s.alternates.map(function(a){ return card(a, '', null); }).join('') + '</div>';
+      });
     } else if (p.kind === 'recommendations' || p.kind === 'discover') {
       var recs = p.recommendations || [];
       if (recs.length) {
-        html += '<div class="trip-planner-result-header"><h2>Recommendations</h2><button type="button" class="app-btn trip-planner-regen-btn" data-plan-regenerate>Show others</button></div>'
+        html += '<h3 class="trip-plan-section-title">Recommendations</h3>'
           + '<div class="trip-plan-grid">' + recs.map(function(s){ return card(s, '', null); }).join('') + '</div>';
         hasVenues = true;
       }
     } else if (p.kind === 'events') {
       var ev = p.events || [];
-      html += '<h2 class="trip-plan-section-title">What\\u2019s on</h2>';
+      html += '<h3 class="trip-plan-section-title">What\\u2019s on</h3>';
       html += ev.length ? '<div class="trip-plan-grid">' + ev.map(function(e){
           var u = safeUrl(e.url);
-          return '<div class="trip-slot-card"><div class="trip-slot-label">' + esc(e.dateLabel) + (e.time ? ' \\u00b7 ' + esc(e.time) : '') + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
-            + (u ? '<div class="trip-slot-actions"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></div>' : '') + '</div>';
+          return '<div class="trip-slot-card trip-slot-card-event"><div class="trip-slot-label">' + esc(e.dateLabel) + (e.time ? ' \\u00b7 ' + esc(e.time) : '') + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+            + (u ? '<div class="trip-slot-actions"><span class="trip-slot-secondary"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></span></div>' : '') + '</div>';
         }).join('') + '</div>' : '<p class="trip-plan-empty">Nothing is listed for that yet.</p>';
     } else if (p.kind === 'navigate' && p.venue && safeUrl(p.venue.url)) {
       html += '<p class="trip-plan-empty">That\\u2019s a place on Okanagan Roam: <a class="trip-plan-see-all" href="' + esc(p.venue.url) + '">open its page \\u2192</a></p>';
@@ -13648,6 +13778,8 @@ function renderTripPlannerV2Script() {
     if (window.__syncFavButtons) window.__syncFavButtons();
     if (window.__syncTripButtons) window.__syncTripButtons();
     if (hasVenues || p.kind === 'events') resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var title = resultEl.querySelector('.trip-plan-title');
+    if (focusTitle && title) { try { title.focus({ preventScroll: true }); } catch (err) { title.focus(); } }
   }
 
   function currentPins(exceptKey){
@@ -13675,10 +13807,13 @@ function renderTripPlannerV2Script() {
       var id = Number(replace.getAttribute('data-replace-id'));
       if (state.exclude.indexOf(id) === -1) state.exclude.push(id);
       var key = replace.getAttribute('data-replace-key');
+      state.trigger = replace;
       request(key ? { pinned: currentPins(key) } : {});
       return;
     }
-    if (e.target.closest && e.target.closest('[data-plan-regenerate]')) {
+    var regenBtn = e.target.closest ? e.target.closest('[data-plan-regenerate]') : null;
+    if (regenBtn) {
+      state.trigger = regenBtn;
       state.seed += 1;
       request({ avoidVenueIds: shownIds() });
     }

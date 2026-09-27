@@ -11799,3 +11799,79 @@ test('Batch B (K-007): the experience eyebrow keeps its eyebrow typography (not 
   // The eyebrow markup itself is unchanged.
   assert.match(page, /'<div class="trip-plan-experience"><p class="trip-plan-eyebrow">' \+ esc\(p\.experience\.title\) \+ '<\/p><p>' \+ esc\(p\.experience\.text\) \+ '<\/p><\/div>'/);
 });
+
+// ==== Build My Trip Phase 2 (2026-09-27): /trip result hierarchy ==============
+// Runs the real render() from the /trip page script against sample plans.
+function tripRenderHarness(text = 'Plan 2 days in Kelowna with golf') {
+  const page = app.renderTripPlannerPage(true);
+  const script = page.match(/<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/)[0];
+  const src = script.slice(script.indexOf('  function esc(s)'), script.indexOf('  function currentPins('));
+  const resultEl = { innerHTML: '', hidden: true, setAttribute() {}, removeAttribute() {}, scrollIntoView() {}, querySelector() { return null; } };
+  const run = new Function('state', 'resultEl', 'statusEl', 'submitBtn', 'window', 'document', `${src}; return render;`);
+  const render = run({ text, seed: 0, exclude: [], last: null }, resultEl, { textContent: '', className: '' }, {}, {}, {});
+  return (plan) => { render(plan, false); return resultEl.innerHTML; };
+}
+const tripVenue = (id, name, type = 'golf') => ({ id, name, type, typeLabel: 'Golf Course', region: 'kelowna', regionLabel: 'Kelowna', url: `/kelowna/golf/v${id}`, rating: 4.5, reviews: 10, price: null });
+
+test('Phase 2 /trip: request, headline, "What to expect", chips, context line, collapsed notes, Regenerate, then the days', () => {
+  const html = tripRenderHarness('Plan a relaxed 2-day golf getaway in Kelowna')({
+    kind: 'multi_day', summary: '2 relaxed days around Kelowna, focused on golf courses.', headline: 'A relaxed 2-day Kelowna golf getaway',
+    experience: { title: 'What to expect', text: 'Two rounds of golf and two dinners, all in Kelowna.' },
+    overview: { where: 'Kelowna', days: 2, pace: 'standard', interests: ['golf courses'] },
+    contextNotes: ['Picked with a date night in mind, based on each place’s type, badges and description.'],
+    notes: ['Picked with a date night in mind, based on each place’s type, badges and description.', 'Stops are timed against each venue’s listed hours.'],
+    warnings: [], unsupported: [],
+    days: [{ day: 1, regionLabel: 'Kelowna', stops: [{ daypart: 'morning', label: 'Morning', venue: tripVenue(1, 'Club One'), why: ['Reason A', 'Reason B', 'Reason C'], caveats: ['Check the day you go'] }] }],
+  });
+  const at = (s) => { const i = html.indexOf(s); assert.ok(i >= 0, `renders ${s}`); return i; };
+  const order = [at('class="trip-plan-eyebrow">Your Okanagan plan'), at('class="trip-plan-request">You asked for “Plan a relaxed 2-day golf getaway in Kelowna”'),
+    at('<h2 class="trip-plan-title" tabindex="-1">A relaxed 2-day Kelowna golf getaway</h2>'), at('<div class="trip-plan-experience"><p class="trip-plan-eyebrow">What to expect</p><p>Two rounds of golf'),
+    at('class="trip-plan-overview"'), at('class="trip-plan-context"'), at('<details class="trip-plan-details"><summary>How this plan was made</summary>'), at('data-plan-regenerate>Regenerate</button>'), at('<div class="trip-day"><h3>Day 1')];
+  assert.deepEqual(order, order.slice().sort((a, b) => a - b), 'hierarchy order');
+  assert.doesNotMatch(html, /2 relaxed days around Kelowna/, 'the headline replaces the templated summary');
+  assert.doesNotMatch(html, /Standard pace/, 'the default pace is not shown as a chip');
+  const details = html.slice(html.indexOf('<details class="trip-plan-details">'), html.indexOf('</details>', html.indexOf('<details class="trip-plan-details">')));
+  assert.match(details, /listed hours/);
+  assert.doesNotMatch(details, /date night in mind/, 'the context line is not repeated in the details');
+  // Card: two reasons visible, the third behind "More reasons"; every existing control is kept.
+  assert.match(html, /<ul class="trip-slot-why" aria-label="Why this fits"><li>Reason A<\/li><li>Reason B<\/li><\/ul><details class="trip-slot-more"><summary>More reasons<\/summary><ul class="trip-slot-why"><li>Reason C<\/li><\/ul><\/details>/);
+  assert.match(html, /<button type="button" class="fav-btn" data-fav-name="Club One">Favorite<\/button>/);
+  assert.match(html, /<button type="button" class="trip-btn" data-trip-name="Club One" data-trip-query="Club One, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna">Add to trip<\/button>/);
+  assert.match(html, /<a class="trip-slot-view-link" href="\/kelowna\/golf\/v1">View details<\/a>/);
+  assert.match(html, /class="trip-slot-remove-btn" data-replace-id="1" data-replace-key="1-morning" aria-label="Replace Club One with another suggestion"/);
+  assert.match(html, /<ul class="trip-slot-caveats" aria-label="Good to know"><li>Check the day you go<\/li><\/ul>/);
+  assert.doesNotMatch(html, /heuristic/i);
+});
+
+test('Phase 2 /trip: itinerary plans keep their summary title and "What to expect" (once, above the stops) and label alternates by part', () => {
+  const html = tripRenderHarness('coffee then a winery in Naramata')({
+    kind: 'itinerary', summary: 'Cafes and wineries in Naramata.', experience: { title: 'What to expect', text: 'Stop for coffee, then enjoy a wine tasting.' },
+    overview: { where: 'Naramata', interests: ['cafes', 'wineries'] }, notes: ['Stops are checked against listed hours.'], warnings: [], unsupported: [],
+    itinerary: { route: null, stops: [
+      { kind: 'venue', label: 'Cafes', venue: tripVenue(2, 'Bean', 'cafe'), why: ['Rated 4.9'], caveats: [], alternates: [{ venue: tripVenue(3, 'Other Bean', 'cafe'), why: [], caveats: [] }] },
+      { kind: 'event', label: 'Live music', event: { name: 'Jazz', url: '/naramata/events/jazz', dateLabel: 'Fri', time: '7 pm', regionLabel: 'Naramata' } },
+    ] },
+  });
+  assert.match(html, /<h2 class="trip-plan-title" tabindex="-1">Cafes and wineries in Naramata\.<\/h2>/);
+  assert.equal((html.match(/class="trip-plan-experience"/g) || []).length, 1);
+  assert.ok(html.indexOf('class="trip-plan-experience"') < html.indexOf('>Your itinerary</h3>'), '"What to expect" before the stops');
+  assert.match(html, /<h3 class="trip-plan-section-title">Other options for cafes<\/h3>/);
+  assert.match(html, /<a class="trip-slot-view-link" href="\/naramata\/events\/jazz">View event<\/a>/);
+  assert.match(html, /data-plan-regenerate>Regenerate<\/button>/);
+});
+
+test('Phase 2 /trip: recommendations keep "Show others"; empty results have no Regenerate; styles stay on the site palette', () => {
+  const render = tripRenderHarness('dogs in Vernon');
+  const recs = render({ kind: 'discover', summary: 'Dog-friendly spots in Vernon.', overview: { where: 'Vernon' }, notes: [], warnings: [], unsupported: [], recommendations: [{ venue: tripVenue(4, 'Dog Cafe', 'cafe'), why: ['Has the Dog-Friendly badge'], caveats: [] }] });
+  assert.match(recs, /data-plan-regenerate>Show others<\/button>/);
+  const empty = render({ kind: 'discover', summary: 'Places that mention “asdf”.', overview: { where: 'the Okanagan' }, notes: [], warnings: ['No Okanagan Roam listings match every part of that request.'], unsupported: [], recommendations: [] });
+  assert.doesNotMatch(empty, /data-plan-regenerate/);
+  assert.match(empty, /class="trip-planner-warnings"/);
+  const page = app.renderTripPlannerPage(true);
+  const phase2Css = page.slice(page.indexOf('/* Phase 2 (2026-09-27): result hierarchy'), page.indexOf('</style>', page.indexOf('/* Phase 2 (2026-09-27): result hierarchy')));
+  const phase2Rules = phase2Css.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(phase2Css.length > 500);
+  assert.doesNotMatch(phase2Rules, /plum|#6B2C40|107,\s*44,\s*64/i, 'no plum/maroon in the new result styles');
+  for (const rule of phase2Rules.split('}').filter((r) => r.includes('{'))) assert.match(rule.split('{')[0], /\.trip-plan-result|^\s*@media|^\s*$/, `scoped: ${rule.split('{')[0].trim()}`);
+  assert.match(phase2Css, /@media \(max-width: 560px\)[\s\S]*min-height: 44px/);
+});

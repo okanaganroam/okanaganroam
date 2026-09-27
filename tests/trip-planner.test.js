@@ -890,6 +890,18 @@ test('Phase 1 overview: adding it changes nothing else in the plan (same picks, 
     const copy = { ...p }; delete copy.headline; delete copy.experience;
     const again = plan(q); delete again.headline; delete again.experience;
     assert.deepEqual(copy, again);
-    assert.ok(Object.keys(copy).every((k) => ['kind', 'summary', 'overview', 'days', 'recommendations', 'outing', 'events', 'notes', 'warnings', 'unsupported', 'needs', 'totalMatches'].includes(k)), `${q}: only the two new fields were added`);
+    assert.ok(Object.keys(copy).every((k) => ['kind', 'summary', 'overview', 'days', 'recommendations', 'outing', 'events', 'notes', 'warnings', 'unsupported', 'needs', 'totalMatches', 'contextNotes'].includes(k)), `${q}: only the two new fields were added`);
   }
+});
+
+test('Phase 2 contextNotes: the occasion and kids notes the visitor asked for, and nothing else; they stay in notes too', () => {
+  const date = plan('Find me a great date night in Kelowna.');
+  assert.deepEqual(date.contextNotes, [date.notes[0]]);
+  assert.match(date.contextNotes[0], /date night in mind/);
+  const kids = plan('Plan 3 days in Penticton with kids.');
+  assert.equal(kids.contextNotes.length, 1);
+  assert.match(kids.contextNotes[0], /^Because you mentioned kids/);
+  assert.ok(kids.notes.includes(kids.contextNotes[0]));
+  assert.deepEqual(plan('Plan a golf weekend around Kelowna.').contextNotes, []);
+  for (const n of plan('cheap eats in Kelowna').contextNotes) assert.doesNotMatch(n, /Budget ranks/, 'the budget note stays secondary');
 });
