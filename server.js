@@ -6856,9 +6856,28 @@ function renderAnalyticsHeadHtml(pageType) {
   })();
   window.trackEvent = function(name, params){
     try {
-      if (typeof gtag === 'function') gtag('event', name, params || {});
+      var p = {};
+      for (var k in (params || {})) p[k] = params[k];
+      // Measurement Phase C: every add_to_trip says where it came from --
+      // 'whole_trip' while Build My Trip's "Add whole trip" is adding its
+      // stops (window.__roamTripSource), otherwise an individual addition.
+      if (name === 'add_to_trip' && !p.trip_source) p.trip_source = window.__roamTripSource || 'individual';
+      if (typeof gtag === 'function') gtag('event', name, p);
     } catch (e) { /* analytics must never break the site */ }
   };
+  // Measurement Phase C: open_my_trip, once per visitor click that OPENS the
+  // My Trip tray. Capture phase, so the tray's state is read before app.js
+  // toggles it; clicks made by page code (isTrusted false) are not counted.
+  document.addEventListener('click', function(e){
+    try {
+      if (!e.isTrusted || !e.target.closest || !e.target.closest('#tripTrayToggle')) return;
+      var panel = document.getElementById('tripTrayPanel');
+      if (!panel || panel.classList.contains('open')) return;
+      var count = document.getElementById('tripTrayCount');
+      var size = count ? parseInt(count.textContent, 10) || 0 : 0;
+      window.trackEvent('open_my_trip', { trip_size: size, open_source: 'tray_button' });
+    } catch (err) { /* analytics must never break the site */ }
+  }, true);
 </script>`;
 }
 
@@ -8172,8 +8191,13 @@ ${golfFavTripScriptBody(type)}
 // matching Good-to-Know and map links), reporting the established
 // outbound_click event with link_type plus venue identity, and one
 // venue_view on load so page-level impressions carry venue_id too.
+//
+// Measurement Phase C (2026-09-27): the other venue types (restaurant, cafe,
+// pub, brewery, cocktail lounge, distillery) get the same venue_view +
+// outbound_click reporting, but NOT the Favorite / Add to Trip module --
+// their pages have no such controls, so there is nothing else to report.
 function golfVenueEngagementScriptHtml(venue) {
-  if (!usesEngagementControls(venue.type)) return '';
+  const favTrip = usesEngagementControls(venue.type);
   const pageCtx = JSON.stringify({
     venue_id: venue.id,
     venue_name: venue.name,
@@ -8194,7 +8218,7 @@ function golfVenueEngagementScriptHtml(venue) {
     params.link_type = link.getAttribute('data-track');
     track('outbound_click', params);
   });
-${golfFavTripScriptBody(venue.type)}
+${favTrip ? golfFavTripScriptBody(venue.type) : ''}
 })();
 </script>`;
 }
@@ -12616,10 +12640,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     }
   }
 
-  // Golf-only (2026-09-19): outbound links carry a data-track kind so the
-  // venue-page engagement script can report them; every other category's
-  // markup is unchanged.
-  const trackAttr = (kind) => (usesThemedCategoryLayout(venue.type) ? ` data-track="${kind}"` : '');
+  // Outbound links carry a data-track kind so the venue-page engagement
+  // script can report them (golf 2026-09-19; every venue type since
+  // Measurement Phase C). An invisible attribute -- markup otherwise unchanged.
+  const trackAttr = (kind) => ` data-track="${kind}"`;
 
   // Golf pages label simulator venues "Indoor Golf" (hero eyebrow, meta
   // line and the Good to Know Type row), using the same isIndoorGolfVenue()
@@ -12996,11 +13020,19 @@ ${occurrences.map((o) => {
     <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(full.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(full.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(full.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
   </div>`;
   const pageCtx = JSON.stringify({ event_id: full.id, event_name: full.name, event_region: full.region, surface: 'event_page' }).replace(/</g, '\\u003c');
+  // Measurement Phase C: one event_view per event-page load, with fixed
+  // descriptors only (type is the stored category; no dates or free text).
+  const viewCtx = JSON.stringify({
+    event_type: ['concert', 'festival', 'sporting'].includes(full.type) ? full.type : 'other',
+    is_recurring: isSeries || !!full.recurrence_rule,
+    is_expired: !!expired,
+  });
   const actionsScript = `<script>
 (function(){
   var pageCtx = ${pageCtx};
   function ctx(){ var c = {}; for (var k in pageCtx) c[k] = pageCtx[k]; return c; }
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
+  (function(){ var v = ctx(), extra = ${viewCtx}; for (var k in extra) v[k] = extra[k]; track('event_view', v); })();
 ${golfFavTripScriptBody('whatson')}
 })();
 </script>`;
@@ -13676,6 +13708,21 @@ function renderTripPlannerV2Script() {
   function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
   function setStatus(text, mode){ statusEl.textContent = text || ''; statusEl.className = 'trip-conv-status' + (mode ? ' is-' + mode : ''); }
 
+  // Measurement Phase C: Build My Trip events. Fixed descriptors only -- the
+  // visitor's text is never sent (region is kept only when it is one of the
+  // site's own region slugs).
+  var TRIP_REGIONS = ${JSON.stringify(Object.keys(REGION_LABELS))};
+  var exampleSubmit = false;
+  function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
+  function planFacts(p){
+    var regions = ((p && p.intent && p.intent.regions) || []).filter(function(r){ return TRIP_REGIONS.indexOf(r) !== -1; });
+    return {
+      plan_kind: (p && /^[a-z_]{1,24}$/.test(p.kind)) ? p.kind : 'unknown',
+      region: regions.length === 1 ? regions[0] : (regions.length ? 'multiple' : 'none'),
+      day_count: (p && p.days) ? p.days.length : 0,
+    };
+  }
+
   function request(extra){
     var body = { text: state.text, seed: state.seed, excludeVenueIds: state.exclude.slice(-200) };
     for (var k in extra) body[k] = extra[k];
@@ -13683,6 +13730,8 @@ function renderTripPlannerV2Script() {
     // loading state itself, where the visitor is looking.
     var trigger = state.trigger || null;
     state.trigger = null;
+    var requestType = state.requestType || 'initial';
+    state.requestType = null;
     var focusTitle = !trigger || trigger.hasAttribute('data-plan-regenerate');
     setStatus('Planning your trip\\u2026', 'loading');
     submitBtn.disabled = true;
@@ -13707,15 +13756,26 @@ function renderTripPlannerV2Script() {
       }
     }
     return fetch('/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function(res){
-        if (!res.ok) { fail(res.j && res.j.error ? res.j.error : 'Something went wrong. Please try again.'); return; }
+        if (!res.ok) {
+          fail(res.j && res.j.error ? res.j.error : 'Something went wrong. Please try again.');
+          track('trip_plan_error', { request_type: requestType, error_type: 'response', http_status: res.status });
+          return;
+        }
         done();
         setStatus('');
         state.last = res.j;
         render(res.j, focusTitle);
+        var facts = planFacts(res.j);
+        facts.request_type = requestType;
+        facts.stop_count = planStopButtons().length;
+        track('trip_plan_complete', facts);
       })
-      .catch(function(){ fail('Something went wrong. Please try again.'); });
+      .catch(function(){
+        fail('Something went wrong. Please try again.');
+        track('trip_plan_error', { request_type: requestType, error_type: 'exception' });
+      });
   }
 
   function metaLine(v){
@@ -13922,13 +13982,22 @@ function renderTripPlannerV2Script() {
     var st = addAllState();
     if (st.state !== 'ready') { announce(stateMessage(st) || 'There are no stops in this plan to add.'); return; }
     var added = 0, already = 0, noRoom = 0, failed = 0;
-    planStopButtons().forEach(function(b){
-      if (b.classList.contains('in-trip')) { already += 1; return; }
-      if (tripSize() >= TRIP_MAX_STOPS) { noRoom += 1; return; }
-      var before = tripSize();
-      b.click();
-      if (b.classList.contains('in-trip') || tripSize() > before) added += 1; else failed += 1;
-    });
+    // Each stop is added by clicking its own Add to trip button, so app.js
+    // reports one add_to_trip per stop; they are tagged trip_source
+    // 'whole_trip' (see trackEvent) while this synchronous loop runs.
+    window.__roamTripSource = 'whole_trip';
+    try {
+      planStopButtons().forEach(function(b){
+        if (b.classList.contains('in-trip')) { already += 1; return; }
+        if (tripSize() >= TRIP_MAX_STOPS) { noRoom += 1; return; }
+        var before = tripSize();
+        b.click();
+        if (b.classList.contains('in-trip') || tripSize() > before) added += 1; else failed += 1;
+      });
+    } finally {
+      window.__roamTripSource = null;
+    }
+    if (added) track('add_whole_trip', { added_count: added, already_in_trip_count: already, no_room_count: noRoom, failed_count: failed, trip_size: tripSize(), plan_kind: planFacts(state.last).plan_kind });
     refreshAddAll();
     var msg = 'Added ' + stopsText(added) + ' to My Trip.';
     if (already) msg += ' ' + (already === 1 ? '1 was' : already + ' were') + ' already there.';
@@ -13972,19 +14041,27 @@ function renderTripPlannerV2Script() {
     var addAll = e.target.closest ? e.target.closest('[data-plan-add-all]') : null;
     if (addAll) { addWholeTrip(); return; }
     var viewTrip = e.target.closest ? e.target.closest('[data-plan-view-trip]') : null;
-    if (viewTrip) { openTripTray(); return; }
+    if (viewTrip) {
+      var trayPanel = document.getElementById('tripTrayPanel');
+      if (trayPanel && !trayPanel.classList.contains('open')) track('open_my_trip', { trip_size: tripSize(), open_source: 'plan_view_trip' });
+      openTripTray();
+      return;
+    }
     var replace = e.target.closest ? e.target.closest('[data-replace-id]') : null;
     if (replace) {
       var id = Number(replace.getAttribute('data-replace-id'));
       if (state.exclude.indexOf(id) === -1) state.exclude.push(id);
       var key = replace.getAttribute('data-replace-key');
       state.trigger = replace;
+      state.requestType = 'replace';
       request(key ? { pinned: currentPins(key) } : {});
       return;
     }
     var regenBtn = e.target.closest ? e.target.closest('[data-plan-regenerate]') : null;
     if (regenBtn) {
+      track('trip_plan_regenerate', { plan_kind: planFacts(state.last).plan_kind });
       state.trigger = regenBtn;
+      state.requestType = 'regenerate';
       state.seed += 1;
       request({ avoidVenueIds: shownIds() });
     }
@@ -13992,12 +14069,15 @@ function renderTripPlannerV2Script() {
   form.addEventListener('submit', function(e){
     e.preventDefault();
     var text = input.value.trim();
+    var fromExample = exampleSubmit;
+    exampleSubmit = false;
     if (!text) { setStatus('Tell us what you\\u2019d like to do and where.', 'error'); return; }
     state = { text: text, seed: 0, exclude: [], last: null };
+    track('trip_plan_start', { input_method: fromExample ? 'example' : 'typed' });
     request({});
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-plan-example]'), function(chip){
-    chip.addEventListener('click', function(){ input.value = chip.textContent; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
+    chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
   if (wizardToggle && wizard) wizardToggle.addEventListener('click', function(){
     var open = wizard.style.display !== 'none';
@@ -15230,6 +15310,8 @@ ${renderGolfHeaderHtml()}
           success.classList.add('show');
           form.hidden = true;
           success.focus();
+          // Measurement Phase C: one listing_submit per accepted submission; no field values.
+          if (window.trackEvent) window.trackEvent('listing_submit', { listing_type: 'venue' });
           return;
         }
         if (r.body.errors) showErrors(r.body.errors);
@@ -15890,6 +15972,8 @@ ${renderGolfHeaderHtml()}
           success.classList.add('show');
           form.hidden = true;
           success.focus();
+          // Measurement Phase C: one listing_submit per accepted submission; no field values.
+          if (window.trackEvent) window.trackEvent('listing_submit', { listing_type: 'event' });
           return;
         }
         if (r.body.errors) showErrors(r.body.errors);

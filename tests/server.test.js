@@ -6364,13 +6364,14 @@ test('REGRESSION: themed venue polish is confined to themed-shell venue pages (w
   }
 });
 
-test('REGRESSION: non-Golf venue pages carry the GA4 tag (Measurement Phase A) but no data-track attributes or engagement script', () => {
+test('REGRESSION: non-Golf venue pages carry the GA4 tag, tracked links and venue_view/outbound_click (Measurement Phases A + C) but no Favorite module', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'); // has phone, address, coords
   const html = app.renderVenuePage(venue, [], [], []);
   assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
   assert.ok(html.includes("var cfg = { page_type: 'venue' };"));
-  assert.doesNotMatch(html, /data-track=|venue_view|outbound_click/);
-  assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>/);
+  assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call<\/a>/);
+  assert.match(html, /"venue_id":\d+,"venue_name":"Test Trattoria","venue_region":"kelowna","venue_category":"restaurant","surface":"venue_page"/);
+  assert.doesNotMatch(html, /okanaganFavorites|venue_favorite/);
 });
 
 // ==== Batch 4A (2026-09-27): Food & Drink venue pages use the themed shell ====
@@ -6416,7 +6417,7 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
   }
 });
 
-test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; no Favorite / Add to Trip or tracking (GA4 tag since Measurement Phase A)', () => {
+test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; no Favorite / Add to Trip (GA4 since Phase A, venue_view/outbound_click since Phase C)', () => {
   for (const type of BATCH4A_FD_TYPES) {
     const venue = batch4aVenue(type);
     const html = app.renderVenuePage(venue, [], [], []);
@@ -6440,7 +6441,7 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.match(html, new RegExp(`<nav class="breadcrumb"[^>]*>[\\s\\S]*?<a href="/kelowna/${slug}">${label.plural}</a>[\\s\\S]*?Test Trattoria[\\s\\S]*?</nav>`), `${type}: breadcrumb nav`);
     // Content and CTAs unchanged.
     assert.match(html, /<p class="venue-description">A fixture restaurant used only by the automated test suite\.<\/p>/);
-    assert.match(html, /<div class="venue-cta-row">\s*<a class="cta secondary" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.888,-119\.496" rel="nofollow noopener" target="_blank">Get Directions<\/a>\s*<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>\s*<\/div>/, `${type}: CTA row unchanged`);
+    assert.match(html, /<div class="venue-cta-row">\s*<a class="cta secondary" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.888,-119\.496" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>\s*<a class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call<\/a>\s*<\/div>/, `${type}: CTA row unchanged (plus data-track since Measurement Phase C)`);
     assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
     assert.match(html, /<h2>Good to Know<\/h2>/);
     // No Favorite / Add to Trip or tracking. Measurement Phase A (2026-09-27) adds only the GA4 tag.
@@ -6448,7 +6449,9 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.doesNotMatch(markup, /class="[^"]*\b(fav-btn|trip-btn|card-action)\b|data-venue-category=|data-venue-id=|data-surface=/, `${type}: no Favorite / Add to Trip`);
     assert.equal((head.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, `${type}: one GA4 tag`);
     assert.ok(head.includes("var cfg = { page_type: 'venue' };"), `${type}: page_type venue`);
-    assert.doesNotMatch(html, /venue_view|outbound_click|data-track=/, `${type}: no engagement events or tracked links`);
+    // Measurement Phase C: venue_view + outbound_click reporting, but no Favorite / Add to Trip module.
+    assert.equal((html.match(/track\('venue_view', ctx\(\)\)/g) || []).length, 1, `${type}: one venue_view`);
+    assert.match(html, /'outbound_click'/, `${type}: outbound_click`);
     assert.doesNotMatch(markup, /okanaganFavorites/, `${type}: no standalone engagement script`);
   }
 });
@@ -6857,7 +6860,8 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
   const page = app.renderVenuePage(trattoria, [], [], []);
   assert.match(page, /<body class="golf-page restaurant-page">/);
   assert.doesNotMatch(page, /Beach page theme|\.venue-advisory \{/);
-  assert.doesNotMatch(markupOnly(page), /beach-page|venue-advisory|data-venue-category|data-track=/);
+  assert.doesNotMatch(markupOnly(page), /beach-page|venue-advisory|data-venue-category/);
+  assert.match(page, / data-track="phone"/, 'tracked links since Measurement Phase C');
   const category = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
   assert.match(category, /<body>/);
   assert.doesNotMatch(category, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<script src="\/scripts\/app\.js">|Beach page theme/);
@@ -11902,7 +11906,7 @@ function wholeTripHarness(stopNames, initialTrip = []) {
   const page = app.renderTripPlannerPage(true);
   const script = page.match(/<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/)[0];
   const src = script.slice(script.indexOf('  function esc(s)'), script.indexOf('  function currentPins('));
-  const app_ = { trip: initialTrip.slice(), capMessages: 0, clicks: [] };
+  const app_ = { trip: initialTrip.slice(), capMessages: 0, clicks: [], events: [], sourceAtClick: [] };
   const mkClassList = () => { const set = new Set(); return { add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c), toggle: (c, on) => (on ? set.add(c) : set.delete(c)) }; };
   let buttons = [];
   const sync = () => buttons.forEach((b) => b.classList.toggle('in-trip', app_.trip.includes(b.name)));
@@ -11910,6 +11914,7 @@ function wholeTripHarness(stopNames, initialTrip = []) {
     const b = { name, classList: mkClassList(), getAttribute: (a) => (a === 'data-trip-name' ? name : null) };
     b.click = () => {
       app_.clicks.push(name);
+      app_.sourceAtClick.push(win.__roamTripSource);
       if (app_.trip.includes(name)) app_.trip = app_.trip.filter((n) => n !== name);
       else if (app_.trip.length >= 10) app_.capMessages += 1;
       else app_.trip.push(name);
@@ -11930,7 +11935,7 @@ function wholeTripHarness(stopNames, initialTrip = []) {
     querySelectorAll: (sel) => (sel === '.trip-btn[data-plan-stop]' ? buttons : []),
   };
   const doc = { addEventListener() {}, getElementById: (id) => (id === 'tripTrayCount' ? count : id === 'tripPlanAddAllStatus' ? status : null) };
-  const win = { addEventListener() {}, localStorage: { getItem: () => JSON.stringify(app_.trip.map((n) => ({ name: n }))) } };
+  const win = { addEventListener() {}, trackEvent: (n, p) => app_.events.push([n, p]), localStorage: { getItem: () => JSON.stringify(app_.trip.map((n) => ({ name: n }))) } };
   const run = new Function('state', 'resultEl', 'statusEl', 'submitBtn', 'window', 'document', 'setTimeout', `${src}; return { addWholeTrip, refreshAddAll, addAllState, TRIP_MAX_STOPS };`);
   const fns = run({ text: 'x', seed: 0, exclude: [], last: null }, resultEl, { textContent: '', className: '' }, {}, win, doc, (fn) => fn());
   fns.refreshAddAll();
@@ -12096,14 +12101,9 @@ test('Measurement Phase A: every venue type, event, guide, winery category and g
   ga4Check(app.render404Page('/no/such/page'), 'not_found', '404');
 });
 
-test('Measurement Phase A: GA4 adds no tracked links, engagement scripts or visitor-supplied values', () => {
-  // Pages that had no engagement markup before still have none.
+test('Measurement Phase A: the analytics block never carries visitor-supplied values; Food & Drink venues gain no Favorite module', () => {
   const fd = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
-  assert.doesNotMatch(fd, /data-track=|venue_view|outbound_click|okanaganFavorites/);
-  for (const [, html] of batch4bEventPages()) assert.doesNotMatch(html, /data-track=|event_view|venue_view/);
-  const trip = app.renderTripPlannerPage(true);
-  for (const name of ['trip_plan_start', 'trip_plan_complete', 'trip_plan_regenerate', 'add_whole_trip', 'open_my_trip', 'listing_submit', 'event_view'])
-    assert.ok(!trip.includes(name) && !fd.includes(name), `${name} is a later phase`);
+  assert.doesNotMatch(fd, /okanaganFavorites/);
   // The analytics block never echoes the request path (404 of an attacker-shaped URL).
   const nf = app.render404Page("/%3Cscript%3E'x");
   const start = nf.indexOf('<script>\n  window.dataLayer');
@@ -12168,8 +12168,11 @@ const runGa4Snippet = (href, { cookie = '', referrer = '' } = {}) => {
   const js = app.renderAnalyticsHeadHtml('venue').replace(/^<script>/, '').replace(/<\/script>$/, '');
   const u = new URL(href);
   let jar = cookie; const writes = []; const loaded = [];
+  const listeners = [];
   const document = {
     referrer,
+    addEventListener(type, fn, capture) { listeners.push({ type, fn, capture }); },
+    getElementById: () => null,
     head: { appendChild(el) { loaded.push({ src: el.src, async: el.async }); } },
     createElement(tag) { assert.equal(tag, 'script'); return {}; },
   };
@@ -12255,5 +12258,124 @@ test('Measurement Phase B: the server ignores ?roam_internal (identical HTML), a
   } finally {
     child.kill('SIGKILL');
     fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+// ==== Measurement Phase C (2026-09-27): behavioural events ====================
+//
+// New: event_view, trip_plan_start / _complete / _regenerate / _error,
+// add_whole_trip, open_my_trip, listing_submit. Existing names unchanged.
+// add_to_trip gains trip_source ('individual' | 'whole_trip'). Food & Drink
+// and winery venue links gain data-track (outbound_click), and Food & Drink
+// venues gain venue_view -- no Favorite module. No free text is ever sent.
+const ga4Harness = () => {
+  const js = app.renderAnalyticsHeadHtml('trip').replace(/^<script>/, '').replace(/<\/script>$/, '');
+  const listeners = []; const els = {};
+  const document = { referrer: '', cookie: '', addEventListener(type, fn, capture) { listeners.push({ type, fn, capture }); }, getElementById: (id) => els[id] || null, head: { appendChild() {} }, createElement: () => ({}) };
+  const ctx = { location: { href: 'https://okanaganroam.com/trip', search: '', origin: 'https://okanaganroam.com', pathname: '/trip', hash: '', hostname: 'okanaganroam.com', protocol: 'https:' }, document };
+  ctx.window = ctx;
+  vm.createContext(ctx); vm.runInContext(js, ctx);
+  const events = () => JSON.parse(JSON.stringify(ctx.dataLayer.map((a) => Array.from(a)).filter((a) => a[0] === 'event').map((a) => [a[1], a[2]])));
+  return { ctx, listeners, els, events };
+};
+
+test('Measurement Phase C: add_to_trip carries trip_source (individual by default, whole_trip while Add whole trip runs); callers are not mutated', () => {
+  const h = ga4Harness();
+  const params = { venue_name: 'A', region: 'kelowna', trip_size: 1 };
+  h.ctx.trackEvent('add_to_trip', params);
+  h.ctx.__roamTripSource = 'whole_trip';
+  h.ctx.trackEvent('add_to_trip', { venue_name: 'B' });
+  h.ctx.__roamTripSource = null;
+  h.ctx.trackEvent('add_to_trip', { venue_name: 'C', trip_source: 'explicit' });
+  h.ctx.trackEvent('remove_from_trip', { venue_name: 'A' });
+  h.ctx.trackEvent('add_to_favorites', { venue_name: 'A' });
+  assert.deepEqual(h.events(), [
+    ['add_to_trip', { venue_name: 'A', region: 'kelowna', trip_size: 1, trip_source: 'individual' }],
+    ['add_to_trip', { venue_name: 'B', trip_source: 'whole_trip' }],
+    ['add_to_trip', { venue_name: 'C', trip_source: 'explicit' }],
+    ['remove_from_trip', { venue_name: 'A' }],
+    ['add_to_favorites', { venue_name: 'A' }],
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(params)), { venue_name: 'A', region: 'kelowna', trip_size: 1 }, 'caller object untouched');
+});
+
+test('Measurement Phase C: open_my_trip fires once per visitor click that opens the tray -- not on close, not for code-triggered clicks', () => {
+  const h = ga4Harness();
+  const cap = h.listeners.filter((l) => l.type === 'click' && l.capture === true);
+  assert.equal(cap.length, 1, 'one capture-phase listener');
+  const open = { v: false };
+  h.els.tripTrayPanel = { classList: { contains: (c) => c === 'open' && open.v } };
+  h.els.tripTrayCount = { textContent: '3' };
+  const toggle = { closest: (sel) => (sel === '#tripTrayToggle' ? toggle : null) };
+  const other = { closest: () => null };
+  const click = (target, isTrusted = true) => cap[0].fn({ target, isTrusted });
+  click(toggle);                 // opens -> counted
+  open.v = true; click(toggle);  // closes -> not counted
+  open.v = false; click(toggle, false); // page code (e.g. "View My Trip") -> not counted here
+  click(other);                  // unrelated click
+  assert.deepEqual(h.events(), [['open_my_trip', { trip_size: 3, open_source: 'tray_button' }]]);
+});
+
+test('Measurement Phase C: venue pages -- every type tags its outbound links; Food & Drink gets venue_view + outbound_click without a Favorite module', () => {
+  for (const type of ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery']) {
+    const html = app.renderVenuePage({ ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), type }, [], [], []);
+    assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call<\/a>/, type);
+    assert.match(html, /data-track="directions">Get Directions<\/a>/, type);
+    assert.equal((html.match(/track\('venue_view', ctx\(\)\)/g) || []).length, 1, `${type}: one venue_view`);
+    assert.equal((html.match(/track\('outbound_click', params\)/g) || []).length, 1, `${type}: one outbound listener`);
+    assert.doesNotMatch(html, /okanaganFavorites|venue_favorite/, `${type}: no Favorite module`);
+  }
+  const winery = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
+  assert.equal((winery.match(/track\('outbound_click', params\)/g) || []).length, 1);
+  assert.match(winery, /okanaganFavorites/, 'winery keeps its existing Favorite / Add to Trip module');
+  const golf = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
+  assert.equal((golf.match(/track\('venue_view', ctx\(\)\)/g) || []).length, 1, 'golf unchanged: one venue_view');
+});
+
+test('Measurement Phase C: event pages report exactly one event_view with fixed descriptors', () => {
+  for (const [kind, html] of batch4bEventPages()) {
+    assert.equal((html.match(/track\('event_view', v\)/g) || []).length, 1, kind);
+    const extra = JSON.parse(html.match(/extra = (\{[^}]*\})/)[1]);
+    assert.deepEqual(Object.keys(extra).sort(), ['event_type', 'is_expired', 'is_recurring'], kind);
+    assert.ok(['concert', 'festival', 'sporting', 'other'].includes(extra.event_type), kind);
+    assert.equal(typeof extra.is_recurring, 'boolean'); assert.equal(typeof extra.is_expired, 'boolean');
+  }
+  const expired = Object.fromEntries(batch4bEventPages()).expired;
+  assert.match(expired, /"is_expired":true/);
+});
+
+test('Measurement Phase C: Build My Trip script -- each planner event is emitted from exactly one place, and never with the visitor\'s text', () => {
+  const html = app.renderTripPlannerPage(true);
+  const script = html.match(/<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/)[0];
+  const calls = [...script.matchAll(/track\('([a-z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(calls.sort(), ['add_whole_trip', 'open_my_trip', 'trip_plan_complete', 'trip_plan_error', 'trip_plan_error', 'trip_plan_regenerate', 'trip_plan_start'].sort());
+  // Every track(...) argument list: no text, input, query, prompt, value or error message.
+  for (const m of script.matchAll(/track\('[a-z_]+'(,[^;]*)?\);/g)) assert.doesNotMatch(m[0], /state\.text|input\.|\.value|query|prompt|msg|\.error|textContent/, m[0]);
+  assert.match(script, /track\('trip_plan_start', \{ input_method: fromExample \? 'example' : 'typed' \}\)/);
+  assert.match(script, /regions\.length === 1 \? regions\[0\] : \(regions\.length \? 'multiple' : 'none'\)/);
+  assert.match(script, /var TRIP_REGIONS = \["kelowna"/);
+});
+
+test('Measurement Phase C: Add whole trip -- one add_whole_trip, and every stop click happens with trip_source whole_trip, restored afterwards', () => {
+  const h = wholeTripHarness(['Cafe A', 'Winery B', 'Dinner C'], ['Cafe A']);
+  h.addWholeTrip();
+  assert.deepEqual(h.app.clicks, ['Winery B', 'Dinner C']);
+  assert.deepEqual(h.app.sourceAtClick, ['whole_trip', 'whole_trip']);
+  const whole = h.app.events.filter(([n]) => n === 'add_whole_trip');
+  assert.equal(whole.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(whole[0][1])), { added_count: 2, already_in_trip_count: 1, no_room_count: 0, failed_count: 0, trip_size: 3, plan_kind: 'unknown' });
+  // Nothing more to add: no second add_whole_trip.
+  h.addWholeTrip();
+  assert.equal(h.app.events.filter(([n]) => n === 'add_whole_trip').length, 1);
+});
+
+test('Measurement Phase C: listing_submit fires only on an accepted submission, with the listing type only', () => {
+  for (const [html, type] of [[app.renderListYourVenuePage(), 'venue'], [app.renderListAnEventPage(), 'event']]) {
+    const calls = [...html.matchAll(/trackEvent\('listing_submit', (\{[^}]*\})\)/g)];
+    assert.equal(calls.length, 1, type);
+    assert.equal(calls[0][1], `{ listing_type: '${type}' }`);
+    const ok = html.indexOf("r.status === 201 && r.body.ok");
+    const at = html.indexOf("trackEvent('listing_submit'");
+    assert.ok(ok > 0 && at > ok && at < html.indexOf('return;', ok), `${type}: inside the success branch only`);
   }
 });
