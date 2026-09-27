@@ -4523,7 +4523,7 @@ test('Batch 4B Events: head and noindex are unchanged (GA4 tag since Measurement
     assert.match(head, /"@type":"BreadcrumbList"/, kind);
     // Measurement Phase A (2026-09-27): the GA4 tag, labelled page_type "event"; still no tracked links.
     assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, `${kind}: one GA4 tag`);
-    assert.ok(head.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'event' });"), `${kind}: page_type event`);
+    assert.ok(head.includes("var cfg = { page_type: 'event' };"), `${kind}: page_type event`);
     assert.doesNotMatch(html, /data-track=/, `${kind}: no tracked links`);
     assert.match(html, /body\.golf-page\.event-page \.golf-main > p,\s*body\.golf-page\.event-page \.golf-main > \.detail-row \{ max-width: 72ch; \}/, `${kind}: 72ch measure`);
   }
@@ -4574,7 +4574,7 @@ test('Batch 4B Guides: guide pages render the themed shell around unchanged cont
   assert.equal(ld[1].itemListElement.length, venues.length);
   // Measurement Phase A (2026-09-27): the GA4 tag, labelled page_type "guide"; still no tracked links.
   assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, 'one GA4 tag');
-  assert.ok(head.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'guide' });"), 'page_type guide');
+  assert.ok(head.includes("var cfg = { page_type: 'guide' };"), 'page_type guide');
   assert.doesNotMatch(html, /data-track=/, 'no tracked links');
 });
 
@@ -6105,7 +6105,8 @@ test('Golf category pages (region + Okanagan-wide) carry the GA4 snippet, trackE
   const allHtml = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory ? app.getVenuesByCategory('golf') : kelownaGolf);
   for (const html of [regionHtml, allHtml]) {
     assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
-    assert.match(html, /gtag\('config', 'G-J312FGJPSC', \{ page_type: '(category|hub)' \}\)/);
+    assert.match(html, /var cfg = \{ page_type: '(category|hub)' \};/);
+    assert.match(html, /gtag\('config', 'G-J312FGJPSC', cfg\)/);
     assert.match(html, /window\.trackEvent = function\(name, params\)/);
     assert.match(html, /\.venue-card\[data-venue-category="golf"\]/);
     assert.match(html, /'description_expand'/);
@@ -6121,7 +6122,7 @@ test('REGRESSION: non-Golf category pages get the GA4 tag (Measurement Phase A) 
   const rows = app.getVenuesByRegionCategory('kelowna', 'restaurant');
   const html = app.renderCategoryPage('kelowna', 'restaurant', rows, []);
   assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
-  assert.ok(html.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'category' });"));
+  assert.ok(html.includes("var cfg = { page_type: 'category' };"));
   assert.doesNotMatch(html, /description_expand|venue_impression|data-venue-category="golf" data-venue-name/);
 });
 
@@ -6367,7 +6368,7 @@ test('REGRESSION: non-Golf venue pages carry the GA4 tag (Measurement Phase A) b
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'); // has phone, address, coords
   const html = app.renderVenuePage(venue, [], [], []);
   assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
-  assert.ok(html.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'venue' });"));
+  assert.ok(html.includes("var cfg = { page_type: 'venue' };"));
   assert.doesNotMatch(html, /data-track=|venue_view|outbound_click/);
   assert.match(html, /<a class="cta secondary" href="tel:\+1 250-555-0100">Call<\/a>/);
 });
@@ -6446,7 +6447,7 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '');
     assert.doesNotMatch(markup, /class="[^"]*\b(fav-btn|trip-btn|card-action)\b|data-venue-category=|data-venue-id=|data-surface=/, `${type}: no Favorite / Add to Trip`);
     assert.equal((head.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, `${type}: one GA4 tag`);
-    assert.ok(head.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'venue' });"), `${type}: page_type venue`);
+    assert.ok(head.includes("var cfg = { page_type: 'venue' };"), `${type}: page_type venue`);
     assert.doesNotMatch(html, /venue_view|outbound_click|data-track=/, `${type}: no engagement events or tracked links`);
     assert.doesNotMatch(markup, /okanaganFavorites/, `${type}: no standalone engagement script`);
   }
@@ -6459,7 +6460,7 @@ test('Batch 4A: winery venue pages keep the old shell and their standalone Favor
   assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<main |<script src="\/scripts\/app\.js">|Hero: same per-type gradient/);
   // Measurement Phase A (2026-09-27): the GA4 tag only; links stay untracked.
   assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
-  assert.ok(html.includes("gtag('config', 'G-J312FGJPSC', { page_type: 'venue' });"));
+  assert.ok(html.includes("var cfg = { page_type: 'venue' };"));
   assert.doesNotMatch(html, /data-track=/);
   assert.match(html, /<span class="venue-hero-name">Test Winery<\/span>/);
   assert.match(html, /<div class="venue-header">\s*<h1>Test Winery<\/h1>/);
@@ -12057,14 +12058,18 @@ test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip
 // (the only form GA4 actually transmits for a custom parameter).
 // No new events, no engagement scripts, no tracked links. The homepage and
 // /browse serve okanagan.html and are untouched.
+// okanagan.html's own static loader (homepage, /browse):
 const GA4_TAG_RE = /<script async src="https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC"><\/script>/g;
+// Server templates (Measurement Phase B): the loader URL appears once, inside the hostname-gated snippet.
+const GA4_URL_RE = /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g;
 const ga4Check = (html, pageType, label) => {
   const head = html.split('</head>')[0];
-  assert.equal((html.match(GA4_TAG_RE) || []).length, 1, `${label}: exactly one GA4 loader`);
+  assert.equal((html.match(GA4_URL_RE) || []).length, 1, `${label}: exactly one GA4 loader`);
+  assert.equal((html.match(GA4_TAG_RE) || []).length, 0, `${label}: no static loader tag (hostname-gated since Phase B)`);
   assert.equal((html.match(/gtag\('config', 'G-J312FGJPSC'/g) || []).length, 1, `${label}: exactly one config`);
   assert.equal((html.match(/window\.trackEvent = function\(name, params\)/g) || []).length, 1, `${label}: exactly one trackEvent wrapper`);
   assert.equal((html.match(/page_type: '[a-z_]+'/g) || []).length, 1, `${label}: exactly one page_type`);
-  assert.ok(head.includes(`gtag('js', new Date());\n  gtag('config', 'G-J312FGJPSC', { page_type: '${pageType}' });`), `${label}: page_type ${pageType} as a config parameter, inside <head>`);
+  assert.ok(head.includes(`var cfg = { page_type: '${pageType}' };`) && head.includes("gtag('config', 'G-J312FGJPSC', cfg);"), `${label}: page_type ${pageType} as a config parameter, inside <head>`);
   assert.doesNotMatch(html, /gtag\('set'/, `${label}: no gtag(set)`);
 };
 
@@ -12101,7 +12106,9 @@ test('Measurement Phase A: GA4 adds no tracked links, engagement scripts or visi
     assert.ok(!trip.includes(name) && !fd.includes(name), `${name} is a later phase`);
   // The analytics block never echoes the request path (404 of an attacker-shaped URL).
   const nf = app.render404Page("/%3Cscript%3E'x");
-  const block = nf.slice(nf.indexOf('<script async src="https://www.googletagmanager.com'), nf.indexOf('</head>'));
+  const start = nf.indexOf('<script>\n  window.dataLayer');
+  assert.ok(start > 0, 'analytics block found');
+  const block = nf.slice(start, nf.indexOf('</head>'));
   assert.doesNotMatch(block, /%3C|<script>'x|\/%3Cscript/);
 });
 
@@ -12144,6 +12151,107 @@ test('Measurement Phase A: the homepage and /browse still serve okanagan.html\'s
       if (r.status === 200) ok++;
     }
     assert.ok(ok >= 8, `most routed templates rendered (${ok})`);
+  } finally {
+    child.kill('SIGKILL');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+// ==== Measurement Phase B (2026-09-27): internal-traffic separation ==========
+//
+// The shared GA4 snippet only fetches gtag.js on okanaganroam.com, and marks
+// hits traffic_type: 'internal' while a first-party roam_internal=1 cookie
+// (set/cleared with ?roam_internal=on|off on any server page) is present.
+// The snippet is executed here in a VM with a fake location/document.
+const vm = require('node:vm');
+const runGa4Snippet = (href, { cookie = '', referrer = '' } = {}) => {
+  const js = app.renderAnalyticsHeadHtml('venue').replace(/^<script>/, '').replace(/<\/script>$/, '');
+  const u = new URL(href);
+  let jar = cookie; const writes = []; const loaded = [];
+  const document = {
+    referrer,
+    head: { appendChild(el) { loaded.push({ src: el.src, async: el.async }); } },
+    createElement(tag) { assert.equal(tag, 'script'); return {}; },
+  };
+  Object.defineProperty(document, 'cookie', {
+    get: () => jar,
+    set: (v) => {
+      writes.push(v);
+      const [kv, ...attrs] = v.split(';'); const k = kv.split('=')[0];
+      const keep = jar.split(/;\s*/).filter((c) => c && !c.startsWith(k + '='));
+      jar = (attrs.some((x) => /max-age=0/.test(x)) ? keep : [...keep, kv.trim()]).join('; ');
+    },
+  });
+  const ctx = { location: { href: u.href, search: u.search, origin: u.origin, pathname: u.pathname, hash: u.hash, hostname: u.hostname, protocol: u.protocol }, document };
+  ctx.window = ctx;
+  vm.createContext(ctx); vm.runInContext(js, ctx);
+  const calls = ctx.dataLayer.map((a) => Array.from(a));
+  // Round-trip through JSON: objects built inside the VM belong to another realm.
+  return JSON.parse(JSON.stringify({ cfg: calls.find((c) => c[0] === 'config')[2], configs: calls.filter((c) => c[0] === 'config').length, loaded, jar, writes, trackEvent: typeof ctx.trackEvent }));
+};
+
+test('Measurement Phase B: ordinary visitors on okanaganroam.com are never marked internal', () => {
+  for (const [href, opts] of [['https://okanaganroam.com/kelowna/wineries', {}], ['https://okanaganroam.com/trip', { cookie: 'xroam_internal=1; roam_internal=0; other=1' }],
+    ['https://okanaganroam.com/trip?roam_internal=yes&xroam_internal=on', {}], ['https://okanaganroam.com/food-drink?types=cafe', { referrer: 'https://www.google.com/' }]]) {
+    const r = runGa4Snippet(href, opts);
+    assert.deepEqual(r.cfg, { page_type: 'venue' }, href);
+    assert.equal(r.writes.length, 0, `${href}: no cookie written`);
+    assert.equal(r.configs, 1, `${href}: one config`);
+    assert.deepEqual(r.loaded, [{ src: 'https://www.googletagmanager.com/gtag/js?id=G-J312FGJPSC', async: true }], `${href}: gtag.js loaded once, async`);
+    assert.equal(r.trackEvent, 'function');
+  }
+});
+
+test('Measurement Phase B: ?roam_internal=on marks the browser internal and persists; ?roam_internal=off clears it', () => {
+  const on = runGa4Snippet('https://okanaganroam.com/food-drink?types=cafe&roam_internal=on&regions=kelowna#top');
+  assert.equal(on.cfg.traffic_type, 'internal');
+  assert.equal(on.cfg.page_location, 'https://okanaganroam.com/food-drink?types=cafe&regions=kelowna#top', 'toggle stripped, everything else kept');
+  assert.deepEqual(on.writes, ['roam_internal=1; max-age=31536000; path=/; samesite=lax; secure']);
+  // Later page views in the same browser: cookie only, no parameter.
+  const later = runGa4Snippet('https://okanaganroam.com/trip', { cookie: on.jar, referrer: 'https://okanaganroam.com/food-drink?types=cafe&roam_internal=on' });
+  assert.deepEqual(later.cfg, { page_type: 'venue', traffic_type: 'internal', page_referrer: 'https://okanaganroam.com/food-drink?types=cafe' });
+  assert.equal(later.writes.length, 0);
+  const off = runGa4Snippet('https://okanaganroam.com/trip?roam_internal=off', { cookie: on.jar });
+  assert.deepEqual(off.cfg, { page_type: 'venue', page_location: 'https://okanaganroam.com/trip' });
+  assert.deepEqual(off.writes, ['roam_internal=; max-age=0; path=/; samesite=lax; secure']);
+  assert.equal(off.jar, '');
+  assert.deepEqual(runGa4Snippet('https://okanaganroam.com/trip', { cookie: off.jar }).cfg, { page_type: 'venue' }, 'visitor again after off');
+});
+
+test('Measurement Phase B: gtag.js is never fetched off the live hostname (local, preview, www)', () => {
+  for (const href of ['http://127.0.0.1:3000/trip', 'http://localhost:3001/kelowna', 'https://okanagan-roam-production.up.railway.app/trip', 'https://www.okanaganroam.com/trip', 'https://okanaganroam.com.evil.test/trip']) {
+    const r = runGa4Snippet(href);
+    assert.equal(r.loaded.length, 0, href);
+    assert.equal(r.configs, 1, `${href}: calls still queue harmlessly`);
+  }
+  // Local testing of the toggle works without secure cookies on http.
+  assert.deepEqual(runGa4Snippet('http://127.0.0.1:3000/trip?roam_internal=on').writes, ['roam_internal=1; max-age=31536000; path=/; samesite=lax']);
+});
+
+test('Measurement Phase B: the server ignores ?roam_internal (identical HTML), and okanagan.html does not know about it (isolated child process)', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4b-'));
+  const projectRoot = path.join(__dirname, '..');
+  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
+  const port = 3596;
+  const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
+  const get = async (p) => { const r = await fetch(`http://localhost:${port}${p}`); return { status: r.status, text: await r.text() }; };
+  try {
+    let ready = false;
+    for (let i = 0; i < 100 && !ready; i++) {
+      try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.ok(ready, 'child server started');
+    for (const p of ['/kelowna', '/kelowna/restaurants', '/kelowna/wineries', '/food-drink', '/whats-on', '/trip', '/list-your-venue', '/no-such-page']) {
+      const plain = await get(p);
+      for (const q of ['?roam_internal=on', '?roam_internal=off']) {
+        const toggled = await get(p + q);
+        assert.equal(toggled.status, plain.status, p + q);
+        assert.equal(toggled.text, plain.text, `${p}${q}: byte-identical to ${p}`);
+      }
+    }
+    for (const p of ['/', '/browse']) assert.doesNotMatch((await get(p)).text, /roam_internal|traffic_type/, p);
+    assert.doesNotMatch(fs.readFileSync(path.join(projectRoot, 'okanagan.html'), 'utf8'), /roam_internal|traffic_type/);
   } finally {
     child.kill('SIGKILL');
     fs.rmSync(tempDir, { recursive: true, force: true });

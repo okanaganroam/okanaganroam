@@ -6805,19 +6805,55 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // automatic page_view and to every later event from this tag (verified on
 // the wire; a separate gtag('set') is NOT transmitted for custom params).
 // Values are fixed strings from this set -- never derived from the URL or
-// from anything a visitor typed. The
-// homepage and /browse are not server templates (they serve okanagan.html
-// unchanged) and are untouched by this.
+// from anything a visitor typed. The homepage and /browse are not server
+// templates (they serve okanagan.html unchanged) and are untouched by this.
 const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'listing_form', 'not_found']);
+
+// Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
+// snippet, so every server template gets it and nothing else changes:
+//  - gtag.js is only fetched when the page is served as GA4_LIVE_HOSTNAME,
+//    so local, test and preview servers never send hits. Calls still queue
+//    in window.dataLayer there, harmlessly (nothing reads it without gtag.js).
+//  - Visiting any server page with ?roam_internal=on sets a first-party
+//    cookie (roam_internal=1, one year); ?roam_internal=off clears it. While
+//    it is set, the config carries traffic_type: 'internal', which the
+//    property's (currently inactive) Internal Traffic data filter matches.
+//    The parameter itself is stripped from the page_location sent to GA4.
+// The cookie holds only "1" and is read only by this snippet; the server
+// never reads it. okanagan.html (/, /browse) is frozen and does not read it.
+const GA4_LIVE_HOSTNAME = 'okanaganroam.com';
+const GA4_INTERNAL_COOKIE = 'roam_internal';
 
 function renderAnalyticsHeadHtml(pageType) {
   if (!GA4_PAGE_TYPES.has(pageType)) throw new Error(`renderAnalyticsHeadHtml: unknown page_type "${pageType}"`);
-  return `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}"></script>
-<script>
+  return `<script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){ dataLayer.push(arguments); }
-  gtag('js', new Date());
-  gtag('config', '${GA4_MEASUREMENT_ID}', { page_type: '${pageType}' });
+  (function(){
+    var cfg = { page_type: '${pageType}' };
+    try {
+      var strip = function(u){
+        var m = /^([^?#]*)(\\?[^#]*)?(#.*)?$/.exec(u);
+        var rest = (m[2] || '').replace(/^\\?/, '').split('&').filter(function(p){ return p && p.indexOf('${GA4_INTERNAL_COOKIE}=') !== 0; }).join('&');
+        return m[1] + (rest ? '?' + rest : '') + (m[3] || '');
+      };
+      var toggle = /(?:^|[?&])${GA4_INTERNAL_COOKIE}=(on|off)(?:&|$)/.exec(location.search);
+      if (toggle) {
+        document.cookie = '${GA4_INTERNAL_COOKIE}=' + (toggle[1] === 'on' ? '1; max-age=31536000' : '; max-age=0') + '; path=/; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '');
+        cfg.page_location = strip(location.href);
+      }
+      if (document.referrer.indexOf('${GA4_INTERNAL_COOKIE}=') !== -1) cfg.page_referrer = strip(document.referrer);
+      if (/(?:^|;\\s*)${GA4_INTERNAL_COOKIE}=1(?:;|$)/.test(document.cookie)) cfg.traffic_type = 'internal';
+    } catch (e) { /* analytics must never break the site */ }
+    if (location.hostname === '${GA4_LIVE_HOSTNAME}') {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}';
+      document.head.appendChild(s);
+    }
+    gtag('js', new Date());
+    gtag('config', '${GA4_MEASUREMENT_ID}', cfg);
+  })();
   window.trackEvent = function(name, params){
     try {
       if (typeof gtag === 'function') gtag('event', name, params || {});
