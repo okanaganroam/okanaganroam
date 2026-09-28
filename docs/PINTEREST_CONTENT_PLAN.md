@@ -6,7 +6,7 @@ generated separately, and publishing is always a manual step by the owner.
 
 - **Site:** https://okanaganroam.com
 - **Repo:** okanaganroam/okanaganroam
-- **Last updated:** 2026-09-23
+- **Last updated:** 2026-09-28
 
 ---
 
@@ -131,6 +131,21 @@ categories: `restaurants` (20 regions) · `outdoors` (19) · `cafes` (19) · `pu
 | 50 | PUBLISHED | Oliver, wine capital | Oliver | Okanagan Wineries & Wine Country | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
 | 51 | PUBLISHED | Knox Mountain hike | Kelowna | Okanagan Hiking & Outdoor Adventures | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
 | 52 | PUBLISHED | Armstrong farm country | Armstrong | Hidden Gems of the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-23** |
+| 53 | PUBLISHED | West Kelowna wineries | West Kelowna | Okanagan Wineries & Wine Country | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 54 | PUBLISHED | Penticton destination guide | Penticton | Okanagan Travel Guide | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 55 | PUBLISHED | Okanagan Falls | Okanagan Falls | Hidden Gems of the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 56 | PUBLISHED | SilverStar opening day / winter | SilverStar | Okanagan Weekend Getaways | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 57 | PUBLISHED | Okanagan camping | Valley-wide | Okanagan Hiking & Outdoor Adventures | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 58 | PUBLISHED | Nature & wildlife | Valley-wide | Things to Do in the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 59 | PUBLISHED | Okanagan fishing | Valley-wide | Okanagan Beaches & Lakes | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 60 | PUBLISHED | Dog-friendly Okanagan | Valley-wide | Okanagan Travel Guide | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 61 | PUBLISHED | Kelowna cafés | Kelowna | Okanagan Food & Drink | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 62 | PUBLISHED | Kelowna cocktail lounges | Kelowna | Okanagan Food & Drink | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 63 | PUBLISHED | Markets & fairs | Valley-wide | Okanagan Events & Festivals | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 64 | PUBLISHED | Field of Screams (haunted corn mazes) | Vernon | Okanagan Events & Festivals | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 65 | PUBLISHED | Family events | Valley-wide | Things to Do in the Okanagan | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 66 | PUBLISHED | Kelowna Rockets home games | Kelowna | Okanagan Events & Festivals | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
+| 67 | PUBLISHED | Build My Trip planner | Valley-wide | Okanagan Weekend Getaways | GENERATED (848 x 1264) | **PUBLISHED 2026-09-28** |
 
 ---
 
@@ -1229,9 +1244,1031 @@ https://ca.pinterest.com/pin/1124422232001518662/
 
 ---
 
+## Batch #53–67 — generation and publication record
+
+Generated and published 2026-09-28 (Gemini Flash, browser workflow; published through Pinterest's organic pin builder). Overlays are rendered by Gemini inside the image, exactly as for #38–52; prompts reuse the final #49 typography wording, plus (for #57–67) an explicit "first line on ONE line, no wider than ~85% of the width" clause added after three-line wraps on #56 and #57.
+
+- 15/15 images 848 x 1264 JPEG, saved to `pinterest-assets/pin-0053.jpg` … `pin-0067.jpg`, QC'd from the saved file.
+- Rejected generations: #56 ×2, #57 ×2, #58 ×1, #60 ×1, #61 ×1 (7 rejected; 22 generations for 15 Pins).
+- **Download note:** after two normal downloads Chrome stopped saving Gemini downloads. Remaining images were fetched from the full-size image URL Gemini requests when "Download full size image" is clicked (`lh3.googleusercontent.com/rd-gg/…=s0-d-I`), via curl, immediately (the signed URL expires within ~1 minute). Same 848 x 1264 original as a normal download.
+- AI-disclosure toggle ("Mark as AI-Modified") left OFF as found on every Pin. No boards created. No other Pins touched.
+- Every Pin verified live on its board page (one instance each). Board counts after publishing: Events & Festivals 7, Food & Drink 10, Things to Do 7, Travel Guide 6, Weekend Getaways 11, Wineries 7, Hidden Gems 6, Hiking & Outdoor 6, Beaches & Lakes 5.
+- Copy source: the approved #53–67 proposal (2026-09-28). Destination URLs were HTTP 200 on 2026-09-28. Counts in descriptions are as of that date.
+
+## PIN #53
+
+**Pinterest Title**
+West Kelowna Wineries 🍷 | Tasting Rooms on the West Side of the Lake
+
+**Board**
+Okanagan Wineries & Wine Country
+
+**Destination**
+https://okanaganroam.com/west-kelowna/wineries
+
+**Description**
+Heading to West Kelowna for a tasting day? Browse 17 wineries across the west side of Okanagan Lake, with hours, ratings and features like patios, lake views and dog-friendly tasting rooms. A handy way to plan your route from one tasting room to the next.
+
+**Overlay Text**
+```
+WEST KELOWNA WINERIES 🍷
+OKANAGAN, BC
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: early-autumn wine country on the west side of Okanagan Lake at West Kelowna, British Columbia. Foreground: a close, detailed vineyard row on a sloping bench, orderly grapevines with dark ripe grape clusters and leaves just beginning to turn gold. Mid-ground: more vineyard terraces stepping down the slope, with a low, modest tasting-room roofline partly hidden among the vines — generic, not an identifiable winery. Background: the wide blue expanse of Okanagan Lake, dry rounded golden hills and scattered ponderosa pine on the far shore, and layered blue-grey ridges.
+
+Light and mood: warm late-afternoon early-autumn light, long soft shadows, clear dry interior air. The vineyard and the lake must dominate the frame.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. The hills must be dry and golden with sparse ponderosa pine, not lush green woodland. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+WEST KELOWNA WINERIES 🍷
+OKANAGAN, BC
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0053.jpg`
+- Dimensions: **848 x 1264**
+- Size: 957,372 bytes
+- MD5: `be274d096cc66f19eaaf49a0563efb57`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001898597/
+
+---
+
+## PIN #54
+
+**Pinterest Title**
+Penticton, BC ☀️ | Beaches, Wineries, Food & What's On
+
+**Board**
+Okanagan Travel Guide
+
+**Destination**
+https://okanaganroam.com/penticton
+
+**Description**
+Planning a Penticton trip? Find restaurants, cafés, wineries, breweries, beaches and outdoor spots in one place, plus a calendar of upcoming local events. Pick a beach, book a tasting, and see what's on while you're in town.
+
+**Overlay Text**
+```
+PENTICTON, BC 🍂
+LAKES, WINE & FOOD
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an early-autumn afternoon on the lakeshore at Penticton, British Columbia. Foreground: a quiet sandy lakeside beach with a few golden-leaved shade trees along the shoreline and fallen leaves on the grass. Mid-ground: clear blue Okanagan Lake with gentle ripples, a couple of distant people walking the beach and one paddleboarder far out on the water. Background: the dry rounded hills and benchlands that surround Penticton, sparsely treed with ponderosa pine, with vineyard blocks visible on the lower slopes and layered mountain ridges beyond.
+
+Light and mood: warm, clear early-autumn light, relaxed and inviting fall-travel atmosphere, not midsummer crowds. The landscape stays dominant; no specific buildings or landmarks.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. Vegetation must show early autumn (gold and amber accents), not bright midsummer green; hills dry and golden. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+PENTICTON, BC 🍂
+LAKES, WINE & FOOD
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0054.jpg`
+- Dimensions: **848 x 1264**
+- Size: 1,072,898 bytes
+- MD5: `710979c37a4d77de04b153be1f7d8013`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001898681/
+
+**Notes**
+- Image obtained via the direct full-size URL (Chrome blocked further Gemini downloads).
+
+---
+
+## PIN #55
+
+**Pinterest Title**
+Okanagan Falls, BC 🍇 | Wineries, Beaches & a Quieter South Okanagan Stop
+
+**Board**
+Hidden Gems of the Okanagan
+
+**Destination**
+https://okanaganroam.com/okanagan-falls
+
+**Description**
+Okanagan Falls is easy to overlook, but Okanagan Roam lists 19 wineries here alongside beaches, outdoor spots, cafés and restaurants. Worth a stop if you're touring the South Okanagan.
+
+**Overlay Text**
+```
+OKANAGAN FALLS 🍇
+SOUTH OKANAGAN, BC
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: peaceful early-autumn wine country near Okanagan Falls in the South Okanagan, British Columbia. Foreground: rows of vineyard with grapes ready for harvest and leaves turning amber. Mid-ground: rolling, open, dry grass-covered hills with scattered ponderosa pine and sagebrush, and a small blue lake nestled in the valley below. Background: rounded brown-gold South Okanagan ridges under a clear sky.
+
+Light and mood: golden late-afternoon light with realistic natural shadows; quiet, open, relaxed rural atmosphere. No winery buildings, no landmarks, no town.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. The landscape must be the arid, open South Okanagan — dry bunchgrass slopes, not forest. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+OKANAGAN FALLS 🍇
+SOUTH OKANAGAN, BC
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0055.jpg`
+- Dimensions: **848 x 1264**
+- Size: 1,089,750 bytes
+- MD5: `f939d8896dbc62aa15c429895172f876`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001898765/
+
+**Notes**
+- "Quieter" in the title is editorial, not a site fact (flagged in the preview).
+
+---
+
+## PIN #56
+
+**Pinterest Title**
+SilverStar, BC ❄️ | Opening Day Nov 27 & Winter Trip Ideas
+
+**Board**
+Okanagan Weekend Getaways
+
+**Destination**
+https://okanaganroam.com/silverstar
+
+**Description**
+Thinking about a SilverStar ski trip? The mountain's Alpine Opening Day is listed for Friday, November 27, 2026, with the annual Light Up on December 5. Find places to eat, cafés and outdoor spots at SilverStar before you go.
+
+**Overlay Text**
+```
+SILVERSTAR ❄️
+OPENING DAY · NOV 27
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an early-season winter day on the mountain at SilverStar near Vernon in British Columbia's North Okanagan. Foreground: fresh, deep snow on the ground and heavy snow loading the branches of dense evergreen fir and spruce trees. Mid-ground: a groomed snowy ski run winding down through the snow-covered forest, with a few skiers and snowboarders small in the frame at a natural distance. Background: rolling snow-covered forested ridges of the Monashee foothills fading into soft winter haze; at most a faint, indistinct hint of a distant chairlift — no buildings in focus and no recognizable resort architecture.
+
+Light and mood: crisp, bright winter light with a clear blue sky, sparkling snow, fresh mountain air. The image must immediately read as winter snow season at a British Columbia mountain resort.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. This scene is a snowy interior British Columbia mountain covered in evergreens. Do NOT render jagged European Alps peaks, a chalet village, or any identifiable building. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+SILVERSTAR ❄️
+OPENING DAY · NOV 27
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0056.jpg`
+- Dimensions: **848 x 1264**
+- Size: 982,420 bytes
+- MD5: `9387008e6ca73f9063ce011a2eacd408`
+- Generations: 3 (2 rejected)
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001898869/
+
+**Notes**
+- First two generations wrapped the overlay to three lines; overlay rebalanced from "SILVERSTAR OPENING DAY ❄️ / NOV 27, 2026" to the two-line version below.
+
+---
+
+## PIN #57
+
+**Pinterest Title**
+Okanagan Camping ⛺ | Provincial Parks, Lakeside Sites & Yurts
+
+**Board**
+Okanagan Hiking & Outdoor Adventures
+
+**Destination**
+https://okanaganroam.com/outdoors/camping
+
+**Description**
+Where to camp in the Okanagan: 51 parks and outdoor destinations for a night under the stars. Options range from Bear Creek's 400-metre beach on Okanagan Lake to lakeside yurts on Skaha Lake in Penticton. Compare spots by region before you book.
+
+**Overlay Text**
+```
+CAMPING ⛺
+OKANAGAN PARKS & LAKES
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an early-autumn campsite in an Okanagan provincial park, British Columbia. Foreground: a tasteful modern tent in a natural clearing among ponderosa pines, with a folding camp chair and a small lantern beside it and a few fallen pine needles and golden leaves on the ground. Mid-ground: the slope drops to a calm blue Okanagan lake. Background: dry, rounded, sparsely treed hills and forested slopes across the water, turning warm in the evening light.
+
+Light and mood: warm golden-hour early-autumn light, peaceful and inviting. The landscape stays dominant over the camping gear.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. Dry interior-BC hills and ponderosa pine only — no tropical or generic alpine scenery. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+CAMPING ⛺
+OKANAGAN PARKS & LAKES
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0057.jpg`
+- Dimensions: **848 x 1264**
+- Size: 1,094,687 bytes
+- MD5: `06a8e8f02d5e6e9b9ddee060dc511e35`
+- Generations: 3 (2 rejected)
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001898967/
+
+**Notes**
+- Rejected: v1 grey banner behind text; v2 three-line wrap. Overlay rebalanced from "OKANAGAN CAMPING ⛺ / PARKS, LAKES & YURTS". ⛺ renders as a cream tent glyph inline.
+
+---
+
+## PIN #58
+
+**Pinterest Title**
+Okanagan Nature & Wildlife 🦌 | Where to See Kokanee, Birds & Bighorn Sheep
+
+**Board**
+Things to Do in the Okanagan
+
+**Destination**
+https://okanaganroam.com/outdoors/nature
+
+**Description**
+54 places to get close to Okanagan nature: conservancies, creek corridors and desert habitat. Watch kokanee, birds and bighorn sheep, or head to the Allan Brooks Nature Centre in Vernon, where one hilltop overlooks Okanagan, Kalamalka and Swan lakes at once.
+
+**Overlay Text**
+```
+OKANAGAN WILDLIFE 🦌
+NATURE SPOTS IN BC
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: early-autumn morning in Okanagan grassland, British Columbia. Foreground: golden bunchgrass and sagebrush with a few rabbitbrush shrubs in yellow bloom. Mid-ground: a single mule deer standing naturally at the edge of a stand of ponderosa pine, realistically sized and relaxed, not posed. Background: a calm blue Okanagan lake and rolling dry hills with layered ridges beyond.
+
+Light and mood: soft, low early-morning light with gentle atmospheric depth. It should feel like exploring nature and spotting wildlife, not a zoo or wildlife portrait — the landscape dominates, the deer is a subtle discovery.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. The deer must be anatomically correct and proportionate. Dry grassland and ponderosa pine, not dense forest. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+OKANAGAN WILDLIFE 🦌
+NATURE SPOTS IN BC
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0058.jpg`
+- Dimensions: **848 x 1264**
+- Size: 941,694 bytes
+- MD5: `913d0f543cbd0a8bb85f515afb42e660`
+- Generations: 2 (1 rejected)
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899076/
+
+**Notes**
+- Rejected v1: stray "|" character added before line 2.
+
+---
+
+## PIN #59
+
+**Pinterest Title**
+Fishing in the Okanagan 🎣 | Docks, Lodges & Guided Lake Charters
+
+**Board**
+Okanagan Beaches & Lakes
+
+**Destination**
+https://okanaganroam.com/outdoors/fishing
+
+**Description**
+Plan an Okanagan fishing day: 12 trout-fishing lodges, public fishing docks and guided charters on the valley's lakes. A BC fishing licence is required. Compare options by region and pick your lake.
+
+**Overlay Text**
+```
+OKANAGAN FISHING 🎣
+DOCKS, LODGES & CHARTERS
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an early-autumn morning on the shoreline of an Okanagan lake, British Columbia. Foreground: a pebbly lakeshore with dry grasses. Mid-ground: a single angler standing on the shore, small in the frame, casting a fishing rod naturally toward mirror-calm water with a light mist lifting off the surface. Background: dry rounded hills with ponderosa pine, a few golden-leaved trees along the shore, and layered ridges.
+
+Light and mood: early-morning golden light, calm and quiet. The landscape is the main subject; no identifiable location, no visible fish species.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. The angler and fishing rod must look anatomically and mechanically correct. Dry interior-BC hills, not alpine peaks. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+OKANAGAN FISHING 🎣
+DOCKS, LODGES & CHARTERS
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0059.jpg`
+- Dimensions: **848 x 1264**
+- Size: 934,166 bytes
+- MD5: `f6e918bbf2a9f507658386888417ec7e`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899158/
+
+---
+
+## PIN #60
+
+**Pinterest Title**
+Dog-Friendly Okanagan 🐕 | Patios, Taprooms & Designated Dog Beaches
+
+**Board**
+Okanagan Travel Guide
+
+**Destination**
+https://okanaganroam.com/dog-friendly
+
+**Description**
+Travelling with your dog? Find 293 dog-friendly patios, cafés, taprooms and tasting rooms across the Okanagan, plus 27 designated dog beaches, each with its official on-leash or off-leash rule.
+
+**Overlay Text**
+```
+DOG-FRIENDLY 🐕
+OKANAGAN PATIOS & DOG BEACHES
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: a happy dog on an Okanagan lakeshore in early autumn, British Columbia. Foreground: a friendly, medium-sized dog standing at the water's edge on a pebbly beach, wet paws, mid-splash or looking back happily. Mid-ground: the dog's owner a few steps behind, relaxed and secondary, partly turned away. Background: clear blue Okanagan Lake and dry golden hills with ponderosa pine on the far shore, a few trees along the beach touched with autumn colour.
+
+Light and mood: bright, warm natural daylight, candid and welcoming. No signs, no named beach.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. The dog and person must be anatomically correct and natural. Dry interior-BC hills around the lake. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+DOG-FRIENDLY 🐕
+OKANAGAN PATIOS & DOG BEACHES
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0060.jpg`
+- Dimensions: **848 x 1264**
+- Size: 911,244 bytes
+- MD5: `93db671e3634797663a2b949c6262e86`
+- Generations: 2 (1 rejected)
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899268/
+
+**Notes**
+- Rejected v1: three-line wrap. Overlay rebalanced from "DOG-FRIENDLY OKANAGAN 🐕 / PATIOS & DOG BEACHES".
+
+---
+
+## PIN #61
+
+**Pinterest Title**
+Kelowna Cafés ☕ | Coffee, Bakeries & Patio Spots
+
+**Board**
+Okanagan Food & Drink
+
+**Destination**
+https://okanaganroam.com/kelowna/cafes
+
+**Description**
+Looking for coffee in Kelowna? Browse 62 cafés with hours and ratings. Filter for patios, dog-friendly spots, vegan and gluten-free options, from Japanese bakery treats to Italian gelato.
+
+**Overlay Text**
+```
+KELOWNA CAFÉS ☕
+COFFEE & PATIO SPOTS
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an early-autumn morning on a café patio on a walkable street in Kelowna, British Columbia. Foreground: a latte with latte art and a pastry on a small outdoor table, in sharp focus. Mid-ground: an inviting independent-style café patio with a few people chatting, potted plants and a tree with golden autumn leaves. Background: a softly blurred street with a glimpse of dry Okanagan hills beyond the buildings.
+
+Light and mood: warm, soft morning light, relaxed local energy. No readable signage, menus or branding anywhere; no identifiable café.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. This is an Okanagan town street with dry hills in the distance, not a European café street. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+KELOWNA CAFÉS ☕
+COFFEE & PATIO SPOTS
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0061.jpg`
+- Dimensions: **848 x 1264**
+- Size: 810,692 bytes
+- MD5: `29081e26202ce5f1f4de4a04aff37219`
+- Generations: 2 (1 rejected)
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899381/
+
+**Notes**
+- Rejected v1: overlay text missing entirely.
+
+---
+
+## PIN #62
+
+**Pinterest Title**
+Kelowna Cocktail Bars 🍸 | Lounges, Patios & Happy Hours
+
+**Board**
+Okanagan Food & Drink
+
+**Destination**
+https://okanaganroam.com/kelowna/cocktail-lounges
+
+**Description**
+Planning a night out in Kelowna? Explore 13 cocktail lounges, from a hidden downtown speakeasy to patio bars, with filters for happy hour, patios and great-for-groups spots.
+
+**Overlay Text**
+```
+COCKTAIL BARS 🍸
+KELOWNA LOUNGES & HAPPY HOURS
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an evening in a sophisticated, approachable cocktail lounge in Kelowna, British Columbia. Foreground: two beautifully presented craft cocktails — one amber stirred drink with a large clear ice cube and an orange twist, one coupe with a delicate garnish — on a polished dark wood table, with realistic reflections and believable glassware. Mid-ground: a softly blurred bar with warm ambient lighting and a few guests. Background: a window glimpse of dusk over dark hills.
+
+Light and mood: warm, intimate autumn evening glow, stylish night out, not a nightclub. No readable signage, labels or bottles with legible branding; no identifiable establishment.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. Glassware and hands must be physically correct; no warped glasses or extra fingers. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+COCKTAIL BARS 🍸
+KELOWNA LOUNGES & HAPPY HOURS
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0062.jpg`
+- Dimensions: **848 x 1264**
+- Size: 707,034 bytes
+- MD5: `54ecad2cef9f658939ddceebe96a41e0`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899486/
+
+**Notes**
+- Overlay pre-emptively rebalanced from "KELOWNA COCKTAIL BARS 🍸 / LOUNGES & HAPPY HOURS". First Publish click did not register; second click published once (board verified: single Pin).
+
+---
+
+## PIN #63
+
+**Pinterest Title**
+Okanagan Markets & Fairs 🧺 | Farmers' Markets & Local Makers
+
+**Board**
+Okanagan Events & Festivals
+
+**Destination**
+https://okanaganroam.com/whats-on?categories=markets-fairs
+
+**Description**
+Find upcoming farmers' markets, craft fairs and local markets across the Okanagan, from Kelowna to Vernon, Penticton and Summerland. Filter by date and region to plan a market morning.
+
+**Overlay Text**
+```
+OKANAGAN MARKETS 🧺
+FARMERS' MARKETS & FAIRS
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an authentic outdoor community fall market in the Okanagan, British Columbia. Foreground: a wooden vendor table heaped with crisp local apples, squash and small pumpkins, with a bucket of autumn flowers. Mid-ground: a few simple canopy stalls with handmade goods and produce, locals and families walking between them. Background: shade trees with golden leaves and dry Okanagan hills beyond.
+
+Light and mood: warm, sunny early-autumn morning, local and welcoming, not a large commercial festival. No readable signs, price tags or logos; no identifiable market.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. People and produce must look natural and correctly formed. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+OKANAGAN MARKETS 🧺
+FARMERS' MARKETS & FAIRS
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0063.jpg`
+- Dimensions: **848 x 1264**
+- Size: 1,050,830 bytes
+- MD5: `bc1375479da6837fd89ef34a49b0bf5f`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899661/
+
+---
+
+## PIN #64
+
+**Pinterest Title**
+Field of Screams, Vernon 🎃 | Haunted Corn Mazes at O'Keefe Ranch
+
+**Board**
+Okanagan Events & Festivals
+
+**Destination**
+https://okanaganroam.com/vernon/events/field-of-screams-xiii-the-unlucky
+
+**Description**
+Four walk-through haunted mazes with live scare actors at Historic O'Keefe Ranch north of Vernon, running Sept 25 to Nov 1, 2026, from 6:30 pm. The organizers say it's built for teens and adults, not children under 12. Wednesdays are discounted all season.
+
+**Overlay Text**
+```
+FIELD OF SCREAMS 🎃
+VERNON · SEPT 25–NOV 1
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: a spooky but tasteful nighttime haunted corn maze on an autumn ranch in the North Okanagan, British Columbia. Foreground: a winding dirt maze path between towering walls of tall, dry, rustling corn stalks, with carved and uncarved pumpkins lining the path. Mid-ground: the path turns a corner into darkness, low ground fog drifting between the stalks, a lone weathered wooden ranch fence post and an old lantern casting a warm orange glow. Background: the dark silhouette of rolling hills under a deep blue night sky.
+
+Light and mood: atmospheric, cinematic but photorealistic night lighting — warm orange lantern glow against cool blue fog, strong contrast, eerie and exciting, not gory or disturbing. No people in costume in focus, no monsters, no copyrighted characters, no ranch name or signage.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. The corn maze is the primary subject — do NOT make this a wooded forest path. No blood, gore or disturbing imagery. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+FIELD OF SCREAMS 🎃
+VERNON · SEPT 25–NOV 1
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0064.jpg`
+- Dimensions: **848 x 1264**
+- Size: 902,685 bytes
+- MD5: `c223dfd95767d51508f5051dc8a1a778`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001893192/
+
+**Notes**
+- Published first (time-sensitive; event ends Nov 1). Description dropped the approved "opening week is cheapest" clause because opening week ends Oct 4. Live Pin destination verified.
+
+---
+
+## PIN #65
+
+**Pinterest Title**
+Family Events in the Okanagan 👨‍👩‍👧 | Kid-Friendly Things On This Month
+
+**Board**
+Things to Do in the Okanagan
+
+**Destination**
+https://okanaganroam.com/whats-on?categories=family-kids
+
+**Description**
+Looking for something to do with the kids? Browse family and kids' events across the Okanagan, in Kelowna, West Kelowna, Vernon, Osoyoos and more, then filter by date to plan your weekend.
+
+**Overlay Text**
+```
+FAMILY EVENTS 🎈
+OKANAGAN, BC
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: a sunny early-autumn community event in a lakeside park in the Okanagan, British Columbia. Foreground: children happily taking part in simple activities such as a sack race or a pumpkin-painting table. Mid-ground: parents and families walking together between a few small activity booths and a food stall, candid and natural. Background: shade trees with golden autumn leaves, open grass, and dry Okanagan hills in the distance.
+
+Light and mood: warm, bright early-autumn afternoon, upbeat and relaxed. No identifiable event, no readable signs or banners, no logos.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. All people must be anatomically correct with natural faces and hands. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+FAMILY EVENTS 🎈
+OKANAGAN, BC
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0065.jpg`
+- Dimensions: **848 x 1264**
+- Size: 1,106,059 bytes
+- MD5: `923701e665b128bc88b9ba357a23d223`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899830/
+
+**Notes**
+- Overlay uses 🎈 instead of the family ZWJ emoji (image models break ZWJ sequences); the title keeps 👨‍👩‍👧.
+
+---
+
+## PIN #66
+
+**Pinterest Title**
+Kelowna Rockets 2026–27 🏒 | Home Game Schedule at Prospera Place
+
+**Board**
+Okanagan Events & Festivals
+
+**Destination**
+https://okanaganroam.com/kelowna/events/kelowna-rockets-home-games-2026-27
+
+**Description**
+Catch a Kelowna Rockets game: 34 WHL regular-season home dates at Prospera Place from September 2026 to March 2027. Check puck-drop times and plan a hockey night in Kelowna.
+
+**Overlay Text**
+```
+KELOWNA ROCKETS 🏒
+2026–27 HOME GAMES
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: a live junior hockey game in a packed Canadian hockey arena, viewed from the upper stands. Foreground: the backs and shoulders of excited fans in the seats, some standing and cheering, softly out of focus. Mid-ground: the brightly lit white ice rink with players in generic plain uniforms (red and white versus dark) mid-play, too small to show recognizable faces. Background: the far stands full of fans and arena lighting.
+
+Light and mood: bright arena lighting, energetic live-game atmosphere of a hockey night in Kelowna. No official logos, no readable team names, no crests, no sponsor boards with legible text, no scoreboard text, no recognizable players.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. Uniforms must be plain and generic; any boards or banners must have no legible text. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+KELOWNA ROCKETS 🏒
+2026–27 HOME GAMES
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0066.jpg`
+- Dimensions: **848 x 1264**
+- Size: 837,485 bytes
+- MD5: `1ae52c8d25d667bac45c4c0674ab39cf`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001899961/
+
+**Notes**
+- Generic uniforms; no logos or legible team branding.
+
+---
+
+## PIN #67
+
+**Pinterest Title**
+Build Your Okanagan Itinerary 🗺️ | Day-by-Day Plans From Real Places
+
+**Board**
+Okanagan Weekend Getaways
+
+**Destination**
+https://okanaganroam.com/trip
+
+**Description**
+Planning a date night, a family weekend or three days of wine? Build a day-by-day Okanagan itinerary from real wineries, restaurants, cafés and activities. Choose your region, days, interests and pace.
+
+**Overlay Text**
+```
+PLAN YOUR TRIP 🗺️
+OKANAGAN DAY-BY-DAY PLANS
+```
+
+**Final Gemini Prompt**
+```
+Create a premium, photorealistic vertical travel photograph in a 2:3 aspect ratio, composed for Pinterest.
+
+Scene: an early-autumn Okanagan road trip, British Columbia. Foreground: a folded paper map with no readable text, a pair of sunglasses and a small daypack resting on a low stone wall at a roadside pullout. Mid-ground: a quiet two-lane road winding down through golden vineyard blocks and orchards. Background: a deep blue Okanagan lake and dry rounded hills with layered mountain ridges.
+
+Light and mood: warm golden early-autumn afternoon light, a feeling of freedom and discovery. No vehicle brand, no road signs with legible text.
+
+Sophisticated travel-editorial photography — natural colour, realistic depth of field, no HDR look, no oversaturation, no AI-looking artifacts. Keep the main subject centred and clear of the upper third so it survives Pinterest portrait cropping.
+
+Important: this must read as the Okanagan Valley of British Columbia specifically. Do NOT render New England autumn forest, European or Tuscan countryside, generic California wine country, tropical scenery, or generic alpine lakes. Dry golden interior-BC hills, vineyards and orchards — not Tuscany or California. Do not depict any specific identifiable real business, venue, landmark building, brand, logo or readable sign.
+
+Text overlay: place the following two lines in the clean upper third of the image, centred, with generous space around them:
+
+PLAN YOUR TRIP 🗺️
+OKANAGAN DAY-BY-DAY PLANS
+
+The overlay must be EXACTLY two lines in total. Render each line as one single unbroken line of text — do not wrap, split, stack or hyphenate either line, and reduce the type size if that is what it takes to keep each line whole on one line. Set the first line larger than the second, but keep the first line on ONE single line no wider than about 85% of the image width — a three-line layout is wrong.
+
+Typography: elegant, highly readable travel-magazine lettering — a refined serif or a clean high-contrast sans serif — in soft white or warm cream, set DIRECTLY onto the photograph so the picture remains fully visible behind and between the letterforms. For legibility use ONLY a soft drop shadow that hugs the contour of each individual letter, exactly as a real shadow would. Do NOT darken, tint, shade, blur or lighten any rectangular region, band, strip or area of the picture behind the text. The background behind and between the letters must remain the untouched photograph — no panel, no gradient block, no vignette behind the text, and no soft-edged rectangle of any kind. If the text is hard to read, move it over a calmer part of the scene or change its size, never add a backing shape.
+
+CRITICAL — the text must not sit on or inside any solid shape. No banner, no bar, no strip, no full-width block, no coloured panel, no opaque or translucent white or dark box, no rounded card, no pill, no badge, no sticker, no label, no plate, no tag, no frame, no outline, and no border of any kind. Do not place the two lines in separate boxes. Nothing behind the text may have a visible edge or corner. The lettering must sit straight on the photograph with the scene showing through around every letter.
+
+Keep the entire overlay comfortably inside the frame with clear margins on all sides, positioned over a calm, uncluttered part of the picture so it stays easy to read.
+
+Reproduce the overlay text EXACTLY as written above. Do not change the wording, do not correct or alter spelling, do not translate it, do not add any extra words, taglines, captions or punctuation, and keep the emoji exactly as shown. Render the emoji inline, as part of its own line of text and at roughly the same height as the letters beside it — it must not become a separate sticker, icon tile, badge, boxed graphic or framed picture, and it must not move to its own line or to a different line.
+
+Do not add any other text anywhere in the image. No logos, no watermarks, no signatures, no website addresses, no borders or frames, and no user-interface elements.
+```
+
+**Image**
+- Path: `pinterest-assets/pin-0067.jpg`
+- Dimensions: **848 x 1264**
+- Size: 918,224 bytes
+- MD5: `da147c90b6f84329c6d7a619691d2d20`
+- Generations: 1
+
+**Status**
+**PUBLISHED 2026-09-28**
+
+**Live Pin URL**
+https://ca.pinterest.com/pin/1124422232001900095/
+
+**Notes**
+- Overlay pre-emptively rebalanced from "BUILD YOUR OKANAGAN TRIP 🗺️ / DAY-BY-DAY PLANS".
+
+---
+
 ## Next batch
 
-Pins #53 onward are not yet drafted. Run the `weekly-pinterest` skill
+Pins #68 onward are not yet drafted. Run the `weekly-pinterest` skill
 (`.claude/skills/weekly-pinterest/SKILL.md`), which defaults to PREVIEW and publishes only
 on explicit instruction.
 
