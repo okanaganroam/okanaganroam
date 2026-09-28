@@ -12112,7 +12112,7 @@ test('Measurement Phase A: the analytics block never carries visitor-supplied va
   assert.doesNotMatch(block, /%3C|<script>'x|\/%3Cscript/);
 });
 
-test('Measurement Phase A: the homepage and /browse still serve okanagan.html\'s own GA4 snippet, unchanged, with no page_type (isolated child process)', async () => {
+test('Measurement Phase A (+ Analytics Cleanup C1): the homepage and /browse serve okanagan.html\'s own GA4 snippet with ONLY the loader tag and gtag(config) swapped for the shared internal-traffic IIFE, with no page_type (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4a-'));
   const projectRoot = path.join(__dirname, '..');
   for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -12129,11 +12129,20 @@ test('Measurement Phase A: the homepage and /browse still serve okanagan.html\'s
     const siteHtml = fs.readFileSync(path.join(projectRoot, 'okanagan.html'), 'utf8');
     const snippet = siteHtml.slice(siteHtml.indexOf('<!-- Google Analytics (GA4) -->'), siteHtml.indexOf('</head>'));
     assert.ok(snippet.length > 100, 'okanagan.html snippet found');
+    // C1: exactly two swaps -- the static loader tag goes (the IIFE injects
+    // gtag.js on the live hostname only) and gtag('js') + the plain
+    // gtag('config') become the shared IIFE with an empty config.
+    const loader = '<script async src="https://www.googletagmanager.com/gtag/js?id=G-J312FGJPSC"></script>\n';
+    const config = "  gtag('js', new Date());\n  gtag('config', 'G-J312FGJPSC');\n";
+    assert.equal(snippet.split(loader).length, 2, 'okanagan.html still has exactly one loader tag');
+    assert.equal(snippet.split(config).length, 2, 'okanagan.html still has exactly one plain config');
+    const expected = snippet.replace(loader, '').replace(config, `${app.renderGa4ConfigIifeJs('{}')}\n`);
     for (const p of ['/', '/browse']) {
       const r = await get(p);
       assert.equal(r.status, 200, p);
-      assert.ok(r.text.includes(snippet), `${p}: okanagan.html's own snippet, byte-for-byte`);
-      assert.equal((r.text.match(GA4_TAG_RE) || []).length, 1, `${p}: one GA4 loader`);
+      assert.ok(r.text.includes(expected), `${p}: okanagan.html's snippet with only the two C1 swaps, byte-for-byte`);
+      assert.equal((r.text.match(GA4_TAG_RE) || []).length, 0, `${p}: no static GA4 loader tag`);
+      assert.equal((r.text.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, `${p}: gtag.js referenced once (inside the hostname guard)`);
       assert.doesNotMatch(r.text, /page_type/, `${p}: no page_type`);
     }
     // Routed server templates, end to end.
@@ -12231,7 +12240,7 @@ test('Measurement Phase B: gtag.js is never fetched off the live hostname (local
   assert.deepEqual(runGa4Snippet('http://127.0.0.1:3000/trip?roam_internal=on').writes, ['roam_internal=1; max-age=31536000; path=/; samesite=lax']);
 });
 
-test('Measurement Phase B: the server ignores ?roam_internal (identical HTML), and okanagan.html does not know about it (isolated child process)', async () => {
+test('Measurement Phase B (+ Analytics Cleanup C1): the server ignores ?roam_internal (identical HTML) on every page incl. / and /browse; okanagan.html on disk does not know about it, the served homepage does (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4b-'));
   const projectRoot = path.join(__dirname, '..');
   for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -12245,7 +12254,7 @@ test('Measurement Phase B: the server ignores ?roam_internal (identical HTML), a
       try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); }
     }
     assert.ok(ready, 'child server started');
-    for (const p of ['/kelowna', '/kelowna/restaurants', '/kelowna/wineries', '/food-drink', '/whats-on', '/trip', '/list-your-venue', '/no-such-page']) {
+    for (const p of ['/', '/browse', '/kelowna', '/kelowna/restaurants', '/kelowna/wineries', '/food-drink', '/whats-on', '/trip', '/list-your-venue', '/no-such-page']) {
       const plain = await get(p);
       for (const q of ['?roam_internal=on', '?roam_internal=off']) {
         const toggled = await get(p + q);
@@ -12253,7 +12262,14 @@ test('Measurement Phase B: the server ignores ?roam_internal (identical HTML), a
         assert.equal(toggled.text, plain.text, `${p}${q}: byte-identical to ${p}`);
       }
     }
-    for (const p of ['/', '/browse']) assert.doesNotMatch((await get(p)).text, /roam_internal|traffic_type/, p);
+    // Analytics Cleanup C1: the served homepage and /browse now carry the
+    // shared mechanism; the frozen okanagan.html file itself still does not.
+    for (const p of ['/', '/browse']) {
+      const html = (await get(p)).text;
+      assert.ok(html.includes("cfg.traffic_type = 'internal'"), `${p}: traffic_type flag`);
+      assert.ok(html.includes("location.hostname === 'okanaganroam.com'"), `${p}: live-hostname guard`);
+      assert.match(html, /roam_internal=\(on\|off\)/, `${p}: toggle`);
+    }
     assert.doesNotMatch(fs.readFileSync(path.join(projectRoot, 'okanagan.html'), 'utf8'), /roam_internal|traffic_type/);
   } finally {
     child.kill('SIGKILL');
@@ -12378,4 +12394,276 @@ test('Measurement Phase C: listing_submit fires only on an accepted submission, 
     const at = html.indexOf("trackEvent('listing_submit'");
     assert.ok(ok > 0 && at > ok && at < html.indexOf('return;', ok), `${type}: inside the success branch only`);
   }
+});
+
+// ==== Analytics Cleanup C1 (2026-09-28): / and /browse join roam_internal ===
+//
+// The homepage and /browse keep okanagan.html on disk untouched; the server
+// swaps only the static loader tag and the plain gtag('config') for the shared
+// GA4 IIFE (renderGa4ConfigIifeJs('{}')). The resulting head script is run in
+// the same kind of VM as the Phase B snippet tests.
+const C1_LOADER = '<script async src="https://www.googletagmanager.com/gtag/js?id=G-J312FGJPSC"></script>\n';
+const C1_CONFIG = "  gtag('js', new Date());\n  gtag('config', 'G-J312FGJPSC');\n";
+const c1SiteHtml = () => fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+const runHomepageHead = (href, { cookie = '', referrer = '' } = {}) => {
+  const html = app.applyHomepageAnalyticsHead(c1SiteHtml());
+  const start = html.indexOf('<!-- Google Analytics (GA4) -->');
+  const js = html.slice(html.indexOf('<script>', start) + 8, html.indexOf('</script>', start));
+  const u = new URL(href);
+  let jar = cookie; const writes = []; const loaded = [];
+  const document = { referrer, addEventListener() {}, getElementById: () => null, head: { appendChild(el) { loaded.push({ src: el.src, async: el.async }); } }, createElement() { return {}; } };
+  Object.defineProperty(document, 'cookie', {
+    get: () => jar,
+    set: (v) => { writes.push(v); const [kv, ...attrs] = v.split(';'); const k = kv.split('=')[0]; const keep = jar.split(/;\s*/).filter((c) => c && !c.startsWith(k + '=')); jar = (attrs.some((x) => /max-age=0/.test(x)) ? keep : [...keep, kv.trim()]).join('; '); },
+  });
+  const ctx = { location: { href: u.href, search: u.search, origin: u.origin, pathname: u.pathname, hash: u.hash, hostname: u.hostname, protocol: u.protocol }, document };
+  ctx.window = ctx;
+  vm.createContext(ctx); vm.runInContext(js, ctx);
+  const calls = ctx.dataLayer.map((a) => Array.from(a));
+  return JSON.parse(JSON.stringify({ cfg: calls.find((c) => c[0] === 'config')[2], configs: calls.filter((c) => c[0] === 'config').length, loaded, jar, writes, trackEvent: typeof ctx.trackEvent }));
+};
+
+test('Analytics Cleanup C1: applyHomepageAnalyticsHead makes exactly two swaps and leaves okanagan.html, the trackEvent wrapper and the body byte-identical', () => {
+  const before = c1SiteHtml();
+  const out = app.applyHomepageAnalyticsHead(before);
+  assert.equal(c1SiteHtml(), before, 'okanagan.html on disk is never modified');
+  assert.equal(before.split(C1_LOADER).length, 2);
+  assert.equal(before.split(C1_CONFIG).length, 2);
+  assert.equal(out, before.replace(C1_LOADER, '').replace(C1_CONFIG, `${app.renderGa4ConfigIifeJs('{}')}\n`), 'only the two swaps');
+  assert.equal(out.slice(out.indexOf('</head>')), before.slice(before.indexOf('</head>')), 'visible markup (everything after </head>) unchanged');
+  const wrapper = before.slice(before.indexOf('  // Small wrapper so every custom event'), before.indexOf('</script>\n</head>'));
+  assert.ok(wrapper.length > 200 && wrapper.includes('window.trackEvent = function(name, params)'));
+  assert.ok(out.includes(wrapper), 'okanagan.html\'s own window.trackEvent wrapper is byte-identical');
+  assert.doesNotMatch(out, /page_type/, 'no page_type on the homepage');
+  // The shared IIFE is literally the one every server template uses.
+  assert.ok(app.renderAnalyticsHeadHtml('hub').includes(app.renderGa4ConfigIifeJs("{ page_type: 'hub' }")));
+  // Fail-safe: anything unexpected -> served unchanged.
+  for (const broken of [before.replace(C1_LOADER, ''), before.replace(C1_CONFIG, ''), before + C1_LOADER, before + C1_CONFIG, '']) {
+    assert.equal(app.applyHomepageAnalyticsHead(broken), broken);
+  }
+});
+
+test('Analytics Cleanup C1: homepage visitors are never marked internal; ?roam_internal=on/off sets and clears the same cookie; toggle stripped; gtag.js only on the live hostname', () => {
+  for (const href of ['https://okanaganroam.com/', 'https://okanaganroam.com/browse?regions=kelowna&features=dog']) {
+    const r = runHomepageHead(href);
+    assert.deepEqual(r.cfg, {}, href);
+    assert.equal(r.writes.length, 0);
+    assert.equal(r.configs, 1);
+    assert.deepEqual(r.loaded, [{ src: 'https://www.googletagmanager.com/gtag/js?id=G-J312FGJPSC', async: true }]);
+    assert.equal(r.trackEvent, 'function', 'okanagan.html\'s trackEvent wrapper still defined');
+  }
+  const on = runHomepageHead('https://okanaganroam.com/?roam_internal=on#top');
+  assert.equal(on.cfg.traffic_type, 'internal');
+  assert.equal(on.cfg.page_location, 'https://okanaganroam.com/#top');
+  assert.deepEqual(on.writes, ['roam_internal=1; max-age=31536000; path=/; samesite=lax; secure']);
+  const later = runHomepageHead('https://okanaganroam.com/browse', { cookie: on.jar, referrer: 'https://okanaganroam.com/trip?roam_internal=on' });
+  assert.deepEqual(later.cfg, { traffic_type: 'internal', page_referrer: 'https://okanaganroam.com/trip' });
+  const off = runHomepageHead('https://okanaganroam.com/browse?roam_internal=off', { cookie: on.jar });
+  assert.deepEqual(off.cfg, { page_location: 'https://okanaganroam.com/browse' });
+  assert.deepEqual(off.writes, ['roam_internal=; max-age=0; path=/; samesite=lax; secure']);
+  assert.equal(off.jar, '');
+  for (const href of ['http://localhost:3001/', 'http://127.0.0.1:3000/browse', 'https://www.okanaganroam.com/', 'https://okanagan-roam-production.up.railway.app/']) {
+    const r = runHomepageHead(href);
+    assert.equal(r.loaded.length, 0, `${href}: gtag.js not fetched`);
+    assert.equal(r.configs, 1, `${href}: calls still queue harmlessly`);
+  }
+});
+
+// ==== Analytics Cleanup C2 (2026-09-28): filter_change on listing surfaces ===
+//
+// Each filter script is executed in a VM against a minimal fake DOM. Only the
+// visitor's own clicks may emit filter_change: page load with a pre-filled URL,
+// Back/Forward (popstate) and search typing must emit nothing.
+function c2El(attrs = {}, opts = {}) {
+  const el = {
+    tag: opts.tag || 'button', classes: new Set(opts.classes || []), parentId: opts.parentId || null,
+    _attrs: {}, _listeners: {}, hidden: false, textContent: opts.textContent || '', innerHTML: '', value: '', style: {},
+    get id() { return this._attrs.id || ''; },
+    get classList() { const c = this.classes; return { add: (x) => c.add(x), remove: (x) => c.delete(x), toggle: (x, on) => { if (on === undefined ? !c.has(x) : on) c.add(x); else c.delete(x); }, contains: (x) => c.has(x) }; },
+    getAttribute(k) { return Object.prototype.hasOwnProperty.call(this._attrs, k) ? String(this._attrs[k]) : null; },
+    setAttribute(k, v) { this._attrs[k] = String(v); },
+    hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this._attrs, k); },
+    removeAttribute(k) { delete this._attrs[k]; },
+    addEventListener(t, fn) { (this._listeners[t] = this._listeners[t] || []).push(fn); },
+    querySelector() { return null; }, querySelectorAll() { return []; }, closest() { return this; },
+    focus() {}, scrollIntoView() {}, appendChild() {}, insertBefore() {}, removeChild() {},
+    content: { querySelectorAll: () => [] },
+  };
+  for (const [k, v] of Object.entries(attrs)) el._attrs[k] = String(v);
+  return el;
+}
+function c2Match(el, part) {
+  part = part.trim(); let m;
+  if ((m = /^#([\w-]+)\s*>\s*\.([\w-]+)$/.exec(part))) return el.parentId === m[1] && el.classes.has(m[2]);
+  if ((m = /^([a-z]+)?((?:\.[\w-]+)*)((?:\[[^\]]+\])*)$/.exec(part))) {
+    const [, tag, cls, attrs] = m;
+    if (tag && el.tag !== tag) return false;
+    for (const c of (cls || '').split('.').filter(Boolean)) if (!el.classes.has(c)) return false;
+    for (const a of (attrs || '').match(/\[[^\]]+\]/g) || []) {
+      const am = /^\[([\w-]+)(?:="([^"]*)")?\]$/.exec(a);
+      if (!am || (am[2] === undefined ? !el.hasAttribute(am[1]) : el.getAttribute(am[1]) !== am[2])) return false;
+    }
+    return !!(tag || cls || attrs);
+  }
+  return false;
+}
+function c2Run(scriptHtml, { url, elements = [], byId = {} }) {
+  const js = scriptHtml.slice(scriptHtml.indexOf('<script>') + 8, scriptHtml.lastIndexOf('</script>'));
+  const u = new URL(url);
+  const loc = { href: u.href, pathname: u.pathname, search: u.search, hash: u.hash, hostname: u.hostname, protocol: u.protocol, origin: u.origin, reload() {}, assign() {} };
+  const setUrl = (next) => { const n = new URL(next, loc.href); loc.href = n.href; loc.pathname = n.pathname; loc.search = n.search; loc.hash = n.hash; };
+  const history = { pushes: [], replaces: [], pushState(s, t, next) { this.pushes.push(next); setUrl(next); }, replaceState(s, t, next) { this.replaces.push(next); setUrl(next); } };
+  const events = []; const winListeners = {};
+  const all = elements.filter(Boolean);
+  for (const [id, el] of Object.entries(byId)) { el._attrs.id = id; all.push(el); }
+  const document = {
+    getElementById: (id) => byId[id] || null,
+    querySelectorAll: (sel) => all.filter((el) => sel.split(',').some((p) => c2Match(el, p))),
+    querySelector: (sel) => all.find((el) => sel.split(',').some((p) => c2Match(el, p))) || null,
+    addEventListener() {}, createElement: () => c2El(), head: { appendChild() {} }, body: c2El(),
+  };
+  const ctx = {
+    document, location: loc, history, URLSearchParams,
+    setTimeout: (fn) => { fn(); return 0; }, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
+    matchMedia: () => ({ matches: false, addEventListener() {} }),
+    addEventListener: (t, fn) => { (winListeners[t] = winListeners[t] || []).push(fn); },
+    trackEvent: (name, params) => events.push({ name, params: JSON.parse(JSON.stringify(params)) }),
+  };
+  ctx.window = ctx;
+  vm.createContext(ctx); vm.runInContext(js, ctx);
+  const evt = (target) => ({ preventDefault() {}, stopPropagation() {}, target, isTrusted: true });
+  return {
+    history, loc,
+    click(el) { for (const fn of el._listeners.click || []) fn(evt(el)); },
+    clickInside(container, target) { for (const fn of container._listeners.click || []) fn(evt(target)); },
+    input(el, value) { el.value = value; for (const fn of el._listeners.input || []) fn(evt(el)); },
+    popstate(next) { setUrl(next); for (const fn of winListeners.popstate || []) fn({}); },
+    fc() { return events.filter((e) => e.name === 'filter_change').map((e) => { const p = e.params; return [p.filter_surface, p.filter_group, p.filter_value, p.filter_action, p.active_filter_count].join('|'); }); },
+    other() { return events.filter((e) => e.name !== 'filter_change'); },
+  };
+}
+// The chip-based hubs (Food & Drink hub + category pages, Dog Friendly,
+// Local Favourites / Hidden Gems / Secret Spots) share one control contract.
+function c2ChipSurface(scriptHtml, url, { pre, feature, open, shape }) {
+  const type = c2El({ [`data-${pre}-type`]: 'cafe', 'aria-pressed': 'false' });
+  const feat = feature ? c2El({ [`data-${pre}-feature`]: 'patio', 'aria-pressed': 'false' }) : null;
+  const region = c2El({ 'data-region': 'kelowna', 'aria-pressed': 'false' }, { classes: ['outdoor-filter-chip'] });
+  const all = c2El({ [`data-${pre}-type-all`]: '', 'aria-pressed': 'true' });
+  const cards = [1, 2].map((i) => c2El({ 'data-venue-id': i, [`data-${pre}-i`]: i - 1, 'data-venue-name': 'V' + i }, { classes: ['venue-card'], parentId: `${pre}Results`, tag: 'li' }));
+  const byId = { [`${pre}Selected`]: c2El(), [`${pre}NoResultsClear`]: c2El(), [`${pre}VenueData`]: c2El({}, { textContent: JSON.stringify({ 1: shape(1), 2: shape(2) }) }), [`${pre}Search`]: c2El() };
+  if (open) byId.fdOpenNow = c2El({ 'aria-pressed': 'false' });
+  return { r: c2Run(scriptHtml, { url, elements: [type, feat, region, all, ...cards], byId }), type, feat, region, all, byId };
+}
+
+test('Analytics Cleanup C2: every approved surface ships filter_change with its own fixed surface slug; search is never a filter_change', () => {
+  const surfaces = {
+    food_drink: app.renderFoodDrinkHubScriptHtml({ openNow: true }),
+    food_drink_category: app.renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category' }),
+    dog_friendly: app.renderDogHubScriptHtml(),
+    outdoors: app.renderOutdoorFilterScriptHtml(),
+    whats_on: app.renderWhatsOnFilterScriptHtml({ hasInventory: true }),
+    local_favourites: app.renderLocalFavouritesScriptHtml('local favourite', 'local_favourites'),
+    hidden_gems: app.renderLocalFavouritesScriptHtml('hidden gem', 'hidden_gems'),
+    secret_spots: app.renderLocalFavouritesScriptHtml('tucked-away', 'secret_spots'),
+  };
+  for (const [slug, html] of Object.entries(surfaces)) {
+    assert.ok(html.includes(`var FILTER_SURFACE = "${slug}";`), `${slug}: surface slug`);
+    assert.ok(html.includes("window.trackEvent('filter_change', { filter_surface: FILTER_SURFACE, filter_group: group, filter_value: String(value), filter_action: action, active_filter_count: activeFilterCount() })"), `${slug}: event shape`);
+    assert.doesNotMatch(html, /trackFilterChange\([^)]*search/i, `${slug}: search is not instrumented`);
+    new Function(html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))); // parses
+  }
+  // The pages themselves carry the right slug.
+  assert.ok(app.renderLocalFavouritesPage([], null).includes('var FILTER_SURFACE = "local_favourites";'));
+  assert.ok(app.renderHiddenGemsPage([], null).includes('var FILTER_SURFACE = "hidden_gems";'));
+  assert.ok(app.renderSecretSpotsPage([], null).includes('var FILTER_SURFACE = "secret_spots";'));
+  assert.ok(app.renderCategoryAllRegionsPage('outdoor', app.getVenuesByCategory('outdoor')).includes('var FILTER_SURFACE = "outdoors";'));
+  // Pages without filters stay uninstrumented.
+  assert.doesNotMatch(app.renderAnalyticsHeadHtml('hub'), /filter_change/);
+});
+
+test('Analytics Cleanup C2: chip hubs -- URL prefill, page load, popstate and search emit nothing; add/remove/clear_all emit filter_change; URLs keep their query params', () => {
+  const fdShape = (i) => ({ c: ['cafe'], f: ['patio'], r: i === 1 ? 'kelowna' : 'vernon', h: null });
+  const lfShape = (i) => ({ t: 'cafe', r: i === 1 ? 'kelowna' : 'vernon' });
+  const cases = [
+    ['food_drink', app.renderFoodDrinkHubScriptHtml({ openNow: true }), { pre: 'fd', feature: true, open: true, shape: fdShape }],
+    ['food_drink_category', app.renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category' }), { pre: 'fd', feature: true, shape: fdShape }],
+    ['dog_friendly', app.renderDogHubScriptHtml(), { pre: 'dog', feature: true, shape: fdShape }],
+    ['local_favourites', app.renderLocalFavouritesScriptHtml('local favourite', 'local_favourites'), { pre: 'lf', shape: lfShape }],
+    ['hidden_gems', app.renderLocalFavouritesScriptHtml('hidden gem', 'hidden_gems'), { pre: 'lf', shape: lfShape }],
+    ['secret_spots', app.renderLocalFavouritesScriptHtml('tucked-away', 'secret_spots'), { pre: 'lf', shape: lfShape }],
+  ];
+  for (const [slug, html, opts] of cases) {
+    const s = c2ChipSurface(html, 'https://okanaganroam.com/x?types=cafe&regions=kelowna&features=patio&open=now', opts);
+    assert.equal(s.type.getAttribute('aria-pressed'), 'true', `${slug}: URL prefill applied`);
+    assert.deepEqual(s.r.fc(), [], `${slug}: no filter_change on load with a pre-filled URL`);
+    assert.equal(s.r.history.pushes.length, 0, `${slug}: load only replaces`);
+    s.r.popstate('https://okanaganroam.com/x?regions=kelowna');
+    assert.deepEqual(s.r.fc(), [], `${slug}: no filter_change on Back/Forward`);
+    s.r.input(s.byId[`${opts.pre}Search`], 'pizza');
+    assert.deepEqual(s.r.fc(), [], `${slug}: search typing is not a filter_change`);
+    s.r.click(s.type); s.r.click(s.type);
+    if (s.feat) s.r.click(s.feat);
+    s.r.clickInside(s.byId[`${opts.pre}Selected`], c2El({ [`data-${opts.pre}-remove-region`]: 'kelowna' }));
+    if (opts.open) { s.r.click(s.byId.fdOpenNow); s.r.clickInside(s.byId.fdSelected, c2El({ 'data-fd-remove-open': '1' })); }
+    s.r.click(s.type); s.r.click(s.all);
+    s.r.click(s.region);
+    s.r.clickInside(s.byId[`${opts.pre}Selected`], c2El({ id: `${opts.pre}SelectedClear` }));
+    s.r.click(s.byId[`${opts.pre}NoResultsClear`]); // nothing left to clear -> no event
+    const f = opts.feature ? 1 : 0;
+    const expected = [
+      // popstate left kelowna pressed, so the first add counts type + region.
+      `${slug}|type|cafe|add|2`, `${slug}|type|cafe|remove|1`,
+      ...(opts.feature ? [`${slug}|feature|patio|add|2`] : []),
+      `${slug}|region|kelowna|remove|${opts.feature ? 1 : 0}`,
+      ...(opts.open ? [`${slug}|open_now|now|add|2`, `${slug}|open_now|now|remove|1`] : []),
+      `${slug}|type|cafe|add|${1 + f}`, `${slug}|type|all|clear_all|${f}`,
+      `${slug}|region|kelowna|add|${1 + f}`, `${slug}|all|all|clear_all|0`,
+    ];
+    assert.deepEqual(s.r.fc(), expected, slug);
+    assert.deepEqual(s.r.other(), [], `${slug}: no other events from the filter script`);
+    for (const p of s.r.history.pushes) assert.match(p, /^\/x(\?(types|features|regions|open)=[^&]+(&(types|features|regions|open)=[^&]+)*)?$/, `${slug}: pushed URL ${p}`);
+  }
+});
+
+test('Analytics Cleanup C2: Outdoors and What\'s On -- region/activity/category chips emit filter_change; prefill, popstate, search and date presets do not', () => {
+  // Outdoors
+  const oc = [
+    c2El({ 'data-region': 'kelowna', 'aria-pressed': 'false' }, { classes: ['outdoor-filter-chip'] }),
+    c2El({ 'data-region': 'vernon', 'aria-pressed': 'false' }, { classes: ['outdoor-filter-chip'] }),
+    c2El({ 'data-activity': 'hiking', 'aria-pressed': 'false' }, { classes: ['outdoor-activity-toggle'] }),
+  ];
+  const oAll = c2El({ 'data-activity-all': '', 'aria-pressed': 'true' }, { classes: ['outdoor-filter-chip'] });
+  const oCards = [1, 2].map((i) => c2El({ 'data-venue-id': i, 'data-venue-region': i === 1 ? 'kelowna' : 'vernon', 'data-venue-name': 'V' + i }, { classes: ['venue-card'], parentId: 'outdoorResults', tag: 'li' }));
+  const oById = { outdoorSelected: c2El(), outdoorNoResultsClear: c2El(), outdoorActivityMap: c2El({}, { textContent: JSON.stringify({ 1: ['hiking'], 2: [] }) }), outdoorsSearch: c2El() };
+  const o = c2Run(app.renderOutdoorFilterScriptHtml(), { url: 'https://okanaganroam.com/outdoors?regions=kelowna&activities=hiking', elements: [...oc, oAll, ...oCards], byId: oById });
+  assert.equal(oc[0].getAttribute('aria-pressed'), 'true');
+  o.popstate('https://okanaganroam.com/outdoors?regions=vernon');
+  o.input(oById.outdoorsSearch, 'lake');
+  assert.deepEqual(o.fc(), [], 'outdoors: nothing on load, popstate or search');
+  o.click(oc[0]); o.click(oc[0]);
+  o.clickInside(oById.outdoorSelected, c2El({ 'data-remove-region': 'vernon' }));
+  o.click(oc[2]); o.click(oAll); o.click(oc[1]);
+  o.clickInside(oById.outdoorSelected, c2El({ id: 'outdoorSelectedClear' }));
+  o.clickInside(oById.outdoorSelected, c2El({ id: 'outdoorSelectedClear' }));
+  assert.deepEqual(o.fc(), ['outdoors|region|kelowna|add|2', 'outdoors|region|kelowna|remove|1', 'outdoors|region|vernon|remove|0', 'outdoors|activity|hiking|add|1', 'outdoors|activity|all|clear_all|0', 'outdoors|region|vernon|add|1', 'outdoors|all|all|clear_all|0']);
+  assert.deepEqual(o.history.pushes, ['/outdoors?regions=kelowna,vernon', '/outdoors?regions=vernon', '/outdoors', '/outdoors?activities=hiking', '/outdoors', '/outdoors?regions=vernon', '/outdoors'], 'existing URL/query behaviour unchanged');
+  // What's On (date presets are real links -> page loads, not filter_change)
+  const wRegion = c2El({ 'data-region': 'kelowna', 'aria-pressed': 'false' }, { classes: ['outdoor-filter-chip'] });
+  const wCat = c2El({ 'data-category': 'live-music', 'aria-pressed': 'false' }, { classes: ['outdoor-filter-chip'] });
+  const wAll = c2El({ 'data-category-all': '', 'aria-pressed': 'true' }, { classes: ['outdoor-filter-chip'] });
+  const wDate = c2El({ 'data-when': 'weekend', 'aria-pressed': 'false' }, { classes: ['outdoor-filter-chip', 'whatson-date-chip'], tag: 'a' });
+  const wCards = [1, 2].map((i) => c2El({ 'data-venue-id': i, 'data-event-region': i === 1 ? 'kelowna' : 'vernon', 'data-event-categories': 'live-music', 'data-venue-name': 'E' + i }, { classes: ['venue-card'], parentId: 'whatsOnResults', tag: 'li' }));
+  const wById = { whatsOnSelected: c2El(), whatsOnNoResultsClear: c2El(), whatsOnClearFilters: c2El(), whatsOnSearch: c2El() };
+  const w = c2Run(app.renderWhatsOnFilterScriptHtml({ hasInventory: true, dateState: { when: 'weekend', from: '', to: '' } }), { url: 'https://okanaganroam.com/whats-on?when=weekend&regions=kelowna&categories=live-music', elements: [wRegion, wCat, wAll, wDate, ...wCards], byId: wById });
+  w.popstate('https://okanaganroam.com/whats-on?when=weekend&regions=kelowna');
+  w.input(wById.whatsOnSearch, 'jazz');
+  w.click(wDate);
+  assert.deepEqual(w.fc(), [], "what's on: nothing on load, popstate, search or a date preset");
+  w.click(wCat); w.click(wCat);
+  w.clickInside(wById.whatsOnSelected, c2El({ 'data-remove-region': 'kelowna' }));
+  w.click(wCat); w.click(wAll); w.click(wRegion);
+  w.click(wById.whatsOnClearFilters);
+  w.click(wById.whatsOnNoResultsClear);
+  assert.deepEqual(w.fc(), ['whats_on|category|live-music|add|2', 'whats_on|category|live-music|remove|1', 'whats_on|region|kelowna|remove|0', 'whats_on|category|live-music|add|1', 'whats_on|category|all|clear_all|0', 'whats_on|region|kelowna|add|1', 'whats_on|all|all|clear_all|0']);
+  for (const p of w.history.pushes) assert.match(p, /^\/whats-on\?when=weekend(&(regions|categories)=[^&]+)*$/, `date window kept on every push: ${p}`);
 });

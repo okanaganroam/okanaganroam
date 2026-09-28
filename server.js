@@ -6824,13 +6824,16 @@ const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', '
 const GA4_LIVE_HOSTNAME = 'okanaganroam.com';
 const GA4_INTERNAL_COOKIE = 'roam_internal';
 
-function renderAnalyticsHeadHtml(pageType) {
-  if (!GA4_PAGE_TYPES.has(pageType)) throw new Error(`renderAnalyticsHeadHtml: unknown page_type "${pageType}"`);
-  return `<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){ dataLayer.push(arguments); }
-  (function(){
-    var cfg = { page_type: '${pageType}' };
+// The GA4 config IIFE shared by every server template (via
+// renderAnalyticsHeadHtml) and, since Analytics Cleanup C1, by the homepage
+// and /browse (via applyHomepageAnalyticsHead). One mechanism: the same
+// roam_internal toggle/cookie, the same traffic_type flag, the same
+// page_location/page_referrer stripping and the same live-hostname guard.
+// cfgInit is a fixed JS object literal chosen by the server -- never
+// derived from the URL or from anything a visitor typed.
+function renderGa4ConfigIifeJs(cfgInit) {
+  return `  (function(){
+    var cfg = ${cfgInit};
     try {
       var strip = function(u){
         var m = /^([^?#]*)(\\?[^#]*)?(#.*)?$/.exec(u);
@@ -6853,7 +6856,15 @@ function renderAnalyticsHeadHtml(pageType) {
     }
     gtag('js', new Date());
     gtag('config', '${GA4_MEASUREMENT_ID}', cfg);
-  })();
+  })();`;
+}
+
+function renderAnalyticsHeadHtml(pageType) {
+  if (!GA4_PAGE_TYPES.has(pageType)) throw new Error(`renderAnalyticsHeadHtml: unknown page_type "${pageType}"`);
+  return `<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
   window.trackEvent = function(name, params){
     try {
       var p = {};
@@ -6879,6 +6890,30 @@ function renderAnalyticsHeadHtml(pageType) {
     } catch (err) { /* analytics must never break the site */ }
   }, true);
 </script>`;
+}
+
+// Analytics Cleanup C1: the homepage and /browse (okanagan.html, frozen on
+// disk) join the same internal-traffic mechanism as every server template.
+// Two exact-string swaps on the HTML read from okanagan.html, nothing else:
+//  1. the static gtag.js loader tag is removed -- the shared IIFE now
+//     injects it, and only on the live hostname;
+//  2. gtag('js') + the plain gtag('config') become the shared IIFE with an
+//     empty config (no page_type -- these pages are not server templates).
+// The dataLayer/gtag stub and okanagan.html's own window.trackEvent wrapper
+// are left byte-for-byte as they are. If either expected string is not found
+// exactly once, the HTML is returned unchanged (fail-safe: the page keeps its
+// previous analytics rather than breaking).
+const HOMEPAGE_GA4_LOADER_TAG = `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}"></script>\n`;
+const HOMEPAGE_GA4_CONFIG_LINES = `  gtag('js', new Date());\n  gtag('config', '${GA4_MEASUREMENT_ID}');\n`;
+function applyHomepageAnalyticsHead(html) {
+  const once = (needle) => {
+    const i = html.indexOf(needle);
+    return i !== -1 && html.indexOf(needle, i + needle.length) === -1;
+  };
+  if (!once(HOMEPAGE_GA4_LOADER_TAG) || !once(HOMEPAGE_GA4_CONFIG_LINES)) return html;
+  return html
+    .replace(HOMEPAGE_GA4_LOADER_TAG, () => '')
+    .replace(HOMEPAGE_GA4_CONFIG_LINES, () => `${renderGa4ConfigIifeJs('{}')}\n`);
 }
 
 function golfEngagementHeadHtml(type, themed = usesThemedCategoryLayout(type), pageType) {
@@ -9240,6 +9275,27 @@ const OUTDOOR_FILTER_CLIENT_PREDICATE_SRC = `function matches(regions, activitie
     for (var i = 0; i < activities.length && !activityOk; i++) { if (venueActivities.indexOf(activities[i]) !== -1) activityOk = true; }
     return regionOk && activityOk;
   }`;
+// Analytics Cleanup C2: one filter_change event per genuine visitor filter
+// action on the listing/filter surfaces (Food & Drink, Dog Friendly,
+// Outdoors, What's On, Local Favourites, Hidden Gems, Secret Spots).
+// Called ONLY from the scripts' own click handlers, after the existing
+// apply('push') -- never from readUrlIntoChips(), popstate, the initial
+// apply('replace'), search typing or any programmatic state change, so URL
+// prefill, page load and Back/Forward never emit it. Parameters are fixed
+// values: the surface slug is chosen by the server, group/value come from
+// the chip's own data attribute (never typed text). filter_action is 'add',
+// 'remove' or 'clear_all' ('clear_all' with filter_group 'all' = every
+// filter cleared; with a group name = that whole group cleared, e.g. the
+// "All" chip). active_filter_count = selected chips after the action.
+function renderFilterChangeClientSrc(surface) {
+  return `var FILTER_SURFACE = ${JSON.stringify(surface)};
+  function trackFilterChange(group, value, action){
+    try {
+      if (window.trackEvent) window.trackEvent('filter_change', { filter_surface: FILTER_SURFACE, filter_group: group, filter_value: String(value), filter_action: action, active_filter_count: activeFilterCount() });
+    } catch (e) { /* analytics must never break the site */ }
+  }`;
+}
+
 function renderOutdoorFilterScriptHtml() {
   const labels = { regions: { ...REGION_LABELS }, activities: Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a.label])) };
   return `<script>
@@ -9262,6 +9318,8 @@ function renderOutdoorFilterScriptHtml() {
   var selectedBox = document.getElementById('outdoorSelected');
   var regionStatus = document.getElementById('outdoorRegionStatus'), activityStatus = document.getElementById('outdoorActivityStatus');
   if (!chips.length || !cards.length) return;
+  ${renderFilterChangeClientSrc('outdoors')}
+  function activeFilterCount(){ return selected('region').length + selected('activity').length; }
   ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
   ${OUTDOOR_SUMMARY_CLIENT_SRC}
@@ -9368,11 +9426,14 @@ function renderOutdoorFilterScriptHtml() {
     }
   }
   function setPressed(kind, value, on){ chips.forEach(function(c){ if (c.getAttribute('data-' + kind) === value) c.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
-  chips.forEach(function(chip){ chip.addEventListener('click', function(){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }); });
+  chips.forEach(function(chip){ chip.addEventListener('click', function(){ var on = chip.getAttribute('aria-pressed') !== 'true'; chip.setAttribute('aria-pressed', on ? 'true' : 'false'); apply('push'); var r = chip.getAttribute('data-region'); trackFilterChange(r ? 'region' : 'activity', r || chip.getAttribute('data-activity'), on ? 'add' : 'remove'); }); });
   function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); searchTerm = ''; if (searchInput) searchInput.value = ''; apply('push'); }
+  function clearAllByVisitor(){ var had = activeFilterCount(); clearAll(); if (had) trackFilterChange('all', 'all', 'clear_all'); }
   if (allChip) allChip.addEventListener('click', function(){
+    var had = selected('activity').length;
     chips.forEach(function(c){ if (c.getAttribute('data-activity')) c.setAttribute('aria-pressed', 'false'); });
     apply('push');
+    if (had) trackFilterChange('activity', 'all', 'clear_all');
   });
   if (searchInput) {
     var searchTimer = null;
@@ -9414,13 +9475,13 @@ function renderOutdoorFilterScriptHtml() {
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
   }
   var emptyClear = document.getElementById('outdoorNoResultsClear');
-  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAllByVisitor(); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
-    if (t.id === 'outdoorSelectedClear') { clearAll(); return; }
+    if (t.id === 'outdoorSelectedClear') { clearAllByVisitor(); return; }
     var r = t.getAttribute('data-remove-region'), a = t.getAttribute('data-remove-activity');
-    if (r) { setPressed('region', r, false); apply('push'); }
-    else if (a) { setPressed('activity', a, false); apply('push'); }
+    if (r) { setPressed('region', r, false); apply('push'); trackFilterChange('region', r, 'remove'); }
+    else if (a) { setPressed('activity', a, false); apply('push'); trackFilterChange('activity', a, 'remove'); }
   });
   function readUrlIntoChips(){
     try {
@@ -10293,6 +10354,8 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
   var regionsCount = document.getElementById('fdRegionsCount');
   var searchTerm = '';
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-fd-apply]'));
+  ${renderFilterChangeClientSrc(opts.surface || 'food_drink')}
+  function activeFilterCount(){ return pressed(typeChips, 'data-fd-type').length + pressed(featureChips, 'data-fd-feature').length + pressed(regionChips, 'data-region').length + (typeof openOn !== 'undefined' && openOn ? 1 : 0); }
   ${FD_HUB_FILTER_CLIENT_PREDICATE_SRC}
   ${FD_HUB_SUMMARY_CLIENT_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
@@ -10428,7 +10491,12 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   }
   function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); page = 1; apply('push'); }
   if (showMore) showMore.addEventListener('click', function(){ page += 1; apply('none'); });
-  [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
+  [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){
+    var on = c.getAttribute('aria-pressed') !== 'true';
+    toggle(c);
+    var group = c.hasAttribute('data-fd-type') ? 'type' : (c.hasAttribute('data-fd-feature') ? 'feature' : 'region');
+    trackFilterChange(group, c.getAttribute(group === 'region' ? 'data-region' : 'data-fd-' + group), on ? 'add' : 'remove');
+  }); }); });
   function clearAll(){
     [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
     searchTerm = ''; if (searchInput) searchInput.value = '';${O(`
@@ -10436,7 +10504,8 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     page = 1;
     apply('push');
   }
-  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); page = 1; apply('push'); });
+  function clearAllByVisitor(){ var had = activeFilterCount(); clearAll(); if (had) trackFilterChange('all', 'all', 'clear_all'); }
+  if (allChip) allChip.addEventListener('click', function(){ var had = pressed(typeChips, 'data-fd-type').length; typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); page = 1; apply('push'); if (had) trackFilterChange('type', 'all', 'clear_all'); });
   if (searchInput) {
     var timer = null;
     searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); page = 1; apply('none'); }, 120); });
@@ -10444,16 +10513,16 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } page = 1; apply('none'); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
-    if (t.id === 'fdSelectedClear') { clearAll(); return; }${O(`
-    if (t.getAttribute('data-fd-remove-open')) { openOn = false; page = 1; apply('push'); return; }`)}
-    var map = [['data-fd-remove-type', typeChips, 'data-fd-type'], ['data-fd-remove-feature', featureChips, 'data-fd-feature'], ['data-fd-remove-region', regionChips, 'data-region']];
+    if (t.id === 'fdSelectedClear') { clearAllByVisitor(); return; }${O(`
+    if (t.getAttribute('data-fd-remove-open')) { openOn = false; page = 1; apply('push'); trackFilterChange('open_now', 'now', 'remove'); return; }`)}
+    var map = [['data-fd-remove-type', typeChips, 'data-fd-type', 'type'], ['data-fd-remove-feature', featureChips, 'data-fd-feature', 'feature'], ['data-fd-remove-region', regionChips, 'data-region', 'region']];
     for (var i = 0; i < map.length; i++) {
       var v = t.getAttribute(map[i][0]);
-      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); page = 1; apply('push'); return; }
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); page = 1; apply('push'); trackFilterChange(map[i][3], v, 'remove'); return; }
     }
   });
   var emptyClear = document.getElementById('fdNoResultsClear');
-  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAllByVisitor(); });
   var popsRoot = document.querySelector('.fd-controls');
   var pops = Array.prototype.slice.call(document.querySelectorAll('.fd-pop'));
   if (popsRoot) popsRoot.classList.add('js');
@@ -10504,7 +10573,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   window.addEventListener('popstate', function(){ readUrlIntoChips(); openGroupsForSelection(); page = 1; apply('none'); });
   readUrlIntoChips();
   openGroupsForSelection();${O(`
-  if (openToggle) openToggle.addEventListener('click', function(){ openOn = !openOn; page = 1; apply('push'); });
+  if (openToggle) openToggle.addEventListener('click', function(){ openOn = !openOn; page = 1; apply('push'); trackFilterChange('open_now', 'now', openOn ? 'add' : 'remove'); });
   // The clock moves: re-read every minute; the list itself only re-filters
   // while Open now is on.
   setInterval(function(){
@@ -10660,7 +10729,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
-  ${renderFoodDrinkHubScriptHtml()}
+  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category' })}
 </body>
 </html>`;
 }
@@ -11113,6 +11182,8 @@ function renderDogHubScriptHtml() {
   var regionsCount = document.getElementById('dogRegionsCount');
   var searchTerm = '';
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-dog-apply]'));
+  ${renderFilterChangeClientSrc('dog_friendly')}
+  function activeFilterCount(){ return pressed(typeChips, 'data-dog-type').length + pressed(featureChips, 'data-dog-feature').length + pressed(regionChips, 'data-region').length; }
   ${DOG_HUB_FILTER_CLIENT_PREDICATE_SRC}
   ${DOG_HUB_SUMMARY_CLIENT_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
@@ -11201,13 +11272,19 @@ function renderDogHubScriptHtml() {
     }
   }
   function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }
-  [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
+  [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){
+    var on = c.getAttribute('aria-pressed') !== 'true';
+    toggle(c);
+    var group = c.hasAttribute('data-dog-type') ? 'type' : (c.hasAttribute('data-dog-feature') ? 'feature' : 'region');
+    trackFilterChange(group, c.getAttribute(group === 'region' ? 'data-region' : 'data-dog-' + group), on ? 'add' : 'remove');
+  }); }); });
   function clearAll(){
     [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
     searchTerm = ''; if (searchInput) searchInput.value = '';
     apply('push');
   }
-  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); });
+  function clearAllByVisitor(){ var had = activeFilterCount(); clearAll(); if (had) trackFilterChange('all', 'all', 'clear_all'); }
+  if (allChip) allChip.addEventListener('click', function(){ var had = pressed(typeChips, 'data-dog-type').length; typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); if (had) trackFilterChange('type', 'all', 'clear_all'); });
   if (searchInput) {
     var timer = null;
     searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120); });
@@ -11215,15 +11292,15 @@ function renderDogHubScriptHtml() {
   if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
-    if (t.id === 'dogSelectedClear') { clearAll(); return; }
-    var map = [['data-dog-remove-type', typeChips, 'data-dog-type'], ['data-dog-remove-feature', featureChips, 'data-dog-feature'], ['data-dog-remove-region', regionChips, 'data-region']];
+    if (t.id === 'dogSelectedClear') { clearAllByVisitor(); return; }
+    var map = [['data-dog-remove-type', typeChips, 'data-dog-type', 'type'], ['data-dog-remove-feature', featureChips, 'data-dog-feature', 'feature'], ['data-dog-remove-region', regionChips, 'data-region', 'region']];
     for (var i = 0; i < map.length; i++) {
       var v = t.getAttribute(map[i][0]);
-      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); apply('push'); return; }
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }.bind(null)); apply('push'); trackFilterChange(map[i][3], v, 'remove'); return; }
     }
   });
   var emptyClear = document.getElementById('dogNoResultsClear');
-  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAllByVisitor(); });
   var popsRoot = document.querySelector('.fd-controls');
   var pops = Array.prototype.slice.call(document.querySelectorAll('.fd-pop'));
   if (popsRoot) popsRoot.classList.add('js');
@@ -11467,7 +11544,7 @@ function renderLocalFavouritesStyles() {
     .replace(/body\.dog-page/g, 'body.lf-page')
     .replace(/#dogResults/g, '#lfResults');
 }
-function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite') {
+function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite', filterSurface = 'local_favourites') {
   const labels = {
     regions: { ...REGION_LABELS },
     types: Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].plural])),
@@ -11491,6 +11568,8 @@ function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite') {
   var regionsCount = document.getElementById('lfRegionsCount');
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-lf-apply]'));
   var searchTerm = '';
+  ${renderFilterChangeClientSrc(filterSurface)}
+  function activeFilterCount(){ return pressed(typeChips, 'data-lf-type').length + pressed(regionChips, 'data-region').length; }
   ${LOCAL_FAVOURITES_FILTER_CLIENT_PREDICATE_SRC}
   ${LOCAL_FAVOURITES_SUMMARY_CLIENT_SRC.replace("' local favourite '", `' ${summaryLabel} '`)}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
@@ -11566,13 +11645,19 @@ function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite') {
     }
   }
   function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }
-  [typeChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){ toggle(c); }); }); });
+  [typeChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){
+    var on = c.getAttribute('aria-pressed') !== 'true';
+    toggle(c);
+    var isType = c.hasAttribute('data-lf-type');
+    trackFilterChange(isType ? 'type' : 'region', c.getAttribute(isType ? 'data-lf-type' : 'data-region'), on ? 'add' : 'remove');
+  }); }); });
   function clearAll(){
     [typeChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
     searchTerm = ''; if (searchInput) searchInput.value = '';
     apply('push');
   }
-  if (allChip) allChip.addEventListener('click', function(){ typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); });
+  function clearAllByVisitor(){ var had = activeFilterCount(); clearAll(); if (had) trackFilterChange('all', 'all', 'clear_all'); }
+  if (allChip) allChip.addEventListener('click', function(){ var had = pressed(typeChips, 'data-lf-type').length; typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); apply('push'); if (had) trackFilterChange('type', 'all', 'clear_all'); });
   if (searchInput) {
     var timer = null;
     searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); apply('none'); }, 120); });
@@ -11580,15 +11665,15 @@ function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite') {
   if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } apply('none'); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
-    if (t.id === 'lfSelectedClear') { clearAll(); return; }
-    var map = [['data-lf-remove-type', typeChips, 'data-lf-type'], ['data-lf-remove-region', regionChips, 'data-region']];
+    if (t.id === 'lfSelectedClear') { clearAllByVisitor(); return; }
+    var map = [['data-lf-remove-type', typeChips, 'data-lf-type', 'type'], ['data-lf-remove-region', regionChips, 'data-region', 'region']];
     for (var i = 0; i < map.length; i++) {
       var v = t.getAttribute(map[i][0]);
-      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }); apply('push'); return; }
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }); apply('push'); trackFilterChange(map[i][3], v, 'remove'); return; }
     }
   });
   var emptyClear = document.getElementById('lfNoResultsClear');
-  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAllByVisitor(); });
   var popsRoot = document.querySelector('.fd-controls');
   var pops = Array.prototype.slice.call(document.querySelectorAll('.fd-pop'));
   if (popsRoot) popsRoot.classList.add('js');
@@ -11642,6 +11727,7 @@ function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite') {
 function renderLocalFavouritesPage(venues, filter = null) {
   return renderCuratedCollectionPage({
     path: '/local-favorites',
+    filterSurface: 'local_favourites',
     heading: 'Local Favourites',
     title: 'Local Favourites in the Okanagan | Okanagan Roam',
     description: `${venues.length} places across the Okanagan Valley with genuine local roots and credible evidence that locals value, recommend or have worked to preserve them \u2014 from independent restaurants, caf\u00e9s and pubs to community-protected parks, trails and beaches. Not a ranking.`,
@@ -11730,7 +11816,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('lf', true)}
-  ${renderLocalFavouritesScriptHtml(cfg.summaryLabel)}
+  ${renderLocalFavouritesScriptHtml(cfg.summaryLabel, cfg.filterSurface)}
 </body>
 </html>`;
 }
@@ -11773,6 +11859,7 @@ function countHiddenGemsOutsideSecretSpots(regions = []) {
 function renderSecretSpotsPage(venues, filter = null) {
   return renderCuratedCollectionPage({
     path: '/secret-spots',
+    filterSurface: 'secret_spots',
     heading: 'Secret Spots',
     title: 'Secret Spots in the Okanagan | Okanagan Roam',
     description: `${venues.length} tucked-away parks, gardens, waterfalls and quieter beaches across the Okanagan Valley that are easy to miss and worth seeking out — each one chosen on specific evidence, not popularity. Not a ranking.`,
@@ -11841,6 +11928,7 @@ function renderHiddenGemsPage(venues, filter = null, feature = null) {
       : ` This view shows only the ones with the ${escapeHtml(badge.title)} badge.`;
   return renderCuratedCollectionPage({
     path: feature ? `/hidden-gems/${feature.replace(/_/g, '-')}` : '/hidden-gems',
+    filterSurface: 'hidden_gems',
     heading,
     title: `${heading} in the Okanagan | Okanagan Roam`,
     description: `${venues.length} ${badge ? `${badge.adj} ` : ''}places on Okanagan Roam's Hidden Gems list across the Okanagan Valley. Not a ranking.`,
@@ -12295,6 +12383,8 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   var selectedBox = document.getElementById('whatsOnSelected');
   var regionStatus = document.getElementById('whatsOnRegionStatus');
   if (!chips.length) return;
+  ${renderFilterChangeClientSrc('whats_on')}
+  function activeFilterCount(){ return selected('region').length + selected('category').length; }
   ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
   function summaryText(shown, total, filtered){ var noun = total === 1 ? 'event' : 'events'; return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' ' + noun); }
@@ -12390,11 +12480,14 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     }
   }
   function setPressed(kind, value, on){ chips.forEach(function(c){ if (c.getAttribute('data-' + kind) === value) c.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
-  chips.forEach(function(chip){ chip.addEventListener('click', function(){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); apply('push'); }); });
+  chips.forEach(function(chip){ chip.addEventListener('click', function(){ var on = chip.getAttribute('aria-pressed') !== 'true'; chip.setAttribute('aria-pressed', on ? 'true' : 'false'); apply('push'); var r = chip.getAttribute('data-region'); trackFilterChange(r ? 'region' : 'category', r || chip.getAttribute('data-category'), on ? 'add' : 'remove'); }); });
   function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); searchTerm = ''; if (searchInput) searchInput.value = ''; apply('push'); }
+  function clearAllByVisitor(){ var had = activeFilterCount(); clearAll(); if (had) trackFilterChange('all', 'all', 'clear_all'); }
   if (allChip) allChip.addEventListener('click', function(){
+    var had = selected('category').length;
     chips.forEach(function(c){ if (c.getAttribute('data-category')) c.setAttribute('aria-pressed', 'false'); });
     apply('push');
+    if (had) trackFilterChange('category', 'all', 'clear_all');
   });
   if (searchInput) {
     var searchTimer = null;
@@ -12435,15 +12528,15 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     document.addEventListener('click', function(){ closePops(null); });
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
   }
-  if (clearBtn) clearBtn.addEventListener('click', clearAll);
+  if (clearBtn) clearBtn.addEventListener('click', clearAllByVisitor);
   var emptyClear = document.getElementById('whatsOnNoResultsClear');
-  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAll(); });
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAllByVisitor(); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
-    if (t.id === 'whatsOnSelectedClear') { clearAll(); return; }
+    if (t.id === 'whatsOnSelectedClear') { clearAllByVisitor(); return; }
     var r = t.getAttribute('data-remove-region'), k = t.getAttribute('data-remove-category');
-    if (r) { setPressed('region', r, false); apply('push'); }
-    else if (k) { setPressed('category', k, false); apply('push'); }
+    if (r) { setPressed('region', r, false); apply('push'); trackFilterChange('region', r, 'remove'); }
+    else if (k) { setPressed('category', k, false); apply('push'); trackFilterChange('category', k, 'remove'); }
   });
   if (showBtn) showBtn.addEventListener('click', function(){ var t = document.getElementById('whatsOnResultsTop'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   function readUrlIntoChips(){
@@ -16033,7 +16126,7 @@ const server = http.createServer(async (req, res) => {
     // of always rendering underneath the new homepage. See /browse below.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
-        let html = fs.readFileSync(SITE_PATH, 'utf8');
+        let html = applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'));
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
         // not just via the sitemap (which some crawlers deprioritize). The
@@ -16174,7 +16267,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (fs.existsSync(SITE_PATH)) {
-        let html = fs.readFileSync(SITE_PATH, 'utf8');
+        let html = applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'));
 
         // /browse redesign harmonization pass (2026-09-18): marks this
         // response so page-scoped CSS can tell it apart from / (same
@@ -18266,6 +18359,9 @@ module.exports = {
   // Measurement Phase A
   renderAnalyticsHeadHtml,
   GA4_PAGE_TYPES,
+  // Analytics Cleanup C1
+  renderGa4ConfigIifeJs,
+  applyHomepageAnalyticsHead,
   FD_HUB_FEATURES,
   getFoodDrinkHubVenues,
   parseFoodDrinkFilterQuery,
