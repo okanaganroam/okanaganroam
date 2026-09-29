@@ -53,6 +53,7 @@ const DISCOVERY_OCCASION_NOTES = {
 
 // ---------- text normalization ----------
 
+const CONTRACTION_WORDS = { d: 'would', re: 'are', ve: 'have', ll: 'will', m: 'am' };
 function normalizeDiscoveryText(text) {
   if (typeof text !== 'string') return '';
   return text
@@ -61,6 +62,14 @@ function normalizeDiscoveryText(text) {
     .replace(/[̀-ͯ]/g, '') // café -> cafe
     .toLowerCase()
     .replace(/[‘’`]/g, "'")
+    // Step 1 (2026-09-29): pronoun contractions and negations are expanded
+    // before apostrophes are dropped, so "we'd" never reads as "wed"
+    // (Wednesday). Only after a pronoun / auxiliary, so venue names such as
+    // "Bless'd" or "Press'd" normalize exactly as before.
+    .replace(/\b(i|we|you|they|he|she|it|that|there|who|what)'(d|re|ve|ll|m)\b/g, (m, w, c) => `${w} ${CONTRACTION_WORDS[c]}`)
+    .replace(/\bwon't\b/g, 'will not')
+    .replace(/\bcan't\b/g, 'can not')
+    .replace(/\b(do|does|did|is|are|was|were|could|would|should|have|has|had)n't\b/g, '$1 not')
     .replace(/'s\b/g, 's') // "what's" -> "whats", "joe's" -> "joes"
     .replace(/[-–—_/]/g, ' ') // "dog-friendly" == "dog friendly", "3-day" == "3 day"
     .replace(/&/g, ' and ')
@@ -218,11 +227,15 @@ const WHEN_TO_PRESET = { today: 'today', tonight: 'today', now: 'today', 'this-w
 
 // Understood as "the visitor wants suggestions of anything" -- consumed so
 // they do not become text terms, but they map to no filter.
-const SCOPE_PHRASES = ['things to do', 'something to do', 'what to do', 'stuff to do', 'fun things', 'activities', 'activity', 'attractions', 'places to go', 'places to visit', 'somewhere to go', 'what should i do', 'what can we do', 'what can i do', 'what to see', 'things to see', 'sights', 'sightseeing'];
+const SCOPE_PHRASES = ['things to do', 'something to do', 'what to do', 'stuff to do', 'fun things', 'activities', 'activity', 'attractions', 'places to go', 'places to visit', 'somewhere to go', 'what should i do', 'what can we do', 'what can i do', 'what to see', 'things to see', 'sights', 'sightseeing',
+  // Step 1 (2026-09-29): wanting to explore is wanting things to do.
+  'explore', 'exploring', 'to explore', 'places to explore', 'somewhere to explore'];
 
 const PLAN_PHRASES = ['plan', 'planning', 'itinerary', 'trip', 'getaway', 'vacation', 'road trip', 'schedule', 'weekend away'];
 const RECOMMEND_PHRASES = ['recommend', 'recommendation', 'recommendations', 'suggest', 'suggestion', 'suggestions', 'find me', 'where can i', 'where can we', 'where should i', 'where should we', 'where to get', 'where to find'];
-const SUPERLATIVE_PHRASES = ['best', 'top', 'greatest', 'great', 'nicest', 'favourite', 'favorite', 'must see', 'must try', 'top rated', 'highest rated'];
+const SUPERLATIVE_PHRASES = ['best', 'top', 'greatest', 'great', 'nicest', 'favourite', 'favorite', 'must see', 'must try', 'top rated', 'highest rated',
+  // Step 1 (2026-09-29): "can't miss" / "don't miss" (after contraction expansion).
+  'can not miss', 'cannot miss', 'do not miss'];
 
 // Travel-related concepts Okanagan Roam knowingly cannot satisfy today.
 const UNSUPPORTED_PHRASES = [
@@ -232,8 +245,33 @@ const UNSUPPORTED_PHRASES = [
   'car rental', 'rental car', 'taxi', 'uber', 'shuttle', 'weather', 'forecast',
   'helicopter', 'helicopter tour', 'private jet', 'michelin', 'michelin star',
   'next weekend', 'next week', 'next month', 'last weekend',
-  'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
 ];
+
+// Step 1 (2026-09-29): a month or season is understood for TRIP PLANNING
+// (plan / recommend requests): the planner uses it for its existing seasonal
+// rules and hedged "check before you go" notes. Nothing else can filter by
+// month, so for any other request the words are still reported as not
+// applied, exactly as before. "may" alone is too ambiguous; only "in may".
+const MONTH_ALIASES = {
+  1: ['january', 'in january'], 2: ['february', 'in february'], 3: ['march', 'in march'], 4: ['april', 'in april'],
+  5: ['in may', 'during may'], 6: ['june', 'in june'], 7: ['july', 'in july'], 8: ['august', 'in august'],
+  9: ['september', 'sept', 'in september'], 10: ['october', 'in october'], 11: ['november', 'in november'], 12: ['december', 'in december'],
+};
+const SEASON_ALIASES = {
+  winter: ['winter', 'in winter', 'in the winter', 'this winter', 'wintertime'],
+  spring: ['spring', 'in spring', 'in the spring', 'this spring', 'springtime', 'spring break'],
+  summer: ['summer', 'in summer', 'in the summer', 'this summer', 'summertime'],
+  fall: ['fall', 'in the fall', 'this fall', 'autumn', 'in autumn', 'in the autumn', 'this autumn'],
+  off: ['off season', 'offseason', 'off peak', 'shoulder season', 'quiet season'],
+};
+const MONTH_SEASON = [null, 'winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'fall', 'fall', 'fall', 'winter'];
+// Amounts, never occasions: "a couple of hidden gems" is not "a couple".
+const QUANTITY_PHRASES = ['a couple of', 'couple of', 'a few', 'a bunch of', 'a handful of'];
+// Plan/recommend requests only: lake words are a request for lake time (the
+// Lake View badge, beaches and water activities), not food or text terms.
+const LAKE_WORDS = ['lake', 'lakes', 'lakeside', 'lakefront', 'waterfront', 'water'];
+// Pace words inside a one-day theme ("one relaxed day").
+const THEME_PACE_WORDS = { relaxed: 'relaxed', relaxing: 'relaxed', easy: 'relaxed', lazy: 'relaxed', leisurely: 'relaxed', chill: 'relaxed', packed: 'packed', busy: 'packed', full: 'packed' };
 
 const DAY_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, a: 1 };
 const LENGTH_PHRASES = [
@@ -255,7 +293,10 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'good nice fun place places spot spots area areas town city day days night nights time trip trips weekend lets let us okay ok hi hey '
   + 'if then than else only one ones all more most much many few little lot lots kind sort type types option options idea ideas '
   + 'around tonight today tomorrow while during after before next last then take takes taking bring bringing stay staying '
-  + 'whats wanna gonna ive id nearby close near').split(/\s+/));
+  + 'whats wanna gonna ive id nearby close near '
+  // Step 1 (2026-09-29): verbs, pronouns and filler that were reaching the
+  // planner as "food" searches ("Nothing matching explore").
+  + 'not have has had coming come them they their explore exploring experience experiences anything everything nothing easy').split(/\s+/));
 
 // ---------- table construction ----------
 
@@ -313,6 +354,9 @@ function buildPhraseTable(taxonomy) {
   for (const p of SUPERLATIVE_PHRASES) add(p, 'superlative', true);
   for (const p of UNSUPPORTED_PHRASES) add(p, 'unsupported', p);
   for (const { phrase, days } of LENGTH_PHRASES) add(phrase, 'length', days);
+  for (const [month, phrases] of Object.entries(MONTH_ALIASES)) for (const p of phrases) add(p, 'month', Number(month));
+  for (const [season, phrases] of Object.entries(SEASON_ALIASES)) for (const p of phrases) add(p, 'season', season);
+  for (const p of QUANTITY_PHRASES) add(p, 'quantity', true);
   // Combined phrases that carry two meanings at once.
   if (t.types.includes('pub') && t.features.includes('sports_tv')) { add('sports bar', 'type', 'pub'); add('sports bars', 'type', 'pub'); }
   if (t.types.includes('beach')) { add('dog beach', 'type', 'beach'); add('dog beaches', 'type', 'beach'); }
@@ -469,6 +513,13 @@ function emptyIntent() {
     exactVenue: null,
     foodTerms: [],
     eventPlanning: false,
+    // Step 1 (2026-09-29), trip planning only: the month (1-12) and season the
+    // visitor named, per-day themes ("one relaxed day with a lake
+    // experience") and a request for lake time. Additive fields.
+    month: null,
+    season: null,
+    dayThemes: [],
+    lake: false,
     matched: [],
     unsupported: [],
     ambiguities: [],
@@ -514,6 +565,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const flags = { event: false, plan: false, recommend: false, scopeAnything: false };
   const lengthMentions = lengths.map((l) => ({ days: l.days, phrase: l.phrase, start: l.start }));
   const budgetMentions = [], paceMentions = [], occasionMentions = [], whenMentions = [], daypartMentions = [];
+  const monthMentions = [], seasonMentions = [];
   const eventCats = [];
   const orderedTypes = [];
 
@@ -538,6 +590,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
         case 'superlative': intent.superlative = true; break;
         case 'scope': if (value === 'anything') flags.scopeAnything = true; break;
         case 'length': lengthMentions.push({ days: value, phrase: hit.phrase, start: hit.start }); break;
+        case 'month': monthMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
+        case 'season': seasonMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
+        case 'quantity': break; // "a couple of": an amount, never an occasion
         case 'unsupported': intent.unsupported.push(value); break;
         default: break;
       }
@@ -563,11 +618,62 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     if (values.length > 1) intent.conflicts.push({ field, values });
     return mentions.length ? mentions.slice().sort((a, b) => a.start - b.start)[mentions.length - 1].value : null;
   };
+  // Step 1 (2026-09-29): a one-day mention inside a longer trip ("a 3-day
+  // trip ... one relaxed day with a nice lake experience", "plan 2 days, one
+  // of them on the lake") is a DAY THEME, never the trip length. Its window
+  // runs from the mention to the next theme (at most 8 words), and what is
+  // said inside it (pace, types, activities, lake) belongs to that day.
+  const longest = lengthMentions.reduce((m, l) => Math.max(m, l.days), 0);
+  const themeAnchors = [];
+  if (longest > 1) {
+    for (const l of lengths) if (l.days === 1 && /^(one|a)\b/.test(l.phrase)) themeAnchors.push({ start: l.start, end: l.end, phrase: l.phrase });
+    for (let i = 0; i + 2 < tokens.length; i++) {
+      if (tokens[i] === 'one' && tokens[i + 1] === 'of' && ['them', 'those', 'the'].includes(tokens[i + 2])) {
+        const end = tokens[i + 2] === 'the' && tokens[i + 3] === 'days' ? i + 4 : i + 3;
+        themeAnchors.push({ start: i, end, phrase: tokens.slice(i, end).join(' ') });
+      }
+    }
+    themeAnchors.sort((a, b) => a.start - b.start);
+  }
+  const themeWindows = themeAnchors.map((a, k) => ({ ...a, to: Math.min(a.end + 8, k + 1 < themeAnchors.length ? themeAnchors[k + 1].start : tokens.length, tokens.length) }));
+  const inTheme = (start) => themeWindows.find((w) => start >= w.start && start < w.to) || null;
+  for (const w of themeWindows) {
+    const theme = { phrase: w.phrase, pace: null, types: [], activities: [], features: [], lake: false };
+    const adjective = w.phrase.split(' ').find((x) => THEME_PACE_WORDS[x]);
+    if (adjective && t.paces.includes(THEME_PACE_WORDS[adjective])) theme.pace = THEME_PACE_WORDS[adjective];
+    for (const hit of accepted) {
+      if (hit.start < w.end || hit.start >= w.to) continue;
+      for (const { field, value } of hit.assign) {
+        if (field === 'pace' && !theme.pace) theme.pace = value;
+        else if (field === 'type' && !theme.types.includes(value)) theme.types.push(value);
+        else if (field === 'activity' && !theme.activities.includes(value)) theme.activities.push(value);
+        else if (field === 'feature' && !theme.features.includes(value)) theme.features.push(value);
+      }
+    }
+    for (let k = w.end; k < w.to; k++) if (LAKE_WORDS.includes(tokens[k]) && !claimed[k]) theme.lake = true;
+    if (theme.features.includes('lake_view')) theme.lake = true;
+    intent.dayThemes.push(theme);
+  }
+  // A type named ONLY inside day themes ("one day of golf") belongs to those
+  // days; named anywhere else too, it is a whole-trip interest as before.
+  for (const theme of intent.dayThemes) {
+    theme.scopedTypes = theme.types.filter((ty) => !accepted.some((hit) => !inTheme(hit.start) && hit.assign.some((a) => a.field === 'type' && a.value === ty)));
+  }
+  const themedPace = (m) => !inTheme(m.start);
+
   intent.budget = lastOf('budget', budgetMentions);
-  intent.pace = lastOf('pace', paceMentions);
-  const occasion = lastOf('occasion', occasionMentions);
+  intent.pace = lastOf('pace', paceMentions.filter(themedPace));
+  // "a romantic weekend for two ... a couple of hidden gems": adults is the
+  // weakest occasion, so any other named occasion wins over it.
+  const occasionPool = occasionMentions.some((m) => m.value !== 'adults') ? occasionMentions.filter((m) => m.value !== 'adults') : occasionMentions;
+  const occasion = lastOf('occasion', occasionPool);
   intent.occasion = occasion;
-  const lengthDays = lastOf('days', lengthMentions.map((l) => ({ value: l.days, start: l.start })));
+  const anchorStarts = new Set(themeAnchors.map((a) => a.start));
+  const lengthDays = lastOf('days', lengthMentions.filter((l) => !anchorStarts.has(l.start)).map((l) => ({ value: l.days, start: l.start })));
+  const month = lastOf('month', monthMentions);
+  const season = lastOf('season', seasonMentions);
+  if (month) intent.month = month;
+  if (season || month) intent.season = season || MONTH_SEASON[month];
   if (lengthDays !== null) {
     if (lengthDays >= 1 && lengthDays <= DISCOVERY_MAX_DAYS) intent.days = lengthDays;
     else intent.unsupported.push(`${lengthDays} days (the planner covers 1-${DISCOVERY_MAX_DAYS})`);
@@ -624,6 +730,51 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // one, venue fields are dropped -- events never select venues.
   if (intent.mode !== 'events') intent.eventCategories = [];
   else clearVenueFields(intent);
+
+  // 8b. Step 1 (2026-09-29): what only trip planning can use. For a plan or
+  // recommendation, lake words ask for lake time and a month/season shapes
+  // the seasonal notes. For anything else nothing can apply them, so they
+  // stay listed as not applied (a month exactly as before) and the lake
+  // words stay the visitor's own search words.
+  const planning = intent.mode === 'plan' || intent.mode === 'recommend';
+  if (planning) {
+    const lakeTerms = intent.textTerms.filter((w) => LAKE_WORDS.includes(w));
+    if (lakeTerms.length) {
+      for (let i = 0; i < tokens.length; i++) if (LAKE_WORDS.includes(tokens[i]) && !claimed[i] && !preClaimed[i] && !inTheme(i)) intent.lake = true;
+      intent.textTerms = intent.textTerms.filter((w) => !LAKE_WORDS.includes(w));
+      intent.foodTerms = intent.foodTerms.filter((f) => f.cuisine || !LAKE_WORDS.includes(f.term));
+    }
+  } else if (monthMentions.length || seasonMentions.length) {
+    // Exactly the previous reading for everything else: a month name
+    // (except "may") is reported as not applied; "in may" and season words
+    // are the visitor's own words again, in their original order.
+    const PREVIOUSLY_UNSUPPORTED_MONTHS = ['january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const released = new Set();
+    for (const hit of accepted) {
+      if (!hit.assign.some((a) => a.field === 'month' || a.field === 'season')) continue;
+      const monthWord = hit.phrase.split(' ').find((w) => PREVIOUSLY_UNSUPPORTED_MONTHS.includes(w));
+      if (monthWord) { if (!intent.unsupported.includes(monthWord)) intent.unsupported.push(monthWord); continue; }
+      for (let k = hit.start; k < hit.end; k++) released.add(k);
+    }
+    if (released.size) {
+      const terms = [];
+      for (let i = 0; i < tokens.length; i++) {
+        if (preClaimed[i] || (claimed[i] && !released.has(i))) continue;
+        const w = tokens[i];
+        if (STOPWORDS.has(w) || /^\d+$/.test(w) || w.length < 2) continue;
+        terms.push(w);
+      }
+      intent.textTerms = uniq(terms);
+      intent.foodTerms = intent.foodTerms.filter((f) => f.cuisine);
+      for (const w of intent.textTerms) if (!intent.foodTerms.some((f) => f.term === w)) intent.foodTerms.push({ term: w, cuisine: null });
+    }
+    intent.month = null;
+    intent.season = null;
+    intent.dayThemes = [];
+  } else {
+    intent.dayThemes = [];
+  }
+  if (!intent.dayThemes.length) intent.dayThemes = [];
 
   // 9. Ordered multi-part request ("a romantic winery and dinner").
   if (intent.mode === 'recommend' && orderedTypes.length >= 2) {
@@ -743,6 +894,22 @@ function validateDiscoveryIntent(candidate, taxonomy, text) {
       && (w.preset !== undefined || w.weekday !== undefined || w.relative !== undefined);
     if (ok) out.when = { ...w }; else rejected.push({ field: 'when', value: w, reason: 'invalid' });
   }
+  // Step 1 (2026-09-29): a month/season needs its own words in the text; day
+  // themes and lake time come only from the deterministic reading.
+  if (candidate.month != null) {
+    const m = candidate.month;
+    if (Number.isInteger(m) && MONTH_ALIASES[m] && MONTH_ALIASES[m].some(hasPhrase)) out.month = m;
+    else rejected.push({ field: 'month', value: m, reason: 'not_in_text' });
+  }
+  if (candidate.season != null) {
+    const s = candidate.season;
+    if (typeof s === 'string' && SEASON_ALIASES[s] && SEASON_ALIASES[s].some(hasPhrase)) out.season = s;
+    else if (out.month && s === MONTH_SEASON[out.month]) out.season = s;
+    else rejected.push({ field: 'season', value: s, reason: 'not_in_text' });
+  }
+  if (out.month && !out.season) out.season = MONTH_SEASON[out.month];
+  if (Array.isArray(candidate.dayThemes) && candidate.dayThemes.length) rejected.push({ field: 'dayThemes', reason: 'deterministic_only' });
+  if (candidate.lake === true) rejected.push({ field: 'lake', reason: 'deterministic_only' });
   if (candidate.party && typeof candidate.party === 'object') {
     out.party.kids = candidate.party.kids === true && out.features.includes('kid_friendly');
     out.party.dog = candidate.party.dog === true && out.features.includes('dog_friendly');
@@ -888,7 +1055,10 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   const t = normalizeTaxonomy(taxonomy);
   const base = baseIntent || interpretDiscoveryQuery(text, taxonomy);
   const out = { multi: false, components: [], route: null, regions: [], party: { dog: false, kids: false }, when: base.when || null, unknownPlaces: [] };
-  const normalized = normalizeDiscoveryText(text);
+  // Step 1 (2026-09-29): a comma or semicolon separates parts like "and"
+  // does ("coffee, a beach afternoon, a winery and dinner"). Normalization
+  // drops punctuation, so the separator is made a word first.
+  const normalized = normalizeDiscoveryText(typeof text === 'string' ? text.replace(/\s*[,;]\s*/g, ' and ') : text);
   if (!normalized || base.exactVenue || !['find', 'events'].includes(base.mode)) return out;
   const tokens = normalized.split(' ');
   const table = tripPhraseTable(taxonomy);
@@ -898,7 +1068,11 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   const route = findTripRoute(tokens, regionPhrase);
   if (route) out.unknownPlaces = route.unknown.slice();
   const masked = tokens.map((tok, i) => (route && i >= route.start && i < route.end ? '\u0000' : tok));
-  const { accepted } = matchPhrases(masked, table);
+  const { accepted, claimed: tripClaimed } = matchPhrases(masked, table);
+  // Step 1 (2026-09-29): the visitor's own words no part could use ("a lake
+  // walk"), so the planner can name them instead of dropping them silently.
+  out.leftoverTerms = uniq(tokens.filter((w, i) => masked[i] !== '\u0000' && !tripClaimed[i] && !STOPWORDS.has(w)
+    && !TRIP_ROUTE_FILLER.has(w) && !TRIP_LIST_JOINERS.has(w) && !/^\d+$/.test(w) && w.length >= 2));
   const eventKinds = Object.fromEntries(TRIP_EVENT_KINDS.map((k) => [k.kind, k]));
   const fieldsOf = (hit, f) => hit.assign.filter((a) => a.field === f).map((a) => a.value);
   const createsComponent = (hit) => ['type', 'activity', 'tripEvent', 'tripMeal', 'cuisine'].some((f) => fieldsOf(hit, f).length)

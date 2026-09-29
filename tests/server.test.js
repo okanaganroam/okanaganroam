@@ -12667,3 +12667,116 @@ test('Analytics Cleanup C2: Outdoors and What\'s On -- region/activity/category 
   assert.deepEqual(w.fc(), ['whats_on|category|live-music|add|2', 'whats_on|category|live-music|remove|1', 'whats_on|region|kelowna|remove|0', 'whats_on|category|live-music|add|1', 'whats_on|category|all|clear_all|0', 'whats_on|region|kelowna|add|1', 'whats_on|all|all|clear_all|0']);
   for (const p of w.history.pushes) assert.match(p, /^\/whats-on\?when=weekend(&(regions|categories)=[^&]+)*$/, `date window kept on every push: ${p}`);
 });
+
+// ==== Build My Trip V3 (Step 2, 2026-09-29): flag, preview opt-in, API additions ====
+//
+// TRIP_PLANNER_V3 'off' (default) leaves /trip exactly as before; 'preview'
+// serves V3 only to a browser that opted in with /trip?trip_v3=on; 'on'
+// serves it to everyone. POST /api/trip/plan gains an optional `overrides`
+// object and returns an additive `understood` block; every existing request
+// body is answered as before.
+const withEnv = (vars, fn) => {
+  const saved = {};
+  for (const k of Object.keys(vars)) { saved[k] = process.env[k]; if (vars[k] === undefined) delete process.env[k]; else process.env[k] = vars[k]; }
+  try { return fn(); } finally { for (const k of Object.keys(saved)) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
+};
+
+test('Build My Trip V3: flag modes and the preview cookie decide who sees V3; off by default', () => {
+  withEnv({ TRIP_PLANNER_V3: undefined }, () => {
+    assert.equal(app.tripPlannerV3Mode(), 'off');
+    assert.equal(app.tripPlannerV3ActiveFor({ headers: { cookie: 'roam_trip_v3=1' } }), false, 'a cookie alone never turns V3 on');
+  });
+  for (const v of ['on', '1', 'true', 'YES']) withEnv({ TRIP_PLANNER_V3: v }, () => assert.equal(app.tripPlannerV3Mode(), 'on', v));
+  withEnv({ TRIP_PLANNER_V3: 'preview' }, () => {
+    assert.equal(app.tripPlannerV3Mode(), 'preview');
+    assert.equal(app.tripPlannerV3ActiveFor({ headers: {} }), false);
+    assert.equal(app.tripPlannerV3ActiveFor({ headers: { cookie: 'a=b; roam_trip_v3=1' } }), true);
+    assert.equal(app.tripPlannerV3ActiveFor({ headers: { cookie: 'roam_trip_v3=0' } }), false);
+  });
+  withEnv({ TRIP_PLANNER_V3: 'on' }, () => assert.equal(app.tripPlannerV3ActiveFor({ headers: {} }), true));
+  withEnv({ TRIP_PLANNER_V3: 'nonsense' }, () => assert.equal(app.tripPlannerV3Mode(), 'off'));
+});
+
+test('Build My Trip V3: /api/trip/plan overrides are optional, strictly validated, and only steer days, pace and base', () => {
+  assert.deepEqual(app.parseTripPlanBody({ text: 'plan 2 days in Kelowna' }).value.overrides, null, 'no overrides: unchanged request');
+  assert.deepEqual(app.parseTripPlanBody({ text: 'x', overrides: { days: 3, pace: 'relaxed', baseRegion: 'penticton' } }).value.overrides, { days: 3, pace: 'relaxed', baseRegion: 'penticton' });
+  assert.ok(app.parseTripPlanBody({ text: 'x', overrides: { baseRegion: 'valley' } }).value);
+  for (const bad of [{ days: 0 }, { days: 8 }, { days: 2.5 }, { pace: 'fast' }, { baseRegion: 'seattle' }, { venue: 1 }, [], null]) {
+    assert.ok(app.parseTripPlanBody({ text: 'x', overrides: bad }).error, JSON.stringify(bad));
+  }
+  const now = new Date('2026-09-29T19:00:00Z');
+  const base = app.runTripPlan({ text: 'Plan 2 days in Kelowna with wineries' }, now);
+  assert.ok(base.understood && Array.isArray(base.understood.interests), 'understood block is returned');
+  assert.deepEqual(app.runTripPlan({ text: 'Plan 2 days in Kelowna with wineries', overrides: { days: 3 } }, now).days.length, 3);
+  const moved = app.runTripPlan({ text: 'Plan 2 days in Kelowna with wineries', overrides: { baseRegion: 'penticton' } }, now);
+  assert.ok(moved.days.every((d) => !d.region || d.region === 'penticton'));
+  assert.deepEqual(moved.understood.base.map((b) => b.slug), ['penticton']);
+  assert.equal(app.runTripPlan({ text: 'Plan 2 days in Kelowna with wineries', overrides: { pace: 'packed' } }, now).understood.pace, 'packed');
+  // Without overrides the plan is exactly the previous one (plus the additive block).
+  const again = app.runTripPlan({ text: 'Plan 2 days in Kelowna with wineries' }, now);
+  delete again.understood; const b2 = { ...base }; delete b2.understood;
+  assert.deepEqual(again, b2);
+});
+
+test('Build My Trip V3: the page is the site shell + the V3 view; canonical /trip; noindex only in preview; analytics page_type trip', () => {
+  const html = app.renderTripPlannerV3Page({ preview: false });
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/trip">/);
+  assert.doesNotMatch(html, /noindex/);
+  assert.match(app.renderTripPlannerV3Page({ preview: true }), /<meta name="robots" content="noindex">/);
+  assert.ok(html.includes("page_type: 'trip'"), 'the shared analytics head with page_type trip');
+  assert.ok(html.includes('<header id="top">') && html.includes('id="tripTray"'), 'the homepage header and Trip tray');
+  assert.ok(html.includes('<script src="/scripts/app.js"></script>'), 'app.js unchanged, for Add to Trip / Favorites');
+  assert.ok(html.includes('id="t3Form"') && html.includes('id="t3Input"') && html.includes('fetch(\'/api/trip/plan\''));
+  for (const ev of ["'trip_plan_start'", "'trip_plan_complete'", "'trip_plan_error'", "'trip_plan_regenerate'", "'add_whole_trip'", "'open_my_trip'"]) assert.ok(html.includes(ev), ev);
+  assert.doesNotMatch(html, /\/api\/trip\/(generate|parse)/, 'the V3 view never uses the legacy endpoints');
+  assert.doesNotMatch(html, /openai|gpt-/i, 'no model is called');
+  const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  new Function(js); // parses
+});
+
+test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
+  const projectRoot = path.join(__dirname, '..');
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'trip-planner-v3-page.js'];
+  const run = async (port, env, fn) => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
+    for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+    fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
+    const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore', env: { ...process.env, TRIP_PLANNER_V2: 'on', ...env } });
+    try {
+      let ready = false;
+      for (let i = 0; i < 100 && !ready; i++) { try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); } }
+      assert.ok(ready, `child server ${port} started`);
+      await fn((p, cookie) => fetch(`http://localhost:${port}${p}`, { redirect: 'manual', headers: cookie ? { cookie } : {} }));
+    } finally { child.kill('SIGKILL'); fs.rmSync(tempDir, { recursive: true, force: true }); }
+  };
+  await run(3621, { TRIP_PLANNER_V3: '' }, async (get) => {
+    const plain = await (await get('/trip')).text();
+    const r = await get('/trip?trip_v3=on');
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('set-cookie'), null);
+    assert.equal(await r.text(), plain, 'with the flag off, ?trip_v3 is ignored');
+    assert.equal(await (await get('/trip', 'roam_trip_v3=1')).text(), plain, 'and so is the cookie');
+    assert.doesNotMatch(plain, /id="tripV3"/);
+  });
+  await run(3622, { TRIP_PLANNER_V3: 'preview' }, async (get) => {
+    assert.doesNotMatch(await (await get('/trip')).text(), /id="tripV3"/, 'no opt-in: the current page');
+    const on = await get('/trip?trip_v3=on');
+    assert.equal(on.status, 302);
+    assert.equal(on.headers.get('location'), '/trip');
+    assert.match(on.headers.get('set-cookie'), /^roam_trip_v3=1; Path=\/; Max-Age=2592000; SameSite=Lax/);
+    const v3 = await (await get('/trip', 'roam_trip_v3=1')).text();
+    assert.match(v3, /id="tripV3"/);
+    assert.match(v3, /noindex/);
+    const off = await get('/trip?trip_v3=off');
+    assert.match(off.headers.get('set-cookie'), /^roam_trip_v3=; Path=\/; Max-Age=0/);
+    const api = await fetch('http://localhost:3622/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'plan 2 days in Kelowna', overrides: { pace: 'relaxed' } }) });
+    assert.equal(api.status, 200);
+  });
+  await run(3623, { TRIP_PLANNER_V3: 'on', TRIP_PLANNER_V2: '' }, async (get) => {
+    const v3 = await (await get('/trip')).text();
+    assert.match(v3, /id="tripV3"/);
+    assert.doesNotMatch(v3, /noindex/);
+    const api = await fetch('http://localhost:3623/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'plan 2 days in Kelowna' }) });
+    assert.equal(api.status, 200, 'the planner API is available to V3 even with V2 off');
+  });
+});

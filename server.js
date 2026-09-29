@@ -3156,6 +3156,28 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() 
 function isTripPlannerV2Enabled() {
   return /^(1|on|true|yes)$/i.test(String(process.env.TRIP_PLANNER_V2 || '').trim());
 }
+// Build My Trip V3 (Step 2, 2026-09-29): the redesigned /trip page, behind
+// TRIP_PLANNER_V3. 'off' (the default): nothing changes. 'preview': only a
+// browser that opted in with /trip?trip_v3=on (a first-party cookie, cleared
+// with /trip?trip_v3=off) sees V3, so it can be checked in production without
+// switching it on for visitors. 'on': everyone. The planner API is the same
+// POST /api/trip/plan either way.
+const TRIP_V3_COOKIE = 'roam_trip_v3';
+function tripPlannerV3Mode() {
+  const v = String(process.env.TRIP_PLANNER_V3 || '').trim().toLowerCase();
+  if (/^(1|on|true|yes)$/.test(v)) return 'on';
+  if (v === 'preview') return 'preview';
+  return 'off';
+}
+function tripPlannerV3ActiveFor(req) {
+  const mode = tripPlannerV3Mode();
+  if (mode === 'on') return true;
+  if (mode !== 'preview') return false;
+  return String((req && req.headers && req.headers.cookie) || '').split(/;\s*/).includes(`${TRIP_V3_COOKIE}=1`);
+}
+function tripPlanApiEnabled() {
+  return isTripPlannerV2Enabled() || tripPlannerV3Mode() !== 'off';
+}
 // Loaded lazily for the same reason as the interpreter (see
 // discoveryIntentModule): server.js still starts without the file.
 function tripPlannerModule() {
@@ -3257,7 +3279,7 @@ const TRIP_PLAN_MAX_IDS = 200;
 const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|evening)$/;
 // Validates the POST /api/trip/plan body; returns { error } or { value }.
 function parseTripPlanBody(body) {
-  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned'];
+  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides'];
   const unexpected = Object.keys(body || {}).filter((k) => !allowed.includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
   const text = body.text;
@@ -3284,7 +3306,21 @@ function parseTripPlanBody(body) {
     }
     pinned = p;
   }
-  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned } };
+  // Build My Trip V3 (Step 2, 2026-09-29), additive and optional: the chips a
+  // visitor edited on /trip ("3 days", "relaxed", "based in Penticton").
+  // Only these three keys, only known values; nothing else can be steered.
+  let overrides = null;
+  if (body.overrides !== undefined) {
+    const o = body.overrides;
+    if (!o || typeof o !== 'object' || Array.isArray(o) || Object.keys(o).some((k) => !['days', 'pace', 'baseRegion'].includes(k))) {
+      return { error: 'overrides may only contain days, pace and baseRegion.' };
+    }
+    if (o.days !== undefined && !(Number.isInteger(o.days) && o.days >= 1 && o.days <= 7)) return { error: 'overrides.days must be an integer between 1 and 7.' };
+    if (o.pace !== undefined && !TRIP_VALID_PACES.includes(o.pace)) return { error: `overrides.pace must be one of: ${TRIP_VALID_PACES.join(', ')}` };
+    if (o.baseRegion !== undefined && o.baseRegion !== 'valley' && !REGION_LABELS[o.baseRegion]) return { error: 'overrides.baseRegion must be a region slug or "valley".' };
+    overrides = { ...o };
+  }
+  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides } };
 }
 
 // The weekday of day 1, only when the request names a date ("tonight",
@@ -3396,13 +3432,25 @@ function selectTripEvents(component, regions, when, now = new Date()) {
   };
 }
 
-function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null }, now = new Date()) {
+function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null }, now = new Date()) {
   const taxonomy = buildDiscoveryTaxonomy();
   const intent = discoveryIntentModule().interpretDiscoveryQuery(text, taxonomy);
   // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
   const trip = discoveryIntentModule().interpretTripComponents(text, taxonomy, intent);
+  // Build My Trip V3 (Step 2): chips the visitor edited. Without overrides
+  // (every existing caller) nothing below changes.
+  if (overrides) {
+    if (overrides.days !== undefined && intent.mode === 'plan') intent.days = overrides.days;
+    if (overrides.pace !== undefined) intent.pace = overrides.pace;
+    if (overrides.baseRegion !== undefined) {
+      const regions = overrides.baseRegion === 'valley' ? [] : [overrides.baseRegion];
+      intent.regions = regions;
+      if (trip.multi && !trip.route) trip.regions = regions;
+    }
+  }
+  const understood = (plan) => tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null });
   if (trip.multi) {
     const planner = tripPlannerModule();
     const eventRegions = trip.route ? planner.routeRegions(trip.route.from, trip.route.to) : trip.regions;
@@ -3436,6 +3484,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       collections: intent.collections, activities: intent.activities, foodTerms: intent.foodTerms, days: intent.days, pace: intent.pace,
       budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities,
     };
+    plan.understood = understood(plan);
     return plan;
   }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now) : null;
@@ -3463,6 +3512,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     collections: intent.collections, activities: intent.activities, foodTerms: intent.foodTerms, days: intent.days, pace: intent.pace,
     budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities,
   };
+  plan.understood = understood(plan);
   return plan;
 }
 
@@ -14361,6 +14411,52 @@ ${renderHomeFooterHTML(true)}
 </html>`;
 }
 
+// Build My Trip V3 (Step 2, 2026-09-29): the redesigned /trip, rendered by
+// trip-planner-v3-page.js and served only when tripPlannerV3ActiveFor(req).
+// Same URL, canonical, breadcrumb, header, Trip tray, footer and analytics
+// page_type as the current page; the planner API is unchanged.
+const tripPlannerV3PageModule = (() => { try { return require('./trip-planner-v3-page.js'); } catch (e) { return null; } })();
+const TRIP_V3_REGION_IMAGES = (() => {
+  const out = {};
+  for (const slug of Object.keys(REGION_LABELS)) {
+    for (const ext of ['webp', 'png', 'jpg']) {
+      if (fs.existsSync(path.join(__dirname, 'public', 'images', 'regions', `${slug}.${ext}`))) { out[slug] = `/images/regions/${slug}.${ext}`; break; }
+    }
+  }
+  return out;
+})();
+function renderTripPlannerV3Page({ preview = false } = {}) {
+  if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
+  const canonical = 'https://okanaganroam.com/trip';
+  let tripTrayHtml = '';
+  let headerHtml = '';
+  if (fs.existsSync(SITE_PATH)) {
+    const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
+    tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+    headerHtml = (extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '')
+      .replace(/href="#moodCards"/g, 'href="/#moodCards"')
+      .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
+      .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
+      .replace(/href="#top"/g, 'href="/"');
+  }
+  return tripPlannerV3PageModule.renderTripPlannerV3Page({
+    esc: escapeHtml,
+    title: 'Build My Trip \u2014 Okanagan Roam',
+    description: 'Describe your Okanagan trip in your own words and get a day-by-day plan built from real places on Okanagan Roam \u2014 wineries, restaurants, beaches, golf and more \u2014 with the reason each stop fits. No invented places.',
+    canonical,
+    faviconLink: '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Crect width=\'40\' height=\'40\' rx=\'8\' fill=\'%23F5EDDD\'/%3E%3Ccircle cx=\'26\' cy=\'11\' r=\'3\' fill=\'%23D9A441\'/%3E%3Cpath d=\'M26 4v2M31 6.5l-1.4 1.4M33.5 11h-2M26 18v-2M20.5 6.5l1.4 1.4\' stroke=\'%23D9A441\' stroke-width=\'1.3\' stroke-linecap=\'round\'/%3E%3Cpath d=\'M6 27L15 13l6 9\' stroke=\'%231F5C5C\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' opacity=\'0.5\'/%3E%3Cpath d=\'M10 27L20 11l10 16\' stroke=\'%231F5C5C\' stroke-width=\'2.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3Cpath d=\'M5 27.5h30\' stroke=\'%231F5C5C\' stroke-width=\'1.5\' stroke-linecap=\'round\' opacity=\'0.3\'/%3E%3C/svg%3E">',
+    breadcrumbJson: JSON.stringify(breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Build My Trip', url: canonical }])),
+    headerHtml,
+    tripTrayHtml,
+    footerHtml: renderHomeFooterHTML(true),
+    footerStyles: renderCanonicalFooterStyles(),
+    analyticsHead: renderAnalyticsHeadHtml('trip'),
+    regions: VALID_REGIONS.map((slug) => ({ slug, label: REGION_LABELS[slug] })),
+    regionImages: TRIP_V3_REGION_IMAGES,
+    preview,
+  });
+}
+
 // Mobile 404 (2026-09-26): the page had no viewport meta (phones laid it
 // out at ~980px) and no site shell. It now uses the same themed shell as
 // /categories -- the homepage's own header, Trip tray and footer (read,
@@ -17668,7 +17764,7 @@ const server = http.createServer(async (req, res) => {
     // day-by-day plan built only from verified venue data (or What's On
     // events for an event request). Behind TRIP_PLANNER_V2: with the flag off
     // the route does not exist and the request falls through as before.
-    if (pathname === '/api/trip/plan' && method === 'POST' && isTripPlannerV2Enabled()) {
+    if (pathname === '/api/trip/plan' && method === 'POST' && tripPlanApiEnabled()) {
       let body;
       try {
         body = await readBody(req);
@@ -17686,6 +17782,22 @@ const server = http.createServer(async (req, res) => {
     // region and 404). Static markup only — the actual itinerary is
     // generated client-side via a POST to /api/trip/generate (Stage 1).
     if (pathname === '/trip' && method === 'GET') {
+      // Build My Trip V3 preview opt-in/opt-out (only while TRIP_PLANNER_V3
+      // is 'preview' or 'on'; with it off these parameters are ignored).
+      if (tripPlannerV3Mode() !== 'off' && (query.trip_v3 === 'on' || query.trip_v3 === 'off')) {
+        const on = query.trip_v3 === 'on';
+        res.writeHead(302, {
+          Location: '/trip',
+          'Set-Cookie': `${TRIP_V3_COOKIE}=${on ? '1' : ''}; Path=/; Max-Age=${on ? 60 * 60 * 24 * 30 : 0}; SameSite=Lax${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`,
+          'Cache-Control': 'no-store',
+        });
+        return res.end();
+      }
+      if (tripPlannerV3ActiveFor(req)) {
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(html);
+      }
       const html = renderTripPlannerPage(isTripPlannerV2Enabled());
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(html);
@@ -18413,6 +18525,9 @@ module.exports = {
   getKnownDiscoveryKinds,
   buildDiscoveryTaxonomy,
   isTripPlannerV2Enabled,
+  tripPlannerV3Mode,
+  tripPlannerV3ActiveFor,
+  renderTripPlannerV3Page,
   buildTripPlannerFacts,
   tripPlannerLabels,
   parseTripPlanBody,

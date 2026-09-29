@@ -339,8 +339,39 @@ function buildContext(intent, labels, options) {
     when: intent.when || null,
     clock: opts.clock && WEEKDAYS.includes(opts.clock.weekday) && Number.isInteger(opts.clock.minutes) && opts.clock.minutes >= 0 && opts.clock.minutes < 1440 ? { weekday: opts.clock.weekday, minutes: opts.clock.minutes } : null,
     whenDaypart: intent.when && SLOT_WINDOWS[intent.when.daypart] ? intent.when.daypart : null,
+    // Step 1 (2026-09-29): the month/season the visitor named (drives the
+    // same soft seasonal rules as itineraries), per-day themes and lake time.
+    itinerary: !!(opts.trip && opts.trip.multi),
+    seasonInfo: requestSeason(intent),
+    dayThemes: Array.isArray(intent.dayThemes) ? intent.dayThemes : [],
+    lake: intent.lake === true,
   };
 }
+
+// The month or season named in the request as a season object (tripSeason
+// shape). A season alone stands for a representative month for the seasonal
+// windows, and is worded as the season itself ("in winter"), never as a month.
+const SEASON_REP_MONTH = { winter: 1, spring: 4, summer: 7, fall: 10, off: 11 };
+const SEASON_WORDS = { winter: 'winter', spring: 'spring', summer: 'summer', fall: 'the fall', off: 'the off-season' };
+function requestSeason(intent) {
+  const month = Number.isInteger(intent.month) && intent.month >= 1 && intent.month <= 12 ? intent.month : null;
+  const m = month || (intent.season && SEASON_REP_MONTH[intent.season]) || null;
+  if (!m) return null;
+  const s = tripSeason(`2000-${String(m).padStart(2, '0')}-15`);
+  if (!s) return null;
+  if (!month) s.monthName = SEASON_WORDS[intent.season];
+  s.named = month ? 'month' : 'season';
+  return s;
+}
+// Lake time: the verified Lake View badge, a beach, or a curated water activity.
+function lakeTest(v) {
+  return v.type === 'beach' || !!(v.features && v.features.lake_view) || (v.activities || []).includes('water');
+}
+// Occasions that should not pull in these types unless the visitor asked for them.
+// (A date-night OUTING may still start with a drink at a pub -- approved
+// behaviour; only a romantic trip leaves pubs out.)
+const OCCASION_EXCLUDED_TYPES = { romantic: ['golf', 'pub'], date_night: ['golf'] };
+const ROMANTIC_EVENING_OCCASIONS = ['romantic', 'date_night'];
 function weekdayFor(ctx, dayIndex) {
   if (!ctx.startWeekday) return null;
   return WEEKDAYS[(WEEKDAYS.indexOf(ctx.startWeekday) + dayIndex) % 7];
@@ -458,6 +489,14 @@ function collectionLabel(ctx, c) { return (ctx.labels.collections && ctx.labels.
 // and only the safety rules below are hard.
 function eligible(v, ctx, strict) {
   if (ctx.exclude.has(v.id)) return false;
+  // Step 1 (2026-09-29): a current advisory that says the place is closed or
+  // under an evacuation order takes it out of every plan (itineraries
+  // already did this; day plans, outings and recommendations now do too).
+  // Multi-part itineraries keep their own handling, which also names the
+  // place that was left out.
+  if (!ctx.itinerary && v.advisory && v.advisory.note && ADVISORY_CLOSED_RE.test(v.advisory.note)) return false;
+  const occasionExcluded = OCCASION_EXCLUDED_TYPES[ctx.occasion];
+  if (occasionExcluded && occasionExcluded.includes(v.type) && !ctx.types.has(v.type)) return false;
   if (ctx.rainy) {
     if (v.type === 'beach' || v.type === 'outdoor') return false;
     if (v.type === 'golf' && !v.indoorGolf) return false;
@@ -585,21 +624,70 @@ function why(reasons) {
   return sorted.slice(0, 3).map((r) => r.text);
 }
 
+// Collections a stop card may name, and how (Build My Trip V3).
+const PUBLIC_COLLECTION_LABELS = { hidden_gem: 'Hidden Gem', local_favorite: 'Local Favourite', dog_friendly: 'Dogs allowed (official)' };
 function publicVenue(v, ctx) {
   return {
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
     rating: v.rating, reviews: v.reviews, price: v.price, address: v.address || null,
     latitude: hasCoords(v) ? v.lat : null, longitude: hasCoords(v) ? v.lng : null,
+    // Build My Trip V3 (Step 2, 2026-09-29), additive: stored facts a stop
+    // card can show as they are -- the verified badge columns that are set
+    // (only on the Food & Drink / winery types, where the badges exist),
+    // the curated collections, and the stored weekly hours as listed.
+    badges: BADGE_TYPES.includes(v.type) ? Object.keys(v.features || {}).filter((f) => v.features[f]).map((f) => ({ key: f, label: ctx ? featureLabel(ctx, f) : f })) : [],
+    // 'dog_friendly' is the official dog-access list for beaches and outdoor
+    // places; on dining venues the Dog-Friendly badge above says it.
+    collections: (v.collections || []).filter((c) => PUBLIC_COLLECTION_LABELS[c] && (c !== 'dog_friendly' || OUTSIDE_TYPES.includes(v.type))).map((c) => ({ key: c, label: PUBLIC_COLLECTION_LABELS[c] })),
+    listedHours: v.hours ? listedHoursText(v, null, null) : null,
+  };
+}
+
+// "Here's what we understood" (Build My Trip V3, Step 2): the request as the
+// planner read it, in visitor words, for the editable chips on /trip. Built
+// only from the interpreted request and the site's own labels -- it names no
+// venue and states no venue fact.
+function buildUnderstood(intent, trip, labels, extras) {
+  const i = intent || {};
+  const ctx = buildContext(i, labels || {}, {});
+  const x = extras || {};
+  const party = [];
+  if (ctx.kids) party.push('with kids');
+  if (ctx.dog) party.push('with a dog');
+  const regions = (trip && trip.multi && trip.regions && trip.regions.length ? trip.regions : ctx.regions);
+  const notUsed = (i.unsupported || []).slice();
+  if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w)) notUsed.push(w);
+  return {
+    kind: x.kind || null,
+    days: Number.isInteger(x.days) ? x.days : (i.days || null),
+    pace: ctx.pace || null,
+    base: regions.map((r) => ({ slug: r, label: regionLabel(ctx, r) })),
+    valleyWide: !regions.length,
+    route: trip && trip.route ? { from: trip.route.from, to: trip.route.to } : null,
+    when: whenText(ctx) || null,
+    season: ctx.seasonInfo ? { label: ctx.seasonInfo.named === 'month' ? ctx.seasonInfo.monthName : ctx.seasonInfo.monthName.replace(/^the /, ''), named: ctx.seasonInfo.named } : null,
+    interests: interestsText(ctx).concat(ctx.lake ? ['lake time'] : []),
+    party,
+    occasion: ctx.occasion ? OCCASION_LABELS[ctx.occasion] : null,
+    themes: (ctx.dayThemes || []).map((th) => themeLabel(ctx, th)).filter(Boolean),
+    notUsed,
   };
 }
 function stopFrom(v, scored, extra, ctx) {
   const reasons = scored.reasons.concat(extra || []);
+  const caveats = (scored.caveats || []).slice();
+  // Step 1 (2026-09-29): a place's current advisory is shown on every stop,
+  // in the note's own words (itineraries already did this).
+  if (v.advisory && v.advisory.note) {
+    const note = `Advisory on Okanagan Roam: ${advisoryExcerpt(v.advisory.note)}`;
+    if (!caveats.includes(note)) caveats.push(note);
+  }
   return {
     venue: publicVenue(v, ctx),
     reasons: reasons.filter((r) => r.text).map((r) => ({ code: r.code, text: r.text })),
     why: why(reasons),
-    caveats: (scored.caveats || []).slice(),
+    caveats,
   };
 }
 function compareScored(a, b) {
@@ -828,6 +916,7 @@ function focusList(ctx) {
   for (const a of ctx.activities) f.push({ key: `activity:${a}`, test: (v) => v.activities.includes(a) });
   for (const c of ctx.collections) f.push({ key: `collection:${c}`, test: (v) => v.collections.includes(c) });
   for (const ft of ctx.foodTerms) f.push({ key: `food:${ft.term}`, test: (v) => !!foodMatch(v, ft) });
+  if (ctx.lake) f.push({ key: 'lake:lake', test: lakeTest });
   return f;
 }
 
@@ -841,9 +930,41 @@ function allowedTypes(ctx) {
   const focusTypes = new Set(ctx.types);
   if (ctx.activities.size) focusTypes.add('outdoor');
   for (const t of ctx.types) for (const c of FOCUS_COMPANION_TYPES[t] || []) focusTypes.add(c);
+  // Step 1 (2026-09-29): day themes bring their own types; lake time brings
+  // beaches and water-activity places (lake-view venues are already dining).
+  const themes = ctx.dayThemes || [];
+  for (const th of themes) {
+    for (const t of th.types || []) focusTypes.add(t);
+    if ((th.activities || []).length) focusTypes.add('outdoor');
+  }
+  const lake = ctx.lake || themes.some((th) => th.lake);
   const hasFocus = focusTypes.size || ctx.collections.size || ctx.foodTerms.length;
-  if (!hasFocus) return ctx.occasion ? new Set([...OCCASION_TYPES[ctx.occasion], ...DINING_TYPES]) : null;
+  if (!hasFocus) {
+    if (!ctx.occasion) return null;
+    const base = new Set([...OCCASION_TYPES[ctx.occasion], ...DINING_TYPES]);
+    if (lake) { base.add('beach'); base.add('outdoor'); }
+    return base;
+  }
+  if (lake) { focusTypes.add('beach'); focusTypes.add('outdoor'); }
   return new Set([...focusTypes, ...DINING_TYPES]);
+}
+// One day's theme as a focus test, or null.
+function themeTest(th) {
+  if (!th) return null;
+  const tests = [];
+  if (th.lake) tests.push(lakeTest);
+  for (const t of th.types || []) tests.push((v) => v.type === t || (v.fdTypes || []).includes(t));
+  for (const a of th.activities || []) tests.push((v) => (v.activities || []).includes(a));
+  return tests.length ? (v) => tests.some((f) => f(v)) : null;
+}
+function themeLabel(ctx, th) {
+  const parts = [];
+  if (th.pace === 'relaxed') parts.push('relaxed day');
+  else if (th.pace === 'packed') parts.push('full day');
+  if (th.lake) parts.push('lake time');
+  for (const t of th.types || []) parts.push(typeLabel(ctx, t).toLowerCase());
+  for (const a of th.activities || []) parts.push(activityLabel(ctx, a));
+  return parts.length ? listText(parts) : null;
 }
 
 function chooseDayRegions(facts, ctx, days, centroids) {
@@ -892,6 +1013,14 @@ function buildDays(facts, ctx, days, pinned) {
   const tripTypeCount = {};
   const warnings = [];
   const out = [];
+  // Step 1 (2026-09-29): day themes ("one relaxed day with a lake
+  // experience") go on the LAST days of the trip, in the order they were
+  // said; a theme the trip is too short for is dropped.
+  const themes = (ctx.dayThemes || []).slice(0, days);
+  const themeByDay = {};
+  themes.forEach((th, k) => { themeByDay[days - themes.length + 1 + k] = th; });
+  // Types asked for only as a day theme ("one day of golf") stay on that day.
+  const scopedTypes = new Set(themes.flatMap((th) => th.scopedTypes || []));
 
   for (let d = 1; d <= days; d++) {
     const region = dayRegions[d - 1] || null;
@@ -900,13 +1029,21 @@ function buildDays(facts, ctx, days, pinned) {
     const dayTypes = {};
     const stops = [];
     let prev = null;
-    for (const daypart of dayparts) {
+    const theme = themeByDay[d] || null;
+    const dayPace = (theme && theme.pace) || ctx.pace;
+    const dayDayparts = PLAN_DAYPARTS[dayPace] || dayparts;
+    const dayMaxHop = PLAN_MAX_HOP_KM[dayPace] || maxHop;
+    const dayKmCost = PLAN_KM_PENALTY[dayPace] || kmCost;
+    const thTest = themeTest(theme);
+    const thLabel = theme ? themeLabel(ctx, theme) : null;
+    let themeMet = false;
+    for (const daypart of dayDayparts) {
       const pin = pinned && pinned[`${d}-${daypart}`];
       let chosen = null;
       if (pin && byId.has(pin) && !ctx.exclude.has(pin) && !used.has(pin) && eligible(byId.get(pin), ctx, false)) {
         const v = byId.get(pin);
         const fit = slotFit(v, ctx, daypart, d - 1, daypart);
-        const dist = distanceTerm(prev, v, kmCost, maxHop);
+        const dist = distanceTerm(prev, v, dayKmCost, dayMaxHop);
         chosen = { v, score: 0, reasons: (base.get(v.id) || scoreVenue(v, ctx)).reasons.concat(fit.ok ? fit.reasons : [], dist.reasons), caveats: (fit.ok ? fit.caveats : []).concat(dist.caveats) };
       } else {
         const cands = [];
@@ -927,17 +1064,35 @@ function buildDays(facts, ctx, days, pinned) {
           else if (focuses.length) extra.push({ code: 'complement', text: `Added to round out the day with ${article(typeLabel(ctx, v.type, 'singular').toLowerCase())} stop`, weight: 2 });
           if (dayTypes[v.type]) score -= 18;
           score -= (tripTypeCount[v.type] || 0) * 3;
+          // Step 1 (2026-09-29): this day's theme. A place that fits it comes
+          // first until the theme is met; a relaxed day keeps golf and active
+          // outdoor mornings off it unless that is what the theme asked for.
+          if (thTest && thTest(v)) {
+            score += themeMet ? 6 : 26;
+            if (thLabel) extra.push({ code: 'theme', text: `Chosen for your ${thLabel}`, weight: 4 });
+          }
+          if (scopedTypes.has(v.type) && !DINING_TYPES.includes(v.type) && !(theme && (theme.scopedTypes || []).includes(v.type))) continue;
+          if (theme && theme.pace === 'relaxed' && !(theme.types || []).includes(v.type)) {
+            if (v.type === 'golf') continue; // a relaxed day is not a round of golf unless it asked for one
+            if (v.type === 'outdoor' && daypart === 'morning' && !(thTest && thTest(v))) score -= 10;
+          }
+          // Romantic plans end the day at dinner or a lounge.
+          if (daypart === 'evening' && ROMANTIC_EVENING_OCCASIONS.includes(ctx.occasion) && !['restaurant', 'cocktail'].includes(v.type)) continue;
+          const seasonal = ctx.seasonInfo
+            ? seasonFit(v, { types: [v.type], activities: [], phrase: (theme && theme.lake) || ctx.lake ? 'lake day' : '' }, ctx.seasonInfo, ctx)
+            : null;
+          if (seasonal) { score += seasonal.score; extra.push(...seasonal.reasons); }
           // Keep dinner possible: an earlier slot never takes the last
           // restaurant that could still serve the evening.
-          if (v.type === 'restaurant' && daypart !== 'evening' && dayparts.includes('evening')) {
+          if (v.type === 'restaurant' && daypart !== 'evening' && dayDayparts.includes('evening')) {
             const spare = dayPool.some((o) => o.id !== v.id && o.type === 'restaurant' && !used.has(o.id) && !reserved.has(o.id) && slotFit(o, ctx, 'evening', d - 1, 'evening').ok);
             if (!spare) continue;
           }
-          const dist = distanceTerm(prev, v, kmCost, maxHop);
+          const dist = distanceTerm(prev, v, dayKmCost, dayMaxHop);
           score += dist.score;
           extra.push(...dist.reasons);
           extra.push({ code: 'daypart', text: `Placed in the ${PLAN_DAYPART_LABELS[daypart].toLowerCase()} slot`, weight: 1 });
-          cands.push({ v, score, reasons: s.reasons.concat(extra), caveats: fit.caveats.concat(dist.caveats) });
+          cands.push({ v, score, reasons: s.reasons.concat(extra), caveats: fit.caveats.concat(seasonal ? seasonal.caveats : [], dist.caveats) });
         }
         cands.sort(compareScored);
         chosen = cands[0] || null;
@@ -952,11 +1107,19 @@ function buildDays(facts, ctx, days, pinned) {
       dayTypes[v.type] = (dayTypes[v.type] || 0) + 1;
       tripTypeCount[v.type] = (tripTypeCount[v.type] || 0) + 1;
       for (const f of focuses) if (f.test(v)) met.add(f.key);
+      if (thTest && thTest(v)) themeMet = true;
       stops.push({ daypart, label: PLAN_DAYPART_LABELS[daypart], ...stopFrom(v, chosen, regionReason(v, ctx), ctx) });
       prev = v;
     }
     const missing = focuses.filter((f) => !met.has(f.key)).map((f) => f.key);
-    out.push({ day: d, region, regionLabel: region ? regionLabel(ctx, region) : null, stops, missingFocus: missing });
+    const day = { day: d, region, regionLabel: region ? regionLabel(ctx, region) : null, stops, missingFocus: missing };
+    // Step 1: the day's theme, stated only as what was asked for; a theme
+    // nothing on Okanagan Roam could meet is reported, never faked.
+    if (theme) {
+      day.theme = { label: thLabel, pace: theme.pace || null, lake: !!theme.lake, met: thTest ? themeMet : true };
+      if (thTest && !themeMet) warnings.push(`No stop matching your ${thLabel} was found for day ${d}${region ? ` in ${regionLabel(ctx, region)}` : ''}.`);
+    }
+    out.push(day);
   }
   // A focus that never appeared anywhere in the trip is reported honestly.
   for (const f of focuses) {
@@ -971,6 +1134,7 @@ function focusText(ctx, key) {
   if (kind === 'activity') return activityLabel(ctx, value);
   if (kind === 'collection') return collectionLabel(ctx, value);
   if (kind === 'food') return `“${value}”`;
+  if (kind === 'lake') return 'a lake-view, beach or water stop';
   return value;
 }
 
@@ -1034,7 +1198,18 @@ function buildOverview(kind, ctx, days) {
     interests: interestsText(ctx),
     occasion: ctx.occasion ? { value: ctx.occasion, label: OCCASION_LABELS[ctx.occasion] } : null,
     budget: ctx.budget,
+    // Step 1 (2026-09-29), additive: the month or season named, as said.
+    season: ctx.seasonInfo ? { label: ctx.seasonInfo.named === 'month' ? ctx.seasonInfo.monthName : ctx.seasonInfo.monthName.replace(/^the /, ''), named: ctx.seasonInfo.named } : null,
   };
+}
+
+// Step 1 (2026-09-29): what a named month/season changed, and the honest
+// limit of the hours data (current listed hours only, never seasonal ones).
+function seasonNotes(result, ctx) {
+  const s = ctx.seasonInfo;
+  if (!s) return;
+  result.notes.push(`Planned for ${s.monthName}: seasonal places such as beaches, water activities, ski areas, campgrounds and outdoor golf are ranked for that time of year, and nothing is left out for the season alone.`);
+  result.notes.push(`Hours shown are each place’s current listed hours on Okanagan Roam and can change by season, so check them before you go in ${s.monthName}.`);
 }
 
 // ---------- trip overview for day plans and outings (2026-09-27) ----------
@@ -1176,7 +1351,9 @@ function planTrip(input) {
     // Only described as a north-to-south route when there is one to describe.
     const routeRegions = uniqRegions(plan.days);
     if (!ctx.regions.length && routeRegions.length > 1) result.notes.push(`No single region was given, so the plan moves through ${listText(routeRegions.map((r) => regionLabel(ctx, r)))} from north to south.`);
+    for (const day of plan.days) if (day.theme && day.theme.label) result.notes.push(`Day ${day.day} is planned around your ${day.theme.label}.`);
     scheduleNotes(result, ctx);
+    seasonNotes(result, ctx);
     Object.assign(result, buildPlanOverview(kind, result, ctx, facts));
     return result;
   }
@@ -1186,6 +1363,7 @@ function planTrip(input) {
     result.overview = buildOverview(kind, ctx, null);
     if (!ctx.regions.length) result.notes.push('No region was given, so these stops were chosen in the same community, anywhere in the valley.');
     scheduleNotes(result, ctx);
+    seasonNotes(result, ctx);
     Object.assign(result, buildPlanOverview(kind, result, ctx, facts));
     return result;
   }
@@ -1202,6 +1380,7 @@ function planTrip(input) {
     if (live) result.notes.push(liveNote(live));
     else if (ctx.startWeekday && (ctx.when.preset === 'today' || ctx.when.relative === 'tomorrow')) result.notes.push(`Hours were checked for ${WEEKDAY_NAMES[ctx.startWeekday]} (Okanagan time).`);
   }
+  seasonNotes(result, ctx);
   return result;
 }
 function uniqRegions(days) { return Array.from(new Set(days.map((d) => d.region).filter(Boolean))); }
@@ -1676,6 +1855,10 @@ function planItinerary(input) {
     itinerary: null, experience: null, notes: [], warnings: [], unsupported: intent.unsupported || [], needs: [],
   };
   for (const place of trip.unknownPlaces || []) result.warnings.push(`“${place}” isn’t a place Okanagan Roam covers, so it wasn’t used for the route.`);
+  // Step 1 (2026-09-29): the visitor's own words that no part of the plan
+  // used are named, never silently dropped ("a lake walk").
+  const leftover = (trip.leftoverTerms || []).filter((w) => !(trip.unknownPlaces || []).some((p) => p.split(' ').includes(w)));
+  if (leftover.length) result.warnings.push(`Not part of this plan: ${listText(leftover.map((w) => `“${w}”`))} — Okanagan Roam couldn’t match ${leftover.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`);
   if (route && !route.from && route.to) result.notes.push(`No starting point was given, so the stops are in ${regionLabel(baseCtx, route.to)}.`);
   const whereText = route && route.from && route.to
     ? `along the way from ${regionLabel(baseCtx, route.from)} to ${regionLabel(baseCtx, route.to)}`
@@ -1902,4 +2085,5 @@ module.exports = {
   routeRegions,
   routeDirection,
   parseEventStart,
+  buildUnderstood,
 };
