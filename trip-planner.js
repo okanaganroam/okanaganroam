@@ -18,6 +18,8 @@
 
 'use strict';
 
+const hoursModule = require('./hours.js');
+
 const PLAN_DAYPARTS = {
   relaxed: ['morning', 'afternoon', 'evening'],
   standard: ['morning', 'afternoon', 'evening'],
@@ -157,43 +159,14 @@ const SLOT_WINDOWS = {
 // there is not flagged as a caveat.
 const HOURS_EXPECTED_TYPES = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery'];
 
-function toMinutes(t) {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t).trim());
-  if (!m) return null;
-  const h = Number(m[1]), mi = Number(m[2]);
-  // Closing times may be written past midnight as "25:00" or "26:30" (22
-  // venues do); opening times must be a real clock time (checked below).
-  return h > 47 || mi > 59 ? null : h * 60 + mi;
-}
 // -> { known, days: { mon: { status: 'open', ranges: [[from, to]] } | { status: 'closed' } | { status: 'unknown' } } }
+// Stage 2 (2026-09-29): the site's one hours reading (hours.js) -- the same
+// open / closed / unknown days, past-midnight closes ("02:00", "26:00") and
+// 24-hour days as the venue page, structured data and Open Now. Only a
+// non-string value is refused here, as before.
 function parseVenueHours(raw) {
-  const unknown = { known: false, days: Object.fromEntries(WEEKDAYS.map((d) => [d, { status: 'unknown' }])) };
-  if (typeof raw !== 'string' || !raw.trim()) return unknown;
-  let obj;
-  try { obj = JSON.parse(raw); } catch (e) { return unknown; }
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return unknown;
-  const days = {};
-  let anyKnown = false;
-  for (const d of WEEKDAYS) {
-    if (!Object.prototype.hasOwnProperty.call(obj, d)) { days[d] = { status: 'unknown' }; continue; }
-    const v = obj[d];
-    if (v === null || (Array.isArray(v) && v.length === 0)) { days[d] = { status: 'closed' }; anyKnown = true; continue; }
-    if (!Array.isArray(v)) { days[d] = { status: 'unknown' }; continue; }
-    const ranges = [];
-    let ok = true;
-    for (const r of v) {
-      if (!Array.isArray(r) || r.length !== 2) { ok = false; break; }
-      const a = toMinutes(r[0]);
-      let b = toMinutes(r[1]);
-      if (a === null || b === null || a >= 24 * 60) { ok = false; break; }
-      if (b === 0) b = 24 * 60; // closes at midnight
-      else if (b <= a) b += 24 * 60; // runs past midnight
-      ranges.push([a, b]);
-    }
-    days[d] = ok && ranges.length ? { status: 'open', ranges } : { status: 'unknown' };
-    if (ok && ranges.length) anyKnown = true;
-  }
-  return { known: anyKnown, days };
+  if (typeof raw !== 'string') return hoursModule.parseHours(null);
+  return hoursModule.parseHours(raw);
 }
 function windowOverlap(day, win) {
   if (!day || day.status !== 'open') return 0;
@@ -247,7 +220,9 @@ function clockText(min) {
   const m = ((min % 1440) + 1440) % 1440;
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
-function rangesText(day) { return day.ranges.map(([a, b]) => `${clockText(a)}\u2013${clockText(b)}`).join(', '); }
+// Periods as the venue page lists them (hours.js formatRange): a past-midnight
+// close as the next morning's time, an all-day day as 00:00\u201323:59.
+function rangesText(day) { return day.ranges.map(hoursModule.formatRange).join(', '); }
 function listedHoursText(v, weekday, days) {
   const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
   if (!parsed.known) return null;
@@ -2066,6 +2041,7 @@ function scheduleNotes(result, ctx) {
 module.exports = {
   parseVenueHours,
   hoursFit,
+  listedHoursText,
   cafeRole,
   SLOT_WINDOWS,
   PLAN_DAYPARTS,

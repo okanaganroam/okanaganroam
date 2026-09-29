@@ -3,10 +3,10 @@
 // ---------- Canonical opening hours (2026-09-26, Open Now Phase 1) ----------
 //
 // One place that reads venues.hours and answers "is it open at this moment?".
-// Nothing calls it yet: Build My Trip (trip-planner.js parseVenueHours), the
-// /browse cards (public/scripts/app.js), the venue page hours list and the
-// OpeningHoursSpecification builder in server.js all keep their own logic
-// until each is deliberately switched over in a later phase.
+// Used by the Food & Drink Open Now status and, since Stage 2 (2026-09-29),
+// by the venue page hours list, the OpeningHoursSpecification builder in
+// server.js and Build My Trip (trip-planner.js parseVenueHours). The /browse
+// cards (public/scripts/app.js, a frozen surface) still keep their own logic.
 //
 // Stored shape (venues.hours, JSON text):
 //   {"mon": [["11:00","14:00"],["17:00","22:00"]], "tue": null, "wed": [], ...}
@@ -231,6 +231,54 @@ function hoursStatusLabel(status, clock) {
   return { state: 'closed', text: status.opensAt ? lead + ' · Opens ' + when(status.opensAt) : (status.closedToday ? 'Closed today' : 'Closed now') };
 }
 
+// ---- Listing and structured data (Stage 2, 2026-09-29) ----
+// The venue page's weekly list and schema.org OpeningHoursSpecification both
+// read parseHours() output, so every surface agrees on what a day is.
+
+// Minutes after the start of the listed day as a 24-hour clock time: a close
+// after midnight is shown as the next morning's time (1560 -> "02:00") and a
+// close at midnight as "00:00", the same way most venues already store it.
+function formatClock24(minutes) {
+  const m = ((minutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+}
+
+// One period as the listing states it. A day open around the clock is shown
+// as 00:00–23:59 (its stored notation and its structured-data value), never
+// reworded as "Open 24 hours": the list restates stored data, it does not
+// strengthen it. ("Open 24 hours" stays in hoursStatusLabel, the Open Now
+// status, which is only shown for verified venues.)
+function formatRange(range) {
+  const [a, b] = range;
+  return (a === 0 && b >= DAY_MINUTES) ? '00:00–23:59' : formatClock24(a) + '–' + formatClock24(b);
+}
+
+// One day of the weekly list: its open periods, "Closed" (listed as closed)
+// or "Hours not listed" (unknown -- never shown as closed).
+function dayHoursText(day) {
+  if (!day || day.status === 'unknown') return 'Hours not listed';
+  if (day.status === 'closed') return 'Closed';
+  return day.ranges.map(formatRange).join(', ');
+}
+
+// schema.org periods for the days listed as open: { day, opens, closes }.
+// Closed and unknown days produce nothing. A close after midnight becomes the
+// next morning's clock time (closes earlier than opens), and a 24-hour day
+// is 00:00-23:59.
+function openingPeriods(parsed) {
+  const out = [];
+  if (!parsed || !parsed.days) return out;
+  for (const d of WEEKDAYS) {
+    const day = parsed.days[d];
+    if (!day || day.status !== 'open') continue;
+    for (const [a, b] of day.ranges) {
+      const allDay = a === 0 && b >= DAY_MINUTES;
+      out.push({ day: d, opens: formatClock24(a), closes: allDay ? '23:59' : formatClock24(b) });
+    }
+  }
+  return out;
+}
+
 // The same functions as browser source, for pages that recompute the status
 // live (the Food & Drink hub). Built from the functions themselves, so the
 // server and the browser can never read hours differently.
@@ -248,4 +296,8 @@ module.exports = {
   statusAt,
   formatClockMinutes,
   hoursStatusLabel,
+  formatClock24,
+  formatRange,
+  dayHoursText,
+  openingPeriods,
 };

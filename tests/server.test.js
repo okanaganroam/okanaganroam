@@ -9995,14 +9995,43 @@ test('hours.js status on the Okanagan clock: Pacific Time, daylight-saving chang
   assert.equal(app.venueHoursStatusAt(JSON.stringify({ tue: [['09:00', '17:00']] }), new Date('2026-09-28T16:00:00Z')).state, 'unknown', 'Monday not listed');
 });
 
-test('hours.js scope: guarded load; used only by venueHoursStatusAt() and the Food & Drink Open Now -- never by Build My Trip or /browse', () => {
+// Stage 2 (2026-09-29): hours.js is the one hours reading for the venue page
+// list, the OpeningHoursSpecification and Build My Trip too. The open/closed
+// STATUS is still computed only where it was (venueHoursStatusAt and the Food
+// & Drink Open Now), and /browse (app.js, frozen) still keeps its own logic.
+test('hours.js scope: guarded load; one reading for the venue page, structured data and Build My Trip; status only in venueHoursStatusAt() and the Food & Drink Open Now; never /browse', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /const hoursModule = \(\(\) => \{ try \{ return require\('\.\/hours\.js'\); \} catch \(e\) \{ return null; \} \}\)\(\);/, 'guarded require, like golf-data.js');
   assert.equal((src.match(/hoursModule\.statusAt/g) || []).length, 2, 'status is computed only in venueHoursStatusAt and foodDrinkOpenNowInfo');
   assert.equal((src.match(/renderFoodDrinkHubScriptHtml\(\{ openNow: true \}\)/g) || []).length, 1, 'the browser status runs on the /food-drink hub only');
   assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 2, 'defined and exported, never called by the app');
-  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /hours\.js/, 'Build My Trip keeps parseVenueHours');
+  assert.equal((src.match(/hoursModule\.openingPeriods\(/g) || []).length, 1, 'structured data periods come from hours.js');
+  assert.equal((src.match(/hoursModule\.dayHoursText\(/g) || []).length, 1, 'the venue page list comes from hours.js');
+  const planner = fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8');
+  assert.match(planner, /const hoursModule = require\('\.\/hours\.js'\);/, 'Build My Trip reads hours through hours.js');
+  assert.doesNotMatch(planner, /statusAt/, 'Build My Trip does not claim open/closed status');
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8'), /statusAt|hours\.js/, '/browse keeps its own logic');
+});
+
+test('Stage 2: the Okanagan clock across 2026-11-01 -- America/Vancouver stays on UTC-7 (no fall-back hour), and Open Now reads it the same in any server timezone', () => {
+  const clock = (iso) => app.okanaganClock(new Date(iso));
+  // PDT before, permanent UTC-7 after (tz 2026b+): 01:59 -> 02:00 -> 03:00 with no repeated hour.
+  assert.deepEqual(clock('2026-11-01T08:59:00Z'), { weekday: 'sun', minutes: 1 * 60 + 59 });
+  assert.deepEqual(clock('2026-11-01T09:00:00Z'), { weekday: 'sun', minutes: 2 * 60 });
+  assert.deepEqual(clock('2026-11-01T10:00:00Z'), { weekday: 'sun', minutes: 3 * 60 });
+  assert.deepEqual(clock('2026-11-15T20:00:00Z'), { weekday: 'sun', minutes: 13 * 60 });
+  assert.deepEqual(clock('2027-01-15T20:00:00Z'), { weekday: 'fri', minutes: 13 * 60 });
+  // A 12:00-26:00 venue on Saturday night is open at 01:30 Sunday before and after the change.
+  const h = JSON.stringify({ sat: [['12:00', '26:00']], sun: [['12:00', '26:00']] });
+  const tz = process.env.TZ;
+  try {
+    for (const zone of ['UTC', 'Asia/Bangkok', 'America/Vancouver']) {
+      process.env.TZ = zone;
+      assert.equal(app.venueHoursStatusAt(h, new Date('2026-10-25T08:30:00Z')).state, 'open', `${zone} Oct 25 01:30`);
+      assert.equal(app.venueHoursStatusAt(h, new Date('2026-11-08T08:30:00Z')).state, 'open', `${zone} Nov 8 01:30 (UTC-7)`);
+      assert.equal(app.venueHoursStatusAt(h, new Date('2026-11-08T09:30:00Z')).state, 'closed', `${zone} Nov 8 02:30 (UTC-7)`);
+    }
+  } finally { if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
 });
 
 // ---- Hours provenance (Open Now Phase 2) ------------------------------------
@@ -12796,4 +12825,150 @@ test('Build My Trip V3 images: day headers map to the full-size copies with srcs
   const page = app.renderTripPlannerV3Page({ preview: true });
   assert.ok(page.includes('/images/regions/wide/kelowna.webp 1648w'), 'the map reaches the page');
   assert.ok(page.includes('/images/trip-v3/hero.webp'));
+});
+
+// ==== Stage 2 hours foundation (2026-09-29) ===================================
+// The venue page list, the OpeningHoursSpecification and Build My Trip read
+// hours through hours.js: unknown is never "Closed", past-midnight and 24:00
+// closes are kept, 24-hour days are consistent.
+
+test('Stage 2: buildOpeningHoursSpecification keeps 24:00 and past-midnight closes, 24-hour days are 00:00-23:59, unknown and closed days publish nothing', () => {
+  const specs = app.buildOpeningHoursSpecification(JSON.stringify({
+    mon: [['11:00', '24:00']], tue: [['12:00', '26:00']], wed: [['18:00', '02:00']], thu: [['00:00', '24:00']],
+    fri: null, sun: [['9:00', '17:00']],
+  }));
+  const short = specs.map((s) => [s.dayOfWeek.replace('https://schema.org/', ''), s.opens, s.closes]);
+  assert.deepEqual(short, [
+    ['Monday', '11:00', '00:00'], ['Tuesday', '12:00', '02:00'], ['Wednesday', '18:00', '02:00'],
+    ['Thursday', '00:00', '23:59'], ['Sunday', '09:00', '17:00'],
+  ]);
+  for (const s of specs) assert.equal(s['@type'], 'OpeningHoursSpecification');
+  // Previously every period below was dropped (the venue lost all its hours).
+  const barking = app.buildOpeningHoursSpecification(JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['12:00', '26:00']]]))));
+  assert.equal(barking.length, 7);
+  assert.ok(barking.every((s) => s.opens === '12:00' && s.closes === '02:00'));
+  // Nothing readable -> the property is omitted.
+  assert.equal(app.buildOpeningHoursSpecification('{}'), undefined);
+  assert.equal(app.buildOpeningHoursSpecification(JSON.stringify({ mon: null, tue: [] })), undefined);
+  assert.equal(app.buildOpeningHoursSpecification(JSON.stringify({ mon: [['x', '1']] })), undefined);
+});
+
+test('Stage 2: the venue page hours list never shows an unlisted day as "Closed", shows past-midnight closes as clock times, and matches its structured data', () => {
+  const hours = JSON.stringify({ tue: [['12:00', '23:00']], wed: null, thu: [['12:00', '26:00']], fri: [['11:00', '24:00']], sat: [['00:00', '24:00']], sun: [] });
+  const info = db.prepare("INSERT INTO venues (name, region, type, hours, slug, description) VALUES ('Stage Two Hours Fixture', 'kelowna', 'restaurant', ?, 'stage-two-hours-fixture', 'fixture')").run(hours);
+  const id = Number(info.lastInsertRowid);
+  try {
+    const html = app.renderVenuePage(app.getVenue(id), [], [], []);
+    const list = (html.match(/<ul class="hours-list">([\s\S]*?)<\/ul>/) || [])[1] || '';
+    const rows = [...list.matchAll(/<li><span>(\w+)<\/span><span>([^<]*)<\/span><\/li>/g)].map((m) => [m[1], m[2]]);
+    assert.deepEqual(rows, [
+      ['Monday', 'Hours not listed'], ['Tuesday', '12:00–23:00'], ['Wednesday', 'Closed'], ['Thursday', '12:00–02:00'],
+      ['Friday', '11:00–00:00'], ['Saturday', '00:00–23:59'], ['Sunday', 'Closed'],
+    ]);
+    assert.doesNotMatch(list, /26:00|24:00|Open 24 hours/);
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1])).find((x) => x.openingHoursSpecification);
+    assert.deepEqual(ld.openingHoursSpecification.map((s) => s.dayOfWeek.replace('https://schema.org/', '')), ['Tuesday', 'Thursday', 'Friday', 'Saturday'], 'no period for the unknown Monday or the closed days');
+    // No hours at all -> no list, no structured hours.
+    db.prepare('UPDATE venues SET hours = NULL WHERE id = ?').run(id);
+    const none = app.renderVenuePage(app.getVenue(id), [], [], []);
+    assert.doesNotMatch(none, /class="hours-list"/);
+    assert.doesNotMatch(none, /openingHoursSpecification/);
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('Stage 2: an unverified all-day listing (Apres #30 Thursday, stored 00:00-23:59) is restated as stored on the venue page and in Build My Trip -- never "Open 24 hours" or "00:00–00:00"', () => {
+  const apresHours = '{"mon":null,"tue":[["10:30","20:00"]],"wed":[["10:30","20:00"]],"thu":[["00:00","23:59"]],"fri":[["10:30","20:30"]],"sat":[["09:30","20:30"]],"sun":null}';
+  const info = db.prepare("INSERT INTO venues (name, region, type, hours, slug, description) VALUES ('Apres Hours Fixture', 'penticton', 'cafe', ?, 'apres-hours-fixture', 'fixture')").run(apresHours);
+  const id = Number(info.lastInsertRowid);
+  try {
+    const html = app.renderVenuePage(app.getVenue(id), [], [], []);
+    assert.match(html, /<li><span>Thursday<\/span><span>00:00–23:59<\/span><\/li>/, 'venue page Thursday as stored');
+    assert.doesNotMatch(html, /Open 24 hours/, 'no strengthened wording on the page');
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1])).find((x) => x.openingHoursSpecification);
+    const thu = ld.openingHoursSpecification.filter((s) => /Thursday$/.test(s.dayOfWeek));
+    assert.deepEqual(thu.map((s) => [s.opens, s.closes]), [['00:00', '23:59']], 'structured data unchanged: 00:00-23:59');
+    const planner = require('../trip-planner.js');
+    const v = { hours: apresHours };
+    assert.equal(planner.listedHoursText(v, 'thu'), 'Listed hours Thursday: 00:00–23:59', 'planner listed hours as stored');
+    assert.doesNotMatch(planner.listedHoursText({ hours: apresHours }, null, null), /00:00–00:00|Open 24 hours/);
+    assert.equal(planner.listedHoursText({ hours: '{"mon":[["12:00","26:00"]]}' }, 'mon'), 'Listed hours Monday: 12:00–02:00', 'past-midnight close unchanged');
+    assert.equal(planner.listedHoursText({ hours: '{"mon":[["11:00","24:00"]]}' }, 'mon'), 'Listed hours Monday: 11:00–00:00', '24:00 close unchanged');
+    // The verified Open Now status is a separate surface and keeps its own wording.
+    const hoursJs = require('../hours.js');
+    const c = { weekday: 'wed', minutes: 12 * 60 };
+    assert.equal(hoursJs.hoursStatusLabel(hoursJs.statusAt(hoursJs.parseHours(JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['00:00', '24:00']]])))), c), c).text, 'Open 24 hours');
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('Stage 2: Build My Trip reads hours through hours.js (the same days as the venue page and Open Now)', () => {
+  const planner = require('../trip-planner.js');
+  const hoursJs = require('../hours.js');
+  const samples = [
+    JSON.stringify({ mon: [['11:00', '14:00'], ['17:00', '22:00']], tue: null, wed: [], thu: [['18:00', '02:00']], fri: [['16:00', '25:00']], sat: [['03:30', '23:00']], sun: [['00:00', '24:00']] }),
+    JSON.stringify({ tue: [['09:00', '17:00']] }),
+    JSON.stringify({ mon: [['x', '17:00']] }),
+    '', 'not json', null,
+  ];
+  for (const s of samples) assert.deepEqual(planner.parseVenueHours(s), hoursJs.parseHours(typeof s === 'string' ? s : null), String(s));
+});
+
+test('Stage 2: POST /admin/verify-hours is the guarded, audited hours write (auth, allowlist, compare-and-set, provenance) -- isolated child process', async () => {
+  const childEnv = { ...process.env };
+  const ISOLATED_PORT = '3097';
+  childEnv.PORT = ISOLATED_PORT;
+  childEnv.ENRICHMENT_ADMIN_TOKEN = 'verify-hours-test-token';
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-verify-hours-'));
+  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
+    if (fs.existsSync(path.join(__dirname, '..', f))) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
+  }
+  try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
+  const child = spawn(process.execPath, ['--no-warnings', path.join(dir, 'server.js')], { cwd: dir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderrOutput = '';
+  child.stderr.on('data', (d) => { stderrOutput += d.toString(); });
+  try {
+    const base = `http://localhost:${ISOLATED_PORT}`;
+    const deadline = Date.now() + 15000; let ready = false;
+    while (Date.now() < deadline && !ready) { try { if ((await fetch(`${base}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); } }
+    assert.ok(ready, `isolated child never became ready. stderr: ${stderrOutput}`);
+    const authed = { 'Content-Type': 'application/json', Authorization: `Bearer ${childEnv.ENRICHMENT_ADMIN_TOKEN}` };
+    const original = '{"sun": [["12:00", "23:00"]], "tue": [["12:00", "23:00"]]}';
+    const created = await (await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Verify Hours Fixture', region: 'penticton', type: 'restaurant', description: 'fixture', slug: 'verify-hours-fixture', hours: original }) })).json();
+    assert.ok(created.id, JSON.stringify(created));
+    const week = { mon: [['11:00', '22:00']], tue: [['11:00', '22:00']], wed: [['11:00', '22:00']], thu: [['11:00', '22:00']], fri: [['11:00', '23:00']], sat: [['11:00', '23:00']], sun: [['12:00', '22:00']] };
+    const today = app.todayLocal(new Date());
+    const good = { id: created.id, expected_current_hours: original, verified: { hours: week, hours_source: 'official_website', hours_checked_at: today }, reason: 'official website', batch_id: 'verify-hours-test' };
+    const post = async (body, headers = authed) => { const r = await fetch(`${base}/admin/verify-hours`, { method: 'POST', headers, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };
+    assert.equal((await post(good, { 'Content-Type': 'application/json', Authorization: 'Bearer wrong' })).status, 401);
+    assert.equal((await post(good, { 'Content-Type': 'application/json' })).status, 401);
+    assert.equal((await post({ ...good, extra: 1 })).status, 400);
+    assert.equal((await post({ ...good, verified: { ...good.verified, note: 'x' } })).status, 400);
+    assert.equal((await post({ ...good, expected_current_hours: undefined })).status, 400);
+    assert.equal((await post({ ...good, verified: { ...good.verified, hours: { mon: [['11:00', '22:00']] } } })).body.error, 'invalid_hours', 'an incomplete week is refused');
+    assert.equal((await post({ ...good, verified: { ...good.verified, hours_source: 'a blog' } })).body.error, 'invalid_source');
+    assert.equal((await post({ ...good, verified: { ...good.verified, hours_checked_at: '2099-01-01' } })).body.error, 'invalid_checked_at');
+    assert.equal((await post({ ...good, reason: '' })).body.error, 'invalid_meta');
+    assert.equal((await post({ ...good, id: 999999999 })).status, 404);
+    const stale = await post({ ...good, expected_current_hours: '{"mon":[["09:00","17:00"]]}' });
+    assert.equal(stale.status, 409);
+    assert.equal(stale.body.live.hours, original, 'a stale caller changes nothing and sees the live value');
+    const ok = await post(good);
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.deepEqual(ok.body.changedFields, ['hours', 'hours_source', 'hours_checked_at']);
+    assert.equal(ok.body.venue.hours, JSON.stringify(week));
+    const pub = await (await fetch(`${base}/api/venues/${created.id}`)).json();
+    assert.equal(pub.hours, JSON.stringify(week));
+    assert.equal('hours_source' in pub, false, 'provenance stays out of the public venue shape');
+    const again = await post({ ...good, expected_current_hours: original });
+    assert.equal(again.status, 409, 'the old expected value no longer matches');
+    const page = await (await fetch(`${base}/penticton/restaurants/verify-hours-fixture`)).text();
+    assert.match(page, /<li><span>Monday<\/span><span>11:00–22:00<\/span><\/li>/);
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise((r) => child.once('exit', r));
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
 });

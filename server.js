@@ -704,9 +704,8 @@ function guardedPhoneCorrectUpdate(id, expectedCurrentPhone, correctedPhone, met
 // ---------- Open Now Phase 2 (2026-09-26): audited, verified hours write ----------
 //
 // A SEPARATE, standalone code path, like guardedPhoneCorrectUpdate() above.
-// It is the only writer of hours_source / hours_checked_at (db.js), and it is
-// deliberately NOT wired to any HTTP route yet -- like guardedEnrichUpdate(),
-// it is tested infrastructure for a later, separately approved phase.
+// It is the only writer of hours_source / hours_checked_at (db.js). Since
+// Stage 2 (2026-09-29) it is reachable through POST /admin/verify-hours.
 //
 // It records that a venue's hours were checked against a named kind of
 // source on an Okanagan calendar date, and may correct the hours in the same
@@ -4822,13 +4821,10 @@ function breadcrumbListSchema(items) {
 // - A day mapped to a non-empty array means one OpeningHoursSpecification
 //   per [start, end] pair in that array (this is how split shifts, e.g.
 //   lunch + dinner, are already represented).
-// - A day mapped to null, an empty array, or simply absent all mean the
-//   same thing: no opening period is generated for that day. This matches
-//   how the existing HTML "Hours" rendering already treats these three
-//   cases identically as "Closed".
-// - Any per-day or per-range value that isn't in the expected shape is
-//   skipped individually rather than aborting the whole venue, so one bad
-//   entry can't take down the others or crash rendering.
+// - A day mapped to null or an empty array is closed; an absent day is
+//   unknown (never "Closed"). Neither generates an opening period.
+// - A day with any period that isn't in the expected shape is unknown as a
+//   whole (hours.js), so no partial, possibly wrong day is published.
 // Returns undefined (not an empty array) when there's nothing valid to
 // show, so the property is cleanly omitted from the schema object exactly
 // like every other conditional field already in localBusiness.
@@ -4841,44 +4837,24 @@ const DAY_SCHEMA_NAMES = {
   sat: 'https://schema.org/Saturday',
   sun: 'https://schema.org/Sunday',
 };
-const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const VALID_TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/; // accepts "9:00" and "09:00" alike; output is always zero-padded
-
-function normalizeTime(t) {
-  const m = VALID_TIME.exec(t);
-  if (!m) return null;
-  return `${m[1].padStart(2, '0')}:${m[2]}`;
-}
-
+// Stage 2 (2026-09-29): the periods now come from hours.js (parseHours ->
+// openingPeriods), the same reading as the venue page list and Open Now. A
+// close stored as "24:00" or past midnight ("26:00") used to fail the
+// 00:00-23:59 check above and was dropped (21 venues, 7 with no hours left);
+// it is now the next morning's clock time ("00:00", "02:00"), closes earlier
+// than opens, which schema.org reads as past midnight. A 24-hour day is
+// 00:00-23:59. Only days listed as open produce periods: a closed day and an
+// unknown day (absent key, malformed period) produce none, as before.
 function buildOpeningHoursSpecification(hoursRaw) {
-  if (!hoursRaw) return undefined;
-
-  let hoursObj;
-  try {
-    hoursObj = JSON.parse(hoursRaw);
-  } catch (e) {
-    return undefined; // malformed JSON — omit rather than guess
-  }
-  if (!hoursObj || typeof hoursObj !== 'object') return undefined;
-
-  const specs = [];
-  for (const day of DAY_ORDER) {
-    const ranges = hoursObj[day];
-    if (!Array.isArray(ranges)) continue; // null, missing, or wrong type -> treated as closed, same as existing HTML rendering
-    for (const range of ranges) {
-      if (!Array.isArray(range) || range.length !== 2) continue; // malformed single entry -> skip just this one
-      const opens = normalizeTime(range[0]);
-      const closes = normalizeTime(range[1]);
-      if (!opens || !closes) continue; // malformed time -> skip just this one
-      specs.push({
-        '@type': 'OpeningHoursSpecification',
-        dayOfWeek: DAY_SCHEMA_NAMES[day],
-        opens,
-        closes,
-      });
-    }
-  }
-
+  if (!hoursRaw || !hoursModule) return undefined;
+  const parsed = hoursModule.parseHours(hoursRaw);
+  if (!parsed.known) return undefined;
+  const specs = hoursModule.openingPeriods(parsed).map((p) => ({
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: DAY_SCHEMA_NAMES[p.day],
+    opens: p.opens,
+    closes: p.closes,
+  }));
   return specs.length > 0 ? specs : undefined;
 }
 
@@ -12764,23 +12740,21 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
   const hiddenGemChip = (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
 
+  // Stage 2 (2026-09-29): read through hours.js like Open Now and the
+  // structured data. A day that is absent or malformed is "Hours not listed",
+  // never "Closed" (only a day stored as null or [] is Closed); a close past
+  // midnight shows as the next morning's time ("12:00\u201302:00", not "26:00");
+  // an all-day day stays 00:00–23:59 (the list restates the stored hours, it
+  // never rewords them as "Open 24 hours"). No list when nothing is readable.
   let hoursHtml = '';
-  if (venue.hours) {
-    try {
-      const hoursObj = JSON.parse(venue.hours);
-      const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      const dayNames = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
-      const rows = dayOrder.map((d) => {
-        const ranges = hoursObj[d];
-        const text = (Array.isArray(ranges) && ranges.length)
-          ? ranges.map((r) => `${r[0]}\u2013${r[1]}`).join(', ')
-          : 'Closed';
-        return `<li><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
-      }).join('');
-      hoursHtml = `<div class="detail-row"><span class="label">Hours</span></div><ul class="hours-list">${rows}</ul>`;
-    } catch (e) {
-      hoursHtml = '';
-    }
+  const parsedHours = venue.hours && hoursModule ? hoursModule.parseHours(venue.hours) : null;
+  if (parsedHours && parsedHours.known) {
+    const dayNames = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+    const rows = hoursModule.HOURS_WEEKDAYS.map((d) => {
+      const text = hoursModule.dayHoursText(parsedHours.days[d]);
+      return `<li><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
+    }).join('');
+    hoursHtml = `<div class="detail-row"><span class="label">Hours</span></div><ul class="hours-list">${rows}</ul>`;
   }
 
   // Outbound links carry a data-track kind so the venue-page engagement
@@ -17215,6 +17189,81 @@ const server = http.createServer(async (req, res) => {
         id,
         changed: result.changed,
         venue: { phone: result.venue.phone },
+      });
+    }
+
+    // POST /admin/verify-hours (Stage 2, 2026-09-29)
+    //
+    // The HTTP route for guardedHoursVerifyUpdate(): records that a venue's
+    // hours were checked against a named source on an Okanagan date, and may
+    // correct them in the same step. Compare-and-set on the caller's expected
+    // current hours (the exact stored text, or null), a complete verified week,
+    // an allowlisted source, a date that is not in the future, reason and
+    // batch_id, one audit row per changed column -- all enforced by the guarded
+    // function. It is the only write path for hours_source / hours_checked_at,
+    // so hours corrected here stay eligible for Open Now (the unguarded
+    // PUT /api/venues/:id clears them). Same bearer-token check and strict key
+    // allowlist as every admin route.
+    if (pathname === '/admin/verify-hours' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Verify-hours endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      }
+      const ALLOWED_VERIFY_HOURS_KEYS = ['id', 'expected_current_hours', 'verified', 'reason', 'batch_id'];
+      const unexpectedVerifyKeys = Object.keys(body).filter((k) => !ALLOWED_VERIFY_HOURS_KEYS.includes(k));
+      if (unexpectedVerifyKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedVerifyKeys.join(', ')}` });
+      }
+      if (!Number.isInteger(body.id) || body.id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (!('expected_current_hours' in body) || (body.expected_current_hours !== null && typeof body.expected_current_hours !== 'string')) {
+        return sendJSON(res, 400, { error: 'expected_current_hours is required and must be the stored hours text or null.' });
+      }
+      const verified = body.verified;
+      if (!verified || typeof verified !== 'object' || Array.isArray(verified)) {
+        return sendJSON(res, 400, { error: 'verified must be an object with hours, hours_source and hours_checked_at.' });
+      }
+      const unexpectedVerifiedKeys = Object.keys(verified).filter((k) => !['hours', 'hours_source', 'hours_checked_at'].includes(k));
+      if (unexpectedVerifiedKeys.length > 0) {
+        return sendJSON(res, 400, { error: `verified has unexpected field(s): ${unexpectedVerifiedKeys.join(', ')}` });
+      }
+
+      let result;
+      try {
+        result = guardedHoursVerifyUpdate(body.id, body.expected_current_hours, verified, {
+          reason: body.reason,
+          batch_id: body.batch_id,
+          reviewed_by: null,
+        });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Hours verification failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = {
+          invalid_meta: 400, invalid_hours: 400, invalid_source: 400, invalid_checked_at: 400,
+          venue_not_found: 404, venue_redirected: 409, mismatch: 409, hours_module_unavailable: 503,
+        };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      return sendJSON(res, 200, {
+        id: body.id,
+        changedFields: result.changedFields,
+        venue: { hours: result.hours, hours_source: result.hours_source, hours_checked_at: result.hours_checked_at },
       });
     }
 

@@ -290,3 +290,58 @@ test('browser copy (HOURS_CLIENT_SRC) reads every minute of the week exactly lik
     }
   }
 });
+
+// ---- Stage 2 (2026-09-29): weekly list and structured-data periods ----
+test('formatClock24: minutes after the start of the listed day as a 24-hour clock', () => {
+  assert.equal(h.formatClock24(0), '00:00');
+  assert.equal(h.formatClock24(570), '09:30');
+  assert.equal(h.formatClock24(1440), '00:00', 'a close at midnight');
+  assert.equal(h.formatClock24(1560), '02:00', 'a close past midnight is the next morning');
+});
+
+test('formatRange: one period as the listing states it; an all-day day stays 00:00–23:59', () => {
+  const range = (a, b) => h.formatRange(h.parseHours(J({ mon: [[a, b]] })).days.mon.ranges[0]);
+  assert.equal(range('00:00', '23:59'), '00:00–23:59', 'stored all-day notation kept as is (Apres #30 Thursday)');
+  assert.equal(range('00:00', '24:00'), '00:00–23:59');
+  assert.equal(range('00:00', '00:00'), '00:00–23:59');
+  assert.equal(range('12:00', '26:00'), '12:00–02:00');
+  assert.equal(range('18:00', '02:00'), '18:00–02:00');
+  assert.equal(range('11:00', '24:00'), '11:00–00:00');
+  assert.equal(range('9:30', '17:00'), '09:30–17:00');
+});
+
+test('dayHoursText: open, closed and unknown are never collapsed; past-midnight closes read as clock times; never "Open 24 hours"', () => {
+  const day = (hours, d) => h.dayHoursText(h.parseHours(J(hours)).days[d]);
+  assert.equal(day({ mon: [['11:00', '14:00'], ['17:00', '22:00']] }, 'mon'), '11:00–14:00, 17:00–22:00');
+  assert.equal(day({ mon: [['9:30', '23:00']] }, 'mon'), '09:30–23:00');
+  assert.equal(day({ mon: [['12:00', '26:00']] }, 'mon'), '12:00–02:00', 'stored "26:00" is shown as 02:00, never "26:00"');
+  assert.equal(day({ mon: [['18:00', '02:00']] }, 'mon'), '18:00–02:00');
+  assert.equal(day({ mon: [['11:00', '24:00']] }, 'mon'), '11:00–00:00');
+  for (const allDay of [['00:00', '24:00'], ['00:00', '00:00'], ['00:00', '23:59']]) {
+    assert.equal(day({ mon: [allDay] }, 'mon'), '00:00–23:59', allDay.join('-'));
+  }
+  // The ordinary listing never words anything as "Open 24 hours" ...
+  for (const d of DAYS) assert.doesNotMatch(day(every([['00:00', '24:00']]), d), /Open 24 hours/);
+  // ... while the verified Open Now status keeps it.
+  assert.equal(label(every([['00:00', '24:00']]), 'wed', '12:00').text, 'Open 24 hours');
+  assert.equal(day({ mon: null }, 'mon'), 'Closed');
+  assert.equal(day({ mon: [] }, 'mon'), 'Closed');
+  assert.equal(day({ tue: [['09:00', '17:00']] }, 'mon'), 'Hours not listed', 'an absent day is unknown, never "Closed"');
+  assert.equal(day({ mon: [['nine', '17:00']] }, 'mon'), 'Hours not listed', 'a malformed day is unknown, never "Closed"');
+  assert.equal(h.dayHoursText(undefined), 'Hours not listed');
+});
+
+test('openingPeriods: only open days, past-midnight closes as next-morning times, 24-hour days as 00:00-23:59', () => {
+  const periods = h.openingPeriods(h.parseHours(J({
+    mon: [['11:00', '24:00']], tue: [['12:00', '26:00']], wed: [['00:00', '24:00']],
+    fri: null, sat: [['bad', '12:00']], sun: [['11:00', '14:00'], ['17:00', '22:00']],
+  })));
+  assert.deepEqual(periods, [
+    { day: 'mon', opens: '11:00', closes: '00:00' },
+    { day: 'tue', opens: '12:00', closes: '02:00' },
+    { day: 'wed', opens: '00:00', closes: '23:59' },
+    { day: 'sun', opens: '11:00', closes: '14:00' },
+    { day: 'sun', opens: '17:00', closes: '22:00' },
+  ], 'thu (absent), fri (closed) and sat (malformed) publish nothing');
+  assert.deepEqual(h.openingPeriods(h.parseHours(null)), []);
+});
