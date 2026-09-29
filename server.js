@@ -15152,9 +15152,17 @@ function renderHiddenElementsScript() {
     // which truncated the longer, rewritten venue descriptions with no way
     // to read the rest. Re-clamp to 6 lines (keeps card heights aligned in
     // the grid) and add a "Read more" toggle for any description that
-    // actually overflows. data-desc-init marks elements already processed
-    // so we don't reprocess them (and don't re-clamp one a user just
-    // expanded) on every 300ms poll.
+    // actually overflows. data-desc-init marks elements already clamped so
+    // we don't re-clamp one a user just expanded on every 300ms poll.
+    // Stage 3.4.1 (2026-09-29): the clamp is applied to every description at
+    // once (cheap style writes, so card heights never change later), but
+    // measuring whether one overflows is expensive -- the browser lays out
+    // the clamped box's full text to answer -- so that happens only for a
+    // card that is displayed and near the viewport, when it gets there
+    // (measureDesc via watchDesc). On /browse?q= it waits until the
+    // visitor's search has been applied, so filtered-out cards are never
+    // measured at all.
+    if (window.__roamPrefillPending && !window.__roamPrefillDone) return;
     var descs = D.querySelectorAll('.venue-desc:not([data-desc-init])');
     for (var k = 0; k < descs.length; k++) {
       var desc = descs[k];
@@ -15165,30 +15173,46 @@ function renderHiddenElementsScript() {
       desc.style.setProperty('overflow', 'hidden', 'important');
       desc.style.setProperty('max-height', 'none', 'important');
       desc.style.setProperty('min-height', '0', 'important');
-
-      if (desc.scrollHeight > desc.clientHeight + 2) {
-        var btn = D.createElement('button');
-        btn.type = 'button';
-        btn.textContent = 'Read more';
-        btn.style.cssText = 'display:block;margin:4px 22px 0;padding:0;border:none;background:none;color:#8A631F;font-size:0.85rem;font-weight:700;cursor:pointer;text-decoration:underline;';
-        var expanded = false;
-        btn.addEventListener('click', function(el, b){
-          return function(){
-            expanded = !expanded;
-            if (expanded) {
-              el.style.setProperty('-webkit-line-clamp', 'unset', 'important');
-              el.style.setProperty('overflow', 'visible', 'important');
-              b.textContent = 'Read less';
-            } else {
-              el.style.setProperty('-webkit-line-clamp', '6', 'important');
-              el.style.setProperty('overflow', 'hidden', 'important');
-              b.textContent = 'Read more';
-            }
-          };
-        }(desc, btn));
-        desc.insertAdjacentElement('afterend', btn);
-      }
+      watchDesc(desc);
     }
+  }
+  // Measured once, when displayed and near the viewport; marked only then.
+  function measureDesc(desc){
+    if (desc.getAttribute('data-desc-measured')) return;
+    desc.setAttribute('data-desc-measured', '1');
+    if (desc.scrollHeight > desc.clientHeight + 2) {
+      var btn = D.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Read more';
+      btn.style.cssText = 'display:block;margin:4px 22px 0;padding:0;border:none;background:none;color:#8A631F;font-size:0.85rem;font-weight:700;cursor:pointer;text-decoration:underline;';
+      var expanded = false;
+      btn.addEventListener('click', function(){
+        expanded = !expanded;
+        if (expanded) {
+          desc.style.setProperty('-webkit-line-clamp', 'unset', 'important');
+          desc.style.setProperty('overflow', 'visible', 'important');
+          btn.textContent = 'Read less';
+        } else {
+          desc.style.setProperty('-webkit-line-clamp', '6', 'important');
+          desc.style.setProperty('overflow', 'hidden', 'important');
+          btn.textContent = 'Read more';
+        }
+      });
+      desc.insertAdjacentElement('afterend', btn);
+    }
+  }
+  // A hidden (filtered-out) card is never intersecting, so it is measured
+  // only if and when it is shown near the viewport.
+  var descObserver = ('IntersectionObserver' in window) ? new IntersectionObserver(function(entries){
+    for (var e = 0; e < entries.length; e++) {
+      if (!entries[e].isIntersecting) continue;
+      descObserver.unobserve(entries[e].target);
+      measureDesc(entries[e].target);
+    }
+  }, { rootMargin: '400px 0px' }) : null;
+  function watchDesc(desc){
+    if (descObserver) descObserver.observe(desc);
+    else if (desc.offsetParent !== null) measureDesc(desc);
   }
   apply();
   setInterval(apply, 300);
@@ -15261,18 +15285,36 @@ function renderBrowsePrefillScript(discoveryParams = false) {
   }
   // app.js wires up .type-chip/#searchBtn/#mapToggleBtn click handlers only
   // once its own venue fetch resolves (window.__applyFilters is set at the
-  // end of that same init step) -- clicking these controls any earlier is a
-  // no-op since no listener exists yet. Poll briefly for that readiness
-  // signal instead of guessing a fixed delay.
-  function whenReady(fn){
-    var tries = 0;
-    (function poll(){
-      if (window.__applyFilters || tries++ > 100) fn();
-      else setTimeout(poll, 50);
-    })();
+  // end of initBlock1(); its other init blocks run in the same task) --
+  // clicking these controls any earlier is a no-op since no listener exists
+  // yet. Stage 3.4.1 (2026-09-29): run() is queued as a microtask from that
+  // very assignment, so it runs right after app.js's init, before the
+  // browser paints and before any timer -- the directory is never shown
+  // unfiltered first, and nothing can race it. There is no give-up: a slow
+  // connection only means it runs later, never that the request is skipped.
+  // A plain poll stays as the fallback.
+  window.__roamPrefillPending = true;
+  var done = false;
+  function once(){
+    if (done) return;
+    done = true;
+    try { run(); } finally { window.__roamPrefillDone = true; }
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ whenReady(run); });
-  else whenReady(run);
+  function later(fn){ if (typeof queueMicrotask === 'function') queueMicrotask(fn); else Promise.resolve().then(fn); }
+  try {
+    var current = window.__applyFilters;
+    if (typeof current === 'function') later(once);
+    else Object.defineProperty(window, '__applyFilters', {
+      configurable: true, enumerable: true,
+      get: function(){ return current; },
+      set: function(v){ current = v; if (typeof v === 'function') later(once); },
+    });
+  } catch (e) {}
+  (function poll(){
+    if (done) return;
+    if (typeof window.__applyFilters === 'function' && document.readyState !== 'loading') once();
+    else setTimeout(poll, 100);
+  })();
 })();
 </script>`;
 }

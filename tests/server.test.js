@@ -9496,9 +9496,12 @@ test('Phase 2: with the flag off, /api/discover does not exist and /browse?q is 
   assert.equal(browse.status, 200, 'no redirect when the flag is off');
   const html = await browse.text();
   assert.ok(!html.includes("params.get('regions')"), 'the pre-fill script is the original one');
-  // The pre-fill script with the flag off is byte-identical to the pre-Phase-2 script.
+  // The pre-fill script with the flag off has no discovery parameters. Its
+  // bytes changed deliberately in Stage 3.4.1 (2026-09-29): with the flag on
+  // or off, the query is applied as soon as app.js is ready, with no 5 s
+  // give-up (the previous pre-Phase-2 hash was 298f621bed7f7cf9548024b8d76bf569).
   const crypto = require('node:crypto');
-  assert.equal(crypto.createHash('md5').update(app.renderBrowsePrefillScript(false)).digest('hex'), '298f621bed7f7cf9548024b8d76bf569');
+  assert.equal(crypto.createHash('md5').update(app.renderBrowsePrefillScript(false)).digest('hex'), '77100983227788bdac60cd942a34fdb0');
   assert.equal(app.renderBrowsePrefillScript(), app.renderBrowsePrefillScript(false));
 })));
 
@@ -13329,4 +13332,39 @@ test('Stage 3.4: "App coming soon" opens the existing app teaser on every page; 
     assert.doesNotMatch(dialog, /<a\s/, 'store badges are not links; no download URL');
     assert.doesNotMatch(dialog, /apps\.apple\.com|play\.google\.com/);
   }
+}));
+
+// ---- Stage 3.4.1 (2026-09-29): /browse loading ------------------------------
+test('Stage 3.4.1: /browse applies ?q= as soon as app.js is ready -- no 5 s give-up, no race, never before its listeners exist', () => {
+  for (const flag of [false, true]) {
+    const s = app.renderBrowsePrefillScript(flag);
+    assert.doesNotMatch(s, /tries\+\+ > 100/, 'no give-up');
+    assert.ok(s.includes("window.__roamPrefillPending = true;"));
+    assert.ok(s.includes("Object.defineProperty(window, '__applyFilters', {"), 'hooked to the moment app.js is ready');
+    assert.ok(s.includes('set: function(v){ current = v; if (typeof v === \'function\') later(once); },'), 'queued right after app.js init, before paint');
+    assert.ok(s.includes("try { run(); } finally { window.__roamPrefillDone = true; }"), 'runs once and always releases the description pass');
+    assert.ok(s.includes("if (typeof window.__applyFilters === 'function' && document.readyState !== 'loading') once();"), 'fallback poll, without a cap');
+  }
+});
+
+test('Stage 3.4.1: /browse "Read more" measures only displayed descriptions near the viewport, after the search is applied', () => withDiscoveryServer(async (base) => {
+  const html = await (await fetch(`${base}/browse?q=fixture`)).text();
+  const i = html.indexOf("var mapOpen = !!D.querySelector('#mapPanel.open');");
+  assert.ok(i !== -1);
+  const script = html.slice(i, html.indexOf('</script>', i));
+  assert.ok(script.includes('if (window.__roamPrefillPending && !window.__roamPrefillDone) return;'), 'waits for the visitor\'s search');
+  assert.ok(script.includes("new IntersectionObserver(function(entries){"), 'measured when a card nears the viewport');
+  assert.ok(script.includes("{ rootMargin: '400px 0px' }"));
+  assert.ok(script.includes("desc.setAttribute('data-desc-measured', '1');"), 'marked only when measured');
+  // Clamping stays immediate (card heights never change later); measuring is deferred.
+  const loop = script.slice(script.indexOf("var descs = D.querySelectorAll('.venue-desc:not([data-desc-init])');"), script.indexOf('// Measured once'));
+  assert.ok(loop.includes("desc.style.setProperty('-webkit-line-clamp', '6', 'important');"));
+  assert.ok(loop.includes('watchDesc(desc);'));
+  assert.doesNotMatch(loop, /scrollHeight/, 'nothing is measured while clamping');
+  // The other /browse duties are unchanged.
+  assert.ok(script.includes("toHide[i].style.display = mapOpen ? '' : 'none';"));
+  assert.ok(script.includes("/^Every place below is a real Okanagan venue/"));
+  // The homepage runs the same script without the pre-fill and is unaffected.
+  const home = await (await fetch(`${base}/`)).text();
+  assert.ok(!home.includes('window.__roamPrefillPending = true;'));
 }));
