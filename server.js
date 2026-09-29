@@ -14416,11 +14416,26 @@ ${renderHomeFooterHTML(true)}
 // Same URL, canonical, breadcrumb, header, Trip tray, footer and analytics
 // page_type as the current page; the planner API is unchanged.
 const tripPlannerV3PageModule = (() => { try { return require('./trip-planner-v3-page.js'); } catch (e) { return null; } })();
+// Day-header photos (V3 image-quality fix, 2026-09-29). The homepage's
+// region cards use 640px thumbnails (public/images/regions/<slug>.webp,
+// unchanged); a full-width V3 day header needs more, so V3 uses its own
+// full-size copies in public/images/regions/wide/ -- the region originals
+// from the repo's history (1648x640) or, where no larger original exists,
+// the same-size WebP of the current PNG. Native widths are listed here for
+// srcset; phones get the 640px thumbnail where one exists.
+const TRIP_V3_WIDE_REGION_WIDTHS = { kelowna: 1648, 'lake-country': 1648, naramata: 1648, penticton: 1648, vernon: 1648, 'west-kelowna': 1648, oliver: 1376, osoyoos: 928, summerland: 928 };
 const TRIP_V3_REGION_IMAGES = (() => {
   const out = {};
+  const has = (rel) => fs.existsSync(path.join(__dirname, 'public', 'images', rel));
   for (const slug of Object.keys(REGION_LABELS)) {
+    const wide = TRIP_V3_WIDE_REGION_WIDTHS[slug] && has(`regions/wide/${slug}.webp`) ? `/images/regions/wide/${slug}.webp` : null;
+    const thumb = has(`regions/${slug}.webp`) ? `/images/regions/${slug}.webp` : null;
+    if (wide) {
+      out[slug] = { src: wide, srcset: (thumb ? `${thumb} 640w, ` : '') + `${wide} ${TRIP_V3_WIDE_REGION_WIDTHS[slug]}w` };
+      continue;
+    }
     for (const ext of ['webp', 'png', 'jpg']) {
-      if (fs.existsSync(path.join(__dirname, 'public', 'images', 'regions', `${slug}.${ext}`))) { out[slug] = `/images/regions/${slug}.${ext}`; break; }
+      if (has(`regions/${slug}.${ext}`)) { out[slug] = { src: `/images/regions/${slug}.${ext}`, srcset: null }; break; }
     }
   }
   return out;
@@ -18528,6 +18543,7 @@ module.exports = {
   tripPlannerV3Mode,
   tripPlannerV3ActiveFor,
   renderTripPlannerV3Page,
+  TRIP_V3_REGION_IMAGES,
   buildTripPlannerFacts,
   tripPlannerLabels,
   parseTripPlanBody,

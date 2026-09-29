@@ -254,7 +254,7 @@ function renderBody(d) {
   const chips = T3_EXAMPLES.map((e) => `<button type="button" class="t3-example" data-t3-example>${esc(e)}</button>`).join('\n          ');
   return `<main class="t3" id="tripV3">
   <section class="t3-hero" aria-labelledby="t3Title">
-    <img class="t3-hero-img" src="/images/trip-cta.webp" width="1600" height="656" alt="">
+    <img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656" alt="" fetchpriority="high">
     <div class="t3-hero-scrim"></div>
     <div class="t3-wrap t3-hero-inner">
       <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; Build My Trip</nav>
@@ -502,10 +502,14 @@ function renderScript(d) {
   }
   function dayHtml(d, counts){
     var img = REGION_IMAGES[d.region];
+    // The day header spans the content width (16px / 32px side padding, at
+    // most 1116px), so the browser picks the 640px thumbnail on phones and
+    // the full-size photo on wider screens.
+    var imgHtml = img ? '<img class="t3-day-img" src="' + esc(img.src) + '"' + (img.srcset ? ' srcset="' + esc(img.srcset) + '" sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1180px) calc(100vw - 64px), 1116px"' : '') + ' alt="" loading="lazy" decoding="async">' : '';
     var dayStops = d.stops.filter(function(s){ return s.venue && !state.removed[d.day + '-' + s.daypart]; });
     var maps = t3MapsUrl(dayStops.map(function(s){ return tripQuery(s.venue); }));
     return '<section class="t3-day" id="t3-day-' + d.day + '" aria-labelledby="t3-day-title-' + d.day + '">'
-      + '<div class="t3-day-head">' + (img ? '<img class="t3-day-img" src="' + esc(img) + '" alt="" loading="lazy">' : '') + '<div class="t3-day-scrim"></div>'
+      + '<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
       + '<div class="t3-day-headin"><div><p class="t3-eyebrow">Day ' + esc(d.day) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || 'The Okanagan') + '</h3>'
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">Planned around your ' + esc(d.theme.label) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">Regenerate day</button>'

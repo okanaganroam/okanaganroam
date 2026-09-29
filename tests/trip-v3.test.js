@@ -96,3 +96,35 @@ test('V3 page: every example chip is a request the planner turns into real stops
     assert.ok(all.every((s) => BY_ID.has(s.venue.id)), text);
   }
 });
+
+// ---- V3 image-quality fix (2026-09-29): full-size day headers and hero ----
+// Reads a WebP file's pixel size from its header (VP8 / VP8L / VP8X).
+function webpSize(file) {
+  const b = fs.readFileSync(file);
+  assert.equal(b.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(b.toString('ascii', 8, 12), 'WEBP');
+  const chunk = b.toString('ascii', 12, 16);
+  if (chunk === 'VP8X') return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
+  if (chunk === 'VP8L') { const v = b.readUInt32LE(21); return [1 + (v & 0x3fff), 1 + ((v >> 14) & 0x3fff)]; }
+  if (chunk === 'VP8 ') return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff];
+  throw new Error(`unknown WebP chunk ${chunk}`);
+}
+const IMG = path.join(__dirname, '..', 'public', 'images');
+
+test('V3 images: the full-size day-header photos and hero exist at their native sizes; the homepage images are the same files as before', () => {
+  const wide = { kelowna: [1648, 640], 'lake-country': [1648, 640], naramata: [1648, 640], penticton: [1648, 640], vernon: [1648, 640], 'west-kelowna': [1648, 640], oliver: [1376, 768], osoyoos: [928, 521], summerland: [928, 521] };
+  for (const [slug, size] of Object.entries(wide)) assert.deepEqual(webpSize(path.join(IMG, 'regions', 'wide', `${slug}.webp`)), size, slug);
+  assert.deepEqual(webpSize(path.join(IMG, 'trip-v3', 'hero.webp')), [1600, 656]);
+  // Untouched: the homepage's 640px region thumbnails and its trip-cta photo.
+  for (const slug of ['kelowna', 'lake-country', 'naramata', 'penticton', 'vernon', 'west-kelowna']) assert.deepEqual(webpSize(path.join(IMG, 'regions', `${slug}.webp`)), [640, 249], `${slug} thumbnail`);
+  assert.deepEqual(webpSize(path.join(IMG, 'trip-cta.webp')), [1600, 656]);
+  assert.equal(fs.statSync(path.join(IMG, 'trip-cta.webp')).size, 95206, 'trip-cta.webp is the same file');
+});
+
+test('V3 images: the page uses the V3 hero; day headers declare srcset widths that match the files', () => {
+  const html = v3.renderTripPlannerV3Page({ esc: (s) => String(s), title: 't', description: 'd', canonical: 'https://okanaganroam.com/trip', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', analyticsHead: '', regions: [], regionImages: {}, preview: false });
+  assert.ok(html.includes('<img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656"'));
+  assert.doesNotMatch(html, /trip-cta\.webp/, 'the homepage photo file is not used by V3');
+  assert.ok(html.includes('object-position: center 40%; opacity: 0.55;'), 'hero crop and darkening unchanged');
+  assert.ok(html.includes("srcset=\"' + esc(img.srcset) + '\" sizes=\"(max-width: 640px) calc(100vw - 32px), (max-width: 1180px) calc(100vw - 64px), 1116px\""));
+});
