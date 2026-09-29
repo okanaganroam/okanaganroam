@@ -446,3 +446,176 @@ test('"right now" is the current time today; "open now" stays unsupported', () =
   assert.deepEqual(I('what can I do in Kelowna right now').textTerms, []);
   assert.ok(I('restaurants open now in Kelowna').unsupported.includes('open now'));
 });
+
+// ==== Stage 3.1 (2026-09-29): polarity, filler words, plural-tolerant aliases ====
+const EMPTY_EXCLUDED = { regions: [], types: [], features: [], collections: [], activities: [], cuisines: [], textTerms: [], budget: null, phrases: [] };
+const WITH_PIZZA = { ...TAXONOMY, cuisines: [...TAXONOMY.cuisines, 'pizza'] };
+const LIST_FIELDS = ['regions', 'types', 'features', 'collections', 'activities', 'cuisines', 'textTerms'];
+// A negated value is never also a positive one.
+function assertDisjoint(intent, text) {
+  for (const f of LIST_FIELDS) {
+    const both = intent[f].filter((v) => intent.excluded[f].includes(v));
+    assert.deepEqual(both, [], `${text}: ${f} both wanted and excluded`);
+  }
+  if (intent.excluded.budget) assert.notEqual(intent.budget, intent.excluded.budget, `${text}: budget both wanted and excluded`);
+}
+
+test('Stage 3.1 contract: intent.excluded is additive, always present, and empty for a positive request', () => {
+  const i = I('wineries in Kelowna');
+  assert.deepEqual(i.excluded, EMPTY_EXCLUDED);
+  assert.deepEqual(i.types, ['winery']);
+  assert.deepEqual(i.regions, ['kelowna']);
+  assert.deepEqual(i.unsupported, []);
+  assert.deepEqual(I('').excluded, EMPTY_EXCLUDED);
+  assert.equal(i.version, 1, 'additive change: the intent version is unchanged');
+});
+
+test('Stage 3.1 negation: "not wineries" excludes wineries and wants nothing', () => {
+  const i = I('not wineries');
+  assert.deepEqual(i.excluded, { ...EMPTY_EXCLUDED, types: ['winery'], phrases: ['not wineries'] });
+  assert.deepEqual(i.types, []);
+  assert.equal(i.mode, 'unknown');
+  assert.deepEqual(i.unsupported, ['not wineries'], 'reported as not applied until exclusions are applied downstream');
+});
+
+test('Stage 3.1 negation: "no breweries" (and "no breweries or pubs") exclude those types; "no" is never a search word', () => {
+  const i = I('no breweries');
+  assert.deepEqual(i.excluded.types, ['brewery']);
+  assert.deepEqual(i.types, []);
+  assert.deepEqual(i.textTerms, []);
+  assert.deepEqual(i.excluded.phrases, ['no breweries']);
+  const j = I('no breweries or pubs');
+  assert.deepEqual(j.excluded.types, ['brewery', 'pub']);
+  assert.deepEqual(j.types, []);
+});
+
+test('Stage 3.1 negation: "wineries but not in kelowna" keeps wineries and excludes only Kelowna', () => {
+  const i = I('wineries but not in kelowna');
+  assert.deepEqual(i.types, ['winery']);
+  assert.deepEqual(i.regions, []);
+  assert.deepEqual(i.excluded, { ...EMPTY_EXCLUDED, regions: ['kelowna'], phrases: ['not in kelowna'] });
+  assert.equal(i.mode, 'find');
+});
+
+test('Stage 3.1 "nothing fancy" / "don\'t want anything fancy" mean only excluded.budget = upscale -- never a positive budget', () => {
+  for (const text of ['nothing fancy', "don't want anything fancy", 'We do not want anything fancy', 'not fancy']) {
+    const i = I(text);
+    assert.equal(i.budget, null, `${text}: no positive budget is invented`);
+    assert.deepEqual({ ...i.excluded, phrases: [] }, { ...EMPTY_EXCLUDED, budget: 'upscale' }, `${text}: only upscale is excluded`);
+    assert.ok(!i.heuristics.some((h) => h.field === 'budget'), `${text}: no budget ranking hint`);
+  }
+  assert.deepEqual(I("don't want anything fancy").excluded.phrases, ['not fancy']);
+  // The approved planner prompt keeps its wineries and superlative reading.
+  const p = I("We don't want anything fancy and can't miss the wineries.");
+  assert.deepEqual(p.types, ['winery']);
+  assert.equal(p.mode, 'recommend');
+  assert.equal(p.budget, null);
+  assert.equal(p.excluded.budget, 'upscale');
+  // A budget the visitor did ask for is kept alongside the exclusion.
+  const c = I('cheap eats but nothing fancy');
+  assert.equal(c.budget, 'budget');
+  assert.equal(c.excluded.budget, 'upscale');
+  assert.deepEqual(c.conflicts, [], 'wanting cheap and excluding upscale is not a conflict');
+});
+
+test('Stage 3.1 negation scope: unrelated positive terms survive; the clause ends at a break, an unrecognised word or a new item', () => {
+  const a = I('3 days in Kelowna, no golf, relaxed pace');
+  assert.deepEqual(a.excluded.types, ['golf']);
+  assert.deepEqual(a.regions, ['kelowna']);
+  assert.equal(a.pace, 'relaxed', 'the pace after the negated item is kept');
+  assert.equal(a.days, 3);
+  const b = I('not too far from Kelowna');
+  assert.deepEqual(b.regions, ['kelowna'], '"not too far from X" never excludes X');
+  assert.deepEqual(b.excluded.regions, []);
+  const c = I('a winery, no breweries, and dinner in Kelowna');
+  assert.deepEqual(c.types, ['winery', 'restaurant']);
+  assert.deepEqual(c.excluded.types, ['brewery']);
+  const parts = d.interpretTripComponents('a winery, no breweries, and dinner in Kelowna', TAXONOMY, c).components;
+  assert.ok(!parts.some((p) => (p.types || []).includes('brewery')), 'a negated part is never a trip stop');
+  assert.ok(parts.some((p) => (p.types || []).includes('winery')) && parts.some((p) => p.meal === 'dinner'));
+  const e = I('wineries without kids');
+  assert.deepEqual(e.types, ['winery']);
+  assert.deepEqual(e.features, []);
+  assert.deepEqual(e.excluded.features, ['kid_friendly']);
+  assert.equal(e.party.kids, false);
+  const g = d.interpretDiscoveryQuery('restaurants other than pizza', WITH_PIZZA);
+  assert.deepEqual(g.types, ['restaurant']);
+  assert.deepEqual(g.cuisines, []);
+  assert.deepEqual(g.excluded.cuisines, ['pizza']);
+  assert.deepEqual(I('anything but golf').excluded.types, ['golf']);
+});
+
+test('Stage 3.1 phrases that contain a negation word keep their own meaning', () => {
+  assert.equal(I('no kids').occasion, 'adults');
+  assert.deepEqual(I('no kids').excluded, EMPTY_EXCLUDED);
+  const miss = I("can't miss the wineries");
+  assert.deepEqual(miss.types, ['winery']);
+  assert.equal(miss.superlative, true);
+  assert.deepEqual(miss.excluded, EMPTY_EXCLUDED);
+  assert.deepEqual(I('non alcoholic drinks in Kelowna').features, ['nonalcoholic']);
+  assert.deepEqual(I('non alcoholic drinks in Kelowna').excluded, EMPTY_EXCLUDED);
+  const both = I('not only wineries but also breweries');
+  assert.deepEqual(both.types, ['winery', 'brewery'], '"not only" is not a negation');
+  assert.deepEqual(both.excluded, EMPTY_EXCLUDED);
+});
+
+test('Stage 3.1 a value said both ways is a conflict and never stays positive; every negative example is disjoint', () => {
+  const i = I('wineries but not wineries');
+  assert.deepEqual(i.types, []);
+  assert.deepEqual(i.excluded.types, ['winery']);
+  assert.deepEqual(i.conflicts, [{ field: 'excluded.types', values: ['winery'] }]);
+  for (const text of ['not wineries', 'no breweries', 'wineries but not in kelowna', "don't want anything fancy", 'nothing fancy', 'no breweries or pubs',
+    'wineries without kids', 'anything but golf', 'a winery, no breweries, and dinner in Kelowna', '3 days in Kelowna, no golf, relaxed pace', 'not too far from Kelowna',
+    'wineries but not wineries', 'cheap eats but nothing fancy', 'no dogs please, just a patio in Penticton']) {
+    const x = I(text);
+    assertDisjoint(x, text);
+    for (const p of x.excluded.phrases) assert.ok(x.unsupported.includes(p), `${text}: "${p}" is reported as not applied`);
+  }
+});
+
+test('Stage 3.1 validation: exclusions come only from the deterministic reading', () => {
+  const { intent, rejected } = d.validateDiscoveryIntent({ types: ['winery'], excluded: { types: ['brewery'] } }, TAXONOMY, 'wineries');
+  assert.deepEqual(intent.excluded, EMPTY_EXCLUDED);
+  assert.ok(rejected.some((r) => r.field === 'excluded' && r.reason === 'deterministic_only'));
+});
+
+test('Stage 3.1 filler words: "spend" and "mix" are never searched for', () => {
+  const lake = I('We have one day and want to spend time on the lake.');
+  assert.deepEqual(lake.textTerms, []);
+  assert.equal(lake.lake, true);
+  assert.equal(lake.days, 1);
+  const kids = I('We have 3 days with kids and want a mix of activities and food.');
+  assert.deepEqual(kids.textTerms, []);
+  assert.deepEqual(kids.types, ['restaurant']);
+  assert.deepEqual(kids.features, ['kid_friendly']);
+  assert.equal(kids.days, 3);
+  const left = d.interpretTripComponents('a mix of cafes and beaches in Penticton', TAXONOMY, I('a mix of cafes and beaches in Penticton')).leftoverTerms || [];
+  assert.ok(!left.includes('mix'));
+});
+
+test('Stage 3.1 plural-tolerant aliases: dinner/dinners, lunch/lunches, pizza/pizzas -- and no unrelated word changes', () => {
+  const r = I('Plan a romantic weekend with nice dinners and wineries.');
+  assert.deepEqual(r.types, ['restaurant', 'winery']);
+  assert.deepEqual(r.textTerms, []);
+  assert.deepEqual(I('dinners in Kelowna').types, I('dinner in Kelowna').types);
+  assert.deepEqual(I('lunches in Penticton').types, ['restaurant']);
+  const meals = d.interpretTripComponents('two lunches and a winery in Kelowna', TAXONOMY, I('two lunches and a winery in Kelowna')).components;
+  assert.ok(meals.some((c) => c.meal === 'lunch'), 'a plural meal is still that meal part');
+  assert.deepEqual(d.interpretDiscoveryQuery('pizzas', WITH_PIZZA).cuisines, ['pizza']);
+  // Plurals are generated only from single-word aliases, never singularised,
+  // never for nationality adjectives, and never over an existing phrase.
+  assert.deepEqual(I('italians').cuisines, [], 'a nationality plural is not a cuisine request');
+  assert.deepEqual(I('spirit').types, [], '"spirits" is not singularised');
+  assert.deepEqual(I('bars in Kelowna').types, ['pub']);
+  assert.deepEqual(I('drinks in Kelowna').types, ['pub', 'cocktail']);
+  assert.deepEqual(I('golf courses').types, ['golf']);
+  assert.deepEqual(I('wines').types, ['winery']);
+  assert.deepEqual(I('parks').types, ['outdoor']);
+  assert.deepEqual(I('kids').features, ['kid_friendly']);
+  // A generated plural carries exactly its singular's meaning.
+  const table = new Map(d.buildPhraseTable(TAXONOMY).map((e) => [e.phrase, e.assign]));
+  assert.deepEqual(table.get('dinners'), table.get('dinner'));
+  assert.deepEqual(table.get('lunches'), table.get('lunch'));
+  assert.equal(table.has('italians'), false);
+  assert.equal(table.has('spirit'), false);
+});

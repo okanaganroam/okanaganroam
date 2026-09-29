@@ -12972,3 +12972,23 @@ test('Stage 2: POST /admin/verify-hours is the guarded, audited hours write (aut
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
   }
 });
+
+// ==== Stage 3.1 (2026-09-29): negated requests are never routed or ranked as their opposite ====
+// No routing code changed: a negated clause is reported as not applied
+// (intent.unsupported), and the existing conservative rule never offers a
+// page for a request it cannot show exactly.
+test('Stage 3.1: negated requests never route to the page they rule out; search and the planner report them as not applied', () => {
+  for (const q of ['not wineries', 'no breweries', 'no breweries or pubs', 'wineries but not in kelowna', 'nothing fancy', "don't want anything fancy", 'anything but golf']) {
+    const intent = app.interpretDiscoveryText(q);
+    const dest = app.resolveDiscoveryDestination(intent);
+    assert.equal(dest.url, null, `${q}: never routed (was /wineries, /breweries, /kelowna/wineries...)`);
+    assert.ok(intent.excluded.phrases.length > 0, `${q}: the exclusion is understood`);
+  }
+  const d = app.runDiscovery('wineries but not in kelowna');
+  assert.deepEqual(d.intent.excluded.regions, ['kelowna']);
+  assert.ok(d.notApplied.some((n) => n.field === 'unsupported' && n.value === 'not in kelowna'), 'reported as not applied');
+  const plan = app.runTripPlan({ text: "We don't want anything fancy and can't miss the wineries." });
+  assert.notEqual(plan.overview && plan.overview.budget, 'upscale', '"nothing fancy" is never an upscale preference');
+  assert.ok(plan.understood.notUsed.includes('not fancy'), 'the planner names what it did not apply');
+  assert.ok(plan.understood.interests.includes('wineries'));
+});

@@ -296,7 +296,83 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'whats wanna gonna ive id nearby close near '
   // Step 1 (2026-09-29): verbs, pronouns and filler that were reaching the
   // planner as "food" searches ("Nothing matching explore").
-  + 'not have has had coming come them they their explore exploring experience experiences anything everything nothing easy').split(/\s+/));
+  + 'not have has had coming come them they their explore exploring experience experiences anything everything nothing easy '
+  // Stage 3.1 (2026-09-29): conversational filler that reached the planner as
+  // unmatched search words ("spend time on the lake", "a mix of activities").
+  + 'spend mix').split(/\s+/));
+
+// ---------- polarity (Stage 3.1, 2026-09-29) ----------
+// A negation word that no phrase claims ("not", "no", "nothing", "without",
+// "except", "excluding", "other than", "anything but") negates what follows it
+// in its own clause: every phrase and every leftover word up to the first
+// clause break ("but", "and", "plus", ...), the next negation, the first
+// unrecognised word (itself negated -- "not too far from Kelowna" negates only
+// "far", never Kelowna), or NEGATION_MAX_SPAN words. "or"/"nor" continue the
+// list ("no breweries or pubs"). "not only" / "not just" is not a negation.
+// Phrases that contain a negation word are matched first and keep their own
+// meaning ("no kids", "can't miss" -> "can not miss", "non alcoholic").
+const NEGATION_TRIGGERS = [['anything', 'but'], ['other', 'than'], ['not'], ['no'], ['nothing'], ['without'], ['except'], ['excluding']];
+const NEGATION_SKIP_AFTER = new Set(['only', 'just']);
+const NEGATION_CONTINUE = new Set(['or', 'nor']);
+const NEGATION_BREAKS = new Set(['but', 'and', 'plus', 'also', 'then', 'though', 'however', 'yet', 'so', 'because', 'while', 'instead', 'rather']);
+const NEGATION_MAX_SPAN = 6;
+// Words left out when a negated clause is reported back to the visitor.
+const NEGATION_DISPLAY_FILLER = new Set(['want', 'wants', 'wanted', 'need', 'needs', 'like', 'looking', 'anything', 'something', 'any', 'really', 'too', 'very', 'do', 'does', 'did', 'have', 'has', 'had', 'the', 'a', 'an']);
+// Fields a negated phrase is recorded under in intent.excluded.
+const EXCLUDED_LIST_FIELDS = { region: 'regions', type: 'types', feature: 'features', collection: 'collections', activity: 'activities', cuisine: 'cuisines' };
+
+function emptyExcluded() {
+  return { regions: [], types: [], features: [], collections: [], activities: [], cuisines: [], textTerms: [], budget: null, phrases: [] };
+}
+
+// tokens: the (masked) token list; accepted/claimed: matchPhrases() output.
+// -> { negatedHits: Set<hit>, negatedTokens: Set<index> (unrecognised words),
+//      triggerTokens: Set<index>, clauses: [{ start, end }] }
+function findNegations(tokens, accepted, claimed) {
+  const hitAt = new Map();
+  for (const h of accepted) for (let k = h.start; k < h.end; k++) hitAt.set(k, h);
+  const triggerAt = (i) => {
+    for (const words of NEGATION_TRIGGERS) {
+      let ok = i + words.length <= tokens.length;
+      for (let j = 0; ok && j < words.length; j++) if (tokens[i + j] !== words[j] || claimed[i + j]) ok = false;
+      if (ok) return words.length;
+    }
+    return 0;
+  };
+  const out = { negatedHits: new Set(), negatedTokens: new Set(), triggerTokens: new Set(), clauses: [] };
+  for (let i = 0; i < tokens.length; i++) {
+    const n = triggerAt(i);
+    if (!n || NEGATION_SKIP_AFTER.has(tokens[i + n])) continue;
+    let k = i + n;
+    let last = -1;
+    // After the first negated item the clause only continues across an
+    // explicit "or"/"nor" list ("no breweries or pubs"); "no golf, relaxed
+    // pace" keeps the pace.
+    let listOpen = true;
+    while (k < tokens.length && k - (i + n) < NEGATION_MAX_SPAN) {
+      const tok = tokens[k];
+      if (tok === '\u0000' || NEGATION_BREAKS.has(tok) || triggerAt(k)) break;
+      if (NEGATION_CONTINUE.has(tok)) { listOpen = true; k++; continue; }
+      if (claimed[k]) {
+        if (!listOpen) break;
+        const hit = hitAt.get(k);
+        out.negatedHits.add(hit);
+        last = hit.end - 1;
+        listOpen = false;
+        k = hit.end;
+        continue;
+      }
+      if (STOPWORDS.has(tok) || /^\d+$/.test(tok) || tok.length < 2) { k++; continue; }
+      if (listOpen) { out.negatedTokens.add(k); last = k; }
+      break;
+    }
+    if (last < 0) continue;
+    for (let j = i; j < i + n; j++) out.triggerTokens.add(j);
+    out.clauses.push({ start: i, end: last + 1 });
+    i = last;
+  }
+  return out;
+}
 
 // ---------- table construction ----------
 
@@ -365,7 +441,34 @@ function buildPhraseTable(taxonomy) {
   for (const type of ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']) if (t.types.includes(type)) { add('food and drink', 'type', type); add('food and drinks', 'type', type); }
   for (const type of ['pub', 'cocktail']) if (t.types.includes(type)) { add('drinks', 'type', type); add('a drink', 'type', type); }
 
+  // Stage 3.1 (2026-09-29): plural-tolerant aliases. A single-word alias for a
+  // type, feature, collection, activity or cuisine also matches its plural
+  // ("dinner" -> "dinners", "pizza" -> "pizzas", "lunch" -> "lunches") --
+  // never the other way round, never a multi-word phrase, and never a word
+  // that is already a phrase with its own meaning.
+  for (const [phrase, assign] of Array.from(entries.entries())) {
+    const plural = pluralOf(phrase);
+    if (!plural || entries.has(plural) || !assign.every((a) => PLURAL_FIELDS.has(a.field))) continue;
+    if (assign.some((a) => a.field === 'cuisine') && !PLURAL_CUISINE_NOUNS.has(phrase)) continue;
+    entries.set(plural, assign.map((a) => ({ ...a })));
+  }
+
   return Array.from(entries.entries()).map(([phrase, assign]) => ({ phrase, words: phrase.split(' '), assign }));
+}
+
+const PLURAL_FIELDS = new Set(['type', 'feature', 'collection', 'activity', 'cuisine']);
+// Cuisine values are mostly adjectives whose plural is a nationality
+// ("italians", "americans") -- never a food request -- so only these food
+// nouns get a plural. Each must still exist in the taxonomy to be matched.
+const PLURAL_CUISINE_NOUNS = new Set(['pizza', 'soup', 'gelato', 'boba', 'ramen', 'sushi', 'burger', 'taco', 'noodle', 'sandwich', 'dumpling', 'crepe', 'bagel', 'donut', 'waffle', 'pie']);
+// The plural of a single normalized word, or null when it is not a safe
+// candidate (several words, already ends in s, an -ing word, very short, or
+// has digits).
+function pluralOf(word) {
+  if (!/^[a-z]{3,}$/.test(word) || word.endsWith('s') || word.endsWith('ing')) return null;
+  if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`;
+  if (/(ch|sh|x|z)$/.test(word)) return `${word}es`;
+  return `${word}s`;
 }
 
 function normalizeTaxonomy(taxonomy) {
@@ -520,6 +623,12 @@ function emptyIntent() {
     season: null,
     dayThemes: [],
     lake: false,
+    // Stage 3.1 (2026-09-29): what the visitor said they do NOT want
+    // ("not wineries", "not in Kelowna", "nothing fancy" -> budget
+    // 'upscale'). Additive; never also present in the positive fields. Not
+    // yet applied by search, routing or the planner, so each clause is also
+    // listed in `unsupported` (reported as not applied, never dropped).
+    excluded: emptyExcluded(),
     matched: [],
     unsupported: [],
     ambiguities: [],
@@ -561,6 +670,10 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // 3. Phrase matching over the remaining tokens.
   const masked = tokens.map((tok, i) => (preClaimed[i] ? '\u0000' : tok));
   const { accepted, claimed } = matchPhrases(masked, table);
+  // 3b. Stage 3.1: polarity. Negated phrases and words go to intent.excluded,
+  // never to the positive fields below.
+  const neg = findNegations(masked, accepted, claimed);
+  const isNegated = (hit) => neg.negatedHits.has(hit);
 
   const flags = { event: false, plan: false, recommend: false, scopeAnything: false };
   const lengthMentions = lengths.map((l) => ({ days: l.days, phrase: l.phrase, start: l.start }));
@@ -570,6 +683,15 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const orderedTypes = [];
 
   for (const hit of accepted) {
+    if (isNegated(hit)) {
+      for (const { field, value } of hit.assign) {
+        if (EXCLUDED_LIST_FIELDS[field]) intent.excluded[EXCLUDED_LIST_FIELDS[field]].push(value);
+        else if (field === 'budget') intent.excluded.budget = value;
+        // Any other negated meaning (an occasion, a date, a pace...) is simply
+        // not applied; its clause is still reported below.
+      }
+      continue;
+    }
     for (const { field, value } of hit.assign) {
       switch (field) {
         case 'region': intent.regions.push(value); break;
@@ -605,10 +727,11 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // are the visitor's own words, searched later against venue text; never
   // generated here.
   for (let i = 0; i < tokens.length; i++) {
-    if (preClaimed[i] || claimed[i]) continue;
+    if (preClaimed[i] || claimed[i] || neg.triggerTokens.has(i)) continue;
     const w = tokens[i];
     if (STOPWORDS.has(w) || /^\d+$/.test(w) || w.length < 2) continue;
-    intent.textTerms.push(w);
+    if (neg.negatedTokens.has(i)) intent.excluded.textTerms.push(w);
+    else intent.textTerms.push(w);
   }
 
   // 5. Single-valued fields: the last mention wins; disagreements are
@@ -642,7 +765,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     const adjective = w.phrase.split(' ').find((x) => THEME_PACE_WORDS[x]);
     if (adjective && t.paces.includes(THEME_PACE_WORDS[adjective])) theme.pace = THEME_PACE_WORDS[adjective];
     for (const hit of accepted) {
-      if (hit.start < w.end || hit.start >= w.to) continue;
+      if (hit.start < w.end || hit.start >= w.to || isNegated(hit)) continue;
       for (const { field, value } of hit.assign) {
         if (field === 'pace' && !theme.pace) theme.pace = value;
         else if (field === 'type' && !theme.types.includes(value)) theme.types.push(value);
@@ -650,14 +773,14 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
         else if (field === 'feature' && !theme.features.includes(value)) theme.features.push(value);
       }
     }
-    for (let k = w.end; k < w.to; k++) if (LAKE_WORDS.includes(tokens[k]) && !claimed[k]) theme.lake = true;
+    for (let k = w.end; k < w.to; k++) if (LAKE_WORDS.includes(tokens[k]) && !claimed[k] && !neg.negatedTokens.has(k)) theme.lake = true;
     if (theme.features.includes('lake_view')) theme.lake = true;
     intent.dayThemes.push(theme);
   }
   // A type named ONLY inside day themes ("one day of golf") belongs to those
   // days; named anywhere else too, it is a whole-trip interest as before.
   for (const theme of intent.dayThemes) {
-    theme.scopedTypes = theme.types.filter((ty) => !accepted.some((hit) => !inTheme(hit.start) && hit.assign.some((a) => a.field === 'type' && a.value === ty)));
+    theme.scopedTypes = theme.types.filter((ty) => !accepted.some((hit) => !isNegated(hit) && !inTheme(hit.start) && hit.assign.some((a) => a.field === 'type' && a.value === ty)));
   }
   const themedPace = (m) => !inTheme(m.start);
 
@@ -700,6 +823,35 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // 6. Deduplicate multi-valued fields, preserving first-mention order.
   for (const key of ['regions', 'types', 'features', 'collections', 'activities', 'cuisines', 'textTerms', 'unsupported']) intent[key] = uniq(intent[key]);
 
+  // 6a. Stage 3.1: exclusions. A value is never both wanted and excluded: if
+  // the visitor said both ("wineries ... but not wineries") it is a conflict
+  // and the positive reading is dropped. Each negated clause is reported as
+  // not applied (unsupported) until search, routing and the planner apply
+  // exclusions -- so nothing is silently ignored and no page is offered that
+  // would show what the visitor ruled out.
+  const ex = intent.excluded;
+  for (const key of ['regions', 'types', 'features', 'collections', 'activities', 'cuisines', 'textTerms']) {
+    ex[key] = uniq(ex[key]);
+    const both = intent[key].filter((v) => ex[key].includes(v));
+    if (both.length) {
+      intent.conflicts.push({ field: `excluded.${key}`, values: both });
+      intent[key] = intent[key].filter((v) => !both.includes(v));
+    }
+  }
+  if (ex.budget && intent.budget === ex.budget) {
+    intent.conflicts.push({ field: 'excluded.budget', values: [ex.budget] });
+    intent.budget = null;
+  }
+  for (const c of neg.clauses) {
+    // The visitor's own words, minus verb filler: "don't want anything
+    // fancy" is reported as "not fancy", "wineries but not in Kelowna" as
+    // "not in kelowna".
+    const phrase = masked.slice(c.start, c.end).filter((w, k) => w !== '\u0000' && (k === 0 || !NEGATION_DISPLAY_FILLER.has(w))).join(' ');
+    if (!phrase) continue;
+    if (!ex.phrases.includes(phrase)) ex.phrases.push(phrase);
+    if (!intent.unsupported.includes(phrase)) intent.unsupported.push(phrase);
+  }
+
   // 6b. The visitor's own food words, kept for display: "sushi" stays
   // "sushi" even though it matches the Japanese cuisine internally.
   for (const m of intent.matched) if (m.field === 'cuisine' && !intent.foodTerms.some((f) => f.term === m.phrase)) intent.foodTerms.push({ term: m.phrase, cuisine: m.value });
@@ -740,7 +892,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   if (planning) {
     const lakeTerms = intent.textTerms.filter((w) => LAKE_WORDS.includes(w));
     if (lakeTerms.length) {
-      for (let i = 0; i < tokens.length; i++) if (LAKE_WORDS.includes(tokens[i]) && !claimed[i] && !preClaimed[i] && !inTheme(i)) intent.lake = true;
+      for (let i = 0; i < tokens.length; i++) if (LAKE_WORDS.includes(tokens[i]) && !claimed[i] && !preClaimed[i] && !inTheme(i) && !neg.negatedTokens.has(i)) intent.lake = true;
       intent.textTerms = intent.textTerms.filter((w) => !LAKE_WORDS.includes(w));
       intent.foodTerms = intent.foodTerms.filter((f) => f.cuisine || !LAKE_WORDS.includes(f.term));
     }
@@ -751,7 +903,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     const PREVIOUSLY_UNSUPPORTED_MONTHS = ['january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
     const released = new Set();
     for (const hit of accepted) {
-      if (!hit.assign.some((a) => a.field === 'month' || a.field === 'season')) continue;
+      if (isNegated(hit) || !hit.assign.some((a) => a.field === 'month' || a.field === 'season')) continue;
       const monthWord = hit.phrase.split(' ').find((w) => PREVIOUSLY_UNSUPPORTED_MONTHS.includes(w));
       if (monthWord) { if (!intent.unsupported.includes(monthWord)) intent.unsupported.push(monthWord); continue; }
       for (let k = hit.start; k < hit.end; k++) released.add(k);
@@ -759,12 +911,12 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     if (released.size) {
       const terms = [];
       for (let i = 0; i < tokens.length; i++) {
-        if (preClaimed[i] || (claimed[i] && !released.has(i))) continue;
+        if (preClaimed[i] || (claimed[i] && !released.has(i)) || neg.triggerTokens.has(i) || neg.negatedTokens.has(i)) continue;
         const w = tokens[i];
         if (STOPWORDS.has(w) || /^\d+$/.test(w) || w.length < 2) continue;
         terms.push(w);
       }
-      intent.textTerms = uniq(terms);
+      intent.textTerms = uniq(terms).filter((w) => !intent.excluded.textTerms.includes(w));
       intent.foodTerms = intent.foodTerms.filter((f) => f.cuisine);
       for (const w of intent.textTerms) if (!intent.foodTerms.some((f) => f.term === w)) intent.foodTerms.push({ term: w, cuisine: null });
     }
@@ -909,6 +1061,9 @@ function validateDiscoveryIntent(candidate, taxonomy, text) {
   }
   if (out.month && !out.season) out.season = MONTH_SEASON[out.month];
   if (Array.isArray(candidate.dayThemes) && candidate.dayThemes.length) rejected.push({ field: 'dayThemes', reason: 'deterministic_only' });
+  // Stage 3.1: exclusions come only from the deterministic reading.
+  if (candidate.excluded && typeof candidate.excluded === 'object'
+    && Object.values(candidate.excluded).some((v) => (Array.isArray(v) ? v.length : v != null))) rejected.push({ field: 'excluded', reason: 'deterministic_only' });
   if (candidate.lake === true) rejected.push({ field: 'lake', reason: 'deterministic_only' });
   if (candidate.party && typeof candidate.party === 'object') {
     out.party.kids = candidate.party.kids === true && out.features.includes('kid_friendly');
@@ -1003,7 +1158,11 @@ function tripPhraseTable(taxonomy) {
     if (!e.assign.some((a) => a.field === field && a.value === value)) e.assign.push({ field, value });
   };
   for (const k of TRIP_EVENT_KINDS) for (const p of k.phrases) add(p, 'tripEvent', k.kind);
-  for (const meal of Object.keys(TRIP_MEALS)) if (TRIP_MEALS[meal].types.every((ty) => t.types.includes(ty))) add(meal, 'tripMeal', meal);
+  for (const meal of Object.keys(TRIP_MEALS)) if (TRIP_MEALS[meal].types.every((ty) => t.types.includes(ty))) {
+    add(meal, 'tripMeal', meal);
+    // Stage 3.1: "nice dinners", "two lunches" are the same meal parts.
+    add(pluralOf(meal), 'tripMeal', meal);
+  }
   for (const [part, phrases] of Object.entries(TRIP_DAYPARTS)) for (const p of phrases) add(p, 'tripDaypart', part);
   return Array.from(byPhrase.values());
 }
@@ -1068,10 +1227,14 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   const route = findTripRoute(tokens, regionPhrase);
   if (route) out.unknownPlaces = route.unknown.slice();
   const masked = tokens.map((tok, i) => (route && i >= route.start && i < route.end ? '\u0000' : tok));
-  const { accepted, claimed: tripClaimed } = matchPhrases(masked, table);
+  const { accepted: allAccepted, claimed: tripClaimed } = matchPhrases(masked, table);
+  // Stage 3.1: a negated part ("a winery, no breweries, and dinner") is never
+  // a trip component; the base intent already reports its clause.
+  const negT = findNegations(masked, allAccepted, tripClaimed);
+  const accepted = allAccepted.filter((hit) => !negT.negatedHits.has(hit));
   // Step 1 (2026-09-29): the visitor's own words no part could use ("a lake
   // walk"), so the planner can name them instead of dropping them silently.
-  out.leftoverTerms = uniq(tokens.filter((w, i) => masked[i] !== '\u0000' && !tripClaimed[i] && !STOPWORDS.has(w)
+  out.leftoverTerms = uniq(tokens.filter((w, i) => masked[i] !== '\u0000' && !tripClaimed[i] && !negT.triggerTokens.has(i) && !negT.negatedTokens.has(i) && !STOPWORDS.has(w)
     && !TRIP_ROUTE_FILLER.has(w) && !TRIP_LIST_JOINERS.has(w) && !/^\d+$/.test(w) && w.length >= 2));
   const eventKinds = Object.fromEntries(TRIP_EVENT_KINDS.map((k) => [k.kind, k]));
   const fieldsOf = (hit, f) => hit.assign.filter((a) => a.field === f).map((a) => a.value);
