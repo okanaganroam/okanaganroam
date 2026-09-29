@@ -452,6 +452,14 @@ function buildPhraseTable(taxonomy) {
     if (assign.some((a) => a.field === 'cuisine') && !PLURAL_CUISINE_NOUNS.has(phrase)) continue;
     entries.set(plural, assign.map((a) => ({ ...a })));
   }
+  // Stage 3.2 (2026-09-29): possessive place names. Normalization turns
+  // "Kelowna's" into "kelownas"; it means the region itself. Only for phrases
+  // that mean a region and nothing else, never over an existing phrase; a
+  // name already ending in s ("Osoyoos'") normalizes to itself.
+  for (const [phrase, assign] of Array.from(entries.entries())) {
+    if (phrase.endsWith('s') || !assign.length || !assign.every((a) => a.field === 'region')) continue;
+    if (!entries.has(`${phrase}s`)) entries.set(`${phrase}s`, assign.map((a) => ({ ...a })));
+  }
 
   return Array.from(entries.entries()).map(([phrase, assign]) => ({ phrase, words: phrase.split(' '), assign }));
 }
@@ -550,8 +558,9 @@ function findLengths(normalized) {
 
 // Exact venue-name match against the taxonomy's own venue list: the WHOLE
 // request is a venue name, optionally with a region word before or after it
-// ("rotary beach park oliver"). Never a partial/fuzzy match.
-function matchExactVenue(normalized, t) {
+// ("rotary beach park oliver"), or (Stage 3.2) a unique name core ("quails gate").
+// Never a fuzzy match.
+function matchExactVenue(normalized, t, index) {
   if (!t.venues.length || !normalized) return { venue: null, ambiguity: null };
   const strip = (s) => s.replace(/^the /, '');
   const byName = new Map();
@@ -578,7 +587,211 @@ function matchExactVenue(normalized, t) {
       }
     }
   }
+  // Stage 3.2: the name without its generic ending ("quails gate" for
+  // "Quails' Gate Winery"). Only after the full name, only a name core of
+  // two or more words that exactly one venue has, that is not also a phrase
+  // with its own meaning, and that no other venue's name contains (a brand
+  // family such as "50th parallel" is never narrowed to one of its venues).
+  // Anything else is left exactly as before: no match, no ambiguity.
+  const coreId = index ? index.cores.get(q) : undefined;
+  const core = coreId === undefined ? null : t.venues.find((v) => v && v.id === coreId);
+  if (core) return pick([core], q);
   return { venue: null, ambiguity: null };
+}
+
+// ---------- Stage 3.2 (2026-09-29): closed-vocabulary corrections ----------
+//
+// A misspelled word is corrected ONLY onto a word of the site's own closed
+// vocabulary -- a region name or a single-word type / feature / collection /
+// activity / cuisine alias -- and only when the correction is small, unique
+// and not a real word:
+//   - words under 5 letters, and every word the interpreter already knows (a
+//     phrase word, stopword, negation or trip word, a word in a venue name)
+//     are never corrected: exact always wins;
+//   - the first letter must match;
+//   - 5-7 letters: one inserted, dropped or swapped (adjacent) letter, never
+//     a substituted one -- substitutions turn real words into other real
+//     words ("chile" -> "child", "steam" -> "steak", "parts" -> "parks");
+//   - 8+ letters: up to two such edits, where a substitution may only swap
+//     one vowel for another ("vegeterian", "distillary");
+//   - never the plural/singular of a non-region target: Stage 3.1's plural
+//     policy decides those ("italians" is not a cuisine);
+//   - never a word on the reviewed NEVER_CORRECT list below;
+//   - never when the closest targets mean different things.
+// Venue-name words and description text are never correction targets.
+// Corrections run after exact venue matching and before phrase matching and
+// polarity, so "not wineris" is an excluded winery exactly like "not
+// wineries". Each one is reported in intent.corrections as { from, to,
+// field }; the visitor's own text is kept by every caller.
+
+const CORRECTION_FIELDS = new Set(['region', 'type', 'feature', 'collection', 'activity', 'cuisine']);
+const CORRECTION_VOWELS = 'aeiouy';
+const CORRECTION_MIN_LENGTH = 5;
+// Real words within reach of a target, reviewed in the Stage 3.2 preflight
+// against a 228k-word English dictionary and the site's own venue and event
+// text: never corrected.
+const NEVER_CORRECT = new Set([
+  // dictionary words a visitor could plausibly type
+  'america', 'americana', 'indiana', 'piazza', 'bleach', 'breach', 'breeches', 'brewer', 'campaign', 'composite',
+  'flashing', 'flushing', 'koran', 'lunge', 'longe', 'lounger', 'outsider', 'padding', 'streak', 'tumbling', 'whisk',
+  'toddle', 'germane', 'germanic', 'polis', 'celia', 'blinking', 'circling', 'skidding', 'skinning', 'boasting',
+  'bloating', 'exacting', 'easting', 'divining', 'bridging', 'westland',
+  // real words used in the site's own venue / event text
+  'badly', 'drinking', 'eater', 'finishing', 'olive', 'outsized', 'polished', 'skipping', 'skirting', 'trial',
+  // implementation review of the site's own text: a correction would change
+  // the meaning ("trailers" are RVs, not hiking trails)
+  'americas', 'boosting', 'defining', 'trailers',
+  // final safety review: a food, another cuisine, a name -- never a gluten-free
+  // filter, Japanese food or the town of Oliver
+  'celeriac', 'javanese', 'olivier',
+]);
+// Venue-name endings that are generic, not part of the name ("Winery").
+const NAME_CORE_GENERIC = new Set(['winery', 'wineries', 'wines', 'wine', 'estate', 'estates', 'vineyard', 'vineyards', 'cellars', 'cellar',
+  'restaurant', 'cafe', 'coffee', 'brewing', 'brewery', 'company', 'co', 'distillery', 'distilling', 'distillers', 'pub', 'bar', 'grill',
+  'kitchen', 'and', 'the', 'ltd', 'inc', 'bistro', 'eatery', 'lounge', 'taproom', 'tasting', 'room', 'family', 'farm', 'farms']);
+
+// Edit distance with adjacent transpositions; a substitution costs 1 only
+// between two vowels when allowed, otherwise it is not an option. Stops as
+// soon as the distance must exceed `max`.
+function correctionDistance(a, b, max, vowelSubstitution) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev2 = null;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const x = a[i - 1], y = b[j - 1];
+      const sub = x === y ? 0 : (vowelSubstitution && CORRECTION_VOWELS.includes(x) && CORRECTION_VOWELS.includes(y) ? 1 : Infinity);
+      let d = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + sub);
+      if (prev2 && i > 1 && j > 1 && x === b[j - 2] && a[i - 2] === y) d = Math.min(d, prev2[j - 2] + 1);
+      row.push(d);
+      if (d < rowMin) rowMin = d;
+    }
+    if (rowMin > max) return max + 1;
+    prev2 = prev;
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+// The single-word aliases written in this file's tables, plus the taxonomy's
+// own region and cuisine names: the only possible correction targets
+// (generated plurals and possessives are exact aliases, never targets).
+function correctionSourceWords(t) {
+  const words = new Set();
+  const addWords = (list) => { for (const p of list) { const n = normalizeDiscoveryText(p); if (n && !n.includes(' ')) words.add(n); } };
+  for (const table of [TYPE_ALIASES, FEATURE_ALIASES, COLLECTION_ALIASES, ACTIVITY_ALIASES, CUISINE_SYNONYMS, REGION_EXTRA_ALIASES]) addWords(Object.values(table).flat());
+  addWords(VALLEY_WIDE_PHRASES);
+  addWords(t.regions.map((r) => r.replace(/-/g, ' ')));
+  addWords(Object.values(t.regionLabels));
+  addWords(t.cuisines);
+  return words;
+}
+
+// Everything derived from the taxonomy that correction and name-core
+// matching need, built once per distinct taxonomy (the server rebuilds an
+// identical taxonomy on every request) and kept for the next call.
+const DISCOVERY_INDEX_CACHE = [];
+const DISCOVERY_INDEX_CACHE_SIZE = 4;
+const validVenue = (v) => v && Number.isInteger(v.id) && typeof v.name === 'string';
+// The index depends only on the vocabulary lists and on each venue's id and
+// name, so a cached index is reused only when those are exactly the same (a
+// direct comparison, no copy of the venue list). Region, type and slug are
+// always read from the current taxonomy, never from the cache.
+function discoveryIndex(taxonomy, t) {
+  const vocabKey = JSON.stringify([t.regions, t.regionLabels, t.types, t.features, t.collections, t.activities, t.cuisines, t.budgets, t.paces, t.datePresets, t.eventCategories]);
+  for (let k = 0; k < DISCOVERY_INDEX_CACHE.length; k++) {
+    const e = DISCOVERY_INDEX_CACHE[k];
+    if (e.vocabKey !== vocabKey) continue;
+    let j = 0, same = true;
+    for (const v of t.venues) {
+      if (!validVenue(v)) continue;
+      if (j >= e.ids.length || e.ids[j] !== v.id || e.names[j] !== v.name) { same = false; break; }
+      j++;
+    }
+    if (same && j === e.ids.length) return e.value;
+  }
+  const venues = t.venues.filter(validVenue);
+  const value = buildDiscoveryIndex(taxonomy, t, venues);
+  DISCOVERY_INDEX_CACHE.unshift({ vocabKey, ids: venues.map((v) => v.id), names: venues.map((v) => v.name), value });
+  DISCOVERY_INDEX_CACHE.length = Math.min(DISCOVERY_INDEX_CACHE.length, DISCOVERY_INDEX_CACHE_SIZE);
+  return value;
+}
+
+function buildDiscoveryIndex(taxonomy, t, venues) {
+  const table = buildPhraseTable(taxonomy);
+  const phrases = new Set(table.map((e) => e.phrase));
+  // Words the interpreter already understands or the site already uses in a
+  // venue name: never corrected.
+  const known = new Set(STOPWORDS);
+  for (const e of table) for (const w of e.words) known.add(w);
+  const addKnown = (list) => { for (const p of list) for (const w of normalizeDiscoveryText(String(p)).split(' ')) if (w) known.add(w); };
+  addKnown(NEGATION_TRIGGERS.flat());
+  addKnown([...NEGATION_SKIP_AFTER, ...NEGATION_CONTINUE, ...NEGATION_BREAKS, ...NEGATION_DISPLAY_FILLER]);
+  addKnown(LAKE_WORDS);
+  addKnown(Object.keys(THEME_PACE_WORDS));
+  addKnown(Object.keys(DAY_WORDS));
+  addKnown(TRIP_EVENT_KINDS.flatMap((k) => k.phrases));
+  addKnown(Object.keys(TRIP_MEALS));
+  addKnown(Object.values(TRIP_DAYPARTS).flat());
+  addKnown([...TRIP_DOG_PARTY, ...TRIP_KID_PARTY, ...TRIP_LIST_JOINERS, ...TRIP_DETERMINERS, ...TRIP_CLAUSE_BREAKS, ...TRIP_ROUTE_FILLER]);
+  const strip = (s) => s.replace(/^the /, '');
+  const fullNames = venues.map((v) => ({ v, name: strip(normalizeDiscoveryText(v.name)) })).filter((x) => x.name);
+  for (const { name } of fullNames) for (const w of name.split(' ')) known.add(w);
+
+  // Correction targets.
+  const sources = correctionSourceWords(t);
+  const targets = new Map();
+  for (const e of table) {
+    if (e.words.length !== 1 || e.phrase.length < CORRECTION_MIN_LENGTH || !sources.has(e.phrase)) continue;
+    if (!e.assign.every((a) => CORRECTION_FIELDS.has(a.field) || (a.field === 'scope' && a.value === 'valley'))) continue;
+    targets.set(e.phrase, {
+      key: e.assign.map((a) => `${a.field}:${a.value}`).sort().join('|'),
+      field: uniq(e.assign.map((a) => a.field)).join('+'),
+      region: e.assign.every((a) => a.field === 'region' || a.field === 'scope'),
+    });
+  }
+
+  // Name cores eligible for an exact match (see matchExactVenue).
+  const coreOf = (name) => { const w = name.split(' '); while (w.length > 1 && NAME_CORE_GENERIC.has(w[w.length - 1])) w.pop(); return w.join(' '); };
+  const byCore = new Map();
+  for (const x of fullNames) { const c = coreOf(x.name); if (!byCore.has(c)) byCore.set(c, []); byCore.get(c).push(x); }
+  const byWord = new Map();
+  for (const x of fullNames) for (const w of new Set(x.name.split(' '))) { if (!byWord.has(w)) byWord.set(w, []); byWord.get(w).push(x); }
+  const cores = new Map();
+  for (const [c, list] of byCore) {
+    if (list.length !== 1 || !c.includes(' ') || c === list[0].name || phrases.has(c)) continue;
+    const padded = ` ${c} `;
+    if ((byWord.get(c.split(' ')[0]) || []).some((x) => x !== list[0] && ` ${x.name} `.includes(padded))) continue;
+    cores.set(c, list[0].v.id);
+  }
+  return { targets, known, cores };
+}
+
+// Corrects each word it can; returns the words (corrected in place) and
+// the corrections made, in order.
+function correctDiscoveryTokens(tokens, index) {
+  const corrections = [];
+  const out = tokens.map((w) => {
+    if (w.length < CORRECTION_MIN_LENGTH || !/^[a-z]+$/.test(w) || index.known.has(w) || index.targets.has(w) || NEVER_CORRECT.has(w)) return w;
+    const short = w.length <= 7;
+    const max = short ? 1 : 2;
+    let best = max + 1;
+    let hits = [];
+    for (const [target, meta] of index.targets) {
+      if (target[0] !== w[0]) continue;
+      if (!meta.region && (pluralOf(target) === w || pluralOf(w) === target)) continue;
+      const d = correctionDistance(w, target, max, !short);
+      if (d > max) continue;
+      if (d < best) { best = d; hits = [[target, meta]]; } else if (d === best) hits.push([target, meta]);
+    }
+    if (!hits.length || new Set(hits.map((h) => h[1].key)).size > 1) return w;
+    hits.sort((a, b) => a[0].length - b[0].length || (a[0] < b[0] ? -1 : 1));
+    corrections.push({ from: w, to: hits[0][0], field: hits[0][1].field });
+    return hits[0][0];
+  });
+  return { tokens: out, corrections };
 }
 
 // ---------- the interpreter ----------
@@ -629,6 +842,10 @@ function emptyIntent() {
     // yet applied by search, routing or the planner, so each clause is also
     // listed in `unsupported` (reported as not applied, never dropped).
     excluded: emptyExcluded(),
+    // Stage 3.2 (2026-09-29): misspellings corrected onto the site's closed
+    // vocabulary, as { from, to, field } -- "osoyos" -> "osoyoos" (region).
+    // Additive; the request text itself is never changed.
+    corrections: [],
     matched: [],
     unsupported: [],
     ambiguities: [],
@@ -652,8 +869,10 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const normalized = normalizeDiscoveryText(text);
   if (!normalized) return finalizeIntent(intent, t);
 
-  // 1. An exact venue name wins outright.
-  const exact = matchExactVenue(normalized, t);
+  // 1. An exact venue name wins outright (the full name, then a unique
+  // name core); always before any correction.
+  const index = discoveryIndex(taxonomy, t);
+  const exact = matchExactVenue(normalized, t, index);
   if (exact.venue) {
     intent.exactVenue = exact.venue;
     intent.mode = 'navigate';
@@ -662,9 +881,13 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   }
   if (exact.ambiguity) intent.ambiguities.push(exact.ambiguity);
 
-  const tokens = normalized.split(' ');
+  // 1b. Stage 3.2: closed-vocabulary corrections ("osoyos" -> "osoyoos").
+  // Everything below reads the corrected words; the corrections are listed.
+  const fixed = correctDiscoveryTokens(normalized.split(' '), index);
+  intent.corrections = fixed.corrections;
+  const tokens = fixed.tokens;
   // 2. Trip lengths claim their tokens first ("3 relaxed days").
-  const lengths = findLengths(normalized);
+  const lengths = findLengths(tokens.join(' '));
   const preClaimed = new Array(tokens.length).fill(false);
   for (const l of lengths) for (let k = l.start; k < l.end && k < tokens.length; k++) preClaimed[k] = true;
   // 3. Phrase matching over the remaining tokens.
@@ -1065,6 +1288,7 @@ function validateDiscoveryIntent(candidate, taxonomy, text) {
   if (candidate.excluded && typeof candidate.excluded === 'object'
     && Object.values(candidate.excluded).some((v) => (Array.isArray(v) ? v.length : v != null))) rejected.push({ field: 'excluded', reason: 'deterministic_only' });
   if (candidate.lake === true) rejected.push({ field: 'lake', reason: 'deterministic_only' });
+  if (Array.isArray(candidate.corrections) && candidate.corrections.length) rejected.push({ field: 'corrections', reason: 'deterministic_only' });
   if (candidate.party && typeof candidate.party === 'object') {
     out.party.kids = candidate.party.kids === true && out.features.includes('kid_friendly');
     out.party.dog = candidate.party.dog === true && out.features.includes('dog_friendly');
@@ -1219,7 +1443,8 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   // drops punctuation, so the separator is made a word first.
   const normalized = normalizeDiscoveryText(typeof text === 'string' ? text.replace(/\s*[,;]\s*/g, ' and ') : text);
   if (!normalized || base.exactVenue || !['find', 'events'].includes(base.mode)) return out;
-  const tokens = normalized.split(' ');
+  // Stage 3.2: the same corrections as the base request, word for word.
+  const tokens = correctDiscoveryTokens(normalized.split(' '), discoveryIndex(taxonomy, t)).tokens;
   const table = tripPhraseTable(taxonomy);
   const regionPhrase = new Map();
   for (const e of table) for (const a of e.assign) if (a.field === 'region' && !regionPhrase.has(e.phrase)) regionPhrase.set(e.phrase, a.value);
@@ -1376,6 +1601,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 
 module.exports = {
   DISCOVERY_INTENT_VERSION,
+  DISCOVERY_NEVER_CORRECT: Object.freeze(Array.from(NEVER_CORRECT)),
   DISCOVERY_MAX_TEXT_LENGTH,
   DISCOVERY_MODES,
   DISCOVERY_OCCASIONS,

@@ -12992,3 +12992,46 @@ test('Stage 3.1: negated requests never route to the page they rule out; search 
   assert.ok(plan.understood.notUsed.includes('not fancy'), 'the planner names what it did not apply');
   assert.ok(plan.understood.interests.includes('wineries'));
 });
+
+test('Stage 3.2: a misspelled request routes, searches and plans exactly like the correct spelling, and says what it corrected', () => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  for (const [typo, right] of [['kelona', 'kelowna'], ['wineris kelona', 'wineries kelowna'], ['vernnon beache', 'vernon beach'], ['restaraunts in kelona', 'restaurants in kelowna'], ['hikng in vernnon', 'hiking in vernon'], ["Kelowna's wineries", 'kelowna wineries']]) {
+    assert.deepEqual(route(typo), route(right), typo);
+    const a = app.runDiscovery(typo), b = app.runDiscovery(right);
+    assert.deepEqual(a.results, b.results, `${typo}: same records`);
+    assert.equal(a.query, typo, 'the visitor\'s own text is kept');
+  }
+  assert.deepEqual(app.runDiscovery('wineris kelona').intent.corrections, [{ from: 'wineris', to: 'wineries', field: 'type' }, { from: 'kelona', to: 'kelowna', field: 'region' }]);
+  // Polarity is untouched: a negated typo is never routed and is reported as not applied.
+  const neg = app.runDiscovery('not wineris');
+  assert.equal(neg.destination.url, null);
+  assert.deepEqual(neg.intent.excluded.types, ['winery']);
+  assert.ok(neg.notApplied.some((n) => n.value === 'not wineries'));
+  const plan = app.runTripPlan({ text: 'a winery and dinner in kelona' });
+  assert.deepEqual(plan.intent.corrections, [{ from: 'kelona', to: 'kelowna', field: 'region' }]);
+  assert.deepEqual(plan.understood.base.map((b) => b.slug), ['kelowna']);
+  assert.equal(plan.query, 'a winery and dinner in kelona');
+});
+
+test('Stage 3.2: Hero Search never rewrites a search typed with an apostrophe ("Joe\'s" -> "joes"); other redirects are unchanged', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const get = (q) => fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
+  for (const q of ["Joe's", "Murray's", "Gallagher's", "Sam's", "Chef's", "Bless'd", "Press'd", 'Joe’s', "joe's patio"]) {
+    const r = await get(q);
+    assert.equal(r.status, 200, `${q}: served by /browse as typed, never redirected to its no-apostrophe form`);
+    await r.text();
+  }
+  // Without an apostrophe nothing changes: a single typed word is still never
+  // redirected to itself, and every other request redirects exactly as before.
+  const plain = await get('joes');
+  assert.equal(plain.status, 200);
+  await plain.text();
+  for (const q of ["Kelowna's wineries", 'kelona', 'restaurants in Kelowna']) {
+    const dest = app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+    const r = await get(q);
+    await r.text();
+    if (dest.url) {
+      assert.equal(r.status, 302, q);
+      assert.equal(r.headers.get('location'), dest.url, q);
+    } else assert.equal(r.status, 200, q);
+  }
+})));

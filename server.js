@@ -3481,7 +3481,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     plan.intent = {
       mode: intent.mode, confidence: intent.confidence, regions: intent.regions, types: intent.types, features: intent.features,
       collections: intent.collections, activities: intent.activities, foodTerms: intent.foodTerms, days: intent.days, pace: intent.pace,
-      budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities,
+      budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities, corrections: intent.corrections,
     };
     plan.understood = understood(plan);
     return plan;
@@ -3509,7 +3509,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   plan.intent = {
     mode: intent.mode, confidence: intent.confidence, regions: intent.regions, types: intent.types, features: intent.features,
     collections: intent.collections, activities: intent.activities, foodTerms: intent.foodTerms, days: intent.days, pace: intent.pace,
-    budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities,
+    budget: intent.budget, occasion: intent.occasion, when: intent.when, ambiguities: intent.ambiguities, corrections: intent.corrections,
   };
   plan.understood = understood(plan);
   return plan;
@@ -16345,7 +16345,15 @@ const server = http.createServer(async (req, res) => {
           // this request when the visitor already typed just that word. Never
           // redirect a URL to itself; the unchanged /browse search handles it.
           const selfTarget = destination.url === `/browse${discoveryQueryString({ q: query.q })}`;
-          if (destination.url && !selfTarget) {
+          // Stage 3.2 (2026-09-29): a text search typed with an apostrophe
+          // ("Joe's", "Murray's") is never rewritten into its normalized
+          // no-apostrophe word ("joes"): the /browse search matches the
+          // visitor's own spelling against venue names, and the rewritten word
+          // matches none of them. The unchanged /browse handles the request as
+          // typed. Destinations without a text search (a venue page, a
+          // region/category page) still redirect as before.
+          const keepsTypedText = /['‘’`]/.test(query.q) && /[?&]q=/.test(destination.url || '');
+          if (destination.url && !selfTarget && !keepsTypedText) {
             res.writeHead(302, { Location: destination.url, 'Cache-Control': 'no-store' });
             return res.end();
           }

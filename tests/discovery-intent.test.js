@@ -619,3 +619,209 @@ test('Stage 3.1 plural-tolerant aliases: dinner/dinners, lunch/lunches, pizza/pi
   assert.equal(table.has('italians'), false);
   assert.equal(table.has('spirit'), false);
 });
+
+// ---- Stage 3.2 (2026-09-29): closed-vocabulary corrections -------------
+const corr = (text, taxonomy = TAXONOMY) => d.interpretDiscoveryQuery(text, taxonomy).corrections.map((c) => `${c.from}>${c.to}:${c.field}`);
+
+test('Stage 3.2 contract: corrections is additive, empty by default, deterministic only', () => {
+  const i = I('restaurants in Kelowna');
+  assert.deepEqual(i.corrections, []);
+  assert.equal(i.version, 1);
+  assert.deepEqual(I('').corrections, []);
+  const v = d.validateDiscoveryIntent({ mode: 'find', regions: ['osoyoos'], corrections: [{ from: 'osoyos', to: 'osoyoos', field: 'region' }] }, TAXONOMY, 'osoyos');
+  assert.deepEqual(v.intent.corrections, []);
+  assert.ok(v.rejected.some((r) => r.field === 'corrections' && r.reason === 'deterministic_only'));
+});
+
+test('Stage 3.2: the known misspellings are corrected onto the closed vocabulary and read like the correct spelling', () => {
+  expectIntent('osoyos', { regions: ['osoyoos'], textTerms: [], corrections: [{ from: 'osoyos', to: 'osoyoos', field: 'region' }] });
+  expectIntent('naramatta', { regions: ['naramata'], textTerms: [], corrections: [{ from: 'naramatta', to: 'naramata', field: 'region' }] });
+  expectIntent('pentiction beach', { regions: ['penticton'], types: ['beach'], textTerms: [] });
+  expectIntent('wineris kelona', { regions: ['kelowna'], types: ['winery'], textTerms: [], corrections: [{ from: 'wineris', to: 'wineries', field: 'type' }, { from: 'kelona', to: 'kelowna', field: 'region' }] });
+  expectIntent('naramatta winery', { regions: ['naramata'], types: ['winery'], textTerms: [] });
+  expectIntent('beache', { types: ['beach'], textTerms: [], corrections: [{ from: 'beache', to: 'beach', field: 'type' }] });
+  // A corrected request is interpreted exactly like the correct spelling.
+  for (const [typo, right] of [['wineris kelona', 'wineries kelowna'], ['kayaking osoyos', 'kayaking osoyoos'], ['3 days in pentiction with kids', '3 days in penticton with kids']]) {
+    const a = I(typo), b = I(right);
+    assert.deepEqual({ ...a, corrections: [], matched: [] }, { ...b, corrections: [], matched: [] }, typo);
+  }
+});
+
+test('Stage 3.2: every correction class -- regions, types, activities, features, cuisines, valley scope', () => {
+  const cases = {
+    kelownaa: 'kelownaa>kelowna:region', summerlnd: 'summerlnd>summerland:region', westbnk: 'westbnk>westbank:region', osoyoo: 'osoyoo>osoyoos:region',
+    penticon: 'penticon>penticton:region', coldstrem: 'coldstrem>coldstream:region', armstong: 'armstong>armstrong:region', enderbey: 'enderbey>enderby:region',
+    restaraunt: 'restaraunt>restaurant:type', breweires: 'breweires>breweries:type', distillary: 'distillary>distillery:type', vinyard: 'vinyard>vineyard:type',
+    cocktials: 'cocktials>cocktails:type', cofee: 'cofee>coffee:type', coffe: 'coffe>coffee:type', expresso: 'expresso>espresso:type', dinnner: 'dinnner>dinner:type',
+    hikng: 'hikng>hiking:activity', bikng: 'bikng>biking:activity', campng: 'campng>camping:activity', kayakng: 'kayakng>kayaking:activity',
+    paddelboarding: 'paddelboarding>paddleboarding:activity', snowshoing: 'snowshoing>snowshoeing:activity', viewpont: 'viewpont>viewpoint:activity', fishng: 'fishng>fishing:activity',
+    vegeterian: 'vegeterian>vegetarian:feature', patoi: 'patoi>patio:feature', lakeveiw: 'lakeveiw>lakeview:feature', mocktials: 'mocktials>mocktails:feature',
+    italain: 'italain>italian:cuisine', mexcian: 'mexcian>mexican:cuisine', japaneese: 'japaneese>japanese:cuisine', sushii: 'sushii>sushi:cuisine',
+    seafod: 'seafod>seafood:cuisine', steakhose: 'steakhose>steakhouse:cuisine', okanagen: 'okanagen>okanagan:scope',
+  };
+  for (const [typo, expected] of Object.entries(cases)) assert.deepEqual(corr(typo), [expected], typo);
+  assert.deepEqual(I('hikng trails in vernnon').activities, ['hiking']);
+  assert.deepEqual(I('hikng trails in vernnon').regions, ['vernon']);
+  assert.deepEqual(I('sushii').cuisines, ['japanese']);
+  assert.deepEqual(I('okanagen').regions, [], 'the valley-wide word stays valley-wide');
+});
+
+test('Stage 3.2: region possessives ("Kelowna\'s") are exact aliases of the region -- all 32, no collisions', () => {
+  expectIntent("Kelowna's best wineries", { regions: ['kelowna'], types: ['winery'], textTerms: [], corrections: [] });
+  expectIntent('Penticton’s beaches', { regions: ['penticton'], types: ['beach'], textTerms: [] });
+  expectIntent("West Kelowna's wineries", { regions: ['west-kelowna'], types: ['winery'] });
+  expectIntent("Lake Country's cafes", { regions: ['lake-country'], types: ['cafe'] });
+  expectIntent("Osoyoos' wineries", { regions: ['osoyoos'], types: ['winery'] });
+  const table = new Map(d.buildPhraseTable(TAXONOMY).map((e) => [e.phrase, e.assign]));
+  const regionOnly = Array.from(table).filter(([p, a]) => a.length && a.every((x) => x.field === 'region') && !/s$/.test(p) && !table.has(p.slice(0, -1)));
+  const forms = regionOnly.map(([p]) => `${p}s`);
+  assert.equal(forms.length, 32);
+  for (const [p, a] of regionOnly) assert.deepEqual(table.get(`${p}s`), a, `${p}s means exactly ${p}`);
+  // Never over an existing phrase: no possessive form is also a plural, a
+  // cuisine or any other meaning.
+  for (const f of forms) assert.ok(table.get(f).every((x) => x.field === 'region'), f);
+});
+
+test('Stage 3.2: corrections never bypass polarity -- a negated typo stays an exclusion', () => {
+  const a = I('not wineris');
+  assert.deepEqual(a.types, []);
+  assert.deepEqual(a.excluded, { ...EMPTY_EXCLUDED, types: ['winery'], phrases: ['not wineries'] });
+  assert.deepEqual(a.corrections, [{ from: 'wineris', to: 'wineries', field: 'type' }]);
+  assert.ok(a.unsupported.includes('not wineries'), 'reported as not applied, in the corrected words');
+  const b = I('no breweris');
+  assert.deepEqual(b.types, []);
+  assert.deepEqual(b.excluded.types, ['brewery']);
+  const c = I('wineris but not in kelona');
+  assert.deepEqual(c.types, ['winery']);
+  assert.deepEqual(c.regions, []);
+  assert.deepEqual(c.excluded.regions, ['kelowna']);
+  assert.deepEqual(c.corrections.map((x) => x.to), ['wineries', 'kelowna']);
+  const e = I('restaurants not in pentiction');
+  assert.deepEqual(e.regions, []);
+  assert.deepEqual(e.excluded.regions, ['penticton']);
+  // Build My Trip never turns a negated typo into a part.
+  const trip = d.interpretTripComponents('a cafe, no breweris, and dinner in pentiction', TAXONOMY);
+  assert.ok(!trip.components.some((p) => p.types.includes('brewery')));
+  assert.deepEqual(trip.regions, ['penticton']);
+});
+
+test('Stage 3.2: Build My Trip parts read the corrected words', () => {
+  const t = d.interpretTripComponents('coffee and a beache in pentiction', TAXONOMY);
+  assert.equal(t.multi, true);
+  assert.deepEqual(t.components.map((p) => p.types), [['cafe'], ['beach']]);
+  assert.deepEqual(t.regions, ['penticton']);
+  const r = d.interpretTripComponents('wineris from kelona to pentiction', TAXONOMY);
+  assert.deepEqual(r.route && [r.route.from, r.route.to], ['kelowna', 'penticton']);
+  assert.deepEqual(r.leftoverTerms, []);
+});
+
+test('Stage 3.2: real words near the vocabulary are never corrected (reviewed list is explicit)', () => {
+  for (const w of ['chile', 'steam', 'trains', 'wintry', 'parts', 'italians', 'viewport', 'bench', 'olive', 'wires', 'poppy', 'capes', 'raven', 'greed', 'lumpy', 'canon', 'beech', 'lynch', 'swinging', 'vegetation', 'bikini', 'olives', 'campus', 'county']) {
+    const i = I(w);
+    assert.deepEqual(i.corrections, [], w);
+    assert.deepEqual(i.textTerms, [w], `${w} stays the visitor's own word`);
+  }
+  // The reviewed never-correct list, exactly: any change must be deliberate.
+  assert.deepEqual(d.DISCOVERY_NEVER_CORRECT.slice().sort(), [
+    'america', 'americana', 'americas', 'badly', 'bleach', 'blinking', 'bloating', 'boasting', 'boosting', 'breach', 'breeches', 'brewer', 'bridging',
+    'campaign', 'celeriac', 'celia', 'circling', 'composite', 'defining', 'divining', 'drinking', 'easting', 'eater', 'exacting', 'finishing', 'flashing', 'flushing',
+    'germane', 'germanic', 'indiana', 'javanese', 'koran', 'longe', 'lounger', 'lunge', 'olive', 'olivier', 'outsider', 'outsized', 'padding', 'piazza', 'polis', 'polished',
+    'skidding', 'skinning', 'skipping', 'skirting', 'streak', 'toddle', 'trailers', 'trial', 'tumbling', 'westland', 'whisk',
+  ]);
+  for (const w of d.DISCOVERY_NEVER_CORRECT) assert.deepEqual(I(w).corrections, [], w);
+  // Final safety review: each is a real food, cuisine or name one edit from a target.
+  assert.deepEqual(I('celeriac soup').features, [], 'celeriac is a vegetable, never gluten-free');
+  assert.deepEqual(I('javanese food').cuisines, [], 'Javanese is not Japanese');
+  assert.deepEqual(I('olivier salad').regions, [], 'Olivier is not the town of Oliver');
+  assert.deepEqual(corr('winer'), ['winer>winery:type'], 'a plain misspelling is still corrected');
+  assert.deepEqual(I('not winer').excluded.types, ['winery']);
+  assert.deepEqual(I('not winer').types, []);
+  const w = I('winer but not in kelona');
+  assert.deepEqual([w.types, w.excluded.regions, w.regions], [['winery'], ['kelowna'], []]);
+  // Short words, digits and words the interpreter already knows are never corrected.
+  for (const w of ['golff', 'bars', 'kelownas', 'dinners', 'hikers2', 'tonight', 'weekend', 'festivel']) assert.ok(!I(w).corrections.some((c) => c.from === w), w);
+  // Ties between different meanings are left alone.
+  assert.deepEqual(corr('hikes'), []);
+});
+
+// Venues for name matching: a unique name core, a brand family, a shared
+// core, a core that is also a category phrase, and a single-word name.
+const NAMES = { ...TAXONOMY, venues: [...TAXONOMY.venues,
+  { id: 530, name: "Quails' Gate Winery", region: 'west-kelowna', type: 'winery', slug: 'quails-gate-winery' },
+  { id: 930, name: 'Old Vines Restaurant', region: 'west-kelowna', type: 'restaurant', slug: 'old-vines-restaurant' },
+  { id: 19, name: '50th Parallel Estate Winery - Tasting Room', region: 'lake-country', type: 'winery', slug: '50th-parallel-estate-winery-tasting-room' },
+  { id: 20, name: '50th Parallel Estate Winery - Block One Restaurant', region: 'lake-country', type: 'restaurant', slug: '50th-parallel-block-one' },
+  { id: 41, name: 'Barn Owl Brewing', region: 'vernon', type: 'brewery', slug: 'barn-owl-brewing' },
+  { id: 42, name: 'Barn Owl Winery', region: 'summerland', type: 'winery', slug: 'barn-owl-winery' },
+  { id: 77, name: 'Happy Hour Bar', region: 'kelowna', type: 'pub', slug: 'happy-hour-bar' },
+  { id: 571, name: 'Sandhill Wines', region: 'kelowna', type: 'winery', slug: 'sandhill-wines' },
+] };
+const N = (text) => d.interpretDiscoveryQuery(text, NAMES);
+
+test('Stage 3.2 name cores: a unique multi-word core navigates; brand families, shared cores and phrases never do', () => {
+  for (const q of ['quails gate', "Quail's Gate", "Quails' Gate", 'the quails gate']) {
+    const i = N(q);
+    assert.equal(i.mode, 'navigate', q);
+    assert.deepEqual(i.exactVenue, { id: 530, region: 'west-kelowna', type: 'winery', slug: 'quails-gate-winery' }, q);
+    assert.deepEqual(i.corrections, []);
+  }
+  assert.equal(N("Quails' Gate Winery").exactVenue.id, 530, 'the full name still matches first');
+  assert.equal(N('Old Vines Restaurant').exactVenue.id, 930);
+  // Brand family: "50th parallel" is in two venue names -- never narrowed to one.
+  assert.equal(N('50th parallel').exactVenue, null);
+  assert.deepEqual(N('50th parallel').ambiguities, []);
+  // Shared core: two venues are "barn owl" -- left exactly as before (no match, no ambiguity).
+  assert.equal(N('barn owl').exactVenue, null);
+  assert.deepEqual(N('barn owl').ambiguities, []);
+  assert.deepEqual(N('barn owl').textTerms, I('barn owl').textTerms);
+  // A core that is also a phrase keeps the phrase's meaning.
+  assert.equal(N('happy hour').exactVenue, null);
+  assert.deepEqual(N('happy hour').features, ['happy_hour']);
+  // Never a partial name, never a single-word core, never a fuzzy name.
+  assert.equal(N('quails').exactVenue, null);
+  assert.equal(N('sandhill').exactVenue, null);
+  const s = N('sandhil');
+  assert.equal(s.exactVenue, null);
+  assert.deepEqual(s.corrections, [], 'venue-name words are never correction targets');
+  assert.deepEqual(s.textTerms, ['sandhil']);
+  assert.equal(N('quails gat').exactVenue, null);
+});
+
+test('Stage 3.2: a word in a venue name is never corrected, and an exact name is matched before any correction', () => {
+  const T2 = { ...TAXONOMY, venues: [...TAXONOMY.venues, { id: 901, name: 'Kelona Kitchen', region: 'kelowna', type: 'restaurant', slug: 'kelona-kitchen' }] };
+  const i = d.interpretDiscoveryQuery('kelona kitchen', T2);
+  assert.equal(i.exactVenue.id, 901);
+  assert.deepEqual(i.corrections, []);
+  assert.deepEqual(d.interpretDiscoveryQuery('kelona', T2).corrections, [], 'the site uses the word in a name');
+  assert.deepEqual(corr('kelona'), ['kelona>kelowna:region']);
+});
+
+test('Stage 3.2: every real venue name (the 812-name seed corpus) still matches exactly as before, with no correction', () => {
+  const seed = require('../venues.json');
+  const list = (Array.isArray(seed) ? seed : seed.venues).filter((v) => TAXONOMY.regions.includes(v.region));
+  const venues = list.map((v, k) => ({ id: 10000 + k, name: v.name, region: v.region, type: v.type, slug: `v-${k}` }));
+  const T3 = { ...TAXONOMY, venues };
+  const key = (s) => d.normalizeDiscoveryText(s).replace(/^the /, '');
+  const byName = new Map();
+  for (const v of venues) { const k = key(v.name); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(v); }
+  let checked = 0;
+  for (const v of venues) {
+    const i = d.interpretDiscoveryQuery(v.name, T3);
+    const same = byName.get(key(v.name));
+    assert.deepEqual(i.corrections, [], v.name);
+    if (same.length === 1) assert.equal(i.exactVenue && i.exactVenue.id, v.id, v.name);
+    else {
+      assert.equal(i.exactVenue, null, v.name);
+      assert.deepEqual(i.ambiguities[0].options.slice().sort(), same.map((x) => x.id).sort(), v.name);
+    }
+    const withRegion = d.interpretDiscoveryQuery(`${v.name} ${TAXONOMY.regionLabels[v.region]}`, T3);
+    assert.deepEqual(withRegion.corrections, [], `${v.name} + region`);
+    // The existing order: a full name that already includes the region
+    // ("TacoRiendo Mexican Cantina Kelowna") wins, then name + region.
+    const whole = byName.get(key(`${v.name} ${TAXONOMY.regionLabels[v.region]}`));
+    const expected = whole || same.filter((x) => x.region === v.region);
+    if (expected.length === 1) assert.equal(withRegion.exactVenue && withRegion.exactVenue.id, expected[0].id, `${v.name} + region`);
+    checked++;
+  }
+  assert.ok(checked > 700, `${checked} venue names checked`);
+});
