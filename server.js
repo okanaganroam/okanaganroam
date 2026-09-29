@@ -3015,74 +3015,87 @@ function resolveDiscoveryDestination(intent) {
   return none('no_matching_page');
 }
 
-// Whole-word match of a term inside already-normalized text.
-function discoveryTextHas(normalized, term) {
-  return ` ${normalized} `.indexOf(` ${term} `) !== -1;
+// Stage 3.3 (2026-09-29): venue retrieval lives in the shared, pure
+// discovery-search.js (also used by Build My Trip for word matching).
+function discoverySearchModule() {
+  return require('./discovery-search');
 }
 
-// Real venues for an intent, ranked deterministically. Constraints are hard
-// filters (region, type incl. secondary Food & Drink categories, every
-// requested feature, collections, activities, cuisine, every text term);
-// ranking is transparent: text relevance (name 3, cuisine 2, description 1
-// per term), then rating, then review count, then name and id. Heuristics
-// (occasion, budget) are NOT applied here -- they are reported back as not
-// applied. An intent with nothing to filter on returns no venues rather than
-// the whole directory.
+// Whole-word match of a term inside already-normalized text.
+function discoveryTextHas(normalized, term) {
+  return discoverySearchModule().textHas(normalized, term);
+}
+
+// The venue records retrieval runs over: each active venue's stored fields,
+// its normalized name/cuisine/description, badge features, curated lists
+// (Hidden Gems, Local Favourites, official dog-friendly places), outdoor
+// activities and secondary Food & Drink types -- all read from the database,
+// nothing computed beyond normalization. `row` is the stored row itself, so
+// every API item is built from exactly the stored values.
+function buildDiscoverySearchVenues() {
+  const normalize = discoveryIntentModule().normalizeDiscoveryText;
+  const member = new Map();
+  const add = (id, key, value) => {
+    if (!member.has(id)) member.set(id, { collections: [], activities: [], fdTypes: [] });
+    member.get(id)[key].push(value);
+  };
+  for (const kind of DISCOVERY_SEARCH_COLLECTION_KINDS) for (const id of getCollectionVenueIds(kind)) add(id, 'collections', kind);
+  for (const a of OUTDOOR_ACTIVITIES) for (const id of getCollectionVenueIds(a.kind)) add(id, 'activities', a.slug);
+  for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) add(id, 'fdTypes', type);
+  const venues = [];
+  for (const row of db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all()) {
+    if (!REGION_LABELS[row.region] || !CATEGORY_SLUGS[row.type]) continue;
+    const features = {};
+    for (const f of BOOL_FIELDS) if (Number(row[f]) === 1) features[f] = true;
+    const m = member.get(row.id) || { collections: [], activities: [], fdTypes: [] };
+    venues.push({
+      id: row.id, name: row.name, region: row.region, type: row.type,
+      cuisine: String(row.cuisine || '').toLowerCase().trim(),
+      textName: normalize(row.name || ''), textCuisine: normalize(row.cuisine || ''), textDesc: normalize(row.description || ''),
+      features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
+      rating: row.rating, reviews: row.reviews, price: row.price, row,
+    });
+  }
+  return venues;
+}
+const DISCOVERY_SEARCH_COLLECTION_KINDS = ['hidden_gem', 'local_favorite', 'dog_friendly'];
+// Built once and reused. Every database write in this app goes through the
+// one connection in db.js, and SQLite's total_changes() on it counts every
+// row any statement has inserted, updated or deleted -- so the index is
+// rebuilt exactly when a write (an admin correction, a collection change, a
+// submission) may have changed what it holds. Memory only; never persisted.
+let discoverySearchCache = null;
+function discoverySearchVenues() {
+  const version = db.prepare('SELECT total_changes() AS n').get().n;
+  if (!discoverySearchCache || discoverySearchCache.version !== version) {
+    discoverySearchCache = { version, venues: buildDiscoverySearchVenues() };
+  }
+  return discoverySearchCache.venues;
+}
+
+// Real venues for an intent, ranked deterministically -- the shared
+// retrieval in discovery-search.js over the cached venue records: hard filters
+// (region, type incl. secondary Food & Drink categories, every requested
+// feature, collections, activities, cuisine, every text term) and the
+// request's applied exclusions; text relevance (name 3, cuisine 2,
+// description 1 per term), then rating, review count, name and id.
+// Heuristics (occasion, budget) are NOT applied here -- they are reported
+// back as not applied. An intent with nothing to filter on returns no venues
+// rather than the whole directory.
 function selectDiscoveryVenues(intent, limit = DISCOVERY_DEFAULT_LIMIT) {
-  if (!intent) return { total: 0, items: [] };
+  const none = { applied: [], notApplied: [] };
+  if (!intent) return { total: 0, items: [], exclusions: none };
   if (intent.mode === 'navigate' && intent.exactVenue) {
     const v = db.prepare('SELECT * FROM venues WHERE id = ? AND redirect_to IS NULL').get(intent.exactVenue.id);
-    return v ? { total: 1, items: [discoveryVenueItem(v, [])] } : { total: 0, items: [] };
+    return v ? { total: 1, items: [discoveryVenueItem(v, [])], exclusions: none } : { total: 0, items: [], exclusions: none };
   }
-  if (intent.mode === 'events' || intent.mode === 'unknown') return { total: 0, items: [] };
-  const R = intent.regions, T = intent.types, F = intent.features, C = intent.collections, A = intent.activities;
-  const cuisines = intent.cuisines, terms = intent.textTerms;
-  if (!R.length && !T.length && !F.length && !C.length && !A.length && !cuisines.length && !terms.length) return { total: 0, items: [] };
-
-  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all();
-  const secondary = new Map();
-  for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) {
-    if (!T.includes(type)) continue;
-    for (const id of getCollectionVenueIds(kind)) { if (!secondary.has(id)) secondary.set(id, new Set()); secondary.get(id).add(type); }
-  }
-  const members = new Map();
-  const memberSet = (kind) => { if (!members.has(kind)) members.set(kind, getCollectionVenueIds(kind)); return members.get(kind); };
-  const activityKind = (slug) => (OUTDOOR_ACTIVITIES.find((a) => a.slug === slug) || {}).kind;
-
-  const scored = [];
-  for (const v of rows) {
-    if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
-    if (R.length && !R.includes(v.region)) continue;
-    if (T.length && !T.includes(v.type) && !(secondary.get(v.id) && T.some((t) => secondary.get(v.id).has(t)))) continue;
-    if (!F.every((f) => Number(v[f]) === 1 || (f === 'dog_friendly' && memberSet('dog_friendly').has(v.id)))) continue;
-    if (!C.every((c) => memberSet(c).has(v.id))) continue;
-    if (A.length && !A.some((a) => activityKind(a) && memberSet(activityKind(a)).has(v.id))) continue;
-    const cuisine = String(v.cuisine || '').toLowerCase().trim();
-    if (cuisines.length && !cuisines.includes(cuisine)) continue;
-    const name = discoveryIntentModule().normalizeDiscoveryText(v.name || '');
-    const cui = discoveryIntentModule().normalizeDiscoveryText(v.cuisine || '');
-    const desc = discoveryIntentModule().normalizeDiscoveryText(v.description || '');
-    let score = cuisines.length ? 2 : 0;
-    const matchedOn = [];
-    let ok = true;
-    for (const term of terms) {
-      const inName = discoveryTextHas(name, term), inCui = discoveryTextHas(cui, term), inDesc = discoveryTextHas(desc, term);
-      if (!inName && !inCui && !inDesc) { ok = false; break; }
-      score += (inName ? 3 : 0) + (inCui ? 2 : 0) + (inDesc ? 1 : 0);
-      matchedOn.push(`${term}:${[inName && 'name', inCui && 'cuisine', inDesc && 'description'].filter(Boolean).join('+')}`);
-    }
-    if (!ok) continue;
-    for (const f of F) matchedOn.push(`feature:${f}`);
-    for (const c of C) matchedOn.push(`collection:${c}`);
-    if (cuisines.length) matchedOn.push(`cuisine:${cuisine}`);
-    scored.push({ v, score, matchedOn });
-  }
-  scored.sort((a, b) => b.score - a.score
-    || (Number(b.v.rating) || 0) - (Number(a.v.rating) || 0)
-    || (Number(b.v.reviews) || 0) - (Number(a.v.reviews) || 0)
-    || String(a.v.name).localeCompare(String(b.v.name))
-    || a.v.id - b.v.id);
-  return { total: scored.length, items: scored.slice(0, limit).map((s) => discoveryVenueItem(s.v, s.matchedOn)) };
+  if (intent.mode === 'events' || intent.mode === 'unknown') return { total: 0, items: [], exclusions: none };
+  const found = discoverySearchModule().searchVenues(intent, discoverySearchVenues());
+  return {
+    total: found.total,
+    items: found.items.slice(0, limit).map((x) => discoveryVenueItem(x.venue.row, x.matchedOn)),
+    exclusions: found.exclusions,
+  };
 }
 // Only fields the database already holds -- nothing computed or invented.
 function discoveryVenueItem(v, matchedOn) {
@@ -3136,7 +3149,10 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() 
     destination,
     results: intent.mode === 'events'
       ? { kind: 'events', total: events.total, items: events.items, window: events.window }
-      : { kind: venues.total ? 'venues' : 'none', total: venues.total, items: venues.items },
+      // Stage 3.3, additive: which of the request's exclusions ("not in
+      // Kelowna", "no breweries", "nothing fancy") the venue results apply,
+      // and which they do not (still listed in notApplied as before).
+      : { kind: venues.total ? 'venues' : 'none', total: venues.total, items: venues.items, exclusions: venues.exclusions },
     notApplied: discoveryNotApplied(intent),
   };
 }
@@ -18642,6 +18658,7 @@ module.exports = {
   interpretDiscoveryText,
   resolveDiscoveryDestination,
   selectDiscoveryVenues,
+  discoverySearchVenues,
   selectDiscoveryEvents,
   runDiscovery,
   renderBrowsePrefillScript,

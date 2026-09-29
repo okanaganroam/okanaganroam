@@ -103,7 +103,9 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 function hasCoords(v) { return v && Number.isFinite(v.lat) && Number.isFinite(v.lng); }
 function kmBetween(a, b) { return hasCoords(a) && hasCoords(b) ? haversineKm(a.lat, a.lng, b.lat, b.lng) : null; }
-function textHas(normalized, term) { return !!normalized && ` ${normalized} `.indexOf(` ${term} `) !== -1; }
+// Stage 3.3: whole-word matching and the food rule come from the shared
+// retrieval module (discovery-search.js) -- the same functions, unchanged.
+const { textHas, foodMatch } = require('./discovery-search.js');
 // Deterministic per-(seed, venue) jitter in [0, 1): regeneration variety
 // without randomness.
 function jitter(seed, id) {
@@ -498,11 +500,6 @@ function eligible(v, ctx, strict) {
   return true;
 }
 
-function foodMatch(v, ft) {
-  if (ft.cuisine && v.cuisine === ft.cuisine) return { cuisine: true };
-  const inName = textHas(v.textName, ft.term), inCui = textHas(v.textCuisine, ft.term), inDesc = textHas(v.textDesc, ft.term);
-  return inName || inCui || inDesc ? { inName, inCui, inDesc } : null;
-}
 
 // ---------- scoring ----------
 //

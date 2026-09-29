@@ -9928,7 +9928,7 @@ test('Phase 3: plans from the real database are grounded in active venues', () =
 }));
 
 test('Phase 3: the planner and interpreter make no network or AI calls', () => {
-  for (const file of ['trip-planner.js', 'discovery-intent.js']) {
+  for (const file of ['trip-planner.js', 'discovery-intent.js', 'discovery-search.js']) {
     const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     assert.ok(!/fetch\(|require\(['"](https?|net|child_process)['"]\)|OPENAI|openai|XMLHttpRequest/.test(src), file);
   }
@@ -12765,7 +12765,7 @@ test('Build My Trip V3: the page is the site shell + the V3 view; canonical /tri
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'trip-planner-v3-page.js'];
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -12922,7 +12922,7 @@ test('Stage 2: POST /admin/verify-hours is the guarded, audited hours write (aut
   childEnv.PORT = ISOLATED_PORT;
   childEnv.ENRICHMENT_ADMIN_TOKEN = 'verify-hours-test-token';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-verify-hours-'));
-  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
+  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
     if (fs.existsSync(path.join(__dirname, '..', f))) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
   }
   try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
@@ -13035,3 +13035,141 @@ test('Stage 3.2: Hero Search never rewrites a search typed with an apostrophe ("
     } else assert.equal(r.status, 200, q);
   }
 })));
+
+// ---- Stage 3.3 (2026-09-29): shared discovery retrieval ---------------------
+// The pre-3.3 selectDiscoveryVenues algorithm, verbatim, as the parity reference.
+function legacySelectDiscoveryVenues(intent) {
+  const normalize = require('../discovery-intent.js').normalizeDiscoveryText;
+  const has = (n, t) => ` ${n} `.indexOf(` ${t} `) !== -1;
+  if (!intent || intent.mode === 'events' || intent.mode === 'unknown') return [];
+  const R = intent.regions, T = intent.types, F = intent.features, C = intent.collections, A = intent.activities;
+  const cuisines = intent.cuisines, terms = intent.textTerms;
+  if (!R.length && !T.length && !F.length && !C.length && !A.length && !cuisines.length && !terms.length) return [];
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all();
+  const secondary = new Map();
+  for (const [type, kind] of Object.entries(app.FD_CATEGORY_KIND_BY_TYPE)) {
+    if (!T.includes(type)) continue;
+    for (const id of app.getCollectionVenueIds(kind)) { if (!secondary.has(id)) secondary.set(id, new Set()); secondary.get(id).add(type); }
+  }
+  const members = new Map();
+  const memberSet = (kind) => { if (!members.has(kind)) members.set(kind, app.getCollectionVenueIds(kind)); return members.get(kind); };
+  const activityKind = (slug) => (app.OUTDOOR_ACTIVITIES.find((a) => a.slug === slug) || {}).kind;
+  const scored = [];
+  for (const v of rows) {
+    if (!app.REGION_LABELS[v.region] || !app.CATEGORY_SLUGS[v.type]) continue;
+    if (R.length && !R.includes(v.region)) continue;
+    if (T.length && !T.includes(v.type) && !(secondary.get(v.id) && T.some((t) => secondary.get(v.id).has(t)))) continue;
+    if (!F.every((f) => Number(v[f]) === 1 || (f === 'dog_friendly' && memberSet('dog_friendly').has(v.id)))) continue;
+    if (!C.every((c) => memberSet(c).has(v.id))) continue;
+    if (A.length && !A.some((a) => activityKind(a) && memberSet(activityKind(a)).has(v.id))) continue;
+    const cuisine = String(v.cuisine || '').toLowerCase().trim();
+    if (cuisines.length && !cuisines.includes(cuisine)) continue;
+    const name = normalize(v.name || ''), cui = normalize(v.cuisine || ''), desc = normalize(v.description || '');
+    let score = cuisines.length ? 2 : 0;
+    const matchedOn = [];
+    let ok = true;
+    for (const term of terms) {
+      const inName = has(name, term), inCui = has(cui, term), inDesc = has(desc, term);
+      if (!inName && !inCui && !inDesc) { ok = false; break; }
+      score += (inName ? 3 : 0) + (inCui ? 2 : 0) + (inDesc ? 1 : 0);
+      matchedOn.push(`${term}:${[inName && 'name', inCui && 'cuisine', inDesc && 'description'].filter(Boolean).join('+')}`);
+    }
+    if (!ok) continue;
+    for (const f of F) matchedOn.push(`feature:${f}`);
+    for (const c of C) matchedOn.push(`collection:${c}`);
+    if (cuisines.length) matchedOn.push(`cuisine:${cuisine}`);
+    scored.push({ v, score, matchedOn });
+  }
+  scored.sort((a, b) => b.score - a.score || (Number(b.v.rating) || 0) - (Number(a.v.rating) || 0)
+    || (Number(b.v.reviews) || 0) - (Number(a.v.reviews) || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id);
+  return scored.map((x) => ({ id: x.v.id, matchedOn: x.matchedOn }));
+}
+
+test('Stage 3.3: shared retrieval returns exactly the pre-3.3 results -- minus applied exclusions, plus dish-word mentions after them', () => {
+  const names = db.prepare('SELECT name, region FROM venues WHERE redirect_to IS NULL').all();
+  const queries = ['restaurants in Kelowna', 'dog friendly', 'golf Kelowna', 'wineries Naramata', 'poutine', 'hidden gems', 'local favourites', 'beaches', 'outdoors',
+    'hiking in vernon', 'italian', 'diner', 'kid friendly', 'patio', 'lake', 'fixture', 'test', 'breweries', 'cafes', 'pubs', 'restaurants but not in kelowna',
+    'golf not in vernon', 'nothing fancy restaurants', 'not wineries', 'no breweries', 'wineries but not in kelowna', "don't want anything fancy", 'pizza', 'sushi',
+    'date night', 'things to do', 'events this weekend', 'osoyos', 'wineris kelona', ...names.map((n) => n.name), ...names.map((n) => `${n.name} ${n.region}`)];
+  let identical = 0, changed = 0;
+  for (const q of queries) {
+    const intent = app.interpretDiscoveryText(q);
+    if (intent.mode === 'navigate') continue; // the exact-venue path is unchanged code
+    const now = app.selectDiscoveryVenues(intent, 100000);
+    const before = legacySelectDiscoveryVenues(intent);
+    const applied = now.exclusions.applied;
+    const dish = (intent.foodTerms || []).some((f) => f.cuisine && require('../discovery-search.js').DISH_WORDS[f.term]);
+    if (!applied.length && !dish) {
+      assert.deepEqual(now.items.map((x) => ({ id: x.id, matchedOn: x.matchedOn })), before, `${q}: identical, including matchedOn`);
+      identical++;
+      continue;
+    }
+    changed++;
+    const records = new Map(app.discoverySearchVenues().map((v) => [v.id, v]));
+    const excluded = (id) => {
+      const v = records.get(id);
+      return applied.some((a) => (a.field === 'region' && v.region === a.value) || (a.field === 'type' && (v.type === a.value || v.fdTypes.includes(a.value)))
+        || (a.field === 'cuisine' && v.cuisine === a.value) || (a.field === 'collection' && v.collections.includes(a.value))
+        || (a.field === 'activity' && v.activities.includes(a.value)) || (a.field === 'budget' && Number(v.price) === 4));
+    };
+    const kept = before.filter((x) => !excluded(x.id));
+    const prefix = now.items.slice(0, kept.length).map((x) => ({ id: x.id, matchedOn: x.matchedOn }));
+    assert.deepEqual(prefix, kept, `${q}: the previous results, in the previous order, minus exclusions`);
+    for (const x of now.items.slice(kept.length)) assert.ok(dish && x.matchedOn.some((m) => /^[a-z ]+:(name|cuisine|description)/.test(m)), `${q}: anything added is a dish-word mention, explained`);
+  }
+  assert.ok(identical >= 25 && changed >= 3, `${identical} identical, ${changed} with exclusions or dish words`);
+});
+
+test('Stage 3.3: /api/discover stays backward compatible; exclusions are reported additively', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const r = await (await fetch(`${base}/api/discover?q=${encodeURIComponent('restaurants but not in kelowna')}&limit=60`)).json();
+  assert.deepEqual(Object.keys(r).sort(), ['destination', 'intent', 'notApplied', 'query', 'results']);
+  assert.deepEqual(Object.keys(r.results).sort(), ['exclusions', 'items', 'kind', 'total']);
+  for (const item of r.results.items) {
+    assert.deepEqual(Object.keys(item).sort(), ['id', 'matchedOn', 'name', 'price', 'rating', 'region', 'reviews', 'type', 'url']);
+    assert.notEqual(item.region, 'kelowna', 'the exclusion is applied to the results');
+  }
+  assert.deepEqual(r.results.exclusions, { applied: [{ field: 'region', value: 'kelowna' }], notApplied: [] });
+  assert.equal(r.destination.url, null, 'still never routed: no page can show an exclusion');
+  assert.ok(r.notApplied.some((n) => n.field === 'unsupported' && n.value === 'not in kelowna'), 'notApplied is unchanged');
+  // Stored values exactly as stored: a venue without reviews stays null, never 0.
+  const nullReviews = db.prepare('SELECT id FROM venues WHERE redirect_to IS NULL AND reviews IS NULL AND region = ?').get('kelowna');
+  if (nullReviews) {
+    const all = await (await fetch(`${base}/api/discover?q=kelowna&limit=60`)).json();
+    const item = all.results.items.find((x) => x.id === nullReviews.id);
+    if (item) assert.equal(item.reviews, null);
+  }
+  const kids = app.runDiscovery('restaurants in kelowna without kids');
+  assert.deepEqual(kids.results.exclusions.notApplied, [{ field: 'feature', value: 'kid_friendly' }], 'feature exclusions are not applied, and say so');
+  assert.equal(kids.results.total, app.runDiscovery('restaurants in kelowna').results.total);
+  const events = app.runDiscovery('events this weekend');
+  assert.equal(events.results.kind, 'events');
+  assert.equal('exclusions' in events.results, false, 'event results are unchanged');
+})));
+
+test('Stage 3.3: pizza / sushi dish words, and the index is rebuilt after a database write (never stale)', () => {
+  const first = app.discoverySearchVenues();
+  assert.equal(app.discoverySearchVenues(), first, 'reused while nothing is written');
+  const pizzaBefore = app.runDiscovery('pizza', { limit: 60 }).results.items.map((x) => x.id);
+  const { lastInsertRowid } = insert.run({
+    name: 'Stage33 Fixture Slice Bar', region: 'kelowna', type: 'restaurant', cuisine: 'italian', phone: null, price: 2, reviews: null, rating: 4.1,
+    description: 'Fixture: thin crust pizza and sushi rolls.', address: null, latitude: null, longitude: null, hours: null, slug: 'stage33-fixture-slice-bar',
+  });
+  const id = Number(lastInsertRowid);
+  try {
+    assert.notEqual(app.discoverySearchVenues(), first, 'a write rebuilds the index');
+    const pizza = app.runDiscovery('pizza', { limit: 60 }).results.items;
+    assert.deepEqual(pizza.filter((x) => x.id !== id).map((x) => x.id), pizzaBefore, 'every earlier result, in the same order');
+    const added = pizza.find((x) => x.id === id);
+    assert.ok(added, 'a venue whose own description says "pizza" is found');
+    assert.deepEqual(added.matchedOn, ['pizza:description']);
+    assert.equal(added.reviews, null);
+    const sushi = app.runDiscovery('sushi', { limit: 60 }).results.items.find((x) => x.id === id);
+    assert.deepEqual(sushi && sushi.matchedOn, ['sushi:description']);
+    assert.equal(app.runDiscovery('french', { limit: 60 }).results.items.some((x) => x.id === id), false, 'no nationality-word mention');
+    db.prepare('UPDATE venues SET description = ? WHERE id = ?').run('Fixture: thin crust only.', id);
+    assert.equal(app.runDiscovery('pizza', { limit: 60 }).results.items.some((x) => x.id === id), false, 'an admin-style edit is seen at once');
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+  assert.deepEqual(app.runDiscovery('pizza', { limit: 60 }).results.items.map((x) => x.id), pizzaBefore);
+});
