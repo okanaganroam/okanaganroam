@@ -3143,7 +3143,7 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() 
   const destination = resolveDiscoveryDestination(intent);
   const venues = selectDiscoveryVenues(intent, limit);
   const events = selectDiscoveryEvents(intent, limit, now);
-  return {
+  const run = {
     query: text,
     intent,
     destination,
@@ -3154,7 +3154,282 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() 
       // and which they do not (still listed in notApplied as before).
       : { kind: venues.total ? 'venues' : 'none', total: venues.total, items: venues.items, exclusions: venues.exclusions },
     notApplied: discoveryNotApplied(intent),
+    // Stage 3.4, additive: how to present this request to a visitor (the
+    // /search page): their own words, the interpretation, corrections,
+    // what was and was not applied, and closed-source suggestions.
+    presentation: null,
   };
+  run.presentation = discoveryPresentation(run);
+  return run;
+}
+
+// ---------- Stage 3.4 (2026-09-29): search presentation, Hero Search routing, /search ----------
+//
+// Presentation is built only from the interpreted request, the retrieval
+// results and the site's own labels, pages and exact venue names -- no
+// fuzzy venue suggestions, no inferred types, no invented facts.
+
+const DISCOVERY_FD_TYPES = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery'];
+const SEARCH_HUB_SUGGESTIONS = [
+  { label: 'Outdoors', url: '/outdoors' },
+  { label: 'Food & Drink', url: '/food-drink' },
+  { label: 'What’s On', url: '/whats-on' },
+  { label: 'Hidden Gems', url: '/hidden-gems' },
+];
+const hasDiscoveryExclusion = (ex) => !!ex && (ex.regions.length || ex.types.length || ex.features.length || ex.collections.length
+  || ex.activities.length || ex.cuisines.length || ex.textTerms.length || !!ex.budget);
+
+// D4: "restaurants open now" is exactly the Food & Drink hub's own
+// verified-hours Open Now filter -- only when the request is nothing but
+// Food & Drink types (plus that page's own badge and region filters).
+function discoveryOpenNowDestination(intent) {
+  if (!intent || intent.mode !== 'find') return null;
+  if (intent.unsupported.length !== 1 || intent.unsupported[0] !== 'open now') return null;
+  if (!intent.types.length || !intent.types.every((t) => DISCOVERY_FD_TYPES.includes(t) && FD_CATEGORY_KIND_BY_TYPE[t])) return null;
+  if (!intent.features.every((f) => FD_HUB_FEATURE_KEYS.has(f))) return null;
+  if (intent.cuisines.length || intent.textTerms.length || intent.collections.length || intent.activities.length) return null;
+  if (intent.occasion || intent.budget || intent.when || intent.days !== null || intent.pace) return null;
+  if (intent.ambiguities.length || intent.conflicts.length || intent.needs.length || hasDiscoveryExclusion(intent.excluded)) return null;
+  const qs = discoveryQueryString({ types: intent.types, features: intent.features, regions: intent.regions });
+  return `/food-drink${qs}${qs ? '&' : '?'}open=now`;
+}
+
+// The interpreted request in the site's own words, e.g. "Wineries in
+// Kelowna" or "Restaurants in Kelowna, nothing upscale".
+function discoveryInterpretedText(intent, labels) {
+  const typeLabel = (t) => (labels.types[t] ? labels.types[t].plural : t).toLowerCase();
+  const foodWords = uniqueList((intent.foodTerms || []).filter((f) => f.cuisine && intent.cuisines.includes(f.cuisine)).map((f) => `“${f.term}”`));
+  const parts = [
+    ...intent.collections.map((c) => labels.collections[c] || c),
+    ...foodWords,
+    ...intent.types.map(typeLabel),
+    ...intent.activities.map((a) => (labels.activities[a] || a)),
+    ...intent.textTerms.map((w) => `“${w}”`),
+  ];
+  const positive = parts.length + intent.features.length + intent.regions.length;
+  if (!positive) return null;
+  let text = parts.length ? parts.join(', ') : 'places';
+  if (intent.features.length) text += ` with the ${intent.features.map((f) => labels.features[f] || f).join(', ')} badge${intent.features.length > 1 ? 's' : ''}`;
+  if (intent.regions.length) text += ` in ${intent.regions.map((r) => labels.regions[r] || r).join(' or ')}`;
+  const ex = intent.excluded;
+  const not = [
+    ...ex.types.map((t) => `no ${typeLabel(t)}`),
+    ...ex.regions.map((r) => `not in ${labels.regions[r] || r}`),
+    ...ex.cuisines.map((c) => `no ${c}`),
+    ...ex.collections.map((c) => `not ${labels.collections[c] || c}`),
+    ...ex.activities.map((a) => `no ${(labels.activities[a] || a).toLowerCase()}`),
+    ...(ex.budget === 'upscale' ? ['nothing upscale'] : []),
+  ];
+  if (not.length) text += `, ${not.join(', ')}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+function uniqueList(list) { return Array.from(new Set(list)); }
+
+function discoveryPresentation(run) {
+  const intent = run.intent, labels = tripPlannerLabels();
+  const total = run.results.total || 0;
+  const positive = intent.regions.length + intent.types.length + intent.features.length + intent.collections.length
+    + intent.activities.length + intent.cuisines.length + intent.textTerms.length;
+  const excluded = hasDiscoveryExclusion(intent.excluded);
+  const venueOptions = [];
+  for (const a of intent.ambiguities) {
+    if (a.field !== 'exactVenue') continue;
+    for (const id of a.options) {
+      const v = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ? AND redirect_to IS NULL').get(id);
+      const url = v && discoveryVenueUrl(v);
+      if (url) venueOptions.push({ kind: 'venue', label: `${v.name} (${REGION_LABELS[v.region]})`, url });
+    }
+  }
+  let status;
+  if (intent.mode === 'events') status = 'events';
+  else if (venueOptions.length && !total) status = 'ambiguous';
+  else if (total) status = 'results';
+  else if (!positive && excluded) status = 'exclusion_only';
+  else if (!positive) status = 'needs_more';
+  else if (intent.textTerms.length && !intent.types.length && !intent.features.length && !intent.collections.length && !intent.activities.length && !intent.cuisines.length) status = 'no_match_for_words';
+  else status = 'no_results';
+
+  const notes = [];
+  const plan = discoverySearchModule().exclusionPlan(intent.excluded);
+  for (const a of plan.applied) notes.push({ code: status === 'results' ? 'exclusion_applied' : 'exclusion_understood', field: a.field, value: a.value });
+  for (const a of plan.notApplied) notes.push({ code: 'exclusion_not_applied', field: a.field, value: a.value });
+  const exclusionPhrases = new Set(intent.excluded.phrases || []);
+  for (const n of run.notApplied) {
+    if (n.field === 'unsupported') { if (!exclusionPhrases.has(n.value)) notes.push({ code: 'not_applied', field: 'phrase', value: n.value }); continue; }
+    notes.push({ code: 'not_applied', field: n.field, value: n.value });
+  }
+
+  const suggestions = [...venueOptions];
+  if (!excluded) {
+    const openNow = discoveryOpenNowDestination(intent);
+    if (openNow) suggestions.push({ kind: 'page', label: 'Open now on Food & Drink', url: openNow });
+    if (run.destination && run.destination.url && !run.destination.url.startsWith('/browse')) suggestions.push({ kind: 'page', label: 'See this on its own page', url: run.destination.url });
+    if (intent.when && intent.mode !== 'events') suggestions.push({ kind: 'events', label: 'What’s On for those dates', url: `/whats-on${discoveryQueryString(discoveryWhatsOnWindowParams(intent.when))}` });
+    if (intent.occasion || intent.mode === 'plan') suggestions.push({ kind: 'planner', label: 'Plan it with Build My Trip', url: '/trip' });
+    if (status === 'needs_more' && !intent.occasion && intent.mode !== 'plan') {
+      for (const h of SEARCH_HUB_SUGGESTIONS) if (!suggestions.some((x) => x.url.split('?')[0] === h.url)) suggestions.push({ kind: 'page', ...h });
+    }
+    if (!total && intent.textTerms.length && intent.mode !== 'events') suggestions.push({ kind: 'directory', label: `Search the directory for “${run.query.trim()}”`, url: `/browse${discoveryQueryString({ q: run.query.trim() })}` });
+  }
+  return {
+    original: run.query,
+    // Several places share the name typed: the choices say it better.
+    interpreted: status === 'ambiguous' ? null : discoveryInterpretedText(intent, labels),
+    corrections: intent.corrections || [],
+    status,
+    notes,
+    suggestions,
+  };
+}
+
+// Hero Search (the homepage box submits to /browse?q=): where a request goes.
+//   exact venue name -> its page (as before)
+//   cuisine / dish words -> /search, in the visitor's own words (D3)
+//   any other request a page shows exactly -> that page (as before)
+//   "restaurants open now" -> Food & Drink's verified-hours Open Now (D4)
+//   an understood exclusion, or several words, that no page can show -> /search (D2)
+//   one word: /browse as typed when the directory's search finds places
+//     (as before); /search when nothing matches (D2)
+// Returns { url, reason }; url null = serve /browse as typed.
+function heroSearchTarget(text) {
+  const intent = interpretDiscoveryText(text);
+  const destination = resolveDiscoveryDestination(intent);
+  const search = `/search${discoveryQueryString({ q: text.trim() })}`;
+  if (intent.mode === 'navigate' && destination.url) return { url: destination.url, reason: 'exact_venue' };
+  if (intent.cuisines.length) return { url: search, reason: 'cuisine' };
+  // A plain one-word text search (/browse?q=<word>, nothing else) is not a
+  // page of its own: the one-word rule below decides, so "Poutine" is never
+  // bounced to /browse?q=poutine first.
+  const pureTextSearch = /^\/browse\?q=[^&]*$/.test(destination.url || '');
+  // Stage 3.2: a search typed with an apostrophe ("Joe's") is never rewritten
+  // into its normalized no-apostrophe word ("joes") on /browse.
+  const keepsTypedText = /['‘’`]/.test(text) && /[?&]q=/.test(destination.url || '');
+  if (destination.url && !pureTextSearch && !keepsTypedText) return { url: destination.url, reason: 'route' };
+  const openNow = discoveryOpenNowDestination(intent);
+  if (openNow) return { url: openNow, reason: 'open_now' };
+  // An understood exclusion ("not wineries") is never a directory text
+  // search; neither is anything that normalizes to several words
+  // ("dog-friendly-patios", "joe's patio").
+  if (hasDiscoveryExclusion(intent.excluded)) return { url: search, reason: 'exclusion' };
+  if (discoveryIntentModule().normalizeDiscoveryText(text).split(' ').filter(Boolean).length > 1) return { url: search, reason: 'multi_word' };
+  const found = selectDiscoveryVenues(intent, 1).total;
+  return found > 0 ? { url: null, reason: 'browse_single_word' } : { url: search, reason: 'single_word_no_results' };
+}
+
+// Visitor-facing sentence for one matchedOn entry (facts from stored fields only).
+function discoveryMatchedOnText(m) {
+  const i = m.indexOf(':');
+  const key = m.slice(0, i), value = m.slice(i + 1);
+  if (key === 'cuisine') return `Listed cuisine: ${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+  if (key === 'feature') return BADGE_LABELS[value] ? `Has the ${BADGE_LABELS[value].title} badge` : null;
+  if (key === 'collection') return value === 'hidden_gem' ? 'One of Okanagan Roam’s Hidden Gems' : value === 'local_favorite' ? 'An Okanagan Roam Local Favourite' : value === 'dog_friendly' ? 'On the official dog-friendly list' : null;
+  const where = value.split('+').map((w) => (w === 'name' ? 'name' : w === 'cuisine' ? 'listed cuisine' : 'description'));
+  return `Mentions “${key}” in its ${where.join(' and ')}`;
+}
+function discoveryNoteText(n, labels) {
+  const region = (r) => labels.regions[r] || r;
+  const typeP = (t) => (labels.types[t] ? labels.types[t].plural.toLowerCase() : t);
+  const what = (f, v) => (f === 'region' ? `not in ${region(v)}` : f === 'type' ? `no ${typeP(v)}` : f === 'cuisine' ? `no ${v}`
+    : f === 'collection' ? `not ${labels.collections[v] || v}` : f === 'activity' ? `no ${(labels.activities[v] || v).toLowerCase()}`
+      : f === 'budget' ? 'nothing upscale' : f === 'feature' ? `without “${labels.features[v] || v}”` : `not “${v}”`);
+  if (n.code === 'exclusion_applied') return n.field === 'budget'
+    ? 'Nothing upscale: places at the highest price level ($$) are left out. Places without a listed price are kept.'
+    : `Understood “${what(n.field, n.value)}” and left those out.`;
+  if (n.code === 'exclusion_understood') return `Understood “${what(n.field, n.value)}”.`;
+  if (n.code === 'exclusion_not_applied') return n.field === 'feature'
+    ? `Understood “${what(n.field, n.value)}”, but search can’t leave places out by a badge, so none were removed.`
+    : `Understood “${what(n.field, n.value)}”, but search can’t apply it, so no places were removed for it.`;
+  if (n.field === 'occasion') return `Occasions like “${String(n.value).replace(/_/g, ' ')}” aren’t applied to search. Build My Trip can plan around one.`;
+  if (n.field === 'budget') return 'Budget isn’t applied to search: not every place lists a price.';
+  if (n.field === 'when') return 'Dates and times aren’t checked for places here. What’s On lists dated events.';
+  if (n.field === 'days' || n.field === 'pace') return 'Trip length and pace are used by Build My Trip, not search.';
+  if (n.field === 'phrase') return `“${n.value}” isn’t something search can apply yet.`;
+  return null;
+}
+const SEARCH_EMPTY_TEXT = {
+  exclusion_only: 'We understood what you don’t want, but that alone doesn’t narrow anything down. Tell us what you’d like instead, for example “restaurants in Kelowna”.',
+  needs_more: 'Add a kind of place or a town, for example “wineries in Naramata” or “beaches in Penticton”, and we’ll show real places.',
+  no_match_for_words: 'We couldn’t find any places whose name, listed cuisine or description mentions those words.',
+  no_results: 'No places match all of that. Try fewer words or another town.',
+  ambiguous: 'More than one place has that name. Pick the one you mean:',
+};
+
+function renderSearchPage(run) {
+  const p = run.presentation, labels = tripPlannerLabels();
+  const q = run.query.trim();
+  const esc = escapeHtml;
+  const total = run.results.total || 0;
+  const items = run.results.items || [];
+  const title = `Search: ${q.length > 60 ? q.slice(0, 60) + '…' : q} | Okanagan Roam`;
+  const correctionText = p.corrections.length
+    ? `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>` : '';
+  const notes = p.notes.map((n) => discoveryNoteText(n, labels)).filter(Boolean);
+  const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
+  let resultsHtml = '';
+  if (run.results.kind === 'events' && items.length) {
+    resultsHtml = `<p class="search-count">${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}</p>
+  <ul class="card-grid">${items.map((e) => `
+    <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
+      <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
+  </ul>`;
+  } else if (items.length) {
+    resultsHtml = `<p class="search-count">${total} place${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}</p>
+  <ul class="card-grid">${items.map((v) => {
+      const why = (v.matchedOn || []).map(discoveryMatchedOnText).filter(Boolean);
+      return `
+    <li class="category-card"><h2><a href="${esc(v.url)}">${esc(v.name)}</a></h2>
+      <p class="venue-meta">${esc(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)} · ${esc(REGION_LABELS[v.region] || v.region)}</p>${why.length ? `
+      <p class="venue-meta search-why">${esc(why.join(' · '))}</p>` : ''}</li>`;
+    }).join('')}
+  </ul>`;
+  } else {
+    resultsHtml = `<p class="search-empty">${esc(SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results)}</p>`;
+  }
+  const suggestionHtml = p.suggestions.length ? `<h2 class="category-subsection-heading">${p.status === 'ambiguous' ? 'Places with that name' : 'You could also try'}</h2>
+  <ul class="search-suggestions">${p.suggestions.map((sg) => `<li><a href="${esc(sg.url)}">${esc(sg.label)}</a></li>`).join('')}</ul>` : '';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, 'Search results on Okanagan Roam.', null, [], { golfTheme: true, noindex: true })}
+${renderOutdoorThemeStyles()}
+${renderAnalyticsHeadHtml('search')}
+<style>
+  body.search-page .search-form { display: flex; gap: 10px; max-width: 640px; margin: 8px 0 18px; }
+  body.search-page .search-form input { flex: 1; min-width: 0; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); font: inherit; background: var(--ref-white, #fff); }
+  body.search-page .search-form button { padding: 12px 22px; border-radius: 999px; border: 0; cursor: pointer; font-weight: 800; background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); font-family: 'Nunito', sans-serif; }
+  body.search-page .search-interpreted { font-size: 1.05rem; margin: 0 0 6px; }
+  body.search-page .search-corrected, body.search-page .search-count { color: rgba(42,32,25,0.72); margin: 0 0 8px; }
+  body.search-page .search-notes { margin: 6px 0 16px; padding-left: 18px; color: rgba(42,32,25,0.72); font-size: 0.92rem; }
+  body.search-page .search-empty { font-size: 1.02rem; margin: 18px 0; }
+  body.search-page .search-why { font-size: 0.85rem; }
+  body.search-page .search-suggestions { list-style: none; padding: 0; margin: 8px 0 30px; display: flex; flex-wrap: wrap; gap: 10px; }
+  body.search-page .search-suggestions a { display: inline-block; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); text-decoration: none; font-weight: 700; background: var(--ref-white, #fff); }
+</style>
+</head>
+<body class="golf-page outdoor-page region-page search-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Search' },
+  ])}
+  <h1>Search results</h1>
+  <form class="search-form" action="/browse" method="get" role="search">
+    <input type="search" name="q" value="${esc(q)}" aria-label="Search Okanagan Roam" maxlength="${discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH}">
+    <button type="submit">Search</button>
+  </form>
+  <p class="search-interpreted">You searched “${esc(q)}”${p.interpreted ? `: showing <strong>${esc(p.interpreted)}</strong>` : ''}</p>
+  ${correctionText}
+  ${noteHtml}
+  ${resultsHtml}
+  ${suggestionHtml}
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
 }
 
 // ---------- Build My Trip planner (Phase 3, 2026-09-25) ----------
@@ -5588,7 +5863,7 @@ function renderHomeFooterHTML(fromBrowse) {
       <div class="home-footer-col">
         <h4 data-i18n="footer.about">About</h4>
         <ul>
-          <li><a href="/browse#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
+          <li><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
           <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
@@ -5620,7 +5895,48 @@ function renderHomeFooterHTML(fromBrowse) {
   <div class="wrap-wide home-footer-bottom">
     <p class="home-footer-copyright" data-i18n="homeFooter.copyright">&copy; 2026 Okanagan Roam. Built for the whole crew, dog included.</p>
   </div>
+  ${renderAppTeaserDialogHtml()}
 </footer>`;
+}
+
+// Stage 3.4 (2026-09-29): "App coming soon" shows the site's existing app
+// teaser (the same words as okanagan.html's #app section) in a dialog on the
+// page the visitor is on, instead of sending them to the bottom of the
+// 1,400-card /browse directory, where they never saw it. No app exists yet:
+// the store badges stay plain labels (no links, no download URLs), and the
+// dialog says so. Rendered once per page with the footer; the small script
+// only opens/closes it (Escape and the backdrop close it too).
+function renderAppTeaserDialogHtml() {
+  return `<dialog class="app-teaser-dialog" id="appTeaserDialog" aria-labelledby="appTeaserTitle">
+    <div class="app-teaser-dialog-inner">
+      <button type="button" class="app-teaser-dialog-close" data-app-teaser-close aria-label="Close">&times;</button>
+      <span class="app-teaser-dialog-eyebrow">Coming soon</span>
+      <h2 id="appTeaserTitle">This directory is becoming the Okanagan Roam app</h2>
+      <p>Same friendly filters, same directory, now in your pocket, including a live "happy hour now" check for wherever you happen to be standing.</p>
+      <div class="app-teaser-dialog-stores">
+        <span class="app-teaser-dialog-store">📱 App Store</span>
+        <span class="app-teaser-dialog-store">▶ Google Play</span>
+      </div>
+      <p class="app-teaser-dialog-note">The app isn't available to download yet.</p>
+    </div>
+  </dialog>
+  <script>
+  (function(){
+    var d = document.getElementById('appTeaserDialog');
+    if (!d) return;
+    function close(){ if (typeof d.close === 'function') d.close(); else d.removeAttribute('open'); }
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('[data-app-teaser-open]')) {
+        e.preventDefault();
+        if (typeof d.showModal === 'function') { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
+        return;
+      }
+      if (t.closest('[data-app-teaser-close]') || t === d) close();
+    });
+  })();
+  </script>`;
 }
 
 // Canonical footer + floating Trip button styles (consolidated 2026-09-19):
@@ -5633,6 +5949,34 @@ function renderHomeFooterHTML(fromBrowse) {
 // A future footer change now only needs to happen here.
 function renderCanonicalFooterStyles() {
   return `
+  /* Stage 3.4 (2026-09-29): the "App coming soon" footer control is a
+     button (it opens the app teaser dialog) styled exactly like the footer's
+     links; the dialog reuses the teaser's navy/gold look. */
+  .home-footer-link-btn {
+    background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: left;
+    font-family: 'Nunito', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78); transition: color 0.15s;
+  }
+  .home-footer-link-btn:hover, .home-footer-link-btn:focus-visible { color: var(--ref-gold, #E0A94E); }
+  .app-teaser-dialog {
+    border: 0; padding: 0; border-radius: 18px; width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+    background: var(--ref-navy-deep, #16233a); color: var(--ref-cream, #F5F3ED); box-shadow: 0 24px 60px -20px rgba(0,0,0,0.55);
+  }
+  .app-teaser-dialog::backdrop { background: rgba(10,16,28,0.55); }
+  .app-teaser-dialog-inner { position: relative; padding: 34px 30px 28px; font-family: 'Nunito', sans-serif; }
+  .app-teaser-dialog-eyebrow { display: inline-block; color: var(--ref-gold, #E0A94E); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+  .app-teaser-dialog h2 { font-family: 'Fraunces', serif; color: inherit; font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.15; margin: 10px 0 12px; }
+  .app-teaser-dialog p { color: rgba(245,243,237,0.78); margin: 0 0 18px; line-height: 1.5; }
+  .app-teaser-dialog-stores { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .app-teaser-dialog-store {
+    display: flex; align-items: center; gap: 8px; background: rgba(255,252,246,0.1); border: 1px solid rgba(255,252,246,0.3);
+    padding: 10px 16px; border-radius: 14px; font-weight: 700; font-size: 0.9rem; cursor: default;
+  }
+  .app-teaser-dialog .app-teaser-dialog-note { font-size: 0.85rem; margin: 0; color: rgba(245,243,237,0.62); }
+  .app-teaser-dialog-close {
+    position: absolute; top: 10px; right: 12px; width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer;
+    background: rgba(255,252,246,0.12); color: inherit; font-size: 1.4rem; line-height: 1;
+  }
+  .app-teaser-dialog-close:hover, .app-teaser-dialog-close:focus-visible { background: rgba(255,252,246,0.22); }
   /* Homepage footer redesign (2026-09-17, revised again same day): full-
      width navy band using the same --ref-navy/--ref-gold/--ref-cream
      system as the header/hero, replacing the old footer's --ink/--sand
@@ -6849,7 +7193,9 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // Values are fixed strings from this set -- never derived from the URL or
 // from anything a visitor typed. The homepage and /browse are not server
 // templates (they serve okanagan.html unchanged) and are untouched by this.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'listing_form', 'not_found']);
+// Stage 3.4 (2026-09-29): 'search' labels only the new /search results page,
+// so site search is measurable separately from the legacy /browse directory.
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'listing_form', 'not_found', 'search']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -8804,6 +9150,109 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+
+// ---------- Map page (Stage 3.4, 2026-09-29): /map ----------
+// Every "Map" control (the header's Discover -> Map, the homepage's Build
+// Your Trip map graphic) used to send visitors to /browse?openMap=1, where
+// the map opened below the fold with its only open/close control hidden.
+// /map shows the same map the directory had -- one pin per town/area
+// centre, the same coordinates, each pin listing that area's places -- on
+// screen straight away, with a visible "Close map" control, in the site's
+// own header/footer/map styles. Pins mark areas, not addresses; every place
+// links to its own page (whose "View on map" opens Google Maps as before).
+// Read-only: names, types, regions and slugs as stored.
+const MAP_AREA_CENTERS = {
+  kelowna: [49.8880, -119.4960], 'west-kelowna': [49.8622, -119.6516], peachland: [49.7719, -119.7386],
+  naramata: [49.5978, -119.5850], penticton: [49.4991, -119.5937], 'okanagan-falls': [49.3512, -119.5568],
+  summerland: [49.6011, -119.6773], oliver: [49.1822, -119.5502], osoyoos: [49.0328, -119.4692],
+  vernon: [50.2670, -119.2720], 'big-white': [49.7218, -118.9288], silverstar: [50.3599, -119.0588],
+  apex: [49.3910, -119.9040], baldy: [49.1528, -119.2364], 'lake-country': [50.0680, -119.4090],
+  coldstream: [50.2260, -119.2010], lumby: [50.2483, -118.9722], armstrong: [50.4489, -119.1997],
+  enderby: [50.5487, -119.1400], kaleden: [49.3940, -119.6010],
+};
+const MAP_POPUP_LIMIT = 12;
+function mapAreaPins() {
+  const rows = db.prepare('SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all()
+    .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
+  return VALID_REGIONS.filter((r) => MAP_AREA_CENTERS[r]).map((region) => {
+    const places = rows.filter((v) => v.region === region).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const label = REGION_LABELS[region];
+    const list = places.slice(0, MAP_POPUP_LIMIT).map((v) => `<li><a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${escapeHtml(v.slug)}">${escapeHtml(v.name)}</a>, ${escapeHtml(CATEGORY_LABELS[v.type].singular)}</li>`).join('');
+    const regionPage = Object.keys(getRegionCategoryCounts(region)).length > 0;
+    const popup = `<h4>${escapeHtml(label)} &middot; ${places.length} ${places.length === 1 ? 'place' : 'places'}</h4>`
+      + (places.length ? `<ul class="map-popup-list">${list}</ul>` : '<p class="map-popup-more">No places listed here yet.</p>')
+      + (regionPage ? `<div class="map-popup-more"><a href="/${region}">See everything in ${escapeHtml(label)} &rarr;</a></div>` : '');
+    return { region, center: MAP_AREA_CENTERS[region], count: places.length, popup };
+  });
+}
+function renderMapPage(pins = mapAreaPins()) {
+  const title = 'Map of the Okanagan | Okanagan Roam';
+  const description = 'A map of Okanagan Roam’s towns and areas, from Enderby to Osoyoos and the ski hills. Tap a pin to see the places listed there.';
+  const data = JSON.stringify(pins.map((p) => ({ c: p.center, n: p.count, h: p.popup }))).replace(/</g, '\\u003c');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, null, [], { golfTheme: true, noindex: true })}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+${renderOutdoorThemeStyles()}
+${renderAnalyticsHeadHtml('hub')}
+<style>
+  body.map-page .map-page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+  body.map-page .map-page-head h1 { margin: 0; }
+  body.map-page a.map-page-close {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; font-weight: 800;
+    background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); text-decoration: none; font-family: 'Nunito', sans-serif;
+  }
+  body.map-page a.map-page-close:hover, body.map-page a.map-page-close:focus-visible { background: var(--ref-gold, #E0A94E); color: var(--ref-navy-deep, #16233a); }
+  body.map-page .map-panel.open { margin: 18px 0 34px; }
+  body.map-page #okMap { height: min(68vh, 640px); min-height: 380px; }
+</style>
+</head>
+<body class="golf-page outdoor-page region-page map-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Map' },
+  ])}
+  <div class="map-page-head">
+    <h1>Map of the Okanagan</h1>
+    <a class="map-page-close" href="/" data-map-close>&times; Close map</a>
+  </div>
+  <p class="subtitle">Tap a pin to see the places listed in that town or area.</p>
+  <div class="map-panel open">
+    <div id="okMap" role="region" aria-label="Map of Okanagan towns and areas"></div>
+    <div class="map-note">Pins mark each town or area centre, not individual addresses. Open any place for its exact location and directions.</div>
+  </div>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+  var close = document.querySelector('[data-map-close]');
+  if (close) close.addEventListener('click', function(e){
+    // Back to wherever the visitor opened the map from, when that was this site.
+    try {
+      if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) { e.preventDefault(); history.back(); }
+    } catch (err) {}
+  });
+  if (!window.L) return;
+  var pins = ${data};
+  var map = L.map('okMap').setView([49.75, -119.55], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 15 }).addTo(map);
+  pins.forEach(function(p){
+    var m = L.marker(p.c).addTo(map).bindPopup(p.h);
+    m.setOpacity(p.n > 0 ? 1 : 0.4);
+  });
+  setTimeout(function(){ map.invalidateSize(); }, 100);
+})();
+</script>
 </body>
 </html>`;
 }
@@ -14662,10 +15111,25 @@ function renderHiddenElementsScript() {
 (function(){
   var D = document;
   function apply(){
+    // Stage 3.4 (2026-09-29): the toggle row stays hidden as requested --
+    // except while the map is open (the header's Map link opens it on this
+    // page), when its "Close the map view" button is the map's close control.
+    var mapOpen = !!D.querySelector('#mapPanel.open');
     var toHide = D.querySelectorAll('.map-toggle-row');
     for (var i = 0; i < toHide.length; i++) {
-      toHide[i].style.display = 'none';
+      toHide[i].style.display = mapOpen ? '' : 'none';
     }
+    // When the map has just opened, bring it (and its close control) on
+    // screen once, below the fixed header -- the opener's own smooth scroll
+    // does not reliably move the page here.
+    if (mapOpen && !window.__roamMapShown && toHide[0]) {
+      window.__roamMapShown = true;
+      var headerEl = D.querySelector('header');
+      var offset = (headerEl ? headerEl.offsetHeight : 0) + 12;
+      // 'instant': the page's CSS smooth scrolling must not delay or cancel it.
+      window.scrollTo({ top: toHide[0].getBoundingClientRect().top + window.scrollY - offset, behavior: 'instant' });
+    }
+    if (!mapOpen) window.__roamMapShown = false;
     var countEl = D.querySelector('.results-count');
     if (countEl) {
       var m = countEl.textContent.match(/^([\\d,]+)(\\s.*)$/);
@@ -16345,7 +16809,34 @@ const server = http.createServer(async (req, res) => {
     // here pre-filtered: ?q=<text> runs a search, ?types=a,b,c presses the
     // matching wizard type chips, ?openMap=1 opens the interactive map —
     // see renderBrowsePrefillScript() below.
+    // GET /search?q= (Stage 3.4): the search results page for requests no
+    // existing page can show exactly (Hero Search sends them here). Behind
+    // DISCOVERY_SEARCH like /api/discover; noindex; never cached.
+    if ((pathname === '/search' || pathname === '/search/') && method === 'GET' && isDiscoverySearchEnabled()) {
+      const q = typeof query.q === 'string' ? query.q : '';
+      if (!q.trim() || q.length > discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
+        res.writeHead(302, { Location: '/browse', 'Cache-Control': 'no-store' });
+        return res.end();
+      }
+      const html = renderSearchPage(runDiscovery(q, { limit: DISCOVERY_MAX_LIMIT }));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
+      return res.end(html);
+    }
+
+    // GET /map (Stage 3.4): the map every "Map" control opens.
+    if ((pathname === '/map' || pathname === '/map/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' });
+      return res.end(renderMapPage());
+    }
+
     if (pathname === '/browse' && method === 'GET') {
+      // Stage 3.4: the old "open the map" deep link (/browse?openMap=1, still
+      // in bookmarks and cached pages) now opens the map itself, not the
+      // directory with the map hidden below it.
+      if (Object.keys(query).length === 1 && query.openMap === '1') {
+        res.writeHead(302, { Location: '/map', 'Cache-Control': 'no-store' });
+        return res.end();
+      }
       // Discovery search (Phase 2): the homepage Hero Search already submits
       // to /browse?q=<text>. With DISCOVERY_SEARCH on, a request carrying ONLY
       // q is interpreted and sent to the existing page that shows exactly that
@@ -16356,21 +16847,11 @@ const server = http.createServer(async (req, res) => {
         const keys = Object.keys(query);
         if (keys.length === 1 && keys[0] === 'q' && typeof query.q === 'string' && query.q.trim()
           && query.q.length <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
-          const destination = resolveDiscoveryDestination(interpretDiscoveryText(query.q));
-          // A single-word text search resolves to /browse?q=<word> -- exactly
-          // this request when the visitor already typed just that word. Never
-          // redirect a URL to itself; the unchanged /browse search handles it.
-          const selfTarget = destination.url === `/browse${discoveryQueryString({ q: query.q })}`;
-          // Stage 3.2 (2026-09-29): a text search typed with an apostrophe
-          // ("Joe's", "Murray's") is never rewritten into its normalized
-          // no-apostrophe word ("joes"): the /browse search matches the
-          // visitor's own spelling against venue names, and the rewritten word
-          // matches none of them. The unchanged /browse handles the request as
-          // typed. Destinations without a text search (a venue page, a
-          // region/category page) still redirect as before.
-          const keepsTypedText = /['‘’`]/.test(query.q) && /[?&]q=/.test(destination.url || '');
-          if (destination.url && !selfTarget && !keepsTypedText) {
-            res.writeHead(302, { Location: destination.url, 'Cache-Control': 'no-store' });
+          // Stage 3.4: heroSearchTarget() decides (see its comment); a null
+          // url keeps today's /browse, as typed.
+          const target = heroSearchTarget(query.q);
+          if (target.url) {
+            res.writeHead(302, { Location: target.url, 'Cache-Control': 'no-store' });
             return res.end();
           }
         }
@@ -18658,6 +19139,11 @@ module.exports = {
   interpretDiscoveryText,
   resolveDiscoveryDestination,
   selectDiscoveryVenues,
+  heroSearchTarget,
+  discoveryPresentation,
+  renderSearchPage,
+  renderMapPage,
+  mapAreaPins,
   discoverySearchVenues,
   selectDiscoveryEvents,
   runDiscovery,

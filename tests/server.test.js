@@ -2683,7 +2683,9 @@ test('Home footer: does not reuse or modify the header\'s shared .logo classes',
 
 test('Home footer: About and Social Media (renamed from Follow) column links/icons are unchanged from the previously approved design', () => {
   const html = app.renderHomeFooterHTML();
-  assert.match(html, /<a href="\/browse#app" data-i18n="nav\.appComingSoon">App coming soon<\/a>/);
+  // Stage 3.4: "App coming soon" opens the app teaser on the page itself.
+  assert.ok(html.includes('<button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button>'));
+  assert.ok(!html.includes('href="/browse#app"'));
   assert.match(html, /<a href="\/list-your-venue" data-i18n="footer\.listVenue">List your venue<\/a>/);
   assert.match(html, /<a href="mailto:okanaganroam@gmail\.com" data-i18n="footer\.contact">Contact<\/a>/);
   assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
@@ -9679,10 +9681,12 @@ test('Phase 2: /api/discover over HTTP, and /browse?q redirects only when safe',
   assert.equal(redirect.headers.get('location'), '/kelowna/restaurants');
   const events = await fetch(`${base}/browse?q=${encodeURIComponent('events this weekend')}`, { redirect: 'manual' });
   assert.equal(events.headers.get('location'), '/whats-on?when=this-weekend');
-  // Not routable -> today's /browse, unchanged.
+  // Not routable. Stage 3.4 (D2): several words no page can show go to the
+  // /search results page, in the visitor's own words -- never a dead end.
   for (const q of ['asdkjfh qwepoiu zxcvb', 'Rotary Beach Park', 'date night in Kelowna']) {
     const res = await fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
-    assert.equal(res.status, 200, q);
+    assert.equal(res.status, 302, q);
+    assert.equal(res.headers.get('location'), `/search?q=${encodeURIComponent(q)}`, q);
   }
   // A destination that would currently 404 (e.g. no Secret Spots in this
   // fixture data) is never offered.
@@ -9697,12 +9701,21 @@ test('Phase 2: /api/discover over HTTP, and /browse?q redirects only when safe',
     assert.equal(res.status, 200, `${q} ends on a page`);
     assert.ok(hops <= 1, `${q}: ${hops} redirect(s)`);
   }
-  assert.equal((await fetch(`${base}/browse?q=poutine`, { redirect: 'manual' })).status, 200, 'a one-word search is served in place, not redirected to itself');
+  // A one-word search is never redirected to itself: with matching places it
+  // is served in place; with none (Stage 3.4, D2) it goes to /search.
+  assert.equal((await fetch(`${base}/browse?q=fixture`, { redirect: 'manual' })).status, 200, 'a one-word search with matches is served in place');
+  const noMatch = await fetch(`${base}/browse?q=poutine`, { redirect: 'manual' });
+  assert.equal(noMatch.status, 302);
+  assert.equal(noMatch.headers.get('location'), '/search?q=poutine', 'a one-word search with no matches goes to /search, never to itself');
   // Any parameter other than q is never intercepted (so a routed /browse URL cannot loop).
-  for (const path of ['/browse?types=winery&q=wine', '/browse?regions=penticton&features=kid_friendly', '/browse?openMap=1', '/browse']) {
+  for (const path of ['/browse?types=winery&q=wine', '/browse?regions=penticton&features=kid_friendly', '/browse']) {
     const res = await fetch(`${base}${path}`, { redirect: 'manual' });
     assert.equal(res.status, 200, path);
   }
+  // Stage 3.4: the old map deep link opens the map page.
+  const map = await fetch(`${base}/browse?openMap=1`, { redirect: 'manual' });
+  assert.equal(map.status, 302);
+  assert.equal(map.headers.get('location'), '/map');
   // With the flag on, /browse carries the region/feature pre-fill.
   const pre = await (await fetch(`${base}/browse?regions=penticton&features=kid_friendly`)).text();
   assert.ok(pre.includes("params.get('regions')") && pre.includes('"kid_friendly":"kids"'));
@@ -10682,7 +10695,8 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
       HEADER_SPEC.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: !!i.mobileOnly })), name);
     // The desktop Build My Trip button is still the header CTA.
     assert.match(nav.header, /id="navTripBtn"/, `${name}: Build My Trip button`);
-    // Map keeps its id and existing behaviour target.
+    // Map keeps its id and href (okanagan.html is frozen); Stage 3.4: the
+    // server answers /browse?openMap=1 with the map page (/map).
     assert.match(nav.header, /<a href="\/browse\?openMap=1" id="navMapLink" data-i18n="nav\.map">Map<\/a>/, name);
     // No duplicates; Hidden Gems top-level only; no Secret Spots, no top-level Golf/Map.
     const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1]));
@@ -11094,7 +11108,7 @@ test('List Your Venue: the staging table is additive and the old /browse form is
 
 const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
         <ul>
-          <li><a href="/browse#app" data-i18n="nav.appComingSoon">App coming soon</a></li>
+          <li><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
           <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
@@ -12108,7 +12122,7 @@ const ga4Check = (html, pageType, label) => {
 };
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'trip', 'venue']);
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'venue']);
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
@@ -13017,21 +13031,27 @@ test('Stage 3.2: Hero Search never rewrites a search typed with an apostrophe ("
   const get = (q) => fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
   for (const q of ["Joe's", "Murray's", "Gallagher's", "Sam's", "Chef's", "Bless'd", "Press'd", 'Joe’s', "joe's patio"]) {
     const r = await get(q);
-    assert.equal(r.status, 200, `${q}: served by /browse as typed, never redirected to its no-apostrophe form`);
     await r.text();
+    // Never rewritten into its no-apostrophe form. Stage 3.4 (D2): with no
+    // matching place (as in this fixture data), or several words, it goes to
+    // /search with the visitor's own words; otherwise /browse as typed.
+    if (r.status === 302) assert.equal(r.headers.get('location'), `/search?q=${encodeURIComponent(q)}`, q);
+    else assert.equal(r.status, 200, q);
   }
-  // Without an apostrophe nothing changes: a single typed word is still never
-  // redirected to itself, and every other request redirects exactly as before.
+  // Without an apostrophe: a single typed word is never redirected to itself
+  // (Stage 3.4: with no matching place it goes to /search), and every other
+  // request goes exactly where Hero Search routing says.
   const plain = await get('joes');
-  assert.equal(plain.status, 200);
+  assert.equal(plain.status, 302);
+  assert.equal(plain.headers.get('location'), '/search?q=joes');
   await plain.text();
   for (const q of ["Kelowna's wineries", 'kelona', 'restaurants in Kelowna']) {
-    const dest = app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+    const target = app.heroSearchTarget(q);
     const r = await get(q);
     await r.text();
-    if (dest.url) {
+    if (target.url) {
       assert.equal(r.status, 302, q);
-      assert.equal(r.headers.get('location'), dest.url, q);
+      assert.equal(r.headers.get('location'), target.url, q);
     } else assert.equal(r.status, 200, q);
   }
 })));
@@ -13122,7 +13142,7 @@ test('Stage 3.3: shared retrieval returns exactly the pre-3.3 results -- minus a
 
 test('Stage 3.3: /api/discover stays backward compatible; exclusions are reported additively', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
   const r = await (await fetch(`${base}/api/discover?q=${encodeURIComponent('restaurants but not in kelowna')}&limit=60`)).json();
-  assert.deepEqual(Object.keys(r).sort(), ['destination', 'intent', 'notApplied', 'query', 'results']);
+  assert.deepEqual(Object.keys(r).sort(), ['destination', 'intent', 'notApplied', 'presentation', 'query', 'results'], 'Stage 3.4: presentation is additive');
   assert.deepEqual(Object.keys(r.results).sort(), ['exclusions', 'items', 'kind', 'total']);
   for (const item of r.results.items) {
     assert.deepEqual(Object.keys(item).sort(), ['id', 'matchedOn', 'name', 'price', 'rating', 'region', 'reviews', 'type', 'url']);
@@ -13173,3 +13193,140 @@ test('Stage 3.3: pizza / sushi dish words, and the index is rebuilt after a data
   }
   assert.deepEqual(app.runDiscovery('pizza', { limit: 60 }).results.items.map((x) => x.id), pizzaBefore);
 });
+
+// ---- Stage 3.4 (2026-09-29): /search, Hero Search routing, Map, App coming soon ----
+test('Stage 3.4: Hero Search sends each kind of request to the right place, never a dead end', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const go = async (q) => { const r = await fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' }); await r.text(); return r.status === 302 ? r.headers.get('location') : `${r.status}`; };
+  const search = (q) => `/search?q=${encodeURIComponent(q)}`;
+  // D3: cuisine and dish words -> /search in the visitor's own words (never ?q=japanese).
+  for (const q of ['sushi', 'steak', 'pizza', 'soup', 'ramen', 'dessert', 'tapas', 'ice cream', 'italian']) assert.equal(await go(q), search(q), q);
+  // D2: several words no page can show, and exclusions (never routed to a page) -> /search.
+  for (const q of ['not wineries', 'no breweries', 'wineries but not in kelowna', "don't want anything fancy", 'restaurants in kelowna nothing fancy',
+    'cheap eats', 'date night', 'things to do', 'something fun this weekend', 'live music tonight', 'xqzvbn plorf']) assert.equal(await go(q), search(q), q);
+  // D2: one word -- /browse as typed when the directory's search finds places, /search when nothing does.
+  assert.equal(await go('fixture'), '200');
+  assert.equal(await go('beachee'), search('beachee'));
+  // D4: "open now" on Food & Drink types -> the hub's verified-hours Open Now filter.
+  assert.equal(await go('restaurants open now'), '/food-drink?types=restaurant&open=now');
+  assert.equal(await go('cafes open now in kelowna'), '/food-drink?types=cafe&regions=kelowna&open=now');
+  // Already-safe routes are unchanged.
+  assert.equal(await go('Test Trattoria'), '/kelowna/restaurants/test-trattoria');
+  assert.equal(await go('events this weekend'), '/whats-on?when=this-weekend');
+  assert.equal(await go('restaurants in Kelowna'), app.resolveDiscoveryDestination(app.interpretDiscoveryText('restaurants in Kelowna')).url);
+  // Every route ends on a real page in at most one hop.
+  for (const q of ['sushi', 'not wineries', 'restaurants open now', 'beachee', 'wineries but not in kelowna']) {
+    let url = `${base}/browse?q=${encodeURIComponent(q)}`, res = await fetch(url, { redirect: 'manual' }), hops = 0;
+    while (res.status === 302 && hops < 3) { hops++; await res.text(); url = new URL(res.headers.get('location'), base).href; res = await fetch(url, { redirect: 'manual' }); }
+    assert.equal(res.status, 200, q); assert.ok(hops <= 1, q); await res.text();
+  }
+})));
+
+test('Stage 3.4: /search shows the visitor\'s words, the interpretation, corrections and exclusions; noindex; GA4 page_type "search" only here', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const page = async (q) => { const r = await fetch(`${base}/search?q=${encodeURIComponent(q)}`); return { r, html: await r.text() }; };
+  const { r, html } = await page('wineris kelona');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-robots-tag'), 'noindex');
+  assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.doesNotMatch(html, /<link rel="canonical"/);
+  assert.equal((html.match(/page_type: '[a-z_]+'/g) || []).length, 1);
+  assert.ok(html.includes("var cfg = { page_type: 'search' };"));
+  assert.ok(html.includes('You searched “wineris kelona”'));
+  assert.ok(html.includes('We read “wineris” as “wineries”, “kelona” as “kelowna”.'));
+  assert.ok(html.includes('<strong>Wineries in Kelowna</strong>'));
+  // An exclusion is stated and applied; results never include what was ruled out.
+  const ex = await page('restaurants but not in kelowna');
+  assert.ok(ex.html.includes('Understood “not in Kelowna” and left those out.'));
+  assert.ok(!/href="\/kelowna\/restaurants\//.test(ex.html), 'no Kelowna restaurant listed');
+  // Honest empty states; an exclusion alone is never offered a directory search.
+  const only = await page('not wineries');
+  assert.ok(only.html.includes('We understood what you don’t want'));
+  assert.ok(!only.html.includes('Search the directory for'));
+  const none = await page('xqzvbn plorf');
+  assert.ok(none.html.includes('We couldn’t find any places whose name, listed cuisine or description mentions those words.'));
+  assert.ok(none.html.includes('href="/browse?q=xqzvbn%20plorf"'), 'the as-typed directory search is offered');
+  // Results explain themselves from stored fields only.
+  const it = await page('italian');
+  assert.ok(it.html.includes('Listed cuisine: Italian'));
+  // Every other template keeps its own page type; none uses "search".
+  for (const p of ['/kelowna', '/kelowna/restaurants/test-trattoria', '/trip', '/map', '/destinations']) {
+    const h = await (await fetch(base + p)).text();
+    assert.ok(!h.includes("page_type: 'search'"), p);
+  }
+  // Blank or oversized queries go to the directory, never a broken page.
+  for (const q of ['', '   ', 'x'.repeat(501)]) {
+    const res = await fetch(`${base}/search?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
+    assert.equal(res.status, 302); assert.equal(res.headers.get('location'), '/browse'); await res.text();
+  }
+})));
+
+test('Stage 3.4: with the discovery flag off, /search does not exist', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const r = await fetch(`${base}/search?q=pizza`, { redirect: 'manual' });
+  assert.notEqual(r.status, 200); await r.text();
+})));
+
+test('Stage 3.4: /api/discover gains an additive presentation block built only from closed sources', () => {
+  const p = (q) => app.runDiscovery(q).presentation;
+  assert.deepEqual(Object.keys(p('restaurants in Kelowna')).sort(), ['corrections', 'interpreted', 'notes', 'original', 'status', 'suggestions']);
+  assert.equal(p('restaurants in Kelowna').status, 'results');
+  assert.equal(p('not wineries').status, 'exclusion_only');
+  assert.deepEqual(p('not wineries').suggestions, [], 'no page is suggested for a request that is only an exclusion');
+  assert.equal(p('date night').status, 'needs_more');
+  assert.ok(p('date night').suggestions.some((s) => s.url === '/trip'));
+  assert.equal(p('xqzvbn plorf').status, 'no_match_for_words');
+  assert.deepEqual(p('wineris kelona').corrections.map((c) => c.to), ['wineries', 'kelowna']);
+  const open = p('restaurants open now');
+  assert.ok(open.suggestions.some((s) => s.url === '/food-drink?types=restaurant&open=now'));
+  for (const q of ['restaurants but not in kelowna', 'wineries but not in kelowna', 'no breweries']) {
+    for (const s of p(q).suggestions) assert.ok(!/kelowna|\/wineries|brewer/.test(s.url), `${q}: no suggestion shows what was ruled out`);
+  }
+  const events = app.runDiscovery('events this weekend');
+  assert.equal(events.presentation.status, 'events');
+});
+
+test('Stage 3.4: Map opens the map page -- on screen, with a visible close control -- from every Map control', () => withDiscoveryServer(async (base) => {
+  const r = await fetch(`${base}/map`);
+  const html = await r.text();
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-robots-tag'), 'noindex');
+  assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.match(html, /<div class="map-panel open">\s*<div id="okMap"/, 'the map panel is open from the start');
+  assert.match(html, /<a class="map-page-close" href="\/" data-map-close>&times; Close map<\/a>/);
+  assert.equal((html.match(/"c":\[/g) || []).length, app.mapAreaPins().length);
+  assert.ok(app.mapAreaPins().length >= 1);
+  for (const pin of app.mapAreaPins()) assert.ok(Array.isArray(pin.center) && pin.center.length === 2 && app.REGION_LABELS[pin.region], pin.region);
+  assert.ok(html.includes('leaflet.min.js'));
+  // The header's Map link and the old deep link both land on /map (okanagan.html stays frozen).
+  const legacy = await fetch(`${base}/browse?openMap=1`, { redirect: 'manual' });
+  assert.equal(legacy.status, 302); assert.equal(legacy.headers.get('location'), '/map'); await legacy.text();
+  for (const p of ['/', '/browse', '/trip', '/kelowna/restaurants/test-trattoria']) {
+    const h = await (await fetch(base + p)).text();
+    assert.match(h, /href="\/browse\?openMap=1" id="navMapLink"/, p);
+  }
+  // app.js stays frozen: its Map handlers send pages without the in-page map
+  // to /browse?openMap=1, which the server now answers with /map; on /browse
+  // itself the in-page map opens and its "Close the map view" toggle is no
+  // longer hidden while the map is open.
+  const browse = await (await fetch(`${base}/browse`)).text();
+  assert.ok(browse.includes("var mapOpen = !!D.querySelector('#mapPanel.open');"));
+  assert.ok(browse.includes("toHide[i].style.display = mapOpen ? '' : 'none';"));
+  assert.ok(browse.includes('if (mapOpen && !window.__roamMapShown && toHide[0]) {'), 'the opened map is brought on screen');
+  // A venue page's "View on map" is still Google Maps, in a new tab.
+  const venue = await (await fetch(`${base}/kelowna/restaurants/test-trattoria`)).text();
+  assert.match(venue, /<a class="map-link" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=[^"]+" rel="nofollow noopener" target="_blank"/);
+}));
+
+test('Stage 3.4: "App coming soon" opens the existing app teaser on every page; no app is implied', () => withDiscoveryServer(async (base) => {
+  for (const p of ['/', '/browse', '/trip', '/kelowna', '/kelowna/restaurants/test-trattoria', '/destinations', '/map']) {
+    const html = await (await fetch(base + p)).text();
+    const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
+    assert.ok(footer, p);
+    assert.ok(footer[0].includes('data-app-teaser-open'), `${p}: the footer control opens the teaser`);
+    assert.equal((html.match(/id="appTeaserDialog"/g) || []).length, 1, `${p}: exactly one teaser dialog`);
+    assert.ok(!html.includes('href="/browse#app"'), `${p}: no link to the bottom of /browse`);
+    const dialog = html.match(/<dialog class="app-teaser-dialog"[\s\S]*?<\/dialog>/)[0];
+    assert.ok(dialog.includes('This directory is becoming the Okanagan Roam app'));
+    assert.ok(dialog.includes('isn\'t available to download yet'));
+    assert.doesNotMatch(dialog, /<a\s/, 'store badges are not links; no download URL');
+    assert.doesNotMatch(dialog, /apps\.apple\.com|play\.google\.com/);
+  }
+}));
