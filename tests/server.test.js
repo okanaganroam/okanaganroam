@@ -9704,9 +9704,13 @@ test('Phase 2: /api/discover over HTTP, and /browse?q redirects only when safe',
     assert.equal(res.status, 200, `${q} ends on a page`);
     assert.ok(hops <= 1, `${q}: ${hops} redirect(s)`);
   }
-  // A one-word search is never redirected to itself: with matching places it
-  // is served in place; with none (Stage 3.4, D2) it goes to /search.
-  assert.equal((await fetch(`${base}/browse?q=fixture`, { redirect: 'manual' })).status, 200, 'a one-word search with matches is served in place');
+  // A one-word search is never redirected to itself. Stage 3.6 (2026-09-30,
+  // approved): with matching places it goes to /search too (before Stage 3.6
+  // it was served in place, status 200); with none (Stage 3.4, D2) likewise.
+  const oneWord = await fetch(`${base}/browse?q=fixture`, { redirect: 'manual' });
+  assert.equal(oneWord.status, 302, 'a one-word search with matches goes to /search');
+  assert.equal(oneWord.headers.get('location'), '/search?q=fixture');
+  await oneWord.text();
   const noMatch = await fetch(`${base}/browse?q=poutine`, { redirect: 'manual' });
   assert.equal(noMatch.status, 302);
   assert.equal(noMatch.headers.get('location'), '/search?q=poutine', 'a one-word search with no matches goes to /search, never to itself');
@@ -13219,8 +13223,9 @@ test('Stage 3.4: Hero Search sends each kind of request to the right place, neve
   // D2: several words no page can show, and exclusions (never routed to a page) -> /search.
   for (const q of ['not wineries', 'no breweries', 'wineries but not in kelowna', "don't want anything fancy", 'restaurants in kelowna nothing fancy',
     'cheap eats', 'date night', 'things to do', 'something fun this weekend', 'live music tonight', 'xqzvbn plorf']) assert.equal(await go(q), search(q), q);
-  // D2: one word -- /browse as typed when the directory's search finds places, /search when nothing does.
-  assert.equal(await go('fixture'), '200');
+  // D2 / Stage 3.6 (2026-09-30, approved): one word -> /search, whether or not
+  // places match (before Stage 3.6 a word with matches stayed on /browse, '200').
+  assert.equal(await go('fixture'), search('fixture'));
   assert.equal(await go('beachee'), search('beachee'));
   // D4: "open now" on Food & Drink types -> the hub's verified-hours Open Now filter.
   assert.equal(await go('restaurants open now'), '/food-drink?types=restaurant&open=now');
@@ -13259,7 +13264,11 @@ test('Stage 3.4: /search shows the visitor\'s words, the interpretation, correct
   assert.ok(!only.html.includes('Search the directory for'));
   const none = await page('xqzvbn plorf');
   assert.ok(none.html.includes('We couldn’t find any places whose name, listed cuisine or description mentions those words.'));
-  assert.ok(none.html.includes('href="/browse?q=xqzvbn%20plorf"'), 'the as-typed directory search is offered');
+  // Stage 3.6 (2026-09-30, approved): the directory link is plain /browse --
+  // /browse?q=<words> now comes straight back to /search (before Stage 3.6 it
+  // was href="/browse?q=xqzvbn%20plorf").
+  assert.ok(none.html.includes('href="/browse"'), 'the directory is offered');
+  assert.ok(!none.html.includes('href="/browse?q='), 'never a /browse?q= link that loops back to /search');
   // Results explain themselves from stored fields only.
   const it = await page('italian');
   assert.ok(it.html.includes('Listed cuisine: Italian'));
@@ -13397,3 +13406,31 @@ test('Stage 3.5: /search shows "Trip length and pace are used by Build My Trip, 
   assert.ok(html.includes('search can’t leave places out by a badge'));
   assert.ok(html.includes('Nothing upscale'));
 }));
+
+// ---- Stage 3.6 (2026-09-30): /browse?q bridge -----------------------------------
+test('Stage 3.6: /browse?q=<one word> goes to /search in one hop; exact names, apostrophes and every other /browse flow are unchanged', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const go = async (path) => { const r = await fetch(`${base}${path}`, { redirect: 'manual' }); await r.text(); return { status: r.status, location: r.headers.get('location') }; };
+  // One word with matches -> /search with the visitor's own words, ending on 200.
+  assert.deepEqual(await go('/browse?q=fixture'), { status: 302, location: '/search?q=fixture' });
+  const landed = await fetch(`${base}/search?q=fixture`, { redirect: 'manual' });
+  assert.equal(landed.status, 200);
+  assert.match(await landed.text(), /class="search-count"/);
+  // Exact names and apostrophes: unchanged (never rewritten into "joes").
+  assert.equal((await go(`/browse?q=${encodeURIComponent('Test Trattoria')}`)).location, '/kelowna/restaurants/test-trattoria');
+  assert.equal((await go(`/browse?q=${encodeURIComponent("Joe's")}`)).location, `/search?q=${encodeURIComponent("Joe's")}`);
+  // Every other /browse flow is served as before.
+  for (const path of ['/browse', '/browse?types=restaurant', '/browse?features=patio', '/browse?regions=kelowna', `/browse?q=fixture&types=restaurant`]) {
+    assert.equal((await go(path)).status, 200, path);
+  }
+  assert.deepEqual(await go('/browse?openMap=1'), { status: 302, location: '/map' });
+  // Zero results: the directory link is plain /browse, never /browse?q= (which now returns to /search).
+  const empty = await (await fetch(`${base}/search?q=xqzvbnplorf`)).text();
+  assert.match(empty, /href="\/browse"/);
+  assert.doesNotMatch(empty, /href="\/browse\?q=/);
+})));
+
+test('Stage 3.6: with discovery search off, /browse?q=<one word> is served in place exactly as before', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const r = await fetch(`${base}/browse?q=fixture`, { redirect: 'manual' });
+  assert.equal(r.status, 200);
+  await r.text();
+})));

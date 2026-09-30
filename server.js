@@ -3269,7 +3269,8 @@ function discoveryPresentation(run) {
     if (status === 'needs_more' && !intent.occasion && intent.mode !== 'plan') {
       for (const h of SEARCH_HUB_SUGGESTIONS) if (!suggestions.some((x) => x.url.split('?')[0] === h.url)) suggestions.push({ kind: 'page', ...h });
     }
-    if (!total && intent.textTerms.length && intent.mode !== 'events') suggestions.push({ kind: 'directory', label: `Search the directory for “${run.query.trim()}”`, url: `/browse${discoveryQueryString({ q: run.query.trim() })}` });
+    // Stage 3.6: plain /browse -- /browse?q=<words> now comes straight back to /search.
+    if (!total && intent.textTerms.length && intent.mode !== 'events') suggestions.push({ kind: 'directory', label: `Search the directory for “${run.query.trim()}”`, url: '/browse' });
   }
   return {
     original: run.query,
@@ -3288,8 +3289,9 @@ function discoveryPresentation(run) {
 //   any other request a page shows exactly -> that page (as before)
 //   "restaurants open now" -> Food & Drink's verified-hours Open Now (D4)
 //   an understood exclusion, or several words, that no page can show -> /search (D2)
-//   one word: /browse as typed when the directory's search finds places
-//     (as before); /search when nothing matches (D2)
+//   one word -> /search (Stage 3.6, 2026-09-30: the shared discovery results
+//     rather than /browse's raw substring filter, which found "low" in
+//     "follow" and nothing for "Earl's")
 // Returns { url, reason }; url null = serve /browse as typed.
 function heroSearchTarget(text) {
   const intent = interpretDiscoveryText(text);
@@ -3313,7 +3315,7 @@ function heroSearchTarget(text) {
   if (hasDiscoveryExclusion(intent.excluded)) return { url: search, reason: 'exclusion' };
   if (discoveryIntentModule().normalizeDiscoveryText(text).split(' ').filter(Boolean).length > 1) return { url: search, reason: 'multi_word' };
   const found = selectDiscoveryVenues(intent, 1).total;
-  return found > 0 ? { url: null, reason: 'browse_single_word' } : { url: search, reason: 'single_word_no_results' };
+  return { url: search, reason: found > 0 ? 'single_word' : 'single_word_no_results' };
 }
 
 // Visitor-facing sentence for one matchedOn entry (facts from stored fields only).
