@@ -639,6 +639,12 @@ function unappliedItineraryOccasion(intent) {
   const m = (intent.matched || []).find((x) => x.field === 'occasion' && x.value === intent.occasion);
   return m ? m.phrase : null;
 }
+// Stage 3.5 D6 (2026-09-30): the named places a day plan does not use (it
+// keeps at most one place per day), given the places its days use.
+function unusedPlanRegions(regions, dayRegions) {
+  if (!Array.isArray(dayRegions) || !dayRegions.length || regions.length < 2) return [];
+  return regions.filter((r) => !dayRegions.includes(r));
+}
 function buildUnderstood(intent, trip, labels, extras) {
   const i = intent || {};
   const ctx = buildContext(i, labels || {}, {});
@@ -651,6 +657,8 @@ function buildUnderstood(intent, trip, labels, extras) {
   const applied = new Set(x.appliedExclusions || []);
   const notUsed = (i.unsupported || []).filter((u) => !applied.has(u));
   if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w)) notUsed.push(w);
+  // Stage 3.5 D6: a named place the day plan did not use.
+  for (const r of unusedPlanRegions(ctx.regions, x.dayRegions)) { const l = regionLabel(ctx, r); if (!notUsed.includes(l)) notUsed.push(l); }
   const occasionNotUsed = trip && trip.multi ? unappliedItineraryOccasion(i) : null;
   if (occasionNotUsed && !notUsed.includes(occasionNotUsed)) notUsed.push(occasionNotUsed);
   return {
@@ -1341,8 +1349,14 @@ function planTrip(input) {
     const plan = buildDays(facts, ctx, days, input.pinned || null);
     result.days = plan.days;
     result.warnings = plan.warnings;
-    result.summary = buildSummary(kind, ctx, days);
-    result.overview = buildOverview(kind, ctx, days);
+    // Stage 3.5 D6 (2026-09-30): a named place no day uses (more places than
+    // days) is reported as not used, and the summary names only the places
+    // the plan uses. The days and stops are unchanged.
+    const unusedRegions = unusedPlanRegions(ctx.regions, plan.days.map((d) => d.region));
+    if (unusedRegions.length) result.unsupported = result.unsupported.concat(unusedRegions.map((r) => regionLabel(ctx, r)).filter((l) => !result.unsupported.includes(l)));
+    const shownCtx = unusedRegions.length ? { ...ctx, regions: ctx.regions.filter((r) => !unusedRegions.includes(r)) } : ctx;
+    result.summary = buildSummary(kind, shownCtx, days);
+    result.overview = buildOverview(kind, shownCtx, days);
     // Only described as a north-to-south route when there is one to describe.
     const routeRegions = uniqRegions(plan.days);
     if (!ctx.regions.length && routeRegions.length > 1) result.notes.push(`No single region was given, so the plan moves through ${listText(routeRegions.map((r) => regionLabel(ctx, r)))} from north to south.`);

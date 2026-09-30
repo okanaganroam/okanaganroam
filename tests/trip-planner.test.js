@@ -1072,3 +1072,33 @@ test('Stage 3.5 D5: an occasion a multi-part plan does not apply is reported und
   assert.equal(plan('a weekend away in Kelowna').days.length, 2);
   assert.deepEqual(d.interpretTripComponents('sushi dinner and a winery', TAXONOMY, intentOf('sushi dinner and a winery')).components.map((c) => c.meal || c.types.join('/')), ['dinner', 'winery']);
 });
+
+// ---- Stage 3.5 D6 (2026-09-30): a named place a day plan does not use is reported ----
+test('Stage 3.5 D6: a day plan reports a named place it does not use; its days and stops are unchanged; places it uses are not reported', () => {
+  const understood = (q, p) => tp.buildUnderstood(intentOf(q), null, LABELS, { dayRegions: p.days.map((x) => x.region) });
+  const one = plan('a day in Kelowna and Penticton');
+  assert.deepEqual(one.days.map((x) => x.region), ['kelowna'], 'one day keeps one place, as before');
+  assert.ok(one.days[0].stops.filter((s) => s.venue).every((s) => s.venue.region === 'kelowna'));
+  assert.ok(one.unsupported.includes('Penticton'), 'V2 lists it');
+  assert.ok(understood('a day in Kelowna and Penticton', one).notUsed.includes('Penticton'), 'V3 lists it');
+  assert.doesNotMatch(one.summary, /Penticton/, 'the summary names only the place used');
+  assert.match(one.summary, /Kelowna/);
+  // More places than days: the day plan keeps two, reports the third.
+  const three = plan('2 days in Kelowna, Penticton and Vernon');
+  assert.equal(three.days.length, 2);
+  const used = new Set(three.days.map((x) => x.region));
+  const dropped = ['kelowna', 'penticton', 'vernon'].filter((r) => !used.has(r)).map((r) => REGIONS[r]);
+  assert.equal(dropped.length, 1);
+  assert.ok(three.unsupported.includes(dropped[0]));
+  assert.ok(understood('2 days in Kelowna, Penticton and Vernon', three).notUsed.includes(dropped[0]));
+  assert.doesNotMatch(three.summary, new RegExp(dropped[0]));
+  // Every place used: nothing reported, text unchanged.
+  const both = plan('2 days in Kelowna and Penticton');
+  assert.deepEqual(both.days.map((x) => x.region).sort(), ['kelowna', 'penticton']);
+  assert.ok(!both.unsupported.includes('Penticton') && !both.unsupported.includes('Kelowna'));
+  assert.match(both.summary, /Kelowna and Penticton/);
+  assert.ok(!understood('2 days in Kelowna and Penticton', both).notUsed.some((w) => /Kelowna|Penticton/.test(w)));
+  // One place, or no day information: unchanged.
+  assert.deepEqual(plan('a day in Kelowna').unsupported, []);
+  assert.ok(!tp.buildUnderstood(intentOf('a day in Kelowna and Penticton'), null, LABELS, {}).notUsed.includes('Penticton'), 'without day places nothing is claimed');
+});

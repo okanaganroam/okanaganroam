@@ -3765,7 +3765,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     // plan.unsupported, V3 understood.notUsed).
     const appliedExclusions = appliedTripExclusions(plan, intent, taxonomy);
     if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
-    return tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions });
+    return tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).map((d) => d.region) });
   };
   if (trip.multi) {
     const planner = tripPlannerModule();
