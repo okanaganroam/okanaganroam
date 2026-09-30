@@ -881,3 +881,31 @@ test('Stage 3.5 D3: "weekend away" is a 2-day trip; "this weekend" stays a date,
     assert.equal(i.days, null, q);
   }
 });
+
+// ---- Stage 3.5 D4 (2026-09-30): an adjacent cuisine + restaurant meal is one part ----
+test('Stage 3.5 D4: "italian dinner" / "italian lunch" are one cuisine meal; supper, brunch and other forms unchanged', () => {
+  const parts = (q) => d.interpretTripComponents(q, TAXONOMY, I(q)).components.map((c) => `${c.meal || c.types.join('/')}${c.cuisines.length ? `(${c.cuisines.join(',')})` : ''}`);
+  // One part: a single request, planned as the existing cuisine list.
+  for (const [q, want] of [['italian dinner in kelowna', 'dinner(italian)'], ['italian lunch in kelowna', 'lunch(italian)']]) {
+    const trip = d.interpretTripComponents(q, TAXONOMY, I(q));
+    assert.deepEqual(parts(q), [want], q);
+    assert.equal(trip.multi, false, `${q}: one part, not a multi-part itinerary`);
+  }
+  // Multi-part: the cuisine goes to its own meal, never to a neighbour.
+  assert.deepEqual(parts('italian dinner and a winery'), ['dinner(italian)', 'winery']);
+  assert.deepEqual(parts('a winery then italian dinner'), ['winery', 'dinner(italian)']);
+  assert.deepEqual(parts('mexican lunch and italian dinner'), ['lunch(mexican)', 'dinner(italian)']);
+  assert.deepEqual(parts('lunch and an italian dinner'), ['lunch', 'dinner(italian)']);
+  // Unchanged: brunch/breakfast, non-adjacent and structurally different forms.
+  assert.deepEqual(parts('italian brunch'), ['restaurant(italian)', 'brunch']);
+  assert.deepEqual(parts('italian supper in kelowna'), ['restaurant(italian)', 'supper']);
+  assert.deepEqual(parts('a winery and italian supper'), ['winery', 'restaurant(italian)', 'supper']);
+  assert.deepEqual(parts('italian food for dinner'), ['restaurant(italian)', 'dinner']);
+  assert.deepEqual(parts('sushi for dinner'), ['restaurant(japanese)', 'dinner']);
+  assert.deepEqual(parts('italian restaurant dinner'), ['restaurant(italian)', 'dinner']);
+  assert.equal(d.interpretTripComponents('dinner italian', TAXONOMY, I('dinner italian')).multi, false);
+  // Everything else about the request is unchanged.
+  const ex = I('italian dinner but not in kelowna');
+  assert.deepEqual(ex.excluded.regions, ['kelowna']);
+  assert.deepEqual(ex.cuisines, ['italian']);
+});

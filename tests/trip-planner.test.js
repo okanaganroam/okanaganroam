@@ -998,3 +998,21 @@ test('Stage 3.5 D3: "a weekend away" plans 2 days; "this weekend" keeps its one 
   assert.equal(thisWeekend.days.length, 1);
   assert.equal(plan('a long weekend away in Kelowna').days.length, 3);
 });
+
+test('Stage 3.5 D4: "sushi dinner and a winery" is two stops -- a Japanese dinner and a winery, no extra restaurant', () => {
+  const text = 'sushi dinner and a winery in Kelowna';
+  const intent = intentOf(text);
+  const trip = d.interpretTripComponents(text, TAXONOMY, intent);
+  assert.ok(trip.multi);
+  const it = tp.planTrip({ intent, trip, tripEvents: trip.components.map(() => []), facts: FACTS, labels: LABELS });
+  const stops = (it.itinerary.stops || []).filter((s) => s.venue).map((s) => byId.get(s.venue.id));
+  assert.equal(stops.length, 2);
+  assert.equal(stops.filter((v) => v.type === 'restaurant').length, 1, 'one dinner, not two restaurants');
+  assert.equal(stops.find((v) => v.type === 'restaurant').cuisine, 'japanese');
+  assert.ok(stops.some((v) => v.type === 'winery'));
+  assert.ok(stops.every((v) => v.region === 'kelowna'));
+  // D1/D2/D3 unchanged alongside it.
+  assert.ok(!stopVenues(plan('a weekend in Kelowna, no wineries')).some((v) => v.type === 'winery'));
+  assert.equal(tp.buildUnderstood(intentOf('3 relaxed days in Kelowna'), null, LABELS, {}).pace, 'relaxed');
+  assert.equal(plan('a weekend away in Kelowna').days.length, 2);
+});

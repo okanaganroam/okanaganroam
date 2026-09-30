@@ -1489,6 +1489,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   let listStart = 0;         // first part of the current coordinated list
   let lastEnd = -1;
   let pendingDaypart = null;
+  let pendingCuisines = null; // Stage 3.5 D4: "italian" waiting for its "dinner"
   const applyMod = (c, m) => {
     if (c.kind !== 'venue') return;
     if (m.field === 'dog') c.dog = true;
@@ -1551,7 +1552,11 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
       newComp(hit, { kind: 'event', event: { kind: k.kind, category: k.category && t.eventCategories.includes(k.category) ? k.category : null, terms: k.terms.slice(), noun: k.noun, venueFeature: k.venueFeature || null } });
       continue;
     }
-    if (meal) { newComp(hit, { types: TRIP_MEALS[meal].types.filter((ty) => t.types.includes(ty)), meal, daypart: TRIP_MEALS[meal].daypart }); continue; }
+    if (meal) {
+      const c = newComp(hit, { types: TRIP_MEALS[meal].types.filter((ty) => t.types.includes(ty)), meal, daypart: TRIP_MEALS[meal].daypart });
+      if (pendingCuisines) { for (const q of pendingCuisines) if (!c.cuisines.includes(q)) c.cuisines.push(q); pendingCuisines = null; }
+      continue;
+    }
     if (types.length) {
       const c = newComp(hit, { types: uniq(types) });
       if (features.includes('dog_friendly')) c.dog = true; // "dog beach"
@@ -1561,6 +1566,15 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     if (activities.length) { newComp(hit, { types: ['outdoor'], activities: uniq(activities) }); continue; }
     const cuisines = fieldsOf(hit, 'cuisine');
     if (cuisines.length) {
+      // Stage 3.5 D4 (2026-09-30): a cuisine right before a restaurant meal
+      // ("italian dinner", "mexican lunch") is that one meal, not a second
+      // restaurant part. Only lunch and dinner, and only when the two words
+      // are adjacent; breakfast, brunch and supper (which a one-part request
+      // would search for as a word) and forms like "sushi for dinner" are
+      // unchanged.
+      const next = accepted[h + 1];
+      const nextMeal = next && next.start === hit.end ? (fieldsOf(next, 'tripMeal')[0] || (TRIP_MEALS[next.phrase] ? next.phrase : null)) : null;
+      if (nextMeal === 'lunch' || nextMeal === 'dinner') { pendingCuisines = uniq(cuisines); continue; }
       const prev = comps[comps.length - 1];
       if (prev && prev.kind === 'venue' && prev.types.includes('restaurant') && between(lastEnd, hit.start).length <= 1) { prev.cuisines.push(...cuisines); continue; }
       newComp(hit, { types: ['restaurant'], cuisines: uniq(cuisines) });
