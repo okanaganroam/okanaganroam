@@ -3363,7 +3363,9 @@ function renderSearchPage(run) {
   const title = `Search: ${q.length > 60 ? q.slice(0, 60) + '…' : q} | Okanagan Roam`;
   const correctionText = p.corrections.length
     ? `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>` : '';
-  const notes = p.notes.map((n) => discoveryNoteText(n, labels)).filter(Boolean);
+  // Stage 3.5: a sentence is shown once ("Trip length and pace are used by
+  // Build My Trip, not search." covers both the length and the pace note).
+  const notes = p.notes.map((n) => discoveryNoteText(n, labels)).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   let resultsHtml = '';
   if (run.results.kind === 'events' && items.length) {
@@ -3722,6 +3724,24 @@ function selectTripEvents(component, regions, when, now = new Date()) {
   };
 }
 
+// Stage 3.5 (2026-09-29): the planner applies the visitor's exclusions (see
+// eligible() in trip-planner.js), so a "not ..." clause it applied in full is
+// no longer listed as "not used". Each clause is re-read on its own with the
+// same interpreter and checked against the /search rules; a clause with any
+// unapplied part ("without kids", "no alcohol") stays listed, and nothing is
+// claimed when no venue plan was made.
+function appliedTripExclusions(plan, intent, taxonomy) {
+  const phrases = (intent.excluded && intent.excluded.phrases) || [];
+  if (!phrases.length || ['unknown', 'navigate', 'events'].includes(plan.kind)) return [];
+  const di = discoveryIntentModule(), ds = discoverySearchModule();
+  const whole = ds.exclusionPlan(intent.excluded).applied.map((a) => `${a.field}:${a.value}`);
+  const phraseTable = di.buildPhraseTable(taxonomy);
+  return phrases.filter((phrase) => {
+    const own = ds.exclusionPlan(di.interpretDiscoveryQuery(phrase, taxonomy, { phraseTable }).excluded);
+    return own.applied.length > 0 && own.notApplied.length === 0 && own.applied.every((a) => whole.includes(`${a.field}:${a.value}`));
+  });
+}
+
 function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null }, now = new Date()) {
   const taxonomy = buildDiscoveryTaxonomy();
   const intent = discoveryIntentModule().interpretDiscoveryQuery(text, taxonomy);
@@ -3740,7 +3760,13 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       if (trip.multi && !trip.route) trip.regions = regions;
     }
   }
-  const understood = (plan) => tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null });
+  const understood = (plan) => {
+    // Stage 3.5: applied exclusions leave both "not used" lists (V2 shows
+    // plan.unsupported, V3 understood.notUsed).
+    const appliedExclusions = appliedTripExclusions(plan, intent, taxonomy);
+    if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
+    return tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions });
+  };
   if (trip.multi) {
     const planner = tripPlannerModule();
     const eventRegions = trip.route ? planner.routeRegions(trip.route.from, trip.route.to) : trip.regions;

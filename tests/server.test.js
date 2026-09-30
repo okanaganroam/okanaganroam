@@ -13006,7 +13006,20 @@ test('Stage 3.1: negated requests never route to the page they rule out; search 
   assert.ok(d.notApplied.some((n) => n.field === 'unsupported' && n.value === 'not in kelowna'), 'reported as not applied');
   const plan = app.runTripPlan({ text: "We don't want anything fancy and can't miss the wineries." });
   assert.notEqual(plan.overview && plan.overview.budget, 'upscale', '"nothing fancy" is never an upscale preference');
-  assert.ok(plan.understood.notUsed.includes('not fancy'), 'the planner names what it did not apply');
+  // Stage 3.5 (2026-09-29, approved PD1): the planner now APPLIES "nothing
+  // fancy" -- a stored price of 4 is left out, nothing else (see the
+  // trip-planner.test.js eligibility test) -- so it is no longer "not used".
+  // Before Stage 3.5 this asserted notUsed.includes('not fancy').
+  assert.equal(plan.intent.budget, null, '"nothing fancy" is never a positive budget');
+  assert.equal(app.interpretDiscoveryText("We don't want anything fancy and can't miss the wineries.").excluded.budget, 'upscale');
+  assert.ok(!plan.understood.notUsed.includes('not fancy'), 'applied, so no longer listed as not used');
+  assert.ok(!plan.unsupported.includes('not fancy'), 'nor on the V2 page');
+  const stops = [...plan.days.flatMap((x) => x.stops), ...(plan.outing ? plan.outing.stops : []), ...plan.recommendations].filter((s) => s.venue);
+  assert.ok(stops.every((s) => s.venue.price !== 4), 'no price-4 stop');
+  // What the planner does not apply is still named: "without kids".
+  const kids = app.runTripPlan({ text: 'wineries without kids' });
+  assert.ok(kids.understood.notUsed.includes('without kids'), 'the planner names what it did not apply');
+  assert.ok(kids.unsupported.includes('without kids'));
   assert.ok(plan.understood.interests.includes('wineries'));
 });
 
@@ -13367,4 +13380,20 @@ test('Stage 3.4.1: /browse "Read more" measures only displayed descriptions near
   // The homepage runs the same script without the pre-fill and is unaffected.
   const home = await (await fetch(`${base}/`)).text();
   assert.ok(!home.includes('window.__roamPrefillPending = true;'));
+}));
+
+// ---- Stage 3.5 (2026-09-29): /search shows each note sentence once ------------
+test('Stage 3.5: /search shows "Trip length and pace are used by Build My Trip, not search." once, for length and pace together', () => withDiscoveryFlag('on', () => {
+  const SENTENCE = 'Trip length and pace are used by Build My Trip, not search.';
+  const count = (q) => app.renderSearchPage(app.runDiscovery(q)).split(SENTENCE).length - 1;
+  for (const q of ['a relaxed 3-day trip in Kelowna', 'a packed 2 day trip in Vernon', '3 relaxed days in Kelowna', 'a busy day in Kelowna']) {
+    const p = app.runDiscovery(q).presentation;
+    assert.equal(p.notes.filter((n) => n.field === 'days' || n.field === 'pace').length, 2, `${q}: both notes are still in the data`);
+    assert.equal(count(q), 1, `${q}: the sentence is shown once`);
+  }
+  assert.equal(count('3 days in Kelowna'), 1, 'a length alone: unchanged');
+  // Different sentences are all still shown.
+  const html = app.renderSearchPage(app.runDiscovery('wineries without kids in kelowna, nothing fancy'));
+  assert.ok(html.includes('search can’t leave places out by a badge'));
+  assert.ok(html.includes('Nothing upscale'));
 }));

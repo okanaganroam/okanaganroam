@@ -272,6 +272,10 @@ const QUANTITY_PHRASES = ['a couple of', 'couple of', 'a few', 'a bunch of', 'a 
 const LAKE_WORDS = ['lake', 'lakes', 'lakeside', 'lakefront', 'waterfront', 'water'];
 // Pace words inside a one-day theme ("one relaxed day").
 const THEME_PACE_WORDS = { relaxed: 'relaxed', relaxing: 'relaxed', easy: 'relaxed', lazy: 'relaxed', leisurely: 'relaxed', chill: 'relaxed', packed: 'packed', busy: 'packed', full: 'packed' };
+// Stage 3.5 (2026-09-29): pace words inside the trip's own length phrase ("3
+// relaxed days", "a busy day"). "full" is left out: "a full day" usually
+// means a whole day, not a packed one.
+const LENGTH_PACE_WORDS = { relaxed: 'relaxed', relaxing: 'relaxed', easy: 'relaxed', lazy: 'relaxed', leisurely: 'relaxed', chill: 'relaxed', packed: 'packed', busy: 'packed' };
 
 const DAY_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, a: 1 };
 const LENGTH_PHRASES = [
@@ -945,6 +949,14 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     }
   }
   for (const l of lengths) intent.matched.push({ phrase: l.phrase, field: 'days', value: l.days });
+  // Stage 3.5: the length phrase claims its pace word ("3 relaxed days"), so
+  // the word is read here as a pace mention. A one-day theme inside a longer
+  // trip ("one relaxed day") starts a theme window below, so its mention is
+  // left to that day exactly as before.
+  for (const l of lengths) {
+    const word = l.phrase.split(' ').find((x) => LENGTH_PACE_WORDS[x]);
+    if (word && t.paces.includes(LENGTH_PACE_WORDS[word])) paceMentions.push({ value: LENGTH_PACE_WORDS[word], start: l.start, phrase: l.phrase });
+  }
 
   // 4. Leftover meaningful words become text terms (e.g. "poutine"). They
   // are the visitor's own words, searched later against venue text; never

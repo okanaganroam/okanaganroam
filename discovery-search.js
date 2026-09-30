@@ -171,4 +171,4 @@ function searchVenues(intent, venues) {
   return { total: scored.length, items: scored.map(({ venue, matchedOn }) => ({ venue, matchedOn })), exclusions: plan };
 }
 
-module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
+module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };

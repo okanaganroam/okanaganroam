@@ -105,7 +105,9 @@ function hasCoords(v) { return v && Number.isFinite(v.lat) && Number.isFinite(v.
 function kmBetween(a, b) { return hasCoords(a) && hasCoords(b) ? haversineKm(a.lat, a.lng, b.lat, b.lng) : null; }
 // Stage 3.3: whole-word matching and the food rule come from the shared
 // retrieval module (discovery-search.js) -- the same functions, unchanged.
-const { textHas, foodMatch } = require('./discovery-search.js');
+// Stage 3.5 (2026-09-29): so do the visitor's exclusions ("not in Kelowna",
+// "no wineries", "nothing fancy"), applied exactly as /search applies them.
+const { textHas, foodMatch, exclusionPlan, isExcluded } = require('./discovery-search.js');
 // Deterministic per-(seed, venue) jitter in [0, 1): regeneration variety
 // without randomness.
 function jitter(seed, id) {
@@ -308,6 +310,9 @@ function buildContext(intent, labels, options) {
     pace,
     seed: Number.isInteger(opts.seed) ? opts.seed : 0,
     exclude: new Set(opts.excludeIds || []),
+    // Stage 3.5: what the visitor ruled out, split into what is applied and
+    // what is not (discovery-search.js exclusionPlan -- the /search rules).
+    exclusions: exclusionPlan(intent.excluded),
     avoid: new Set(opts.avoidIds || []),
     // The weekday of day 1 when the request named a date ("tonight", "this
     // weekend", "Saturday"); null otherwise, so hours are judged across the week.
@@ -466,6 +471,11 @@ function collectionLabel(ctx, c) { return (ctx.labels.collections && ctx.labels.
 // and only the safety rules below are hard.
 function eligible(v, ctx, strict) {
   if (ctx.exclude.has(v.id)) return false;
+  // Stage 3.5: an applied exclusion is a hard rule in every kind of plan.
+  // Only the kinds /search applies (types, regions, stored cuisines, curated
+  // lists, activities, and "nothing fancy" = a stored price of 4); "without
+  // kids", "no alcohol" and the like stay unapplied and are reported.
+  if (ctx.exclusions.applied.length && isExcluded(v, ctx.exclusions)) return false;
   // Step 1 (2026-09-29): a current advisory that says the place is closed or
   // under an evacuation order takes it out of every plan (itineraries
   // already did this; day plans, outings and recommendations now do too).
@@ -628,7 +638,9 @@ function buildUnderstood(intent, trip, labels, extras) {
   if (ctx.kids) party.push('with kids');
   if (ctx.dog) party.push('with a dog');
   const regions = (trip && trip.multi && trip.regions && trip.regions.length ? trip.regions : ctx.regions);
-  const notUsed = (i.unsupported || []).slice();
+  // Stage 3.5: an exclusion the plan applied is no longer "not used".
+  const applied = new Set(x.appliedExclusions || []);
+  const notUsed = (i.unsupported || []).filter((u) => !applied.has(u));
   if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w)) notUsed.push(w);
   return {
     kind: x.kind || null,
@@ -1889,6 +1901,8 @@ function planItinerary(input) {
       regions, types: c.types, activities: c.activities || [], collections: c.collections || [], features: c.features || [],
       foodTerms: (c.cuisines || []).map((q) => ({ term: q, cuisine: q })), party: { dog: !!c.dog, kids: !!c.kids },
       occasion: null, when, superlative: false,
+      // Stage 3.5: the request's exclusions hold for every part.
+      excluded: intent.excluded,
     };
     const ctx = buildContext(ci, labels, { ...input, startWeekday: pairWithEvent && anchor.weekday ? anchor.weekday : input.startWeekday });
     const scored = [];

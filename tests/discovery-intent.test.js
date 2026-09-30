@@ -825,3 +825,29 @@ test('Stage 3.2: every real venue name (the 812-name seed corpus) still matches 
   }
   assert.ok(checked > 700, `${checked} venue names checked`);
 });
+
+// ---- Stage 3.5 (2026-09-29): pace inside a trip-length phrase ---------------------
+test('Stage 3.5: a pace word inside the trip length is the trip pace ("3 relaxed days"); "full" is not a pace; day themes unchanged', () => {
+  for (const [q, days, pace] of [
+    ['3 relaxed days in Kelowna', 3, 'relaxed'], ['3 relaxed days in Kelowna with wine and hidden gems', 3, 'relaxed'],
+    ['a relaxing day in Kelowna', 1, 'relaxed'], ['a chill day in Penticton', 1, 'relaxed'], ['2 easy days around Vernon', 2, 'relaxed'],
+    ['a lazy day in Naramata', 1, 'relaxed'], ['two leisurely days in Penticton', 2, 'relaxed'],
+    ['three packed days of golf', 3, 'packed'], ['a busy day in Kelowna', 1, 'packed'],
+  ]) {
+    const i = I(q);
+    assert.equal(i.days, days, q);
+    assert.equal(i.pace, pace, q);
+  }
+  // "full" usually means a whole day; other adjectives are not paces.
+  for (const q of ['a full day in Kelowna', 'three full days in Kelowna', 'a fun day in Kelowna', '3 amazing days in Kelowna']) assert.equal(I(q).pace, null, q);
+  // A one-day theme inside a longer trip stays that day's theme, not the trip pace.
+  const themed = I('Plan a 3 day golf trip to Kelowna with one relaxed day');
+  assert.equal(themed.days, 3);
+  assert.equal(themed.pace, null);
+  assert.equal(themed.dayThemes.length, 1);
+  assert.equal(themed.dayThemes[0].pace, 'relaxed');
+  // Pace words elsewhere keep working exactly as before.
+  assert.equal(I('a relaxed trip to Kelowna').pace, 'relaxed');
+  assert.equal(I('a packed 2 day trip in Vernon').pace, 'packed');
+  assert.deepEqual(I('relaxed but packed days').conflicts, [{ field: 'pace', values: ['relaxed', 'packed'] }]);
+});

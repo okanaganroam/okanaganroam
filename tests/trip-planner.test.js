@@ -905,3 +905,82 @@ test('Phase 2 contextNotes: the occasion and kids notes the visitor asked for, a
   assert.deepEqual(plan('Plan a golf weekend around Kelowna.').contextNotes, []);
   for (const n of plan('cheap eats in Kelowna').contextNotes) assert.doesNotMatch(n, /Budget ranks/, 'the budget note stays secondary');
 });
+
+// ---- Stage 3.5 (2026-09-29): exclusions ---------------------------------------
+// The visitor's exclusions are applied in every kind of plan, with the same
+// shared rules /search uses (discovery-search.js exclusionPlan/isExcluded).
+const stopIds = (p) => allStops(p).map((s) => s.venue.id);
+const stopVenues = (p) => allStops(p).map((s) => byId.get(s.venue.id) || s.venue);
+
+test('Stage 3.5: "nothing fancy" leaves out a stored price of 4 only -- price 3 and unpriced venues stay eligible', () => {
+  const facts = [
+    fact({ id: 9001, name: 'Kelowna Price Four Room', region: 'kelowna', type: 'restaurant', price: 4, rating: 4.9 }),
+    fact({ id: 9002, name: 'Kelowna Price Three Kitchen', region: 'kelowna', type: 'restaurant', price: 3, rating: 4.5 }),
+    fact({ id: 9003, name: 'Kelowna Unpriced Diner', region: 'kelowna', type: 'restaurant', rating: 4.4 }),
+  ];
+  const run = (q) => tp.planTrip({ intent: intentOf(q), facts, labels: LABELS }).recommendations.map((s) => s.venue.id).sort();
+  assert.deepEqual(run('restaurants in Kelowna'), [9001, 9002, 9003]);
+  assert.deepEqual(run('restaurants in Kelowna, nothing fancy'), [9002, 9003]);
+  assert.deepEqual(run("restaurants in Kelowna, I don't want anything fancy"), [9002, 9003]);
+  const i = intentOf('restaurants in Kelowna, nothing fancy');
+  assert.equal(i.budget, null, 'never a positive "cheap" budget');
+  assert.equal(i.excluded.budget, 'upscale');
+});
+
+test('Stage 3.5: each applied exclusion kind is a hard rule -- regions, types, stored cuisines, curated lists, activities', () => {
+  const cases = [
+    ['wineries', 'wineries but not in Kelowna', (v) => v.region === 'kelowna'],
+    ['restaurants', 'restaurants but not japanese', (v) => v.cuisine === 'japanese'],
+    ['wineries', 'wineries but not hidden gems', (v) => v.collections.includes('hidden_gem')],
+    ['outdoor places', 'outdoor places but no hiking', (v) => v.activities.includes('hiking')],
+  ];
+  for (const [control, q, ruledOut] of cases) {
+    assert.ok(stopVenues(plan(control)).some(ruledOut), `${control}: the control includes what "${q}" rules out`);
+    const p = plan(q);
+    assert.ok(allStops(p).length > 0, `${q}: still a plan`);
+    assert.ok(!stopVenues(p).some(ruledOut), `${q}: nothing it ruled out`);
+  }
+});
+
+test('Stage 3.5: exclusions hold in day plans, multi-day plans, outings and multi-part itineraries, and beat occasion picks', () => {
+  const noType = (q, type) => {
+    const p = plan(q);
+    assert.ok(allStops(p).length > 0, `${q}: still a plan`);
+    assert.ok(!stopVenues(p).some((v) => v.type === type), `${q}: no ${type}`);
+  };
+  assert.ok(stopVenues(plan('3 days in Kelowna')).some((v) => v.type === 'winery'), 'control: a Kelowna trip has wineries');
+  noType('3 days in Kelowna, no wineries', 'winery');
+  noType('a day in Kelowna, no wineries', 'winery');
+  assert.ok(stopVenues(plan('a romantic weekend in Kelowna')).some((v) => v.type === 'winery'), 'control: romance favours wineries');
+  noType('a romantic weekend in Kelowna with no wineries', 'winery');
+  assert.equal(tp.classifyPlanRequest(intentOf('date night in kelowna, no cocktail bars')), 'outing');
+  noType('date night in kelowna, no cocktail bars', 'cocktail');
+  // A multi-part itinerary: every part keeps the request's exclusions.
+  const text = 'a winery and dinner but not in Kelowna';
+  const intent = intentOf(text);
+  const trip = d.interpretTripComponents(text, TAXONOMY, intent);
+  assert.ok(trip.multi);
+  const it = tp.planTrip({ intent, trip, tripEvents: trip.components.map(() => []), facts: FACTS, labels: LABELS });
+  const stops = (it.itinerary.stops || []).filter((s) => s.venue);
+  assert.ok(stops.length >= 2);
+  assert.ok(!stops.some((s) => s.venue.region === 'kelowna'), 'no part in Kelowna');
+});
+
+test('Stage 3.5: exclusions the planner does not apply stay unapplied -- "without kids", "no alcohol", other budgets', () => {
+  for (const [control, q] of [['wineries', 'wineries without kids'], ['wineries', 'wineries, no alcohol'], ['wineries', 'wineries that are not cheap'], ['restaurants in Kelowna', 'restaurants in Kelowna without kids']]) {
+    assert.deepEqual(stopIds(plan(q)), stopIds(plan(control)), `${q}: same picks as "${control}"`);
+  }
+  assert.deepEqual(intentOf('wineries without kids').excluded.features, ['kid_friendly']);
+  assert.ok(tp.buildUnderstood(intentOf('wineries without kids'), null, LABELS, {}).notUsed.includes('without kids'));
+  // Only a clause the caller says was applied leaves "not used".
+  const i = intentOf('wineries but not in Kelowna');
+  assert.ok(tp.buildUnderstood(i, null, LABELS, {}).notUsed.includes('not in kelowna'));
+  assert.ok(!tp.buildUnderstood(i, null, LABELS, { appliedExclusions: ['not in kelowna'] }).notUsed.includes('not in kelowna'));
+});
+
+test('Stage 3.5: "3 relaxed days in Kelowna" plans at a relaxed pace (the /trip example prompt)', () => {
+  assert.equal(tp.buildUnderstood(intentOf('3 relaxed days in Kelowna'), null, LABELS, {}).pace, 'relaxed');
+  assert.equal(tp.buildUnderstood(intentOf('a busy day in Kelowna'), null, LABELS, {}).pace, 'packed');
+  assert.equal(tp.buildUnderstood(intentOf('a full day in Kelowna'), null, LABELS, {}).pace, 'standard', '"full" is not a pace');
+  assert.match(plan('3 relaxed days in Kelowna').headline, /relaxed/i);
+});
