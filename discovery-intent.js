@@ -281,6 +281,10 @@ const DAY_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7
 const LENGTH_PHRASES = [
   { phrase: 'long weekend', days: 3 },
   { phrase: 'weekend', days: 2 },
+  // Stage 3.5 D3 (2026-09-30): "weekend away" is also a plan phrase, which
+  // claimed "weekend" before its length was read; it is a 2-day trip like
+  // "weekend getaway" and "weekend trip" already are.
+  { phrase: 'weekend away', days: 2 },
   { phrase: 'day trip', days: 1 },
   { phrase: 'a week', days: 7 },
   { phrase: 'one week', days: 7 },

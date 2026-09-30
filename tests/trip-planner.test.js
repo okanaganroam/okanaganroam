@@ -984,3 +984,17 @@ test('Stage 3.5: "3 relaxed days in Kelowna" plans at a relaxed pace (the /trip 
   assert.equal(tp.buildUnderstood(intentOf('a full day in Kelowna'), null, LABELS, {}).pace, 'standard', '"full" is not a pace');
   assert.match(plan('3 relaxed days in Kelowna').headline, /relaxed/i);
 });
+
+test('Stage 3.5 D3: "a weekend away" plans 2 days; "this weekend" keeps its one dated day', () => {
+  const away = plan('a weekend away in Kelowna');
+  assert.equal(away.kind, 'multi_day');
+  assert.equal(away.days.length, 2);
+  assert.ok(away.days.every((x) => x.region === 'kelowna'));
+  const noWine = plan('a weekend away in Kelowna, no wineries');
+  assert.equal(noWine.days.length, 2);
+  assert.ok(!stopVenues(noWine).some((v) => v.type === 'winery'), 'exclusions still hold on both days');
+  const thisWeekend = plan('plan this weekend in Kelowna', { startWeekday: 'sat' });
+  assert.equal(thisWeekend.kind, 'day_plan');
+  assert.equal(thisWeekend.days.length, 1);
+  assert.equal(plan('a long weekend away in Kelowna').days.length, 3);
+});

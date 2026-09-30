@@ -851,3 +851,33 @@ test('Stage 3.5: a pace word inside the trip length is the trip pace ("3 relaxed
   assert.equal(I('a packed 2 day trip in Vernon').pace, 'packed');
   assert.deepEqual(I('relaxed but packed days').conflicts, [{ field: 'pace', values: ['relaxed', 'packed'] }]);
 });
+
+// ---- Stage 3.5 D3 (2026-09-30): "weekend away" is a 2-day trip -------------------
+test('Stage 3.5 D3: "weekend away" is a 2-day trip; "this weekend" stays a date, "next weekend" unsupported, "long weekend away" 3 days', () => {
+  for (const q of ['weekend away', 'a weekend away', 'a quiet weekend away', 'weekend away in Kelowna', 'a romantic weekend away', 'weekend away with the kids']) {
+    const i = I(q);
+    assert.equal(i.mode, 'plan', q);
+    assert.equal(i.days, 2, q);
+    assert.ok(!i.needs.includes('days'), `${q}: no longer needs a length`);
+  }
+  assert.equal(I('a relaxed weekend away').pace, 'relaxed');
+  assert.equal(I('a busy weekend away').pace, 'packed');
+  assert.deepEqual(I('weekend away with no wineries').excluded.types, ['winery']);
+  // Unchanged: phrases that were already 2 days, and "long weekend".
+  for (const [q, days] of [['weekend getaway', 2], ['a weekend trip', 2], ['weekend', 2], ['a weekend in Kelowna', 2], ['winter weekend', 2], ['weekend with kids', 2], ['relaxed weekend in Kelowna', 2], ['relaxing weekend', 2], ['a long weekend away', 3], ['a long weekend in Penticton', 3]]) {
+    assert.equal(I(q).days, days, q);
+  }
+  // "this weekend" is a date, never a length.
+  for (const q of ['this weekend', 'wineries this weekend', 'plan this weekend in Kelowna']) {
+    const i = I(q);
+    assert.deepEqual(i.when, { preset: 'this-weekend' }, q);
+    assert.equal(i.days, null, q);
+  }
+  // "next weekend" stays unsupported: no date, no length.
+  for (const q of ['next weekend', 'plan a trip next weekend']) {
+    const i = I(q);
+    assert.ok(i.unsupported.includes('next weekend'), q);
+    assert.equal(i.when, null, q);
+    assert.equal(i.days, null, q);
+  }
+});
