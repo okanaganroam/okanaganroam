@@ -1016,3 +1016,59 @@ test('Stage 3.5 D4: "sushi dinner and a winery" is two stops -- a Japanese dinne
   assert.equal(tp.buildUnderstood(intentOf('3 relaxed days in Kelowna'), null, LABELS, {}).pace, 'relaxed');
   assert.equal(plan('a weekend away in Kelowna').days.length, 2);
 });
+
+// ---- Stage 3.5 D5 (2026-09-30): multi-part plans keep the budget; an unused occasion is reported ----
+function itinerary(text) {
+  const intent = intentOf(text);
+  const trip = d.interpretTripComponents(text, TAXONOMY, intent);
+  assert.ok(trip.multi, `${text}: a multi-part request`);
+  const p = tp.planTrip({ intent, trip, tripEvents: trip.components.map(() => []), facts: FACTS, labels: LABELS });
+  const stops = (p.itinerary.stops || []).filter((s) => s.venue);
+  return { intent, trip, p, stops, venues: stops.map((s) => byId.get(s.venue.id)), understood: tp.buildUnderstood(intent, trip, LABELS, {}) };
+}
+
+test('Stage 3.5 D5: the request budget ranks every part of a multi-part plan, as in a single plan', () => {
+  const plain = itinerary('dinner and a winery in Kelowna');
+  const upscale = itinerary('an upscale dinner and a winery in Kelowna');
+  const dinner = (r) => r.venues.find((v) => v.type === 'restaurant');
+  assert.ok(dinner(plain).price < 3, 'control: without a budget the dinner is not an upscale place');
+  assert.ok(dinner(upscale).price >= 3, 'an upscale dinner ranks a known price of 3-4 first');
+  const cheap = itinerary('a cheap dinner and a winery in Kelowna');
+  assert.ok(dinner(cheap).price <= 2);
+  assert.ok(cheap.stops.find((s) => byId.get(s.venue.id).type === 'restaurant').reasons.some((r) => r.code === 'budget'), 'the budget reason is shown');
+  // Unpriced places are never excluded: the winery part still has its winery.
+  assert.ok(upscale.venues.some((v) => v.type === 'winery'));
+  assert.ok(cheap.venues.some((v) => v.type === 'winery'));
+  // "nothing fancy" is still only the upscale exclusion (D1), never a budget.
+  const plainFancy = itinerary('a winery and dinner in Kelowna, nothing fancy');
+  assert.equal(plainFancy.intent.budget, null);
+  assert.ok(plainFancy.venues.every((v) => v.price !== 4));
+});
+
+test('Stage 3.5 D5: an occasion a multi-part plan does not apply is reported under Not used, never shown as understood; stops unchanged', () => {
+  const withOcc = itinerary('lunch and a winery in Kelowna for a birthday');
+  const without = itinerary('lunch and a winery in Kelowna');
+  assert.deepEqual(withOcc.stops.map((s) => s.venue.id), without.stops.map((s) => s.venue.id), 'the same stops');
+  assert.equal(withOcc.understood.occasion, null);
+  assert.ok(withOcc.understood.notUsed.includes('birthday'));
+  assert.ok(withOcc.p.unsupported.includes('birthday'), 'V2 lists it too');
+  // The parser's own phrase is kept ("birthday dinner").
+  assert.ok(itinerary('a birthday dinner and a winery in Kelowna').understood.notUsed.includes('birthday dinner'));
+  // Two phrases for one occasion: the first matched one is reported, once.
+  const rainy = itinerary('coffee and dinner in Kelowna on a rainy day, somewhere indoor');
+  assert.equal(rainy.understood.notUsed.filter((w) => w === 'rainy day' || w === 'indoor').length, 1);
+  assert.ok(rainy.understood.notUsed.includes('rainy day'));
+  // Family is applied through the kids rules, so it stays understood.
+  const family = itinerary('coffee and a beach in Kelowna with the family');
+  assert.equal(family.understood.occasion, 'family trip');
+  assert.ok(!family.understood.notUsed.includes('family'));
+  assert.ok(family.trip.components.every((c) => c.kids));
+  // Single plans, outings and day plans keep their occasion exactly as before.
+  assert.equal(tp.buildUnderstood(intentOf('a birthday dinner in Kelowna'), null, LABELS, {}).occasion, 'celebration');
+  assert.equal(tp.buildUnderstood(intentOf('a romantic dinner and a winery'), null, LABELS, {}).occasion, 'romantic outing');
+  assert.ok(!tp.buildUnderstood(intentOf('a birthday dinner in Kelowna'), null, LABELS, {}).notUsed.includes('birthday dinner'));
+  // D2/D3/D4 unchanged alongside it.
+  assert.equal(tp.buildUnderstood(intentOf('3 relaxed days in Kelowna'), null, LABELS, {}).pace, 'relaxed');
+  assert.equal(plan('a weekend away in Kelowna').days.length, 2);
+  assert.deepEqual(d.interpretTripComponents('sushi dinner and a winery', TAXONOMY, intentOf('sushi dinner and a winery')).components.map((c) => c.meal || c.types.join('/')), ['dinner', 'winery']);
+});

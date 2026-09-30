@@ -630,6 +630,15 @@ function publicVenue(v, ctx) {
 // planner read it, in visitor words, for the editable chips on /trip. Built
 // only from the interpreted request and the site's own labels -- it names no
 // venue and states no venue fact.
+// Stage 3.5 D5 (2026-09-30): a multi-part plan does not apply an occasion to
+// its parts (family does apply, through the kids rules), so the occasion is
+// reported as not used instead of shown as understood. The visitor's own
+// phrase is used -- the first of the parser's matched phrases for it.
+function unappliedItineraryOccasion(intent) {
+  if (!intent || !intent.occasion || intent.occasion === 'family') return null;
+  const m = (intent.matched || []).find((x) => x.field === 'occasion' && x.value === intent.occasion);
+  return m ? m.phrase : null;
+}
 function buildUnderstood(intent, trip, labels, extras) {
   const i = intent || {};
   const ctx = buildContext(i, labels || {}, {});
@@ -642,6 +651,8 @@ function buildUnderstood(intent, trip, labels, extras) {
   const applied = new Set(x.appliedExclusions || []);
   const notUsed = (i.unsupported || []).filter((u) => !applied.has(u));
   if (trip && trip.multi) for (const w of trip.leftoverTerms || []) if (!notUsed.includes(w)) notUsed.push(w);
+  const occasionNotUsed = trip && trip.multi ? unappliedItineraryOccasion(i) : null;
+  if (occasionNotUsed && !notUsed.includes(occasionNotUsed)) notUsed.push(occasionNotUsed);
   return {
     kind: x.kind || null,
     days: Number.isInteger(x.days) ? x.days : (i.days || null),
@@ -653,7 +664,7 @@ function buildUnderstood(intent, trip, labels, extras) {
     season: ctx.seasonInfo ? { label: ctx.seasonInfo.named === 'month' ? ctx.seasonInfo.monthName : ctx.seasonInfo.monthName.replace(/^the /, ''), named: ctx.seasonInfo.named } : null,
     interests: interestsText(ctx).concat(ctx.lake ? ['lake time'] : []),
     party,
-    occasion: ctx.occasion ? OCCASION_LABELS[ctx.occasion] : null,
+    occasion: ctx.occasion && !occasionNotUsed ? OCCASION_LABELS[ctx.occasion] : null,
     themes: (ctx.dayThemes || []).map((th) => themeLabel(ctx, th)).filter(Boolean),
     notUsed,
   };
@@ -1838,6 +1849,9 @@ function planItinerary(input) {
     kind: 'itinerary', summary: '', overview: null, days: [], recommendations: [], outing: null, events: [],
     itinerary: null, experience: null, notes: [], warnings: [], unsupported: intent.unsupported || [], needs: [],
   };
+  // Stage 3.5 D5: an occasion the parts do not use is reported, not dropped.
+  const occasionNotUsed = unappliedItineraryOccasion(intent);
+  if (occasionNotUsed && !result.unsupported.includes(occasionNotUsed)) result.unsupported = result.unsupported.concat(occasionNotUsed);
   for (const place of trip.unknownPlaces || []) result.warnings.push(`“${place}” isn’t a place Okanagan Roam covers, so it wasn’t used for the route.`);
   // Step 1 (2026-09-29): the visitor's own words that no part of the plan
   // used are named, never silently dropped ("a lake walk").
@@ -1903,6 +1917,10 @@ function planItinerary(input) {
       occasion: null, when, superlative: false,
       // Stage 3.5: the request's exclusions hold for every part.
       excluded: intent.excluded,
+      // Stage 3.5 D5: so does its budget -- the same soft ranking as a
+      // single plan (a known price that fits ranks up, one that misses ranks
+      // down, a place without a price is never excluded).
+      budget: intent.budget || null,
     };
     const ctx = buildContext(ci, labels, { ...input, startWeekday: pairWithEvent && anchor.weekday ? anchor.weekday : input.startWeekday });
     const scored = [];
