@@ -14298,6 +14298,10 @@ function renderTripPlannerV2Styles() {
     .trip-plan-result .trip-slot-actions .fav-btn, .trip-plan-result .trip-slot-actions .trip-btn,
     .trip-plan-result .trip-slot-actions .trip-slot-view-link, .trip-plan-result .trip-slot-actions .trip-slot-remove-btn,
     .trip-plan-result .trip-planner-regen-btn, .trip-plan-result .trip-plan-details summary, .trip-plan-result .trip-slot-more summary { min-height: 44px; }
+    /* Stage 4.0 (F10): "View details" / "Replace" start their own line at the
+       left instead of sitting at the right edge, where the floating Trip
+       button covers them while the page scrolls. */
+    .trip-plan-result .trip-slot-secondary { margin-left: 0; flex-basis: 100%; }
   }
   </style>`;
 }
@@ -14619,7 +14623,12 @@ function renderTripPlannerV2Script() {
   }
   function openTripTray(){
     var toggle = document.getElementById('tripTrayToggle'), panel = document.getElementById('tripTrayPanel');
-    if (toggle && panel && !panel.classList.contains('open')) toggle.click();
+    if (!toggle || !panel) return;
+    // Stage 4.0 (F07): opened after this click has finished -- app.js closes
+    // the tray on any click outside it, which would otherwise include this
+    // one (the same deferral the V3 view uses). Checked again when the timer
+    // runs, so a click while the tray is already open leaves it open.
+    setTimeout(function(){ if (!panel.classList.contains('open')) toggle.click(); }, 0);
   }
   // Any change to My Trip elsewhere (a card's Add to trip, a tray remove,
   // Clear trip) recalculates the button once app.js has handled the click.

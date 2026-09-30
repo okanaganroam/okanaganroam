@@ -13434,3 +13434,58 @@ test('Stage 3.6: with discovery search off, /browse?q=<one word> is served in pl
   assert.equal(r.status, 200);
   await r.text();
 })));
+
+// ---- Stage 4.0 (2026-09-30): V2 "View My Trip" (F07) and the mobile floating Trip button (F10) ----
+// Runs the real openTripTray() from the V2 /trip script against a fake tray whose
+// outside-click close is simulated between the click and the deferred timer.
+function v2OpenTripTray() {
+  const page = app.renderTripPlannerPage(true);
+  const src = page.match(/ {2}function openTripTray\(\)\{[\s\S]*?\n {2}\}/)[0];
+  const timers = [];
+  const open = { v: false };
+  const toggle = { clicks: 0, click() { this.clicks += 1; open.v = !open.v; } };
+  const panel = { classList: { contains: (c) => c === 'open' && open.v } };
+  const doc = { getElementById: (id) => (id === 'tripTrayToggle' ? toggle : id === 'tripTrayPanel' ? panel : null) };
+  const openTripTray = new Function('document', 'setTimeout', `${src}; return openTripTray;`)(doc, (fn) => timers.push(fn));
+  const flush = () => { while (timers.length) timers.shift()(); };
+  return { openTripTray, toggle, open, timers, flush };
+}
+
+test('Stage 4.0 F07: V2 "View My Trip" opens the tray after the click, and stays open on repeated clicks', () => {
+  const h = v2OpenTripTray();
+  h.openTripTray();
+  assert.equal(h.toggle.clicks, 0, 'nothing is toggled during the click itself (app.js would close it again)');
+  h.flush();
+  assert.equal(h.open.v, true, 'the tray is open once the click has finished');
+  assert.equal(h.toggle.clicks, 1);
+  // Clicked again while open: app.js's outside-click handler closes it during that click; the timer reopens it.
+  h.openTripTray();
+  h.open.v = false;
+  h.flush();
+  assert.equal(h.open.v, true, 'a repeated click leaves the tray open');
+  // Clicked again while open and nothing closed it: no toggle, so it is not closed by us.
+  const before = h.toggle.clicks;
+  h.openTripTray();
+  h.flush();
+  assert.equal(h.open.v, true);
+  assert.equal(h.toggle.clicks, before, 'no toggle when the tray is already open');
+  // Two quick clicks before the timers run still end open (one toggle).
+  const q = v2OpenTripTray();
+  q.openTripTray(); q.openTripTray(); q.flush();
+  assert.equal(q.open.v, true);
+  assert.equal(q.toggle.clicks, 1);
+  // The open_my_trip event is still sent only when the tray was closed at click time (unchanged handler).
+  const page = app.renderTripPlannerPage(true);
+  assert.match(page, /if \(trayPanel && !trayPanel\.classList\.contains\('open'\)\) track\('open_my_trip', \{ trip_size: tripSize\(\), open_source: 'plan_view_trip' \}\);\s*openTripTray\(\);/);
+});
+
+test('Stage 4.0 F10: on phones the V2 stop links start their own line at the left; desktop and the planner-off page are unchanged', () => {
+  const v2 = app.renderTripPlannerPage(true);
+  const styles = v2.match(/<style>\s*\/\* Build My Trip planner view[\s\S]*?<\/style>/)[0];
+  const mobile = styles.slice(styles.indexOf('@media (max-width: 560px) {'));
+  assert.match(mobile, /\.trip-plan-result \.trip-slot-secondary \{ margin-left: 0; flex-basis: 100%; \}\s*\}\s*<\/style>/, 'inside the existing 560px block');
+  const desktop = styles.slice(0, styles.indexOf('@media (max-width: 560px) {'));
+  assert.match(desktop, /\.trip-plan-result \.trip-slot-secondary \{ display: inline-flex; align-items: center; gap: 12px; margin-left: auto; \}/, 'the wider-screen rule is unchanged');
+  assert.equal((v2.match(/flex-basis: 100%/g) || []).length, 1, 'one rule, nowhere else');
+  assert.doesNotMatch(app.renderTripPlannerPage(false), /trip-slot-secondary \{ margin-left: 0; flex-basis: 100%/, 'the planner-off page is untouched');
+});
