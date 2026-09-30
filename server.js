@@ -1189,7 +1189,9 @@ function usesThemedHubLayout(type) {
 // This is possible because golfFavTripScriptBody()'s standalone branch
 // already implements the full behaviour against the same okanaganFavorites
 // / okanaganTrip localStorage keys the homepage Trip Planner reads, so
-// app.js is not required to make the buttons work.
+// app.js is not required to make the buttons work. Stage 4.1 (2026-09-30):
+// winery VENUE pages now use the themed venue shell (THEMED_VENUE_SHELL_TYPES
+// below); the region pages still get the controls alone, as described here.
 const ENGAGEMENT_ONLY_TYPES = new Set(['winery']);
 function usesEngagementControls(type) {
   return usesThemedCategoryLayout(type) || ENGAGEMENT_ONLY_TYPES.has(type);
@@ -1202,8 +1204,10 @@ function usesEngagementControls(type) {
 // renderVenuePage() alone, so their listings and cards are unchanged, and
 // it adds no Favorite / Add to Trip controls, analytics or data-track
 // attributes (those stay on usesEngagementControls() /
-// usesThemedCategoryLayout()). Wineries stay out (frozen 2026-09-23).
-const THEMED_VENUE_SHELL_TYPES = new Set(['cafe', 'restaurant', 'pub', 'brewery', 'cocktail', 'distillery']);
+// usesThemedCategoryLayout()). Stage 4.1 (2026-09-30): winery venue pages
+// join too, keeping their Favorite / Add to Trip controls, which then hand
+// off to app.js as on Golf venue pages; winery region pages are unchanged.
+const THEMED_VENUE_SHELL_TYPES = new Set(['cafe', 'restaurant', 'pub', 'brewery', 'cocktail', 'distillery', 'winery']);
 function usesThemedVenueShell(type) {
   return usesThemedCategoryLayout(type) || THEMED_VENUE_SHELL_TYPES.has(type);
 }
@@ -13329,7 +13333,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>Call</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
-    usesEngagementControls(venue.type) ? golfFavTripButtonsHtml(venue, { appLabels: usesThemedCategoryLayout(venue.type) }) : null,
+    usesEngagementControls(venue.type) ? golfFavTripButtonsHtml(venue, { appLabels: themedShell }) : null,
   ].filter(Boolean).join('\n  ');
   const ctaRowAttrs = usesEngagementControls(venue.type)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
@@ -13418,7 +13422,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !usesThemedCategoryLayout(venue.type) ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>

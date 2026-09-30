@@ -2275,13 +2275,12 @@ test('Wine hub: /wineries is enabled, winery-only, valley-wide, and themed for t
     assert.ok(hub.includes(`href="/${r}/wineries"`), `region selector must link to /${r}/wineries`);
   }
 
-  // 5. hub-only theming: the REGION page and the VENUE page must be untouched
+  // 5. hub-only theming: the REGION page must be untouched. (Stage 4.1: the
+  // VENUE page uses the themed venue shell -- see the Stage 4.1 tests.)
   const first = wineries[0];
   const regionPage = app.renderCategoryPage(first.region, 'winery', app.getVenuesByRegionCategory(first.region, 'winery'), []);
   assert.doesNotMatch(regionPage, /class="golf-page/, 'winery region pages must NOT be themed');
   assert.doesNotMatch(regionPage, /venue-card-cue/, 'winery region cards must keep their original markup');
-  const venuePage = app.renderVenuePage(first, [], [], []);
-  assert.doesNotMatch(venuePage, /class="golf-page/, 'winery venue pages must NOT be themed');
   assert.ok(!app.THEMED_CATEGORY_TYPES.has('winery'), 'winery must never join the global THEMED_CATEGORY_TYPES');
 });
 
@@ -2299,12 +2298,11 @@ test('Wine engagement: winery region and venue pages carry Favorite / Add to Tri
   assert.doesNotMatch(regionPage, /class="golf-desc"/, 'winery region cards must not gain the themed description block');
   assert.doesNotMatch(regionPage, /id="tripTray"/, 'engagement-only pages must not pull in the trip tray');
 
-  // 2. venue page: controls in the CTA row, presentation untouched
+  // 2. venue page: controls in the CTA row (Stage 4.1: inside the themed venue shell)
   const venuePage = app.renderVenuePage(first, [], [], []);
   assert.match(venuePage, /class="card-action fav-btn"/, 'winery venue pages must render Favorite');
   assert.match(venuePage, /class="card-action trip-btn"/, 'winery venue pages must render Add to Trip');
   assert.match(venuePage, /<div class="venue-cta-row" data-venue-id=/, 'the CTA row needs its engagement attributes');
-  assert.doesNotMatch(venuePage, /class="golf-page/, 'winery venue pages must stay unthemed');
 
   // 3. the controls are wired: the standalone script needs no app.js
   assert.match(regionPage, /var HOLDER = '\[data-venue-category="winery"\]'/, 'region page must bind the engagement script to winery cards');
@@ -4609,10 +4607,10 @@ test('Batch 4B Guides: golf cards keep Favorite / Add to Trip with canonical lab
 });
 
 test('Batch 4B Guides: winery venue and region pages keep their own presentation', () => {
+  // Stage 4.1: winery venue pages use the themed venue shell, never the guide theme.
   const venue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  assert.match(venue, /<body>/);
-  assert.match(venue, /<header class="top">/);
-  assert.doesNotMatch(venue, /guide-page|golf-page|<script src="\/scripts\/app\.js">/);
+  assert.match(venue, /<body class="golf-page winery-page">/);
+  assert.doesNotMatch(venue, /guide-page/);
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   assert.doesNotMatch(region, /guide-page|golf-page|<script src="\/scripts\/app\.js">/);
 });
@@ -6199,10 +6197,11 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.doesNotMatch(html, /getElementById\('navHamburger'\)/, 'no duplicate nav handlers alongside app.js');
   }
   // Batch 4A (2026-09-27): Food & Drink VENUE pages now use the themed shell
-  // (see the Batch 4A tests); their listings and winery venue pages do not.
+  // (see the Batch 4A tests); their listings do not. Stage 4.1: nor do winery
+  // REGION pages (winery venue pages use the themed shell -- Stage 4.1 tests).
   const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
-  const wineryVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  for (const html of [restaurants, wineryVenue]) {
+  const wineryRegion = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
+  for (const html of [restaurants, wineryRegion]) {
     assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js"><\/script>/);
     assert.match(html, /<header class="top">/);
     assert.match(html, /<body>/);
@@ -6237,16 +6236,18 @@ test('Golf theme keeps the shared footer links visible (golf and beach pages)', 
   const golf = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
   const beach = app.renderVenuePage(app.findVenueBySlug('kelowna', 'beach', 'test-beach-park'), [], [], []);
   // Batch 4A: Food & Drink venue pages share the themed shell, so the rule
-  // applies to them too; winery venue pages stay unthemed.
+  // applies to them too; Stage 4.1: so do winery venue pages. Winery region
+  // pages stay unthemed.
   const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
   const winery = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
+  const wineryRegion = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   const rule = /body\.golf-page \.home-footer-col a, body\.golf-page \.home-footer-region-group a \{ color: rgba\(245,243,237,0\.78\); \}/;
-  for (const html of [golf, beach, restaurant]) {
+  for (const html of [golf, beach, restaurant, winery]) {
     assert.match(html, /body\.golf-page a \{ color: var\(--ref-navy\); \}/);
     assert.match(html, rule, 'footer link colour restated inside the golf theme');
     assert.match(html, /<footer class="home-footer">/);
   }
-  assert.doesNotMatch(winery, rule);
+  assert.doesNotMatch(wineryRegion, rule);
 });
 
 test('Golf "At a glance" card renders only curated facts, escaped, in a dl grid; empty for other categories', () => {
@@ -6351,14 +6352,15 @@ test('REGRESSION: themed venue polish is confined to themed-shell venue pages (w
   const restaurantMarkup = restaurantVenue.replace(/<style>[\s\S]*?<\/style>/g, '');
   assert.match(restaurantVenue, /<style>\s*\/\* Hero: same per-type gradient/);
   assert.doesNotMatch(restaurantMarkup, /golf-glance|At a glance|venue-hero-type">Indoor Golf</);
+  // Stage 4.1 (2026-09-30): winery venue pages use the themed shell too, so
+  // they also get the hero polish -- and likewise never the golf-only content.
   const wineryVenue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  assert.doesNotMatch(wineryVenue, /golf-glance|At a glance|Hero: same per-type gradient|venue-hero-type">Indoor Golf</);
+  const wineryMarkup = wineryVenue.replace(/<style>[\s\S]*?<\/style>/g, '');
+  assert.match(wineryVenue, /<style>\s*\/\* Hero: same per-type gradient/);
+  assert.doesNotMatch(wineryMarkup, /golf-glance|At a glance|venue-hero-type">Indoor Golf</);
   // Batch 3 (2026-09-26): long website URLs now wrap on every detail page via
-  // the shared .detail-row rule (the Golf pages already had their own); the
-  // rest of the Golf venue polish stays confined to the themed pages.
+  // the shared .detail-row rule (the Golf pages already had their own).
   assert.match(wineryVenue, /\.detail-row a \{ overflow-wrap: anywhere; \}/);
-  assert.match(wineryVenue, /<div class="venue-header">\s*<h1>Test /, 'non-themed pages keep the <h1> in the header');
-  assert.match(wineryVenue, /<span class="venue-hero-name">/);
   const golfRows = app.getVenuesByRegionCategory('kelowna', 'golf');
   const beachRows = app.getVenuesByRegionCategory('kelowna', 'beach');
   for (const html of [app.renderCategoryPage('kelowna', 'golf', golfRows, []), app.renderCategoryAllRegionsPage('golf', golfRows), app.renderCategoryPage('kelowna', 'beach', beachRows, []), app.renderCategoryAllRegionsPage('beach', beachRows)]) {
@@ -6387,10 +6389,9 @@ test('REGRESSION: non-Golf venue pages carry the GA4 tag, tracked links and venu
 const BATCH4A_FD_TYPES = ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery'];
 const batch4aVenue = (type) => ({ ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), type });
 
-test('Batch 4A: the venue-shell predicate covers exactly the themed types plus the six Food & Drink types', () => {
-  assert.deepEqual([...app.THEMED_VENUE_SHELL_TYPES].sort(), [...BATCH4A_FD_TYPES].sort());
-  for (const t of [...BATCH4A_FD_TYPES, 'golf', 'beach', 'outdoor']) assert.equal(app.usesThemedVenueShell(t), true, t);
-  assert.equal(app.usesThemedVenueShell('winery'), false, 'winery venue pages stay frozen');
+test('Batch 4A: the venue-shell predicate covers exactly the themed types plus the six Food & Drink types (and, since Stage 4.1, winery)', () => {
+  assert.deepEqual([...app.THEMED_VENUE_SHELL_TYPES].sort(), [...BATCH4A_FD_TYPES, 'winery'].sort());
+  for (const t of [...BATCH4A_FD_TYPES, 'winery', 'golf', 'beach', 'outdoor']) assert.equal(app.usesThemedVenueShell(t), true, t);
   // The listing / card predicate is unchanged.
   assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'outdoor']);
   for (const t of BATCH4A_FD_TYPES) assert.equal(app.usesThemedCategoryLayout(t), false, t);
@@ -6458,19 +6459,53 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
   }
 });
 
-test('Batch 4A: winery venue pages keep the old shell and their standalone Favorite / Add to Trip controls', () => {
+// ---- Stage 4.1 (2026-09-30): winery VENUE pages use the themed venue shell ----
+// Same shell as the Golf / Beach / Food & Drink venue pages (site header and
+// navigation, Trip tray, <main>, app.css / app.js, body.golf-page, hero <h1>).
+// The Favorite / Add to Trip controls stay, with app.js's labels, and the
+// engagement script takes its hand-off branch; winery REGION pages are unchanged.
+test('Stage 4.1: winery venue pages render the themed shell with one hero <h1> and their Favorite / Add to Trip controls', () => {
   const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
-  assert.match(html, /<body>/);
-  assert.match(html, /<header class="top">\s*<a class="brand" href="https:\/\/okanaganroam\.com\/">Okanagan Roam<\/a>\s*<a href="https:\/\/okanaganroam\.com\/">Explore the full directory →<\/a>/);
-  assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<main |<script src="\/scripts\/app\.js">|Hero: same per-type gradient/);
-  // Measurement Phase A (2026-09-27): the GA4 tag only; links stay untracked.
+  assert.match(html, /<body class="golf-page winery-page">/);
+  assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
+  assert.match(html, /id="tripTray"/, 'the site-wide Trip tray is on the page');
+  assert.match(html, /<header id="top">/, 'the shared site header and navigation');
+  assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, 'the old minimal header is gone');
+  assert.match(html, /<main class="wrap-wide golf-main">/);
+  assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1>');
+  assert.match(html, /<div class="venue-hero venue-hero-fallback[^"]*">\s*<span class="venue-hero-type">Winery<\/span>\s*<h1>Test Winery<\/h1>/, 'the hero carries the <h1>');
+  // Favorite / Add to Trip: app.js's labels, and no standalone-page stylesheet.
+  assert.match(html, /<button type="button" class="card-action fav-btn" data-fav-name="Test Winery" aria-pressed="false" aria-label="Favorite Test Winery"><svg [^>]*>[\s\S]*?<\/svg> Favorite<\/button>/, 'app.js heart label, as on Golf venue pages');
+  assert.match(html, /class="card-action trip-btn" data-trip-name="Test Winery"[^>]*>\u{1F9F3} Add to trip<\/button>/u);
+  assert.doesNotMatch(html, /\.venue-card\[data-venue-category="winery"\] \.card-actions/, 'the engagement-only stylesheet is for unthemed pages');
+  assert.match(html, /body\.golf-page \.venue-cta-row \.card-action \{/, 'the themed CTA-row button rules apply instead');
+  assert.match(html, /<div class="venue-cta-row" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="winery" data-venue-name="Test Winery" data-surface="venue_page">/);
+  // app.js loads first, so the engagement script takes its hand-off branch (as on Golf venue pages).
+  const appAt = html.indexOf('<script src="/scripts/app.js"></script>');
+  assert.ok(appAt > 0 && appAt < html.indexOf('var pageCtx'), 'app.js loads before the venue engagement script');
+  assert.match(html, /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{/);
+  assert.match(html, /okanaganFavorites/, 'standalone fallback still present');
+  // Measurement Phase A/C: one GA4 tag, page_type venue, one venue_view.
   assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1);
   assert.ok(html.includes("var cfg = { page_type: 'venue' };"));
-  assert.doesNotMatch(html, /data-track=/);
-  assert.match(html, /<span class="venue-hero-name">Test Winery<\/span>/);
-  assert.match(html, /<div class="venue-header">\s*<h1>Test Winery<\/h1>/);
-  assert.match(html, /data-venue-category="winery"/);
-  assert.match(html, /okanaganFavorites/, 'standalone engagement script still present');
+  assert.equal((html.match(/track\('venue_view', ctx\(\)\)/g) || []).length, 1);
+  assert.doesNotMatch(html, /data-track=/, 'the fixture has no website, phone or address');
+});
+
+test('Stage 4.1: the winery venue page keeps its SEO head; winery region pages keep the old shell', () => {
+  const venue = app.findVenueBySlug('kelowna', 'winery', 'test-winery');
+  const html = app.renderVenuePage(venue, [], [], []);
+  assert.match(html, /<title>Test Winery[^<]*<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/wineries\/test-winery">/);
+  assert.match(html, /"@type":"Winery"/, 'LocalBusiness JSON-LD type unchanged');
+  assert.match(html, /"@type":"BreadcrumbList"/);
+  const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
+  assert.match(region, /<body>/);
+  assert.match(region, /<header class="top">/);
+  assert.doesNotMatch(region, /golf-page|id="tripTray"|<main |<script src="\/scripts\/app\.js">/);
+  assert.match(region, /class="card-action fav-btn"/);
+  assert.match(region, /\.venue-card\[data-venue-category="winery"\] \.card-action/, 'region cards keep the engagement-only stylesheet');
+  assert.match(region, /var HOLDER = '\[data-venue-category="winery"\]'/);
 });
 
 // ==== Golf card Favorite + Add to Trip (2026-09-19, Golf only) ===========
@@ -7246,13 +7281,13 @@ test('REGRESSION (Outdoors): Golf and Beach pages carry no outdoor theme or mark
   // The beach theme block is byte-identical to its pre-Outdoors form (derived from the same golf rules).
   assert.match(app.renderBeachThemeStyles(), /^<style>\n  \/\* Beach page theme \(2026-09-19\)/);
   // Batch 4A (2026-09-27): restaurant venue pages use the shared golf-page
-  // shell but never the outdoor theme; winery venue pages stay unthemed.
+  // shell but never the outdoor theme; Stage 4.1: so do winery venue pages.
   const restaurant = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
   assert.doesNotMatch(restaurant, /Outdoor page theme/);
   assert.doesNotMatch(outdoorMarkupOnly(restaurant), /outdoor-page|data-venue-category/);
   const winery = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
   assert.doesNotMatch(winery, /Outdoor page theme/);
-  assert.doesNotMatch(outdoorMarkupOnly(winery), /golf-page|outdoor-page/);
+  assert.doesNotMatch(outdoorMarkupOnly(winery), /outdoor-page/);
 });
 
 test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and after outdoor venues exist; /beaches and /golf unchanged; routes, sitemap and trip API behave (isolated child process)', async () => {
