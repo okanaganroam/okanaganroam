@@ -4508,7 +4508,7 @@ test('Batch 4B Events: app.js loads before the inline Favorite / Add to Trip scr
     assert.match(row[0], /data-venue-category="whatson" data-venue-id="event-\d+" data-venue-region="kelowna" data-venue-name="[^"]+"(?: data-occurrence-id="\d+" data-occurrence-date="[^"]+"(?: data-occurrence-time="[^"]+")?)? data-surface="event_page"/, `${kind}: holder attributes unchanged`);
     assert.ok(row[1].includes(`aria-pressed="false" aria-label="Favorite `) && row[1].includes(`">${heart} Favorite</button>`), `${kind}: Favorite = app.js HEART_OUTLINE + "Favorite"`);
     assert.ok(row[1].includes('\u{1F9F3} Add to trip</button>'), `${kind}: Add to trip = app.js label`);
-    assert.match(row[1], /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" aria-pressed="false"/, `${kind}: trip data unchanged`);
+    assert.match(row[1], /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="event:\d+" aria-pressed="false"/, `${kind}: trip data unchanged (Stage 5C: + the event ref)`);
     assert.doesNotMatch(row[1], /&#9825;|&#65291;/, `${kind}: no standalone labels`);
   }
 });
@@ -4597,7 +4597,7 @@ test('Batch 4B Guides + Stage 5B: every guide card is the compact card -- View d
     assert.match(c, /<div class="card-actions">/);
     assert.ok(c.includes(`${heart} Favorite</button>`) && c.includes('\u{1F9F3} Add to trip</button>'), 'canonical labels');
     assert.match(c, /class="card-action fav-btn" data-fav-name="[^"]+" aria-pressed="false" aria-label="Favorite [^"]+"/);
-    assert.match(c, /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+" data-trip-region="kelowna" aria-pressed="false" aria-label="Add [^"]+ to trip"/);
+    assert.match(c, /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false" aria-label="Add [^"]+ to trip"/);
     assert.ok(c.indexOf('class="chips"') < c.indexOf('class="card-actions"'), 'buttons after the badge chips');
   }
   assert.doesNotMatch(html, /&#9825; Favorite|&#65291; Add to Trip/, 'no standalone labels');
@@ -4652,6 +4652,73 @@ test('Stage 5B: guide pages keep their SEO head, structured data and links; only
   assert.match(html, /<p class="venue-meta">Browse by category: /);
   assert.ok(html.includes('<a class="cta" href="/kelowna">See all of Kelowna on Okanagan Roam</a>'));
   ga4Check(html, 'guide', 'guide');
+});
+
+// Stage 5C (2026-10-01): My Trip identifies a stop by its ref (Trip half of
+// W07). Every server-rendered Add to trip button carries "venue:<id>" or
+// "event:<id>" next to its existing name / query / region.
+test('Stage 5C: every server-rendered Add to trip button carries its venue or event ref', () => {
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  assert.ok(app.venueCardHtml(golf).includes(`data-trip-region="kelowna" data-trip-ref="venue:${golf.id}" aria-pressed="false"`), 'listing card');
+  assert.ok(app.renderVenuePage(golf, [], [], []).includes(`data-trip-ref="venue:${golf.id}"`), 'venue page');
+  const guide = app.renderGuidePage('kelowna', 'patio', batch4bGuideVenues());
+  const cards = guide.replace(/<script[\s\S]*?<\/script>/g, '').match(/<li class="venue-card"[^>]*>[\s\S]*?<\/li>/g);
+  for (const c of cards) assert.equal((c.match(/data-trip-ref="venue:(\d+)"/) || [])[1], (c.match(/data-venue-id="(\d+)"/) || [])[1], 'guide card ref = its venue id');
+  for (const [kind, html] of batch4bEventPages()) {
+    const row = html.match(/<div class="venue-cta-row event-actions"[^>]*data-venue-id="event-(\d+)"[\s\S]*?<\/div>/);
+    assert.ok(row && row[0].includes(`data-trip-ref="event:${row[1]}"`), `${kind} event page`);
+  }
+  const winery = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
+  const wineryRefs = winery.match(/data-trip-ref="venue:\d+"/g) || [];
+  assert.equal(wineryRefs.length, (winery.match(/class="card-action trip-btn"/g) || []).length, 'winery region page (standalone script)');
+});
+
+test('Stage 5C: the standalone tray script (pages without app.js) matches stops by ref, else by name + region, and stores the ref', () => {
+  const winery = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
+  const src = winery.match(/var TRIP_REF_RE = [\s\S]*?function syncTrip/)[0].replace(/function syncTrip$/, '');
+  const fn = new Function(`${src}; return { tripStop: tripStop, sameTripStop: sameTripStop };`)();
+  const btn = (name, region, ref) => ({ dataset: { tripName: name, tripRegion: region, tripRef: ref } });
+  const k = fn.tripStop(btn('Okanagan Virtual Golf', 'kelowna', 'venue:1126'));
+  const p = fn.tripStop(btn('Okanagan Virtual Golf', 'penticton', 'venue:1132'));
+  assert.equal(fn.sameTripStop({ name: 'Okanagan Virtual Golf', region: 'kelowna', ref: 'venue:1126' }, k), true);
+  assert.equal(fn.sameTripStop({ name: 'Okanagan Virtual Golf', region: 'kelowna', ref: 'venue:1126' }, p), false, 'same name, different ref');
+  assert.equal(fn.sameTripStop({ name: 'Okanagan Virtual Golf', region: 'penticton' }, p), true, 'a stop saved before refs: name + region');
+  assert.equal(fn.sameTripStop({ name: 'Okanagan Virtual Golf', region: 'penticton' }, k), false);
+  assert.equal(fn.sameTripStop({ name: 'Okanagan Virtual Golf' }, k), true, 'no region saved: name only, as before');
+  assert.equal(fn.sameTripStop(null, k), false);
+  assert.equal(fn.tripStop(btn('X', 'kelowna', 'venue:0')).ref, null, 'a malformed ref is ignored');
+  assert.ok(winery.includes('if (stop.ref) entry.ref = stop.ref;'), 'adds keep the ref');
+  for (const ev of ["track('add_to_trip', params)", "track('remove_from_trip', params)"]) assert.ok(winery.includes(ev), `analytics unchanged: ${ev}`);
+});
+
+test('Stage 5C V2 /trip: plan stops carry their refs; two same-name places are two stops; events carry the event ref', () => {
+  const render = tripRenderHarness('Plan 2 days with golf');
+  const twin = (id, region) => ({ ...tripVenue(id, 'Okanagan Virtual Golf'), region, regionLabel: region === 'kelowna' ? 'Kelowna' : 'Penticton' });
+  const html = render({
+    kind: 'multi_day', summary: 'x', headline: 'x', overview: {}, notes: [], warnings: [], unsupported: [],
+    days: [{ day: 1, regionLabel: 'Kelowna', stops: [{ daypart: 'morning', label: 'Morning', venue: twin(1126, 'kelowna'), why: [], caveats: [] }, { daypart: 'afternoon', label: 'Afternoon', venue: twin(1132, 'penticton'), why: [], caveats: [] }] }],
+  });
+  assert.match(html, /data-trip-name="Okanagan Virtual Golf"[^>]*data-trip-region="kelowna" data-trip-ref="venue:1126" data-plan-stop>/);
+  assert.match(html, /data-trip-name="Okanagan Virtual Golf"[^>]*data-trip-region="penticton" data-trip-ref="venue:1132" data-plan-stop>/);
+  const itin = render({
+    kind: 'itinerary', summary: 'x', overview: {}, notes: [], warnings: [], unsupported: [],
+    itinerary: { route: null, stops: [{ kind: 'event', label: 'Live music', event: { id: 77, name: 'Jazz Night', region: 'naramata', regionLabel: 'Naramata', url: '/naramata/events/jazz', dateLabel: 'Fri' } }] },
+  });
+  assert.match(itin, /data-trip-name="Jazz Night"[^>]*data-trip-region="naramata" data-trip-ref="event:77" data-plan-stop>Add to trip<\/button>/);
+  const page = app.renderTripPlannerPage(true);
+  assert.ok(page.includes("var n = b.getAttribute('data-trip-ref') || b.getAttribute('data-trip-name');"), '"Add whole trip" counts one stop per ref');
+});
+
+test('Stage 5C V3: no same-name notice; stop buttons carry refs; "Add whole trip" counts one stop per ref; share link and analytics untouched', () => {
+  const html = app.renderTripPlannerV3Page({ preview: true });
+  assert.ok(!html.includes('t3-samename') && !html.includes('My Trip lists places by name'), 'the obsolete notice is gone');
+  assert.ok(html.includes(`(v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '')`));
+  assert.ok(html.includes(`(e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '')`));
+  assert.ok(html.includes("var n = b.getAttribute('data-trip-ref') || b.getAttribute('data-trip-name');"));
+  // The share link (Stage 5A) and the V3 events are byte-for-byte what they were.
+  for (const s of ["add('pin'", "add('avoid'", "add('rm'", "add('keep'", "add('skip'", "track('trip_plan_share', { share_method: method, plan_kind: f.plan_kind, day_count: f.day_count })", "track('trip_plan_edit', { edit_action: 'remove', plan_kind: planFacts(state.last).plan_kind })"]) assert.ok(html.includes(s), s);
+  const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  new Function(js); // parses
 });
 
 test('Batch 4B Guides: winery venue and region pages keep their own presentation', () => {
@@ -6210,7 +6277,7 @@ test('Golf venue page shows all five actions: Website, Get Directions, Call, Fav
   assert.match(body, /class="cta secondary" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions</);
   assert.match(body, /class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call</);
   assert.match(body, /class="card-action fav-btn" data-fav-name="Test Golf Course" aria-pressed="false"/);
-  assert.match(body, /class="card-action trip-btn" data-trip-name="Test Golf Course" data-trip-query="Test Golf Course, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" aria-pressed="false"/);
+  assert.match(body, /class="card-action trip-btn" data-trip-name="Test Golf Course" data-trip-query="Test Golf Course, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false"/);
   assert.equal((body.match(/<(a|button)\b/g) || []).length, 5, 'exactly five actions');
   // The venue script carries the shared fav/trip module.
   for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'add_to_trip'", "track('venue_view'"]) {
@@ -6570,7 +6637,7 @@ test('Golf listing card actions are ONLY Favorite and Add to Trip (no website / 
   assert.match(html, /<div class="card-actions">/);
   const escapedName = wk.name.replace(/&/g, '&amp;');
   assert.ok(html.includes(`<button type="button" class="card-action fav-btn" data-fav-name="${escapedName}" aria-pressed="false" aria-label="Favorite ${escapedName}">&#9825; Favorite</button>`));
-  assert.ok(html.includes(`<button type="button" class="card-action trip-btn" data-trip-name="${escapedName}" data-trip-query="${escapedName}, West Kelowna, Okanagan Valley, BC" data-trip-region="west-kelowna" aria-pressed="false" aria-label="Add ${escapedName} to trip">&#65291; Add to Trip</button>`));
+  assert.ok(html.includes(`<button type="button" class="card-action trip-btn" data-trip-name="${escapedName}" data-trip-query="${escapedName}, West Kelowna, Okanagan Valley, BC" data-trip-region="west-kelowna" data-trip-ref="venue:${wk.id}" aria-pressed="false" aria-label="Add ${escapedName} to trip">&#65291; Add to Trip</button>`));
   assert.doesNotMatch(html, /data-track=|href="https?:|href="tel:|google\.com\/maps|Website|Call |Directions/);
   const actions = html.match(/<div class="card-actions">([\s\S]*?)<\/div>/)[1];
   assert.equal((actions.match(/<(a|button)\b/g) || []).length, 2, 'exactly two actions on the card');
@@ -9534,7 +9601,9 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // it. Verified before this hash was updated: homepage HTML, DOM after
   // scripts and after interactions, network (minus that one request), console
   // and screenshots unchanged at 390px and 1280px.
-  assert.equal(md5('public/scripts/app.js'), 'db7b8c66f1cd176b3be54bc0f760cc6b', 'public/scripts/app.js (Batch 2: venue list fetched only by /browse, 2026-09-26)');
+  // Approved Stage 5C change (2026-10-01): the Trip tray identifies stops by
+  // ref (Trip half of W07) -- the four contained areas of the Stage 5C plan.
+  assert.equal(md5('public/scripts/app.js'), '5ecb85aecf648f3ae967dc3bde910f40', 'public/scripts/app.js (Stage 5C: Trip tray ref identity, 2026-10-01)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -11243,7 +11312,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d');
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
-  assert.equal(md5('public/scripts/app.js'), 'db7b8c66f1cd176b3be54bc0f760cc6b');
+  // Stage 5C (2026-10-01): approved Trip tray ref identity.
+  assert.equal(md5('public/scripts/app.js'), '5ecb85aecf648f3ae967dc3bde910f40');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -11818,7 +11888,7 @@ test('Batch 3: canonical labels equal what app.js renders, on pages that load ap
   assert.ok(ev.includes(`${heart} Favorite</button>`) && ev.includes('\u{1F9F3} Add to trip</button>'));
   // Accessible names and data attributes are unchanged.
   assert.match(canonical, /class="card-action fav-btn" data-fav-name="Batch Three Cafe" aria-pressed="false"/);
-  assert.match(canonical, /class="card-action trip-btn" data-trip-name="Batch Three Cafe" data-trip-query="Batch Three Cafe, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" aria-pressed="false"/);
+  assert.match(canonical, /class="card-action trip-btn" data-trip-name="Batch Three Cafe" data-trip-query="Batch Three Cafe, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false"/);
 });
 
 test('Batch 3: long website URLs wrap inside detail rows on every detail page (display only)', () => {
@@ -11998,7 +12068,7 @@ test('Phase 2 /trip: request, headline, "What to expect", chips, context line, c
   // Card: two reasons visible, the third behind "More reasons"; every existing control is kept.
   assert.match(html, /<ul class="trip-slot-why" aria-label="Why this fits"><li>Reason A<\/li><li>Reason B<\/li><\/ul><details class="trip-slot-more"><summary>More reasons<\/summary><ul class="trip-slot-why"><li>Reason C<\/li><\/ul><\/details>/);
   assert.match(html, /<button type="button" class="fav-btn" data-fav-name="Club One">Favorite<\/button>/);
-  assert.match(html, /<button type="button" class="trip-btn" data-trip-name="Club One" data-trip-query="Club One, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-plan-stop>Add to trip<\/button>/, 'a plan stop (Phase 3 marks it for the whole-trip action)');
+  assert.match(html, /<button type="button" class="trip-btn" data-trip-name="Club One" data-trip-query="Club One, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="venue:1" data-plan-stop>Add to trip<\/button>/, 'a plan stop (Phase 3 marks it for the whole-trip action)');
   assert.match(html, /<a class="trip-slot-view-link" href="\/kelowna\/golf\/v1">View details<\/a>/);
   assert.match(html, /class="trip-slot-remove-btn" data-replace-id="1" data-replace-key="1-morning" aria-label="Replace Club One with another suggestion"/);
   assert.match(html, /<ul class="trip-slot-caveats" aria-label="Good to know"><li>Check the day you go<\/li><\/ul>/);
@@ -12185,7 +12255,7 @@ test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip
   assert.match(itin, /<button type="button" class="trip-plan-view-trip" data-plan-view-trip hidden>View My Trip<\/button>/);
   assert.match(itin, /class="trip-btn" data-trip-name="Jazz Night" data-trip-query="Jazz Night, Naramata, Okanagan Valley, BC" data-trip-region="naramata" data-plan-stop>Add to trip<\/button>/, 'events can be added like on their own pages');
   assert.match(itin, /data-trip-name="Bean"[^>]*data-plan-stop>/, 'a plan stop');
-  assert.match(itin, /data-trip-name="Other Bean"[^>]*data-trip-region="kelowna">Add to trip/, 'alternates are not part of the whole trip');
+  assert.match(itin, /data-trip-name="Other Bean"[^>]*data-trip-region="kelowna" data-trip-ref="venue:3">Add to trip/, 'alternates are not part of the whole trip');
   assert.doesNotMatch(itin.match(/<button[^>]*data-plan-add-all[^>]*>/)[0], /trip-btn|fav-btn|data-plan-regenerate|data-replace-id/, 'never mistaken for a card control');
   assert.ok(itin.indexOf('data-plan-add-all') < itin.indexOf('data-plan-regenerate'), 'primary action first');
   const recs = render({ kind: 'discover', summary: 'x', overview: {}, notes: [], warnings: [], unsupported: [], recommendations: [{ venue: tripVenue(4, 'Solo', 'cafe'), why: [], caveats: [] }] });

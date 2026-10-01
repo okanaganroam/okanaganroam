@@ -7449,8 +7449,19 @@ function golfFavTripScriptBody(type = 'golf') {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     btn.textContent = on ? '\\u2665 Favorited' : '\\u2661 Favorite';
   }
+  // Stage 5C: the same stop identity as app.js's tray -- the ref when both
+  // sides have one, otherwise name + region (stops saved before refs existed).
+  var TRIP_REF_RE = /^(venue|event):[1-9][0-9]*$/;
+  function tripStop(btn){ var r = btn.dataset.tripRef; return { ref: TRIP_REF_RE.test(r || '') ? r : null, name: btn.dataset.tripName, region: btn.dataset.tripRegion || null }; }
+  function sameTripStop(t, s){
+    if (!t || typeof t.name !== 'string') return false;
+    if (t.ref && s.ref) return t.ref === s.ref;
+    if (t.name !== s.name) return false;
+    return !t.region || !s.region || t.region === s.region;
+  }
   function syncTrip(btn){
-    var on = readList('okanaganTrip').some(function(t){ return t && t.name === btn.dataset.tripName; });
+    var s = tripStop(btn);
+    var on = readList('okanaganTrip').some(function(t){ return sameTripStop(t, s); });
     btn.classList.toggle('in-trip', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     btn.textContent = on ? '\\u2713 In trip' : '\\uFF0B Add to Trip';
@@ -7511,11 +7522,11 @@ function golfFavTripScriptBody(type = 'golf') {
       }
       var tb = e.target.closest(HOLDER + ' .trip-btn');
       if (!tb) return;
-      var holder = tb.closest(HOLDER), tname = tb.dataset.tripName, trip = readList('okanaganTrip');
+      var holder = tb.closest(HOLDER), stop = tripStop(tb), tname = stop.name, trip = readList('okanaganTrip');
       var params = ctx(holder);
       params.region = params.venue_region;
-      if (trip.some(function(t){ return t && t.name === tname; })) {
-        trip = trip.filter(function(t){ return !(t && t.name === tname); });
+      if (trip.some(function(t){ return sameTripStop(t, stop); })) {
+        trip = trip.filter(function(t){ return !sameTripStop(t, stop); });
         writeList('okanaganTrip', trip);
         syncAll();
         params.trip_size = trip.length;
@@ -7526,7 +7537,9 @@ function golfFavTripScriptBody(type = 'golf') {
         notice(holder, 'Trips are capped at ' + MAX_STOPS + ' stops so the route stays manageable. Remove a stop to add another.');
         return;
       }
-      trip.push({ name: tname, query: tb.dataset.tripQuery, region: tb.dataset.tripRegion || null });
+      var entry = { name: tname, query: tb.dataset.tripQuery, region: tb.dataset.tripRegion || null };
+      if (stop.ref) entry.ref = stop.ref;
+      trip.push(entry);
       writeList('okanaganTrip', trip);
       syncAll();
       params.trip_size = trip.length;
@@ -7556,7 +7569,7 @@ function golfFavTripButtonsHtml(venue, opts = {}) {
   const favLabel = opts.appLabels ? APP_FAV_LABEL_HTML : '&#9825; Favorite';
   const tripLabel = opts.appLabels ? APP_TRIP_LABEL_HTML : '&#65291; Add to Trip';
   return `<button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(venue.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(venue.name)}">${favLabel}</button>
-          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(venue.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(venue.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(venue.name)} to trip">${tripLabel}</button>`;
+          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(venue.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(venue.region)}" data-trip-ref="venue:${venue.id}" aria-pressed="false" aria-label="Add ${escapeHtml(venue.name)} to trip">${tripLabel}</button>`;
 }
 
 // ---------- Golf page theme (2026-09-19, Golf pages only) ----------
@@ -13066,7 +13079,7 @@ function whatsOnEventCardHtml(ev) {
         <p class="chips">${chips}</p>
         <div class="card-actions">
           <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(ev.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(ev.name)}">${APP_FAV_LABEL_HTML}</button>
-          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(ev.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(ev.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(ev.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
+          <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(ev.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(ev.region)}" data-trip-ref="event:${ev.id}" aria-pressed="false" aria-label="Add ${escapeHtml(ev.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
         </div>
       </li>`;
 }
@@ -13942,7 +13955,7 @@ ${occurrences.map((o) => {
   const actionsHtml = `
   <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}"${savedOccurrenceAttrs(upcoming[0])} data-surface="event_page">
     <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(full.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(full.name)}">${APP_FAV_LABEL_HTML}</button>
-    <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(full.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(full.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(full.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
+    <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(full.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(full.region)}" data-trip-ref="event:${full.id}" aria-pressed="false" aria-label="Add ${escapeHtml(full.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
   </div>`;
   const pageCtx = JSON.stringify({ event_id: full.id, event_name: full.name, event_region: full.region, surface: 'event_page' }).replace(/</g, '\\u003c');
   // Measurement Phase C: one event_view per event-page load, with fixed
@@ -14734,7 +14747,7 @@ function renderTripPlannerV2Script() {
       + ((stop.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + stop.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
       + '<div class="trip-slot-actions">'
       + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>'
-      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery) + '" data-trip-region="' + esc(v.region) + '"' + (planStop ? ' data-plan-stop' : '') + '>Add to trip</button>'
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (planStop ? ' data-plan-stop' : '') + '>Add to trip</button>'
       + '<span class="trip-slot-secondary">'
       + (url ? '<a class="trip-slot-view-link" href="' + esc(url) + '">View details</a>' : '')
       + '<button type="button" class="trip-slot-remove-btn" data-replace-id="' + esc(v.id) + '"' + (key ? ' data-replace-key="' + esc(key) + '"' : '') + ' aria-label="Replace ' + esc(v.name) + ' with another suggestion" title="Remove this stop and suggest another">Replace</button>'
@@ -14814,7 +14827,7 @@ function renderTripPlannerV2Script() {
             + '<div class="trip-slot-meta">' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</div>'
             + ((s.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + s.caveats.map(li).join('') + '</ul>' : '')
             + '<div class="trip-slot-actions">'
-            + (e.name ? '<button type="button" class="trip-btn" data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '" data-plan-stop>Add to trip</button>' : '')
+            + (e.name ? '<button type="button" class="trip-btn" data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' data-plan-stop>Add to trip</button>' : '')
             + (u ? '<span class="trip-slot-secondary"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></span>' : '') + '</div></div>';
         }).join('') + '</div>';
       } else {
@@ -14870,7 +14883,8 @@ function renderTripPlannerV2Script() {
   function planStopButtons(){
     var seen = {}, out = [];
     Array.prototype.forEach.call(resultEl.querySelectorAll('.trip-btn[data-plan-stop]'), function(b){
-      var n = b.getAttribute('data-trip-name');
+      // Stage 5C: one stop per ref (two same-name places are two stops).
+      var n = b.getAttribute('data-trip-ref') || b.getAttribute('data-trip-name');
       if (!n || seen[n]) return;
       seen[n] = true;
       out.push(b);
