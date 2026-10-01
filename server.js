@@ -16954,6 +16954,14 @@ const server = http.createServer(async (req, res) => {
         // without touching any actual search behavior).
         html = html.replace('<body class="wizard-active">', '<body class="wizard-active page-browse">');
 
+        // Stage 4.2 (2026-10-01): /browse is a compatibility directory in its
+        // own right, not a copy of the homepage -- its own title and a
+        // self-canonical (query strings ignored). The og:/twitter: tags and
+        // everything else in the template are unchanged.
+        html = html
+          .replace(/<title>[^<]*<\/title>/, () => '<title>Browse &amp; Search the Okanagan | Okanagan Roam</title>')
+          .replace(/<link rel="canonical" href="[^"]*">/, () => '<link rel="canonical" href="https://okanaganroam.com/browse">');
+
         // Same broken-anchor problem as the footer fix below, found in the
         // same audit: the shared header's "Discover"/"Things to Do" nav
         // dropdowns link to #moodCards/#hiddenGems/#exploreRegions, which

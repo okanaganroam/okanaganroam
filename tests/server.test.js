@@ -13524,3 +13524,42 @@ test('Stage 4.0 F10: on phones the V2 stop links start their own line at the lef
   assert.equal((v2.match(/flex-basis: 100%/g) || []).length, 1, 'one rule, nowhere else');
   assert.doesNotMatch(app.renderTripPlannerPage(false), /trip-slot-secondary \{ margin-left: 0; flex-basis: 100%/, 'the planner-off page is untouched');
 });
+
+// ---- Stage 4.2 (2026-10-01): /browse has its own title and a self-canonical ----
+// /browse stays the legacy directory (same template, same app.js behaviour),
+// but it no longer presents itself as the homepage. Query strings are ignored
+// for the canonical; the homepage's own head is untouched.
+const STAGE42_TITLE = '<title>Browse &amp; Search the Okanagan | Okanagan Roam</title>';
+const STAGE42_CANONICAL = '<link rel="canonical" href="https://okanaganroam.com/browse">';
+async function stage42Head(base, path) {
+  const html = await (await fetch(`${base}${path}`)).text();
+  return {
+    html,
+    titles: html.match(/<title>[^<]*<\/title>/g) || [],
+    canonicals: html.match(/<link rel="canonical" href="[^"]*">/g) || [],
+  };
+}
+
+for (const flag of ['on', undefined]) {
+  test(`Stage 4.2: /browse has its own title and a self-canonical, for every query string (discovery search ${flag || 'off'})`, () => withDiscoveryFlag(flag, () => withDiscoveryServer(async (base) => {
+    for (const path of ['/browse', '/browse?types=restaurant', '/browse?features=patio', '/browse?regions=kelowna', '/browse?q=fixture&types=restaurant']) {
+      const { html, titles, canonicals } = await stage42Head(base, path);
+      assert.deepEqual(titles, [STAGE42_TITLE], `${path}: one title, the approved one`);
+      assert.deepEqual(canonicals, [STAGE42_CANONICAL], `${path}: one canonical, /browse`);
+      // Everything else in the head is the template's own (og:/twitter: unchanged).
+      assert.match(html, /<meta property="og:url" content="https:\/\/okanaganroam\.com\/">/, path);
+      assert.match(html, /<body class="wizard-active page-browse">/, path);
+    }
+    // The homepage keeps its own title and canonical.
+    const home = await stage42Head(base, '/');
+    assert.deepEqual(home.titles, ['<title>Okanagan Roam, Find Wineries, Lounges & Restaurants Worth the Drive</title>']);
+    assert.deepEqual(home.canonicals, ['<link rel="canonical" href="https://okanaganroam.com/">']);
+  })));
+}
+
+test('Stage 4.2: the /browse redirects run before the page is built (Stage 3.6 bridge and the map link unchanged)', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const go = async (path) => { const r = await fetch(`${base}${path}`, { redirect: 'manual' }); await r.text(); return { status: r.status, location: r.headers.get('location') }; };
+  assert.deepEqual(await go('/browse?q=fixture'), { status: 302, location: '/search?q=fixture' });
+  assert.deepEqual(await go('/browse?openMap=1'), { status: 302, location: '/map' });
+  assert.equal((await go(`/browse?q=${encodeURIComponent('Test Trattoria')}`)).location, '/kelowna/restaurants/test-trattoria');
+})));
