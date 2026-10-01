@@ -32,12 +32,166 @@ test('V3 helpers: a shared link carries only the request, seed, edits, kept and 
   const s = { text: 'Plan 3 days in Kelowna & wine', seed: 4, overrides: { days: 3, pace: 'relaxed', baseRegion: 'penticton' }, locks: { '1-morning': 12, '9-night': 5 }, exclude: [7, 8] };
   const qs = v3.t3StateToQuery(s);
   assert.ok(!qs.includes('9-night'), 'invalid lock keys are not written');
-  assert.deepEqual(v3.t3QueryToState(qs, ['penticton', 'kelowna']), { text: s.text, seed: 4, overrides: s.overrides, locks: { '1-morning': 12 }, exclude: [7, 8] });
+  assert.deepEqual(v3.t3QueryToState(qs, ['penticton', 'kelowna']), { text: s.text, seed: 4, overrides: s.overrides, locks: { '1-morning': 12 }, exclude: [7, 8], pinned: null, avoid: [], removed: [], invalid: false });
   assert.equal(v3.t3QueryToState('', []), null);
   assert.equal(v3.t3QueryToState('?seed=3', []), null, 'no request, no plan');
   const junk = v3.t3QueryToState('?q=hi&seed=-1&days=12&pace=fast&base=seattle&keep=1-morning:abc,2-evening:5&skip=1,x,2', ['kelowna']);
-  assert.deepEqual(junk, { text: 'hi', seed: 0, overrides: {}, locks: { '2-evening': 5 }, exclude: [1, 2] });
+  assert.deepEqual(junk, { text: 'hi', seed: 0, overrides: {}, locks: { '2-evening': 5 }, exclude: [1, 2], pinned: null, avoid: [], removed: [], invalid: true });
   assert.equal(v3.t3QueryToState('?q=' + 'a'.repeat(900), []).text.length, 500);
+});
+
+// ---- Stage 5A (F09, 2026-10-01): the link replays the request behind the plan on screen ----
+
+// What the V3 page sends for a request, and what it rebuilds from a link --
+// the same rules as renderScript() (request(), syncUrl(), the restore block).
+const pageBody = (st, extra) => {
+  const body = { text: st.text, seed: st.seed, excludeVenueIds: st.exclude.slice(-200) };
+  const ov = {};
+  ['days', 'pace', 'baseRegion'].forEach((k) => { if (st.overrides[k] !== undefined) ov[k] = st.overrides[k]; });
+  if (Object.keys(ov).length) body.overrides = ov;
+  return Object.assign(body, extra);
+};
+const linkFor = (st, body, removed = {}) => v3.t3StateToQuery({ text: st.text, seed: body.seed, overrides: body.overrides || {}, locks: st.locks, exclude: body.excludeVenueIds, pinned: body.pinned || null, avoid: body.avoidVenueIds || [], removed });
+const replayBody = (qs, regions) => {
+  const r = v3.t3QueryToState(qs, regions);
+  const extra = {};
+  if (r.pinned) extra.pinned = r.pinned; else if (Object.keys(r.locks).length) extra.pinned = r.locks;
+  if (r.avoid.length) extra.avoidVenueIds = r.avoid;
+  return pageBody({ text: r.text, seed: r.seed, overrides: r.overrides, exclude: r.exclude }, extra);
+};
+const planFor = (body) => {
+  const intent = d.interpretDiscoveryQuery(body.text, T);
+  if (body.overrides && body.overrides.days) intent.days = body.overrides.days;
+  if (body.overrides && body.overrides.pace) intent.pace = body.overrides.pace;
+  return tp.planTrip({ intent, facts: FACTS, labels: LABELS, seed: body.seed, excludeIds: body.excludeVenueIds, avoidIds: body.avoidVenueIds || [], pinned: body.pinned || null, clock: { weekday: 'tue', minutes: 720 } });
+};
+const slotIds = (p) => (p.days || []).map((x) => x.stops.map((s) => x.day + '-' + s.daypart + ':' + (s.venue ? s.venue.id : '-')).join(' ')).join(' | ');
+const pinsOf = (p, except) => { const o = {}; (p.days || []).forEach((x) => x.stops.forEach((s) => { const k = x.day + '-' + s.daypart; if (s.venue && k !== except) o[k] = s.venue.id; })); return o; };
+
+test('Stage 5A F09: after Swap, Regenerate and Regenerate day the recipient gets the identical request -- and the identical plan', () => {
+  const text = 'Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake';
+  const st = { text, seed: 0, overrides: {}, locks: {}, exclude: [] };
+  // 1. first plan
+  let body = pageBody(st, {});
+  let shown = planFor(body);
+  assert.ok(shown.days.length === 3 && stops(shown).length >= 9, 'a real 3-day plan');
+  const check = (label, removed) => {
+    const qs = linkFor(st, body, removed);
+    assert.deepEqual(replayBody(qs, []), body, `${label}: the link rebuilds the exact request`);
+    assert.equal(slotIds(planFor(replayBody(qs, []))), slotIds(shown), `${label}: the recipient's plan is the sender's`);
+    assert.equal(v3.t3StateToQuery(Object.assign(v3.t3QueryToState(qs, []), { locks: v3.t3QueryToState(qs, []).locks, removed: Object.fromEntries(v3.t3QueryToState(qs, []).removed.map((k) => [k, 1])) })), qs, `${label}: re-encoding a decoded link gives the same link`);
+    return qs;
+  };
+  check('initial');
+  // 2. Keep one stop, then Swap another (pins every other stop, skips the swapped one)
+  const keepKey = Object.keys(pinsOf(shown))[0];
+  st.locks[keepKey] = pinsOf(shown)[keepKey];
+  const swapKey = Object.keys(pinsOf(shown))[2];
+  st.exclude.push(pinsOf(shown)[swapKey]);
+  body = pageBody(st, { pinned: pinsOf(shown, swapKey) });
+  const before = slotIds(shown);
+  shown = planFor(body);
+  assert.notEqual(slotIds(shown), before, 'the swap changed the plan');
+  check('after swap');
+  // 3. Regenerate the whole plan (seed + 1, avoid what was shown except kept stops)
+  st.seed += 1;
+  const kept = Object.values(st.locks);
+  body = pageBody(st, { pinned: Object.assign({}, st.locks), avoidVenueIds: stops(shown).map((s) => s.venue.id).filter((x) => !kept.includes(x)) });
+  shown = planFor(body);
+  check('after regenerate');
+  // 4. Regenerate day 2 (pins the other days, avoids day 2's stops)
+  const pins = pinsOf(shown);
+  Object.keys(pins).forEach((k) => { if (k[0] === '2' && st.locks[k] !== pins[k]) delete pins[k]; });
+  st.seed += 1;
+  body = pageBody(st, { pinned: pins, avoidVenueIds: shown.days[1].stops.filter((s) => s.venue).map((s) => s.venue.id) });
+  shown = planFor(body);
+  check('after regenerate day');
+  // 5. A removed stop travels as its slot key (rm=), never as a name.
+  const rmKey = Object.keys(pinsOf(shown)).slice(-1)[0];
+  const qs = check('with a removed stop', { [rmKey]: 1 });
+  assert.deepEqual(v3.t3QueryToState(qs, []).removed, [rmKey]);
+});
+
+test('Stage 5A F09: Swap on every stop of a plan -- the link always reproduces it; the pre-5A link (no pin) does not', () => {
+  let legacyMisses = 0, swaps = 0;
+  for (const text of ['Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake', '2 days in Penticton with the kids — beaches, parks and easy food', 'Coffee, a hike, a winery and dinner in Kelowna']) {
+    const st0 = { text, seed: 0, overrides: {}, locks: {}, exclude: [] };
+    const first = planFor(pageBody(st0, {}));
+    for (const key of Object.keys(pinsOf(first))) {
+      const st = { text, seed: 0, overrides: {}, locks: {}, exclude: [pinsOf(first)[key]] };
+      const body = pageBody(st, { pinned: pinsOf(first, key) });
+      const shown = planFor(body);
+      const qs = linkFor(st, body);
+      assert.equal(slotIds(planFor(replayBody(qs, []))), slotIds(shown), `${text} / swap ${key}`);
+      if (slotIds(planFor(replayBody(qs.replace(/&pin=[^&]*/, ''), []))) !== slotIds(shown)) legacyMisses += 1;
+      swaps += 1;
+    }
+  }
+  assert.ok(swaps >= 10, `${swaps} swaps checked`);
+  assert.ok(legacyMisses > 0, `the F09 defect is real: ${legacyMisses} of ${swaps} swaps were not reproduced by a pre-5A link`);
+});
+
+test('Stage 5A F09: a link holds only the request text, settings, slot keys and venue ids -- never a name or a fact', () => {
+  const st = { text: 'A romantic weekend in Naramata with wineries and a great dinner', seed: 2, overrides: { pace: 'relaxed' }, locks: {}, exclude: [] };
+  const body = pageBody(st, {});
+  const shown = planFor(body);
+  const qs = linkFor(st, Object.assign({}, body, { pinned: pinsOf(shown) }), {});
+  const params = qs.slice(1).split('&').map((x) => x.split('=')[0]);
+  assert.deepEqual(params, ['q', 'seed', 'pace', 'pin']);
+  const rest = qs.replace(/^\?q=[^&]*/, '');
+  for (const s of stops(shown)) assert.ok(!rest.includes(encodeURIComponent(s.venue.name)) && !rest.includes(s.venue.name), `no venue name (${s.venue.name})`);
+  assert.match(decodeURIComponent(rest), /^&seed=2&pace=relaxed&pin=([1-7]-(morning|midday|afternoon|evening):\d+,?)+$/);
+});
+
+test('Stage 5A F09: keys are written in day / daypart order, so the same state is always the same link', () => {
+  const a = v3.t3StateToQuery({ text: 'x', pinned: { '2-evening': 5, '1-midday': 4, '1-morning': 3 }, locks: { '2-morning': 9, '1-evening': 8 }, removed: { '3-afternoon': 1, '1-morning': 1 } });
+  const b = v3.t3StateToQuery({ text: 'x', pinned: { '1-morning': 3, '2-evening': 5, '1-midday': 4 }, locks: { '1-evening': 8, '2-morning': 9 }, removed: { '1-morning': 1, '3-afternoon': 1 } });
+  assert.equal(a, b);
+  assert.equal(decodeURIComponent(a), '?q=x&keep=1-evening:8,2-morning:9&pin=1-morning:3,1-midday:4,2-evening:5&rm=1-morning,3-afternoon');
+});
+
+test('Stage 5A F09: malformed links fail safe -- bad parts are dropped and flagged, never guessed; no request text means no plan', () => {
+  const R = (qs) => v3.t3QueryToState(qs, ['kelowna']);
+  assert.equal(R('?pin=1-morning:5&rm=1-morning'), null, 'no q: a plain /trip');
+  assert.equal(R('?q=%20%20'), null);
+  assert.doesNotThrow(() => R('?q=hi&pin=%E0%A4%A'));
+  assert.equal(R('?q=hi&pin=%E0%A4%A').invalid, true, 'a broken escape is flagged, not thrown');
+  assert.equal(R('?q=hi&seed=1000001').seed, 0, 'seed above the server limit is dropped');
+  assert.equal(R('?q=hi&seed=1000001').invalid, true);
+  assert.equal(R('?q=hi&seed=1000000').seed, 1000000);
+  const bad = R('?q=hi&pin=1-morning:0,2-noon:5,1-evening:7&avoid=0,3,-1&skip=4,abc&rm=1-evening,9-morning&keep=1-midday:x');
+  assert.deepEqual(bad.pinned, { '1-evening': 7 }, 'zero ids and unknown slots dropped');
+  assert.deepEqual(bad.avoid, [3]);
+  assert.deepEqual(bad.exclude, [4]);
+  assert.deepEqual(bad.removed, ['1-evening']);
+  assert.deepEqual(bad.locks, {});
+  assert.equal(bad.invalid, true);
+  const clean = R('?q=hi&pin=1-evening:7&avoid=3&skip=4&rm=1-evening');
+  assert.equal(clean.invalid, false);
+  assert.equal(R('?q=hi&pin=').pinned, null, 'an empty pin is no pin');
+  // Bounds the API enforces: at most 28 pins, at most 200 ids per list.
+  const many = Array.from({ length: 7 }, (_, i) => ['morning', 'midday', 'afternoon', 'evening'].map((p, j) => `${i + 1}-${p}:${i * 4 + j + 1}`)).flat();
+  assert.equal(Object.keys(R('?q=hi&pin=' + many.join(',')).pinned).length, 28);
+  assert.equal(R('?q=hi&pin=' + many.join(',')).invalid, false);
+  const ids = Array.from({ length: 250 }, (_, i) => i + 1).join(',');
+  assert.equal(R('?q=hi&avoid=' + ids).avoid.length, 200);
+  assert.equal(R('?q=hi&avoid=' + ids).invalid, true);
+  assert.deepEqual(R('?q=hi&skip=' + ids).exclude.slice(0, 2), [51, 52], 'skip keeps the most recent 200, as the page sends');
+});
+
+test('Stage 5A F09: the largest realistic link (7 days x 4 stops, 200 skipped, 200 avoided, every stop kept or removed) stays a few KB', () => {
+  const pinned = {}; const locks = {}; const removed = {};
+  for (let day = 1; day <= 7; day++) ['morning', 'midday', 'afternoon', 'evening'].forEach((p, j) => { pinned[`${day}-${p}`] = 100000 + day * 10 + j; if (j % 2) locks[`${day}-${p}`] = pinned[`${day}-${p}`]; else removed[`${day}-${p}`] = 1; });
+  const ids = Array.from({ length: 200 }, (_, i) => 100000 + i);
+  const qs = v3.t3StateToQuery({ text: 'x'.repeat(500), seed: 1000000, overrides: { days: 7, pace: 'packed', baseRegion: 'kelowna' }, locks, exclude: ids, pinned, avoid: ids, removed });
+  const url = 'https://okanaganroam.com/trip' + qs;
+  assert.ok(url.length < 8000, `link length ${url.length}`);
+  const back = v3.t3QueryToState(qs, ['kelowna']);
+  assert.equal(back.invalid, false);
+  assert.equal(Object.keys(back.pinned).length, 28);
+  assert.equal(back.exclude.length, 200);
+  assert.equal(back.avoid.length, 200);
+  assert.equal(back.removed.length, 14);
 });
 
 test('V3 helpers: "Map this day" uses the stops\' own stored name + address, in order', () => {

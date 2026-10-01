@@ -38,44 +38,92 @@ function t3KmText(km) {
 }
 // The shareable plan state <-> a query string. Only the request text, the
 // seed, the visitor's edits and their kept / removed stops -- never a fact.
+//
+// Stage 5A (F09, 2026-10-01): a link replays the exact plan request that
+// produced the plan on screen -- its seed, settings, skipped stops (skip),
+// pinned stops (pin) and avoided stops (avoid) -- and then re-applies the
+// visitor's own edits on top: kept stops (keep) and removed stops (rm). The
+// planner is deterministic for the same request and the same listings, so
+// the recipient sees the sender's plan, including after Swap, Regenerate and
+// Regenerate day. Only slot keys and venue ids are added: no names, no facts.
+// Keys are written in day / daypart order so the same state is always the
+// same link. Links made before Stage 5A (no pin / avoid / rm) restore exactly
+// as they did before.
 function t3StateToQuery(s) {
   const p = [];
   const add = (k, v) => p.push(k + '=' + encodeURIComponent(v));
+  const KEY = /^[1-7]-(morning|midday|afternoon|evening)$/;
+  const PARTS = ['morning', 'midday', 'afternoon', 'evening'];
+  const byKey = (a, b) => (Number(a[0]) - Number(b[0])) || (PARTS.indexOf(a.slice(2)) - PARTS.indexOf(b.slice(2)));
+  const id = (x) => Number.isInteger(x) && x > 0 && x < 1e9;
+  const slots = (m) => Object.keys(m || {}).filter((k) => KEY.test(k) && id(m[k])).sort(byKey).map((k) => k + ':' + m[k]);
   if (s.text) add('q', s.text);
   if (s.seed) add('seed', String(s.seed));
   const o = s.overrides || {};
   if (o.days) add('days', String(o.days));
   if (o.pace) add('pace', o.pace);
   if (o.baseRegion) add('base', o.baseRegion);
-  const locks = Object.keys(s.locks || {}).filter((k) => /^[1-7]-(morning|midday|afternoon|evening)$/.test(k)).map((k) => k + ':' + s.locks[k]);
+  const locks = slots(s.locks);
   if (locks.length) add('keep', locks.join(','));
-  const ex = (s.exclude || []).filter((x) => Number.isInteger(x) && x > 0).slice(-50);
+  const ex = (s.exclude || []).filter(id).slice(-200);
   if (ex.length) add('skip', ex.join(','));
+  const pins = slots(s.pinned).slice(0, 28);
+  if (pins.length) add('pin', pins.join(','));
+  const avoid = (s.avoid || []).filter(id).slice(0, 200);
+  if (avoid.length) add('avoid', avoid.join(','));
+  const removed = Object.keys(s.removed || {}).filter((k) => KEY.test(k)).sort(byKey);
+  if (removed.length) add('rm', removed.join(','));
   return p.length ? '?' + p.join('&') : '';
 }
+// The reverse: anything malformed is dropped (never guessed) and reported
+// through `invalid`, so a damaged link still plans from its request text.
 function t3QueryToState(search, regions) {
   const q = {};
   String(search || '').replace(/^\?/, '').split('&').forEach((pair) => {
     if (!pair) return;
     const i = pair.indexOf('=');
-    const k = decodeURIComponent((i < 0 ? pair : pair.slice(0, i)).replace(/\+/g, ' '));
-    const v = i < 0 ? '' : decodeURIComponent(pair.slice(i + 1).replace(/\+/g, ' '));
-    q[k] = v;
+    try {
+      const k = decodeURIComponent((i < 0 ? pair : pair.slice(0, i)).replace(/\+/g, ' '));
+      const v = i < 0 ? '' : decodeURIComponent(pair.slice(i + 1).replace(/\+/g, ' '));
+      q[k] = v;
+    } catch (e) { q.__bad = '1'; }
   });
   const text = typeof q.q === 'string' ? q.q.trim().slice(0, 500) : '';
   if (!text) return null;
-  const seed = /^\d{1,7}$/.test(q.seed || '') ? Number(q.seed) : 0;
+  let invalid = !!q.__bad;
+  const ID = '[1-9]\\d{0,8}';
+  const SLOT = new RegExp('^([1-7]-(?:morning|midday|afternoon|evening)):(' + ID + ')$');
+  const seedOk = /^\d{1,7}$/.test(q.seed || '') && Number(q.seed) <= 1000000;
+  const seed = seedOk ? Number(q.seed) : 0;
+  if (q.seed !== undefined && !seedOk) invalid = true;
   const overrides = {};
-  if (/^[1-7]$/.test(q.days || '')) overrides.days = Number(q.days);
-  if (['relaxed', 'standard', 'packed'].indexOf(q.pace) !== -1) overrides.pace = q.pace;
-  if (q.base === 'valley' || (regions || []).indexOf(q.base) !== -1) overrides.baseRegion = q.base;
-  const locks = {};
-  String(q.keep || '').split(',').forEach((pair) => {
-    const m = /^([1-7]-(?:morning|midday|afternoon|evening)):(\d{1,9})$/.exec(pair);
-    if (m) locks[m[1]] = Number(m[2]);
-  });
-  const exclude = String(q.skip || '').split(',').filter((x) => /^\d{1,9}$/.test(x)).map(Number).slice(-50);
-  return { text, seed, overrides, locks, exclude };
+  if (/^[1-7]$/.test(q.days || '')) overrides.days = Number(q.days); else if (q.days !== undefined) invalid = true;
+  if (['relaxed', 'standard', 'packed'].indexOf(q.pace) !== -1) overrides.pace = q.pace; else if (q.pace !== undefined) invalid = true;
+  if (q.base === 'valley' || (regions || []).indexOf(q.base) !== -1) overrides.baseRegion = q.base; else if (q.base !== undefined) invalid = true;
+  const slotMap = (raw, max) => {
+    if (raw === undefined) return null;
+    const out = {};
+    let n = 0;
+    String(raw).split(',').forEach((pair) => {
+      const m = SLOT.exec(pair);
+      if (m && n < max) { if (!(m[1] in out)) n += 1; out[m[1]] = Number(m[2]); } else invalid = true;
+    });
+    return out;
+  };
+  const idList = (raw, max) => {
+    if (raw === undefined) return [];
+    const all = String(raw).split(',');
+    const ok = all.filter((x) => new RegExp('^' + ID + '$').test(x)).map(Number);
+    if (ok.length !== all.length || ok.length > max) invalid = true;
+    return ok.slice(-max);
+  };
+  const locks = slotMap(q.keep, 28) || {};
+  const exclude = idList(q.skip, 200);
+  const pinned = slotMap(q.pin, 28);
+  const avoid = idList(q.avoid, 200);
+  const removed = [];
+  if (q.rm !== undefined) String(q.rm).split(',').forEach((k) => { if (/^[1-7]-(morning|midday|afternoon|evening)$/.test(k)) { if (removed.indexOf(k) === -1) removed.push(k); } else invalid = true; });
+  return { text, seed, overrides, locks, exclude, pinned: pinned && Object.keys(pinned).length ? pinned : null, avoid, removed, invalid };
 }
 // A Google Maps directions link through the given stops, in order, using
 // each stop's stored name + address (the same query My Trip's route uses).
@@ -304,13 +352,17 @@ function renderScript(d) {
   var REGION_IMAGES = ${JSON.stringify(d.regionImages)};
   var TRIP_MAX_STOPS = 10; // My Trip's own limit (MAX_STOPS in /scripts/app.js)
   ${CLIENT_HELPERS_SRC}
-  var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null };
+  var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
   function setStatus(text, mode){ statusEl.textContent = text || ''; statusEl.className = 't3-status' + (mode ? ' is-' + mode : ''); }
 
-  // ---- analytics: the same events and fixed parameters as the V2 view ----
+  // ---- analytics: the same events and fixed parameters as the V2 view, plus
+  // the Stage 5A (F12) V3 events: trip_plan_edit (keep / unkeep / remove /
+  // undo), trip_plan_share, outbound_click for "Map this day", and the
+  // 'shared_link' request type / 'invalid_share' error. Fixed values only --
+  // never the request text, a venue name or a venue id. ----
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
   function planFacts(p){
     var regions = ((p && p.intent && p.intent.regions) || []).filter(function(r){ return REGION_SLUGS.indexOf(r) !== -1; });
@@ -347,7 +399,16 @@ function renderScript(d) {
         }
         setStatus('');
         state.last = res.j;
+        state.lastReq = { seed: body.seed, overrides: body.overrides || {}, exclude: body.excludeVenueIds, pinned: body.pinned || null, avoid: body.avoidVenueIds || [] };
         state.removed = {};
+        // A shared link's removed stops (rm=): removed again, exactly as the
+        // sender left them, and skipped by any later regenerate.
+        (opts.removedKeys || []).forEach(function(key){
+          var rs = stopAt(key);
+          if (!rs) return;
+          state.removed[key] = rs.venue.id;
+          if (state.exclude.indexOf(rs.venue.id) === -1) state.exclude.push(rs.venue.id);
+        });
         // Kept stops the planner could not keep are no longer kept.
         Object.keys(state.locks).forEach(function(key){ if (!stopAt(key) || stopAt(key).venue.id !== state.locks[key]) delete state.locks[key]; });
         render(opts.focus !== false);
@@ -363,8 +424,15 @@ function renderScript(d) {
         track('trip_plan_error', { request_type: requestType, error_type: 'exception' });
       });
   }
+  // The address bar always holds the link to the plan on screen (replaceState:
+  // no extra history entries, so Back leaves the page as before). It is built
+  // from the request that produced that plan -- not from a later request that
+  // failed -- plus the visitor's kept and removed stops.
   function syncUrl(){
-    try { history.replaceState(null, '', '/trip' + t3StateToQuery({ text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude })); } catch (e) {}
+    var r = state.lastReq;
+    var s = r ? { text: state.text, seed: r.seed, overrides: r.overrides, locks: state.locks, exclude: r.exclude, pinned: r.pinned, avoid: r.avoid, removed: state.removed }
+      : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
+    try { history.replaceState(null, '', '/trip' + t3StateToQuery(s)); } catch (e) {}
   }
 
   // ---- plan helpers ----
@@ -514,7 +582,7 @@ function renderScript(d) {
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">Planned around your ' + esc(d.theme.label) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">Regenerate day</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">Add day to My Trip</button>'
-      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener">Map this day</a>' : '') + '</div></div></div>'
+      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>Map this day</a>' : '') + '</div></div></div>'
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
       + '</section>';
   }
@@ -669,12 +737,18 @@ function renderScript(d) {
       if (panel && !panel.classList.contains('open')) { track('open_my_trip', { trip_size: tripSize(), open_source: 'plan_view_trip' }); if (toggle) setTimeout(function(){ toggle.click(); }, 0); }
       return;
     }
+    if ((b = t.closest('[data-t3-map-day]'))) {
+      track('outbound_click', { link_type: 'trip_day_map', surface: 'trip_planner' });
+      return;
+    }
     if ((b = t.closest('[data-t3-share]'))) {
       syncUrl();
       var link = location.href;
-      var ok = function(){ announce('Link copied — anyone with it sees this plan.'); };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(ok, function(){ announce('Copy this link: ' + link); });
-      else announce('Copy this link: ' + link);
+      var shared = function(method){ var f = planFacts(state.last); track('trip_plan_share', { share_method: method, plan_kind: f.plan_kind, day_count: f.day_count }); };
+      var ok = function(){ announce('Link copied — anyone with it sees this plan.'); shared('clipboard'); };
+      var manual = function(){ announce('Copy this link: ' + link); shared('manual'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(ok, manual);
+      else manual();
       return;
     }
     if ((b = t.closest('[data-t3-keep]'))) {
@@ -682,6 +756,7 @@ function renderScript(d) {
       if (!s) return;
       if (state.locks[key] === s.venue.id) delete state.locks[key]; else state.locks[key] = s.venue.id;
       var on = state.locks[key] === s.venue.id;
+      track('trip_plan_edit', { edit_action: on ? 'keep' : 'unkeep', plan_kind: planFacts(state.last).plan_kind });
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
       b.textContent = on ? 'Kept' : 'Keep';
       var card = b.closest('.t3-card'); if (card) card.classList.toggle('is-kept', on);
@@ -694,6 +769,7 @@ function renderScript(d) {
       if (!rs) return;
       state.removed[rk] = rs.venue.id;
       delete state.locks[rk];
+      track('trip_plan_edit', { edit_action: 'remove', plan_kind: planFacts(state.last).plan_kind });
       if (state.exclude.indexOf(rs.venue.id) === -1) state.exclude.push(rs.venue.id);
       render(false);
       syncUrl();
@@ -705,6 +781,7 @@ function renderScript(d) {
     if ((b = t.closest('[data-t3-undo]'))) {
       var uk = b.getAttribute('data-t3-undo'), id = state.removed[uk];
       delete state.removed[uk];
+      track('trip_plan_edit', { edit_action: 'undo', plan_kind: planFacts(state.last).plan_kind });
       state.exclude = state.exclude.filter(function(x){ return x !== id; });
       render(false);
       syncUrl();
@@ -776,13 +853,23 @@ function renderScript(d) {
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip){
     chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
-  // A shared link (/trip?q=...) restores the same plan.
+  // A shared link (/trip?q=...) restores the same plan: it replays the
+  // sender's plan request (pin / avoid; an older link without them pins its
+  // kept stops, as before), then removes the stops the sender removed. A link
+  // that cannot be read at all leaves the page exactly as a plain /trip.
   var restored = t3QueryToState(location.search, REGION_SLUGS);
   if (restored) {
     input.value = restored.text;
-    state = { text: restored.text, seed: restored.seed, overrides: restored.overrides, locks: restored.locks, exclude: restored.exclude, removed: {}, last: null };
+    state = { text: restored.text, seed: restored.seed, overrides: restored.overrides, locks: restored.locks, exclude: restored.exclude, removed: {}, last: null, lastReq: null };
     track('trip_plan_start', { input_method: 'link' });
-    request(Object.keys(restored.locks).length ? { pinned: restored.locks } : {}, { requestType: 'initial' });
+    if (restored.invalid) track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
+    var replay = {};
+    if (restored.pinned) replay.pinned = restored.pinned;
+    else if (Object.keys(restored.locks).length) replay.pinned = restored.locks;
+    if (restored.avoid.length) replay.avoidVenueIds = restored.avoid;
+    request(replay, { requestType: 'shared_link', removedKeys: restored.removed });
+  } else if (/(?:^|[?&])(?:q|seed|days|pace|base|keep|skip|pin|avoid|rm)=/.test(location.search)) {
+    track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
   }
 })();
 </script>`;

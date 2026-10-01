@@ -12166,14 +12166,14 @@ const ga4Check = (html, pageType, label) => {
   assert.equal((html.match(GA4_TAG_RE) || []).length, 0, `${label}: no static loader tag (hostname-gated since Phase B)`);
   assert.equal((html.match(/gtag\('config', 'G-J312FGJPSC'/g) || []).length, 1, `${label}: exactly one config`);
   assert.equal((html.match(/window\.trackEvent = function\(name, params\)/g) || []).length, 1, `${label}: exactly one trackEvent wrapper`);
-  assert.equal((html.match(/page_type: '[a-z_]+'/g) || []).length, 1, `${label}: exactly one page_type`);
+  assert.equal((html.match(/page_type: '[a-z0-9_]+'/g) || []).length, 1, `${label}: exactly one page_type`);
   assert.ok(head.includes(`var cfg = { page_type: '${pageType}' };`) && head.includes("gtag('config', 'G-J312FGJPSC', cfg);"), `${label}: page_type ${pageType} as a config parameter, inside <head>`);
   assert.doesNotMatch(html, /gtag\('set'/, `${label}: no gtag(set)`);
 };
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
-  // Stage 4.4: + 'favorites' (the /favorites page).
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'venue']);
+  // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip).
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
@@ -12812,12 +12812,14 @@ test('Build My Trip V3: /api/trip/plan overrides are optional, strictly validate
   assert.deepEqual(again, b2);
 });
 
-test('Build My Trip V3: the page is the site shell + the V3 view; canonical /trip; noindex only in preview; analytics page_type trip', () => {
+test('Build My Trip V3: the page is the site shell + the V3 view; canonical /trip; noindex only in preview; analytics page_type trip_v3', () => {
   const html = app.renderTripPlannerV3Page({ preview: false });
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/trip">/);
   assert.doesNotMatch(html, /noindex/);
   assert.match(app.renderTripPlannerV3Page({ preview: true }), /<meta name="robots" content="noindex">/);
-  assert.ok(html.includes("page_type: 'trip'"), 'the shared analytics head with page_type trip');
+  // Stage 5A (F12): V3 views are labelled trip_v3, apart from V2's 'trip'.
+  ga4Check(html, 'trip_v3', 'trip v3');
+  assert.ok(!html.includes("page_type: 'trip'"), 'not the V2 label');
   assert.ok(html.includes('<header id="top">') && html.includes('id="tripTray"'), 'the homepage header and Trip tray');
   assert.ok(html.includes('<script src="/scripts/app.js"></script>'), 'app.js unchanged, for Add to Trip / Favorites');
   assert.ok(html.includes('id="t3Form"') && html.includes('id="t3Input"') && html.includes('fetch(\'/api/trip/plan\''));
@@ -12826,6 +12828,43 @@ test('Build My Trip V3: the page is the site shell + the V3 view; canonical /tri
   assert.doesNotMatch(html, /openai|gpt-/i, 'no model is called');
   const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
   new Function(js); // parses
+});
+
+// Stage 5A (F12, 2026-10-01): the V3 events -- where each fires, and that no
+// event carries the request text, a venue name or a venue id.
+test('Stage 5A F12: V3 reports edits, shares, Map this day and shared-link opens with fixed values only', () => {
+  const html = app.renderTripPlannerV3Page({ preview: true });
+  const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  const calls = js.match(/track\('[a-z_]+', \{[^}]*\}\)/g) || [];
+  const byName = (n) => calls.filter((c) => c.startsWith(`track('${n}'`));
+  // Edits: one call each in the Keep (keep / unkeep), Remove and Undo handlers.
+  assert.equal(byName('trip_plan_edit').length, 3);
+  assert.ok(byName('trip_plan_edit').every((c) => /\{ edit_action: (on \? 'keep' : 'unkeep'|'remove'|'undo'), plan_kind: planFacts\(state\.last\)\.plan_kind \}/.test(c)), byName('trip_plan_edit').join('\n'));
+  // Share: one call, after the copy succeeded ('clipboard') or the link was shown ('manual').
+  assert.deepEqual(byName('trip_plan_share'), ["track('trip_plan_share', { share_method: method, plan_kind: f.plan_kind, day_count: f.day_count })"]);
+  assert.ok(js.includes("shared('clipboard')") && js.includes("shared('manual')"));
+  // Map this day: the established outbound_click, with fixed values.
+  assert.deepEqual(byName('outbound_click'), ["track('outbound_click', { link_type: 'trip_day_map', surface: 'trip_planner' })"]);
+  assert.ok(js.includes('data-t3-map-day>Map this day</a>'));
+  // Opening a shared link: trip_plan_start (input_method link), then the
+  // plan request reported as request_type shared_link; an unreadable link
+  // is trip_plan_error invalid_share.
+  assert.ok(js.includes("track('trip_plan_start', { input_method: 'link' })"));
+  assert.ok(js.includes("requestType: 'shared_link'"));
+  assert.equal(byName('trip_plan_error').filter((c) => c.includes("error_type: 'invalid_share'")).length, 2);
+  // Every V3 event is fired from a handler or a request completion, never from render().
+  const renderFn = js.slice(js.indexOf('function render(focus)'), js.indexOf('// ---- My Trip (tray)'));
+  assert.ok(renderFn.length > 1000 && !/track\(/.test(renderFn), 'render() fires no events');
+  // No visitor text, names or ids in any V3 event parameter.
+  for (const c of calls) assert.doesNotMatch(c, /state\.text|\.name\b|venue\.id|\bid\b|location|href/, c);
+  // Existing V3 events are unchanged.
+  for (const c of ["track('trip_plan_complete', facts)", "track('trip_plan_regenerate', { plan_kind: planFacts(state.last).plan_kind })", "track('trip_plan_start', { input_method: fromExample ? 'example' : 'typed' })"]) assert.ok(js.includes(c), c);
+});
+
+test('Stage 5A F09/F12: the V2 /trip page is untouched -- no share replay, no V3 events, page_type trip', () => {
+  const v2 = app.renderTripPlannerPage(true);
+  ga4Check(v2, 'trip', 'trip v2');
+  for (const s of ['trip_plan_edit', 'trip_plan_share', 'shared_link', 'invalid_share', 'trip_day_map', 'data-t3-', 't3QueryToState']) assert.ok(!v2.includes(s), s);
 });
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {

@@ -7307,7 +7307,10 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // so site search is measurable separately from the legacy /browse directory.
 // Stage 4.4 (2026-10-01): 'favorites' labels the /favorites page (page_view
 // only; no new events).
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'listing_form', 'not_found', 'search', 'favorites']);
+// Stage 5A (F12, 2026-10-01): 'trip_v3' labels the Build My Trip V3 view, so
+// V3 page views and its trip_plan_* events are told apart from V2's ('trip').
+// Same URL (/trip), served only while TRIP_PLANNER_V3 allows it.
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -15239,7 +15242,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     tripTrayHtml,
     footerHtml: renderHomeFooterHTML(true),
     footerStyles: renderCanonicalFooterStyles(),
-    analyticsHead: renderAnalyticsHeadHtml('trip'),
+    analyticsHead: renderAnalyticsHeadHtml('trip_v3'),
     regions: VALID_REGIONS.map((slug) => ({ slug, label: REGION_LABELS[slug] })),
     regionImages: TRIP_V3_REGION_IMAGES,
     preview,
