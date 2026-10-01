@@ -13716,3 +13716,20 @@ test('Stage 4.3: GET /api/saved/resolve resolves ids and exact names, is bounded
   assert.deepEqual((await (await fetch(`${base}/api/saved/resolve`)).json()), { items: [], names: [] });
   assert.deepEqual(db.prepare('SELECT COUNT(*) AS n, MAX(updated_at) AS u FROM venues').get(), before, 'read-only');
 }));
+
+test('Stage 4.3: the real /whats-on page cards carry the first occurrence in the displayed window; /api/events stays unchanged', () => withDiscoveryServer(async (base) => {
+  // The page renders through getWhatsOnEvents() -> whatsOnPublicEvent(), not
+  // queryWhatsOnEvents() directly; this exercises that real path.
+  const occ = db.prepare("SELECT o.id, o.start_date FROM event_occurrences o JOIN events e ON e.id = o.event_id WHERE e.region = 'kelowna' AND e.slug = 'test-weekly-market' ORDER BY o.start_date").all();
+  const card = (html) => (html.match(/<li class="venue-card whatson-event-card" data-venue-id="event-\d+"[^>]*data-venue-name="Test Weekly Market"[^>]*>/) || [])[0];
+  const full = card(await (await fetch(`${base}/whats-on?from=2099-01-01&to=2099-01-31`)).text());
+  assert.ok(full, 'the weekly market card is on the page');
+  assert.ok(full.includes(` data-occurrence-id="${occ[0].id}" data-occurrence-date="2099-01-03" data-occurrence-time="09:00"`), full);
+  const later = card(await (await fetch(`${base}/whats-on?from=2099-01-05&to=2099-01-31`)).text());
+  assert.ok(later.includes(` data-occurrence-id="${occ[1].id}" data-occurrence-date="2099-01-10"`), 'first occurrence in the window shown');
+  // The same public shape feeds /api/events: no new field in its JSON.
+  assert.ok(app.getWhatsOnEvents({ from: '2099-01-01', to: '2099-01-31' }).every((e) => !Object.keys(e).includes('firstOccurrence')));
+  const api = await (await fetch(`${base}/api/events?from=2099-01-01&to=2099-01-31`)).text();
+  assert.match(api, /Test Weekly Market/);
+  assert.doesNotMatch(api, /firstOccurrence|data-occurrence/);
+}));

@@ -2670,12 +2670,17 @@ const EVENT_META_KEYS = ['reason', 'batch_id', 'reviewed_by', 'reviewed_duplicat
 // comment): exactly what a listing card needs, nothing about sources,
 // confidence, status or internal ids beyond the event's own id.
 function whatsOnPublicEvent(row) {
-  return {
+  const card = {
     id: row.id, name: row.name, slug: row.slug, region: row.region, valleyWide: row.valleyWide,
     categories: row.categories, description: row.description, image: row.image,
     startDate: row.startDate, endDate: row.endDate, dateLabel: row.dateLabel, time: row.time,
     occurrenceCount: row.occurrenceCount, venueName: row.venueName, attribution: row.attribution,
   };
+  // Stage 4.3: keep the card's occurrence (non-enumerable, as on the row) so
+  // the What's On cards rendered from this shape carry it; /api/events JSON
+  // is unchanged.
+  if (row.firstOccurrence) Object.defineProperty(card, 'firstOccurrence', { value: row.firstOccurrence, enumerable: false });
+  return card;
 }
 function whatsOnPublicOccurrence(o) {
   return { id: o.id, startDate: o.start_date, endDate: o.end_date, startTime: o.start_time, endTime: o.end_time, endsNextDay: o.ends_next_day, allDay: o.all_day, label: o.label };
