@@ -261,7 +261,6 @@ function renderStyles() {
   .t3-why { margin: 0 0 6px; padding-left: 18px; font-size: 0.88rem; line-height: 1.5; }
   .t3-caveats { margin: 0 0 8px; padding: 8px 12px; list-style: none; background: #FFF6E6; border-radius: 10px; font-size: 0.82rem; color: #5B4212; }
   .t3-caveats li + li { margin-top: 4px; }
-  .t3-samename { margin: 0 0 8px; font-size: 0.8rem; font-style: italic; color: #7A4A2A; }
   .t3-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 40px; }
   .t3-act { background: transparent; border: 1px solid rgba(27,43,58,0.2); color: var(--ref-navy); border-radius: 999px; padding: 7px 13px; min-height: 40px; font-size: 0.8rem; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
@@ -496,9 +495,8 @@ function renderScript(d) {
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + ' <span class="t3-sr">(</span>— check before you go<span class="t3-sr">)</span></p>' : '')
       + (why ? '<ul class="t3-why" aria-label="Why it fits">' + why + '</ul>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="Good to know">' + cav + '</ul>' : '')
-      + (same ? '<p class="t3-samename">Another stop in this plan has the same name. My Trip lists places by name, so only one of them can be added there.</p>' : '')
       + '<div class="t3-actions">'
-      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + '>Add to trip</button>'
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + '>Add to trip</button>'
       + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>';
     if (key) {
       html += '<button type="button" class="t3-act" data-t3-keep="' + esc(key) + '" aria-pressed="' + (kept ? 'true' : 'false') + '" aria-label="Keep ' + esc(v.name) + ' when regenerating">' + (kept ? 'Kept' : 'Keep') + '</button>'
@@ -553,7 +551,7 @@ function renderScript(d) {
           var e = s.event, u = safeUrl(e.url);
           html += '<li class="t3-stop"><div class="t3-when">' + esc(s.label) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>Event</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '">Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">View event</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">View event</a>' : '') + '</div></article></div></li>';
           return;
         }
         html += '<li class="t3-stop"><div class="t3-when">' + esc(s.label) + '</div><div class="t3-empty">No suitable stop was found for this part of the day.</div></li>';
@@ -657,7 +655,8 @@ function renderScript(d) {
     var seen = {}, out = [];
     Array.prototype.forEach.call(resultEl.querySelectorAll('.trip-btn[data-plan-stop]'), function(b){
       if (day && b.getAttribute('data-plan-day') !== String(day)) return;
-      var n = b.getAttribute('data-trip-name');
+      // Stage 5C: one stop per ref -- two same-name places are two stops.
+      var n = b.getAttribute('data-trip-ref') || b.getAttribute('data-trip-name');
       if (!n || seen[n]) return;
       seen[n] = true; out.push(b);
     });

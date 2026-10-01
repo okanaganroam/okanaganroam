@@ -924,6 +924,8 @@ function venueCardHtml(v){
 
   return '' +
     '<article class="venue-card" data-name="' + escapeAttr(v.name) + '" data-region="' + escapeAttr(v.region) + '" data-type="' + escapeAttr(v.type) + '"' +
+    // Stage 5C: the Trip tray identifies a stop by this ref (not by its name).
+    (typeof v.id === 'number' && v.id > 0 ? ' data-trip-ref="venue:' + v.id + '"' : '') +
     // Effective Food & Drink categories: the venue's own type plus any
     // secondary category memberships the API reports. Absent for venues with
     // no Food & Drink identity (wineries, golf, beaches, outdoors), whose
@@ -1765,6 +1767,7 @@ function initBlock11(){
     tripBtn.dataset.tripQuery = query;
     tripBtn.dataset.tripName = name;
     tripBtn.dataset.tripRegion = regionSlug;
+    if (card.dataset.tripRef) tripBtn.dataset.tripRef = card.dataset.tripRef;
     tripBtn.textContent = t('trip.addToTrip');
     tripFavRow.appendChild(tripBtn);
 
@@ -2305,13 +2308,34 @@ window.__scrollToVenueCard = function(name){
     if (saved) trip = JSON.parse(saved);
   } catch (e) { trip = []; }
 
+  // Stage 5C (Trip half of W07): a stop is identified by its ref ("venue:<id>"
+  // or "event:<id>", the Stage 4.3 format) when it has one; a stop saved before
+  // refs existed is matched by name + region, as before. Entries keep their
+  // name / query / region, so older cached pages still read them. Unusable
+  // elements are ignored; a malformed ref is dropped and the stop kept.
+  var REF_RE = /^(venue|event):[1-9][0-9]*$/;
+  if (!Array.isArray(trip)) trip = [];
+  trip = trip.filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
+  trip.forEach(function(x){ if (x.ref !== undefined && !REF_RE.test(x.ref)) delete x.ref; });
+
+  function stopOf(btn){
+    var ref = btn.dataset.tripRef;
+    return { ref: REF_RE.test(ref || '') ? ref : null, name: btn.dataset.tripName, query: btn.dataset.tripQuery, region: btn.dataset.tripRegion || null };
+  }
+  function sameStop(x, s){
+    if (x.ref && s.ref) return x.ref === s.ref;
+    if (x.name !== s.name) return false;
+    return !x.region || !s.region || x.region === s.region;
+  }
+
   function save(){
     try { window.localStorage.setItem('okanaganTrip', JSON.stringify(trip)); } catch (e) {}
   }
 
   function syncButtons(){
     document.querySelectorAll('.trip-btn').forEach(function(btn){
-      var inTrip = trip.some(function(t){ return t.name === btn.dataset.tripName; });
+      var s = stopOf(btn);
+      var inTrip = trip.some(function(t){ return sameStop(t, s); });
       btn.classList.toggle('in-trip', inTrip);
       btn.textContent = inTrip ? t('trip.inTrip') : t('trip.addToTrip');
     });
@@ -2334,9 +2358,14 @@ window.__scrollToVenueCard = function(name){
       return;
     }
 
+    // Two stops with the same name are told apart by their region, in the
+    // tray's existing small type; a unique name renders exactly as before.
+    var nameCount = {};
+    trip.forEach(function(x){ nameCount[x.name] = (nameCount[x.name] || 0) + 1; });
     listEl.innerHTML = trip.map(function(t, i){
-      var item = '<div class="trip-item"><span>' + (i + 1) + '. ' + t.name.replace(/</g, '&lt;') + '</span>' +
-        '<button class="trip-remove" data-remove-index="' + i + '" aria-label="Remove ' + t.name.replace(/"/g, '&quot;') + '">✕</button></div>';
+      var place = nameCount[t.name] > 1 && t.region ? String((window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[t.region]) || t.region) : '';
+      var item = '<div class="trip-item"><span>' + (i + 1) + '. ' + t.name.replace(/</g, '&lt;') + (place ? '<br><small class="trip-distance">' + place.replace(/</g, '&lt;') + '</small>' : '') + '</span>' +
+        '<button class="trip-remove" data-remove-index="' + i + '" aria-label="Remove ' + (place ? t.name + ' (' + place + ')' : t.name).replace(/"/g, '&quot;') + '">✕</button></div>';
       var nextStop = trip[i + 1];
       var distanceLine = nextStop ? distanceLineHtml(t.region, nextStop.region) : '';
       return item + distanceLine;
@@ -2353,21 +2382,25 @@ window.__scrollToVenueCard = function(name){
     msgEl._hideTimer = setTimeout(function(){ msgEl.style.display = 'none'; }, 4000);
   }
 
-  function addToTrip(name, query, region){
-    if (trip.some(function(t){ return t.name === name; })) return;
+  function addToTrip(s){
+    if (trip.some(function(t){ return sameStop(t, s); })) return;
     if (trip.length >= MAX_STOPS) {
       showMessage('Trips are capped at ' + MAX_STOPS + ' stops so the route stays manageable. Remove a stop to add another.');
       return;
     }
-    trip.push({ name: name, query: query, region: region || null });
-    if (window.trackEvent) window.trackEvent('add_to_trip', { venue_name: name, region: region || null, trip_size: trip.length });
+    var entry = { name: s.name, query: s.query, region: s.region || null };
+    if (s.ref) entry.ref = s.ref;
+    trip.push(entry);
+    if (window.trackEvent) window.trackEvent('add_to_trip', { venue_name: s.name, region: s.region || null, trip_size: trip.length });
     save();
     syncButtons();
     render();
   }
 
-  function removeFromTrip(name){
-    trip = trip.filter(function(t){ return t.name !== name; });
+  // keep(t) decides which stops stay: a card's button removes its matching
+  // stop(s); the tray's ✕ removes exactly the one it belongs to.
+  function removeFromTrip(name, keep){
+    trip = trip.filter(keep);
     if (window.trackEvent) window.trackEvent('remove_from_trip', { venue_name: name });
     save();
     syncButtons();
@@ -2377,12 +2410,12 @@ window.__scrollToVenueCard = function(name){
   document.addEventListener('click', function(e){
     var tripBtn = e.target.closest('.trip-btn');
     if (tripBtn) {
-      var name = tripBtn.dataset.tripName;
-      var isIn = trip.some(function(t){ return t.name === name; });
+      var s = stopOf(tripBtn);
+      var isIn = trip.some(function(t){ return sameStop(t, s); });
       if (isIn) {
-        removeFromTrip(name);
+        removeFromTrip(s.name, function(t){ return !sameStop(t, s); });
       } else {
-        addToTrip(name, tripBtn.dataset.tripQuery, tripBtn.dataset.tripRegion);
+        addToTrip(s);
       }
       return;
     }
@@ -2391,7 +2424,7 @@ window.__scrollToVenueCard = function(name){
     if (removeBtn) {
       var idx = parseInt(removeBtn.dataset.removeIndex);
       var t = trip[idx];
-      if (t) removeFromTrip(t.name);
+      if (t) removeFromTrip(t.name, function(x){ return x !== t; });
       return;
     }
 
@@ -2451,6 +2484,34 @@ window.__scrollToVenueCard = function(name){
 
   syncButtons();
   render();
+
+  // Stage 5C: once per browser, give stops saved before refs existed their ref
+  // when the existing read-only resolver finds exactly one match (in the stop's
+  // own region, when it has one). Several matches or none: the stop is kept as
+  // it is, marked so it is not asked about again -- never guessed, never
+  // deleted. A failed request changes nothing and is retried on a later load.
+  (function convertSavedStops(){
+    var names = [];
+    trip.forEach(function(x){ if (!x.ref && !x.unresolved && x.name.length <= 120 && names.indexOf(x.name) === -1) names.push(x.name); });
+    if (!names.length || !window.fetch) return;
+    window.fetch('/api/saved/resolve?' + names.slice(0, 100).map(function(n){ return 'name=' + encodeURIComponent(n); }).join('&'))
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if (!j || !Array.isArray(j.names)) return;
+        var found = {};
+        j.names.forEach(function(n){ if (n && typeof n.name === 'string') found[n.name] = n; });
+        var changed = false;
+        trip.forEach(function(x){
+          if (x.ref || x.unresolved || !found[x.name]) return;
+          var c = (found[x.name].candidates || []).filter(function(c){ return c && REF_RE.test(c.ref) && (!x.region || c.region === x.region); });
+          if (c.length === 1 && !trip.some(function(y){ return y.ref === c[0].ref; })) x.ref = c[0].ref;
+          else x.unresolved = 1;
+          changed = true;
+        });
+        if (changed) { save(); syncButtons(); render(); }
+      })
+      .catch(function(){});
+  })();
 
   // Exposed so initBlock11 can re-sync once it actually builds the trip-btn
   // elements for the freshly-rendered cards — DOMContentLoaded/load don't
@@ -2625,6 +2686,7 @@ window.__scrollToVenueCard = function(name){
     addBtn.dataset.tripQuery = venue.address ? (venue.name + ', ' + venue.address) : (venue.name + ', ' + regionLabel + ', Okanagan Valley, BC');
     addBtn.dataset.tripName = venue.name;
     addBtn.dataset.tripRegion = venue.region;
+    if (typeof venue.id === 'number' && venue.id > 0) addBtn.dataset.tripRef = 'venue:' + venue.id;
     addBtn.textContent = t('trip.addToTrip');
     actions.appendChild(addBtn);
 
