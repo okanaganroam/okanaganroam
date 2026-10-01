@@ -17,12 +17,32 @@ const APP_JS = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', '
 const START = '/* ---------- Trip planner: build a multi-stop route across saved venues ---------- */';
 const END = '/* ---------- Build My Trip, Stage 2: /trip planner page';
 const TRAY_JS = APP_JS.slice(APP_JS.indexOf(START), APP_JS.indexOf(END));
-const STRINGS = { 'trip.addToTrip': '\u{1F9F3} Add to trip', 'trip.inTrip': '✓ In trip', 'trip.emptyState': 'No venues added yet.', 'trip.sameArea': 'Same area', 'trip.kmToNextStop': 'km to next stop' };
+const STRINGS = { 'trip.addToTrip': '\u{1F9F3} Add to trip', 'trip.inTrip': '✓ In trip', 'trip.emptyState': 'No venues added yet.', 'trip.sameArea': 'Same area', 'trip.kmToNextStop': 'km to next stop', 'trip.removed': 'Removed {name}.', 'trip.undo': 'Undo', 'trip.undoLabel': 'Undo: put {name} back in your trip', 'trip.restored': 'Restored {name}.' };
 const REGION_LABELS = { kelowna: 'Kelowna', penticton: 'Penticton', 'west-kelowna': 'West Kelowna', oliver: 'Oliver', osoyoos: 'Osoyoos', vernon: 'Vernon' };
 
 // A minimal element: dataset, class list, text, innerHTML, closest() by class.
+// W14 additions: attributes, focus(), textContent/innerHTML kept in step, and
+// querySelector() for the two things the tray looks up in its own markup (the
+// Undo button and a row's remove button).
 class El {
-  constructor(id, className = '') { this.id = id; this.className = className; this.dataset = {}; this.textContent = ''; this.innerHTML = ''; this.disabled = false; this.style = {}; this.listeners = {}; }
+  constructor(id, className = '') { this.id = id; this.className = className; this.dataset = {}; this.textContent = ''; this.disabled = false; this.style = {}; this.listeners = {}; this.attrs = {}; }
+  get innerHTML() { return this._html; }
+  set innerHTML(h) { this._html = String(h); this._text = this._html.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&quot;/g, '"').replace(/&amp;/g, '&'); this._kids = {}; }
+  get textContent() { return this._text; }
+  set textContent(v) { this.innerHTML = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;'); this._text = v; }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  focus() { El.focused = this; }
+  querySelector(sel) {
+    if (sel in this._kids) return this._kids[sel];
+    let kid = null, m;
+    if (sel === '[data-trip-undo]' && (m = this._html.match(/<button[^>]*data-trip-undo[^>]*aria-label="([^"]*)"[^>]*>([^<]*)<\/button>/))) {
+      kid = new El('', ''); kid.dataset.tripUndo = ''; kid.setAttribute('aria-label', m[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&amp;/g, '&')); kid.textContent = m[2]; kid.setAttribute('style', (this._html.match(/style="([^"]*)"/) || [])[1]);
+    } else if ((m = sel.match(/^\[data-remove-index="(\d+)"\]$/)) && this._html.includes(`data-remove-index="${m[1]}"`)) {
+      kid = new El('', 'trip-remove'); kid.dataset.removeIndex = m[1];
+    }
+    return (this._kids[sel] = kid);
+  }
   get classList() {
     const self = this;
     const set = () => new Set(self.className.split(/\s+/).filter(Boolean));
@@ -35,11 +55,15 @@ class El {
   }
   addEventListener(type, fn) { this.listeners[type] = fn; }
   contains(other) { return other === this; }
-  closest(sel) { return this.classList.contains(sel.replace(/^\./, '').split(',')[0].trim()) ? this : null; }
+  closest(sel) {
+    if (sel === '[data-trip-undo]') return 'tripUndo' in this.dataset ? this : null;
+    return this.classList.contains(sel.replace(/^\./, '').split(',')[0].trim()) ? this : null;
+  }
 }
 
 // Boot the tray with a given saved trip and the given page buttons.
-function boot({ saved, buttons = [], resolve = null } = {}) {
+function boot({ saved, buttons = [], resolve = null, timers = null } = {}) {
+  El.focused = null;
   const els = { tripTrayToggle: new El('tripTrayToggle'), tripTrayPanel: new El('tripTrayPanel'), tripTrayList: new El('tripTrayList'), tripTrayCount: new El('tripTrayCount'), tripRouteBtn: new El('tripRouteBtn'), tripClearBtn: new El('tripClearBtn'), tripTrayMessage: new El('tripTrayMessage') };
   const store = new Map(saved === undefined ? [] : [['okanaganTrip', typeof saved === 'string' ? saved : JSON.stringify(saved)]]);
   const events = [], requests = [];
@@ -56,7 +80,7 @@ function boot({ saved, buttons = [], resolve = null } = {}) {
     querySelectorAll: (sel) => (sel === '.trip-btn' ? buttons : []),
     addEventListener: (type, fn) => { if (type === 'click') docClick = fn; },
   };
-  const ctx = { window, document, t: (k) => STRINGS[k] || k, setTimeout, clearTimeout, parseInt, JSON, String, Array, Object };
+  const ctx = { window, document, t: (k) => STRINGS[k] || k, setTimeout: timers ? timers.setTimeout : setTimeout, clearTimeout: timers ? timers.clearTimeout : clearTimeout, parseInt, JSON, String, Array, Object, Math };
   vm.createContext(ctx);
   vm.runInContext(TRAY_JS, ctx);
   const click = (target) => docClick({ target });
@@ -66,6 +90,9 @@ function boot({ saved, buttons = [], resolve = null } = {}) {
     rawStored: () => store.get('okanaganTrip'),
     click,
     removeAt: (i) => { const b = new El('', 'trip-remove'); b.dataset.removeIndex = String(i); click(b); },
+    msg: els.tripTrayMessage,
+    undoBtn: () => els.tripTrayMessage.querySelector('[data-trip-undo]'),
+    focused: () => El.focused,
     items: () => (els.tripTrayList.innerHTML.match(/<div class="trip-item">[\s\S]*?<\/div>/g) || []),
     settle: () => new Promise((r) => setTimeout(r, 0)),
   };
@@ -252,4 +279,160 @@ test('Stage 5C compatibility: stored stops keep name / query / region, so older 
   // The pre-5C tray matched stops by name only: it still finds both (and removes both together).
   const legacyMatch = (name) => t.stored().filter((x) => x.name === name).length;
   assert.equal(legacyMatch('Okanagan Virtual Golf'), 2);
+});
+
+// ---- W14 (2026-10-01): Undo for the tray's ✕ ----
+// Only the most recent ✕ removal, for about 10 seconds (paused on hover / focus),
+// while My Trip is otherwise unchanged. The exact stored object goes back at its
+// original index -- never a stop looked up by name.
+function fakeTimers() {
+  let now = 0, id = 0; const q = new Map();
+  return {
+    setTimeout: (fn, ms) => { const i = ++id; q.set(i, { fn, at: now + ms }); return i; },
+    clearTimeout: (i) => { q.delete(i); },
+    advance(ms) { now += ms; for (const [i, x] of [...q].sort((a, b) => a[1].at - b[1].at)) if (x.at <= now && q.has(i)) { q.delete(i); x.fn(); } },
+  };
+}
+const plain = (x) => JSON.parse(JSON.stringify(x));
+const TRIP3 = [
+  { name: 'Tower Ranch Golf & Country Club', query: 'q1', region: 'kelowna', ref: 'venue:1087' },
+  { name: 'Okanagan Virtual Golf', query: 'q2', region: 'kelowna', ref: 'venue:1126' },
+  { name: 'Okanagan Virtual Golf', query: 'q3', region: 'penticton', ref: 'venue:1132' },
+];
+
+test('W14: ✕ offers Undo (role="status", focus on Undo); Undo puts the exact stop back at its place; analytics: remove_from_trip unchanged + undo_remove_from_trip { trip_size } only', () => {
+  const t = boot({ saved: TRIP3 });
+  assert.equal(t.msg.getAttribute('role'), 'status');
+  const before = t.rawStored();
+  t.removeAt(0);
+  assert.deepEqual(t.stored().map((x) => x.ref), ['venue:1126', 'venue:1132']);
+  assert.equal(t.msg.style.display, 'block');
+  assert.match(t.msg.textContent, /^Removed Tower Ranch Golf & Country Club\. Undo$/);
+  const undo = t.undoBtn();
+  assert.ok(undo && t.focused() === undo, 'focus moves to Undo');
+  assert.equal(undo.getAttribute('aria-label'), 'Undo: put Tower Ranch Golf & Country Club back in your trip');
+  assert.match(undo.getAttribute('style'), /min-height:44px/);
+  t.click(undo);
+  assert.equal(t.rawStored(), before, 'storage byte-identical to before the removal');
+  assert.equal(t.msg.textContent, 'Restored Tower Ranch Golf & Country Club.');
+  assert.equal(t.focused().dataset.removeIndex, '0', 'focus moves to the restored row');
+  assert.deepEqual(plain(t.events), [
+    ['remove_from_trip', { venue_name: 'Tower Ranch Golf & Country Club' }],
+    ['undo_remove_from_trip', { trip_size: 3 }],
+  ]);
+  assert.ok(!t.events.some((e) => e[0] === 'add_to_trip'), 'Undo is not an add_to_trip');
+});
+
+test('W14: middle and last positions; an event; same-name A and B are each restored exactly, the other untouched', () => {
+  for (const i of [1, 2]) {
+    const t = boot({ saved: TRIP3 });
+    const before = t.rawStored();
+    t.removeAt(i);
+    t.click(t.undoBtn());
+    assert.equal(t.rawStored(), before, `position ${i}`);
+  }
+  // Same-name: the message names the region; B is untouched while A goes and comes back.
+  const a = boot({ saved: TRIP3 });
+  a.removeAt(1);
+  assert.match(a.msg.textContent, /^Removed Okanagan Virtual Golf \(Kelowna\)\./);
+  assert.deepEqual(a.stored()[1], TRIP3[2], 'B untouched');
+  a.click(a.undoBtn());
+  assert.deepEqual(a.stored(), TRIP3);
+  const b = boot({ saved: TRIP3 });
+  b.removeAt(2);
+  assert.match(b.msg.textContent, /^Removed Okanagan Virtual Golf \(Penticton\)\./);
+  b.click(b.undoBtn());
+  assert.deepEqual(b.stored(), TRIP3);
+  // Events: same name AND region, told apart by ref.
+  const evs = [{ name: 'Oktoberfest', query: 'q', region: 'osoyoos', ref: 'event:583' }, { name: 'Oktoberfest', query: 'q', region: 'osoyoos', ref: 'event:598' }, { name: 'Shannon Lake Restaurant', query: 'q', region: 'west-kelowna', ref: 'venue:583' }];
+  const e = boot({ saved: evs });
+  e.removeAt(0);
+  e.click(e.undoBtn());
+  assert.deepEqual(e.stored(), evs);
+});
+
+test('W14: legacy entries -- a converted one and an unresolved one come back byte-identical, with no resolver request', async () => {
+  const saved = [
+    { name: 'Tower Ranch Golf & Country Club', query: 'Tower Ranch, Kelowna', region: 'kelowna', ref: 'venue:1087' },
+    { name: 'Oktoberfest', query: 'Oktoberfest, Osoyoos', region: 'osoyoos', unresolved: 1 },
+    { name: 'Old Name Only', query: 'Old Name Only' , unresolved: 1 },
+  ];
+  const t = boot({ saved, resolve: resolver(TABLE) });
+  await t.settle();
+  assert.equal(t.requests.length, 0);
+  for (const i of [1, 2, 0]) {
+    const before = t.rawStored();
+    t.removeAt(i);
+    t.click(t.undoBtn());
+    assert.equal(t.rawStored(), before, `entry ${i}`);
+  }
+  assert.equal(t.requests.length, 0, 'Undo never re-resolves');
+});
+
+test('W14: only the latest removal is undoable; any other change or closing the tray withdraws Undo -- never a duplicate', () => {
+  const t = boot({ saved: TRIP3 });
+  t.removeAt(0); t.removeAt(0);                                   // remove A, then B
+  t.click(t.undoBtn());
+  assert.deepEqual(t.stored().map((x) => x.ref), ['venue:1126', 'venue:1132'], 'only B came back');
+  // Remove, then re-add the same stop from its card: Undo is withdrawn, no duplicate.
+  const k = OVG_K();
+  const r = boot({ saved: TRIP3, buttons: [k] });
+  r.removeAt(1);
+  const stale = r.undoBtn();
+  r.click(k);
+  assert.equal(r.msg.style.display, 'none');
+  assert.equal(r.undoBtn(), null, 'no Undo button any more');
+  r.click(stale);                                                 // a stale Undo does nothing
+  assert.deepEqual(r.stored().map((x) => x.ref), ['venue:1087', 'venue:1132', 'venue:1126']);
+  // Card removal, Clear trip and closing the tray: no Undo offered / Undo withdrawn.
+  const c = boot({ saved: TRIP3, buttons: [k] });
+  c.click(k);
+  assert.equal(c.undoBtn(), null, 'card-button removal offers no Undo');
+  c.removeAt(0);
+  c.els.tripTrayPanel.classList.add('open');
+  c.click(c.els.tripTrayToggle);                                  // closes the tray
+  assert.equal(c.undoBtn(), null);
+  assert.equal(c.msg.style.display, 'none');
+  assert.equal(c.stored().length, 1);
+});
+
+test('W14: the 10-stop cap -- Undo never exceeds 10 and never drops another stop', () => {
+  const ten = Array.from({ length: 10 }, (_, i) => ({ name: `Place ${i}`, query: 'q', region: 'kelowna', ref: `venue:${100 + i}` }));
+  const t = boot({ saved: ten });
+  t.removeAt(4);
+  t.click(t.undoBtn());
+  assert.deepEqual(t.stored(), ten, 'back to exactly the same 10');
+  const n = tripBtn('Newcomer', 'kelowna', 'venue:999');
+  const u = boot({ saved: ten, buttons: [n] });
+  u.removeAt(4);
+  const stale = u.undoBtn();
+  u.click(n);                                                     // fills the freed place
+  u.click(stale);
+  assert.equal(u.stored().length, 10);
+  assert.ok(u.stored().some((x) => x.ref === 'venue:999') && !u.stored().some((x) => x.ref === 'venue:104'), 'the newcomer stays; nothing is dropped');
+});
+
+test('W14: Undo expires after about 10 seconds; hover and keyboard focus pause it', () => {
+  const tm = fakeTimers();
+  const t = boot({ saved: TRIP3, timers: tm });
+  t.removeAt(0);
+  tm.advance(9999);
+  assert.ok(t.undoBtn(), 'still there just before 10 s');
+  tm.advance(1);
+  assert.equal(t.undoBtn(), null, 'withdrawn at 10 s');
+  assert.equal(t.msg.style.display, 'none');
+  assert.equal(t.stored().length, 2, 'the removal stands');
+  // Paused while hovered or focused.
+  const h = boot({ saved: TRIP3, timers: tm });
+  h.removeAt(0);
+  h.msg.listeners.mouseenter();
+  tm.advance(60000);
+  assert.ok(h.undoBtn(), 'hover pauses expiry');
+  h.msg.listeners.mouseleave();
+  h.msg.listeners.focusin();
+  tm.advance(60000);
+  assert.ok(h.undoBtn(), 'focus pauses expiry');
+  h.msg.listeners.focusout();
+  tm.advance(10000);
+  assert.equal(h.undoBtn(), null);
 });

@@ -14959,10 +14959,10 @@ function renderTripPlannerV2Script() {
     // runs, so a click while the tray is already open leaves it open.
     setTimeout(function(){ if (!panel.classList.contains('open')) toggle.click(); }, 0);
   }
-  // Any change to My Trip elsewhere (a card's Add to trip, a tray remove,
+  // Any change to My Trip elsewhere (a card's Add to trip, a tray remove or Undo,
   // Clear trip) recalculates the button once app.js has handled the click.
   document.addEventListener('click', function(e){
-    if (e.target.closest && e.target.closest('.trip-btn, .trip-remove, #tripClearBtn')) setTimeout(refreshAddAll, 0);
+    if (e.target.closest && e.target.closest('.trip-btn, .trip-remove, #tripClearBtn, [data-trip-undo]')) setTimeout(refreshAddAll, 0);
   });
   window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganTrip') refreshAddAll(); });
 

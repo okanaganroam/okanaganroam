@@ -4721,6 +4721,12 @@ test('Stage 5C V3: no same-name notice; stop buttons carry refs; "Add whole trip
   new Function(js); // parses
 });
 
+test('W14: the V2 and V3 "Add whole trip" buttons recalculate after a tray Undo, as after a tray remove', () => {
+  const sel = "e.target.closest('.trip-btn, .trip-remove, #tripClearBtn, [data-trip-undo]')) setTimeout(refreshAddAll, 0);";
+  assert.ok(app.renderTripPlannerPage(true).includes(sel), 'V2');
+  assert.ok(app.renderTripPlannerV3Page({ preview: true }).includes(sel), 'V3');
+});
+
 test('Batch 4B Guides: winery venue and region pages keep their own presentation', () => {
   // Stage 4.1: winery venue pages use the themed venue shell, never the guide theme.
   const venue = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'test-winery'), [], [], []);
@@ -9603,7 +9609,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // and screenshots unchanged at 390px and 1280px.
   // Approved Stage 5C change (2026-10-01): the Trip tray identifies stops by
   // ref (Trip half of W07) -- the four contained areas of the Stage 5C plan.
-  assert.equal(md5('public/scripts/app.js'), '5ecb85aecf648f3ae967dc3bde910f40', 'public/scripts/app.js (Stage 5C: Trip tray ref identity, 2026-10-01)');
+  // Approved W14 change (2026-10-01): Undo for the tray's ✕ (tray module only).
+  assert.equal(md5('public/scripts/app.js'), '7feba1eff98dcd0ec5b4fc175c53c76a', 'public/scripts/app.js (W14: Trip tray Undo, 2026-10-01)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -11312,8 +11319,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d');
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
-  // Stage 5C (2026-10-01): approved Trip tray ref identity.
-  assert.equal(md5('public/scripts/app.js'), '5ecb85aecf648f3ae967dc3bde910f40');
+  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo.
+  assert.equal(md5('public/scripts/app.js'), '7feba1eff98dcd0ec5b4fc175c53c76a');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
