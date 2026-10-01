@@ -13,6 +13,7 @@ This file is the shared coordination point for AI assistants working on this rep
 
 ## Current Status
 
+* **Current status (2026-10-01): read "Stage 0–4 Program" below first.** It holds the current production baseline, the frozen files and the standing rules. The dated baselines in this list are kept as history.
 * Repository: `okanaganroam/okanaganroam`
 * Default branch: `main`
 * Shared AI handoff file established: September 8, 2026
@@ -21,6 +22,198 @@ This file is the shared coordination point for AI assistants working on this rep
 * Updated baseline (2026-09-15, verified live against production `/api/venues`): 1,055 active venues, 989 complete (address+lat+lng all present), 66 missing (all three fields missing together in every case — no partial records). Total-including-redirects and redirect count were not reverified this pass (no admin access this session); only the active/complete/missing figures above were independently confirmed.
 * Updated baseline (2026-09-22, verified read-only on the live `/data/okanagan.db` and `/api/venues` after the Nature/Viewpoints/Camping write): 1,404 venue rows, 1,365 active, `sqlite_sequence.venues` = 1406; 195 active `type='outdoor'` destinations; activity memberships 328 (hiking 57, winter 51, nature 51, camping 50, viewpoints 43, cycling 33, adventure 18, water 13, fishing 12); `/outdoors` landing lists 204 (outdoor-type rows plus beach-type rows holding a live activity membership).
 * **What's On baseline (2026-09-22, verified via public reads after the final approved write):** 638 events (ids 1–638, contiguous), 1,109 scheduled occurrences, 638 event URLs in the sitemap (2,244 total). Batches: canary `whatson-2026-10-canary` (ids 1–10), v1 `whatson-2026-10-v1` (11–92), v2 `whatson-2026-10-v2` (93–626), v3 `whatson-2026-10-v3` (627–638), plus two occurrence-level edits (`whatson-2026-10-v2-edit-1` on #387, `whatson-2026-10-craft-culture-edit-1` on #548). Runtime: Node 24.21.0 / ICU 78.3 / tzdata 2026c on Railway (deployment `772b4bd0`, commit `6568501`) — America/Vancouver is −07:00 for every date from 2026-03-08 onward.
+
+## Stage 0–4 Program (2026-09-29 → 2026-10-01)
+
+A gated program run by Claude for the owner. Every step went through the same gates: a read-only preflight, owner approval, implementation with local validation, owner approval, then commit, push, deploy and full production verification, then a stop and report. Nothing in it was committed, pushed or deployed without explicit approval. Anything unexpected was stopped and reported, not fixed on the spot.
+
+### Current production status (verified 2026-10-01)
+
+* **Live commit:** `f915bb85d0f9e04c1109c1761b257132f420501a` (Stage 4.4). **Railway deployment:** `5ab00cf0-f05a-4691-9c5b-a1ba30930bf2`, SUCCESS. Railway deploys automatically on every push to `main`, docs-only pushes included.
+* **Feature flags (Railway variables, names only, never values):** `DISCOVERY_SEARCH=on`, `TRIP_PLANNER_V2=on`, `TRIP_PLANNER_V3=preview`. Under `preview`, V3 is served only to a browser that opted in with `/trip?trip_v3=on`, which sets the `roam_trip_v3=1` cookie; the opt-in view is noindex. The service has 19 variable names.
+* **Cloudflare** sits in front of Railway. Its email-obfuscation token changes per request, so page captures must normalise it before hashing.
+
+### Production and integrity baseline (2026-10-01, after Stage 4.4)
+
+All hashes below are the first 16 hex characters of SHA-256, except the frozen files, which are full MD5s.
+
+| Item | Value |
+|---|---|
+| `/api/venues` | 1,411 venues; response hash `8d8c7014fdaa1160` |
+| Committed `okanagan.db` (old local snapshot, 812 venues, no events or outdoor/golf/beach rows) | `62fc133824319c46`; it must never change in a commit |
+| `/sitemap.xml` | 2,157 URLs; `7f0999198d9e234e`. It drifts daily: events expire, and 20 hub entries carry a UTC `lastmod` |
+| `/robots.txt` | `bb6f51a8b54cc3e6` |
+| Page capture | 2,183 URLs: every sitemap URL plus extras |
+| Discovery corpus | 9,173 queries plus the `/browse?q=` routing set |
+| Planner corpus | 929 queries plus 300 seeded runs. The 11 "tonight / right now / this evening" queries depend on the clock and change minute to minute |
+| Redirected venue IDs | 41 in production (e.g. `38` → `40`) |
+
+### History and commits
+
+* **Context before Stage 0:** Build My Trip accuracy fixes and the V3 view behind `TRIP_PLANNER_V3` (`d148244`), plus V3 image quality (`c208141`).
+* **Stage 0 (read-only):**
+  * Readiness check: the deployed Node/ICU already has the 2026b+ timezone data.
+  * Produced the data-correction manifest that Stage 1 used.
+* **Stage 1 (data only, no commit):** seven production corrections, M1–M7, made only through the compare-and-set routes (`/admin/correct-venue`, `/admin/correct-region`, `/admin/correct-phone`). The admin token was injected with `railway run`, so it stayed inside that one process.
+
+  | ID | Venue | Correction |
+  |---|---|---|
+  | M1 | #1098 Predator Ridge — Predator Course | latitude `49.189367` → `50.189367` |
+  | M2 | #1099 Predator Ridge — Ridge Course | latitude `49.189367` → `50.189367` |
+  | M3 | #80 Blind Tiger Vineyards | region `vernon` → `lake-country`; the old URL now 301s |
+  | M4 | #659 Terravista Vineyards | removed the duplicated house number from the address |
+  | M5 | #586 Silver Sage Winery | address and coordinates now point to 4852 Ryegrass Rd, Oliver |
+  | M6 | #586 Silver Sage Winery | phone added: `+1 250-498-0310` |
+  | M7 | #353 La Vela Pizzeria | address and coordinates now point to 444 Bernard Ave, Kelowna |
+
+  Deliberately left untouched: the other candidate corrections, the advisories, the ambiguous cases and the Food & Drink batch.
+* **Stage 2:** one canonical hours model (`hours.js`) for venue pages, structured data and Build My Trip (`e8b7999`).
+* **Stage 3, discovery and search:**
+
+  | Step | Commit(s) | What it did |
+  |---|---|---|
+  | 3.1 | `aff6235` | Query understanding: polarity, filler words, plural-tolerant aliases |
+  | 3.2 | `aaedef9` | Closed-vocabulary corrections, possessive regions, apostrophe-safe Hero Search |
+  | 3.3 | `8b22b94` | Shared retrieval: `discovery-search.js` with a cached venue index |
+  | 3.4 | `80498d6` | `/search` results page, Hero Search routing, `/map`, the App "coming soon" teaser |
+  | 3.4.1 | `517d362` | `/browse` loads without freezing |
+  | 3.5 | `fa20a59` | Build My Trip applies exclusions and trip-length pace |
+  | 3.5 D3–D6 | `58a9061`, `fe972e9`, `a6570f3`, `e32ceca` | Planner refinements: weekend = 2 days, merged meal intent, kept budget, reports unused intent and places |
+  | 3.6 | `6a0ad06` | Legacy `/browse` searches bridge to `/search` |
+
+  **Stage 3.7** was a read-only audit. It produced findings F07–F12 and W01–W25, which Stage 4 used.
+* **Stage 4, owner decisions:**
+  * **D1:** keep the trip tray cap at 10. This closes F08.
+  * **D2:** a dedicated Favorites page.
+    * D2a: shell pages only; the homepage stays byte-identical.
+    * D2b: an event saves its next upcoming occurrence; a What's On card saves the occurrence it shows.
+    * D2c: redirected venue IDs are rewritten automatically to the canonical venue.
+  * **D3:** the themed shell goes on winery *venue* pages only.
+  * **D7:** keep `/browse` as the legacy directory. D7a: it gets its own canonical and title.
+* **Stage 4, phases:**
+
+  | Phase | Commit | What it did |
+  |---|---|---|
+  | 4.0 | `0a6f910` | F07: V2 "View My Trip" opens the tray. F10: on phones, stop links no longer collide with the floating Trip button |
+  | 4.1 | `041d59a` | Winery venue pages use the common themed venue shell, keeping their Favorite and Add to Trip controls. Winery region and listing pages keep the old shell |
+  | 4.2 | `b0087e7` | `/browse` gets the title "Browse & Search the Okanagan \| Okanagan Roam" and a self-canonical |
+  | 4.3 | `866694b` | Hidden saved-item identity (details below) |
+  | 4.3a | `411b84c` | Fix: What's On cards keep `firstOccurrence` through `whatsOnPublicEvent`, carried as a non-enumerable property |
+  | 4.4 | `f915bb8` | The dedicated `/favorites` page and Favorites navigation (details below) |
+
+  **4.3 details:**
+  * New `saved-items.js` with pure rules for typed references:
+    * `venue:<id>` and `event:<id>@<occurrence>`;
+    * resolver statuses: active / redirected / missing for venues; upcoming / past / cancelled / postponed / undated / missing_occurrence for events; resolved / ambiguous / missing for names.
+  * A capture script on 11 templates plus the V2 `/trip` page keeps a hidden `okanaganSaved` store next to the legacy `okanaganFavorites` name list.
+  * Occurrence attributes are written on What's On cards and event pages. Guide cards carry only their venue ID.
+  * The read-only route `GET /api/saved/resolve` takes at most 100 items and 100 names of up to 120 characters each.
+
+  **4.4 details:**
+  * The page uses the shell, is `noindex` (`X-Robots-Tag` as well) and is never cached. It is measured as GA4 `page_type: 'favorites'`, with no new events.
+  * `/favourites` 301-redirects to `/favorites` and keeps the query string.
+  * The page's rules live in `favorites-page.js` (ES5; `server.js` inlines `favoritesCore.toString()`):
+    * a redirected venue is rewritten to the canonical venue;
+    * a name-only favourite with exactly one match adopts that ID;
+    * several same-name matches wait for the visitor to choose, and are never guessed;
+    * an event saved without a date shows "No date saved";
+    * Remove also clears the legacy name once no saved item carries it.
+  * A "Favorites" nav link appears on shell pages, `/trip` and the V3 header. It is hidden from 941 to 1,099px (owner's Option C).
+
+### Frozen files (must not change without explicit owner approval)
+
+| File | MD5 at `f915bb8` |
+|---|---|
+| `okanagan.html` (the homepage) | `b42d6ef9d201947ad109b8b6d8b4f28d` |
+| `public/scripts/app.js` (the **served** script; the root `app.js` is an old copy that is not served) | `db7b8c66f1cd176b3be54bc0f760cc6b` |
+| `public/styles/app.css` | `f2e72558306fba5cdaac92f6d525f58b` |
+| `public/styles/tokens.css` | `d7ce492fa551ea500eb8868cc47d347f` |
+| `trip-planner-v3-page.js` | `e41e6ea420b425948a823540ac2a6e5c` |
+
+The shell header and trip tray are extracted from `okanagan.html` at render time (`renderGolfHeaderHtml`, `renderGolfTripTrayHtml`). Changes to them are made in `server.js` by rewriting the extracted copy; the frozen file itself is never edited.
+
+### Standing rules (owner-set)
+
+* **No commit, push or deploy without explicit owner approval.** Product decisions belong to the owner. Anything unexpected is a stop-and-report, not an automatic fix.
+* **Secrets:** never expose credentials. Railway variable *names* may be read; *values* may not. The admin token is used only through `railway run …`.
+* **Out of bounds unless the owner says otherwise:**
+  * GA4, Cloudflare, IndexNow, the sitemap and robots logic, Railway configuration and environment variables. `TRIP_PLANNER_V3` stays `preview`.
+  * The saved-item format and resolver, and the analytics event definitions.
+* **Tests only in isolated copies.** Never run `tests/server.test.js` in a real checkout, because it replaces the tracked `okanagan.db`. Run the suite in a `git archive` export in a scratch directory, and never `require` `server.js` in the working checkout.
+* **Leave alone:** Pinterest work in the main checkout (`docs/PINTEREST_CONTENT_PLAN.md`, `pinterest-assets/`) and unrelated projects outside this repo.
+* **Images:** new outdoor activity and venue images are 16:9, 1600×900 (minimum 1200×675).
+
+### Validation method (used for every Stage 3–4 deploy)
+
+1. **Local:**
+   * targeted unit tests plus the full suite on an isolated copy;
+   * a byte check of the frozen files and the committed `okanagan.db`;
+   * a `git diff --stat` limited to the approved files.
+2. **Before deploying:** capture production twice, the same day: every sitemap URL plus extras. The two captures show which pages vary on their own (time-of-day content, Cloudflare tokens).
+3. **After deploying:**
+   * confirm the Railway deployment is SUCCESS on the new commit;
+   * capture again;
+   * compare page hashes after stripping **only** the intended additions;
+   * any other difference must be explained (for example, `/food-drink`'s server-rendered Open Now state flips at closing times) or the deploy is reported as a failure.
+4. **Corpora:**
+   * the planner corpus (929 + 300 seeded): only the clock-sensitive queries may differ;
+   * the discovery sweep (9,173 queries plus `/browse?q=` routing, concurrency 3, about 25–58 minutes).
+5. **Integrity:** `/api/venues` count and hash, sitemap, robots, the served frozen-file MD5s, and the Railway variable names.
+6. **Browser checks:**
+   * headless Chrome with a throwaway profile and GA blocked;
+   * isolated browser contexts per scenario, so localStorage can't leak between scenarios;
+   * responsive widths where relevant.
+
+The capture and sweep harnesses are scratch scripts kept outside the repo; the baselines above are what a re-run must match.
+
+### Known limitations and intentional non-fixes (as of 2026-10-01)
+
+**Production limitations (live behaviour, kept by owner decision):**
+
+* **No Favorites link at 941–1,099px** (Option C). There is no hamburger menu at those widths, so `/favorites` has no navigation link there.
+* **No Favorites link on `/browse`:** it is kept byte-identical by decision. (`/` has none either; see the frozen-file limitations.)
+* **Name-only event favourites** show "No date saved". There is no date picker, by decision.
+* **Trip tray cap of 10** (D1).
+
+**Intentional frozen-file limitations (would need a frozen file unfrozen):**
+
+* **Same-name Favorite toggle:** the frozen `public/scripts/app.js` keys `okanaganFavorites` by name, so two venues with the same name share a pressed state. `/favorites` never guesses between them.
+* **Guide-page Favorite controls:** these are built by the frozen `app.js` and are invisible, with no accessible name. Left as they are by decision. Fixing them would change the 84 `/guide/` pages in the sitemap.
+* **Trip tray is keyed by name:** the frozen `app.js` owns it, which is why the Trip half of W07 and W14 are blocked.
+* **No Favorites link on the homepage** (`okanagan.html` is frozen).
+
+**Test-only hygiene issues (not production defects, not a Stage 4 regression):**
+
+* **Suite result: 855/856 at `f915bb8`, run on an isolated copy with `--test-force-exit`.** The one failing test is `HTTP routes: region, category, venue, guide, and 404 all respond correctly` (`tests/server.test.js:4715`). It stops at its first failure: line 4824 expects the `/golf` region selector *not* to list Osoyoos. But the Build My Trip fixture "Trip Golf Course" is in Osoyoos, so the selector correctly lists it.
+* **The test has failed since the assertion was added** (`92564f3`, 2026-09-19): the fixture arrived in `0e22562` the day before. The 2026-09-24 Change Log entries call it "the pre-existing golf-selector assertion".
+* **More stale expectations sit behind the first.** With each assertion in that test made non-fatal (scratch copies only), 9 fail. The same 9 fail at `6a0ad06`, before Stage 4, and 8 already failed at `b1dead1`, before Stage 0.
+  * **Stale expectations from earlier intended changes:**
+    * line 4824: the Osoyoos selector, as above;
+    * line 4840: the test splits the whole page, so the `<head>` ItemList JSON-LD falls in the "Golf Courses" half (the cards themselves are in the right sections);
+    * line 5021: Hidden Gems cards now link to their dedicated pages (`994d1b0`, `f4318f6`);
+    * lines 5056, 5060, 5061 and 5063: `/events` now 301-redirects to `/whats-on`, and the mood card links there (`b7e8702`);
+    * line 5071: `/api/events` exists since `dd6a044`.
+  * **Test-environment issue:** line 5120 compares `node:sqlite` rows, which have a null prototype, with plain objects using strict deep-equal. The values are identical.
+  * Production does the intended thing in every case.
+* **The test never closes its server.** It starts the server on port 3001 and leaves it open, so without `--test-force-exit` the run never exits. A left-over run held port 3001 from 2026-09-27 until it was ended on 2026-10-01. While it did, this test failed with EADDRINUSE instead.
+* **The fix would be test-only** (`tests/server.test.js`), with no production code change. It is deliberately **not** done; see the roadmap.
+
+### Open roadmap
+
+* **Stage 5, V3 readiness** (not started):
+  * F09: a V3 share link;
+  * F12: V3 analytics.
+
+  It needs `trip-planner-v3-page.js` unfrozen and the F12 analytics taxonomy decided. `TRIP_PLANNER_V3` stays `preview` until the owner decides otherwise.
+* **Blocked by the freeze on `app.js`, `okanagan.html` and the CSS:**
+  * trip-tray ID migration (the Trip half of W07);
+  * tray undo (W14);
+  * the same-name Favorite toggle;
+  * the guide-page Favorite controls;
+  * a homepage Favorites link.
+* **Needs separate authorisation:** shell accessibility W21/W25 (a skip link, `aria-expanded`/`aria-controls` on the Trip toggle, keyboard order) through server-side header and tray rewrites. This would change markup on about 2,150 pages.
+* **Test hygiene: a separate task, requiring owner approval, not scheduled.** Update the stale expectations in the HTTP routes test (the 9 assertions listed under Known limitations), compare plain objects at line 5120, and close the test server so the suite exits without `--test-force-exit`. This is test-only, but a push to `main` still redeploys identical server code.
+* The existing **Open Tasks** below (Local Favourites, dog-friendly trails, Pinterest, District Wine Village, SEO, What's On, location enrichment) are unchanged by this program.
 
 ## Authentication / Admin API Notes
 
@@ -357,3 +550,4 @@ This file is the shared coordination point for AI assistants working on this rep
 * 2026-09-24 — Claude fixed the `/food-drink` initial-load lag: **`f134315`** "Food & Drink: render one batch, defer the rest to a template" (Railway **`79a4ef22`**, SUCCESS; `server.js` + `tests/server.test.js` only). All 850 cards were in the render tree; only the first **75 matching** now are, with every other card parsed into an inert `<template>` the browser never styles, lays out or paints, and a centered "Show more (75 of 850)" that reveals the next batch **with no network request**. Same `renderCategoryCardsHtml()` markup either way, so there is no second card renderer. **Live: domInteractive 3157 → 959ms (−70%), DOM nodes 23,855 → 2,445 (−90%)**; locally 2054 → 594ms and 18,024 → 2,291. Search, filters and counts still run over **all 850** (the pool is the live cards plus the template's, read without instantiating them); `data-fd-i` keeps canonical order. SEO unchanged — the ItemList still carries all 850 with url/name/description, canonical, title, meta description and sitemap untouched, and the deferred cards are NOT hidden with CSS. Two bugs fixed on the way: `golfFavTripScriptBody()` returns out of the engagement IIFE when app.js is present (so the wiring hook had to move above it), and — pre-existing since `543fdbb` — the hub was wired as `'restaurant'`, so its cafe, pub, cocktail and brewery cards had **Favorite and Add to Trip buttons that did nothing**; `themedCardHolderSelector` now has an `'fd'` case. Tests **369 pass / 1 fail of 370**, the failure being the pre-existing golf-selector assertion. `okanagan.db` unchanged.
 * 2026-09-24 — Claude shipped the Dog Friendly Finds directory: **`994d1b0`** "Dog Friendly Finds: a dedicated /dog-friendly directory" (Railway **`a06d82e5`**, SUCCESS; `server.js` + `tests/server.test.js` only). The homepage's Hidden Gems "Dog-Friendly Finds" card had resolved to `/browse` with **no dog filter applied**; `/dog-friendly` is now its real destination. **281 destinations** — the union of two disjoint datasets: **254** `dog_friendly` food/drink/winery venues and the **27 curated dog beaches** from the `dog_friendly` collection. **7 type chips**, the **20 canonical regions** (reusing `renderOutdoorRegionFilterChips()`, so no second taxonomy), and **3 verified feature filters — Patio, Lake View, Great for Groups**. **No off-leash filter: the current data does not support one**, so the off-leash/seasonal detail that exists as free text is instead shown — **all 27 dog beaches display their official restriction inline** via the new opt-in `dogNoteInline`, not a tooltip. Search and multi-select filtering (types OR / regions OR / features AND). Favorite and Add to Trip on every card, with a new **`'dog'` engagement selector** covering the Food & Drink types plus `winery` and `beach` so the mixed list's buttons actually work. **All 281 cards render server-side — no `<template>`, no "Show more"**: at this size Food & Drink's batching would add moving parts and cost indexability for no measured win. SEO: canonical `/dog-friendly`, **ItemList covering all 281**, one sitemap entry, plus links to the **10 existing regional `/guide/<region>/dog_friendly` pages**. The homepage card now points at `/dog-friendly` and the homepage is **otherwise unchanged** (live diff = the one href plus a per-request Cloudflare token; byte delta exactly +6). `/beaches`, `/outdoors`, region, category and venue pages verified byte-identical where checked; `okanagan.db` untouched. **377 tests / 376 passing**, the only failure being the same known pre-existing Golf selector one. Dog data is **seeded inside the tests** because the `db.js` fixture contains no dog-friendly records. Data limitation on the record: the **196 outdoor destinations and 49 golf venues have no dog-friendly flags**, so the 27 curated beaches are the existing outdoor dog dataset — **adding hiking/trail dog coverage requires a separate data-enrichment phase, not a code workaround**.
 * 2026-09-24 — Claude completed the **Local Favourites membership update** (data only, production via the audited `POST /admin/collection-membership` route, batch `local-favourites-2026-09-v1`; no code, schema, venue, event or other-collection change). Applied the owner-defined standard from `300ea4c` (locally rooted + credible evidence that locals value/recommend/preserve it + worthwhile for visitors; popularity, ratings, heritage, awards or tourism importance alone do not satisfy the second test). **The `local_favorite` collection went from 11 to 26 members:** **+19 added** — 719 Theo's Restaurant, 121 Cannery Brewing Co., 1214 Skaha Bluffs Provincial Park (Penticton); 1429 Tickleberry's (Okanagan Falls); 805 Zias Stonehouse Restaurant, 1227 Giant's Head Mountain Park (Summerland); 1231 Pincushion Mountain Trail (Peachland); 1141 Gellatly Nut Farm Regional Park (West Kelowna); 1226 Knox Mountain Park, 1217 Mission Creek Regional Park (Kelowna); 1250 Okanagan Rail Trail (Lake Country); 1146 Kalamalka Lake Provincial Park – Cosens Bay, 15 Alexander's Beach Pub (Coldstream); 407 Midtown Bistro, 978 Winston Pub, 62 Bean Scene Coffee House, 1144 Hurlburt Park (Vernon); 1339 Nk'Mip Desert Cultural Centre (Osoyoos) — and 1437 Shuswap River Float, which was added and then **removed again the same day** after review (its only evidence was tourism framing, the same basis that put 1215 Enderby Cliffs on HOLD); **−3 removed** (HOLD: poll-only or thin evidence; venues untouched) — 1103 The Harvest Golf Club, 1106 Two Eagles Golf Course & Academy, 1132 Okanagan Virtual Golf; **8 kept** — 1107, 1109, 1111, 1114, 1118, 1122, 1136, 1167. Arithmetic: 11 + 19 − 3 − 1 = 26. Each new membership stores a concise, sourced rationale in `collection_items.note` (**internal only — no page renders `local_favorite` notes; the badge code reads IDs only**). 1136 Boyce-Gyro and 1167 Paddlewheel still have no stored note. **Deliberately NOT added (HOLD/NO):** 1215 Enderby Cliffs, 210 Farmhouse Cafe (Davison Orchards; owner-only statement, record is the café only), 246 Granny's (café operation after Dec 2023 unconfirmed), 1159 Manitou Park (sources inaccessible), 1437, 1147 (second record for the Kal Park — one membership only, on 1146), and 1163/1164 Okanagan Beach / Okanagan Lake Park Beach (possible duplicate pair, left untouched). **Evidence:** every YES was re-verified against the underlying page (Castanet, kelowna.ca and RDOS block automated fetches; Castanet and kelowna.ca were read in a real browser, read-only); the full evidence record lives in the session's scratchpad `local-favorites/LOCAL_FAVOURITES_DISCOVERY.md/.tsv`. visitsummerland.com and exploringenderby.com now serve spam — do not cite them. **Verification:** production backup `/data/backups/okanagan-raw-20260924T124339Z.db` taken first; integrity ok; all 26 point at active, non-redirected venues; no duplicate memberships; venues, events and every non-Local-Favourite membership identical to the backup; 23 audit rows (19 adds + 4 removes); homepage, `/browse` and `/trip` byte-identical (the frozen homepage does not read `local_favorite`); only the ♥ Local Favourite badge appears/disappears on hub, category and venue pages. Build My Trip already treats `local_favorite` as a discovery kind, so trip suggestions reflect the new set with no code change.
+* 2026-10-01 — Claude recorded the **Stage 0–4 Program** (Stages 0–3, the Stage 4 decisions and Phases 4.0–4.4: commits `e8b7999` … `f915bb8`; Stages 0 and 1 had no commits), the current production and integrity baseline, the frozen files, the standing rules, the validation method, known limitations and the open roadmap in the new "Stage 0–4 Program" section (Phase 4.5, documentation only). Ended a left-over local test run (since 2026-09-27) that held port 3001. With the port free, the isolated suite is 855/856 (with `--test-force-exit`). The one failing test, HTTP routes, carries 9 pre-existing stale or test-environment assertions plus an unclosed server. Test-only, not a production defect; recorded under Known limitations, and its cleanup is on the roadmap as a separate approval-required task.
