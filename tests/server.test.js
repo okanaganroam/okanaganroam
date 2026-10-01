@@ -4504,7 +4504,8 @@ test('Batch 4B Events: app.js loads before the inline Favorite / Add to Trip scr
     assert.match(html, /var HOLDER = '\[data-venue-category="whatson"\]';/, kind);
     const row = html.match(/<div class="venue-cta-row event-actions"[^>]*>([\s\S]*?)<\/div>/);
     assert.ok(row, kind);
-    assert.match(row[0], /data-venue-category="whatson" data-venue-id="event-\d+" data-venue-region="kelowna" data-venue-name="[^"]+" data-surface="event_page"/, `${kind}: holder attributes unchanged`);
+    // Stage 4.3: plus the hidden occurrence identity when the event has an upcoming date.
+    assert.match(row[0], /data-venue-category="whatson" data-venue-id="event-\d+" data-venue-region="kelowna" data-venue-name="[^"]+"(?: data-occurrence-id="\d+" data-occurrence-date="[^"]+"(?: data-occurrence-time="[^"]+")?)? data-surface="event_page"/, `${kind}: holder attributes unchanged`);
     assert.ok(row[1].includes(`aria-pressed="false" aria-label="Favorite `) && row[1].includes(`">${heart} Favorite</button>`), `${kind}: Favorite = app.js HEART_OUTLINE + "Favorite"`);
     assert.ok(row[1].includes('\u{1F9F3} Add to trip</button>'), `${kind}: Add to trip = app.js label`);
     assert.match(row[1], /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" aria-pressed="false"/, `${kind}: trip data unchanged`);
@@ -9806,7 +9807,9 @@ test('Phase 3: with the flag on, /trip swaps only the hero; the wizard, tray and
   for (const id of ['tripWizardSection', 'tripPlannerForm', 'tripPlannerResult', 'tripRegenerateBtn']) assert.match(v2, new RegExp(`id="${id}"`), `${id} kept`);
   assert.match(v2, /<script src="\/scripts\/app\.js"><\/script>/);
   // Everything outside the hero section and the added style/script blocks is identical.
+  // (Stage 4.3: the V2 view also adds the saved-item capture script.)
   const strip = (html) => html.replace(/\n<style>\s*\/\* Build My Trip planner view[\s\S]*?<\/style>/, '').replace(/\n<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/, '')
+    .replace(/\n<script>\n\(function\(\)\{\n {2}var KEY = 'okanaganSaved';[\s\S]*?<\/script>/, '')
     .replace(/<section class="trip-conv-hero[\s\S]*?<\/section>\s*(<section id="tripPlanResult"[\s\S]*?<\/section>\s*)?/, '[HERO]');
   assert.equal(strip(v2), strip(legacy));
 }));
@@ -13563,3 +13566,153 @@ test('Stage 4.2: the /browse redirects run before the page is built (Stage 3.6 b
   assert.deepEqual(await go('/browse?openMap=1'), { status: 302, location: '/map' });
   assert.equal((await go(`/browse?q=${encodeURIComponent('Test Trattoria')}`)).location, '/kelowna/restaurants/test-trattoria');
 })));
+
+// ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
+// okanaganFavorites (names) is untouched; pages with Favorite controls also
+// carry a small capture script that records WHICH item was saved
+// (okanaganSaved: venue:<id> / event:<id>@<occurrence>), and
+// GET /api/saved/resolve looks those ids (and legacy names) up. Nothing
+// visible renders from either yet; no analytics.
+const SIDECAR_MARK = "var KEY = 'okanaganSaved';";
+const sidecarCount = (html) => html.split(SIDECAR_MARK).length - 1;
+
+test('Stage 4.3: the capture script is on pages with Favorite controls and nowhere else', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const page = async (p) => (await fetch(`${base}${p}`)).text();
+  for (const p of ['/kelowna/golf', '/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/wineries', '/food-drink', '/whats-on', '/kelowna/events/test-future-festival', '/kelowna/events/test-past-market', '/trip']) {
+    assert.equal(sidecarCount(await page(p)), 1, `${p}: one capture script`);
+  }
+  for (const p of ['/', '/browse', '/kelowna', '/kelowna/restaurants/test-trattoria', '/search?q=fixture', '/map', '/destinations', '/list-your-venue']) {
+    assert.equal(sidecarCount(await page(p)), 0, `${p}: no capture script`);
+  }
+  const guide = app.renderGuidePage('kelowna', 'patio', [app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria')]);
+  assert.equal(sidecarCount(guide), 1, 'guide pages: one capture script');
+}))));
+
+test('Stage 4.3: the capture script sends no analytics and never writes okanaganFavorites', () => {
+  const src = app.renderSavedSidecarScriptHtml();
+  assert.doesNotMatch(src, /trackEvent|dataLayer|gtag|sendBeacon|fetch\(/);
+  assert.doesNotMatch(src, /setItem\('okanaganFavorites'/);
+  assert.equal((src.match(/setItem\(/g) || []).length, 1, 'writes only okanaganSaved');
+});
+
+// Runs the real capture script against a fake page: the "app" toggles the
+// legacy name list during the click, as app.js / the engagement script do,
+// and the capture script mirrors the result once the click has finished.
+function sidecarHarness() {
+  const store = {};
+  const ls = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+  const listeners = [];
+  const timers = [];
+  const doc = { addEventListener: (type, fn) => { if (type === 'click') listeners.push(fn); } };
+  const holder = (attrs) => ({ getAttribute: (n) => (n in attrs ? attrs[n] : null) });
+  const button = (name, h) => ({ getAttribute: (n) => (n === 'data-fav-name' ? name : null), closest: (sel) => (sel === '.fav-btn' ? null : sel === '[data-venue-id]' ? h : null) });
+  const src = app.renderSavedSidecarScriptHtml().replace(/^<script>|<\/script>$/g, '');
+  vm.runInNewContext(src, { document: doc, localStorage: ls, setTimeout: (fn) => timers.push(fn), JSON, Number, Date, Array });
+  const legacy = () => JSON.parse(ls.getItem('okanaganFavorites') || '[]');
+  const saved = () => JSON.parse(ls.getItem('okanaganSaved') || 'null');
+  // A click: app toggles the legacy name first (as on the page), then timers run.
+  const click = (btn, name) => {
+    const target = { closest: (sel) => (sel === '.fav-btn' ? btn : null) };
+    for (const fn of listeners) fn({ target });
+    const l = legacy(); const i = l.indexOf(name);
+    if (i === -1) l.push(name); else l.splice(i, 1);
+    ls.setItem('okanaganFavorites', JSON.stringify(l));
+    while (timers.length) timers.shift()();
+  };
+  return { ls, store, holder, button, click, legacy, saved, timers };
+}
+
+test('Stage 4.3: capture -- a venue favourite records venue:<id>; un-favouriting removes it; the legacy list is exactly what the page wrote', () => {
+  const h = sidecarHarness();
+  const card = h.holder({ 'data-venue-id': '571' });
+  const btn = h.button('Sandhill Wines', card);
+  h.click(btn, 'Sandhill Wines');
+  assert.deepEqual(h.legacy(), ['Sandhill Wines']);
+  const s = h.saved();
+  assert.equal(s.v, 1);
+  assert.equal(s.items.length, 1);
+  assert.equal(s.items[0].k, 'venue'); assert.equal(s.items[0].id, 571); assert.equal(s.items[0].name, 'Sandhill Wines');
+  assert.match(s.items[0].savedAt, /^\d{4}-\d{2}-\d{2}T/);
+  h.click(btn, 'Sandhill Wines');
+  assert.deepEqual(h.legacy(), []);
+  assert.deepEqual(h.saved().items, []);
+});
+
+test('Stage 4.3: capture -- an event saves its specific occurrence; another date of it is a separate item; un-favouriting the name removes all of them', () => {
+  const h = sidecarHarness();
+  const card1 = h.holder({ 'data-venue-id': 'event-256', 'data-occurrence-id': '466', 'data-occurrence-date': '2026-10-30', 'data-occurrence-time': '13:00' });
+  h.click(h.button('BC Wine Night', card1), 'BC Wine Night');
+  assert.deepEqual(h.saved().items.map(({ k, id, occ, date, time }) => ({ k, id, occ, date, time })), [{ k: 'event', id: 256, occ: 466, date: '2026-10-30', time: '13:00' }]);
+  // The same name is still a favourite when a second date's card is clicked on (legacy re-adds it):
+  const card2 = h.holder({ 'data-venue-id': 'event-256', 'data-occurrence-id': '467', 'data-occurrence-date': '2026-11-30' });
+  h.ls.setItem('okanaganFavorites', '[]'); // the page toggled it off and on again across two clicks
+  h.click(h.button('BC Wine Night', card2), 'BC Wine Night');
+  assert.deepEqual(h.saved().items.map((x) => x.occ), [466, 467], 'two dates of one event are two saved items');
+  h.click(h.button('BC Wine Night', card2), 'BC Wine Night');
+  assert.deepEqual(h.saved().items, [], 'no longer a favourite: every saved date of it is removed');
+  // An event page with no upcoming date saves the event with no occurrence (never invented).
+  h.click(h.button('Old Market', h.holder({ 'data-venue-id': 'event-12' })), 'Old Market');
+  assert.deepEqual(h.saved().items.map(({ k, id, occ, date }) => ({ k, id, occ, date })), [{ k: 'event', id: 12, occ: null, date: null }]);
+});
+
+test('Stage 4.3: capture -- no holder id or no name records nothing; a corrupt okanaganSaved is replaced with a valid one', () => {
+  const h = sidecarHarness();
+  h.click(h.button('Somewhere', h.holder({})), 'Somewhere');
+  h.click(h.button('Somewhere Else', null), 'Somewhere Else');
+  h.click(h.button('Not An Id', h.holder({ 'data-venue-id': 'abc' })), 'Not An Id');
+  assert.equal(h.saved(), null, 'nothing written');
+  h.ls.setItem('okanaganSaved', '{not json');
+  h.click(h.button('Solo Cafe', h.holder({ 'data-venue-id': '7' })), 'Solo Cafe');
+  assert.deepEqual(h.saved().items.map((x) => x.id), [7]);
+});
+
+test('Stage 4.3: event pages carry the next upcoming occurrence; expired events carry none', () => {
+  const occs = (slug) => db.prepare("SELECT o.* FROM event_occurrences o JOIN events e ON e.id = o.event_id WHERE e.region = 'kelowna' AND e.slug = ? AND o.status = 'scheduled' ORDER BY o.start_date, o.id").all(slug);
+  const cta = (html) => html.match(/<div class="venue-cta-row event-actions"[^>]*>/)[0];
+  const active = cta(app.renderEventPage(app.findEventBySlug('kelowna', 'test-future-festival'), null));
+  const fest = occs('test-future-festival')[0];
+  assert.ok(active.includes(` data-occurrence-id="${fest.id}" data-occurrence-date="2099-06-01" data-occurrence-time="10:00"`), active);
+  const weekly = cta(app.renderEventPage(app.findEventBySlug('kelowna', 'test-weekly-market'), null));
+  assert.ok(weekly.includes(` data-occurrence-id="${occs('test-weekly-market')[0].id}" data-occurrence-date="2099-01-03"`), 'a series saves its next date');
+  const expired = cta(app.renderEventPage(app.findEventBySlug('kelowna', 'test-past-market'), null));
+  assert.doesNotMatch(expired, /data-occurrence-/, 'no upcoming date: nothing invented');
+});
+
+test('Stage 4.3: What\'s On cards carry the first occurrence in their window; the /api/events JSON is unchanged', () => {
+  const weeklyOccs = db.prepare("SELECT o.id, o.start_date FROM event_occurrences o JOIN events e ON e.id = o.event_id WHERE e.region = 'kelowna' AND e.slug = 'test-weekly-market' ORDER BY o.start_date").all();
+  const find = (from, to) => app.queryWhatsOnEvents({ from, to }).find((c) => c.slug === 'test-weekly-market' && c.region === 'kelowna');
+  const all = find('2099-01-01', '2099-12-31');
+  assert.equal(all.firstOccurrence.id, weeklyOccs[0].id);
+  assert.ok(app.whatsOnEventCardHtml(all).includes(` data-occurrence-id="${weeklyOccs[0].id}" data-occurrence-date="2099-01-03" data-occurrence-time="09:00" data-surface="whatson_card"`));
+  const later = find('2099-01-05', '2099-12-31');
+  assert.equal(later.firstOccurrence.id, weeklyOccs[1].id, 'the first date in the window the card is shown in');
+  assert.ok(!Object.keys(all).includes('firstOccurrence'), 'not enumerable');
+  assert.doesNotMatch(JSON.stringify(all), /firstOccurrence|data-occurrence/);
+});
+
+test('Stage 4.3: guide cards carry only their venue id (no category), so only the capture script reads it', () => {
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const html = app.renderGuidePage('kelowna', 'patio', [trattoria]);
+  assert.ok(html.includes(`<li class="venue-card" data-venue-id="${trattoria.id}">`));
+  assert.doesNotMatch(html, /data-venue-category="restaurant"/);
+  // Other card surfaces are unchanged: without savedId a non-engagement card has no attributes.
+  assert.match(app.venueCardHtml(trattoria, {}), /<li class="venue-card">/);
+});
+
+test('Stage 4.3: GET /api/saved/resolve resolves ids and exact names, is bounded, and never writes', () => withDiscoveryServer(async (base) => {
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const fest = db.prepare("SELECT o.id, o.event_id FROM event_occurrences o JOIN events e ON e.id = o.event_id WHERE e.region = 'kelowna' AND e.slug = 'test-future-festival'").get();
+  const before = db.prepare('SELECT COUNT(*) AS n, MAX(updated_at) AS u FROM venues').get();
+  const res = await fetch(`${base}/api/saved/resolve?items=venue:${trattoria.id},event:${fest.event_id}@${fest.id},venue:99999999&name=Test%20Trattoria&name=No%20Such%20Place`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.items.map((x) => x.status), ['active', 'upcoming', 'missing']);
+  assert.equal(body.items[0].venue.url, '/kelowna/restaurants/test-trattoria');
+  assert.equal(body.items[1].occurrence.date, '2099-06-01');
+  assert.deepEqual(body.names.map((x) => [x.name, x.status]), [['Test Trattoria', 'resolved'], ['No Such Place', 'missing']]);
+  assert.equal((await fetch(`${base}/api/saved/resolve?items=venue:abc`)).status, 400);
+  const tooMany = Array.from({ length: 101 }, (_, i) => `venue:${i + 1}`).join(',');
+  assert.equal((await fetch(`${base}/api/saved/resolve?items=${tooMany}`)).status, 400);
+  assert.deepEqual((await (await fetch(`${base}/api/saved/resolve`)).json()), { items: [], names: [] });
+  assert.deepEqual(db.prepare('SELECT COUNT(*) AS n, MAX(updated_at) AS u FROM venues').get(), before, 'read-only');
+}));

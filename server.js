@@ -2616,7 +2616,7 @@ function queryWhatsOnEvents({ from, to, regions = [], categories = [] } = {}) {
     const event = rowToEventFull(row);
     const occs = occStmt.all(row.id, f, t).map(rowToEventOccurrence);
     const venue = event.venue_id ? getVenue(event.venue_id) : null;
-    return {
+    const card = {
       id: event.id,
       name: event.name,
       slug: event.slug,
@@ -2637,6 +2637,11 @@ function queryWhatsOnEvents({ from, to, regions = [], categories = [] } = {}) {
       attribution: EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) ? null : event.source_name,
       status: event.status,
     };
+    // Stage 4.3: the occurrence this card shows (its first in the window), for
+    // the card's hidden saved-item identity. Non-enumerable, so the public
+    // /api/events JSON (built from these objects) is unchanged.
+    Object.defineProperty(card, 'firstOccurrence', { value: occs[0], enumerable: false });
+    return card;
   });
 }
 // Chip/tile counts for a result set (valley-wide rows count once per
@@ -3023,6 +3028,74 @@ function resolveDiscoveryDestination(intent) {
 // discovery-search.js (also used by Build My Trip for word matching).
 function discoverySearchModule() {
   return require('./discovery-search');
+}
+
+// Stage 4.3 (2026-10-01): saved-item identity. The pure rules live in
+// saved-items.js; the server supplies read-only lookups. Used by
+// GET /api/saved/resolve only -- nothing visible renders from it yet.
+function savedItemsModule() {
+  return require('./saved-items');
+}
+function savedItemsDeps(now = new Date()) {
+  const venueUrl = (v) => (v.slug && CATEGORY_SLUGS[v.type] ? `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}` : null);
+  return {
+    today: todayLocal(now),
+    getVenue: (id) => db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(id) || null,
+    getEvent: (id) => db.prepare('SELECT id, name, region, slug FROM events WHERE id = ?').get(id) || null,
+    getOccurrence: (id) => db.prepare('SELECT id, event_id, start_date, end_date, start_time, status FROM event_occurrences WHERE id = ?').get(id) || null,
+    findVenuesByName: (name) => db.prepare('SELECT id, name, region, type, slug FROM venues WHERE name = ? AND redirect_to IS NULL AND slug IS NOT NULL ORDER BY region, id').all(name),
+    findEventsByName: (name) => db.prepare("SELECT id, name, region, slug FROM events WHERE name = ? AND status = 'scheduled' ORDER BY id").all(name),
+    venueUrl,
+    eventUrl: (e) => `/${e.region}/events/${e.slug}`,
+  };
+}
+function resolveSavedItemsRequest(query, now = new Date()) {
+  const items = typeof query.items === 'string' && query.items ? query.items.split(',') : [];
+  const names = query.name === undefined ? [] : (Array.isArray(query.name) ? query.name : [query.name]);
+  return savedItemsModule().resolveSavedItems({ items, names }, savedItemsDeps(now));
+}
+
+// The hidden capture half (Stage 4.3): after any Favorite click on a page
+// that opts in, mirror the result into okanaganSaved with the clicked item's
+// stable id -- read from the nearest [data-venue-id] holder (a venue id, or
+// event-<id> with the data-occurrence-* of the occurrence that card or page
+// shows). okanaganFavorites (names; written by app.js or the engagement
+// script) stays the record of WHETHER something is a favourite and is never
+// written here; okanaganSaved only adds WHICH one. Deferred to after the
+// click so it sees the result whichever script toggled it. No analytics.
+function renderSavedSidecarScriptHtml() {
+  return `<script>
+(function(){
+  var KEY = 'okanaganSaved';
+  function readSaved(){ try { var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && s.v === 1 && Array.isArray(s.items)) return s; } catch (e) {} return { v: 1, items: [] }; }
+  function writeSaved(s){ try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+  function favNames(){ try { var l = JSON.parse(localStorage.getItem('okanaganFavorites') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+  function refOf(h){
+    var id = h.getAttribute('data-venue-id') || '', m = /^event-([1-9][0-9]*)$/.exec(id);
+    if (m) {
+      var occ = h.getAttribute('data-occurrence-id');
+      return { k: 'event', id: Number(m[1]), occ: /^[1-9][0-9]*$/.test(occ || '') ? Number(occ) : null, date: h.getAttribute('data-occurrence-date') || null, time: h.getAttribute('data-occurrence-time') || null };
+    }
+    return /^[1-9][0-9]*$/.test(id) ? { k: 'venue', id: Number(id) } : null;
+  }
+  function sameItem(a, b){ return a.k === b.k && a.id === b.id && (a.k !== 'event' || (a.occ || null) === (b.occ || null)); }
+  document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest ? e.target.closest('.fav-btn') : null;
+    if (!btn) return;
+    var holder = btn.closest('[data-venue-id]'), ref = holder ? refOf(holder) : null, name = btn.getAttribute('data-fav-name') || '';
+    if (!ref || !name) return;
+    setTimeout(function(){
+      var on = favNames().indexOf(name) !== -1, s = readSaved(), had = s.items.some(function(x){ return x && sameItem(x, ref); });
+      if (on && !had) { ref.name = name; ref.savedAt = new Date().toISOString(); s.items.push(ref); writeSaved(s); }
+      else if (!on) {
+        // The name is no longer a favourite: drop every saved entry for it.
+        var kept = s.items.filter(function(x){ return x && x.name !== name && !(x.k === ref.k && x.id === ref.id); });
+        if (kept.length !== s.items.length) { s.items = kept; writeSaved(s); }
+      }
+    }, 0);
+  });
+})();
+</script>`;
 }
 
 // Whole-word match of a term inside already-normalized text.
@@ -5269,7 +5342,7 @@ function renderGuidePage(region, badge, venues) {
   // they render app.js's canonical labels, and the existing golf card script
   // adds "Read more" and mirrors aria-pressed. Winery venue pages and the
   // winery region pages are separate templates and are not affected.
-  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true })).join('\n');
+  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true, savedId: true })).join('\n');
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -5293,7 +5366,7 @@ function renderGuidePage(region, badge, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, savedSidecar: true })}
 ${renderAnalyticsHeadHtml('guide')}
 </head>
 <body class="golf-page guide-page">
@@ -8687,7 +8760,9 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // the Golf rules, see renderBeachThemeStyles) plus, when the page
   // carries one, the advisory-notice styles. Golf pages' head is
   // byte-identical to before.
-  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false, golfDataStyles = false } = opts;
+  // savedSidecar (Stage 4.3): pages that render Favorite controls opt in to
+  // the hidden saved-item capture script; every other page's head is unchanged.
+  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false } = opts;
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
@@ -8704,7 +8779,7 @@ ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.strin
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/tokens.css">
-${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${outdoorTheme ? '\n' + renderOutdoorThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}${golfDataStyles && golfData ? '\n' + golfData.GOLF_DATA_CSS : ''}`;
+${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${outdoorTheme ? '\n' + renderOutdoorThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}${golfDataStyles && golfData ? '\n' + golfData.GOLF_DATA_CSS : ''}${savedSidecar ? '\n' + renderSavedSidecarScriptHtml() : ''}`;
 }
 
 function siteHeader(rightLinkHref, rightLinkText) {
@@ -8788,7 +8863,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -8824,9 +8899,12 @@ function venueCardHtml(venue, opts = {}) {
   // shared engagement script locates a card by data-venue-category, so an
   // unthemed card carrying the controls needs these attributes too. They are
   // data attributes only -- no themed CSS rule matches a non-golf category.
+  // savedId (Stage 4.3): a card whose Favorite button app.js adds client-side
+  // (guide pages) carries just its venue id, for the saved-item capture
+  // script -- no category, so no engagement script or themed rule binds to it.
   const liAttrs = (isGolf || actions)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="category_card"`
-    : '';
+    : (savedId ? ` data-venue-id="${venue.id}"` : '');
   // Golf-only (2026-09-19): the listing card's only actions are Favorite
   // and Add to Trip (golfFavTripButtonsHtml). Website / phone / directions
   // live on the venue page instead -- the data is untouched, only where it
@@ -9525,7 +9603,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, golfDataStyles: golfDetails.size > 0 })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type, true, 'category')}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -10282,7 +10360,7 @@ function renderOutdoorActivityPage(activity, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, outdoorTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, outdoorTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${golfEngagementHeadHtml('outdoor', true, 'category')}
 </head>
 <body${themedBodyClassAttr('outdoor')}>
@@ -10454,7 +10532,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0 })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
 ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
@@ -11219,7 +11297,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0 })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
@@ -11330,7 +11408,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
@@ -11932,7 +12010,7 @@ function renderDogHubPage(venues, filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderDogHubStyles()}
 ${golfEngagementHeadHtml('dog', true, 'hub')}
@@ -12305,7 +12383,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)) })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderLocalFavouritesStyles()}
 ${golfEngagementHeadHtml('lf', true, 'hub')}
@@ -12738,6 +12816,13 @@ function whatsOnResultBarHtml(shown, total, filtered, selectedRegions, selectedC
 // category chips, Favorite + Add to Trip) for an event record. No website
 // or phone on the listing card. The detail href follows the existing
 // events route (/:region/events/:slug).
+// Stage 4.3: the hidden identity of one event occurrence, for the saved-item
+// capture script (data attributes only; nothing renders from them).
+function savedOccurrenceAttrs(o) {
+  if (!o || !o.id) return '';
+  return ` data-occurrence-id="${o.id}" data-occurrence-date="${escapeHtml(o.start_date)}"${o.start_time ? ` data-occurrence-time="${escapeHtml(o.start_time)}"` : ''}`;
+}
+
 function whatsOnEventCardHtml(ev) {
   const href = `/${ev.region}/events/${ev.slug}`;
   const when = [ev.dateLabel, ev.time].filter(Boolean).join(' · ');
@@ -12746,7 +12831,7 @@ function whatsOnEventCardHtml(ev) {
   const descId = `golf-desc-event-${ev.id}`;
   const tripQuery = `${ev.name}, ${REGION_LABELS[ev.region] || ev.region}, Okanagan Valley, BC`;
   return `
-      <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''} data-surface="whatson_card">
+      <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''}${savedOccurrenceAttrs(ev.firstOccurrence)} data-surface="whatson_card">
         ${ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : ''}
         <h2><a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(ev.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>
         <p class="venue-meta">${meta}</p>
@@ -13150,7 +13235,7 @@ function renderWhatsOnPage(filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, outdoorTheme: true, noindex: !hasInventory })}
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, outdoorTheme: true, noindex: !hasInventory, savedSidecar: true })}
 ${renderWhatsOnStyles()}
 ${renderAnalyticsHeadHtml('hub')}
 </head>
@@ -13422,7 +13507,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
@@ -13629,7 +13714,7 @@ ${occurrences.map((o) => {
     : '';
   const tripQuery = `${full.name}, ${regionLabel}, Okanagan Valley, BC`;
   const actionsHtml = `
-  <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}" data-surface="event_page">
+  <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}"${savedOccurrenceAttrs(upcoming[0])} data-surface="event_page">
     <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(full.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(full.name)}">${APP_FAV_LABEL_HTML}</button>
     <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(full.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(full.region)}" aria-pressed="false" aria-label="Add ${escapeHtml(full.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
   </div>`;
@@ -13675,7 +13760,7 @@ ${related.map((r) => {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { noindex: expired, golfTheme: true })}
+${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { noindex: expired, golfTheme: true, savedSidecar: true })}
 ${renderAnalyticsHeadHtml('event')}
 <style>
   /* Batch 4B (2026-09-27): the event page uses the themed shell, whose
@@ -14886,7 +14971,7 @@ ${v2 ? renderTripPlannerV2HeroHtml() : TRIP_LEGACY_HERO_HTML}
 ${renderHomeFooterHTML(true)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="/scripts/app.js"></script>${v2 ? '\n' + renderTripPlannerV2Script() : ''}
+<script src="/scripts/app.js"></script>${v2 ? '\n' + renderTripPlannerV2Script() + '\n' + renderSavedSidecarScriptHtml() : ''}
 </body>
 </html>`;
 }
@@ -18155,6 +18240,15 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, listVenues(query));
     }
 
+    // GET /api/saved/resolve?items=venue:571,event:256@466&name=<legacy name>
+    // (Stage 4.3): read-only lookup of saved-item identities for the future
+    // /favorites page. Bounded (saved-items.js limits); never writes; never
+    // guesses between same-name venues.
+    if (pathname === '/api/saved/resolve' && method === 'GET') {
+      const out = resolveSavedItemsRequest(query);
+      return sendJSON(res, out.ok ? 200 : 400, out.ok ? { items: out.items, names: out.names } : { error: out.error });
+    }
+
     // GET /api/discover?q=<text>&limit=<n> -- Discovery search, Phase 2
     // (2026-09-25). Read-only: interprets the text into a validated intent
     // and returns the existing page that shows it plus the real matching
@@ -19080,6 +19174,10 @@ module.exports = {
   getSecretSpotVenues,
   renderSecretSpotsPage,
   renderFoodDrinkScopedPage,
+  // Stage 4.3: saved-item identity
+  renderSavedSidecarScriptHtml,
+  resolveSavedItemsRequest,
+  savedOccurrenceAttrs,
   regionCategoryTabsHtml,
   SECRET_SPOT_TYPES,
   renderLocalFavouritesStyles,
