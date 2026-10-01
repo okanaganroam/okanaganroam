@@ -7305,7 +7305,9 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // templates (they serve okanagan.html unchanged) and are untouched by this.
 // Stage 3.4 (2026-09-29): 'search' labels only the new /search results page,
 // so site search is measurable separately from the legacy /browse directory.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'listing_form', 'not_found', 'search']);
+// Stage 4.4 (2026-10-01): 'favorites' labels the /favorites page (page_view
+// only; no new events).
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'listing_form', 'not_found', 'search', 'favorites']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -7570,7 +7572,7 @@ function renderGolfHeaderHtml() {
   if (!headerHtml) {
     return siteHeader('https://okanaganroam.com/', 'Explore the full directory →');
   }
-  return headerHtml
+  return withFavoritesNavLink(headerHtml
     .replace(/href="#moodCards"/g, 'href="/#moodCards"')
     .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
     .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
@@ -7582,7 +7584,26 @@ function renderGolfHeaderHtml() {
     // need app.js and turn the trip button into a real link to /trip.
     .replace(/<button class="nav-search-btn"[\s\S]*?<\/button>\s*/, '')
     .replace(/<button class="lang-toggle"[\s\S]*?<\/button>\s*/, '')
-    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>');
+    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>'));
+}
+
+// Stage 4.4 (2026-10-01): "Favorites" in the shared navigation (desktop links
+// and the mobile menu, which is the same #navLinks list), inserted into the
+// header extracted from okanagan.html -- the template itself, the homepage and
+// /browse are unchanged. No data-i18n: app.js's frozen dictionary has no key
+// for it. No count, so no extra script on the shell pages.
+// Decision (Option C): from 941px (where the desktop nav row starts, app.css's
+// max-width: 940px mobile breakpoint) through 1099px the desktop row has no room
+// for one more item without its labels wrapping, so the desktop link is hidden
+// there and the header stays exactly as before; it shows from 1100px, and in
+// the mobile menu (940px and below). The rule travels with the header it
+// belongs to, so every page carrying the link carries it too.
+const FAVORITES_NAV_ITEM = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
+const FAVORITES_NAV_STYLE = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
+function withFavoritesNavLink(headerHtml) {
+  const marker = '<li class="nav-links-trip">';
+  if (!headerHtml || !headerHtml.includes(marker) || headerHtml.includes(FAVORITES_NAV_ITEM)) return headerHtml;
+  return headerHtml.replace(marker, `${FAVORITES_NAV_ITEM}\n      ${marker}`) + `\n${FAVORITES_NAV_STYLE}`;
 }
 
 // Favorite / Add to Trip styling for ENGAGEMENT_ONLY_TYPES pages only
@@ -9366,6 +9387,189 @@ ${renderGolfHeaderHtml()}
     m.setOpacity(p.n > 0 ? 1 : 0.4);
   });
   setTimeout(function(){ map.invalidateSize(); }, 100);
+})();
+</script>
+</body>
+</html>`;
+}
+
+// ---------- /favorites (Stage 4.4, 2026-10-01) ----------
+// The visitor's own saved places and events. Favourites live only in this
+// browser (okanaganFavorites names + the Stage 4.3 okanaganSaved ids), so the
+// server sends an empty shell and the page script resolves the saved items
+// through GET /api/saved/resolve. The rules (merge, redirects, same-name
+// choice, Remove keeping the legacy names in step) are favorites-page.js,
+// inlined here so the browser runs exactly the tested code. noindex, no
+// canonical, never cached, not in the sitemap. Buttons here are NOT .fav-btn,
+// so app.js's Favorite handling never touches them.
+function favoritesPageModule() {
+  return require('./favorites-page');
+}
+function renderFavoritesPage() {
+  const title = 'My Favorites | Okanagan Roam';
+  const description = 'The places and events you have saved on Okanagan Roam, in this browser.';
+  const regionLabels = JSON.stringify(REGION_LABELS).replace(/</g, '\\u003c');
+  const typeLabels = JSON.stringify(Object.fromEntries(Object.entries(CATEGORY_LABELS).map(([k, v]) => [k, v.singular]))).replace(/</g, '\\u003c');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, null, [], { golfTheme: true, noindex: true })}
+${renderAnalyticsHeadHtml('favorites')}
+<style>
+  body.favorites-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  body.favorites-page .fav-intro { margin: 0 0 22px; color: var(--ink); opacity: 0.8; }
+  body.favorites-page .fav-section { margin: 0 0 30px; }
+  body.favorites-page .fav-section h2 { font-family: 'Fraunces', serif; font-size: 1.35rem; margin: 0 0 12px; }
+  body.favorites-page .fav-section h3 { font-size: 0.95rem; margin: 18px 0 8px; }
+  body.favorites-page .fav-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
+  body.favorites-page .fav-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 14px 16px; border-radius: 14px; background: var(--ref-white, #fff); border: 1px solid rgba(27,43,58,0.12); }
+  body.favorites-page .fav-main { flex: 1 1 220px; min-width: 0; }
+  body.favorites-page .fav-name { font-weight: 800; color: var(--ref-navy, #1B2B3A); overflow-wrap: anywhere; }
+  body.favorites-page .fav-meta { display: block; font-size: 0.85rem; opacity: 0.75; margin-top: 2px; }
+  body.favorites-page .fav-flag { display: inline-block; font-size: 0.75rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: rgba(107,44,64,0.1); color: var(--plum-dark, #6B2C40); margin-left: 6px; }
+  body.favorites-page .fav-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.favorites-page .fav-actions button, body.favorites-page .fav-retry { min-height: 44px; padding: 8px 16px; border-radius: 999px; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: transparent; color: var(--ref-navy, #1B2B3A); border: 1px solid rgba(27,43,58,0.25); }
+  body.favorites-page .fav-actions .fav-pick { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: var(--ref-navy, #1B2B3A); }
+  body.favorites-page .fav-choice { padding: 14px 16px; border-radius: 14px; border: 1px dashed rgba(27,43,58,0.3); }
+  body.favorites-page .fav-choice p { margin: 0 0 10px; }
+  body.favorites-page details.fav-past summary { cursor: pointer; font-weight: 800; min-height: 44px; display: flex; align-items: center; }
+  body.favorites-page .fav-empty a { font-weight: 800; }
+  body.favorites-page #favRoot { padding-bottom: 72px; } /* clear of the floating Trip button on phones */
+  @media (min-width: 900px) { body.favorites-page .fav-list { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body class="golf-page favorites-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Favorites' },
+  ])}
+  <h1>My Favorites</h1>
+  <p class="fav-intro">Places and events you have saved. Favorites are kept in this browser only.</p>
+  <p id="favStatus" class="visually-hidden" role="status" aria-live="polite"></p>
+  <div id="favRoot" aria-busy="true"><p>Loading your favorites&hellip;</p></div>
+  <noscript><p>Your favorites are saved in this browser and need JavaScript to show here.</p></noscript>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script>
+(function(){
+  var core = (${favoritesPageModule().favoritesCore.toString()})();
+  var REGIONS = ${regionLabels}, TYPES = ${typeLabels};
+  var root = document.getElementById('favRoot'), statusEl = document.getElementById('favStatus');
+  var LEGACY = 'okanaganFavorites', SAVED = 'okanaganSaved';
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function get(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function put(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function stores(){ return { legacy: core.readLegacy(get(LEGACY)), saved: core.readSaved(get(SAVED)) }; }
+  function announce(t){ if (statusEl) statusEl.textContent = t; }
+  function fmtDate(d){
+    var p = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(d || ''); if (!p) return '';
+    return new Date(Date.UTC(+p[1], +p[2] - 1, +p[3])).toLocaleDateString('en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function fmtTime(t){
+    var p = /^([0-9]{2}):([0-9]{2})/.exec(t || ''); if (!p) return '';
+    var h = +p[1], ap = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12; return h + ':' + p[2] + ' ' + ap;
+  }
+  function where(region, type){ return [REGIONS[region] || region, type ? (TYPES[type] || type) : ''].filter(Boolean).join(' · '); }
+  function removeBtn(attrs, name){ return '<button type="button" class="fav-remove" ' + attrs + ' aria-label="Remove ' + esc(name) + ' from Favorites">Remove</button>'; }
+  function placeHtml(p){
+    return '<li class="fav-item"><div class="fav-main"><a class="fav-name" href="' + esc(p.url) + '">' + esc(p.name) + '</a><span class="fav-meta">' + esc(where(p.region, p.type)) + '</span></div>'
+      + '<div class="fav-actions">' + removeBtn('data-ref="' + esc(p.ref) + '"', p.name) + '</div></li>';
+  }
+  function eventHtml(e){
+    var when = '';
+    if (e.status === 'undated') when = 'No date saved';
+    else if (e.status === 'missing_occurrence') when = 'This date is no longer listed';
+    else {
+      when = fmtDate(e.date) + (e.endDate && e.endDate !== e.date ? ' – ' + fmtDate(e.endDate) : '') + (e.time ? ' · ' + fmtTime(e.time) : '');
+    }
+    var flag = e.status === 'cancelled' ? '<span class="fav-flag">Cancelled</span>' : e.status === 'postponed' ? '<span class="fav-flag">Postponed</span>' : '';
+    return '<li class="fav-item"><div class="fav-main"><a class="fav-name" href="' + esc(e.url) + '">' + esc(e.name) + '</a>' + flag + '<span class="fav-meta">' + esc(when) + (REGIONS[e.region] ? ' · ' + esc(REGIONS[e.region]) : '') + '</span></div>'
+      + '<div class="fav-actions">' + removeBtn('data-ref="' + esc(e.ref) + '"', e.name) + '</div></li>';
+  }
+  function chooseHtml(c){
+    var opts = c.candidates.map(function(o){
+      return '<li class="fav-item"><div class="fav-main"><a class="fav-name" href="' + esc(o.url) + '">' + esc(o.name) + '</a><span class="fav-meta">' + esc(o.kind === 'event' ? 'Event · ' + (REGIONS[o.region] || o.region) : where(o.region, o.type)) + '</span></div>'
+        + '<div class="fav-actions"><button type="button" class="fav-pick" data-name="' + esc(c.name) + '" data-ref="' + esc(o.ref) + '">This one</button></div></li>';
+    }).join('');
+    return '<div class="fav-choice"><p>You saved “' + esc(c.name) + '”, and more than one listing has that name. Which one did you mean?</p><ul class="fav-list">' + opts + '</ul>'
+      + '<div class="fav-actions" style="margin-top:10px">' + removeBtn('data-name="' + esc(c.name) + '"', c.name) + '</div></div>';
+  }
+  function goneHtml(g){
+    var attrs = g.ref ? 'data-ref="' + esc(g.ref) + '"' : 'data-name="' + esc(g.name) + '"';
+    return '<li class="fav-item"><div class="fav-main"><span class="fav-name">' + esc(g.name) + '</span><span class="fav-meta">No longer listed on Okanagan Roam</span></div><div class="fav-actions">' + removeBtn(attrs, g.name) + '</div></li>';
+  }
+  function section(id, title, body){ return '<section class="fav-section" id="' + id + '" aria-labelledby="' + id + 'H"><h2 id="' + id + 'H">' + title + '</h2>' + body + '</section>'; }
+  function render(view){
+    var html = '';
+    var places = view.places.slice().sort(function(a, b){ return a.name.localeCompare(b.name); });
+    if (places.length) html += section('favPlaces', 'Places', '<ul class="fav-list">' + places.map(placeHtml).join('') + '</ul>');
+    var g = core.eventGroups(view.events), ev = '';
+    if (g.upcoming.length) ev += '<h3>Upcoming</h3><ul class="fav-list">' + g.upcoming.map(eventHtml).join('') + '</ul>';
+    if (g.undated.length) ev += '<h3>No date saved</h3><ul class="fav-list">' + g.undated.map(eventHtml).join('') + '</ul>';
+    if (g.past.length) ev += '<details class="fav-past"><summary>Past events (' + g.past.length + ')</summary><ul class="fav-list">' + g.past.map(eventHtml).join('') + '</ul></details>';
+    if (ev) html += section('favEvents', 'Events', ev);
+    if (view.choose.length) html += section('favChoose', 'Choose which one', view.choose.map(chooseHtml).join(''));
+    if (view.gone.length) html += section('favGone', 'No longer listed', '<ul class="fav-list">' + view.gone.map(goneHtml).join('') + '</ul>');
+    if (!html) html = '<div class="fav-empty"><p>You haven’t saved any favorites yet. Tap “Favorite” on a place or event to keep it here.</p><p><a href="/wineries">Wineries</a> · <a href="/food-drink">Food &amp; Drink</a> · <a href="/beaches">Beaches</a> · <a href="/outdoors">Outdoors</a> · <a href="/whats-on">What’s On</a></p></div>';
+    root.innerHTML = html;
+  }
+  function renderOffline(st){
+    var names = st.legacy.slice();
+    st.saved.items.forEach(function(x){ if (x.name && names.indexOf(x.name) === -1) names.push(x.name); });
+    root.innerHTML = '<p>Couldn’t load the details of your favorites just now. <button type="button" class="fav-retry">Try again</button></p>'
+      + (names.length ? '<ul class="fav-list">' + names.map(function(n){ return '<li class="fav-item"><span class="fav-name">' + esc(n) + '</span></li>'; }).join('') + '</ul>' : '');
+  }
+  function resolveAll(p){
+    var batches = core.batches(p), merged = { items: [], names: [] }, i = 0;
+    return new Promise(function(resolve, reject){
+      (function next(){
+        if (i >= batches.length) return resolve(merged);
+        var b = batches[i++], q = [];
+        if (b.items.length) q.push('items=' + encodeURIComponent(b.items.join(',')));
+        b.names.forEach(function(n){ q.push('name=' + encodeURIComponent(n)); });
+        fetch('/api/saved/resolve' + (q.length ? '?' + q.join('&') : ''), { headers: { Accept: 'application/json' } })
+          .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function(j){ merged.items = merged.items.concat(j.items || []); merged.names = merged.names.concat(j.names || []); next(); })
+          .catch(reject);
+      })();
+    });
+  }
+  function load(){
+    var st = stores(), p = core.plan(st.legacy, st.saved);
+    if (!p.refs.length && !p.names.length) { render({ places: [], events: [], choose: [], gone: [] }); root.removeAttribute('aria-busy'); return; }
+    root.setAttribute('aria-busy', 'true');
+    resolveAll(p).then(function(res){
+      var a = core.apply(st.legacy, st.saved, res, new Date().toISOString());
+      if (a.changed) put(SAVED, a.saved);
+      render(a.view);
+    }).catch(function(){ renderOffline(st); }).then(function(){ root.removeAttribute('aria-busy'); });
+  }
+  root.addEventListener('click', function(e){
+    var t = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!t) return;
+    if (t.classList.contains('fav-retry')) { load(); return; }
+    var st = stores();
+    if (t.classList.contains('fav-remove')) {
+      var ref = t.getAttribute('data-ref'), name = t.getAttribute('data-name');
+      var r = core.remove(st.legacy, st.saved, ref ? { ref: ref } : { name: name });
+      put(SAVED, r.saved); put(LEGACY, r.legacy);
+      announce('Removed from your favorites.');
+      load();
+      return;
+    }
+    if (t.classList.contains('fav-pick')) {
+      put(SAVED, core.choose(st.saved, t.getAttribute('data-name'), t.getAttribute('data-ref'), new Date().toISOString()));
+      announce('Saved your choice.');
+      load();
+    }
+  });
+  window.addEventListener('storage', function(ev){ if (ev.key === LEGACY || ev.key === SAVED) load(); });
+  load();
 })();
 </script>
 </body>
@@ -14853,12 +15057,12 @@ function renderTripPlannerPage(v2 = false) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
     tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
     headerHtml = extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '';
-    headerHtml = headerHtml
+    headerHtml = withFavoritesNavLink(headerHtml
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
       // Same dead-anchor fix as /browse: the logo goes home from here.
-      .replace(/href="#top"/g, 'href="/"');
+      .replace(/href="#top"/g, 'href="/"'));
   }
 
   const regionOptions = VALID_REGIONS
@@ -15018,11 +15222,11 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
   if (fs.existsSync(SITE_PATH)) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
     tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
-    headerHtml = (extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '')
+    headerHtml = withFavoritesNavLink((extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '')
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
-      .replace(/href="#top"/g, 'href="/"');
+      .replace(/href="#top"/g, 'href="/"'));
   }
   return tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
@@ -17000,6 +17204,18 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/map' || pathname === '/map/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' });
       return res.end(renderMapPage());
+    }
+
+    // GET /favorites (Stage 4.4): the visitor's saved places and events, from
+    // this browser's storage. noindex; never cached; not in the sitemap.
+    if ((pathname === '/favorites' || pathname === '/favorites/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
+      return res.end(renderFavoritesPage());
+    }
+    // The British spelling goes to the same page.
+    if ((pathname === '/favourites' || pathname === '/favourites/') && method === 'GET') {
+      res.writeHead(301, { Location: '/favorites' + (parsed.search || ''), 'Cache-Control': 'no-store' });
+      return res.end();
     }
 
     if (pathname === '/browse' && method === 'GET') {
@@ -19337,6 +19553,8 @@ module.exports = {
   discoveryPresentation,
   renderSearchPage,
   renderMapPage,
+  renderFavoritesPage,
+  withFavoritesNavLink,
   mapAreaPins,
   discoverySearchVenues,
   selectDiscoveryEvents,

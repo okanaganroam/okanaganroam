@@ -10721,8 +10721,9 @@ function parseNav(html) {
       const m = li.match(/<span data-i18n="([^"]+)">([^<]+)<\/span>/);
       return { key: m[1], label: m[2], items: [...li.matchAll(/<a href="([^"]+)"(?: id="[^"]+")? data-i18n="([^"]+)">([^<]+)<\/a>/g)].map((x) => [x[1], x[2], x[3]]) };
     }
-    const a = li.match(/<a href="([^"]+)" data-i18n="([^"]+)">([^<]+)<\/a>/);
-    return { href: a[1], key: a[2], label: a[3], mobileOnly: /class="nav-links-trip"/.test(li) };
+    // Stage 4.4: the Favorites link has no data-i18n key (app.js's frozen dictionary has none).
+    const a = li.match(/<a href="([^"]+)"(?: data-i18n="([^"]+)")?>([^<]+)<\/a>/);
+    return { href: a[1], key: a[2] || null, label: a[3], mobileOnly: /class="nav-links-trip"/.test(li) };
   }) };
 }
 
@@ -10734,10 +10735,14 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
     '/destinations': await (await fetch(`${base}/destinations`)).text(),
     themed: app.renderGolfHeaderHtml(),
   };
+  // Stage 4.4: server-built headers (/trip, themed pages) add Favorites before
+  // the mobile-only Build My Trip row; / and /browse keep the template's own.
+  const withFavorites = [...HEADER_SPEC.slice(0, -1), { href: '/favorites', key: null, label: 'Favorites' }, HEADER_SPEC[HEADER_SPEC.length - 1]];
   for (const [name, html] of Object.entries(pages)) {
     const nav = parseNav(html);
+    const spec = (name === '/' || name === '/browse') ? HEADER_SPEC : withFavorites;
     assert.deepEqual(nav.items.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: i.mobileOnly })),
-      HEADER_SPEC.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: !!i.mobileOnly })), name);
+      spec.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: !!i.mobileOnly })), name);
     // The desktop Build My Trip button is still the header CTA.
     assert.match(nav.header, /id="navTripBtn"/, `${name}: Build My Trip button`);
     // Map keeps its id and href (okanagan.html is frozen); Stage 3.4: the
@@ -12167,7 +12172,8 @@ const ga4Check = (html, pageType, label) => {
 };
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'venue']);
+  // Stage 4.4: + 'favorites' (the /favorites page).
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'venue']);
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
@@ -13733,3 +13739,52 @@ test('Stage 4.3: the real /whats-on page cards carry the first occurrence in the
   assert.match(api, /Test Weekly Market/);
   assert.doesNotMatch(api, /firstOccurrence|data-occurrence/);
 }));
+
+// ---- Stage 4.4 (2026-10-01): /favorites -------------------------------------------
+test('Stage 4.4: GET /favorites is a noindex, uncached shell page measured as page_type favorites; /favourites redirects to it', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/favorites`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-robots-tag'), 'noindex');
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  const html = await res.text();
+  assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.doesNotMatch(html, /rel="canonical"/);
+  assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
+  assert.match(html, /<h1>My Favorites<\/h1>/);
+  assert.match(html, /<main class="wrap-wide golf-main">/);
+  assert.match(html, /id="tripTray"/);
+  assert.match(html, /page_type: 'favorites'/);
+  // The browser runs exactly the tested rules.
+  assert.ok(html.includes(require('../favorites-page').favoritesCore.toString()));
+  // No new analytics events, no capture script, and no .fav-btn for app.js to bind to.
+  const pageScript = html.slice(html.lastIndexOf('<script>'));
+  assert.doesNotMatch(pageScript, /trackEvent|dataLayer\.push|gtag\(/);
+  assert.doesNotMatch(html, /var KEY = 'okanaganSaved';/);
+  assert.doesNotMatch(html, /class="[^"]*\bfav-btn\b/);
+  assert.equal((await fetch(`${base}/favorites/`)).status, 200);
+  const r = await fetch(`${base}/favourites?x=1`, { redirect: 'manual' });
+  assert.equal(r.status, 301);
+  assert.equal(r.headers.get('location'), '/favorites?x=1');
+  const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+  assert.doesNotMatch(sitemap, /favorites|favourites/);
+}));
+
+test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile menu list) on shell pages and /trip, never on / or /browse', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const item = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
+  const page = async (p) => (await fetch(`${base}${p}`)).text();
+  for (const p of ['/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/restaurants/test-trattoria', '/whats-on', '/kelowna', '/search?q=fixture', '/map', '/favorites', '/trip']) {
+    const html = await page(p);
+    assert.equal(html.split(item).length - 1, 1, `${p}: one Favorites nav item`);
+    const links = html.slice(html.indexOf('<ul class="nav-links" id="navLinks">'), html.indexOf('</ul>', html.indexOf('<ul class="nav-links" id="navLinks">')) + 5);
+    assert.ok(links.includes(`${item}\n      <li class="nav-links-trip">`), `${p}: inside #navLinks, before Build My Trip`);
+    // Option C: the desktop link is hidden 941-1099px (no label wrapping); the rule follows the header.
+    const rule = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
+    assert.equal(html.split(rule).length - 1, 1, `${p}: one 941-1099px rule`);
+    assert.ok(html.indexOf(rule) > html.indexOf('</header>') && html.indexOf(rule) - html.indexOf('</header>') < 20, `${p}: right after the header`);
+  }
+  for (const p of ['/', '/browse']) assert.doesNotMatch(await page(p), /href="\/favorites"|nav-links-favorites/, `${p}: unchanged`);
+  // The helper is idempotent and leaves a header without the marker alone.
+  const once = app.withFavoritesNavLink('<ul><li class="nav-links-trip">x</li></ul>');
+  assert.equal(app.withFavoritesNavLink(once), once);
+  assert.equal(app.withFavoritesNavLink('<header></header>'), '<header></header>');
+}))));
