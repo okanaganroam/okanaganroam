@@ -232,6 +232,10 @@ var TRANSLATIONS = {
     'trip.inTrip': '\u2713 In trip',
     'trip.sameArea': 'Same area',
     'trip.kmToNextStop': 'km to next stop',
+    'trip.removed': 'Removed {name}.',
+    'trip.undo': 'Undo',
+    'trip.undoLabel': 'Undo: put {name} back in your trip',
+    'trip.restored': 'Restored {name}.',
 
     'trip.planner.title': 'Build My Trip',
     'trip.planner.subtitle': 'Answer a few questions and we\u2019ll put together a real, day-by-day Okanagan itinerary from actual venues \u2014 no invented places, no AI guesswork.',
@@ -524,6 +528,10 @@ var TRANSLATIONS = {
     'trip.inTrip': '\u2713 Dans le voyage',
     'trip.sameArea': 'M\u00eame secteur',
     'trip.kmToNextStop': 'km jusqu\u2019au prochain arr\u00eat',
+    'trip.removed': '{name} retir\u00e9 du voyage.',
+    'trip.undo': 'Annuler',
+    'trip.undoLabel': 'Annuler\u00a0: remettre {name} dans votre voyage',
+    'trip.restored': '{name} remis dans le voyage.',
 
     'trip.planner.title': 'Planifiez mon voyage',
     'trip.planner.subtitle': 'R\u00e9pondez \u00e0 quelques questions et nous cr\u00e9erons un itin\u00e9raire r\u00e9el, jour par jour, dans l\u2019Okanagan \u00e0 partir de vrais \u00e9tablissements \u2014 aucun lieu invent\u00e9, aucune supposition par IA.',
@@ -2375,11 +2383,93 @@ window.__scrollToVenueCard = function(name){
   function showMessage(text){
     var msgEl = document.getElementById('tripTrayMessage');
     if (!msgEl) return;
+    pendingUndo = null;               // W14: the message no longer offers Undo
     msgEl.textContent = text;
     msgEl.style.display = 'block';
     panel.classList.add('open');
     clearTimeout(msgEl._hideTimer);
     msgEl._hideTimer = setTimeout(function(){ msgEl.style.display = 'none'; }, 4000);
+  }
+
+  // W14: Undo for the tray's ✕ -- only the most recent removal, for about 10
+  // seconds (paused while the message is hovered or focused), and only while
+  // My Trip is otherwise unchanged: any other add / remove / clear, or closing
+  // the tray, withdraws it. The removed stop is kept as the exact stored object
+  // (ref, legacy flags and all) with its index, so Undo puts back that very
+  // entry where it was -- never one looked up by name.
+  var UNDO_MS = 10000;
+  var pendingUndo = null;
+  var trayMsg = document.getElementById('tripTrayMessage');
+  if (trayMsg) {
+    trayMsg.setAttribute('role', 'status');
+    var undoHold = { hover: false, focus: false };
+    var holdUndo = function(key, on){
+      undoHold[key] = on;
+      if (!pendingUndo) return;
+      clearTimeout(trayMsg._hideTimer);
+      if (!undoHold.hover && !undoHold.focus) trayMsg._hideTimer = setTimeout(withdrawUndo, UNDO_MS);
+    };
+    trayMsg.addEventListener('mouseenter', function(){ holdUndo('hover', true); });
+    trayMsg.addEventListener('mouseleave', function(){ holdUndo('hover', false); });
+    trayMsg.addEventListener('focusin', function(){ holdUndo('focus', true); });
+    trayMsg.addEventListener('focusout', function(){ holdUndo('focus', false); });
+  }
+  function escText(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+  // The removed stop's name, with its region when another stop shares the name
+  // (the same rule as the tray rows).
+  function stopLabel(x){
+    var twins = trip.filter(function(y){ return y !== x && y.name === x.name; }).length;
+    var place = twins && x.region ? String((window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[x.region]) || x.region) : '';
+    return place ? x.name + ' (' + place + ')' : x.name;
+  }
+  function withdrawUndo(){
+    if (!pendingUndo) return;
+    pendingUndo = null;
+    clearTimeout(trayMsg._hideTimer);
+    trayMsg.style.display = 'none';
+    trayMsg.innerHTML = '';
+  }
+  function offerUndo(item, index){
+    if (!trayMsg) return;
+    var label = stopLabel(item);
+    pendingUndo = { item: item, index: index, label: label };
+    trayMsg.innerHTML = escText(t('trip.removed').replace('{name}', label)) +
+      ' <button type="button" data-trip-undo aria-label="' + escText(t('trip.undoLabel').replace('{name}', label)) + '"' +
+      ' style="background:none;border:0;padding:0 6px;min-height:44px;font:inherit;font-weight:800;color:inherit;text-decoration:underline;cursor:pointer">' +
+      escText(t('trip.undo')) + '</button>';
+    trayMsg.style.display = 'block';
+    clearTimeout(trayMsg._hideTimer);
+    trayMsg._hideTimer = setTimeout(withdrawUndo, UNDO_MS);
+    var b = trayMsg.querySelector('[data-trip-undo]');
+    if (b && b.focus) b.focus();
+  }
+  function undoRemove(){
+    var u = pendingUndo;
+    if (!u) return;
+    pendingUndo = null;
+    clearTimeout(trayMsg._hideTimer);
+    // Never a duplicate, never past the cap, never dropping another stop. (Any
+    // change since the removal has already withdrawn the Undo; these guard it.)
+    var present = trip.indexOf(u.item) !== -1 || (u.item.ref && trip.some(function(x){ return x.ref === u.item.ref; }));
+    if (present) {
+      trayMsg.style.display = 'none';
+      trayMsg.innerHTML = '';
+      return;
+    }
+    if (trip.length >= MAX_STOPS) {
+      showMessage('Trips are capped at ' + MAX_STOPS + ' stops so the route stays manageable. Remove a stop to add another.');
+      return;
+    }
+    var at = Math.min(u.index, trip.length);
+    trip.splice(at, 0, u.item);
+    if (window.trackEvent) window.trackEvent('undo_remove_from_trip', { trip_size: trip.length });
+    save();
+    syncButtons();
+    render();
+    trayMsg.textContent = t('trip.restored').replace('{name}', u.label);
+    trayMsg._hideTimer = setTimeout(function(){ trayMsg.style.display = 'none'; }, 4000);
+    var row = listEl.querySelector('[data-remove-index="' + at + '"]');
+    if (row && row.focus) row.focus();
   }
 
   function addToTrip(s){
@@ -2390,6 +2480,7 @@ window.__scrollToVenueCard = function(name){
     }
     var entry = { name: s.name, query: s.query, region: s.region || null };
     if (s.ref) entry.ref = s.ref;
+    withdrawUndo();
     trip.push(entry);
     if (window.trackEvent) window.trackEvent('add_to_trip', { venue_name: s.name, region: s.region || null, trip_size: trip.length });
     save();
@@ -2400,6 +2491,7 @@ window.__scrollToVenueCard = function(name){
   // keep(t) decides which stops stay: a card's button removes its matching
   // stop(s); the tray's ✕ removes exactly the one it belongs to.
   function removeFromTrip(name, keep){
+    withdrawUndo();
     trip = trip.filter(keep);
     if (window.trackEvent) window.trackEvent('remove_from_trip', { venue_name: name });
     save();
@@ -2424,17 +2516,27 @@ window.__scrollToVenueCard = function(name){
     if (removeBtn) {
       var idx = parseInt(removeBtn.dataset.removeIndex);
       var t = trip[idx];
-      if (t) removeFromTrip(t.name, function(x){ return x !== t; });
+      if (t) {
+        removeFromTrip(t.name, function(x){ return x !== t; });
+        offerUndo(t, idx);
+      }
+      return;
+    }
+
+    if (e.target.closest('[data-trip-undo]')) {
+      undoRemove();
       return;
     }
 
     if (e.target === toggleBtn || toggleBtn.contains(e.target)) {
       panel.classList.toggle('open');
+      if (!panel.classList.contains('open')) withdrawUndo();
       return;
     }
 
     if (!panel.contains(e.target) && panel.classList.contains('open')) {
       panel.classList.remove('open');
+      withdrawUndo();
     }
   });
 
@@ -2476,6 +2578,7 @@ window.__scrollToVenueCard = function(name){
     clearTimeout(clearConfirmTimer);
     clearBtn.classList.remove('confirming');
     clearBtn.textContent = 'Clear trip';
+    withdrawUndo();
     trip = [];
     save();
     syncButtons();

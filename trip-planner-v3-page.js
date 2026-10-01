@@ -718,7 +718,7 @@ function renderScript(d) {
     if (view && added) view.hidden = false;
   }
   document.addEventListener('click', function(e){
-    if (e.target.closest && e.target.closest('.trip-btn, .trip-remove, #tripClearBtn')) setTimeout(refreshAddAll, 0);
+    if (e.target.closest && e.target.closest('.trip-btn, .trip-remove, #tripClearBtn, [data-trip-undo]')) setTimeout(refreshAddAll, 0);
   });
   window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganTrip') refreshAddAll(); });
 
