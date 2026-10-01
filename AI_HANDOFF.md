@@ -200,11 +200,9 @@ The capture and sweep harnesses are scratch scripts kept outside the repo; the b
 
 ### Open roadmap
 
-* **Stage 5, V3 readiness** (not started):
-  * F09: a V3 share link;
-  * F12: V3 analytics.
-
-  It needs `trip-planner-v3-page.js` unfrozen and the F12 analytics taxonomy decided. `TRIP_PLANNER_V3` stays `preview` until the owner decides otherwise.
+* **Stage 5, V3 readiness:**
+  * F09 (a V3 share link) and F12 (V3 analytics) were authorised on 2026-10-01 as Stage 5A, with `trip-planner-v3-page.js` unfrozen for that work only. See "Stage 5A" below.
+  * `TRIP_PLANNER_V3` stays `preview` until the owner decides otherwise.
 * **Blocked by the freeze on `app.js`, `okanagan.html` and the CSS:**
   * trip-tray ID migration (the Trip half of W07);
   * tray undo (W14);
@@ -214,6 +212,53 @@ The capture and sweep harnesses are scratch scripts kept outside the repo; the b
 * **Needs separate authorisation:** shell accessibility W21/W25 (a skip link, `aria-expanded`/`aria-controls` on the Trip toggle, keyboard order) through server-side header and tray rewrites. This would change markup on about 2,150 pages.
 * **Test hygiene: a separate task, requiring owner approval, not scheduled.** Update the stale expectations in the HTTP routes test (the 9 assertions listed under Known limitations), compare plain objects at line 5120, and close the test server so the suite exits without `--test-force-exit`. This is test-only, but a push to `main` still redeploys identical server code.
 * The existing **Open Tasks** below (Local Favourites, dog-friendly trails, Pinterest, District Wine Village, SEO, What's On, location enrichment) are unchanged by this program.
+
+## Stage 5A — Build My Trip V3 share link (F09) and analytics (F12)
+
+Scope authorised by the owner on 2026-10-01: F09 and F12 only. `trip-planner-v3-page.js` is unfrozen for this work; every other frozen file stays frozen. `TRIP_PLANNER_V3` stays `preview`, so all of this reaches only browsers that opted in with `/trip?trip_v3=on`. Branch `stage5a-v3-share-analytics`; nothing is committed or deployed until the owner approves.
+
+### F09: the share link
+
+"Copy link to this plan" (and the address bar, kept current with `history.replaceState`, so there are no extra history entries) holds a link that **replays the exact plan request behind the plan on screen**, then re-applies the visitor's own edits. The planner is deterministic for the same request and the same listings, so the recipient sees the sender's plan, including after Swap, Regenerate and Regenerate day. Before Stage 5A, a link carried only the text, seed, settings, kept and skipped stops, so after a Swap the recipient could get a different plan.
+
+| Parameter | Meaning | Limits |
+|---|---|---|
+| `q` | the request text, as typed | at most 500 characters; required (no `q` = a plain `/trip`) |
+| `seed` | the planner seed of the request shown | 0–1,000,000 |
+| `days`, `pace`, `base` | the visitor's edited settings | 1–7; `relaxed` / `standard` / `packed`; a region slug or `valley` |
+| `keep` | kept stops, `<day>-<daypart>:<venue id>` | at most 28 |
+| `skip` | skipped venue ids (`excludeVenueIds` of the request shown) | the most recent 200 |
+| `pin` | pinned stops of the request shown (new) | at most 28 |
+| `avoid` | avoided venue ids of the request shown (new) | at most 200 |
+| `rm` | slots the visitor removed after the plan was made (new) | slot keys only |
+
+* **What a link holds:** only the request text, fixed settings, slot keys and venue ids. It never holds a name, an address or any other fact. Keys are written in day / daypart order, so the same state is always the same link.
+* **Malformed links fail safe:** a bad part is dropped and never guessed, and the plan is still made from the text. A link without `q` is a plain `/trip`.
+* **Older links:** links without `pin`, `avoid` or `rm` restore exactly as before (kept stops pinned).
+* **Limitations:**
+  * The link is the request, not a frozen copy of the plan. A link opened on a later day can differ where the plan depends on the date or time ("tonight", events, the season) or where listings changed. An unknown or closed venue id is simply not used.
+  * While `TRIP_PLANNER_V3` is `preview`, a recipient who has not opted in gets the V2 planner, which ignores these parameters. The opt-in redirect (`/trip?trip_v3=on`) also drops other parameters. Both are unchanged by Stage 5A.
+
+### F12: V3 analytics taxonomy
+
+Reuses the Phase C conventions: the shared `window.trackEvent` wrapper, snake_case names, and fixed enumerated parameter values. No request text, venue name or venue id is sent by any V3 event. No GA4 property, custom-dimension, key-event or retention setting was changed.
+
+| What is measured | Event | Parameters | New in 5A? |
+|---|---|---|---|
+| V3 planner opened | automatic `page_view` | `page_type: 'trip_v3'` (V2 stays `'trip'`); attached to every V3 event | new page_type value |
+| A plan is requested | `trip_plan_start` | `input_method`: `typed` / `example` / `link` | existing |
+| A plan arrives | `trip_plan_complete` | `request_type`: `initial` / `refine` / `replace` (Swap) / `regenerate` / `regenerate_day` / **`shared_link`**; `plan_kind`, `region`, `day_count`, `stop_count` | `shared_link` value new |
+| Regenerate clicked | `trip_plan_regenerate` | `plan_kind` | existing |
+| Keep, unkeep, remove, undo | **`trip_plan_edit`** | `edit_action`: `keep` / `unkeep` / `remove` / `undo`; `plan_kind` | new event |
+| Share link generated | **`trip_plan_share`** | `share_method`: `clipboard` (copied) / `manual` (link shown to copy); `plan_kind`, `day_count` | new event |
+| Share link opened | `trip_plan_start` (`input_method: 'link'`), then `trip_plan_complete` (`request_type: 'shared_link'`) | as above | existing event, new value |
+| Map this day | `outbound_click` | `link_type: 'trip_day_map'`, `surface: 'trip_planner'` | existing event, new values |
+| Failures | `trip_plan_error` | `request_type` (incl. `shared_link`); `error_type`: `response` (+ `http_status`) / `exception` / **`invalid_share`** (a link with unreadable parts, or share parameters without `q`) | `invalid_share` new |
+| My Trip | `add_whole_trip`, `open_my_trip`, `add_to_trip` | unchanged | existing |
+
+Notes:
+* Swap, Refine and Regenerate day are counted through `trip_plan_complete.request_type`, not as `trip_plan_edit`, so they are not double-counted.
+* New parameters (`edit_action`, `share_method`) are sent on the events but appear in GA4 reports only if the owner later registers them as custom dimensions; event counts by name work without that.
 
 ## Authentication / Admin API Notes
 
