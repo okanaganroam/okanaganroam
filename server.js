@@ -5343,11 +5343,14 @@ function renderGuidePage(region, badge, venues) {
   // Batch 4B Guides (2026-09-27): the page uses the themed shell (site
   // header + navigation, Trip tray, <main>, app.css / app.js, body.golf-page
   // theme), so every card -- golf, winery and the rest -- takes the themed
-  // card treatment. Only golf cards carry Favorite / Add to Trip (unchanged);
-  // they render app.js's canonical labels, and the existing golf card script
-  // adds "Read more" and mirrors aria-pressed. Winery venue pages and the
-  // winery region pages are separate templates and are not affected.
-  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true, savedId: true })).join('\n');
+  // card treatment. Winery venue pages and the winery region pages are
+  // separate templates and are not affected.
+  // Stage 5B (2026-10-01): every guide card uses the compact card that
+  // /dog-friendly, /local-favorites and golf cards already use -- "View
+  // details", the description clamped behind Read more / Read less, and
+  // Favorite / Add to Trip with app.js's canonical labels. Golf cards are
+  // unchanged (they already had it).
+  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true, savedId: true, themed: true })).join('\n');
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -5394,7 +5397,7 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
-  ${golfCardEngagementScriptHtml('golf')}
+  ${golfCardEngagementScriptHtml('guide', true, { impressionCards: '[data-venue-category="golf"]' })}
 </body>
 </html>`;
 }
@@ -8650,11 +8653,22 @@ function themedCardHolderSelector(type) {
   if (type === 'dog') return `:is(${DOG_HUB_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   // 'lf' is the Local Favourites page, whose one list can hold any venue type.
   if (type === 'lf') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
+  // 'guide' (Stage 5B) is a guide page, whose one list can hold any venue
+  // type -- the same set as 'lf', but its events report each card's own
+  // venue_category (see golfCardEngagementScriptHtml).
+  if (type === 'guide') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
   return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
 }
-function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(type)) {
+// opts.impressionCards (Stage 5B, optional): a selector limiting which cards
+// report venue_impression. Guide pages pass golf cards only, so the impression
+// stream stays exactly as it was when only golf guide cards were wired. Without
+// it (every other caller) the script is byte-identical to before.
+function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(type), opts = {}) {
   if (!themed) return '';
+  const observe = opts.impressionCards
+    ? `if (c.matches(${JSON.stringify(opts.impressionCards)})) io.observe(c);`
+    : 'io.observe(c);';
   return `<script>
 (function(){
   var cards = Array.prototype.slice.call(document.querySelectorAll('.venue-card${themedCardHolderSelector(type)}'));
@@ -8664,7 +8678,7 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
       venue_id: Number(card.dataset.venueId),
       venue_name: card.dataset.venueName,
       venue_region: card.dataset.venueRegion,
-      venue_category: ${(type === 'outdoor' || type === 'fd') ? `card.dataset.venueCategory || '${type}'` : `'${type}'`},
+      venue_category: ${(type === 'outdoor' || type === 'fd' || type === 'guide') ? `card.dataset.venueCategory || '${type}'` : `'${type}'`},
       surface: card.dataset.surface || 'category_card',
       page_path: location.pathname
     };
@@ -8708,7 +8722,7 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
         track('venue_impression', ctx(en.target));
       });
     }, { threshold: 0.5 });
-    cards.forEach(function(c){ io.observe(c); });
+    cards.forEach(function(c){ ${observe} });
   }
 
   // ---- Favorite + Add to Trip: same localStorage keys, item shape and
@@ -8734,7 +8748,7 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
       card.__ogWired = true;
       cards.push(card);
       setup(card);
-      if (typeof io !== 'undefined' && io) io.observe(card);
+      ${opts.impressionCards ? `if (typeof io !== 'undefined' && io && card.matches(${JSON.stringify(opts.impressionCards)})) io.observe(card);` : `if (typeof io !== 'undefined' && io) io.observe(card);`}
     });
     if (typeof syncAll === 'function') syncAll();
   };

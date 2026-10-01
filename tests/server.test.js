@@ -4579,32 +4579,79 @@ test('Batch 4B Guides: guide pages render the themed shell around unchanged cont
   assert.doesNotMatch(html, /data-track=/, 'no tracked links');
 });
 
-test('Batch 4B Guides: golf cards keep Favorite / Add to Trip with canonical labels and the existing card script; other cards gain no actions', () => {
+test('Batch 4B Guides + Stage 5B: every guide card is the compact card -- View details, Read more, Favorite / Add to Trip with canonical labels -- and app.js loads before the card script', () => {
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
   const heart = appJs.match(/var HEART_OUTLINE = '([^']+)';/)[1];
-  const html = app.renderGuidePage('kelowna', 'patio', batch4bGuideVenues());
+  const venues = batch4bGuideVenues();
+  const html = app.renderGuidePage('kelowna', 'patio', venues);
   const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
   const cards = markup.match(/<li class="venue-card"[^>]*>[\s\S]*?<\/li>/g);
-  const golf = cards.filter((c) => /data-venue-category="golf"/.test(c));
-  const others = cards.filter((c) => !/data-venue-category=/.test(c));
-  assert.ok(golf.length >= 1 && others.length >= 2, 'fixture mixes golf and plain cards');
-  assert.equal(golf.length + others.length, cards.length, 'only golf cards carry a data-venue-category');
-  for (const c of golf) {
+  assert.equal(cards.length, venues.length, 'every venue still listed, once');
+  const types = new Set(cards.map((c) => (c.match(/data-venue-category="([^"]+)"/) || [])[1]));
+  assert.ok(types.has('golf') && types.has('restaurant') && types.has('winery'), 'fixture mixes golf, restaurant and winery cards');
+  for (const c of cards) {
+    // Stage 5B: the compact card /dog-friendly uses, for every venue type.
+    assert.match(c, /^<li class="venue-card" data-venue-id="\d+" data-venue-region="[^"]+" data-venue-category="[^"]+" data-venue-name="[^"]+" data-surface="category_card">/);
+    assert.match(c, /<h2><a class="venue-card-link" href="\/kelowna\/[a-z-]+\/[^"]+"><span class="venue-card-name">[^<]+<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a><\/h2>/);
+    assert.match(c, /<div class="golf-desc" id="golf-desc-(\d+)"><p>[\s\S]+?<\/p><\/div>\s*<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-\1" hidden>Read more &rarr;<\/button>/, 'Read more markup present, hidden until the script finds the text truncated');
     assert.match(c, /<div class="card-actions">/);
     assert.ok(c.includes(`${heart} Favorite</button>`) && c.includes('\u{1F9F3} Add to trip</button>'), 'canonical labels');
-    assert.match(c, /class="card-action fav-btn" data-fav-name="[^"]+" aria-pressed="false"/);
-    assert.match(c, /class="golf-desc"[\s\S]*class="desc-toggle"/, 'Read more markup present');
+    assert.match(c, /class="card-action fav-btn" data-fav-name="[^"]+" aria-pressed="false" aria-label="Favorite [^"]+"/);
+    assert.match(c, /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+" data-trip-region="kelowna" aria-pressed="false" aria-label="Add [^"]+ to trip"/);
+    assert.ok(c.indexOf('class="chips"') < c.indexOf('class="card-actions"'), 'buttons after the badge chips');
   }
-  for (const c of others) assert.doesNotMatch(c, /card-actions|fav-btn|trip-btn|golf-desc/, 'plain and winery cards gain no actions');
-  assert.ok(others.some((c) => /<p class="venue-meta">winery/.test(c)), 'winery cards are listed as plain cards');
   assert.doesNotMatch(html, /&#9825; Favorite|&#65291; Add to Trip/, 'no standalone labels');
-  // Scripts: app.js exactly once, then the existing golf card script (Read more + aria-pressed hand-off).
+  // The full description stays in the page for every card (the clamp is visual only).
+  for (const v of venues.filter((x) => x.description)) assert.ok(markup.includes(`<p>${app.escapeHtml(v.description)}</p>`), `full description of ${v.name}`);
+  // Scripts: app.js exactly once, then the card script (guide holder: every venue type).
   assert.equal((html.match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1);
   const appAt = html.indexOf('<script src="/scripts/app.js"></script>');
-  const cardScriptAt = html.indexOf(`document.querySelectorAll('.venue-card[data-venue-category="golf"]')`);
-  assert.ok(appAt > 0 && cardScriptAt > appAt, 'card script follows app.js, so it takes its hand-off branch');
-  assert.ok(html.includes(app.golfCardEngagementScriptHtml('golf')), 'the existing golf card script, not a copy');
+  const guideScript = app.golfCardEngagementScriptHtml('guide', true, { impressionCards: '[data-venue-category="golf"]' });
+  assert.ok(html.includes(guideScript), 'the guide card script, built by the shared function');
+  assert.ok(html.indexOf(guideScript) > appAt, 'card script follows app.js, so it takes its hand-off branch');
+  assert.ok(!html.includes(app.golfCardEngagementScriptHtml('golf')), 'the golf-only script is no longer used here');
   assert.match(html, /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{/);
+});
+
+// Stage 5B (2026-10-01): guide-card analytics, option (b). The guide card
+// script wires every card (Read more, aria-pressed, venue_favorite) and reports
+// each card's own venue_category, but venue_impression stays golf-only -- the
+// same impression stream as when only golf guide cards were wired.
+test('Stage 5B: the guide card script covers every venue type, reports the card\'s own category, and observes only golf cards for impressions', () => {
+  const s = app.golfCardEngagementScriptHtml('guide', true, { impressionCards: '[data-venue-category="golf"]' });
+  for (const t of ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery', 'golf', 'beach', 'outdoor']) assert.ok(s.includes(`[data-venue-category="${t}"]`), `holder covers ${t}`);
+  assert.ok(s.includes("venue_category: card.dataset.venueCategory || 'guide',"), 'events report the card\'s own category');
+  assert.ok(s.includes('cards.forEach(function(c){ if (c.matches("[data-venue-category=\\"golf\\"]")) io.observe(c); });'), 'impressions: golf cards only');
+  assert.ok(s.includes('if (typeof io !== \'undefined\' && io && card.matches("[data-venue-category=\\"golf\\"]")) io.observe(card);'), 'cards wired later: golf only too');
+  assert.equal((s.match(/track\('venue_impression'/g) || []).length, 1);
+  for (const ev of ["'description_collapse' : 'description_expand'", "'venue_favorite' : 'venue_unfavorite'"]) assert.ok(s.includes(ev), ev);
+  new Function(s.replace(/^<script>/, '').replace(/<\/script>$/, '')); // parses
+});
+
+test('Stage 5B: every other page\'s card script is unchanged (no impression limit unless a caller asks for one)', () => {
+  for (const [type, themed] of [['golf'], ['beach'], ['outdoor'], ['fd', true], ['dog', true], ['lf', true], ['winery', true]]) {
+    const s = themed === undefined ? app.golfCardEngagementScriptHtml(type) : app.golfCardEngagementScriptHtml(type, themed);
+    assert.ok(s.includes('cards.forEach(function(c){ io.observe(c); });'), `${type}: observes every card, as before`);
+    assert.ok(s.includes("if (typeof io !== 'undefined' && io) io.observe(card);"), `${type}: later cards observed as before`);
+    assert.ok(!s.includes('.matches('), `${type}: no impression limit`);
+    assert.equal(s, themed === undefined ? app.golfCardEngagementScriptHtml(type, undefined, {}) : app.golfCardEngagementScriptHtml(type, themed, {}), `${type}: an empty opts object changes nothing`);
+  }
+  assert.ok(app.golfCardEngagementScriptHtml('golf').includes("venue_category: 'golf',"), 'golf pages still report the literal golf category');
+});
+
+test('Stage 5B: guide pages keep their SEO head, structured data and links; only the card treatment changes', () => {
+  const venues = batch4bGuideVenues();
+  const html = app.renderGuidePage('kelowna', 'patio', venues);
+  const head = html.split('</head>')[0];
+  assert.match(head, /<title>Patio Venues in Kelowna, BC \| Okanagan Roam<\/title>/);
+  assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guide\/kelowna\/patio">/);
+  assert.doesNotMatch(head, /noindex/);
+  const itemList = JSON.parse(head.match(/<script type="application\/ld\+json">\s*(\{"@context":"https:\/\/schema\.org","@type":"ItemList"[\s\S]*?)\s*<\/script>/)[1]);
+  assert.equal(itemList.itemListElement.length, venues.length);
+  assert.deepEqual(itemList.itemListElement.map((x) => x.item.name), venues.map((v) => v.name), 'same venues, same order');
+  assert.match(html, /<p class="venue-meta">Browse by category: /);
+  assert.ok(html.includes('<a class="cta" href="/kelowna">See all of Kelowna on Okanagan Roam</a>'));
+  ga4Check(html, 'guide', 'guide');
 });
 
 test('Batch 4B Guides: winery venue and region pages keep their own presentation', () => {
@@ -13735,11 +13782,11 @@ test('Stage 4.3: What\'s On cards carry the first occurrence in their window; th
   assert.doesNotMatch(JSON.stringify(all), /firstOccurrence|data-occurrence/);
 });
 
-test('Stage 4.3: guide cards carry only their venue id (no category), so only the capture script reads it', () => {
+test('Stage 4.3 + 5B: guide cards keep their venue id for the capture script (and, since Stage 5B, the compact-card attributes)', () => {
   const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderGuidePage('kelowna', 'patio', [trattoria]);
-  assert.ok(html.includes(`<li class="venue-card" data-venue-id="${trattoria.id}">`));
-  assert.doesNotMatch(html, /data-venue-category="restaurant"/);
+  assert.ok(html.includes(`<li class="venue-card" data-venue-id="${trattoria.id}" data-venue-region="kelowna" data-venue-category="restaurant" data-venue-name="Test Trattoria" data-surface="category_card">`));
+  assert.equal(app.renderSavedSidecarScriptHtml().length > 0 && (html.match(/okanaganSaved/g) || []).length > 0, true, 'the Stage 4.3 capture script is still on the page');
   // Other card surfaces are unchanged: without savedId a non-engagement card has no attributes.
   assert.match(app.venueCardHtml(trattoria, {}), /<li class="venue-card">/);
 });
