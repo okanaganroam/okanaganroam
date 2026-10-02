@@ -464,6 +464,9 @@ function renderScript(d) {
         var facts = planFacts(res.j);
         facts.request_type = requestType;
         facts.stop_count = planStopButtons().length;
+        // The plan's pace (Stage 5H analytics): one of the planner's three fixed values, never text.
+        var pace = res.j && res.j.understood && res.j.understood.pace;
+        if (pace === 'relaxed' || pace === 'standard' || pace === 'packed') facts.pace = pace;
         track('trip_plan_complete', facts);
       })
       .catch(function(){
@@ -1068,17 +1071,22 @@ function renderScript(d) {
   // sender's plan request (pin / avoid; an older link without them pins its
   // kept stops, as before), then removes the stops the sender removed. A link
   // that cannot be read at all leaves the page exactly as a plain /trip.
+  // Analytics only (Stage 5H): a page reloading its own plan (refresh, or
+  // Back / Forward loading it again) is reported as 'restore'; any other
+  // arrival with a plan link stays 'link' / 'shared_link'.
   var restored = t3QueryToState(location.search, REGION_SLUGS);
   if (restored) {
+    var arrival = 'link';
+    try { var nav = performance.getEntriesByType('navigation')[0]; if (nav && (nav.type === 'reload' || nav.type === 'back_forward')) arrival = 'restore'; } catch (e) {}
     input.value = restored.text;
     state = { text: restored.text, seed: restored.seed, overrides: restored.overrides, locks: restored.locks, exclude: restored.exclude, removed: {}, last: null, lastReq: null };
-    track('trip_plan_start', { input_method: 'link' });
+    track('trip_plan_start', { input_method: arrival });
     if (restored.invalid) track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
     var replay = {};
     if (restored.pinned) replay.pinned = restored.pinned;
     else if (Object.keys(restored.locks).length) replay.pinned = restored.locks;
     if (restored.avoid.length) replay.avoidVenueIds = restored.avoid;
-    request(replay, { requestType: 'shared_link', removedKeys: restored.removed });
+    request(replay, { requestType: arrival === 'restore' ? 'restore' : 'shared_link', removedKeys: restored.removed });
   } else if (/(?:^|[?&])(?:q|seed|days|pace|base|keep|skip|pin|avoid|rm)=/.test(location.search)) {
     track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
   }
