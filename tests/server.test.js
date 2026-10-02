@@ -12973,9 +12973,10 @@ test('Stage 5A F12: V3 reports edits, shares, Map this day and shared-link opens
   assert.ok(js.includes('data-t3-map-day>Map this day</a>'));
   // Opening a shared link: trip_plan_start (input_method link), then the
   // plan request reported as request_type shared_link; an unreadable link
-  // is trip_plan_error invalid_share.
-  assert.ok(js.includes("track('trip_plan_start', { input_method: 'link' })"));
-  assert.ok(js.includes("requestType: 'shared_link'"));
+  // is trip_plan_error invalid_share. Stage 5H: a reload / Back-Forward of
+  // the page's own plan is reported as 'restore' instead (see the 5H test).
+  assert.ok(js.includes("track('trip_plan_start', { input_method: arrival })"));
+  assert.ok(js.includes("requestType: arrival === 'restore' ? 'restore' : 'shared_link'"));
   assert.equal(byName('trip_plan_error').filter((c) => c.includes("error_type: 'invalid_share'")).length, 2);
   // Every V3 event is fired from a handler or a request completion, never from render().
   const renderFn = js.slice(js.indexOf('function render(focus)'), js.indexOf('// ---- My Trip (tray)'));
@@ -13042,6 +13043,51 @@ test('Stage 5G: V3 whole-trip map -- collapsed, loaded on demand, attributed, ke
   // V2 untouched.
   const v2 = app.renderTripPlannerPage(true);
   for (const s of ['t3MapPoints', 't3-map', 'LEAFLET_JS_SRI', 'https://tile.openstreetmap.org/']) assert.ok(!v2.includes(s), s);
+});
+
+// Stage 5H (2026-10-02): analytics only. trip_plan_complete carries the
+// plan's pace (relaxed / standard / packed, never text), and a page that
+// reloads its own plan (refresh, or Back / Forward loading it again) reports
+// 'restore' instead of 'link' / 'shared_link'. Event names, other parameters
+// and planner behaviour are unchanged; a damaged link is still
+// trip_plan_error shared_link / invalid_share.
+test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forward reported as restore, genuine links unchanged', () => {
+  const html = app.renderTripPlannerV3Page({ preview: false });
+  const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  new Function(js); // parses
+  // pace: read from the plan, restricted to the three planner values, added to trip_plan_complete only.
+  const PACE = "var pace = res.j && res.j.understood && res.j.understood.pace;\n        if (pace === 'relaxed' || pace === 'standard' || pace === 'packed') facts.pace = pace;\n        track('trip_plan_complete', facts);";
+  assert.ok(js.includes(PACE));
+  assert.equal(js.split('facts.pace').length, 2, 'pace is set in one place');
+  const calls = js.match(/track\('[a-z_]+', \{[^}]*\}\)/g) || [];
+  assert.ok(calls.every((c) => !/pace/.test(c)), 'no other event carries pace');
+  const paceOf = (j) => { const facts = {}; vm.runInNewContext(PACE.replace("track('trip_plan_complete', facts);", ''), { res: { j }, facts }); return facts.pace; };
+  for (const p of ['relaxed', 'standard', 'packed']) assert.equal(paceOf({ understood: { pace: p } }), p);
+  for (const j of [{ understood: { pace: 'chaotic' } }, { understood: { pace: '<b>' } }, { understood: {} }, {}, null]) assert.equal(paceOf(j), undefined);
+  // restore: only the browser's own load type; reload / back_forward -> restore, anything else -> link.
+  const ARRIVAL = "var arrival = 'link';\n    try { var nav = performance.getEntriesByType('navigation')[0]; if (nav && (nav.type === 'reload' || nav.type === 'back_forward')) arrival = 'restore'; } catch (e) {}";
+  assert.ok(js.includes(ARRIVAL));
+  const arrivalFor = (performance) => vm.runInNewContext(ARRIVAL + '\narrival;', { performance });
+  const nav = (type) => ({ getEntriesByType: (k) => (k === 'navigation' ? [{ type }] : []) });
+  assert.equal(arrivalFor(nav('reload')), 'restore');
+  assert.equal(arrivalFor(nav('back_forward')), 'restore');
+  assert.equal(arrivalFor(nav('navigate')), 'link');
+  assert.equal(arrivalFor(nav('prerender')), 'link');
+  assert.equal(arrivalFor({ getEntriesByType: () => [] }), 'link', 'no entry: as before');
+  assert.equal(arrivalFor({ getEntriesByType: () => { throw new Error('x'); } }), 'link', 'unsupported: as before');
+  assert.equal(arrivalFor(undefined), 'link', 'no performance API: as before');
+  // The restore block: start and plan request both follow arrival; the damaged-link error is unchanged.
+  const block = js.slice(js.indexOf('var restored = t3QueryToState('), js.indexOf('})();', js.indexOf('var restored = t3QueryToState(')));
+  assert.ok(block.indexOf(ARRIVAL) < block.indexOf("track('trip_plan_start', { input_method: arrival })"));
+  assert.ok(block.includes("request(replay, { requestType: arrival === 'restore' ? 'restore' : 'shared_link', removedKeys: restored.removed });"));
+  assert.equal(block.split("track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' })").length, 3, 'both invalid_share errors still shared_link');
+  // Nothing else: same event names and the same number of track() calls; requestType only labels analytics.
+  assert.equal((js.match(/track\('/g) || []).length, 16);
+  assert.deepEqual([...new Set((js.match(/track\('[a-z_]+'/g) || []).map((c) => c.slice(7, -1)))].sort(), ['add_whole_trip', 'open_my_trip', 'outbound_click', 'trip_plan_complete', 'trip_plan_edit', 'trip_plan_error', 'trip_plan_regenerate', 'trip_plan_share', 'trip_plan_start'].sort());
+  for (const use of js.split('\n').filter((l) => /\brequestType\b/.test(l) && !/requestType: '|requestType: arrival|var requestType = /.test(l))) assert.match(use, /track\(|facts\.request_type = requestType/, use.trim());
+  // V2 untouched.
+  const v2 = app.renderTripPlannerPage(true);
+  for (const s of ['facts.pace', "'restore'", 'arrival']) assert.ok(!v2.includes(s), s);
 });
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
