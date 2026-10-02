@@ -3060,21 +3060,27 @@ function resolveSavedItemsRequest(query, now = new Date()) {
   return savedItemsModule().resolveSavedItems({ items, names }, savedItemsDeps(now));
 }
 
-// The hidden capture half (Stage 4.3): after any Favorite click on a page
-// that opts in, mirror the result into okanaganSaved with the clicked item's
-// stable id -- read from the nearest [data-venue-id] holder (a venue id, or
-// event-<id> with the data-occurrence-* of the occurrence that card or page
-// shows). okanaganFavorites (names; written by app.js or the engagement
-// script) stays the record of WHETHER something is a favourite and is never
-// written here; okanaganSaved only adds WHICH one. Deferred to after the
-// click so it sees the result whichever script toggled it. No analytics.
+// The hidden capture half (Stage 4.3): okanaganSaved records WHICH place or
+// event a Favorite is, by the stable id of the nearest [data-venue-id] holder
+// (a venue id, or event-<id> with the data-occurrence-* of the occurrence that
+// card or page shows). No analytics.
+// Stage 5E: one writer per Favorite click. Where app.js runs, app.js writes
+// both lists and this script writes nothing. Where it does not (the winery
+// region pages), this script is the one writer: the page's Favorite script
+// calls window.__roamFav.toggle(button), which writes okanaganFavorites and
+// okanaganSaved together -- by id, an event being one Favorite whichever date
+// was saved, the name kept while a same-name place is still saved. It registers
+// no click listener of its own. isOn() is the same "is it a favourite" rule as
+// app.js: the saved id, else the name when no saved item carries it (a
+// favourite from before ids).
 function renderSavedSidecarScriptHtml() {
   return `<script>
 (function(){
   var KEY = 'okanaganSaved';
+  var NAMES = 'okanaganFavorites';
   function readSaved(){ try { var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && s.v === 1 && Array.isArray(s.items)) return s; } catch (e) {} return { v: 1, items: [] }; }
-  function writeSaved(s){ try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
-  function favNames(){ try { var l = JSON.parse(localStorage.getItem('okanaganFavorites') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+  function readNames(){ try { var l = JSON.parse(localStorage.getItem(NAMES) || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+  function write(key, value){ try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
   function refOf(h){
     var id = h.getAttribute('data-venue-id') || '', m = /^event-([1-9][0-9]*)$/.exec(id);
     if (m) {
@@ -3083,22 +3089,37 @@ function renderSavedSidecarScriptHtml() {
     }
     return /^[1-9][0-9]*$/.test(id) ? { k: 'venue', id: Number(id) } : null;
   }
-  function sameItem(a, b){ return a.k === b.k && a.id === b.id && (a.k !== 'event' || (a.occ || null) === (b.occ || null)); }
-  document.addEventListener('click', function(e){
-    var btn = e.target && e.target.closest ? e.target.closest('.fav-btn') : null;
-    if (!btn) return;
-    var holder = btn.closest('[data-venue-id]'), ref = holder ? refOf(holder) : null, name = btn.getAttribute('data-fav-name') || '';
-    if (!ref || !name) return;
-    setTimeout(function(){
-      var on = favNames().indexOf(name) !== -1, s = readSaved(), had = s.items.some(function(x){ return x && sameItem(x, ref); });
-      if (on && !had) { ref.name = name; ref.savedAt = new Date().toISOString(); s.items.push(ref); writeSaved(s); }
-      else if (!on) {
-        // The name is no longer a favourite: drop every saved entry for it.
-        var kept = s.items.filter(function(x){ return x && x.name !== name && !(x.k === ref.k && x.id === ref.id); });
-        if (kept.length !== s.items.length) { s.items = kept; writeSaved(s); }
+  function refOfBtn(btn){ var h = btn.closest('[data-venue-id]'); return h ? refOf(h) : null; }
+  function sameFav(x, ref){ return !!x && x.k === ref.k && x.id === ref.id; }
+  function carried(s, name){ return s.items.some(function(x){ return x && x.name === name; }); }
+  function isOn(name, ref, names, s){
+    if (!ref) return names.indexOf(name) !== -1;
+    return s.items.some(function(x){ return sameFav(x, ref); }) || (names.indexOf(name) !== -1 && !carried(s, name));
+  }
+  window.__roamFav = {
+    isOn: function(btn){ return isOn(btn.getAttribute('data-fav-name') || '', refOfBtn(btn), readNames(), readSaved()); },
+    // The new state (true / false), or null when nothing was written.
+    toggle: function(btn){
+      if (window.__syncFavButtons) return null;
+      var name = btn.getAttribute('data-fav-name') || '';
+      if (!name) return null;
+      var ref = refOfBtn(btn), names = readNames(), s = readSaved(), on = isOn(name, ref, names, s), i = names.indexOf(name);
+      if (on) {
+        if (ref && s.items.some(function(x){ return sameFav(x, ref); })) {
+          s.items = s.items.filter(function(x){ return !sameFav(x, ref); });
+          write(KEY, s);
+          if (i !== -1 && !carried(s, name)) names.splice(i, 1);
+        } else if (i !== -1) {
+          names.splice(i, 1);
+        }
+      } else {
+        if (i === -1) names.push(name);
+        if (ref) { ref.name = name; ref.savedAt = new Date().toISOString(); s.items.push(ref); write(KEY, s); }
       }
-    }, 0);
-  });
+      write(NAMES, names);
+      return !on;
+    }
+  };
 })();
 </script>`;
 }
@@ -7443,8 +7464,10 @@ function golfFavTripScriptBody(type = 'golf') {
     try { var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
   function writeList(key, list){ try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) {} }
+  // Stage 5E: the same Favorite rule as app.js (window.__roamFav, from the
+  // capture script): the saved id, else the name for a pre-id favourite.
   function syncFav(btn){
-    var on = readList('okanaganFavorites').indexOf(btn.dataset.favName) !== -1;
+    var on = window.__roamFav ? window.__roamFav.isOn(btn) : readList('okanaganFavorites').indexOf(btn.dataset.favName) !== -1;
     btn.classList.toggle('is-fav', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     btn.textContent = on ? '\\u2665 Favorited' : '\\u2661 Favorite';
@@ -7513,11 +7536,20 @@ function golfFavTripScriptBody(type = 'golf') {
     document.addEventListener('click', function(e){
       var fav = e.target.closest(HOLDER + ' .fav-btn');
       if (fav) {
-        var name = fav.dataset.favName, list = readList('okanaganFavorites'), i = list.indexOf(name);
-        if (i === -1) list.push(name); else list.splice(i, 1);
-        writeList('okanaganFavorites', list);
+        // Stage 5E: on these pages the capture script is the one Favorite
+        // writer (both lists, by id); without it, the name list as before.
+        var on;
+        if (window.__roamFav) {
+          on = window.__roamFav.toggle(fav);
+          if (on === null) return;
+        } else {
+          var name = fav.dataset.favName, list = readList('okanaganFavorites'), i = list.indexOf(name);
+          if (i === -1) list.push(name); else list.splice(i, 1);
+          writeList('okanaganFavorites', list);
+          on = i === -1;
+        }
         syncAll();
-        track(i === -1 ? 'venue_favorite' : 'venue_unfavorite', ctx(fav.closest(HOLDER)));
+        track(on ? 'venue_favorite' : 'venue_unfavorite', ctx(fav.closest(HOLDER)));
         return;
       }
       var tb = e.target.closest(HOLDER + ' .trip-btn');

@@ -9610,7 +9610,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved Stage 5C change (2026-10-01): the Trip tray identifies stops by
   // ref (Trip half of W07) -- the four contained areas of the Stage 5C plan.
   // Approved W14 change (2026-10-01): Undo for the tray's ✕ (tray module only).
-  assert.equal(md5('public/scripts/app.js'), '7feba1eff98dcd0ec5b4fc175c53c76a', 'public/scripts/app.js (W14: Trip tray Undo, 2026-10-01)');
+  // Approved Stage 5E change (2026-10-01): Favorites by place / event id (Favorites module only).
+  assert.equal(md5('public/scripts/app.js'), '24ae2e487942f753816241591de4985e', 'public/scripts/app.js (Stage 5E: Same-name Favorites, 2026-10-01)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -11319,8 +11320,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d');
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
-  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo.
-  assert.equal(md5('public/scripts/app.js'), '7feba1eff98dcd0ec5b4fc175c53c76a');
+  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id.
+  assert.equal(md5('public/scripts/app.js'), '24ae2e487942f753816241591de4985e');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -13757,82 +13758,184 @@ test('Stage 4.3: the capture script is on pages with Favorite controls and nowhe
   assert.equal(sidecarCount(guide), 1, 'guide pages: one capture script');
 }))));
 
-test('Stage 4.3: the capture script sends no analytics and never writes okanaganFavorites', () => {
+test('Stage 4.3 + 5E: the capture script sends no analytics and registers no click listener; it writes only through toggle(), which refuses when app.js is loaded', () => {
   const src = app.renderSavedSidecarScriptHtml();
   assert.doesNotMatch(src, /trackEvent|dataLayer|gtag|sendBeacon|fetch\(/);
-  assert.doesNotMatch(src, /setItem\('okanaganFavorites'/);
-  assert.equal((src.match(/setItem\(/g) || []).length, 1, 'writes only okanaganSaved');
+  const h = favPageHarness({ engagement: false, appJs: true });
+  assert.equal(h.docListeners.length, 0, 'no click listener of its own');
+  const btn = h.card({ 'data-venue-id': '571', 'data-venue-name': 'Sandhill Wines' }).fav;
+  assert.equal(h.win.__roamFav.toggle(btn), null, 'app.js pages: app.js is the only writer');
+  assert.deepEqual(h.writes, []);
 });
 
-// Runs the real capture script against a fake page: the "app" toggles the
-// legacy name list during the click, as app.js / the engagement script do,
-// and the capture script mirrors the result once the click has finished.
-function sidecarHarness() {
+// Stage 5E: runs the REAL capture script and the REAL engagement script of a
+// winery region page (no app.js) together, in page order, against a small
+// fake DOM -- one Favorite writer per click (the capture script's toggle,
+// called by the page's Favorite script).
+function favPageHarness({ appJs = false, engagement = true, capture = true, names, saved } = {}) {
   const store = {};
-  const ls = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
-  const listeners = [];
-  const timers = [];
-  const doc = { addEventListener: (type, fn) => { if (type === 'click') listeners.push(fn); } };
-  const holder = (attrs) => ({ getAttribute: (n) => (n in attrs ? attrs[n] : null) });
-  const button = (name, h) => ({ getAttribute: (n) => (n === 'data-fav-name' ? name : null), closest: (sel) => (sel === '.fav-btn' ? null : sel === '[data-venue-id]' ? h : null) });
-  const src = app.renderSavedSidecarScriptHtml().replace(/^<script>|<\/script>$/g, '');
-  vm.runInNewContext(src, { document: doc, localStorage: ls, setTimeout: (fn) => timers.push(fn), JSON, Number, Date, Array });
-  const legacy = () => JSON.parse(ls.getItem('okanaganFavorites') || '[]');
-  const saved = () => JSON.parse(ls.getItem('okanaganSaved') || 'null');
-  // A click: app toggles the legacy name first (as on the page), then timers run.
-  const click = (btn, name) => {
-    const target = { closest: (sel) => (sel === '.fav-btn' ? btn : null) };
-    for (const fn of listeners) fn({ target });
-    const l = legacy(); const i = l.indexOf(name);
-    if (i === -1) l.push(name); else l.splice(i, 1);
-    ls.setItem('okanaganFavorites', JSON.stringify(l));
-    while (timers.length) timers.shift()();
+  if (names !== undefined) store.okanaganFavorites = typeof names === 'string' ? names : JSON.stringify(names);
+  if (saved !== undefined) store.okanaganSaved = typeof saved === 'string' ? saved : JSON.stringify(saved);
+  const writes = [], events = [], docListeners = [], cards = [], favs = [];
+  const ls = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { writes.push(k); store[k] = String(v); } };
+  const HOLDER = '[data-venue-category="winery"]';
+  class FEl {
+    constructor(cls, attrs, parent) { this.className = cls; this.attrs = attrs; this.parent = parent || null; this.dataset = {}; this.textContent = ''; }
+    getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; }
+    setAttribute(n, v) { this.attrs[n] = String(v); }
+    get classList() { const self = this, set = () => new Set(self.className.split(/\s+/).filter(Boolean)); return { contains: (c) => set().has(c), add: (c) => { const x = set(); x.add(c); self.className = [...x].join(' '); }, toggle: (c, on) => { const x = set(); if (on === undefined ? !x.has(c) : on) x.add(c); else x.delete(c); self.className = [...x].join(' '); } }; }
+    isHolder() { return this.attrs['data-venue-category'] === 'winery'; }
+    closest(sel) {
+      if (sel === '[data-venue-id]') { for (let e = this; e; e = e.parent) if ('data-venue-id' in e.attrs) return e; return null; }
+      if (sel === HOLDER) { for (let e = this; e; e = e.parent) if (e.isHolder()) return e; return null; }
+      if (sel === HOLDER + ' .fav-btn' || sel === '.fav-btn') return this.classList.contains('fav-btn') && (sel === '.fav-btn' || (this.parent && this.parent.isHolder())) ? this : null;
+      return null;
+    }
+    querySelector() { return null; }
+    matches() { return false; }
+    addEventListener() {}
+  }
+  const card = (attrs) => {
+    const c = new FEl('venue-card', Object.assign({ 'data-venue-category': 'winery', 'data-venue-region': 'kelowna' }, attrs));
+    c.dataset = { venueId: attrs['data-venue-id'], venueName: attrs['data-venue-name'], venueRegion: c.attrs['data-venue-region'] };
+    const fav = new FEl('card-action fav-btn', { 'data-fav-name': attrs['data-venue-name'], 'aria-pressed': 'false' }, c);
+    fav.dataset.favName = attrs['data-venue-name'];
+    cards.push(c); favs.push(fav);
+    return { card: c, fav };
   };
-  return { ls, store, holder, button, click, legacy, saved, timers };
+  const doc = {
+    addEventListener: (type, fn) => { if (type === 'click') docListeners.push(fn); },
+    querySelectorAll: (sel) => (sel === '.venue-card' + HOLDER ? cards : sel === HOLDER + ' .fav-btn' || sel === HOLDER + ' .fav-btn, ' + HOLDER + ' .trip-btn' ? favs : []),
+  };
+  const win = { trackEvent: (n, p) => events.push([n, p]), addEventListener: () => {} };
+  if (appJs) { win.__syncFavButtons = () => {}; win.__syncTripButtons = () => {}; }
+  const ctx = vm.createContext({ window: win, document: doc, localStorage: ls, location: { pathname: '/kelowna/wineries' }, JSON, Number, Date, Array, String, setTimeout, clearTimeout, MutationObserver: class { observe() {} } });
+  const strip = (html) => html.replace(/^\s*<script>|<\/script>\s*$/g, '');
+  if (capture) vm.runInContext(strip(app.renderSavedSidecarScriptHtml()), ctx);
+  const boot = () => { if (engagement) vm.runInContext(strip(app.golfCardEngagementScriptHtml('winery', true)), ctx); };
+  return {
+    win, store, writes, events, docListeners, card, boot,
+    click: (btn) => { const n = writes.length; for (const fn of docListeners) fn({ target: btn }); return writes.slice(n); },
+    names: () => JSON.parse(store.okanaganFavorites || 'null'),
+    saved: () => JSON.parse(store.okanaganSaved || 'null'),
+    on: (btn) => btn.classList.contains('is-fav') && btn.getAttribute('aria-pressed') === 'true' && /Favorited/.test(btn.textContent),
+  };
 }
 
-test('Stage 4.3: capture -- a venue favourite records venue:<id>; un-favouriting removes it; the legacy list is exactly what the page wrote', () => {
-  const h = sidecarHarness();
-  const card = h.holder({ 'data-venue-id': '571' });
-  const btn = h.button('Sandhill Wines', card);
-  h.click(btn, 'Sandhill Wines');
-  assert.deepEqual(h.legacy(), ['Sandhill Wines']);
+test('Stage 4.3 + 5E: winery region page (no app.js) -- a venue favourite records venue:<id> and the name in ONE write operation; un-favouriting removes both; venue_favorite / venue_unfavorite unchanged', () => {
+  const h = favPageHarness();
+  const { fav } = h.card({ 'data-venue-id': '571', 'data-venue-name': 'Sandhill Wines' });
+  h.boot();
+  assert.deepEqual(h.writes, [], 'loading writes nothing');
+  assert.deepEqual(h.click(fav).sort(), ['okanaganFavorites', 'okanaganSaved'], 'one write of each list -- the capture toggle; the page script writes nothing itself');
+  assert.deepEqual(h.names(), ['Sandhill Wines']);
   const s = h.saved();
   assert.equal(s.v, 1);
-  assert.equal(s.items.length, 1);
-  assert.equal(s.items[0].k, 'venue'); assert.equal(s.items[0].id, 571); assert.equal(s.items[0].name, 'Sandhill Wines');
+  assert.deepEqual(s.items.map(({ k, id, name }) => [k, id, name]), [['venue', 571, 'Sandhill Wines']]);
   assert.match(s.items[0].savedAt, /^\d{4}-\d{2}-\d{2}T/);
-  h.click(btn, 'Sandhill Wines');
-  assert.deepEqual(h.legacy(), []);
-  assert.deepEqual(h.saved().items, []);
+  assert.ok(h.on(fav), 'shown as Favorited, aria-pressed true');
+  assert.deepEqual(h.click(fav).sort(), ['okanaganFavorites', 'okanaganSaved']);
+  assert.deepEqual(h.names(), []); assert.deepEqual(h.saved().items, []);
+  assert.ok(!h.on(fav));
+  assert.deepEqual(JSON.parse(JSON.stringify(h.events)), [
+    ['venue_favorite', { venue_id: 571, venue_name: 'Sandhill Wines', venue_region: 'kelowna', venue_category: 'winery', surface: 'category_card', page_path: '/kelowna/wineries' }],
+    ['venue_unfavorite', { venue_id: 571, venue_name: 'Sandhill Wines', venue_region: 'kelowna', venue_category: 'winery', surface: 'category_card', page_path: '/kelowna/wineries' }],
+  ], 'the same events and parameters as before Stage 5E');
 });
 
-test('Stage 4.3: capture -- an event saves its specific occurrence; another date of it is a separate item; un-favouriting the name removes all of them', () => {
-  const h = sidecarHarness();
-  const card1 = h.holder({ 'data-venue-id': 'event-256', 'data-occurrence-id': '466', 'data-occurrence-date': '2026-10-30', 'data-occurrence-time': '13:00' });
-  h.click(h.button('BC Wine Night', card1), 'BC Wine Night');
+test('Stage 5E: winery region page -- two same-name places are two Favorites; removing one keeps the other and the shared name; venue 583 never matches event 583', () => {
+  const h = favPageHarness();
+  const k = h.card({ 'data-venue-id': '1126', 'data-venue-name': 'Okanagan Virtual Golf' }).fav;
+  const p = h.card({ 'data-venue-id': '1132', 'data-venue-name': 'Okanagan Virtual Golf', 'data-venue-region': 'penticton' }).fav;
+  h.boot();
+  h.click(k);
+  assert.ok(h.on(k) && !h.on(p), 'only Kelowna');
+  h.click(p);
+  assert.deepEqual(h.saved().items.map((x) => x.id), [1126, 1132]);
+  assert.deepEqual(h.names(), ['Okanagan Virtual Golf']);
+  h.click(k);
+  assert.ok(!h.on(k) && h.on(p));
+  assert.deepEqual(h.saved().items.map((x) => x.id), [1132], 'only Kelowna removed');
+  assert.deepEqual(h.names(), ['Okanagan Virtual Golf'], 'the name stays while Penticton is saved');
+  h.click(p);
+  assert.deepEqual(h.saved().items, []); assert.deepEqual(h.names(), []);
+  h.click(k);
+  assert.ok(h.on(k) && !h.on(p), 're-add Kelowna only');
+  const u = favPageHarness();
+  const v583 = u.card({ 'data-venue-id': '583', 'data-venue-name': 'Shannon Lake Restaurant' }).fav;
+  u.boot();
+  u.click(v583);
+  assert.equal(u.win.__roamFav.isOn(u.card({ 'data-venue-id': 'event-583', 'data-venue-name': 'Oktoberfest' }).fav), false);
+});
+
+test('Stage 4.3 + 5E: events -- saved with the occurrence it was saved from; one Favorite per event (kind + id) whichever date is clicked; never a duplicate', () => {
+  const h = favPageHarness();
+  const d1 = h.card({ 'data-venue-id': 'event-256', 'data-venue-name': 'BC Wine Night', 'data-occurrence-id': '466', 'data-occurrence-date': '2026-10-30', 'data-occurrence-time': '13:00' }).fav;
+  const d2 = h.card({ 'data-venue-id': 'event-256', 'data-venue-name': 'BC Wine Night', 'data-occurrence-id': '467', 'data-occurrence-date': '2026-11-30' }).fav;
+  const other = h.card({ 'data-venue-id': 'event-257', 'data-venue-name': 'BC Wine Night' }).fav;
+  h.boot();
+  h.click(d1);
   assert.deepEqual(h.saved().items.map(({ k, id, occ, date, time }) => ({ k, id, occ, date, time })), [{ k: 'event', id: 256, occ: 466, date: '2026-10-30', time: '13:00' }]);
-  // The same name is still a favourite when a second date's card is clicked on (legacy re-adds it):
-  const card2 = h.holder({ 'data-venue-id': 'event-256', 'data-occurrence-id': '467', 'data-occurrence-date': '2026-11-30' });
-  h.ls.setItem('okanaganFavorites', '[]'); // the page toggled it off and on again across two clicks
-  h.click(h.button('BC Wine Night', card2), 'BC Wine Night');
-  assert.deepEqual(h.saved().items.map((x) => x.occ), [466, 467], 'two dates of one event are two saved items');
-  h.click(h.button('BC Wine Night', card2), 'BC Wine Night');
-  assert.deepEqual(h.saved().items, [], 'no longer a favourite: every saved date of it is removed');
+  assert.ok(h.on(d1) && h.on(d2), 'every date of the event shows as a Favorite');
+  assert.ok(!h.on(other), 'a same-name event with another id does not');
+  h.click(d2);
+  assert.deepEqual(h.saved().items, [], 'clicking another date removes the event');
+  assert.deepEqual(h.names(), []);
+  h.click(d2);
+  assert.deepEqual(h.saved().items.map((x) => x.occ), [467], 'saved again, from the second date');
+  h.click(d1); h.click(d1);
+  assert.equal(h.saved().items.filter((x) => x.id === 256).length, 1, 'never two items for one event');
   // An event page with no upcoming date saves the event with no occurrence (never invented).
-  h.click(h.button('Old Market', h.holder({ 'data-venue-id': 'event-12' })), 'Old Market');
-  assert.deepEqual(h.saved().items.map(({ k, id, occ, date }) => ({ k, id, occ, date })), [{ k: 'event', id: 12, occ: null, date: null }]);
+  const e = favPageHarness();
+  const undated = e.card({ 'data-venue-id': 'event-12', 'data-venue-name': 'Old Market' }).fav;
+  e.boot(); e.click(undated);
+  assert.deepEqual(e.saved().items.map(({ k, id, occ, date }) => ({ k, id, occ, date })), [{ k: 'event', id: 12, occ: null, date: null }]);
 });
 
-test('Stage 4.3: capture -- no holder id or no name records nothing; a corrupt okanaganSaved is replaced with a valid one', () => {
-  const h = sidecarHarness();
-  h.click(h.button('Somewhere', h.holder({})), 'Somewhere');
-  h.click(h.button('Somewhere Else', null), 'Somewhere Else');
-  h.click(h.button('Not An Id', h.holder({ 'data-venue-id': 'abc' })), 'Not An Id');
-  assert.equal(h.saved(), null, 'nothing written');
-  h.ls.setItem('okanaganSaved', '{not json');
-  h.click(h.button('Solo Cafe', h.holder({ 'data-venue-id': '7' })), 'Solo Cafe');
-  assert.deepEqual(h.saved().items.map((x) => x.id), [7]);
+test('Stage 5E: winery region page -- a favourite saved by name before ids matches by name and is never converted or rewritten; un-favouriting removes the name as before', () => {
+  const h = favPageHarness({ names: ['Okanagan Virtual Golf'] });
+  const k = h.card({ 'data-venue-id': '1126', 'data-venue-name': 'Okanagan Virtual Golf' }).fav;
+  const p = h.card({ 'data-venue-id': '1132', 'data-venue-name': 'Okanagan Virtual Golf' }).fav;
+  h.boot();
+  assert.ok(h.on(k) && h.on(p), 'shown on both, as before');
+  assert.deepEqual(h.writes, [], 'loading writes nothing');
+  assert.deepEqual(h.click(p), ['okanaganFavorites'], 'only the name list is written');
+  assert.deepEqual(h.names(), []); assert.equal(h.saved(), null, 'no saved item invented');
+  assert.ok(!h.on(k) && !h.on(p));
+});
+
+test('Stage 4.3 + 5E: winery region page -- no holder id records only the name; corrupt lists are replaced with valid ones; without the capture script the page falls back to the name list as before; with app.js the page scripts write nothing', () => {
+  // No usable holder id -- an empty id, no data-venue-id holder at all, or an
+  // invalid id: the name-only Favorite (the approved fallback); okanaganSaved
+  // is never written.
+  const h = favPageHarness();
+  const noId = h.card({ 'data-venue-id': '', 'data-venue-name': 'Somewhere' }).fav;
+  const noHolder = h.card({ 'data-venue-name': 'Somewhere Else' }).fav;
+  const badId = h.card({ 'data-venue-id': 'abc', 'data-venue-name': 'Not An Id' }).fav;
+  h.boot();
+  assert.equal(noHolder.closest('[data-venue-id]'), null, 'this card has no id holder at all');
+  assert.deepEqual(h.click(noId), ['okanaganFavorites']);
+  assert.deepEqual(h.click(noHolder), ['okanaganFavorites']);
+  assert.deepEqual(h.click(badId), ['okanaganFavorites']);
+  assert.deepEqual(h.names(), ['Somewhere', 'Somewhere Else', 'Not An Id']);
+  assert.equal(h.saved(), null, 'okanaganSaved stays absent');
+  assert.equal('okanaganSaved' in h.store, false);
+  const c = favPageHarness({ names: '{not json', saved: '{not json' });
+  const solo = c.card({ 'data-venue-id': '7', 'data-venue-name': 'Solo Cafe' }).fav;
+  c.boot();
+  assert.ok(!c.on(solo));
+  c.click(solo);
+  assert.deepEqual(c.names(), ['Solo Cafe']); assert.deepEqual(c.saved().items.map((x) => x.id), [7]);
+  const f = favPageHarness({ capture: false });
+  const fb = f.card({ 'data-venue-id': '7', 'data-venue-name': 'Solo Cafe' }).fav;
+  f.boot();
+  assert.deepEqual(f.click(fb), ['okanaganFavorites'], 'fallback: the name list, exactly as before Stage 5E');
+  assert.deepEqual(f.names(), ['Solo Cafe']); assert.equal(f.saved(), null);
+  assert.equal(f.events[0][0], 'venue_favorite');
+  const a = favPageHarness({ appJs: true });
+  const ab = a.card({ 'data-venue-id': '571', 'data-venue-name': 'Sandhill Wines' }).fav;
+  a.boot();
+  assert.deepEqual(a.click(ab), [], 'app.js pages: neither page script writes (app.js does, alone)');
 });
 
 test('Stage 4.3: event pages carry the next upcoming occurrence; expired events carry none', () => {
