@@ -135,7 +135,33 @@ function t3MapsUrl(queries) {
   if (q.length > 2) url += '&waypoints=' + encodeURIComponent(q.slice(1, -1).join('|'));
   return url;
 }
-const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl].map((fn) => fn.toString()).join('\n');
+// The whole-trip map's points (Stage 5G, 2026-10-02): per day, in plan order,
+// each shown stop numbered by its place among that day's shown stops. Only a
+// stored location inside a generous Okanagan box counts (lat 48.5-51.5, lng
+// -121.5 to -117.5); a stop without one -- including every event -- is
+// counted as "not on the map". Removed stops and empty slots have no card, so
+// they are neither numbered nor counted.
+function t3MapPoints(days, removed) {
+  const inRange = (n, lo, hi) => typeof n === 'number' && isFinite(n) && n >= lo && n <= hi;
+  const out = { days: [], count: 0, skipped: 0 };
+  (Array.isArray(days) ? days : []).forEach((d) => {
+    if (!d || !Array.isArray(d.stops)) return;
+    const points = [];
+    let n = 0;
+    d.stops.forEach((s) => {
+      if (!s || (!s.venue && !(s.kind === 'event' && s.event))) return;
+      const key = d.day + '-' + s.daypart;
+      if (removed && Object.prototype.hasOwnProperty.call(removed, key)) return;
+      n += 1;
+      const v = s.venue;
+      if (!v || !inRange(v.latitude, 48.5, 51.5) || !inRange(v.longitude, -121.5, -117.5)) { out.skipped += 1; return; }
+      points.push({ n, key, label: String(s.label || ''), name: String(v.name || ''), lat: v.latitude, lng: v.longitude });
+    });
+    if (points.length) { out.days.push({ day: d.day, points }); out.count += points.length; }
+  });
+  return out;
+}
+const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   'Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake',
@@ -272,6 +298,27 @@ function renderStyles() {
   .t3-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   .t3-seeall { display: inline-block; margin-top: 18px; font-weight: 800; color: var(--ref-navy); }
 
+  /* Whole-trip map (Stage 5G): collapsed until opened. The canvas is its own
+     stacking context, so Leaflet's internal z-indexes stay below the sticky
+     day nav and the Trip tray. */
+  .t3-map { background: #fff; border-radius: 14px; padding: 12px 14px; margin: 0 0 16px; box-shadow: 0 10px 22px -18px rgba(27,43,58,0.45); }
+  .t3-map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .t3-map-note { margin: 0; font-size: 0.84rem; color: rgba(27,43,58,0.72); }
+  .t3-map-panel { margin-top: 12px; }
+  .t3-map-days { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+  .t3-map-chip { display: inline-flex; align-items: center; gap: 6px; background: #fff; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); border-radius: 999px; padding: 6px 12px; min-height: 36px; font-size: 0.82rem; font-weight: 800; cursor: pointer; }
+  .t3-map-chip:hover { border-color: var(--ref-navy); }
+  .t3-map-chip[aria-pressed="true"] { background: var(--ref-navy); border-color: var(--ref-navy); color: #fff; }
+  .t3-map-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 999px; box-shadow: 0 0 0 1px rgba(255,255,255,0.85); }
+  .t3-map-canvas { position: relative; z-index: 0; isolation: isolate; height: 400px; border-radius: 12px; overflow: hidden; background: #E8E4DA; }
+  .t3-map-status { margin: 8px 0 0; font-size: 0.84rem; font-weight: 700; color: var(--ref-navy); }
+  .t3-map-status:empty { display: none; }
+  .t3-pin { background: transparent; border: 0; }
+  .t3-pin span { display: flex; box-sizing: border-box; width: 28px; height: 28px; border-radius: 999px; align-items: center; justify-content: center; color: #fff; font: 800 0.8rem/1 'Nunito', sans-serif; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+  .t3-map-pop { font-family: 'Nunito', sans-serif; color: var(--ref-navy); }
+  .t3-map-pop-when { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(27,43,58,0.62); }
+  .t3-map-pop strong { display: block; font-family: 'Fraunces', serif; font-size: 1rem; margin: 2px 0 8px; }
+
   @media (max-width: 900px) {
     .t3-how-grid { grid-template-columns: 1fr; }
   }
@@ -292,6 +339,8 @@ function renderStyles() {
     .t3-plan-actions .t3-btn { flex: 1 1 auto; justify-content: center; }
     .t3-day-head { min-height: 130px; }
     .t3-day-headin { padding: 14px 14px; }
+    .t3-map { padding: 12px; }
+    .t3-map-canvas { height: 300px; }
   }
 </style>`;
 }
@@ -466,6 +515,165 @@ function renderScript(d) {
     return c;
   }
 
+  // ---- whole-trip map (Stage 5G, 2026-10-02) ----
+  // One map for the day plan on screen, collapsed until the visitor opens it:
+  // Leaflet (cdnjs, pinned by integrity hash) and the OpenStreetMap tiles load
+  // only then. The map lives in one element kept outside render(): render()
+  // detaches it before rewriting the result and puts it back into the new
+  // plan's map slot, so an open map, its chosen day and its Leaflet instance
+  // survive every edit -- only the markers and day lines are redrawn. A view
+  // only: no analytics, no URL state, no request to Okanagan Roam.
+  var LEAFLET_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';
+  var LEAFLET_JS_SRI = 'sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==';
+  var LEAFLET_CSS_SRI = 'sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==';
+  var MAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var MAP_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
+  var DAY_COLORS = ['#1F5C5C', '#B5452B', '#3B5BA5', '#7B4B94', '#8A6A00', '#2F7A3D', '#A3325A'];
+  var tripMap = { box: null, open: false, day: null, leaflet: null, layer: null, data: null };
+  var leafletWaiting = null, leafletReady = false;
+  function dayColor(day){ return DAY_COLORS[(Number(day) - 1) % DAY_COLORS.length] || DAY_COLORS[0]; }
+  function mapBox(){
+    if (tripMap.box) return tripMap.box;
+    var box = document.createElement('section');
+    box.className = 't3-map';
+    box.setAttribute('aria-label', 'Trip map');
+    box.innerHTML = '<div class="t3-map-bar"><button type="button" class="t3-btn t3-btn-ghost t3-map-toggle" aria-expanded="false" aria-controls="t3MapPanel">Show trip map</button><p class="t3-map-note" hidden></p></div>'
+      + '<div class="t3-map-panel" id="t3MapPanel" hidden><div class="t3-map-days" role="group" aria-label="Days shown on the map" hidden></div>'
+      + '<div class="t3-map-canvas"></div><p class="t3-map-status" role="status" aria-live="polite"></p></div>';
+    box.querySelector('.t3-map-toggle').addEventListener('click', function(){ setMapOpen(!tripMap.open); });
+    box.querySelector('.t3-map-days').addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('[data-t3-map-only]') : null;
+      if (!b) return;
+      var v = b.getAttribute('data-t3-map-only');
+      tripMap.day = v === 'all' ? null : Number(v);
+      drawMap(true);
+    });
+    tripMap.box = box;
+    return box;
+  }
+  function mapStatus(text){ if (tripMap.box) tripMap.box.querySelector('.t3-map-status').textContent = text || ''; }
+  function detachMap(){ if (tripMap.box && tripMap.box.parentNode) tripMap.box.parentNode.removeChild(tripMap.box); }
+  // After every render(): the map goes into the new plan's slot (day plans
+  // with at least one mappable stop only) and is redrawn if it is open.
+  function placeMap(){
+    var slot = resultEl.querySelector('[data-t3-map-slot]');
+    tripMap.data = slot ? t3MapPoints(days(), state.removed) : null;
+    if (!slot || !tripMap.data.count) return;
+    var box = mapBox();
+    slot.appendChild(box);
+    var data = tripMap.data;
+    if (tripMap.day !== null && !data.days.some(function(d){ return d.day === tripMap.day; })) tripMap.day = null;
+    var note = box.querySelector('.t3-map-note');
+    note.textContent = data.skipped === 1 ? '1 stop isn’t on the map — it has no stored location.' : data.skipped + ' stops aren’t on the map — they have no stored location.';
+    note.hidden = !data.skipped;
+    var chips = box.querySelector('.t3-map-days');
+    chips.hidden = data.days.length < 2;
+    chips.innerHTML = data.days.length < 2 ? '' : '<button type="button" class="t3-map-chip" data-t3-map-only="all" aria-pressed="false">All days</button>'
+      + data.days.map(function(d){ return '<button type="button" class="t3-map-chip" data-t3-map-only="' + esc(d.day) + '" aria-pressed="false"><span class="t3-map-swatch" style="background:' + dayColor(d.day) + '" aria-hidden="true"></span>Day ' + esc(d.day) + '</button>'; }).join('');
+    if (tripMap.open) { if (tripMap.leaflet) drawMap(true); else openMap(); }
+  }
+  function setMapOpen(open){
+    var box = mapBox(), btn = box.querySelector('.t3-map-toggle');
+    tripMap.open = open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btn.textContent = open ? 'Hide trip map' : 'Show trip map';
+    box.querySelector('.t3-map-panel').hidden = !open;
+    if (open) openMap();
+  }
+  function openMap(){
+    if (tripMap.leaflet) { drawMap(true); return; }
+    mapStatus('Loading the map…');
+    loadLeaflet(function(ok){
+      if (!tripMap.open || tripMap.leaflet || !tripMap.box.parentNode) return;
+      if (!ok) { mapStatus('The map couldn’t load. Hide it and try again.'); return; }
+      try {
+        tripMap.leaflet = L.map(tripMap.box.querySelector('.t3-map-canvas'), { scrollWheelZoom: false, maxZoom: 15 }).setView([49.75, -119.55], 9);
+        L.tileLayer(MAP_TILES, { maxZoom: 15, attribution: MAP_ATTRIBUTION }).addTo(tripMap.leaflet);
+        tripMap.layer = L.layerGroup().addTo(tripMap.leaflet);
+      } catch (e) { tripMap.leaflet = null; mapStatus('The map couldn’t load. Hide it and try again.'); return; }
+      mapStatus('');
+      drawMap(true);
+    });
+  }
+  // Leaflet's stylesheet and script, once, on first open. A failure or a
+  // 15-second stall removes them, so the next open tries again.
+  function loadLeaflet(done){
+    if (leafletReady) { done(true); return; }
+    if (leafletWaiting) { leafletWaiting.push(done); return; }
+    leafletWaiting = [done];
+    var pending = 2, settled = false, timer;
+    var css = document.createElement('link'), js = document.createElement('script');
+    function finish(ok){
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      leafletReady = ok;
+      if (!ok) { [css, js].forEach(function(el){ if (el.parentNode) el.parentNode.removeChild(el); }); }
+      var w = leafletWaiting; leafletWaiting = null;
+      w.forEach(function(f){ f(ok); });
+    }
+    function loaded(){ pending -= 1; if (!pending) finish(!!(window.L && window.L.map)); }
+    css.rel = 'stylesheet'; css.href = LEAFLET_BASE + 'leaflet.min.css'; css.integrity = LEAFLET_CSS_SRI; css.crossOrigin = 'anonymous';
+    js.src = LEAFLET_BASE + 'leaflet.min.js'; js.integrity = LEAFLET_JS_SRI; js.crossOrigin = 'anonymous'; js.async = true;
+    css.onload = loaded; js.onload = loaded;
+    css.onerror = js.onerror = function(){ finish(false); };
+    timer = setTimeout(function(){ finish(false); }, 15000);
+    document.head.appendChild(css);
+    document.head.appendChild(js);
+  }
+  function drawMap(fit){
+    var lf = tripMap.leaflet, data = tripMap.data;
+    if (!lf || !tripMap.open || !data || !tripMap.box.parentNode) return;
+    Array.prototype.forEach.call(tripMap.box.querySelectorAll('[data-t3-map-only]'), function(b){
+      var v = b.getAttribute('data-t3-map-only');
+      b.setAttribute('aria-pressed', (v === 'all' ? tripMap.day === null : Number(v) === tripMap.day) ? 'true' : 'false');
+    });
+    tripMap.layer.clearLayers();
+    var bounds = [];
+    data.days.forEach(function(d){
+      if (tripMap.day !== null && d.day !== tripMap.day) return;
+      var color = dayColor(d.day), line = [];
+      d.points.forEach(function(p){
+        var at = [p.lat, p.lng];
+        line.push(at); bounds.push(at);
+        var label = 'Day ' + d.day + ', stop ' + p.n + ': ' + p.name;
+        var marker = L.marker(at, { title: label, riseOnHover: true, icon: L.divIcon({ className: 't3-pin', html: '<span style="background:' + color + '">' + p.n + '</span>', iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] }) });
+        marker.bindPopup(mapPopup(d.day, p));
+        marker.on('add', function(){ var el = this.getElement(); if (el) el.setAttribute('aria-label', label); });
+        tripMap.layer.addLayer(marker);
+      });
+      if (line.length > 1) tripMap.layer.addLayer(L.polyline(line, { color: color, weight: 3, opacity: 0.8, interactive: false }));
+    });
+    requestAnimationFrame(function(){
+      lf.invalidateSize();
+      if (!fit || !bounds.length) return;
+      if (bounds.length === 1) lf.setView(bounds[0], 13);
+      else lf.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 });
+    });
+  }
+  function mapPopup(day, p){
+    var el = document.createElement('div');
+    el.className = 't3-map-pop';
+    var when = document.createElement('div');
+    when.className = 't3-map-pop-when';
+    when.textContent = 'Day ' + day + ' · ' + p.n + (p.label ? ' · ' + p.label : '');
+    var name = document.createElement('strong');
+    name.textContent = p.name;
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 't3-act'; btn.textContent = 'Show in plan';
+    btn.addEventListener('click', function(){ showInPlan(p.key); });
+    el.appendChild(when); el.appendChild(name); el.appendChild(btn);
+    return el;
+  }
+  function showInPlan(key){
+    var keep = resultEl.querySelector('[data-t3-keep="' + key + '"]');
+    var card = keep && keep.closest('.t3-card');
+    if (!card) return;
+    if (tripMap.leaflet) tripMap.leaflet.closePopup();
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var target = card.querySelector('h4 a') || keep;
+    try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); }
+  }
+
   // ---- rendering ----
   function factsLine(v){
     var parts = [];
@@ -608,6 +816,7 @@ function renderScript(d) {
     var issues = (p.warnings || []).slice();
     if (issues.length) html += '<div class="t3-warnings" role="note"><ul>' + issues.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>';
     if (planKinds && days().length) {
+      html += '<div class="t3-map-slot" data-t3-map-slot></div>';
       if (days().length > 1) html += '<nav class="t3-daynav" aria-label="Jump to a day">' + days().map(function(d){ return '<a href="#t3-day-' + d.day + '">Day ' + d.day + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
       html += days().map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
@@ -631,8 +840,10 @@ function renderScript(d) {
     }
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" href="' + esc(p.seeAll.url) + '">See everything that matches on Okanagan Roam →</a>';
     html += '</div>';
+    detachMap();
     resultEl.innerHTML = html;
     resultEl.hidden = false;
+    placeMap();
     if (howEl) howEl.hidden = true;
     if (window.__syncFavButtons) window.__syncFavButtons();
     if (window.__syncTripButtons) window.__syncTripButtons();
@@ -843,6 +1054,7 @@ function renderScript(d) {
     var fromExample = exampleSubmit; exampleSubmit = false;
     if (!text) { setStatus('Tell us a little about the trip you’d like — where, how long, what you love.', 'error'); input.focus(); return; }
     state = { text: text, seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null };
+    tripMap.day = null;
     track('trip_plan_start', { input_method: fromExample ? 'example' : 'typed' });
     request({}, { requestType: 'initial' });
   });
@@ -920,4 +1132,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, T3_EXAMPLES };
+module.exports = { renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
