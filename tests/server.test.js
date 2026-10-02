@@ -12992,6 +12992,58 @@ test('Stage 5A F09/F12: the V2 /trip page is untouched -- no share replay, no V3
   for (const s of ['trip_plan_edit', 'trip_plan_share', 'shared_link', 'invalid_share', 'trip_day_map', 'data-t3-', 't3QueryToState']) assert.ok(!v2.includes(s), s);
 });
 
+// Stage 5G (2026-10-02): the V3 whole-trip map. Collapsed until opened;
+// Leaflet 1.9.4 (cdnjs, integrity-pinned) and the OpenStreetMap tiles are
+// fetched only by the page script on first open -- never by the page itself;
+// visible OpenStreetMap attribution; one map element kept outside render();
+// day plans only; no analytics; the share link and the V2 page untouched.
+test('Stage 5G: V3 whole-trip map -- collapsed, loaded on demand, attributed, kept across render(), no new events', () => {
+  for (const preview of [true, false]) {
+    const html = app.renderTripPlannerV3Page({ preview });
+    assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/trip">/);
+    assert.equal(/noindex/.test(html), preview, 'noindex only in preview');
+    assert.doesNotMatch(html, /<(script|link)[^>]*leaflet/i, 'the page itself never loads Leaflet');
+    assert.doesNotMatch(html, /tile\.openstreetmap\.org[^'"]*\.png"/, 'no tile in the page markup');
+  }
+  const html = app.renderTripPlannerV3Page({ preview: true });
+  const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  new Function(js); // parses
+  // On demand, pinned, from the approved sources only.
+  assert.ok(js.includes("var LEAFLET_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';"));
+  assert.ok(js.includes("var LEAFLET_JS_SRI = 'sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==';"));
+  assert.ok(js.includes("var LEAFLET_CSS_SRI = 'sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==';"));
+  assert.ok(js.includes("js.integrity = LEAFLET_JS_SRI; js.crossOrigin = 'anonymous';") && js.includes("css.integrity = LEAFLET_CSS_SRI; css.crossOrigin = 'anonymous';"));
+  assert.ok(js.includes("var MAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';"), 'tiles without subdomains');
+  assert.doesNotMatch(js, /\{s\}\.tile\.openstreetmap/);
+  assert.ok(js.includes('href="https://www.openstreetmap.org/copyright"') && js.includes('OpenStreetMap</a> contributors') && js.includes('attribution: MAP_ATTRIBUTION'), 'OpenStreetMap attribution');
+  const openFn = js.slice(js.indexOf('function openMap()'), js.indexOf('function loadLeaflet('));
+  assert.ok(openFn.includes('loadLeaflet(') && js.indexOf('loadLeaflet(') > js.indexOf('function setMapOpen('), 'Leaflet is requested only from opening the map');
+  // Collapsed by default, on every screen size.
+  assert.ok(js.includes('aria-expanded="false" aria-controls="t3MapPanel">Show trip map</button>') && js.includes('<div class="t3-map-panel" id="t3MapPanel" hidden>'));
+  assert.ok(js.includes("var tripMap = { box: null, open: false,"));
+  // render(): the map slot only in day plans; the map is detached before the
+  // result is rewritten and placed back after.
+  const renderFn = js.slice(js.indexOf('function render(focus)'), js.indexOf('// ---- My Trip (tray)'));
+  assert.ok(renderFn.includes("if (planKinds && days().length) {\n      html += '<div class=\"t3-map-slot\" data-t3-map-slot></div>';"));
+  assert.equal(renderFn.split('data-t3-map-slot').length, 2, 'one slot');
+  const i = (s) => renderFn.indexOf(s);
+  assert.ok(i('detachMap();') > 0 && i('detachMap();') < i('resultEl.innerHTML = html;') && i('resultEl.innerHTML = html;') < i('placeMap();'));
+  // Map controls never collide with the result's own click handling.
+  const mapSrc = js.slice(js.indexOf('// ---- whole-trip map'), js.indexOf('// ---- rendering ----'));
+  assert.ok(mapSrc.length > 3000);
+  assert.ok(!/data-t3-(add-all|add-day|view-trip|map-day|share|keep|remove|undo|swap|regen)/.test(mapSrc.replace("'[data-t3-keep=\"' + key + '\"]'", '')), 'map controls use their own attributes');
+  // Names reach the popup as text only.
+  assert.ok(mapSrc.includes('name.textContent = p.name;') && !/innerHTML[^;]*p\.name/.test(mapSrc));
+  // No analytics from the map.
+  assert.ok(!/track\(|trackEvent|dataLayer|gtag/.test(mapSrc), 'no map analytics');
+  assert.equal((js.match(/track\('/g) || []).length, 16, 'the V3 page has exactly the track() calls it had before Stage 5G');
+  // Share link: the map adds nothing to it (the fixed-state link is checked byte for byte in trip-v3.test.js).
+  assert.ok(!/tripMap|t3MapPoints/.test(js.slice(js.indexOf('function syncUrl()'), js.indexOf('// ---- plan helpers'))), 'the URL never carries map state');
+  // V2 untouched.
+  const v2 = app.renderTripPlannerPage(true);
+  for (const s of ['t3MapPoints', 't3-map', 'LEAFLET_JS_SRI', 'https://tile.openstreetmap.org/']) assert.ok(!v2.includes(s), s);
+});
+
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
   const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];

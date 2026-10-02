@@ -296,3 +296,97 @@ test('Stage 5C: V3 same-name notice removed; stop buttons carry refs; the Stage 
   assert.equal(qs, '?q=Plan%202%20days%20in%20Kelowna&seed=3&days=2&pace=relaxed&keep=1-evening%3A8%2C2-morning%3A9&skip=4%2C5&pin=1-morning%3A3%2C1-midday%3A4&avoid=7&rm=2-evening');
   assert.deepEqual(v3.t3QueryToState(qs, ['kelowna']), { text: 'Plan 2 days in Kelowna', seed: 3, overrides: { days: 2, pace: 'relaxed' }, locks: { '1-evening': 8, '2-morning': 9 }, exclude: [4, 5], pinned: { '1-morning': 3, '1-midday': 4 }, avoid: [7], removed: ['2-evening'], invalid: false });
 });
+
+// Stage 5G (2026-10-02): the whole-trip map's points -- per day, in plan
+// order, numbered among each day's shown stops; only stored locations inside
+// the Okanagan box; removed stops and empty slots neither numbered nor counted.
+const shownStops = (d) => d.stops.filter((s) => s.venue || (s.kind === 'event' && s.event));
+test('Stage 5G map: one-day, multi-day and multi-region plans -- every point is a shown stop, in day order, with its stored coordinates', () => {
+  const cases = [
+    ['A day in Penticton with a winery and lunch', 'day_plan', 1],
+    ['Plan me a 2-day trip in Kelowna with wineries and restaurants', 'multi_day', 2],
+    ['3 days: Kelowna, Penticton and Osoyoos with wineries', 'multi_day', 3],
+    ['A packed 4 day trip around the whole Okanagan', 'multi_day', 4],
+  ];
+  for (const [text, kind, dayCount] of cases) {
+    const p = plan(text);
+    assert.equal(p.kind, kind, text);
+    assert.equal(p.days.length, dayCount, text);
+    const m = v3.t3MapPoints(p.days, {});
+    const shown = p.days.reduce((n, d) => n + shownStops(d).length, 0);
+    assert.equal(m.count + m.skipped, shown, `${text}: every shown stop is either on the map or counted as not on it`);
+    assert.ok(m.count > 0, text);
+    assert.deepEqual(m.days.map((d) => d.day), p.days.filter((d) => m.days.some((x) => x.day === d.day)).map((d) => d.day), 'days in plan order');
+    for (const md of m.days) {
+      const day = p.days.find((d) => d.day === md.day);
+      const shownDay = shownStops(day);
+      for (const pt of md.points) {
+        const s = shownDay[pt.n - 1];
+        assert.ok(s && s.venue, `${text}: point ${md.day}/${pt.n} is that day's ${pt.n}th shown stop`);
+        assert.equal(pt.key, `${md.day}-${s.daypart}`);
+        assert.equal(pt.name, s.venue.name);
+        assert.equal(pt.label, s.label);
+        const v = BY_ID.get(s.venue.id);
+        assert.equal(pt.lat, v.lat); assert.equal(pt.lng, v.lng);
+        assert.deepEqual(Object.keys(pt).sort(), ['key', 'label', 'lat', 'lng', 'n', 'name'], 'a point carries nothing else');
+      }
+      assert.deepEqual(md.points.map((x) => x.n), md.points.map((x) => x.n).slice().sort((a, b) => a - b), 'numbers rise along the day');
+    }
+  }
+  const multi = plan('3 days: Kelowna, Penticton and Osoyoos with wineries');
+  assert.deepEqual(multi.days.map((d) => d.region), ['kelowna', 'penticton', 'osoyoos'], 'multi-region: one region a day');
+  assert.deepEqual(v3.t3MapPoints(multi.days, {}).days.map((d) => d.day), [1, 2, 3]);
+});
+
+test('Stage 5G map: partial coordinates -- stops without a stored location are counted, not placed, and keep their numbers', () => {
+  const p = plan('2 days in Vernon with golf, cafes and pubs');
+  const m = v3.t3MapPoints(p.days, {});
+  const missing = p.days.flatMap(shownStops).filter((s) => !Number.isFinite(BY_ID.get(s.venue.id).lat));
+  assert.ok(missing.length > 0, 'this plan has stops without a stored location');
+  assert.equal(m.skipped, missing.length);
+  for (const md of m.days) {
+    const shownDay = shownStops(p.days.find((d) => d.day === md.day));
+    for (const pt of md.points) assert.equal(shownDay[pt.n - 1].venue.name, pt.name, 'a number is the stop\'s place in the day, gaps included');
+  }
+});
+
+test('Stage 5G map: a removed stop leaves the map and the count; Undo (no longer removed) brings it back', () => {
+  const p = plan('Plan me a 2-day trip in Kelowna with wineries and restaurants');
+  const all = v3.t3MapPoints(p.days, {});
+  const target = all.days[0].points[0];
+  const removed = { [target.key]: 123 };
+  const less = v3.t3MapPoints(p.days, removed);
+  assert.equal(less.count, all.count - 1);
+  assert.equal(less.skipped, all.skipped);
+  assert.ok(!less.days.flatMap((d) => d.points).some((x) => x.key === target.key));
+  assert.deepEqual(less.days[0].points.map((x) => x.n), all.days[0].points.slice(1).map((x) => x.n - 1), 'the day renumbers from 1');
+  assert.deepEqual(v3.t3MapPoints(p.days, {}), all, 'undo: the same points as before');
+});
+
+test('Stage 5G map: no locations, bad locations, events, empty slots, shared locations and the largest plan', () => {
+  const at = (lat, lng, name = 'P') => ({ name, latitude: lat, longitude: lng });
+  const day = (n, stops) => ({ day: n, stops });
+  // No stored locations at all: nothing to map, every stop counted.
+  const none = v3.t3MapPoints([day(1, [{ daypart: 'morning', label: 'Morning', venue: at(null, null) }, { daypart: 'evening', label: 'Evening', venue: { name: 'Q' } }])], {});
+  assert.deepEqual(none, { days: [], count: 0, skipped: 2 });
+  // Bad values are "no location": NaN, strings, 0/0, outside the Okanagan box.
+  const bad = [at(NaN, -119.5), at('49.8', -119.5), at(0, 0), at(49.8, 119.5), at(53.5, -119.5), at(49.8, Infinity)];
+  assert.deepEqual(v3.t3MapPoints([day(1, bad.map((v, i) => ({ daypart: 'd' + i, label: 'x', venue: v })))], {}), { days: [], count: 0, skipped: 6 });
+  // Events have no stored location: shown, numbered, counted, never placed. Empty slots are not stops.
+  const mixed = v3.t3MapPoints([day(1, [
+    { daypart: 'morning', label: 'Morning', venue: null },
+    { daypart: 'afternoon', label: 'Hockey game', kind: 'event', event: { name: 'Game' } },
+    { daypart: 'evening', label: 'Evening', venue: at(49.88, -119.49, 'Dinner') },
+  ])], {});
+  assert.deepEqual(mixed, { days: [{ day: 1, points: [{ n: 2, key: '1-evening', label: 'Evening', name: 'Dinner', lat: 49.88, lng: -119.49 }] }], count: 1, skipped: 1 });
+  // Two places at the same stored location are two points.
+  const twin = v3.t3MapPoints([day(1, [{ daypart: 'morning', label: 'M', venue: at(49.5, -119.6, 'A') }, { daypart: 'midday', label: 'L', venue: at(49.5, -119.6, 'B') }])], {});
+  assert.deepEqual(twin.days[0].points.map((x) => x.name), ['A', 'B']);
+  // 7 days x 4 stops: 28 points, 4 a day, numbered 1-4.
+  const PARTS = ['morning', 'midday', 'afternoon', 'evening'];
+  const big = v3.t3MapPoints(Array.from({ length: 7 }, (_, i) => day(i + 1, PARTS.map((dp, j) => ({ daypart: dp, label: dp, venue: at(49 + i * 0.2, -119.9 + j * 0.1) })))), {});
+  assert.equal(big.count, 28);
+  assert.ok(big.days.every((d) => d.points.map((x) => x.n).join() === '1,2,3,4'));
+  // Nothing to read: no days.
+  assert.deepEqual(v3.t3MapPoints(undefined, undefined), { days: [], count: 0, skipped: 0 });
+});
