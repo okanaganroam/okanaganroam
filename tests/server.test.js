@@ -9659,7 +9659,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d', 'okanagan.html (header navigation redesign 2026-09-25)');
+  assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
   assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
@@ -10997,7 +10997,8 @@ test('Header: okanagan.html outside <header id="top"> is byte-identical to the a
   const html = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
   const outside = html.replace(/<header id="top">[\s\S]*?<\/header>/, '');
   const crypto = require('node:crypto');
-  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), 'af6d2bf810dbd738f30f30eef68e38f7');
+  // SEO-2 (2026-10-02): approved description/og:/twitter: description change.
+  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), '54597c2b2c95e986f935f3158fcfc349');
   assert.match(html, /<a href="#top" class="logo"/, 'the logo keeps its in-page #top anchor on the homepage');
 });
 
@@ -11378,7 +11379,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), 'b42d6ef9d201947ad109b8b6d8b4f28d');
+  assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41'); // SEO-2 (2026-10-02) descriptions
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id.
@@ -13894,6 +13895,42 @@ test('Stage 4.2: the /browse redirects run before the page is built (Stage 3.6 b
   assert.deepEqual(await go('/browse?q=fixture'), { status: 302, location: '/search?q=fixture' });
   assert.deepEqual(await go('/browse?openMap=1'), { status: 302, location: '/map' });
   assert.equal((await go(`/browse?q=${encodeURIComponent('Test Trattoria')}`)).location, '/kelowna/restaurants/test-trattoria');
+})));
+
+// ---- SEO-2 (2026-10-02): homepage description + share image ----------------
+// One approved description is used for the meta, og: and twitter: description
+// on the template (/ and /browse); the share image stays at its existing URL
+// and is a 1200x630 PNG matching the declared og:image size.
+const SEO2_DESCRIPTION = "A review-backed guide to 1,000+ wineries, restaurants, breweries and cafes across BC's Okanagan Valley, plus local events and a day-by-day trip planner.";
+
+test('SEO-2: homepage descriptions match the approved text; share image is a 1200x630 PNG at the existing URL', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  assert.equal(SEO2_DESCRIPTION.length, 152);
+  const metaAll = (html, attr, key) => [...html.matchAll(new RegExp(`<meta ${attr}="${key}" content="([^"]*)">`, 'g'))].map((m) => m[1]);
+  for (const path of ['/', '/browse']) {
+    const html = await (await fetch(`${base}${path}`)).text();
+    assert.deepEqual(metaAll(html, 'name', 'description'), [SEO2_DESCRIPTION], `${path}: one meta description, the approved one`);
+    assert.deepEqual(metaAll(html, 'property', 'og:description'), [SEO2_DESCRIPTION], `${path}: og:description matches`);
+    assert.deepEqual(metaAll(html, 'name', 'twitter:description'), [SEO2_DESCRIPTION], `${path}: twitter:description matches`);
+    assert.deepEqual(metaAll(html, 'property', 'og:image'), ['https://okanaganroam.com/og-image.png'], `${path}: og:image absolute, unchanged URL`);
+    assert.deepEqual(metaAll(html, 'name', 'twitter:image'), ['https://okanaganroam.com/og-image.png'], `${path}: twitter:image absolute, unchanged URL`);
+    assert.deepEqual(metaAll(html, 'property', 'og:image:width'), ['1200'], path);
+    assert.deepEqual(metaAll(html, 'property', 'og:image:height'), ['630'], path);
+  }
+  // /browse keeps its own Stage 4.2 title and canonical.
+  const browse = await (await fetch(`${base}/browse`)).text();
+  assert.ok(browse.includes(STAGE42_TITLE) && browse.includes(STAGE42_CANONICAL));
+
+  const res = await fetch(`${base}/og-image.png`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'image/png');
+  const png = Buffer.from(await res.arrayBuffer());
+  assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 'PNG signature');
+  assert.equal(png.toString('ascii', 12, 16), 'IHDR');
+  assert.equal(png.readUInt32BE(16), 1200, 'width');
+  assert.equal(png.readUInt32BE(20), 630, 'height');
+  assert.ok(png.length < 1500 * 1024, `share image stays under 1.5 MB (${png.length} bytes)`);
+  // The approved crop (the old V1 image was also 1200x630, so size alone can't tell them apart).
+  assert.equal(require('node:crypto').createHash('sha256').update(png).digest('hex'), '9f1ad2ef30248bb06a5bf0a2ee3de5724cd8d8ed6b890790d78df9f9b3086269');
 })));
 
 // ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
