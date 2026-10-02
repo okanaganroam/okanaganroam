@@ -3780,7 +3780,8 @@ test('S5 #8/#14/#16/#17: a sports series lists its games chronologically with Sp
   assert.equal(ld.name, 'S5 Rockets Home Games 2032-33 – vs Penticton Vees', 'the next game is the main Event');
   assert.equal(ld.startDate, '2032-10-04T18:05:00-07:00');
   assert.equal(ld.eventStatus, 'https://schema.org/EventScheduled');
-  assert.deepEqual(ld.location, { '@type': 'Place', name: 'Prospera Place' });
+  // SEO-1 A: no host venue -> the region as a locality-level PostalAddress (never a guessed street).
+  assert.deepEqual(ld.location, { '@type': 'Place', name: 'Prospera Place', address: { '@type': 'PostalAddress', addressLocality: 'Kelowna', addressRegion: 'BC', addressCountry: 'CA' } });
   assert.deepEqual(ld.subEvent.map((s) => [s['@type'], s.name, s.startDate.slice(0, 16)]), [
     ['SportsEvent', 'S5 Rockets Home Games 2032-33 \u2013 vs Kamloops Blazers', '2032-11-01T19:05'],
     ['SportsEvent', 'S5 Rockets Home Games 2032-33 \u2013 vs Victoria Royals', '2032-12-19T18:05'],
@@ -3806,6 +3807,66 @@ test('S5 #18: no fabricated dates or times -- untimed occurrences stay date-only
   assert.equal(app.eventSchemaType({ type: null }, ['live-music']), 'MusicEvent');
   assert.equal(app.eventSchemaType({ type: 'festival' }, ['live-music']), 'Festival', 'stored type hint wins');
   assert.equal(app.eventSchemaType({ type: null }, ['workshops-classes']), 'Event');
+});
+
+// SEO-1 (2026-10-02). A: every Event JSON-LD location carries an address --
+// the host venue's stored street address when it has one, otherwise the
+// region as a locality-level PostalAddress (valley-wide: "Okanagan Valley").
+// E: two events with exactly the same name in the same region get their own
+// date in <title>; every other event title is unchanged.
+test('SEO-1: Event location always has an address; same-name same-region events get dated titles, others unchanged', async () => {
+  try {
+    const locality = (name) => ({ '@type': 'PostalAddress', addressLocality: name, addressRegion: 'BC', addressCountry: 'CA' });
+    // A -- host venue with a stored street address: kept exactly.
+    assert.equal(app.eventLocationAddress({ region: 'kelowna' }, { region: 'kelowna', address: '1 Test St, Kelowna, BC' }), '1 Test St, Kelowna, BC');
+    // Host venue without an address: the venue's region as locality.
+    assert.deepEqual(app.eventLocationAddress({ region: 'kelowna' }, { region: 'penticton', address: null }), locality('Penticton'));
+    // No host venue: the event's region; valley-wide: Okanagan Valley.
+    assert.deepEqual(app.eventLocationAddress({ region: 'vernon', valley_wide: 0 }, null), locality('Vernon'));
+    assert.deepEqual(app.eventLocationAddress({ region: 'kelowna', valley_wide: 1 }, null), locality('Okanagan Valley'));
+    // Rendered page: main Event and every subEvent carry the same addressed location.
+    const series = s5create({ name: 'SEO1 Market Series', venue_id: null, venue_name_text: 'Laurel Packinghouse',
+      occurrences: [{ start_date: '2032-07-03' }, { start_date: '2032-07-10' }, { start_date: '2032-07-17' }] });
+    const page = (await s5get(`/kelowna/events/${series.slug}`)).text;
+    const ld = s5jsonLd(page).find((b) => b['@type'] !== 'BreadcrumbList');
+    assert.deepEqual(ld.location, { '@type': 'Place', name: 'Laurel Packinghouse', address: locality('Kelowna') });
+    assert.equal(ld.subEvent.length, 2);
+    for (const s of ld.subEvent) assert.deepEqual(s.location, ld.location);
+    // Host-venue event: the venue's stored address when present, else its region.
+    const hosted = s5create({ name: 'SEO1 Hosted Night' });
+    const hostedLd = s5jsonLd((await s5get(`/kelowna/events/${hosted.slug}`)).text).find((b) => b['@type'] !== 'BreadcrumbList');
+    assert.deepEqual(hostedLd.location.address, s5venue.address || locality('Kelowna'));
+    // Nothing else in the Event JSON-LD changed shape.
+    assert.deepEqual(Object.keys(ld).sort(), ['@context', '@type', 'description', 'endDate', 'eventAttendanceMode', 'eventStatus', 'location', 'name', 'startDate', 'subEvent', 'url'].sort());
+
+    // E -- a unique name keeps the plain title.
+    const titleOf = (html) => (/<title>([^<]*)<\/title>/.exec(html) || [])[1];
+    assert.equal(titleOf(page), 'SEO1 Market Series — Event in Kelowna, BC | Okanagan Roam');
+    // Two events with the same name in the same region: each title carries its own date.
+    const a = s5create({ name: 'SEO1 Long Table Dinner', occurrences: [{ start_date: '2032-10-21', start_time: '18:00' }] });
+    const b = s5create({ name: 'SEO1 Long Table Dinner', occurrences: [{ start_date: '2032-10-28', start_time: '18:00' }] });
+    assert.notEqual(a.slug, b.slug);
+    const pa = (await s5get(`/kelowna/events/${a.slug}`)).text;
+    assert.equal(titleOf(pa), 'SEO1 Long Table Dinner — October 21, 2032 — Event in Kelowna, BC | Okanagan Roam');
+    assert.equal(titleOf((await s5get(`/kelowna/events/${b.slug}`)).text), 'SEO1 Long Table Dinner — October 28, 2032 — Event in Kelowna, BC | Okanagan Roam');
+    // The same name in a DIFFERENT region is not a twin: plain title.
+    const other = s5create({ name: 'SEO1 Long Table Dinner', region: 'penticton', venue_id: null, venue_name_text: 'Penticton Hall', occurrences: [{ start_date: '2032-11-04' }] });
+    assert.equal(titleOf((await s5get(`/penticton/events/${other.slug}`)).text), 'SEO1 Long Table Dinner — Event in Penticton, BC | Okanagan Roam');
+    // og:title / twitter:title follow <title> (pageHead); the H1 stays the plain name.
+    assert.ok(pa.includes('<meta property="og:title" content="SEO1 Long Table Dinner — October 21, 2032 — Event in Kelowna, BC | Okanagan Roam">'));
+    assert.match(pa, /<h1[^>]*>SEO1 Long Table Dinner<\/h1>/);
+    // The helper: legacy rows (no occurrence) use the stored start date; no twin -> plain.
+    assert.equal(app.eventPageTitle({ id: -1, region: 'kelowna', name: 'SEO1 No Twin Here', start_datetime: '2032-01-01' }, 'Kelowna', null), 'SEO1 No Twin Here — Event in Kelowna, BC | Okanagan Roam');
+    assert.equal(app.eventPageTitle({ id: -1, region: 'kelowna', name: 'SEO1 Long Table Dinner', start_datetime: '2032-12-01T19:00' }, 'Kelowna', null), 'SEO1 Long Table Dinner — December 1, 2032 — Event in Kelowna, BC | Okanagan Roam');
+  } finally {
+    // Remove this test's own fixtures so later sitemap/cleanup tests see exactly their own.
+    for (const { id } of db.prepare("SELECT id FROM events WHERE name LIKE 'SEO1 %'").all()) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
 });
 
 test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, unexpired events once each and keeps every other URL', async () => {

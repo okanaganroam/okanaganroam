@@ -13887,6 +13887,16 @@ function occurrenceIsoEnd(o) {
 // occurrence (or the first, when all are past) is the Event; further
 // occurrences become subEvent entries (cap 10). Nothing is emitted for a
 // cancelled/postponed row or a row with no occurrences.
+// SEO-1 A (2026-10-02): Google requires location.address for Event rich
+// results. A host venue's stored street address is used exactly as before;
+// any other event gets its region as a locality-level PostalAddress -- never
+// a guessed street address. Valley-wide events are "Okanagan Valley".
+function eventLocationAddress(event, hostVenue) {
+  if (hostVenue && hostVenue.address) return hostVenue.address;
+  const region = hostVenue && hostVenue.region ? hostVenue.region : event.region;
+  const locality = !hostVenue && event.valley_wide === 1 ? 'Okanagan Valley' : (REGION_LABELS[region] || 'Okanagan Valley');
+  return { '@type': 'PostalAddress', addressLocality: locality, addressRegion: 'BC', addressCountry: 'CA' };
+}
 function eventJsonLd(event, occurrences, categories, hostVenue, canonical, todayStr) {
   if (event.status !== 'scheduled' || !occurrences.length) return null;
   const upcoming = occurrences.filter((o) => o.end_date >= todayStr);
@@ -13894,8 +13904,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
   const others = occurrences.filter((o) => o.id !== main.id && o.end_date >= todayStr).slice(0, 10);
   const schemaType = eventSchemaType(event, categories);
   const location = hostVenue
-    ? { '@type': 'Place', name: hostVenue.name, address: hostVenue.address || undefined }
-    : { '@type': 'Place', name: event.venue_name_text || (event.valley_wide === 1 ? 'Okanagan Valley, BC' : REGION_LABELS[event.region]) };
+    ? { '@type': 'Place', name: hostVenue.name, address: eventLocationAddress(event, hostVenue) }
+    : { '@type': 'Place', name: event.venue_name_text || (event.valley_wide === 1 ? 'Okanagan Valley, BC' : REGION_LABELS[event.region]), address: eventLocationAddress(event, null) };
   const sub = (o) => ({
     '@type': schemaType,
     name: o.label ? `${event.name} – ${o.label}` : event.name,
@@ -13918,13 +13928,24 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     subEvent: others.length ? others.map(sub) : undefined,
   };
 }
+// SEO-1 E (2026-10-02): when another event has exactly the same name in the
+// same region, both pages would carry an identical <title>; such pages add
+// their own date (the next upcoming occurrence, else the first; legacy rows
+// use the stored start date). Every other event title is unchanged.
+function eventPageTitle(full, regionLabel, mainOccurrence) {
+  const plain = `${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`;
+  const twin = db.prepare('SELECT 1 FROM events WHERE region = ? AND name = ? AND id <> ? LIMIT 1').get(full.region, full.name, full.id);
+  if (!twin) return plain;
+  const dateStr = mainOccurrence ? mainOccurrence.start_date : String(full.start_datetime || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return plain;
+  return `${full.name} — ${formatLocalDateLong(dateStr, { weekday: false })} — Event in ${regionLabel}, BC | Okanagan Roam`;
+}
 function renderEventPage(event, hostVenue, opts = {}) {
   const now = opts.now || new Date();
   const todayStr = todayLocal(now);
   const full = getEventById(event.id) || event; // status/source/venue text when the caller passed a bare rowToEvent()
   const regionLabel = REGION_LABELS[full.region];
   const canonical = `https://okanaganroam.com/${full.region}/events/${full.slug}`;
-  const title = `${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`;
   const rawDesc = full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`;
   const description = rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc;
   const expired = isEventExpired(full, now);
@@ -13932,6 +13953,7 @@ function renderEventPage(event, hostVenue, opts = {}) {
   const categories = getEventCategoryKeys(full.id);
   const isSeries = occurrences.length > 1;
   const upcoming = occurrences.filter((o) => o.end_date >= todayStr);
+  const title = eventPageTitle(full, regionLabel, upcoming[0] || occurrences[0]);
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -19387,6 +19409,8 @@ module.exports = {
   describeEventOccurrence,
   eventSchemaType,
   eventJsonLd,
+  eventLocationAddress,
+  eventPageTitle,
   // What's On Step 4: API plumbing
   EVENT_WRITE_STATUS_MAP,
   EVENT_META_KEYS,
