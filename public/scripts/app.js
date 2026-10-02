@@ -3476,30 +3476,86 @@ window.__scrollToVenueCard = function(name){
     try { window.localStorage.setItem('okanaganFavorites', JSON.stringify(Array.from(favorites))); } catch (e) {}
   }
 
+  // Stage 5E (Favorites half of W07): a Favorite belongs to one place or event,
+  // not to its name. The Stage 4.3 okanaganSaved list records which one, and
+  // this module writes it together with okanaganFavorites on every click. The
+  // capture script stands aside wherever app.js is present (it detects this
+  // module's window.__syncFavButtons, the existing Favorite sync hook, and
+  // writes nothing). The id comes from the existing markup: the
+  // [data-venue-id] holder, else the card's data-trip-ref, else the
+  // neighbouring trip button. An event is one Favorite whichever of its dates
+  // was saved. A name with no saved item carrying it (a favourite from before
+  // ids) still matches by name; /favorites asks which one.
+  var SAVED_KEY = 'okanaganSaved';
+  function readSaved(){
+    try { var s = JSON.parse(window.localStorage.getItem(SAVED_KEY) || 'null'); if (s && s.v === 1 && Array.isArray(s.items)) return s; } catch (e) {}
+    return { v: 1, items: [] };
+  }
+  var savedList = readSaved();
+  function favItemOf(btn){
+    var h = btn.closest('[data-venue-id]'), id = h ? h.getAttribute('data-venue-id') || '' : '', m = /^event-([1-9][0-9]*)$/.exec(id);
+    if (m) {
+      var occ = h.getAttribute('data-occurrence-id');
+      return { k: 'event', id: Number(m[1]), occ: /^[1-9][0-9]*$/.test(occ || '') ? Number(occ) : null, date: h.getAttribute('data-occurrence-date') || null, time: h.getAttribute('data-occurrence-time') || null };
+    }
+    if (/^[1-9][0-9]*$/.test(id)) return { k: 'venue', id: Number(id) };
+    var c = btn.closest('[data-trip-ref]'), row = btn.parentNode;
+    var tb = row && row.querySelector ? row.querySelector('.trip-btn[data-trip-ref]') : null;
+    var r = /^(venue|event):([1-9][0-9]*)$/.exec((c && c.getAttribute('data-trip-ref')) || (tb && tb.getAttribute('data-trip-ref')) || '');
+    if (!r) return null;
+    return r[1] === 'venue' ? { k: 'venue', id: Number(r[2]) } : { k: 'event', id: Number(r[2]), occ: null, date: null, time: null };
+  }
+  function sameFav(x, item){ return !!x && x.k === item.k && x.id === item.id; }
+  function carried(name){ return savedList.items.some(function(x){ return x && x.name === name; }); }
+  function isFavorite(name, item){
+    if (!item) return favorites.has(name);
+    if (savedList.items.some(function(x){ return sameFav(x, item); })) return true;
+    return favorites.has(name) && !carried(name);
+  }
+  function favoriteCount(){
+    var seen = {}, n = 0;
+    savedList.items.forEach(function(x){ if (x && (x.k === 'venue' || x.k === 'event') && !seen[x.k + x.id]) { seen[x.k + x.id] = 1; n++; } });
+    favorites.forEach(function(name){ if (!carried(name)) n++; });
+    return n;
+  }
+
   var HEART_OUTLINE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
   var HEART_FILLED = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
 
   function syncButtons(){
     document.querySelectorAll('.fav-btn').forEach(function(btn){
-      var isFav = favorites.has(btn.dataset.favName);
+      var isFav = isFavorite(btn.dataset.favName, favItemOf(btn));
       btn.classList.toggle('is-fav', isFav);
       btn.innerHTML = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? t('card.favorited') : t('card.favorite'));
 
       var card = btn.closest('.venue-card, .featured-card');
       if (card) card.dataset.favorite = isFav ? '1' : '0';
     });
-    if (countEl) countEl.textContent = favorites.size;
+    if (countEl) countEl.textContent = favoriteCount();
   }
 
-  function toggleFavorite(name){
-    if (favorites.has(name)) {
-      favorites.delete(name);
+  function toggleFavorite(name, item){
+    // Both lists as they are now (/favorites or another tab may have changed them).
+    try { var l = JSON.parse(window.localStorage.getItem('okanaganFavorites') || '[]'); if (Array.isArray(l)) favorites = new Set(l); } catch (e) {}
+    savedList = readSaved();
+    var savedChanged = false;
+    if (isFavorite(name, item)) {
+      if (item && savedList.items.some(function(x){ return sameFav(x, item); })) {
+        // This place / event only: its twin with the same name keeps the name.
+        savedList.items = savedList.items.filter(function(x){ return !sameFav(x, item); });
+        savedChanged = true;
+        if (!carried(name)) favorites.delete(name);
+      } else {
+        favorites.delete(name);
+      }
       if (window.trackEvent) window.trackEvent('remove_from_favorites', { venue_name: name });
     } else {
       favorites.add(name);
+      if (item) { item.name = name; item.savedAt = new Date().toISOString(); savedList.items.push(item); savedChanged = true; }
       if (window.trackEvent) window.trackEvent('add_to_favorites', { venue_name: name });
     }
     save();
+    if (savedChanged) { try { window.localStorage.setItem(SAVED_KEY, JSON.stringify(savedList)); } catch (e) {} }
     syncButtons();
     if (window.__applyFilters) window.__applyFilters();
   }
@@ -3507,7 +3563,7 @@ window.__scrollToVenueCard = function(name){
   document.addEventListener('click', function(e){
     var favBtn = e.target.closest('.fav-btn');
     if (!favBtn) return;
-    toggleFavorite(favBtn.dataset.favName);
+    toggleFavorite(favBtn.dataset.favName, favItemOf(favBtn));
   });
 
   syncButtons();
