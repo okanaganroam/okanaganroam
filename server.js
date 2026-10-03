@@ -16017,9 +16017,16 @@ body.page-browse #venueGrid .card-links a:focus-visible,
 body.page-browse #venueGrid .trip-btn:focus-visible,
 body.page-browse #venueGrid .fav-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
-/* ---- Grid: four columns where cards stay at least ~320px wide ---- */
-@media (min-width: 1440px) {
-  body.page-browse #venueGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+/* ---- Above phone width: compact badge chips, actions sized to their labels ----
+   The grid keeps app.css's three columns at every desktop width: the results
+   container stops at 1360px, so four columns would mean ~324px cards at any
+   screen size, too narrow for text chips. Buttons take their natural width so
+   a longer label (e.g. French) never wraps; phones keep the equal split. */
+@media (min-width: 561px) {
+  body.page-browse #venueGrid .badge-row { gap: 4px; }
+  body.page-browse #venueGrid .badge { min-height: 20px; padding: 1px 7px; font-size: 0.68rem; line-height: 1.3; }
+  body.page-browse #venueGrid .trip-fav-row > .trip-btn,
+  body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 0 0 auto; }
 }
 
 /* ---- Phones ---- */
