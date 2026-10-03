@@ -296,6 +296,16 @@ function renderStyles() {
   .t3-empty { background: #fff; border-radius: 14px; padding: 16px 18px; font-size: 0.92rem; }
   .t3-section-title { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 22px 0 12px; color: var(--ref-navy); }
   .t3-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  /* Cards in a grid row line up: badges, details and buttons start at the same
+     height whatever the title length or badge count. Without subgrid support
+     the card is a column with its buttons pinned to the bottom instead. */
+  .t3-card { display: flex; flex-direction: column; }
+  .t3-card .t3-actions { margin-top: auto; }
+  @supports (grid-template-rows: subgrid) {
+    .t3-grid { row-gap: 0; }
+    .t3-grid > .t3-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; margin-bottom: 14px; align-content: start; }
+    .t3-grid > .t3-card .t3-actions { margin-top: 0; align-self: end; }
+  }
   .t3-seeall { display: inline-block; margin-top: 18px; font-weight: 800; color: var(--ref-navy); }
 
   /* Whole-trip map (Stage 5G): collapsed until opened. The canvas is its own
@@ -698,14 +708,21 @@ function renderScript(d) {
     var cav = (stop.caveats || []).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
     var same = counts[v.name] > 1;
     var html = '<article class="t3-card' + (kept ? ' is-kept' : '') + '" data-venue-id="' + esc(v.id) + '">'
+      // Four groups (head / tags / body / actions) so that cards in the same
+      // grid row can share row tracks (see .t3-grid) and line up. Each group
+      // is always present, empty or not.
+      + '<div class="t3-card-head">'
       + '<div class="t3-card-top"><span>' + esc(v.typeLabel) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a href="' + esc(url) + '">' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
       + factsLine(v)
-      + badgesHtml(v)
+      + '</div>'
+      + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
+      + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + ' <span class="t3-sr">(</span>— check before you go<span class="t3-sr">)</span></p>' : '')
       + (why ? '<ul class="t3-why" aria-label="Why it fits">' + why + '</ul>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="Good to know">' + cav + '</ul>' : '')
+      + '</div>'
       + '<div class="t3-actions">'
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + '>Add to trip</button>'
       + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>';
