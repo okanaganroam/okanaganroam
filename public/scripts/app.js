@@ -803,16 +803,28 @@ function checkHoursWindow(open, close, currentMinutes, isYesterday){
   return null;
 }
 
+// One formatter for every call: its options never change, and creating a new
+// one per card was about a quarter of /browse's initial render (F4a,
+// 2026-10-03). Created on first use, so the output -- and where an error
+// would surface -- are exactly as before.
+var openStatusFormatter = null;
+function getOpenStatusFormatter(){
+  if (!openStatusFormatter) {
+    openStatusFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Vancouver',
+      weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false
+    });
+  }
+  return openStatusFormatter;
+}
+
 function computeOpenStatus(hoursJson, testDate){
   if (!hoursJson) return null;
   var hours;
   try { hours = JSON.parse(hoursJson); } catch (e) { return null; }
 
   var now = testDate || new Date();
-  var parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Vancouver',
-    weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(now);
+  var parts = getOpenStatusFormatter().formatToParts(now);
 
   var map = {};
   parts.forEach(function(p){ map[p.type] = p.value; });

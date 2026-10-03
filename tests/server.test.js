@@ -9672,7 +9672,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // ref (Trip half of W07) -- the four contained areas of the Stage 5C plan.
   // Approved W14 change (2026-10-01): Undo for the tray's ✕ (tray module only).
   // Approved Stage 5E change (2026-10-01): Favorites by place / event id (Favorites module only).
-  assert.equal(md5('public/scripts/app.js'), '24ae2e487942f753816241591de4985e', 'public/scripts/app.js (Stage 5E: Same-name Favorites, 2026-10-01)');
+  // Approved /browse performance change F4a: one open-status date formatter (computeOpenStatus only), 2026-10-03.
+  assert.equal(md5('public/scripts/app.js'), '06dc20f253065cf6b4593ca6063801d8', 'public/scripts/app.js (F4a: one open-status formatter, 2026-10-03)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -11382,8 +11383,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41'); // SEO-2 (2026-10-02) descriptions
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
-  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id.
-  assert.equal(md5('public/scripts/app.js'), '24ae2e487942f753816241591de4985e');
+  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter.
+  assert.equal(md5('public/scripts/app.js'), '06dc20f253065cf6b4593ca6063801d8');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
