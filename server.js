@@ -8731,6 +8731,53 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
   var MORE = 'Read more \\u2192', LESS = 'Read less \\u2191';
   function isTruncated(p){ return p.scrollHeight > p.clientHeight + 1; }
+  // Mobile performance (2026-10-03): asking whether a clamped description
+  // overflows makes the browser lay out its full text, so doing it for every
+  // card at load froze large hubs for seconds on phones. As on /browse
+  // (Stage 3.4.1), the clamp is applied at once but each description is
+  // measured when its card comes within 400px of the viewport; the rest are
+  // then measured in the background in ~8ms slices (never a long task), so a
+  // card reached by a fast scroll or a jump is normally already measured and
+  // its Read more never pops in under the reader. A card hidden by a filter
+  // is left until it is shown. Its Read more stays hidden, as served, until
+  // measured. Within one batch every height is read before any button
+  // changes, so a batch costs one layout.
+  var pending = [], drainTimer = null, scrollWatching = false;
+  function measure(list){
+    list = list.filter(function(x){ return !x.measured; });
+    var over = list.map(function(x){ return isTruncated(x.p); });
+    list.forEach(function(x, i){ x.measured = true; x.btn.hidden = !over[i]; if (measureIo) measureIo.unobserve(x.card); });
+  }
+  var measureIo = ('IntersectionObserver' in window) ? new IntersectionObserver(function(entries){
+    var due = [];
+    entries.forEach(function(en){
+      var x = en.target.__ogReadMore;
+      if (en.isIntersecting && x && due.indexOf(x) === -1) due.push(x);
+    });
+    measure(due);
+  }, { rootMargin: '400px 0px' }) : null;
+  function drain(){
+    drainTimer = null;
+    var start = Date.now(), batch = [], over = [];
+    while (pending.length && Date.now() - start < 8) {
+      var x = pending.shift();
+      x.queued = false;
+      // Hidden by a filter (or not in the page): measured when shown instead.
+      if (x.measured || x.card.offsetParent === null) continue;
+      batch.push(x); over.push(isTruncated(x.p));
+    }
+    batch.forEach(function(x, i){ x.measured = true; x.btn.hidden = !over[i]; measureIo.unobserve(x.card); });
+    if (pending.length) drainTimer = setTimeout(drain, 16); else stopScrollWatch();
+  }
+  function watch(x){
+    if (!measureIo) { measure([x]); return; }
+    x.measured = false;
+    x.card.__ogReadMore = x;
+    measureIo.observe(x.card);
+    if (!x.queued) { x.queued = true; pending.push(x); }
+    if (!drainTimer) drainTimer = setTimeout(drain, 300);
+    startScrollWatch();
+  }
   function setup(card){
     var desc = card.querySelector('.golf-desc');
     var btn = card.querySelector('.desc-toggle');
@@ -8738,7 +8785,7 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
     var p = desc.querySelector('p');
     if (!p) return;
     desc.classList.add('is-clamped');
-    btn.hidden = !isTruncated(p);
+    var x = { card: card, btn: btn, p: p };
     btn.addEventListener('click', function(){
       var expanded = btn.getAttribute('aria-expanded') === 'true';
       desc.classList.toggle('is-clamped', expanded);
@@ -8748,10 +8795,41 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
     });
     card._golfRecheck = function(){
       if (btn.getAttribute('aria-expanded') === 'true') return;
-      btn.hidden = !isTruncated(p);
+      watch(x);
     };
+    watch(x);
   }
   cards.forEach(setup);
+  // These cards are wired now, so __ogWireVenueCards (below) must never wire
+  // them again when a filter re-inserts one: that added a second Read more
+  // listener (one tap expanded and collapsed it) and re-observed impressions.
+  cards.forEach(function(card){ card.__ogWired = true; });
+  // Cards already on screen are measured now, in the same task as their clamp,
+  // so the clamp and Read more appear together (no second shift). Until the
+  // background pass has measured every shown card, a passive scroll listener
+  // measures cards entering the screen -- scroll events run before the browser
+  // draws the frame, so a jump or fast scroll never shows a card whose Read
+  // more then pops in. It detaches when the pass is done.
+  function onScreen(){
+    var h = window.innerHeight || document.documentElement.clientHeight;
+    return pending.filter(function(x){
+      if (x.measured || x.card.offsetParent === null) return false;
+      var r = x.card.getBoundingClientRect();
+      return r.bottom > 0 && r.top < h;
+    });
+  }
+  function measureOnScreen(){ measure(onScreen()); }
+  function startScrollWatch(){
+    if (scrollWatching) return;
+    scrollWatching = true;
+    window.addEventListener('scroll', measureOnScreen, { passive: true });
+  }
+  function stopScrollWatch(){
+    if (!scrollWatching) return;
+    scrollWatching = false;
+    window.removeEventListener('scroll', measureOnScreen, { passive: true });
+  }
+  if (measureIo) measureOnScreen();
   var resizeTimer;
   window.addEventListener('resize', function(){
     clearTimeout(resizeTimer);
@@ -13452,12 +13530,62 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   readUrlIntoChips(); openGroupsForSelection(); apply('replace');
   // Description clamp / Read more for event cards (same behaviour as the themed venue cards).
   var MORE = 'Read more \\u2192', LESS = 'Read less \\u2191';
+  // Measured when a card comes within 400px of the viewport, the rest in the
+  // background in ~8ms slices; a card hidden by a filter is measured when
+  // shown. One batch of reads before any writes -- the same mobile
+  // performance fix as the themed venue cards (2026-10-03).
+  var readMorePending = [], readMoreTimer = null, readMoreScrolling = false;
+  function readMoreOver(x){ return x.p.scrollHeight > x.p.clientHeight + 1; }
+  function readMoreMeasure(list){
+    list = list.filter(function(x){ return !x.measured; });
+    var over = list.map(readMoreOver);
+    list.forEach(function(x, i){ x.measured = true; x.btn.hidden = !over[i]; if (readMoreIo) readMoreIo.unobserve(x.card); });
+  }
+  var readMoreIo = ('IntersectionObserver' in window) ? new IntersectionObserver(function(entries){
+    var due = [];
+    entries.forEach(function(en){
+      var x = en.target.__readMore;
+      if (en.isIntersecting && x && due.indexOf(x) === -1) due.push(x);
+    });
+    readMoreMeasure(due);
+  }, { rootMargin: '400px 0px' }) : null;
+  function readMoreDrain(){
+    readMoreTimer = null;
+    var start = Date.now(), batch = [], over = [];
+    while (readMorePending.length && Date.now() - start < 8) {
+      var x = readMorePending.shift();
+      if (x.measured || x.card.offsetParent === null) continue;
+      batch.push(x); over.push(readMoreOver(x));
+    }
+    batch.forEach(function(x, i){ x.measured = true; x.btn.hidden = !over[i]; readMoreIo.unobserve(x.card); });
+    if (readMorePending.length) readMoreTimer = setTimeout(readMoreDrain, 16);
+    else if (readMoreScrolling) { readMoreScrolling = false; window.removeEventListener('scroll', readMoreOnScreen, { passive: true }); }
+  }
   cards.forEach(function(card){
     var desc = card.querySelector('.golf-desc'), btn = card.querySelector('.desc-toggle'); if (!desc || !btn) return;
     var p = desc.querySelector('p'); if (!p) return;
-    desc.classList.add('is-clamped'); btn.hidden = !(p.scrollHeight > p.clientHeight + 1);
+    desc.classList.add('is-clamped');
+    var x = { card: card, btn: btn, p: p, measured: false };
+    if (readMoreIo) { card.__readMore = x; readMoreIo.observe(card); readMorePending.push(x); } else readMoreMeasure([x]);
     btn.addEventListener('click', function(){ var expanded = btn.getAttribute('aria-expanded') === 'true'; desc.classList.toggle('is-clamped', expanded); btn.setAttribute('aria-expanded', expanded ? 'false' : 'true'); btn.textContent = expanded ? MORE : LESS; });
   });
+  // Cards already on screen are measured now (clamp and Read more together);
+  // until the background pass is done, a passive scroll listener measures cards
+  // entering the screen before the frame is drawn, then detaches.
+  function readMoreOnScreen(){
+    var h = window.innerHeight || document.documentElement.clientHeight;
+    readMoreMeasure(readMorePending.filter(function(x){
+      if (x.measured || x.card.offsetParent === null) return false;
+      var r = x.card.getBoundingClientRect();
+      return r.bottom > 0 && r.top < h;
+    }));
+  }
+  if (readMorePending.length) {
+    readMoreOnScreen();
+    readMoreTimer = setTimeout(readMoreDrain, 300);
+    readMoreScrolling = true;
+    window.addEventListener('scroll', readMoreOnScreen, { passive: true });
+  }
 })();
 </script>`;
 }
