@@ -1411,7 +1411,12 @@ function initBlock4(){
     }
 
     if (value === 'rating-desc'){
-      cards.sort(function(a, b){ return getRating(b) - getRating(a); });
+      // Each card's rating is read once per sort instead of twice per
+      // comparison (thousands of DOM queries for 1,411 cards; F5,
+      // 2026-10-03). Same ratings, same comparator, same stable order.
+      var ratings = new Map();
+      cards.forEach(function(card){ ratings.set(card, getRating(card)); });
+      cards.sort(function(a, b){ return ratings.get(b) - ratings.get(a); });
     } else if (value === 'name-asc'){
       cards.sort(function(a, b){
         return (a.dataset.name || '').localeCompare(b.dataset.name || '');

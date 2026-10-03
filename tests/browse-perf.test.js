@@ -129,3 +129,124 @@ test('F4a: the formatter is created once, on first use, and reused for every car
   ctx.previousComputeOpenStatus(HOURS[0], DATES[0]);
   assert.equal(counter.constructed, 2, '(the previous code built one per call)');
 });
+
+// ---- F5: /browse sort reads each card's rating once --------------------------
+// "Highest rated" re-read both cards' ratings from the DOM on every comparison
+// (thousands of querySelectorAll calls for 1,411 cards). Ratings are now read
+// once per sort; the comparator and the (stable) sort are unchanged.
+
+const SORT_JS = slice('/* ---------- Sort ---------- */', '/* ---------- List Your Venue form');
+
+// The previous initBlock4, verbatim apart from its name.
+const PREVIOUS_SORT = `function previousInitBlock4(){
+  var sortSelect = document.getElementById('sortSelect');
+  var grid = document.getElementById('venueGrid');
+  if (!sortSelect || !grid) return;
+
+  // Preserve the original DOM order so "Featured order" can restore it exactly.
+  var originalOrder = Array.prototype.slice.call(grid.children);
+
+  function getRating(card){
+    var spans = card.querySelectorAll('.venue-region .mono');
+    for (var i = 0; i < spans.length; i++){
+      var text = spans[i].textContent || '';
+      if (text.indexOf('★') !== -1){
+        var match = text.match(/([\\d.]+)/);
+        if (match) return parseFloat(match[1]);
+      }
+    }
+    return -1; // unrated cards sort last
+  }
+
+  function applySort(){
+    var value = sortSelect.value;
+    var cards = Array.prototype.slice.call(grid.children);
+
+    if (value === 'default'){
+      originalOrder.forEach(function(card){ grid.appendChild(card); });
+      return;
+    }
+
+    if (value === 'rating-desc'){
+      cards.sort(function(a, b){ return getRating(b) - getRating(a); });
+    } else if (value === 'name-asc'){
+      cards.sort(function(a, b){
+        return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+      });
+    }
+
+    cards.forEach(function(card){ grid.appendChild(card); });
+  }
+
+  sortSelect.addEventListener('change', applySort);
+}`;
+
+// Cards: rated (with ties), unrated, a cuisine span before the star, a star
+// with no number, a malformed number, duplicate names and missing names.
+function makeCards(n, seed, { unreadable = true } = {}) {
+  let s = seed;
+  const rnd = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const names = ['Ailm Estate', 'BNA Brewing', 'Rotary Beach Park', 'Sandhill Wines', 'Antico Pizza', 'Waterfront Wines', 'Micro Bar', ''];
+  return Array.from({ length: n }, (_, i) => {
+    let kind = Math.floor(rnd() * 10);
+    if (!unreadable && kind === 3) kind = 5;
+    const rating = (Math.round((3 + rnd() * 2) * 10) / 10).toFixed(1);
+    const spans = kind === 0 ? [] // unrated
+      : kind === 1 ? [{ textContent: 'Italian' }, { textContent: `★ ${rating}` }] // cuisine first
+      : kind === 2 ? [{ textContent: '★ ' }] // star, no number
+      : kind === 3 ? [{ textContent: '★ .' }] // parses to NaN
+      : [{ textContent: `★ ${kind === 4 ? '4.5' : rating}` }]; // many ties at 4.5
+    return { id: i, spans, dataset: { name: names[Math.floor(rnd() * names.length)] + (rnd() < 0.5 ? '' : ' ' + i) } };
+  });
+}
+function sortHarness(fnName, cards) {
+  let queries = 0, handler = null;
+  const grid = { children: [] };
+  grid.appendChild = (c) => { const i = grid.children.indexOf(c); if (i !== -1) grid.children.splice(i, 1); grid.children.push(c); };
+  const select = { value: 'default', addEventListener: (type, fn) => { if (type === 'change') handler = fn; } };
+  for (const c of cards) grid.appendChild({ id: c.id, dataset: c.dataset, querySelectorAll: (sel) => { assert.equal(sel, '.venue-region .mono'); queries++; return c.spans; } });
+  const ctx = vm.createContext({ document: { getElementById: (id) => ({ sortSelect: select, venueGrid: grid })[id] || null }, Map, parseFloat });
+  vm.runInContext(`${SORT_JS}\n${PREVIOUS_SORT}\n${fnName}();`, ctx);
+  return { order: () => grid.children.map((c) => c.id), choose: (v) => { select.value = v; handler(); }, queries: () => queries, reset: () => { queries = 0; } };
+}
+
+test('F5: every sort option, in any sequence, gives exactly the previous order', () => {
+  for (const [n, seed] of [[1411, 7], [200, 42], [37, 3], [2, 1], [1, 9], [0, 5]]) {
+    const now = sortHarness('initBlock4', makeCards(n, seed));
+    const before = sortHarness('previousInitBlock4', makeCards(n, seed));
+    assert.deepEqual(now.order(), before.order(), `${n}: same starting order`);
+    for (const v of ['rating-desc', 'name-asc', 'rating-desc', 'default', 'rating-desc', 'rating-desc', 'name-asc', 'default', 'unknown-value', 'default']) {
+      now.choose(v); before.choose(v);
+      assert.deepEqual(now.order(), before.order(), `${n} cards, seed ${seed}, after "${v}"`);
+    }
+  }
+});
+
+// (A star with an unreadable number parses to NaN, which the comparator
+// treats as equal to everything -- so, as before, such a card makes the order
+// only partly sorted. The equivalence test above covers that case; this one
+// uses readable ratings.)
+test('F5: highest rated -- best first, unrated last, Featured restores the original order', () => {
+  const h = sortHarness('initBlock4', makeCards(300, 11, { unreadable: false }));
+  const cards = makeCards(300, 11, { unreadable: false });
+  h.choose('rating-desc');
+  const rating = (c) => { for (const sp of c.spans) if (sp.textContent.includes('★')) { const m = sp.textContent.match(/([\d.]+)/); if (m) return parseFloat(m[1]); } return -1; };
+  const sorted = h.order().map((id) => cards[id]);
+  const numbers = sorted.map(rating);
+  assert.ok(numbers.every((r) => !Number.isNaN(r)));
+  for (let i = 1; i < numbers.length; i++) assert.ok(numbers[i - 1] >= numbers[i], `position ${i}: ${numbers[i - 1]} then ${numbers[i]}`);
+  assert.equal(numbers[numbers.length - 1], -1, 'unrated cards are last');
+  h.choose('default');
+  assert.deepEqual(h.order(), cards.map((c) => c.id), '"Featured order" restores the original order exactly');
+});
+
+test('F5: ratings are read once per card per sort (previously twice per comparison)', () => {
+  const now = sortHarness('initBlock4', makeCards(1411, 7));
+  const before = sortHarness('previousInitBlock4', makeCards(1411, 7));
+  now.reset(); before.reset();
+  now.choose('rating-desc'); before.choose('rating-desc');
+  assert.equal(now.queries(), 1411, 'one rating read per card');
+  assert.ok(before.queries() > 5 * 1411, `the previous code read ${before.queries()} times`);
+  now.reset(); now.choose('name-asc'); now.choose('default');
+  assert.equal(now.queries(), 0, 'A-Z and Featured order read no ratings');
+});
