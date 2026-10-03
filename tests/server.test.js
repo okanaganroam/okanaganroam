@@ -14262,6 +14262,31 @@ for (const flag of ['on', undefined]) {
   })));
 }
 
+// ---- Directory redesign, Phase 2 (2026-10-04) ----------------------------------
+// The card hierarchy is built on app.js's existing markup with CSS only: text
+// badges come from each badge's own aria-label, the hidden phone placeholder is
+// dropped, and nothing reorders or re-displays elements (focus order and the
+// JS hooks see the same DOM). app.js and okanagan.html stay pinned above.
+// Revised after review: compact chips and natural-width actions above phone
+// width, and no four-column grid (cards would be ~324px wide at any width).
+test('Directory Phase 2: card hierarchy is CSS only, on the existing card markup', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const browse = await (await fetch(`${base}/browse`)).text();
+  const start = browse.indexOf('<style id="browse-directory-styles">');
+  const css = browse.slice(start, browse.indexOf('</style>', start)).replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(css, /body\.page-browse #venueGrid \.badge::after \{ content: attr\(aria-label\); \}/, 'badge text is the existing aria-label');
+  assert.match(css, /body\.page-browse #venueGrid \.badge > svg,\s*body\.page-browse #venueGrid \.badge > \.badge-text-icon \{ display: none; \}/, 'icons give way to the text');
+  assert.match(css, /body\.page-browse #venueGrid \.card-links \.phone-link\[aria-hidden="true"\] \{ display: none; \}/, 'only the hidden placeholder is dropped');
+  assert.match(css, /body\.page-browse #venueGrid \.trip-fav-row > \.trip-btn,\s*body\.page-browse #venueGrid \.trip-fav-row > \.fav-btn \{ flex: 1 1 0;/, 'Add to Trip and Favorite share the action row');
+  // Above phone width the chips are compact and the buttons take their natural
+  // width, so a longer (French) label never wraps; the grid stays three columns.
+  const wide = (css.match(/@media \(min-width: 561px\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+  assert.match(wide, /\.badge \{ min-height: 20px; padding: 1px 7px; font-size: 0\.68rem;/, 'compact chips above phone width');
+  assert.match(wide, /\.trip-fav-row > \.trip-btn,\s*body\.page-browse #venueGrid \.trip-fav-row > \.fav-btn \{ flex: 0 0 auto; \}/, 'natural-width actions above phone width');
+  assert.ok(!/grid-template-columns/.test(css), 'column count left to app.css');
+  assert.ok(!/(^|[;{\s])order\s*:|display:\s*contents|visibility:\s*hidden/.test(css), 'no reordering, no display:contents, nothing visibly hidden');
+  assert.ok(!/\.(directions|menu|booking)-link[^{]*\{[^}]*display:\s*none/.test(css), 'utility links stay visible');
+})));
+
 // ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
 // okanaganFavorites (names) is untouched; pages with Favorite controls also
 // carry a small capture script that records WHICH item was saved
