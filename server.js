@@ -15867,6 +15867,87 @@ function renderBrowsePrefillScript(discoveryParams = false) {
 </script>`;
 }
 
+// Hero search loading state (2026-10-03): /browse builds every venue card in
+// the browser before renderBrowsePrefillScript() can apply the visitor's
+// search, which can take seconds on a phone. When the URL carries a query that
+// script will apply, the served HTML already shows it: the search box holds
+// the typed text, and #directory is marked loading (wizard step 1, its
+// progress dots and the results heading hidden; a short "Finding ..." note with
+// a spinner shown). The results section keeps its place but stays invisible
+// (at least a screen tall) until then, so neither the results arriving nor
+// app.js collapsing the filter bar after a search moves anything visible.
+// The mark is removed the moment the prefill script finishes
+// (window.__roamPrefillDone), or after a timeout if app.js never initialises.
+// Returns null -- and /browse is byte-identical to before -- for any URL the
+// prefill script would not act on.
+const BROWSE_LOADING_TIMEOUT_MS = 10000;
+function browseLoadingState(query, discoveryParams = false) {
+  const first = (v) => (Array.isArray(v) ? v[0] : v);
+  const q = first(query.q);
+  const types = first(query.types);
+  const regions = discoveryParams ? first(query.regions) : undefined;
+  const features = discoveryParams ? first(query.features) : undefined;
+  const has = (v) => typeof v === 'string' && v !== '';
+  if (!has(q) && !has(types) && !has(regions) && !has(features)) return null;
+
+  const listText = (items) => (items.length < 3 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
+  const typed = has(q) ? q.trim().replace(/\s+/g, ' ') : '';
+  const typeLabels = has(types) ? types.split(',').filter((t) => CATEGORY_LABELS[t]).map((t) => CATEGORY_LABELS[t].plural.toLowerCase()) : [];
+  const regionLabels = has(regions) ? regions.split(',').filter((r) => REGION_LABELS[r]).map((r) => REGION_LABELS[r]) : [];
+  const what = typed ? (typed.length > 60 ? `${typed.slice(0, 60)}…` : typed) : (typeLabels.length ? listText(typeLabels) : 'places');
+  const message = `Finding ${what}${regionLabels.length ? ` in ${listText(regionLabels)}` : ''}…`;
+
+  const note = `<style>
+.browse-loading-note { display: none; }
+@media (scripting: enabled) {
+  #directory.browse-results-loading #wizardProgress,
+  #directory.browse-results-loading #wizardStep1,
+  #directory.browse-results-loading .results-head { display: none !important; }
+  #directory.browse-results-loading .browse-loading-note { display: flex; align-items: center; gap: 10px; margin: 4px 0 22px; font-weight: 700; color: var(--forest, #1F5C5C); }
+  body:has(#directory.browse-results-loading) section.results { visibility: hidden; min-height: 100vh; }
+}
+.browse-loading-spinner { width: 18px; height: 18px; flex: none; border-radius: 50%; border: 2.5px solid rgba(31, 92, 92, 0.25); border-top-color: currentColor; animation: browse-loading-spin 0.8s linear infinite; }
+@keyframes browse-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .browse-loading-spinner { animation: none; } }
+</style>
+<p class="browse-loading-note" role="status" aria-live="polite"><span class="browse-loading-spinner" aria-hidden="true"></span><span>${escapeHtml(message)}</span></p>
+<script>
+(function(){
+  var dir = document.getElementById('directory');
+  if (!dir) return;
+  var cleared = false;
+  function clear(){ if (cleared) return; cleared = true; dir.classList.remove('browse-results-loading'); }
+  var value = window.__roamPrefillDone;
+  if (value) { clear(); return; }
+  try {
+    Object.defineProperty(window, '__roamPrefillDone', {
+      configurable: true, enumerable: true,
+      get: function(){ return value; },
+      set: function(v){ value = v; if (v) clear(); },
+    });
+  } catch (e) {}
+  (function poll(){ if (cleared) return; if (window.__roamPrefillDone) clear(); else setTimeout(poll, 250); })();
+  setTimeout(clear, ${BROWSE_LOADING_TIMEOUT_MS});
+})();
+</script>`;
+  return { message, inputValue: has(q) ? q : null, note };
+}
+
+// Applies browseLoadingState() to the finished /browse HTML; returns the HTML
+// unchanged when there is no state (or a target is missing).
+function applyBrowseLoadingState(html, state) {
+  if (!state) return html;
+  const directoryTag = '<section class="filter-bar" id="directory">';
+  const searchBoxEnd = '<button id="searchBtn">Search</button>\n    </div>\n';
+  const inputTag = '<input type="text" id="searchInput" ';
+  const once = (s) => html.split(s).length === 2;
+  if (!once(directoryTag) || !once(searchBoxEnd) || (state.inputValue !== null && !once(inputTag))) return html;
+  html = html.replace(directoryTag, () => '<section class="filter-bar browse-results-loading" id="directory">');
+  html = html.replace(searchBoxEnd, () => `${searchBoxEnd}\n${state.note}\n`);
+  if (state.inputValue !== null) html = html.replace(inputTag, () => `${inputTag}value="${escapeHtml(state.inputValue)}" `);
+  return html;
+}
+
 // ---------- List Your Venue, Phase 1 (2026-09-25) ----------
 //
 // The public venue submission workflow:
@@ -17539,6 +17620,8 @@ const server = http.createServer(async (req, res) => {
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n${prefillScript}\n</body>`)
           : html + footer + openNowScript + hiddenElementsScript + prefillScript;
+        // Hero search loading state: only for a query the prefill script applies.
+        html = applyBrowseLoadingState(html, browseLoadingState(query, isDiscoverySearchEnabled()));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -19775,6 +19858,9 @@ module.exports = {
   selectDiscoveryEvents,
   runDiscovery,
   renderBrowsePrefillScript,
+  browseLoadingState,
+  applyBrowseLoadingState,
+  BROWSE_LOADING_TIMEOUT_MS,
   BROWSE_FEATURE_CHIP,
   isValidTripRegion,
   isValidTripDays,

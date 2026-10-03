@@ -14124,6 +14124,114 @@ test('Read more (/whats-on): clamped at load, measured near the viewport first, 
   assert.deepEqual(h.events, [], 'event cards still send no Read more events');
 });
 
+// ---- Hero search loading state (2026-10-03) ---------------------------------
+// /browse with a query the prefill script applies is served already showing it:
+// the typed text in the search box, #directory marked loading (wizard step 1,
+// progress dots and results heading hidden) with a "Finding ..." note. Every
+// other /browse URL is byte-identical to before.
+const LOADING_DIRECTORY = '<section class="filter-bar browse-results-loading" id="directory">';
+const PLAIN_DIRECTORY = '<section class="filter-bar" id="directory">';
+// Undo exactly what applyBrowseLoadingState() adds.
+function stripBrowseLoadingState(html) {
+  return html
+    .replace(LOADING_DIRECTORY, PLAIN_DIRECTORY)
+    .replace(/\n<style>\n\.browse-loading-note[\s\S]*?<\/script>\n/, '')
+    .replace(/(<input type="text" id="searchInput" )value="[^"]*" /, '$1');
+}
+
+test('Hero search loading state: the message and when it applies', () => {
+  const s = (query, flag = true) => app.browseLoadingState(query, flag);
+  assert.equal(s({ regions: 'kelowna', q: 'poutine' }).message, 'Finding poutine in Kelowna…');
+  assert.equal(s({ regions: 'kelowna', q: 'poutine' }).inputValue, 'poutine');
+  assert.equal(s({ types: 'winery,brewery' }).message, 'Finding wineries and breweries…');
+  assert.equal(s({ types: 'winery,brewery' }).inputValue, null);
+  assert.equal(s({ regions: 'kelowna,penticton,vernon' }).message, 'Finding places in Kelowna, Penticton and Vernon…');
+  assert.equal(s({ features: 'patio' }).message, 'Finding places…');
+  assert.equal(s({ q: '  late   night  pizza ' }).message, 'Finding late night pizza…');
+  assert.equal(s({ q: 'x'.repeat(80) }).message, `Finding ${'x'.repeat(60)}……`);
+  assert.equal(s({ q: ['first', 'second'] }).inputValue, 'first', 'the first value, as URLSearchParams.get() reads it');
+  assert.equal(s({ regions: 'atlantis', q: 'tacos' }).message, 'Finding tacos…', 'unknown regions are not named');
+  // Nothing the prefill script would act on: no state at all.
+  for (const query of [{}, { q: '' }, { sort: 'rating-desc' }, { openMap: '1' }, { regions: '' }]) assert.equal(s(query), null, JSON.stringify(query));
+  // Discovery search off: the prefill script ignores regions/features, so they never trigger it.
+  assert.equal(s({ regions: 'kelowna' }, false), null);
+  assert.equal(s({ features: 'patio' }, false), null);
+  assert.equal(s({ regions: 'kelowna', q: 'poutine' }, false).message, 'Finding poutine…');
+});
+
+for (const flag of ['on', undefined]) {
+  test(`Hero search loading state: /browse with no query is unchanged; a query only adds the loading state (discovery search ${flag || 'off'})`, () => withDiscoveryFlag(flag, () => withDiscoveryServer(async (base) => {
+    const page = async (p) => (await fetch(`${base}${p}`)).text();
+    const plain = await page('/browse');
+    assert.ok(plain.includes(PLAIN_DIRECTORY));
+    assert.ok(!plain.includes('browse-results-loading') && !plain.includes('browse-loading-note'), 'no loading state without a query');
+    assert.match(plain, /<input type="text" id="searchInput" data-i18n-placeholder=/, 'search box has no value');
+    for (const p of ['/browse?sort=rating-desc', '/browse?q=', ...(flag ? [] : ['/browse?regions=kelowna'])]) {
+      assert.equal(await page(p), plain, `${p}: byte-identical to /browse`);
+    }
+    for (const p of ['/browse?types=restaurant', '/browse?q=fixture&types=restaurant', ...(flag ? ['/browse?regions=kelowna&q=poutine', '/browse?features=patio'] : [])]) {
+      const html = await page(p);
+      assert.equal(html.split(LOADING_DIRECTORY).length, 2, `${p}: #directory marked loading once`);
+      assert.equal(html.split('class="browse-loading-note"').length, 2, `${p}: one loading note`);
+      assert.equal(stripBrowseLoadingState(html), plain, `${p}: nothing else differs from /browse`);
+      // The results section keeps its place but is invisible while loading (no
+      // layout shift when results arrive); only with scripting, like the rest.
+      const loadingCss = html.slice(html.indexOf('@media (scripting: enabled) {'), html.indexOf('.browse-loading-spinner {'));
+      assert.equal(html.split('section.results {').length, 2, `${p}: one results rule`);
+      assert.ok(loadingCss.includes('  body:has(#directory.browse-results-loading) section.results { visibility: hidden; min-height: 100vh; }\n}'), `${p}: results reserved, hidden, inside the scripting block`);
+      assert.ok(!/section\.results \{[^}]*display: none/.test(html), `${p}: results are never display:none (that moves the next section instead)`);
+      // Stage 4.2 head and the prefill script are untouched.
+      assert.ok(html.includes(STAGE42_TITLE) && html.includes(STAGE42_CANONICAL), p);
+      assert.match(html, /<meta property="og:url" content="https:\/\/okanaganroam\.com\/">/, p);
+      assert.ok(html.includes('window.__roamPrefillPending = true;'), `${p}: prefill script still present`);
+    }
+    if (flag) {
+      const html = await page('/browse?regions=kelowna&q=poutine');
+      assert.match(html, /<input type="text" id="searchInput" value="poutine" data-i18n-placeholder=/);
+      assert.match(html, /<p class="browse-loading-note" role="status" aria-live="polite"><span class="browse-loading-spinner" aria-hidden="true"><\/span><span>Finding poutine in Kelowna…<\/span><\/p>/);
+      assert.ok(html.indexOf('class="browse-loading-note"') > html.indexOf('id="searchBtn"') && html.indexOf('class="browse-loading-note"') < html.indexOf('id="wizardProgress"'), 'note sits between the search box and the wizard');
+    }
+  })));
+}
+
+test('Hero search loading state: hostile query text is escaped everywhere it is written', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const hostile = `"><script>alert(1)</script>'<img src=x onerror=alert(2)>`;
+  const html = await (await fetch(`${base}/browse?types=restaurant&q=${encodeURIComponent(hostile)}`)).text();
+  assert.ok(!html.includes('<script>alert(1)') && !html.includes('<img src=x'), 'no raw markup from the query');
+  const escaped = '&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;&#39;&lt;img src=x onerror=alert(2)&gt;';
+  assert.ok(html.includes(`<input type="text" id="searchInput" value="${escaped}" `), 'input value escaped');
+  assert.ok(html.includes(`<span>Finding ${escaped}…</span>`), 'loading note escaped');
+})));
+
+test('Hero search loading state: the loading mark is removed when the prefill finishes, or by the timeout', () => {
+  const note = app.browseLoadingState({ q: 'poutine' }).note;
+  const script = /<script>\n([\s\S]*?)<\/script>/.exec(note)[1];
+  const run = (preset) => {
+    const removed = []; const timers = [];
+    const dir = { classList: { remove: (c) => removed.push(c) } };
+    const ctx = { document: { getElementById: (id) => (id === 'directory' ? dir : null) }, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; } };
+    ctx.window = ctx;
+    if (preset) ctx.__roamPrefillDone = true;
+    vm.createContext(ctx);
+    vm.runInContext(script, ctx);
+    return { ctx, removed, timers };
+  };
+  // The prefill script's own `window.__roamPrefillDone = true` clears it at once.
+  const a = run(false);
+  assert.deepEqual(a.removed, []);
+  vm.runInContext('window.__roamPrefillDone = true;', a.ctx);
+  assert.deepEqual(a.removed, ['browse-results-loading']);
+  assert.equal(vm.runInContext('window.__roamPrefillDone', a.ctx), true, 'the flag still reads back for the other scripts');
+  // Already finished before this script ran: cleared immediately.
+  assert.deepEqual(run(true).removed, ['browse-results-loading']);
+  // app.js never initialises: the timeout clears it, once.
+  const c = run(false);
+  const timeout = c.timers.find((t) => t.ms === app.BROWSE_LOADING_TIMEOUT_MS);
+  assert.ok(timeout, 'a timeout fallback is scheduled');
+  timeout.fn(); timeout.fn();
+  assert.deepEqual(c.removed, ['browse-results-loading']);
+});
+
 // ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
 // okanaganFavorites (names) is untouched; pages with Favorite controls also
 // carry a small capture script that records WHICH item was saved
