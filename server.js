@@ -15956,6 +15956,13 @@ function applyBrowseLoadingState(html, state) {
 // Read-more button are deliberately not styled here (their clamp and
 // measurement belong to the Read-more script), and the card keeps app.css's
 // content-visibility / contain-intrinsic-size.
+//
+// Phase 2 (2026-10-04): the card hierarchy -- type eyebrow, name, meta line,
+// description, text badges, subordinate links, then Add to Trip / Favorite --
+// is achieved on the existing app.js markup, still CSS only. Badges show their
+// existing aria-label as text (::after), so they follow the language switch;
+// the hidden phone placeholder is dropped. No CSS order on interactive
+// elements, so focus order still matches the visual order.
 function renderBrowseDirectoryStyles() {
   return `<style id="browse-directory-styles">
 /* ---- Search, filters, sort, result count, empty state ---- */
@@ -15975,7 +15982,7 @@ body.page-browse #noResults.show { max-width: 560px; margin: 8px auto 48px; padd
 /* ---- Cards ---- */
 body.page-browse #venueGrid .venue-card { display: flex; flex-direction: column; border: 1px solid rgba(27,43,58,0.08); box-shadow: 0 12px 26px -22px rgba(27,43,58,0.55); }
 body.page-browse #venueGrid .venue-top { padding-bottom: 6px; }
-body.page-browse #venueGrid .venue-type { font-size: 0.68rem; letter-spacing: 0.08em; padding: 3px 9px; border-radius: 999px; margin-bottom: 10px; }
+body.page-browse #venueGrid .venue-type { font-size: 0.7rem; letter-spacing: 0.1em; padding: 0; border-radius: 0; background: none; margin-bottom: 6px; }
 body.page-browse #venueGrid .venue-region { color: rgba(42,32,25,0.72); }
 body.page-browse #venueGrid .venue-region .rating-hover-link { color: #9A6B00 !important; }
 body.page-browse #venueGrid .venue-region .review-count { color: rgba(42,32,25,0.55); }
@@ -15983,15 +15990,23 @@ body.page-browse #venueGrid .open-status { display: inline-block; padding: 0 8px
 body.page-browse #venueGrid .open-status-open { background: rgba(42,122,79,0.12); }
 body.page-browse #venueGrid .open-status-closing-soon { background: rgba(184,134,11,0.14); color: #8A631F; }
 body.page-browse #venueGrid .open-status-closed { background: rgba(42,32,25,0.07); color: rgba(42,32,25,0.62); }
-body.page-browse #venueGrid .badge-row { min-height: 0; padding: 10px 22px 6px; gap: 6px; }
-body.page-browse #venueGrid .badge { width: 30px; height: 30px; background: rgba(42,107,103,0.08); border-color: rgba(42,107,103,0.22); color: var(--teal-deep, #1F5C5C); }
+body.page-browse #venueGrid .badge-row { min-height: 0; padding: 12px 22px 4px; gap: 5px; }
+body.page-browse #venueGrid .badge-row:empty { display: none; }
+body.page-browse #venueGrid .badge { width: auto; height: auto; min-height: 24px; padding: 2px 9px; border-radius: 999px; background: rgba(42,107,103,0.08); border-color: rgba(42,107,103,0.22); color: var(--teal-deep, #1F5C5C); font-size: 0.72rem; font-weight: 700; line-height: 1.3; }
+body.page-browse #venueGrid .badge > svg,
+body.page-browse #venueGrid .badge > .badge-text-icon { display: none; }
+body.page-browse #venueGrid .badge::after { content: attr(aria-label); }
 body.page-browse #venueGrid .venue-card > button { align-self: flex-start; }
 body.page-browse #venueGrid .card-links { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: auto 22px 20px; padding-top: 10px; }
 body.page-browse #venueGrid .card-links .directions-link,
 body.page-browse #venueGrid .card-links .menu-link,
 body.page-browse #venueGrid .card-links .booking-link,
-body.page-browse #venueGrid .card-links .phone-link { color: var(--ref-navy); font-size: 0.8rem; }
+body.page-browse #venueGrid .card-links .phone-link { color: rgba(27,43,58,0.74); font-size: 0.78rem; }
+body.page-browse #venueGrid .card-links a:hover { color: var(--ref-navy); }
+body.page-browse #venueGrid .card-links .phone-link[aria-hidden="true"] { display: none; }
 body.page-browse #venueGrid .trip-fav-row { flex-basis: 100%; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid rgba(27,43,58,0.08); }
+body.page-browse #venueGrid .trip-fav-row > .trip-btn,
+body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 1 1 0; justify-content: center; }
 body.page-browse #venueGrid .trip-btn { background: var(--ref-navy); color: #fff; min-height: 38px; padding: 8px 16px; font-size: 0.84rem; }
 body.page-browse #venueGrid .trip-btn:hover { background: var(--ref-navy-deep, #142230); }
 body.page-browse #venueGrid .trip-btn.in-trip { background: var(--teal); color: var(--paper); }
@@ -16017,7 +16032,7 @@ body.page-browse #venueGrid .fav-btn:focus-visible { outline: 2px solid var(--am
   body.page-browse #venueGrid .venue-region { min-height: 0; }
   body.page-browse #venueGrid .card-links { gap: 4px 12px; }
   body.page-browse #venueGrid .trip-fav-row > .trip-btn,
-  body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 1 1 0; justify-content: center; min-height: 44px; }
+  body.page-browse #venueGrid .trip-fav-row > .fav-btn { min-height: 44px; }
 }
 
 /* ---- Open Now pill: off the headings, above the Continue bar, under the trip tray ---- */

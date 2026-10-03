@@ -14262,6 +14262,23 @@ for (const flag of ['on', undefined]) {
   })));
 }
 
+// ---- Directory redesign, Phase 2 (2026-10-04) ----------------------------------
+// The card hierarchy is built on app.js's existing markup with CSS only: text
+// badges come from each badge's own aria-label, the hidden phone placeholder is
+// dropped, and nothing reorders or re-displays elements (focus order and the
+// JS hooks see the same DOM). app.js and okanagan.html stay pinned above.
+test('Directory Phase 2: card hierarchy is CSS only, on the existing card markup', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const browse = await (await fetch(`${base}/browse`)).text();
+  const start = browse.indexOf('<style id="browse-directory-styles">');
+  const css = browse.slice(start, browse.indexOf('</style>', start)).replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(css, /body\.page-browse #venueGrid \.badge::after \{ content: attr\(aria-label\); \}/, 'badge text is the existing aria-label');
+  assert.match(css, /body\.page-browse #venueGrid \.badge > svg,\s*body\.page-browse #venueGrid \.badge > \.badge-text-icon \{ display: none; \}/, 'icons give way to the text');
+  assert.match(css, /body\.page-browse #venueGrid \.card-links \.phone-link\[aria-hidden="true"\] \{ display: none; \}/, 'only the hidden placeholder is dropped');
+  assert.match(css, /body\.page-browse #venueGrid \.trip-fav-row > \.trip-btn,\s*body\.page-browse #venueGrid \.trip-fav-row > \.fav-btn \{ flex: 1 1 0;/, 'Add to Trip and Favorite share the action row');
+  assert.ok(!/(^|[;{\s])order\s*:|display:\s*contents|visibility:\s*hidden/.test(css), 'no reordering, no display:contents, nothing visibly hidden');
+  assert.ok(!/\.(directions|menu|booking)-link[^{]*\{[^}]*display:\s*none/.test(css), 'utility links stay visible');
+})));
+
 // ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
 // okanaganFavorites (names) is untouched; pages with Favorite controls also
 // carry a small capture script that records WHICH item was saved
