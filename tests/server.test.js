@@ -14235,6 +14235,33 @@ test('Hero search loading state: the loading mark is removed when the prefill fi
   assert.deepEqual(c.removed, ['browse-results-loading']);
 });
 
+// ---- Directory redesign, Phase 1 (2026-10-03) ----------------------------------
+// A /browse-only stylesheet. Every rule is scoped to body.page-browse, it never
+// styles .venue-desc or the Read-more button, never touches the card's
+// content-visibility, and appears on no other page.
+for (const flag of ['on', undefined]) {
+  test(`Directory Phase 1: /browse alone carries the scoped Directory stylesheet (discovery search ${flag || 'off'})`, () => withDiscoveryFlag(flag, () => withDiscoveryServer(async (base) => {
+    const page = async (p) => (await fetch(`${base}${p}`)).text();
+    const browse = await page('/browse');
+    assert.equal(browse.split('<style id="browse-directory-styles">').length, 2, 'exactly one Directory stylesheet on /browse');
+    assert.ok(browse.includes('<body class="wizard-active page-browse">'), 'the scope class is on /browse');
+    const start = browse.indexOf('<style id="browse-directory-styles">');
+    assert.ok(start < browse.indexOf('id="directory"'), 'placed before the Directory section');
+    assert.ok((await page('/browse?types=restaurant')).includes('<style id="browse-directory-styles">'), 'also with the F3 loading state');
+    for (const p of ['/', '/golf', '/trip', '/wineries']) {
+      assert.ok(!(await page(p)).includes('browse-directory-styles'), `${p}: no Directory stylesheet`);
+    }
+    const css = browse.slice(start, browse.indexOf('</style>', start)).replace(/<style[^>]*>/, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    // Every selector in every rule (inside or outside @media) is scoped to body.page-browse.
+    const selectors = [...css.matchAll(/([^{}]+)\{[^{}]*\}/g)].map((m) => m[1].trim()).filter((s) => !s.startsWith('@'));
+    assert.ok(selectors.length > 20, `${selectors.length} rules`);
+    for (const group of selectors) for (const sel of group.split(',')) assert.match(sel.trim(), /^body\.page-browse /, sel.trim());
+    // Hands off what Read more, F1/F2 and the card's offscreen sizing own.
+    assert.ok(!/venue-desc|desc-toggle|line-clamp|content-visibility|contain-intrinsic-size/.test(css), 'no description / Read-more / content-visibility rules');
+    assert.ok(!/<script/i.test(browse.slice(start, browse.indexOf('</style>', start))), 'CSS only');
+  })));
+}
+
 // ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
 // okanaganFavorites (names) is untouched; pages with Favorite controls also
 // carry a small capture script that records WHICH item was saved

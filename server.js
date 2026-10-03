@@ -15948,6 +15948,85 @@ function applyBrowseLoadingState(html, state) {
   return html;
 }
 
+// Directory redesign, Phase 1 (2026-10-03): a /browse-only visual layer.
+// Every rule is scoped to body.page-browse (the class only the /browse route
+// adds), so the homepage -- which renders from the same okanagan.html and
+// app.css -- and the hub pages that also use .venue-card are untouched. CSS
+// only: no markup, script, analytics or behaviour changes. .venue-desc and the
+// Read-more button are deliberately not styled here (their clamp and
+// measurement belong to the Read-more script), and the card keeps app.css's
+// content-visibility / contain-intrinsic-size.
+function renderBrowseDirectoryStyles() {
+  return `<style id="browse-directory-styles">
+/* ---- Search, filters, sort, result count, empty state ---- */
+body.page-browse #directory .search-box { background: #fff; border: 1px solid rgba(27,43,58,0.14); border-radius: 999px; padding: 6px 6px 6px 10px; box-shadow: 0 12px 26px -20px rgba(27,43,58,0.5); max-width: 560px; }
+body.page-browse #directory #searchBtn { border-radius: 999px; min-height: 44px; padding: 0 24px; font-weight: 800; }
+body.page-browse #directory .filter-label { font-size: 0.7rem; letter-spacing: 0.1em; color: rgba(27,43,58,0.62); }
+body.page-browse #directory .filter-group .region-chip,
+body.page-browse #directory .type-chip,
+body.page-browse #directory .stamp-btn,
+body.page-browse #directory .near-me-btn { min-height: 32px; padding: 5px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 999px; }
+body.page-browse #directory .wizard-continue-btn { border-radius: 999px; padding: 10px 24px; font-weight: 800; }
+body.page-browse .results-head { align-items: center; padding-bottom: 14px; margin-bottom: 24px; border-bottom: 1px solid rgba(27,43,58,0.12); }
+body.page-browse #resultsCount { font-size: 0.84rem; font-weight: 800; color: var(--ref-navy); background: rgba(27,43,58,0.06); border-radius: 999px; padding: 6px 12px; }
+body.page-browse #sortSelect { -webkit-appearance: none; appearance: none; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.84rem !important; color: var(--ref-navy); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231B2B3A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; padding: 8px 36px 8px 14px !important; }
+body.page-browse #noResults.show { max-width: 560px; margin: 8px auto 48px; padding: 28px 24px; background: var(--paper); border: 1px dashed rgba(27,43,58,0.25); border-radius: 16px; color: rgba(27,43,58,0.78); font-size: 0.98rem; }
+
+/* ---- Cards ---- */
+body.page-browse #venueGrid .venue-card { display: flex; flex-direction: column; border: 1px solid rgba(27,43,58,0.08); box-shadow: 0 12px 26px -22px rgba(27,43,58,0.55); }
+body.page-browse #venueGrid .venue-top { padding-bottom: 6px; }
+body.page-browse #venueGrid .venue-type { font-size: 0.68rem; letter-spacing: 0.08em; padding: 3px 9px; border-radius: 999px; margin-bottom: 10px; }
+body.page-browse #venueGrid .venue-region { color: rgba(42,32,25,0.72); }
+body.page-browse #venueGrid .venue-region .rating-hover-link { color: #9A6B00 !important; }
+body.page-browse #venueGrid .venue-region .review-count { color: rgba(42,32,25,0.55); }
+body.page-browse #venueGrid .open-status { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 0.76rem; line-height: 1.6; }
+body.page-browse #venueGrid .open-status-open { background: rgba(42,122,79,0.12); }
+body.page-browse #venueGrid .open-status-closing-soon { background: rgba(184,134,11,0.14); color: #8A631F; }
+body.page-browse #venueGrid .open-status-closed { background: rgba(42,32,25,0.07); color: rgba(42,32,25,0.62); }
+body.page-browse #venueGrid .badge-row { min-height: 0; padding: 10px 22px 6px; gap: 6px; }
+body.page-browse #venueGrid .badge { width: 30px; height: 30px; background: rgba(42,107,103,0.08); border-color: rgba(42,107,103,0.22); color: var(--teal-deep, #1F5C5C); }
+body.page-browse #venueGrid .venue-card > button { align-self: flex-start; }
+body.page-browse #venueGrid .card-links { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: auto 22px 20px; padding-top: 10px; }
+body.page-browse #venueGrid .card-links .directions-link,
+body.page-browse #venueGrid .card-links .menu-link,
+body.page-browse #venueGrid .card-links .booking-link,
+body.page-browse #venueGrid .card-links .phone-link { color: var(--ref-navy); font-size: 0.8rem; }
+body.page-browse #venueGrid .trip-fav-row { flex-basis: 100%; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid rgba(27,43,58,0.08); }
+body.page-browse #venueGrid .trip-btn { background: var(--ref-navy); color: #fff; min-height: 38px; padding: 8px 16px; font-size: 0.84rem; }
+body.page-browse #venueGrid .trip-btn:hover { background: var(--ref-navy-deep, #142230); }
+body.page-browse #venueGrid .trip-btn.in-trip { background: var(--teal); color: var(--paper); }
+body.page-browse #venueGrid .fav-btn { background: transparent; border: 1px solid rgba(27,43,58,0.25); color: var(--ref-navy); min-height: 38px; padding: 8px 14px; font-size: 0.84rem; }
+body.page-browse #venueGrid .fav-btn:hover { background: rgba(27,43,58,0.05); }
+body.page-browse #venueGrid .fav-btn.is-fav { background: rgba(92,35,51,0.1); border-color: var(--plum); color: var(--plum); }
+body.page-browse #venueGrid .card-links a:focus-visible,
+body.page-browse #venueGrid .trip-btn:focus-visible,
+body.page-browse #venueGrid .fav-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* ---- Grid: four columns where cards stay at least ~320px wide ---- */
+@media (min-width: 1440px) {
+  body.page-browse #venueGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+}
+
+/* ---- Phones ---- */
+@media (max-width: 560px) {
+  body.page-browse #directory .search-box { border-radius: 18px; padding: 6px; }
+  body.page-browse #directory #searchBtn { border-radius: 12px; }
+  body.page-browse .results-head { align-items: flex-start; }
+  body.page-browse #venueGrid { gap: 18px; }
+  body.page-browse #venueGrid .venue-card h3,
+  body.page-browse #venueGrid .venue-region { min-height: 0; }
+  body.page-browse #venueGrid .card-links { gap: 4px 12px; }
+  body.page-browse #venueGrid .trip-fav-row > .trip-btn,
+  body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 1 1 0; justify-content: center; min-height: 44px; }
+}
+
+/* ---- Open Now pill: off the headings, above the Continue bar, under the trip tray ---- */
+@media (max-width: 700px) {
+  body.page-browse .og-open-now-btn { top: auto !important; bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important; z-index: 145 !important; }
+}
+</style>`;
+}
+
 // ---------- List Your Venue, Phase 1 (2026-09-25) ----------
 //
 // The public venue submission workflow:
@@ -17609,7 +17688,7 @@ const server = http.createServer(async (req, res) => {
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${renderHomepageDiscoveryStyles()}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${renderHomepageDiscoveryStyles()}\n${renderBrowseDirectoryStyles()}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
