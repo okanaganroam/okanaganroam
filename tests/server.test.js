@@ -9674,7 +9674,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved Stage 5E change (2026-10-01): Favorites by place / event id (Favorites module only).
   // Approved /browse performance change F4a: one open-status date formatter (computeOpenStatus only), 2026-10-03.
   // Approved /browse performance change F5: the sort reads each rating once (initBlock4 only), 2026-10-03.
-  assert.equal(md5('public/scripts/app.js'), '9c660a7b535e588a32ef3eac27cb3529', 'public/scripts/app.js (F5: sort reads ratings once, 2026-10-03)');
+  // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
+  assert.equal(md5('public/scripts/app.js'), 'f171925702447b5295cc4174a59a32f9', 'public/scripts/app.js (F6: Favorites rewrite only changed buttons, 2026-10-03)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -11384,8 +11385,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41'); // SEO-2 (2026-10-02) descriptions
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
-  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once.
-  assert.equal(md5('public/scripts/app.js'), '9c660a7b535e588a32ef3eac27cb3529');
+  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons.
+  assert.equal(md5('public/scripts/app.js'), 'f171925702447b5295cc4174a59a32f9');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();

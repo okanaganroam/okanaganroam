@@ -3539,14 +3539,22 @@ window.__scrollToVenueCard = function(name){
   var HEART_OUTLINE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
   var HEART_FILLED = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
 
+  // Every button is checked on each sync, but only a button whose markup
+  // would actually change is rewritten (F6, 2026-10-03): rewriting all of
+  // them (1,411 on /browse) was most of a Favorite tap's cost. A button
+  // remembers the exact markup this function last wrote; a new button, a
+  // changed state or a changed language label (the language switch calls
+  // this too) still gets rewritten, so every button ends up as before.
   function syncButtons(){
     document.querySelectorAll('.fav-btn').forEach(function(btn){
       var isFav = isFavorite(btn.dataset.favName, favItemOf(btn));
       btn.classList.toggle('is-fav', isFav);
-      btn.innerHTML = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? t('card.favorited') : t('card.favorite'));
+      var html = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? t('card.favorited') : t('card.favorite'));
+      if (btn.__favHtml !== html) { btn.innerHTML = html; btn.__favHtml = html; }
 
       var card = btn.closest('.venue-card, .featured-card');
-      if (card) card.dataset.favorite = isFav ? '1' : '0';
+      var favorite = isFav ? '1' : '0';
+      if (card && card.dataset.favorite !== favorite) card.dataset.favorite = favorite;
     });
     if (countEl) countEl.textContent = favoriteCount();
   }
