@@ -13933,6 +13933,197 @@ test('SEO-2: homepage descriptions match the approved text; share image is a 120
   assert.equal(require('node:crypto').createHash('sha256').update(png).digest('hex'), '9f1ad2ef30248bb06a5bf0a2ee3de5724cd8d8ed6b890790d78df9f9b3086269');
 })));
 
+// ---- Read more: measured near the viewport + one wiring per card (2026-10-03) --
+// F1: every description is clamped at load, but measured (the expensive part)
+// when its card comes near the viewport, as /browse has done since Stage
+// 3.4.1, and the rest in small background slices; its button stays hidden, as
+// served, until measured, and a card hidden by a filter waits until shown.
+// F2: a card wired at load is never wired again when the Food & Drink filter
+// re-inserts it. Runs the REAL page scripts against a small fake DOM whose
+// description boxes log every clamp (write) and height read (layout); the test
+// decides which cards "intersect" and when timers run.
+function readMoreHarness(specs, { io = true } = {}) {
+  const log = [], events = [], observers = [], timers = [];
+  const classes = (el) => ({
+    contains: (c) => el.cls.has(c),
+    add: (c) => { log.push('write'); el.cls.add(c); },
+    toggle: (c, on) => { if (on === undefined ? !el.cls.has(c) : on) el.cls.add(c); else el.cls.delete(c); },
+  });
+  const makeCard = (spec, i) => {
+    const desc = { cls: new Set(['golf-desc']) }; desc.classList = classes(desc);
+    const p = {
+      get scrollHeight() { log.push('read'); return spec.overflow ? 200 : 60; },
+      get clientHeight() { log.push('read'); return desc.cls.has('is-clamped') ? 60 : (spec.overflow ? 200 : 60); },
+    };
+    desc.querySelector = (s) => (s === 'p' ? p : null);
+    const btn = { hidden: true, attrs: { 'aria-expanded': 'false' }, listeners: [], textContent: 'Read more →',
+      getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; }, setAttribute(n, v) { this.attrs[n] = String(v); },
+      addEventListener(type, fn) { if (type === 'click') this.listeners.push(fn); }, click() { this.listeners.forEach((fn) => fn({})); } };
+    const card = { dataset: { venueId: String(100 + i), venueName: `Card ${i}`, venueRegion: 'kelowna', venueCategory: 'restaurant' }, desc, btn, shown: !spec.hidden, top: spec.top === undefined ? 5000 + i * 400 : spec.top,
+      getBoundingClientRect() { return { top: this.top, bottom: this.top + 300 }; },
+      querySelector: (s) => (spec.noDesc ? null : s === '.golf-desc' ? desc : s === '.desc-toggle' ? btn : null), matches: () => true };
+    Object.defineProperty(card, 'offsetParent', { get() { return card.shown ? {} : null; } });
+    return card;
+  };
+  const cards = specs.map(makeCard);
+  class IO {
+    constructor(cb, opts) { this.cb = cb; this.opts = opts || {}; this.targets = new Set(); this.observeCalls = []; observers.push(this); }
+    observe(el) { this.observeCalls.push(el); this.targets.add(el); }
+    unobserve(el) { this.targets.delete(el); }
+  }
+  const measureIo = () => observers.find((o) => o.opts.rootMargin === '400px 0px');
+  const impressionIo = () => observers.find((o) => o.opts.threshold === 0.5);
+  // Fire one observer callback, the way a scroll delivers a batch of entries.
+  const intersect = (list, isIntersecting = true) => { const o = measureIo(); const entries = list.filter((c) => o.targets.has(c)).map((c) => ({ target: c, isIntersecting })); if (entries.length) o.cb(entries); };
+  const runTimers = () => { let n = 0; while (timers.length && n++ < 100) timers.shift().fn(); };
+  const listeners = [];
+  const win = { trackEvent: (n, p) => events.push([n, p.venue_id]), innerHeight: 800, __syncFavButtons: () => {}, __syncTripButtons: () => {},
+    addEventListener: (type, fn, opts) => listeners.push({ type, fn, opts }),
+    removeEventListener: (type, fn) => { const i = listeners.findIndex((l) => l.type === type && l.fn === fn); if (i !== -1) listeners.splice(i, 1); } };
+  const scrollListeners = () => listeners.filter((l) => l.type === 'scroll');
+  // Scroll the page by `dy`: every card moves up, then the scroll listeners run (as the browser does, before drawing).
+  const scroll = (dy) => { cards.forEach((c) => { c.top -= dy; }); scrollListeners().forEach((l) => l.fn({})); };
+  if (io) win.IntersectionObserver = IO;
+  const doc = { querySelectorAll: (s) => (/^\.venue-card/.test(s) ? cards.slice() : []), addEventListener: () => {}, documentElement: { clientHeight: 800 } };
+  const fakeSetTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+  const ctx = vm.createContext({ window: win, document: doc, ...(io ? { IntersectionObserver: IO } : {}), MutationObserver: class { observe() {} }, location: { pathname: '/food-drink' },
+    localStorage: { getItem: () => null, setItem: () => {} }, JSON, Number, Array, String, Date, setTimeout: fakeSetTimeout, clearTimeout: () => {} });
+  const reads = () => log.filter((x) => x === 'read').length;
+  return { log, events, cards, win, ctx, makeCard, intersect, measureIo, impressionIo, reads, timers, runTimers, scroll, scrollListeners };
+}
+const stripScript = (html) => html.replace(/^\s*<script>|<\/script>\s*$/g, '');
+const SPECS = [{ overflow: true }, { overflow: false }, { overflow: true }, { noDesc: true }, { overflow: false }, { overflow: true, hidden: true }];
+const RESULT = [false, true, false, true, true]; // Read more shown only where the clamped text overflows (first five cards)
+const hiddenStates = (h) => h.cards.map((c) => c.btn.hidden);
+const whatsOnReadMore = () => { const s = app.renderWhatsOnFilterScriptHtml({}); return s.slice(s.indexOf("  var MORE = 'Read more"), s.lastIndexOf('})();')); };
+
+for (const type of ['fd', 'winery', 'outdoor', 'dog']) {
+  test(`Read more (${type}): clamped at load, measured near the viewport first, the rest in background slices, each once; buttons and events as before`, () => {
+    const h = readMoreHarness(SPECS);
+    vm.runInContext(stripScript(app.golfCardEngagementScriptHtml(type, true)), h.ctx);
+    assert.equal(h.log.filter((x) => x === 'write').length, 5, 'every description clamped at load');
+    assert.equal(h.reads(), 0, 'nothing measured at load');
+    assert.deepEqual(hiddenStates(h), [true, true, true, true, true, true], 'buttons stay hidden (as served) until measured');
+    assert.deepEqual(h.cards.map((c) => c.btn.listeners.length), [1, 1, 1, 0, 1, 1], 'one Read more listener per card, wired at load');
+    assert.equal(h.measureIo().targets.size, 5, 'each card with a description is watched');
+    assert.deepEqual(h.timers.map((t) => t.ms), [300], 'one background pass scheduled, after load');
+    // Not intersecting: not measured.
+    h.intersect([h.cards[0], h.cards[1]], false);
+    assert.equal(h.reads(), 0);
+    // The first two cards come near the viewport in one batch.
+    h.intersect([h.cards[0], h.cards[1]]);
+    assert.equal(h.reads(), 4);
+    assert.deepEqual(hiddenStates(h).slice(0, 3), [false, true, true]);
+    h.intersect([h.cards[0]]);
+    assert.equal(h.reads(), 4, 'measured once');
+    // The background pass measures the rest that are shown, skipping the one hidden by a filter.
+    h.runTimers();
+    assert.deepEqual(hiddenStates(h), [...RESULT, true]);
+    assert.equal(h.reads(), 8, 'cards 2 and 4 measured once each; the hidden card not at all');
+    assert.deepEqual([...h.measureIo().targets], [h.cards[5]], 'only the hidden card is still watched');
+    // A filter shows it: measured when it comes near the viewport.
+    h.cards[5].shown = true; h.intersect([h.cards[5]]);
+    assert.equal(h.cards[5].btn.hidden, false);
+    // Expand / collapse and its events are unchanged.
+    const c0 = h.cards[0];
+    c0.btn.click();
+    assert.equal(c0.btn.getAttribute('aria-expanded'), 'true'); assert.ok(!c0.desc.cls.has('is-clamped')); assert.equal(c0.btn.textContent, 'Read less ↑');
+    c0.btn.click();
+    assert.equal(c0.btn.getAttribute('aria-expanded'), 'false'); assert.ok(c0.desc.cls.has('is-clamped')); assert.equal(c0.btn.textContent, 'Read more →');
+    assert.deepEqual(h.events, [['description_expand', 100], ['description_collapse', 100]], 'event names and payload unchanged');
+    // Resize: a collapsed card is re-measured (near the viewport or in the background); an expanded one is left alone.
+    h.cards[2].btn.click();
+    c0._golfRecheck(); h.cards[2]._golfRecheck();
+    assert.ok(h.measureIo().targets.has(c0) && !h.measureIo().targets.has(h.cards[2]));
+    const before = h.reads(); h.runTimers(); assert.equal(h.reads(), before + 2); assert.equal(c0.btn.hidden, false);
+  });
+}
+
+test('Read more (fd): a card wired at load is not wired again when a filter re-inserts it; a newly revealed card is wired exactly once', () => {
+  const h = readMoreHarness(SPECS);
+  vm.runInContext(stripScript(app.golfCardEngagementScriptHtml('fd', true)), h.ctx);
+  const imp = h.impressionIo();
+  assert.equal(imp.observeCalls.length, 6, 'each card observed once for its impression');
+  // The Food & Drink filter re-inserts cards that were on the page at load.
+  h.win.__ogWireVenueCards([h.cards[0], h.cards[2]]);
+  assert.deepEqual([h.cards[0].btn.listeners.length, h.cards[2].btn.listeners.length], [1, 1], 'no second Read more listener');
+  assert.equal(imp.observeCalls.length, 6, 'not observed again (no second impression)');
+  h.intersect([h.cards[0]]);
+  h.events.length = 0;
+  h.cards[0].btn.click();
+  assert.deepEqual(h.events, [['description_expand', 100]], 'one tap, one event');
+  assert.equal(h.cards[0].btn.getAttribute('aria-expanded'), 'true', 'and it really expands');
+  // "Show more" reveals a card that was not on the page at load: wired once, observed once, then measured.
+  const fresh = h.makeCard({ overflow: true }, 9);
+  h.win.__ogWireVenueCards([fresh]);
+  h.win.__ogWireVenueCards([fresh]);
+  assert.equal(fresh.btn.listeners.length, 1);
+  assert.equal(imp.observeCalls.filter((c) => c === fresh).length, 1);
+  assert.equal(fresh.btn.hidden, true, 'not measured synchronously');
+  h.runTimers();
+  assert.equal(fresh.btn.hidden, false);
+});
+
+test('Read more (no IntersectionObserver): every card is measured at load, as before', () => {
+  const h = readMoreHarness(SPECS.slice(0, 5), { io: false });
+  vm.runInContext(stripScript(app.golfCardEngagementScriptHtml('fd', true)), h.ctx);
+  assert.deepEqual(hiddenStates(h), RESULT);
+  const h2 = readMoreHarness(SPECS.slice(0, 5), { io: false }); h2.ctx.cards = h2.cards;
+  vm.runInContext(whatsOnReadMore(), h2.ctx);
+  assert.deepEqual(hiddenStates(h2), RESULT);
+});
+
+for (const which of ['fd', 'whats-on']) {
+  test(`Read more (${which}): cards on screen at load are measured with their clamp; a passive scroll listener measures cards entering the screen until the background pass is done`, () => {
+    // Cards 0 and 1 are on screen at load; the rest are far below the 800px viewport.
+    const specs = [{ overflow: true, top: 100 }, { overflow: false, top: 450 }, { overflow: true, top: 20000 }, { overflow: true }, { overflow: false, top: 30000 }, { overflow: true, hidden: true }];
+    const h = readMoreHarness(specs);
+    if (which === 'fd') vm.runInContext(stripScript(app.golfCardEngagementScriptHtml('fd', true)), h.ctx);
+    else { h.ctx.cards = h.cards; vm.runInContext(whatsOnReadMore(), h.ctx); }
+    // (a) on-screen cards measured in the same task as the clamp
+    assert.deepEqual(hiddenStates(h), [false, true, true, true, true, true]);
+    assert.equal(h.reads(), 4, 'only the two on-screen cards measured at load');
+    // (b) one passive scroll listener while cards remain
+    assert.equal(h.scrollListeners().length, 1);
+    assert.equal(h.scrollListeners()[0].opts.passive, true, 'passive');
+    // Jump far down: card 3 lands on screen and is measured by the scroll listener, before the frame is drawn.
+    h.cards[3].top = 6000; h.scroll(5800);
+    assert.equal(h.cards[3].btn.hidden, false, 'measured on the scroll that brought it into view');
+    assert.equal(h.cards[2].btn.hidden, true, 'a card scrolled past without being on screen waits for the background pass');
+    // A hidden (filtered-out) card on screen is not measured.
+    h.cards[5].top = 300; h.scroll(0);
+    assert.equal(h.cards[5].btn.hidden, true);
+    // The background pass measures the rest, then the listener detaches.
+    h.runTimers();
+    assert.deepEqual(hiddenStates(h), [false, true, false, false, true, true]);
+    assert.equal(h.scrollListeners().length, 0, 'scroll listener removed once the pass is complete');
+    const reads = h.reads(); h.scroll(100); assert.equal(h.reads(), reads, 'nothing measured after it detaches');
+  });
+}
+
+test('Read more (/whats-on): clamped at load, measured near the viewport first, the rest in background slices, each once; toggling unchanged and untracked', () => {
+  const h = readMoreHarness(SPECS);
+  h.ctx.cards = h.cards;
+  vm.runInContext(whatsOnReadMore(), h.ctx);
+  assert.equal(h.log.filter((x) => x === 'write').length, 5);
+  assert.equal(h.reads(), 0, 'nothing measured at load');
+  assert.deepEqual(hiddenStates(h), [true, true, true, true, true, true]);
+  assert.deepEqual(h.cards.map((c) => c.btn.listeners.length), [1, 1, 1, 0, 1, 1]);
+  assert.deepEqual(h.timers.map((t) => t.ms), [300]);
+  h.intersect([h.cards[0], h.cards[1]]);
+  assert.deepEqual(hiddenStates(h).slice(0, 3), [false, true, true]);
+  h.runTimers();
+  assert.deepEqual(hiddenStates(h), [...RESULT, true]);
+  assert.equal(h.reads(), 8, 'each shown card measured exactly once; the filtered-out card not at all');
+  h.cards[5].shown = true; h.intersect([h.cards[5]]);
+  assert.equal(h.cards[5].btn.hidden, false, 'measured once a filter shows it');
+  h.cards[2].btn.click();
+  assert.equal(h.cards[2].btn.getAttribute('aria-expanded'), 'true'); assert.ok(!h.cards[2].desc.cls.has('is-clamped'));
+  h.cards[2].btn.click();
+  assert.equal(h.cards[2].btn.getAttribute('aria-expanded'), 'false'); assert.ok(h.cards[2].desc.cls.has('is-clamped'));
+  assert.deepEqual(h.events, [], 'event cards still send no Read more events');
+});
+
 // ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
 // okanaganFavorites (names) is untouched; pages with Favorite controls also
 // carry a small capture script that records WHICH item was saved
