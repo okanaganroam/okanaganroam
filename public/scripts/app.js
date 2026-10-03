@@ -803,16 +803,28 @@ function checkHoursWindow(open, close, currentMinutes, isYesterday){
   return null;
 }
 
+// One formatter for every call: its options never change, and creating a new
+// one per card was about a quarter of /browse's initial render (F4a,
+// 2026-10-03). Created on first use, so the output -- and where an error
+// would surface -- are exactly as before.
+var openStatusFormatter = null;
+function getOpenStatusFormatter(){
+  if (!openStatusFormatter) {
+    openStatusFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Vancouver',
+      weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false
+    });
+  }
+  return openStatusFormatter;
+}
+
 function computeOpenStatus(hoursJson, testDate){
   if (!hoursJson) return null;
   var hours;
   try { hours = JSON.parse(hoursJson); } catch (e) { return null; }
 
   var now = testDate || new Date();
-  var parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Vancouver',
-    weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(now);
+  var parts = getOpenStatusFormatter().formatToParts(now);
 
   var map = {};
   parts.forEach(function(p){ map[p.type] = p.value; });
@@ -1399,7 +1411,12 @@ function initBlock4(){
     }
 
     if (value === 'rating-desc'){
-      cards.sort(function(a, b){ return getRating(b) - getRating(a); });
+      // Each card's rating is read once per sort instead of twice per
+      // comparison (thousands of DOM queries for 1,411 cards; F5,
+      // 2026-10-03). Same ratings, same comparator, same stable order.
+      var ratings = new Map();
+      cards.forEach(function(card){ ratings.set(card, getRating(card)); });
+      cards.sort(function(a, b){ return ratings.get(b) - ratings.get(a); });
     } else if (value === 'name-asc'){
       cards.sort(function(a, b){
         return (a.dataset.name || '').localeCompare(b.dataset.name || '');
@@ -3522,14 +3539,22 @@ window.__scrollToVenueCard = function(name){
   var HEART_OUTLINE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
   var HEART_FILLED = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
 
+  // Every button is checked on each sync, but only a button whose markup
+  // would actually change is rewritten (F6, 2026-10-03): rewriting all of
+  // them (1,411 on /browse) was most of a Favorite tap's cost. A button
+  // remembers the exact markup this function last wrote; a new button, a
+  // changed state or a changed language label (the language switch calls
+  // this too) still gets rewritten, so every button ends up as before.
   function syncButtons(){
     document.querySelectorAll('.fav-btn').forEach(function(btn){
       var isFav = isFavorite(btn.dataset.favName, favItemOf(btn));
       btn.classList.toggle('is-fav', isFav);
-      btn.innerHTML = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? t('card.favorited') : t('card.favorite'));
+      var html = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? t('card.favorited') : t('card.favorite'));
+      if (btn.__favHtml !== html) { btn.innerHTML = html; btn.__favHtml = html; }
 
       var card = btn.closest('.venue-card, .featured-card');
-      if (card) card.dataset.favorite = isFav ? '1' : '0';
+      var favorite = isFav ? '1' : '0';
+      if (card && card.dataset.favorite !== favorite) card.dataset.favorite = favorite;
     });
     if (countEl) countEl.textContent = favoriteCount();
   }
