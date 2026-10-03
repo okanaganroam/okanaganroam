@@ -16019,6 +16019,11 @@ body.page-browse #venueGrid .fav-btn:focus-visible { outline: 2px solid var(--am
   body.page-browse #venueGrid .trip-fav-row > .trip-btn,
   body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 1 1 0; justify-content: center; min-height: 44px; }
 }
+
+/* ---- Open Now pill: off the headings, above the Continue bar, under the trip tray ---- */
+@media (max-width: 700px) {
+  body.page-browse .og-open-now-btn { top: auto !important; bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important; z-index: 145 !important; }
+}
 </style>`;
 }
 
