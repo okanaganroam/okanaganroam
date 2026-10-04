@@ -14276,15 +14276,39 @@ test('Directory Phase 2: card hierarchy is CSS only, on the existing card markup
   assert.match(css, /body\.page-browse #venueGrid \.badge::after \{ content: attr\(aria-label\); \}/, 'badge text is the existing aria-label');
   assert.match(css, /body\.page-browse #venueGrid \.badge > svg,\s*body\.page-browse #venueGrid \.badge > \.badge-text-icon \{ display: none; \}/, 'icons give way to the text');
   assert.match(css, /body\.page-browse #venueGrid \.card-links \.phone-link\[aria-hidden="true"\] \{ display: none; \}/, 'only the hidden placeholder is dropped');
-  assert.match(css, /body\.page-browse #venueGrid \.trip-fav-row > \.trip-btn,\s*body\.page-browse #venueGrid \.trip-fav-row > \.fav-btn \{ flex: 1 1 0;/, 'Add to Trip and Favorite share the action row');
+  assert.match(css, /body\.page-browse #venueGrid \.trip-fav-row > \.trip-btn,\s*body\.page-browse #venueGrid \.trip-fav-row > \.fav-btn \{ flex: 1 1 auto;/, 'Add to Trip and Favorite share the action row (by content since Phase 3)');
   // Above phone width the chips are compact and the buttons take their natural
-  // width, so a longer (French) label never wraps; the grid stays three columns.
+  // width, so a longer (French) label never wraps.
   const wide = (css.match(/@media \(min-width: 561px\) \{([\s\S]*?)\n\}/) || [])[1] || '';
   assert.match(wide, /\.badge \{ min-height: 20px; padding: 1px 7px; font-size: 0\.68rem;/, 'compact chips above phone width');
   assert.match(wide, /\.trip-fav-row > \.trip-btn,\s*body\.page-browse #venueGrid \.trip-fav-row > \.fav-btn \{ flex: 0 0 auto; \}/, 'natural-width actions above phone width');
-  assert.ok(!/grid-template-columns/.test(css), 'column count left to app.css');
+  assert.deepEqual(css.match(/grid-template-columns[^;]*;/g), ['grid-template-columns: repeat(2, minmax(0, 1fr));'], 'the only column override is Phase 3\'s two-column range');
   assert.ok(!/(^|[;{\s])order\s*:|display:\s*contents|visibility:\s*hidden/.test(css), 'no reordering, no display:contents, nothing visibly hidden');
   assert.ok(!/\.(directions|menu|booking)-link[^{]*\{[^}]*display:\s*none/.test(css), 'utility links stay visible');
+})));
+
+// ---- Directory redesign, Phase 3 (2026-10-04): layout, spacing, tap targets ---
+// Still CSS only, inside the /browse stylesheet: two columns from 941 to 1199px
+// (app.css switches to three at 941px, too narrow for text chips), no reserved
+// second title/meta line at any width, phone action buttons sized by content
+// (French "Ajouter au voyage" stays on one line), and 24px tap targets for the
+// utility links, Read more and Clear all.
+test('Directory Phase 3: two columns 941-1199px, no reserved lines, content-sized phone actions, 24px targets', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const browse = await (await fetch(`${base}/browse`)).text();
+  const start = browse.indexOf('<style id="browse-directory-styles">');
+  const css = browse.slice(start, browse.indexOf('</style>', start)).replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = (media) => { const i = css.indexOf(media + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('\n}', i)); };
+  // Outside every @media block: what applies at all widths.
+  const allWidths = css.replace(/@media[^{]*\{[\s\S]*?\n\}/g, '');
+  assert.match(block('@media (min-width: 941px) and (max-width: 1199px)'), /body\.page-browse #venueGrid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/, 'two columns from 941 to 1199px');
+  assert.match(allWidths, /body\.page-browse #venueGrid \.venue-card h3,\s*body\.page-browse #venueGrid \.venue-region \{ min-height: 0; \}/, 'no reserved second title/meta line at any width');
+  assert.ok(!/min-height: 0/.test(block('@media (max-width: 560px)')), 'the phone-only copy of that rule is gone');
+  assert.match(block('@media (min-width: 561px)'), /\.fav-btn \{ flex: 0 0 auto; \}/, 'desktop actions keep their natural width');
+  assert.match(allWidths, /\.card-links \.phone-link \{[^}]*min-height: 24px;/, 'utility links: 24px target');
+  assert.match(allWidths, /\.venue-card > button \{ align-self: flex-start; min-height: 24px !important; padding: 3px 0 !important; \}/, 'Read more: 24px target over its inline style');
+  assert.match(allWidths, /body\.page-browse #directory #clearFilters \{ min-height: 24px; \}/, 'Clear all: 24px target');
+  // Read more's clamp and measurement stay with the Read-more script.
+  assert.ok(!/venue-desc|line-clamp|content-visibility/.test(css), 'description clamp and offscreen sizing untouched');
 })));
 
 // ---- Stage 4.3 (2026-10-01): hidden saved-item identity -----------------------
