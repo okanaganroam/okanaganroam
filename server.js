@@ -15963,6 +15963,13 @@ function applyBrowseLoadingState(html, state) {
 // existing aria-label as text (::after), so they follow the language switch;
 // the hidden phone placeholder is dropped. No CSS order on interactive
 // elements, so focus order still matches the visual order.
+//
+// Phase 3 (2026-10-04), still CSS only: two columns from 941 to 1199px (three
+// columns there meant 280-367px cards and rows dominated by wrapped chips);
+// no reserved second title / meta line above phone width (they now take only
+// the lines they use); phone action buttons share the row by content so a
+// longer (French) label never wraps; utility links, Read more and Clear all
+// get at least a 24px tap target.
 function renderBrowseDirectoryStyles() {
   return `<style id="browse-directory-styles">
 /* ---- Search, filters, sort, result count, empty state ---- */
@@ -15974,6 +15981,7 @@ body.page-browse #directory .type-chip,
 body.page-browse #directory .stamp-btn,
 body.page-browse #directory .near-me-btn { min-height: 32px; padding: 5px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 999px; }
 body.page-browse #directory .wizard-continue-btn { border-radius: 999px; padding: 10px 24px; font-weight: 800; }
+body.page-browse #directory #clearFilters { min-height: 24px; }
 body.page-browse .results-head { align-items: center; padding-bottom: 14px; margin-bottom: 24px; border-bottom: 1px solid rgba(27,43,58,0.12); }
 body.page-browse #resultsCount { font-size: 0.84rem; font-weight: 800; color: var(--ref-navy); background: rgba(27,43,58,0.06); border-radius: 999px; padding: 6px 12px; }
 body.page-browse #sortSelect { -webkit-appearance: none; appearance: none; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.84rem !important; color: var(--ref-navy); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231B2B3A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; padding: 8px 36px 8px 14px !important; }
@@ -15982,6 +15990,8 @@ body.page-browse #noResults.show { max-width: 560px; margin: 8px auto 48px; padd
 /* ---- Cards ---- */
 body.page-browse #venueGrid .venue-card { display: flex; flex-direction: column; border: 1px solid rgba(27,43,58,0.08); box-shadow: 0 12px 26px -22px rgba(27,43,58,0.55); }
 body.page-browse #venueGrid .venue-top { padding-bottom: 6px; }
+body.page-browse #venueGrid .venue-card h3,
+body.page-browse #venueGrid .venue-region { min-height: 0; }
 body.page-browse #venueGrid .venue-type { font-size: 0.7rem; letter-spacing: 0.1em; padding: 0; border-radius: 0; background: none; margin-bottom: 6px; }
 body.page-browse #venueGrid .venue-region { color: rgba(42,32,25,0.72); }
 body.page-browse #venueGrid .venue-region .rating-hover-link { color: #9A6B00 !important; }
@@ -15996,17 +16006,17 @@ body.page-browse #venueGrid .badge { width: auto; height: auto; min-height: 24px
 body.page-browse #venueGrid .badge > svg,
 body.page-browse #venueGrid .badge > .badge-text-icon { display: none; }
 body.page-browse #venueGrid .badge::after { content: attr(aria-label); }
-body.page-browse #venueGrid .venue-card > button { align-self: flex-start; }
+body.page-browse #venueGrid .venue-card > button { align-self: flex-start; min-height: 24px !important; padding: 3px 0 !important; }
 body.page-browse #venueGrid .card-links { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: auto 22px 20px; padding-top: 10px; }
 body.page-browse #venueGrid .card-links .directions-link,
 body.page-browse #venueGrid .card-links .menu-link,
 body.page-browse #venueGrid .card-links .booking-link,
-body.page-browse #venueGrid .card-links .phone-link { color: rgba(27,43,58,0.74); font-size: 0.78rem; }
+body.page-browse #venueGrid .card-links .phone-link { color: rgba(27,43,58,0.74); font-size: 0.78rem; min-height: 24px; }
 body.page-browse #venueGrid .card-links a:hover { color: var(--ref-navy); }
 body.page-browse #venueGrid .card-links .phone-link[aria-hidden="true"] { display: none; }
 body.page-browse #venueGrid .trip-fav-row { flex-basis: 100%; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid rgba(27,43,58,0.08); }
 body.page-browse #venueGrid .trip-fav-row > .trip-btn,
-body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 1 1 0; justify-content: center; }
+body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 1 1 auto; justify-content: center; }
 body.page-browse #venueGrid .trip-btn { background: var(--ref-navy); color: #fff; min-height: 38px; padding: 8px 16px; font-size: 0.84rem; }
 body.page-browse #venueGrid .trip-btn:hover { background: var(--ref-navy-deep, #142230); }
 body.page-browse #venueGrid .trip-btn.in-trip { background: var(--teal); color: var(--paper); }
@@ -16018,15 +16028,19 @@ body.page-browse #venueGrid .trip-btn:focus-visible,
 body.page-browse #venueGrid .fav-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
 /* ---- Above phone width: compact badge chips, actions sized to their labels ----
-   The grid keeps app.css's three columns at every desktop width: the results
-   container stops at 1360px, so four columns would mean ~324px cards at any
-   screen size, too narrow for text chips. Buttons take their natural width so
-   a longer label (e.g. French) never wraps; phones keep the equal split. */
+   No four-column grid: the results container stops at 1360px, so four columns
+   would mean ~324px cards at any screen size, too narrow for text chips.
+   Buttons take their natural width so a longer label (e.g. French) never wraps. */
 @media (min-width: 561px) {
   body.page-browse #venueGrid .badge-row { gap: 4px; }
   body.page-browse #venueGrid .badge { min-height: 20px; padding: 1px 7px; font-size: 0.68rem; line-height: 1.3; }
   body.page-browse #venueGrid .trip-fav-row > .trip-btn,
   body.page-browse #venueGrid .trip-fav-row > .fav-btn { flex: 0 0 auto; }
+}
+
+/* ---- 941-1199px: two columns (app.css switches to three at 941px) ---- */
+@media (min-width: 941px) and (max-width: 1199px) {
+  body.page-browse #venueGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ---- Phones ---- */
@@ -16035,8 +16049,6 @@ body.page-browse #venueGrid .fav-btn:focus-visible { outline: 2px solid var(--am
   body.page-browse #directory #searchBtn { border-radius: 12px; }
   body.page-browse .results-head { align-items: flex-start; }
   body.page-browse #venueGrid { gap: 18px; }
-  body.page-browse #venueGrid .venue-card h3,
-  body.page-browse #venueGrid .venue-region { min-height: 0; }
   body.page-browse #venueGrid .card-links { gap: 4px 12px; }
   body.page-browse #venueGrid .trip-fav-row > .trip-btn,
   body.page-browse #venueGrid .trip-fav-row > .fav-btn { min-height: 44px; }
