@@ -305,9 +305,18 @@ function isFrenchTokens(tokens, keep, text) {
   });
   return strong >= 1 || weak.size >= 2;
 }
+// Venue names can only take French markers away (a name's words are not
+// counted), never add them. So a request with no marker anywhere is not
+// French whatever the venue list holds, and the list is never prepared for
+// it -- the ordinary English request takes this path.
+const NO_PROTECTION = new Set();
+function mayBeFrench(tokens, text) {
+  return isFrenchTokens(tokens, NO_PROTECTION, text);
+}
 function isFrenchTripRequest(text, taxonomy) {
   if (typeof text !== 'string') return false;
   const tokens = tokenize(text);
+  if (!mayBeFrench(tokens, text)) return false;
   return isFrenchTokens(tokens, protectedPositions(tokens, placesFor(taxonomy).names), text);
 }
 
@@ -316,6 +325,7 @@ function isFrenchTripRequest(text, taxonomy) {
 function tripPlannerText(text, taxonomy) {
   if (typeof text !== 'string') return text;
   const tokens = tokenize(text);
+  if (!mayBeFrench(tokens, text)) return text;
   const places = placesFor(taxonomy);
   const keep = protectedPositions(tokens, places.names);
   if (!isFrenchTokens(tokens, keep, text)) return text;

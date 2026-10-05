@@ -13158,7 +13158,7 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -13200,6 +13200,45 @@ test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in
     assert.doesNotMatch(v3, /noindex/);
     const api = await fetch('http://localhost:3623/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'plan 2 days in Kelowna' }) });
     assert.equal(api.status, 200, 'the planner API is available to V3 even with V2 off');
+  });
+});
+
+// V3 French support (PR #31 review, 2026-10-04): trip-planner-fr.js is loaded
+// like the interpreter, never behind a try/catch. Present, French and English
+// requests both plan through the real server; missing, the plan request fails
+// with the module's own error instead of quietly planning in English only.
+test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails clearly without it (isolated child processes)', async () => {
+  const projectRoot = path.join(__dirname, '..');
+  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const run = async (port, files, fn) => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripfr-'));
+    for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+    fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
+    const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore', env: { ...process.env, TRIP_PLANNER_V2: 'on', TRIP_PLANNER_V3: 'on' } });
+    try {
+      let ready = false;
+      for (let i = 0; i < 100 && !ready; i++) { try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); } }
+      assert.ok(ready, `child server ${port} started`);
+      await fn((text) => fetch(`http://localhost:${port}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }));
+    } finally { child.kill('SIGKILL'); fs.rmSync(tempDir, { recursive: true, force: true }); }
+  };
+  await run(3624, [...base, 'trip-planner-fr.js'], async (plan) => {
+    const frRes = await plan('3 jours à Kelowna avec des vignobles');
+    assert.equal(frRes.status, 200);
+    const fr = await frRes.json();
+    const en = await (await plan('3 days in Kelowna with vineyards')).json();
+    assert.equal(fr.kind, 'multi_day');
+    assert.equal(fr.days.length, 3);
+    assert.deepEqual(fr.intent.types, ['winery']);
+    assert.equal(fr.query, '3 jours à Kelowna avec des vignobles', 'the request shown is the visitor’s own');
+    assert.deepEqual(fr.days.map((d) => d.stops.map((s) => s.venue && s.venue.id)), en.days.map((d) => d.stops.map((s) => s.venue && s.venue.id)), 'the same stops as the English request');
+  });
+  await run(3625, base, async (plan) => {
+    for (const text of ['3 jours à Kelowna avec des vignobles', 'Plan 3 days in Kelowna']) {
+      const r = await plan(text);
+      assert.equal(r.status, 500, text);
+      assert.match((await r.json()).error, /trip-planner-fr/, 'the error names the missing module');
+    }
   });
 });
 

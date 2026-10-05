@@ -237,10 +237,43 @@ test('English: every English request is returned as the very same string, so Eng
   for (const x of [undefined, null, 42]) assert.equal(fr.tripPlannerText(x, TAXONOMY), x);
 });
 
+test('English: an ordinary English request never prepares the French venue list; a French one does', () => {
+  // A taxonomy that counts every read of its venue list.
+  let reads = 0;
+  const counting = { ...TAXONOMY };
+  Object.defineProperty(counting, 'venues', { get() { reads += 1; return TAXONOMY.venues; } });
+  const english = [
+    ...v3.T3_EXAMPLES,
+    ...require('./fixtures/trip-parser-baseline.json').fixtures.map((f) => f.text),
+    ...PAIRS.map(([, e]) => e),
+  ];
+  for (const text of english) {
+    assert.equal(fr.tripPlannerText(text, counting), text, text);
+    assert.equal(fr.isFrenchTripRequest(text, counting), false, text);
+  }
+  assert.equal(reads, 0, 'no English request read the venue list');
+  // English that carries French-looking words still gets the full check and is still unchanged.
+  assert.equal(fr.tripPlannerText('Le Vieux Pin and La Frenz wine tasting', counting), 'Le Vieux Pin and La Frenz wine tasting');
+  assert.ok(reads > 0);
+  reads = 0;
+  for (const [french] of PAIRS) assert.notEqual(fr.tripPlannerText(french, counting), french, french);
+  assert.ok(reads > 0, 'French requests read the venue list');
+});
+
+test('French module: loads, exports its two functions, and server.js loads it without a fallback', () => {
+  const mod = require('../trip-planner-fr.js');
+  assert.equal(typeof mod.tripPlannerText, 'function');
+  assert.equal(typeof mod.isFrenchTripRequest, 'function');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const loader = src.slice(src.indexOf('function tripPlannerFrModule()'), src.indexOf('function runTripPlan('));
+  assert.ok(loader.includes("return require('./trip-planner-fr.js');"), loader);
+  assert.ok(!/catch|\?\?|\|\|/.test(loader), 'no try/catch or fallback around the load');
+});
+
 test('English: runTripPlan() reads the French layer’s text; the request shown and shared stays the visitor’s own', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const fn = src.slice(src.indexOf('function runTripPlan('), src.indexOf('// ---------- Temporary-condition advisories'));
-  assert.ok(fn.includes('const planText = tripPlannerFrModule ? tripPlannerFrModule.tripPlannerText(text, taxonomy) : text;'));
+  assert.ok(fn.includes('const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);'));
   assert.ok(fn.includes('interpretDiscoveryQuery(planText, taxonomy)') && fn.includes('interpretTripComponents(planText, taxonomy, intent)'));
   assert.equal((fn.match(/plan\.query = text;/g) || []).length, 2, 'plan.query is the visitor’s own text');
   // Site search does not use it.
