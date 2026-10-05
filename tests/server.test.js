@@ -9675,7 +9675,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved /browse performance change F4a: one open-status date formatter (computeOpenStatus only), 2026-10-03.
   // Approved /browse performance change F5: the sort reads each rating once (initBlock4 only), 2026-10-03.
   // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
-  assert.equal(md5('public/scripts/app.js'), 'f171925702447b5295cc4174a59a32f9', 'public/scripts/app.js (F6: Favorites rewrite only changed buttons, 2026-10-03)');
+  // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
+  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -11385,8 +11386,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41'); // SEO-2 (2026-10-02) descriptions
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
-  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons.
-  assert.equal(md5('public/scripts/app.js'), 'f171925702447b5295cc4174a59a32f9');
+  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
+  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -13035,7 +13036,7 @@ test('Stage 5A F12: V3 reports edits, shares, Map this day and shared-link opens
   assert.ok(js.includes("shared('clipboard')") && js.includes("shared('manual')"));
   // Map this day: the established outbound_click, with fixed values.
   assert.deepEqual(byName('outbound_click'), ["track('outbound_click', { link_type: 'trip_day_map', surface: 'trip_planner' })"]);
-  assert.ok(js.includes('data-t3-map-day>Map this day</a>'));
+  assert.ok(js.includes("data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>"));
   // Opening a shared link: trip_plan_start (input_method link), then the
   // plan request reported as request_type shared_link; an unreadable link
   // is trip_plan_error invalid_share. Stage 5H: a reload / Back-Forward of
@@ -13085,7 +13086,7 @@ test('Stage 5G: V3 whole-trip map -- collapsed, loaded on demand, attributed, ke
   const openFn = js.slice(js.indexOf('function openMap()'), js.indexOf('function loadLeaflet('));
   assert.ok(openFn.includes('loadLeaflet(') && js.indexOf('loadLeaflet(') > js.indexOf('function setMapOpen('), 'Leaflet is requested only from opening the map');
   // Collapsed by default, on every screen size.
-  assert.ok(js.includes('aria-expanded="false" aria-controls="t3MapPanel">Show trip map</button>') && js.includes('<div class="t3-map-panel" id="t3MapPanel" hidden>'));
+  assert.ok(js.includes(`aria-expanded="false" aria-controls="t3MapPanel">' + esc(tx('tripv3.map.show')) + '</button>`) && js.includes('<div class="t3-map-panel" id="t3MapPanel" hidden>'));
   assert.ok(js.includes("var tripMap = { box: null, open: false,"));
   // render(): the map slot only in day plans; the map is detached before the
   // result is rewritten and placed back after.
@@ -13157,7 +13158,7 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -13199,6 +13200,45 @@ test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in
     assert.doesNotMatch(v3, /noindex/);
     const api = await fetch('http://localhost:3623/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'plan 2 days in Kelowna' }) });
     assert.equal(api.status, 200, 'the planner API is available to V3 even with V2 off');
+  });
+});
+
+// V3 French support (PR #31 review, 2026-10-04): trip-planner-fr.js is loaded
+// like the interpreter, never behind a try/catch. Present, French and English
+// requests both plan through the real server; missing, the plan request fails
+// with the module's own error instead of quietly planning in English only.
+test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails clearly without it (isolated child processes)', async () => {
+  const projectRoot = path.join(__dirname, '..');
+  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const run = async (port, files, fn) => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripfr-'));
+    for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+    fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
+    const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore', env: { ...process.env, TRIP_PLANNER_V2: 'on', TRIP_PLANNER_V3: 'on' } });
+    try {
+      let ready = false;
+      for (let i = 0; i < 100 && !ready; i++) { try { if ((await fetch(`http://localhost:${port}/robots.txt`)).status === 200) ready = true; } catch (_) { await new Promise((r) => setTimeout(r, 100)); } }
+      assert.ok(ready, `child server ${port} started`);
+      await fn((text) => fetch(`http://localhost:${port}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }));
+    } finally { child.kill('SIGKILL'); fs.rmSync(tempDir, { recursive: true, force: true }); }
+  };
+  await run(3624, [...base, 'trip-planner-fr.js'], async (plan) => {
+    const frRes = await plan('3 jours à Kelowna avec des vignobles');
+    assert.equal(frRes.status, 200);
+    const fr = await frRes.json();
+    const en = await (await plan('3 days in Kelowna with vineyards')).json();
+    assert.equal(fr.kind, 'multi_day');
+    assert.equal(fr.days.length, 3);
+    assert.deepEqual(fr.intent.types, ['winery']);
+    assert.equal(fr.query, '3 jours à Kelowna avec des vignobles', 'the request shown is the visitor’s own');
+    assert.deepEqual(fr.days.map((d) => d.stops.map((s) => s.venue && s.venue.id)), en.days.map((d) => d.stops.map((s) => s.venue && s.venue.id)), 'the same stops as the English request');
+  });
+  await run(3625, base, async (plan) => {
+    for (const text of ['3 jours à Kelowna avec des vignobles', 'Plan 3 days in Kelowna']) {
+      const r = await plan(text);
+      assert.equal(r.status, 500, text);
+      assert.match((await r.json()).error, /trip-planner-fr/, 'the error names the missing module');
+    }
   });
 });
 

@@ -243,6 +243,7 @@ function renderStyles() {
   .t3-plan-head .t3-btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,0.4); }
   .t3-plan-head .t3-btn-ghost:hover { background: rgba(255,255,255,0.12); }
   .t3-plan-status { margin: 10px 0 0; font-size: 0.88rem; color: rgba(255,255,255,0.9); min-height: 1.2em; }
+  .t3-edit-error { margin: 8px 0; padding: 8px 12px; border-radius: 10px; background: #FFF6E6; border: 1px solid rgba(181,69,43,0.45); color: #7A2E1B; font-size: 0.88rem; font-weight: 700; }
   .t3-details { margin-top: 12px; font-size: 0.84rem; color: rgba(255,255,255,0.8); }
   .t3-details summary { cursor: pointer; font-weight: 700; }
   .t3-details ul { margin: 8px 0 0; padding-left: 18px; }
@@ -357,37 +358,39 @@ function renderStyles() {
 
 function renderBody(d) {
   const esc = d.esc;
-  const chips = T3_EXAMPLES.map((e) => `<button type="button" class="t3-example" data-t3-example>${esc(e)}</button>`).join('\n          ');
+  // data-i18n: /scripts/app.js shows these in the visitor's language (the
+  // tripv3.* keys); the English below is the same text it shows in English.
+  const chips = T3_EXAMPLES.map((e, i) => `<button type="button" class="t3-example" data-t3-example data-i18n="tripv3.example${i + 1}">${esc(e)}</button>`).join('\n          ');
   return `<main class="t3" id="tripV3">
   <section class="t3-hero" aria-labelledby="t3Title">
     <img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656" alt="" fetchpriority="high">
     <div class="t3-hero-scrim"></div>
     <div class="t3-wrap t3-hero-inner">
-      <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; Build My Trip</nav>
-      <p class="t3-eyebrow">Build My Trip</p>
-      <h1 class="t3-title" id="t3Title">Tell us the trip. We&rsquo;ll map it out.</h1>
-      <p class="t3-lead">Describe your Okanagan trip in your own words &mdash; how long, who&rsquo;s coming, what you love. We&rsquo;ll plan it day by day from real places on Okanagan Roam, and tell you why each one fits.</p>
+      <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/" data-i18n="tripv3.crumbHome">Home</a> &rsaquo; <span data-i18n="tripv3.name">Build My Trip</span></nav>
+      <p class="t3-eyebrow" data-i18n="tripv3.name">Build My Trip</p>
+      <h1 class="t3-title" id="t3Title" data-i18n="tripv3.title">Tell us the trip. We&rsquo;ll map it out.</h1>
+      <p class="t3-lead" data-i18n="tripv3.lead">Describe your Okanagan trip in your own words &mdash; how long, who&rsquo;s coming, what you love. We&rsquo;ll plan it day by day from real places on Okanagan Roam, and tell you why each one fits.</p>
       <form class="t3-composer" id="t3Form" novalidate>
-        <label class="t3-sr" for="t3Input">Describe the trip you want</label>
-        <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake."></textarea>
+        <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
+        <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake." data-i18n-placeholder="tripv3.placeholder"></textarea>
         <div class="t3-composer-foot">
-          <span class="t3-hint">Real Okanagan Roam places only &mdash; no invented details.</span>
-          <button type="submit" class="t3-submit" id="t3Submit">Plan my trip <span aria-hidden="true">&rarr;</span></button>
+          <span class="t3-hint" data-i18n="tripv3.hint">Real Okanagan Roam places only &mdash; no invented details.</span>
+          <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
         </div>
       </form>
       <div class="t3-examples">
-        <span class="t3-examples-label" id="t3ExamplesLabel">Or start from one of these:</span>
+        <span class="t3-examples-label" id="t3ExamplesLabel" data-i18n="tripv3.examplesLabel">Or start from one of these:</span>
           ${chips}
       </div>
       <p class="t3-status" id="t3Status" role="status" aria-live="polite"></p>
     </div>
   </section>
   <section class="t3-wrap t3-how" id="t3How" aria-labelledby="t3HowTitle">
-    <h2 id="t3HowTitle">How it works</h2>
+    <h2 id="t3HowTitle" data-i18n="tripv3.howTitle">How it works</h2>
     <ol class="t3-how-grid">
-      <li><span class="t3-how-num">1</span><strong>Say it your way</strong>&ldquo;Three days, wine and golf, one slow day by the lake.&rdquo; Days, dates, kids, dogs and occasions all count.</li>
-      <li><span class="t3-how-num">2</span><strong>Real places, real reasons</strong>Every stop is a place listed on Okanagan Roam, chosen from what we actually know about it &mdash; and we tell you why.</li>
-      <li><span class="t3-how-num">3</span><strong>Make it yours</strong>Keep the stops you love, swap or remove the rest, regenerate a day and add it all to My Trip.</li>
+      <li><span class="t3-how-num">1</span><strong data-i18n="tripv3.how1Title">Say it your way</strong><span data-i18n="tripv3.how1Text">&ldquo;Three days, wine and golf, one slow day by the lake.&rdquo; Days, dates, kids, dogs and occasions all count.</span></li>
+      <li><span class="t3-how-num">2</span><strong data-i18n="tripv3.how2Title">Real places, real reasons</strong><span data-i18n="tripv3.how2Text">Every stop is a place listed on Okanagan Roam, chosen from what we actually know about it &mdash; and we tell you why.</span></li>
+      <li><span class="t3-how-num">3</span><strong data-i18n="tripv3.how3Title">Make it yours</strong><span data-i18n="tripv3.how3Text">Keep the stops you love, swap or remove the rest, regenerate a day and add it all to My Trip.</span></li>
     </ol>
   </section>
   <section class="t3-wrap t3-result" id="t3Result" hidden aria-labelledby="t3Headline"></section>
@@ -415,6 +418,24 @@ function renderScript(d) {
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
   function setStatus(text, mode){ statusEl.textContent = text || ''; statusEl.className = 't3-status' + (mode ? ' is-' + mode : ''); }
+  // Interface text in the visitor's language (2026-10-04): the tripv3.* keys
+  // of /scripts/app.js, through its t() and getCurrentLang(). In English every
+  // string is the page's original text. Labels the planner sends (badges,
+  // types, parts of the day, who is coming, the occasion) keep the planner's
+  // own English and are only replaced in French; the plan's sentences
+  // (headline, reasons, notes) are shown as the planner wrote them.
+  function lang(){ return typeof getCurrentLang === 'function' ? getCurrentLang() : 'en'; }
+  function tx(key, vars){
+    var s = typeof t === 'function' ? t(key) : key;
+    if (vars) Object.keys(vars).forEach(function(k){ s = s.split('{' + k + '}').join(String(vars[k])); });
+    return s;
+  }
+  function frLabel(key, english){ if (lang() !== 'fr') return english; var s = tx(key); return s === key ? english : s; }
+  function num(n){ return lang() === 'fr' ? String(n).replace('.', ',') : String(n); }
+  function kmText(km){
+    if (km === null || km === undefined) return null;
+    return km < 1 ? tx('tripv3.kmUnder') : tx('tripv3.kmAbout', { n: num(km < 10 ? Math.round(km * 10) / 10 : Math.round(km)) });
+  }
 
   // ---- analytics: the same events and fixed parameters as the V2 view, plus
   // the Stage 5A (F12) V3 events: trip_plan_edit (keep / unkeep / remove /
@@ -441,17 +462,19 @@ function renderScript(d) {
     for (var k in extra) body[k] = extra[k];
     var requestType = opts.requestType || 'initial';
     var trigger = opts.trigger || null;
-    setStatus('Planning your trip…', 'loading');
+    setStatus(tx('tripv3.planning'), 'loading');
     submitBtn.disabled = true;
     resultEl.setAttribute('aria-busy', 'true');
     if (trigger) { trigger.disabled = true; trigger.setAttribute('aria-busy', 'true'); }
+    clearEditError();
     function done(){ submitBtn.disabled = false; resultEl.removeAttribute('aria-busy'); if (trigger) { trigger.disabled = false; trigger.removeAttribute('aria-busy'); } }
     return fetch('/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function(res){
         done();
         if (!res.ok) {
-          setStatus(res.j && res.j.error ? res.j.error : 'Something went wrong. Please try again.', 'error');
+          setStatus(res.j && res.j.error ? res.j.error : tx('tripv3.error'), 'error');
+          showEditError(trigger, statusEl.textContent);
           track('trip_plan_error', { request_type: requestType, error_type: 'response', http_status: res.status });
           return;
         }
@@ -481,9 +504,25 @@ function renderScript(d) {
       })
       .catch(function(){
         done();
-        setStatus('Something went wrong. Please try again.', 'error');
+        setStatus(tx('tripv3.error'), 'error');
+        showEditError(trigger, statusEl.textContent);
         track('trip_plan_error', { request_type: requestType, error_type: 'exception' });
       });
+  }
+  // An edit that fails (Swap, Regenerate day, a changed setting, ...) is also
+  // shown next to the control that made it: on a phone the hero's status line
+  // is far above the plan. The same message; the plan on screen is unchanged,
+  // so the note stays until the next request or render. Not a live region --
+  // the hero's status line already announces it.
+  function clearEditError(){ Array.prototype.forEach.call(resultEl.querySelectorAll('.t3-edit-error'), function(el){ el.parentNode.removeChild(el); }); }
+  function showEditError(trigger, text){
+    if (!trigger || !text || !resultEl.contains(trigger)) return;
+    var host = trigger.closest('.t3-day-head, .t3-actions, .t3-removed, .t3-chips, .t3-plan-actions') || trigger;
+    var note = document.createElement('p');
+    note.className = 't3-edit-error';
+    note.textContent = text;
+    host.parentNode.insertBefore(note, host.nextSibling);
+    try { note.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
   }
   // The address bar always holds the link to the plan on screen (replaceState:
   // no extra history entries, so Back leaves the page as before). It is built
@@ -549,9 +588,9 @@ function renderScript(d) {
     if (tripMap.box) return tripMap.box;
     var box = document.createElement('section');
     box.className = 't3-map';
-    box.setAttribute('aria-label', 'Trip map');
-    box.innerHTML = '<div class="t3-map-bar"><button type="button" class="t3-btn t3-btn-ghost t3-map-toggle" aria-expanded="false" aria-controls="t3MapPanel">Show trip map</button><p class="t3-map-note" hidden></p></div>'
-      + '<div class="t3-map-panel" id="t3MapPanel" hidden><div class="t3-map-days" role="group" aria-label="Days shown on the map" hidden></div>'
+    box.setAttribute('aria-label', tx('tripv3.map.label'));
+    box.innerHTML = '<div class="t3-map-bar"><button type="button" class="t3-btn t3-btn-ghost t3-map-toggle" aria-expanded="false" aria-controls="t3MapPanel">' + esc(tx('tripv3.map.show')) + '</button><p class="t3-map-note" hidden></p></div>'
+      + '<div class="t3-map-panel" id="t3MapPanel" hidden><div class="t3-map-days" role="group" aria-label="' + esc(tx('tripv3.map.daysLabel')) + '" hidden></div>'
       + '<div class="t3-map-canvas"></div><p class="t3-map-status" role="status" aria-live="polite"></p></div>';
     box.querySelector('.t3-map-toggle').addEventListener('click', function(){ setMapOpen(!tripMap.open); });
     box.querySelector('.t3-map-days').addEventListener('click', function(e){
@@ -577,33 +616,37 @@ function renderScript(d) {
     var data = tripMap.data;
     if (tripMap.day !== null && !data.days.some(function(d){ return d.day === tripMap.day; })) tripMap.day = null;
     var note = box.querySelector('.t3-map-note');
-    note.textContent = data.skipped === 1 ? '1 stop isn’t on the map — it has no stored location.' : data.skipped + ' stops aren’t on the map — they have no stored location.';
+    note.textContent = data.skipped === 1 ? tx('tripv3.map.skippedOne') : tx('tripv3.map.skippedMany', { n: data.skipped });
+    // The box is kept across renders, so its own labels follow the language.
+    box.setAttribute('aria-label', tx('tripv3.map.label'));
+    box.querySelector('.t3-map-toggle').textContent = tripMap.open ? tx('tripv3.map.hide') : tx('tripv3.map.show');
+    box.querySelector('.t3-map-days').setAttribute('aria-label', tx('tripv3.map.daysLabel'));
     note.hidden = !data.skipped;
     var chips = box.querySelector('.t3-map-days');
     chips.hidden = data.days.length < 2;
-    chips.innerHTML = data.days.length < 2 ? '' : '<button type="button" class="t3-map-chip" data-t3-map-only="all" aria-pressed="false">All days</button>'
-      + data.days.map(function(d){ return '<button type="button" class="t3-map-chip" data-t3-map-only="' + esc(d.day) + '" aria-pressed="false"><span class="t3-map-swatch" style="background:' + dayColor(d.day) + '" aria-hidden="true"></span>Day ' + esc(d.day) + '</button>'; }).join('');
+    chips.innerHTML = data.days.length < 2 ? '' : '<button type="button" class="t3-map-chip" data-t3-map-only="all" aria-pressed="false">' + esc(tx('tripv3.map.allDays')) + '</button>'
+      + data.days.map(function(d){ return '<button type="button" class="t3-map-chip" data-t3-map-only="' + esc(d.day) + '" aria-pressed="false"><span class="t3-map-swatch" style="background:' + dayColor(d.day) + '" aria-hidden="true"></span>' + esc(tx('tripv3.day', { n: d.day })) + '</button>'; }).join('');
     if (tripMap.open) { if (tripMap.leaflet) drawMap(true); else openMap(); }
   }
   function setMapOpen(open){
     var box = mapBox(), btn = box.querySelector('.t3-map-toggle');
     tripMap.open = open;
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    btn.textContent = open ? 'Hide trip map' : 'Show trip map';
+    btn.textContent = open ? tx('tripv3.map.hide') : tx('tripv3.map.show');
     box.querySelector('.t3-map-panel').hidden = !open;
     if (open) openMap();
   }
   function openMap(){
     if (tripMap.leaflet) { drawMap(true); return; }
-    mapStatus('Loading the map…');
+    mapStatus(tx('tripv3.map.loading'));
     loadLeaflet(function(ok){
       if (!tripMap.open || tripMap.leaflet || !tripMap.box.parentNode) return;
-      if (!ok) { mapStatus('The map couldn’t load. Hide it and try again.'); return; }
+      if (!ok) { mapStatus(tx('tripv3.map.failed')); return; }
       try {
         tripMap.leaflet = L.map(tripMap.box.querySelector('.t3-map-canvas'), { scrollWheelZoom: false, maxZoom: 15 }).setView([49.75, -119.55], 9);
         L.tileLayer(MAP_TILES, { maxZoom: 15, attribution: MAP_ATTRIBUTION }).addTo(tripMap.leaflet);
         tripMap.layer = L.layerGroup().addTo(tripMap.leaflet);
-      } catch (e) { tripMap.leaflet = null; mapStatus('The map couldn’t load. Hide it and try again.'); return; }
+      } catch (e) { tripMap.leaflet = null; mapStatus(tx('tripv3.map.failed')); return; }
       mapStatus('');
       drawMap(true);
     });
@@ -648,7 +691,7 @@ function renderScript(d) {
       d.points.forEach(function(p){
         var at = [p.lat, p.lng];
         line.push(at); bounds.push(at);
-        var label = 'Day ' + d.day + ', stop ' + p.n + ': ' + p.name;
+        var label = tx('tripv3.map.marker', { day: d.day, n: p.n, name: p.name });
         var marker = L.marker(at, { title: label, riseOnHover: true, icon: L.divIcon({ className: 't3-pin', html: '<span style="background:' + color + '">' + p.n + '</span>', iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] }) });
         marker.bindPopup(mapPopup(d.day, p));
         marker.on('add', function(){ var el = this.getElement(); if (el) el.setAttribute('aria-label', label); });
@@ -668,11 +711,11 @@ function renderScript(d) {
     el.className = 't3-map-pop';
     var when = document.createElement('div');
     when.className = 't3-map-pop-when';
-    when.textContent = 'Day ' + day + ' · ' + p.n + (p.label ? ' · ' + p.label : '');
+    when.textContent = tx('tripv3.day', { n: day }) + ' · ' + p.n + (p.label ? ' · ' + p.label : '');
     var name = document.createElement('strong');
     name.textContent = p.name;
     var btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 't3-act'; btn.textContent = 'Show in plan';
+    btn.type = 'button'; btn.className = 't3-act'; btn.textContent = tx('tripv3.map.showInPlan');
     btn.addEventListener('click', function(){ showInPlan(p.key); });
     el.appendChild(when); el.appendChild(name); el.appendChild(btn);
     return el;
@@ -690,14 +733,19 @@ function renderScript(d) {
   // ---- rendering ----
   function factsLine(v){
     var parts = [];
-    if (v.rating != null) parts.push('<span class="t3-star" aria-hidden="true">★</span> ' + esc(v.rating) + (v.reviews ? ' <span class="t3-sr">from</span>(' + esc(Number(v.reviews).toLocaleString('en-CA')) + ' reviews)' : ''));
-    if (v.price) parts.push('<span aria-label="Price level ' + v.price + ' of 4">' + new Array(v.price + 1).join('$') + '</span>');
+    if (v.rating != null) parts.push('<span class="t3-star" aria-hidden="true">★</span> ' + esc(num(v.rating)) + (v.reviews ? ' <span class="t3-sr">' + esc(tx('tripv3.from')) + '</span>' + esc(tx('tripv3.reviews', { n: Number(v.reviews).toLocaleString(lang() === 'fr' ? 'fr-CA' : 'en-CA') })) : ''));
+    if (v.price) parts.push('<span aria-label="' + esc(tx('tripv3.priceLevel', { n: v.price })) + '">' + new Array(v.price + 1).join('$') + '</span>');
     return parts.length ? '<p class="t3-facts">' + parts.join(' · ') + '</p>' : '';
   }
+  // The site's own badge names (the same keys as /browse).
+  var BADGE_KEYS = { dog_friendly: 'badge.dogFriendly', vegan: 'badge.vegan', vegetarian: 'badge.vegetarian', gluten_free: 'badge.glutenFree', patio: 'badge.patio', kid_friendly: 'badge.kidFriendly', lake_view: 'badge.lakeView', nonalcoholic: 'badge.nonalcoholic', sports_tv: 'badge.sportsTv', live_music: 'badge.liveMusic', great_groups: 'badge.greatGroups', happy_hour: 'badge.happyHour' };
+  var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', evening: 'Evening' };
+  // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
+  function whenLabel(s){ return DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; }
   function badgesHtml(v){
-    var items = (v.badges || []).map(function(b){ return '<li>' + esc(b.label) + '</li>'; })
-      .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(c.label) + '</li>'; }));
-    return items.length ? '<ul class="t3-badges" aria-label="Verified on Okanagan Roam">' + items.join('') + '</ul>' : '';
+    var items = (v.badges || []).map(function(b){ return '<li>' + esc(frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; })
+      .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }));
+    return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
   }
   function cardHtml(stop, key, opts){
     opts = opts || {};
@@ -712,30 +760,33 @@ function renderScript(d) {
       // grid row can share row tracks (see .t3-grid) and line up. Each group
       // is always present, empty or not.
       + '<div class="t3-card-head">'
-      + '<div class="t3-card-top"><span>' + esc(v.typeLabel) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
+      + '<div class="t3-card-top"><span>' + esc(frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a href="' + esc(url) + '">' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
       + factsLine(v)
       + '</div>'
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
-      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + ' <span class="t3-sr">(</span>— check before you go<span class="t3-sr">)</span></p>' : '')
-      + (why ? '<ul class="t3-why" aria-label="Why it fits">' + why + '</ul>' : '')
-      + (cav ? '<ul class="t3-caveats" aria-label="Good to know">' + cav + '</ul>' : '')
+      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + ' <span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></p>' : '')
+      + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
+      + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
       + '<div class="t3-actions">'
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + '>Add to trip</button>'
       + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>';
     if (key) {
-      html += '<button type="button" class="t3-act" data-t3-keep="' + esc(key) + '" aria-pressed="' + (kept ? 'true' : 'false') + '" aria-label="Keep ' + esc(v.name) + ' when regenerating">' + (kept ? 'Kept' : 'Keep') + '</button>'
-        + '<button type="button" class="t3-act" data-t3-swap="' + esc(key) + '" aria-label="Swap ' + esc(v.name) + ' for another suggestion">Swap</button>'
-        + '<button type="button" class="t3-act" data-t3-remove="' + esc(key) + '" aria-label="Remove ' + esc(v.name) + ' from this plan">Remove</button>';
+      html += '<button type="button" class="t3-act" data-t3-keep="' + esc(key) + '" aria-pressed="' + (kept ? 'true' : 'false') + '" aria-label="' + esc(tx('tripv3.keepLabel', { name: v.name })) + '">' + esc(kept ? tx('tripv3.kept') : tx('tripv3.keep')) + '</button>'
+        + '<button type="button" class="t3-act" data-t3-swap="' + esc(key) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>'
+        + '<button type="button" class="t3-act" data-t3-remove="' + esc(key) + '" aria-label="' + esc(tx('tripv3.removeLabel', { name: v.name })) + '">' + esc(tx('tripv3.remove')) + '</button>';
     } else if (opts.swapId) {
-      html += '<button type="button" class="t3-act" data-t3-swap-id="' + esc(v.id) + '" aria-label="Swap ' + esc(v.name) + ' for another suggestion">Swap</button>';
+      html += '<button type="button" class="t3-act" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>';
     }
-    if (url) html += '<a class="t3-act" href="' + esc(url) + '">View details</a>';
+    if (url) html += '<a class="t3-act" href="' + esc(url) + '">' + esc(tx('tripv3.viewDetails')) + '</a>';
     return html + '</div></article>';
   }
+  // The planner's fixed occasion and party labels (trip-planner.js).
+  var OCCASION_KEYS = { 'date night': 'tripv3.occasion.date_night', 'romantic outing': 'tripv3.occasion.romantic', 'family trip': 'tripv3.occasion.family', 'rainy day': 'tripv3.occasion.rainy_day', celebration: 'tripv3.occasion.celebration', 'group getaway': 'tripv3.occasion.group_getaway', 'relaxing getaway': 'tripv3.occasion.relaxing', adventure: 'tripv3.occasion.adventure', 'adults-only trip': 'tripv3.occasion.adults' };
+  var PARTY_KEYS = { 'with kids': 'tripv3.party.kids', 'with a dog': 'tripv3.party.dog' };
   function understoodHtml(p){
     var u = p.understood;
     if (!u) return '';
@@ -743,53 +794,53 @@ function renderScript(d) {
     var planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';
     if (planKinds) {
       var dOpts = '';
-      for (var n = 1; n <= 7; n++) dOpts += '<option value="' + n + '"' + (n === (p.days || []).length ? ' selected' : '') + '>' + n + (n === 1 ? ' day' : ' days') + '</option>';
-      chips.push('<li class="t3-chip"><span class="t3-chip-label">Length</span><select data-t3-override="days" aria-label="Trip length">' + dOpts + '</select></li>');
+      for (var n = 1; n <= 7; n++) dOpts += '<option value="' + n + '"' + (n === (p.days || []).length ? ' selected' : '') + '>' + esc(tx(n === 1 ? 'tripv3.dayOne' : 'tripv3.dayMany', { n: n })) + '</option>';
+      chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.length')) + '</span><select data-t3-override="days" aria-label="' + esc(tx('tripv3.lengthLabel')) + '">' + dOpts + '</select></li>');
     }
     if (!(u.route && u.route.to) && ['events', 'navigate', 'unknown'].indexOf(p.kind) === -1) {
       var cur = u.base.length === 1 ? u.base[0].slug : (u.base.length ? '' : 'valley');
       var bOpts = (u.base.length > 1 ? '<option value="" selected>' + esc(u.base.map(function(b){ return b.label; }).join(' & ')) + '</option>' : '')
-        + '<option value="valley"' + (cur === 'valley' ? ' selected' : '') + '>Anywhere in the Okanagan</option>'
+        + '<option value="valley"' + (cur === 'valley' ? ' selected' : '') + '>' + esc(tx('tripv3.anywhere')) + '</option>'
         + REGIONS.map(function(r){ return '<option value="' + esc(r.slug) + '"' + (cur === r.slug ? ' selected' : '') + '>' + esc(r.label) + '</option>'; }).join('');
-      chips.push('<li class="t3-chip"><span class="t3-chip-label">Where</span><select data-t3-override="baseRegion" aria-label="Where to base the plan">' + bOpts + '</select></li>');
+      chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.where')) + '</span><select data-t3-override="baseRegion" aria-label="' + esc(tx('tripv3.whereLabel')) + '">' + bOpts + '</select></li>');
     }
     if (planKinds) {
-      var paces = [['relaxed', 'Relaxed'], ['standard', 'Balanced'], ['packed', 'Packed']];
-      chips.push('<li class="t3-chip"><span class="t3-chip-label">Pace</span><select data-t3-override="pace" aria-label="Pace">' + paces.map(function(x){ return '<option value="' + x[0] + '"' + (u.pace === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></li>');
+      var paces = ['relaxed', 'standard', 'packed'];
+      chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.pace')) + '</span><select data-t3-override="pace" aria-label="' + esc(tx('tripv3.pace')) + '">' + paces.map(function(x){ return '<option value="' + x + '"' + (u.pace === x ? ' selected' : '') + '>' + esc(tx('tripv3.pace.' + x)) + '</option>'; }).join('') + '</select></li>');
     }
-    if (u.season) chips.push('<li class="t3-chip"><span class="t3-chip-label">When</span>' + esc(u.season.label) + '</li>');
-    else if (u.when) chips.push('<li class="t3-chip"><span class="t3-chip-label">When</span>' + esc(u.when) + '</li>');
-    if (u.occasion) chips.push('<li class="t3-chip">' + esc(u.occasion.charAt(0).toUpperCase() + u.occasion.slice(1)) + '</li>');
-    (u.party || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(x.charAt(0).toUpperCase() + x.slice(1)) + '</li>'); });
+    if (u.season) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(u.season.label) + '</li>');
+    else if (u.when) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(u.when) + '</li>');
+    if (u.occasion) chips.push('<li class="t3-chip">' + esc(frLabel(OCCASION_KEYS[u.occasion], u.occasion.charAt(0).toUpperCase() + u.occasion.slice(1))) + '</li>');
+    (u.party || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(frLabel(PARTY_KEYS[x], x.charAt(0).toUpperCase() + x.slice(1))) + '</li>'); });
     (u.interests || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(x.charAt(0).toUpperCase() + x.slice(1)) + '</li>'); });
-    (u.themes || []).forEach(function(x){ chips.push('<li class="t3-chip"><span class="t3-chip-label">One day</span>' + esc(x) + '</li>'); });
-    var notUsed = (u.notUsed || []).length ? '<p class="t3-notused">Not something we can plan around yet: ' + u.notUsed.map(function(w){ return '“' + esc(w) + '”'; }).join(', ') + '.</p>' : '';
-    return '<div class="t3-understood"><p class="t3-eyebrow">Here’s what we understood</p><ul class="t3-chips">' + chips.join('') + '</ul>' + notUsed + '</div>';
+    (u.themes || []).forEach(function(x){ chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.oneDay')) + '</span>' + esc(x) + '</li>'); });
+    var notUsed = (u.notUsed || []).length ? '<p class="t3-notused">' + esc(tx('tripv3.notUsed', { list: '\u0001' })).split('\u0001').join(u.notUsed.map(function(w){ return (lang() === 'fr' ? '«\u00a0' : '“') + esc(w) + (lang() === 'fr' ? '\u00a0»' : '”'); }).join(', ')) + '</p>' : '';
+    return '<div class="t3-understood"><p class="t3-eyebrow">' + esc(tx('tripv3.understood')) + '</p><ul class="t3-chips">' + chips.join('') + '</ul>' + notUsed + '</div>';
   }
   function stopsListHtml(stops, keyFor, counts){
     var html = '<ol class="t3-stops">', prev = null;
     stops.forEach(function(s){
       var key = keyFor ? keyFor(s) : null;
       if (key && state.removed[key]) {
-        html += '<li class="t3-stop"><div class="t3-when">' + esc(s.label) + '</div><div class="t3-removed">Removed from this plan. <button type="button" class="t3-act" data-t3-undo="' + esc(key) + '">Undo</button><button type="button" class="t3-act" data-t3-swap="' + esc(key) + '">Suggest another</button></div></li>';
+        html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-removed">' + esc(tx('tripv3.removedStop')) + ' <button type="button" class="t3-act" data-t3-undo="' + esc(key) + '">' + esc(tx('tripv3.undo')) + '</button><button type="button" class="t3-act" data-t3-swap="' + esc(key) + '">' + esc(tx('tripv3.suggestAnother')) + '</button></div></li>';
         return;
       }
       if (!s.venue) {
         if (s.kind === 'event' && s.event) {
           var e = s.event, u = safeUrl(e.url);
-          html += '<li class="t3-stop"><div class="t3-when">' + esc(s.label) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>Event</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">View event</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
         }
-        html += '<li class="t3-stop"><div class="t3-when">' + esc(s.label) + '</div><div class="t3-empty">No suitable stop was found for this part of the day.</div></li>';
+        html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty">' + esc(tx('tripv3.noStop')) + '</div></li>';
         return;
       }
       if (prev) {
-        var km = t3KmText(t3Km(prev.venue, s.venue));
-        if (km) html += '<li class="t3-leg" aria-label="Distance from the previous stop">' + esc(km) + '</li>';
+        var km = kmText(t3Km(prev.venue, s.venue));
+        if (km) html += '<li class="t3-leg" aria-label="' + esc(tx('tripv3.distanceLabel')) + '">' + esc(km) + '</li>';
       }
-      html += '<li class="t3-stop"><div class="t3-when">' + esc(s.label) + '</div><div>' + cardHtml(s, key, { planStop: true, counts: counts, swapId: !key }) + '</div></li>';
+      html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div>' + cardHtml(s, key, { planStop: true, counts: counts, swapId: !key }) + '</div></li>';
       prev = s;
     });
     return html + '</ol>';
@@ -804,11 +855,11 @@ function renderScript(d) {
     var maps = t3MapsUrl(dayStops.map(function(s){ return tripQuery(s.venue); }));
     return '<section class="t3-day" id="t3-day-' + d.day + '" aria-labelledby="t3-day-title-' + d.day + '">'
       + '<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
-      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">Day ' + esc(d.day) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || 'The Okanagan') + '</h3>'
-      + (d.theme && d.theme.label ? '<p class="t3-day-theme">Planned around your ' + esc(d.theme.label) + '</p>' : '') + '</div>'
-      + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">Regenerate day</button>'
-      + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">Add day to My Trip</button>'
-      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>Map this day</a>' : '') + '</div></div></div>'
+      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
+      + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
+      + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
+      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>'
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
       + '</section>';
   }
@@ -817,48 +868,48 @@ function renderScript(d) {
     var counts = nameCounts();
     var planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';
     var hasStops = planKinds || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary && (p.itinerary.stops || []).length);
-    var regen = hasStops ? 'Regenerate plan' : ((p.kind === 'recommendations' || p.kind === 'discover') && (p.recommendations || []).length ? 'Show others' : null);
+    var regen = hasStops ? tx('tripv3.regenPlan') : ((p.kind === 'recommendations' || p.kind === 'discover') && (p.recommendations || []).length ? tx('tripv3.showOthers') : null);
     var notes = (p.notes || []).filter(function(n){ return (p.contextNotes || []).indexOf(n) === -1; });
     var html = understoodHtml(p)
-      + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">Your Okanagan plan</p>'
-      + (state.text ? '<p class="t3-request">You asked for “' + esc(state.text) + '”</p>' : '')
+      + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
+      + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
       + (p.experience && p.experience.text ? '<p class="t3-expect">' + esc(p.experience.text) + '</p>' : '')
       + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
       + '<div class="t3-plan-actions">'
-      + (hasStops ? '<button type="button" class="t3-btn" data-t3-add-all aria-describedby="t3PlanStatus">Add whole trip to My Trip</button>' : '')
-      + (regen ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-regen>' + regen + '</button>' : '')
-      + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-share>Copy link to this plan</button>'
-      + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-view-trip hidden>View My Trip</button>'
+      + (hasStops ? '<button type="button" class="t3-btn" data-t3-add-all aria-describedby="t3PlanStatus">' + esc(tx('tripv3.addAll')) + '</button>' : '')
+      + (regen ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-regen>' + esc(regen) + '</button>' : '')
+      + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-share>' + esc(tx('tripv3.share')) + '</button>'
+      + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-view-trip hidden>' + esc(tx('tripv3.viewTrip')) + '</button>'
       + '</div><p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p>'
-      + (notes.length ? '<details class="t3-details"><summary>How this plan was made</summary><ul>' + notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></details>' : '')
+      + (notes.length ? '<details class="t3-details"><summary>' + esc(tx('tripv3.howMade')) + '</summary><ul>' + notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></details>' : '')
       + '</header>';
     var issues = (p.warnings || []).slice();
     if (issues.length) html += '<div class="t3-warnings" role="note"><ul>' + issues.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>';
     if (planKinds && days().length) {
       html += '<div class="t3-map-slot" data-t3-map-slot></div>';
-      if (days().length > 1) html += '<nav class="t3-daynav" aria-label="Jump to a day">' + days().map(function(d){ return '<a href="#t3-day-' + d.day + '">Day ' + d.day + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
+      if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a href="#t3-day-' + d.day + '">' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
       html += days().map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
-      html += '<h3 class="t3-section-title">Your outing</h3>' + stopsListHtml(p.outing.stops, function(s){ return null; }, counts);
-      if ((p.outing.alternates || []).length) html += '<h3 class="t3-section-title">Other good options</h3><div class="t3-grid">' + p.outing.alternates.map(function(a){ return cardHtml(a, null, { counts: {} }); }).join('') + '</div>';
+      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.yourOuting')) + '</h3>' + stopsListHtml(p.outing.stops, function(s){ return null; }, counts);
+      if ((p.outing.alternates || []).length) html += '<h3 class="t3-section-title">' + esc(tx('tripv3.otherOptions')) + '</h3><div class="t3-grid">' + p.outing.alternates.map(function(a){ return cardHtml(a, null, { counts: {} }); }).join('') + '</div>';
     } else if (p.kind === 'itinerary' && p.itinerary) {
       var it = p.itinerary;
-      html += '<h3 class="t3-section-title">Your itinerary</h3>';
+      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.yourItinerary')) + '</h3>';
       if (it.route && it.route.regions && it.route.regions.length > 1) html += '<p class="t3-hours">' + it.route.regions.map(function(r){ return esc(r.label); }).join(' → ') + '</p>';
-      html += (it.stops || []).length ? stopsListHtml(it.stops, null, counts) : '<p class="t3-empty">Nothing on Okanagan Roam matches those parts yet.</p>';
-      (it.stops || []).forEach(function(s){ if ((s.alternates || []).length) html += '<h3 class="t3-section-title">Other options for ' + esc(String(s.label || '').toLowerCase()) + '</h3><div class="t3-grid">' + s.alternates.map(function(a){ return cardHtml(a, null, { counts: {} }); }).join('') + '</div>'; });
+      html += (it.stops || []).length ? stopsListHtml(it.stops, null, counts) : '<p class="t3-empty">' + esc(tx('tripv3.noMatchParts')) + '</p>';
+      (it.stops || []).forEach(function(s){ if ((s.alternates || []).length) html += '<h3 class="t3-section-title">' + esc(tx('tripv3.optionsFor', { label: String(s.label || '').toLowerCase() })) + '</h3><div class="t3-grid">' + s.alternates.map(function(a){ return cardHtml(a, null, { counts: {} }); }).join('') + '</div>'; });
     } else if ((p.kind === 'recommendations' || p.kind === 'discover') && (p.recommendations || []).length) {
-      html += '<h3 class="t3-section-title">Places that fit</h3><div class="t3-grid">' + p.recommendations.map(function(s){ return cardHtml(s, null, { counts: {} }); }).join('') + '</div>';
+      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.placesFit')) + '</h3><div class="t3-grid">' + p.recommendations.map(function(s){ return cardHtml(s, null, { counts: {} }); }).join('') + '</div>';
     } else if (p.kind === 'events') {
       var ev = p.events || [];
-      html += '<h3 class="t3-section-title">What’s on</h3>' + (ev.length ? '<div class="t3-grid">' + ev.map(function(e){ var u = safeUrl(e.url); return '<article class="t3-card"><div class="t3-card-top"><span>' + esc(e.dateLabel) + (e.time ? ' · ' + esc(e.time) : '') + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>' + (u ? '<div class="t3-actions"><a class="t3-act" href="' + esc(u) + '">View event</a></div>' : '') + '</article>'; }).join('') + '</div>' : '<p class="t3-empty">Nothing is listed for that yet.</p>');
+      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.whatsOn')) + '</h3>' + (ev.length ? '<div class="t3-grid">' + ev.map(function(e){ var u = safeUrl(e.url); return '<article class="t3-card"><div class="t3-card-top"><span>' + esc(e.dateLabel) + (e.time ? ' · ' + esc(e.time) : '') + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>' + (u ? '<div class="t3-actions"><a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a></div>' : '') + '</article>'; }).join('') + '</div>' : '<p class="t3-empty">' + esc(tx('tripv3.nothingListed')) + '</p>');
     } else if (p.kind === 'navigate' && p.venue && safeUrl(p.venue.url)) {
-      html += '<p class="t3-empty">That’s a place on Okanagan Roam: <a class="t3-seeall" href="' + esc(p.venue.url) + '">open its page →</a></p>';
+      html += '<p class="t3-empty">' + esc(tx('tripv3.placeIs')) + ' <a class="t3-seeall" href="' + esc(p.venue.url) + '">' + esc(tx('tripv3.openPage')) + '</a></p>';
     } else {
-      html += '<p class="t3-empty">Try telling us how long you have and what you’d love to do — for example “three days in Kelowna with wineries and beaches”.</p>';
+      html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
-    if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" href="' + esc(p.seeAll.url) + '">See everything that matches on Okanagan Roam →</a>';
+    if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" href="' + esc(p.seeAll.url) + '">' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';
     detachMap();
     resultEl.innerHTML = html;
@@ -893,7 +944,7 @@ function renderScript(d) {
     });
     return out;
   }
-  function stopsText(n){ return n === 1 ? '1 stop' : n + ' stops'; }
+  function stopsText(n){ return n === 1 ? tx('tripv3.stopOne') : tx('tripv3.stopMany', { n: n }); }
   function addState(day){
     var stops = planStopButtons(day);
     var missing = stops.filter(function(b){ return !b.classList.contains('in-trip'); }).length;
@@ -904,12 +955,12 @@ function renderScript(d) {
     var btn = resultEl.querySelector('[data-t3-add-all]');
     if (btn) {
       var st = addState();
-      btn.textContent = st.state === 'added' ? '✓ Whole trip in My Trip' : st.state === 'full' ? 'My Trip is full' : st.missing < st.total ? 'Add the remaining ' + stopsText(st.missing) + ' to My Trip' : (st.total > st.room ? 'Add ' + stopsText(st.room) + ' to My Trip (it holds ' + TRIP_MAX_STOPS + ')' : 'Add whole trip to My Trip');
+      btn.textContent = st.state === 'added' ? tx('tripv3.addedAll') : st.state === 'full' ? tx('tripv3.full') : st.missing < st.total ? tx('tripv3.addRemaining', { stops: stopsText(st.missing) }) : (st.total > st.room ? tx('tripv3.addSome', { stops: stopsText(st.room), max: TRIP_MAX_STOPS }) : tx('tripv3.addAll'));
       btn.setAttribute('aria-disabled', st.state === 'ready' ? 'false' : 'true');
     }
     Array.prototype.forEach.call(resultEl.querySelectorAll('[data-t3-add-day]'), function(b){
       var st = addState(b.getAttribute('data-t3-add-day'));
-      b.textContent = st.state === 'added' ? '✓ Day in My Trip' : st.state === 'full' ? 'My Trip is full' : 'Add day to My Trip';
+      b.textContent = st.state === 'added' ? tx('tripv3.addedDay') : st.state === 'full' ? tx('tripv3.full') : tx('tripv3.addDay');
       b.setAttribute('aria-disabled', st.state === 'ready' ? 'false' : 'true');
     });
   }
@@ -922,7 +973,7 @@ function renderScript(d) {
   function addStops(day){
     var st = addState(day);
     if (st.state !== 'ready') {
-      announce(st.state === 'added' ? 'Those stops are already in My Trip — nothing new was added.' : st.state === 'full' ? 'My Trip is full (' + TRIP_MAX_STOPS + ' stops). Remove a stop from My Trip to make room.' : 'There are no stops to add.');
+      announce(st.state === 'added' ? tx('tripv3.alreadyAll') : st.state === 'full' ? tx('tripv3.fullMsg', { max: TRIP_MAX_STOPS }) : tx('tripv3.noStops'));
       return;
     }
     var added = 0, already = 0, noRoom = 0, failed = 0;
@@ -940,10 +991,10 @@ function renderScript(d) {
     } finally { window.__roamTripSource = null; }
     if (added && !day) track('add_whole_trip', { added_count: added, already_in_trip_count: already, no_room_count: noRoom, failed_count: failed, trip_size: tripSize(), plan_kind: planFacts(state.last).plan_kind });
     refreshAddAll();
-    var msg = 'Added ' + stopsText(added) + ' to My Trip.';
-    if (already) msg += ' ' + (already === 1 ? '1 was' : already + ' were') + ' already there.';
-    if (noRoom) msg += ' ' + stopsText(noRoom) + ' didn’t fit — My Trip holds up to ' + TRIP_MAX_STOPS + ' stops, so remove some to make room.';
-    if (failed) msg += ' ' + stopsText(failed) + ' couldn’t be added. Please try again.';
+    var msg = tx('tripv3.added', { stops: stopsText(added) });
+    if (already) msg += ' ' + (already === 1 ? tx('tripv3.alreadyOne') : tx('tripv3.alreadyMany', { n: already }));
+    if (noRoom) msg += ' ' + tx('tripv3.noRoom', { stops: stopsText(noRoom), max: TRIP_MAX_STOPS });
+    if (failed) msg += ' ' + tx('tripv3.failed', { stops: stopsText(failed) });
     announce(msg);
     var view = resultEl.querySelector('[data-t3-view-trip]');
     if (view && added) view.hidden = false;
@@ -975,8 +1026,8 @@ function renderScript(d) {
       syncUrl();
       var link = location.href;
       var shared = function(method){ var f = planFacts(state.last); track('trip_plan_share', { share_method: method, plan_kind: f.plan_kind, day_count: f.day_count }); };
-      var ok = function(){ announce('Link copied — anyone with it sees this plan.'); shared('clipboard'); };
-      var manual = function(){ announce('Copy this link: ' + link); shared('manual'); };
+      var ok = function(){ announce(tx('tripv3.copied')); shared('clipboard'); };
+      var manual = function(){ announce(tx('tripv3.copyThis', { link: link })); shared('manual'); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(ok, manual);
       else manual();
       return;
@@ -988,9 +1039,9 @@ function renderScript(d) {
       var on = state.locks[key] === s.venue.id;
       track('trip_plan_edit', { edit_action: on ? 'keep' : 'unkeep', plan_kind: planFacts(state.last).plan_kind });
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
-      b.textContent = on ? 'Kept' : 'Keep';
+      b.textContent = on ? tx('tripv3.kept') : tx('tripv3.keep');
       var card = b.closest('.t3-card'); if (card) card.classList.toggle('is-kept', on);
-      announce(on ? s.venue.name + ' will stay when you regenerate.' : s.venue.name + ' is no longer kept.');
+      announce(on ? tx('tripv3.willStay', { name: s.venue.name }) : tx('tripv3.noLongerKept', { name: s.venue.name }));
       syncUrl();
       return;
     }
@@ -1005,7 +1056,7 @@ function renderScript(d) {
       syncUrl();
       var undo = resultEl.querySelector('[data-t3-undo="' + rk + '"]');
       if (undo) undo.focus();
-      announce(rs.venue.name + ' was removed from this plan.');
+      announce(tx('tripv3.wasRemoved', { name: rs.venue.name }));
       return;
     }
     if ((b = t.closest('[data-t3-undo]'))) {
@@ -1072,7 +1123,7 @@ function renderScript(d) {
     e.preventDefault();
     var text = input.value.trim();
     var fromExample = exampleSubmit; exampleSubmit = false;
-    if (!text) { setStatus('Tell us a little about the trip you’d like — where, how long, what you love.', 'error'); input.focus(); return; }
+    if (!text) { setStatus(tx('tripv3.emptyRequest'), 'error'); input.focus(); return; }
     state = { text: text, seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null };
     tripMap.day = null;
     track('trip_plan_start', { input_method: fromExample ? 'example' : 'typed' });
@@ -1107,6 +1158,11 @@ function renderScript(d) {
   } else if (/(?:^|[?&])(?:q|seed|days|pace|base|keep|skip|pin|avoid|rm)=/.test(location.search)) {
     track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
   }
+  // The header's EN / FR switch: /scripts/app.js has already translated the
+  // static text by the time this runs, so the plan on screen is redrawn in
+  // the new language (same plan, same kept and removed stops).
+  var langToggle = document.getElementById('langToggle');
+  if (langToggle) langToggle.addEventListener('click', function(){ setTimeout(function(){ if (state.last) render(false); }, 0); });
 })();
 </script>`;
 }

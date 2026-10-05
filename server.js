@@ -3847,13 +3847,23 @@ function appliedTripExclusions(plan, intent, taxonomy) {
   });
 }
 
+// French requests (2026-10-04): trip-planner-fr.js rewrites a French request
+// into the English the interpreter reads; any other request is returned as
+// the same string, so English plans are unchanged. Planner only (not search).
+// Loaded like the interpreter (discoveryIntentModule): a missing or broken
+// file fails the plan request with its error, never a silent English-only
+// planner.
+function tripPlannerFrModule() {
+  return require('./trip-planner-fr.js');
+}
 function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null }, now = new Date()) {
   const taxonomy = buildDiscoveryTaxonomy();
-  const intent = discoveryIntentModule().interpretDiscoveryQuery(text, taxonomy);
+  const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
+  const intent = discoveryIntentModule().interpretDiscoveryQuery(planText, taxonomy);
   // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
-  const trip = discoveryIntentModule().interpretTripComponents(text, taxonomy, intent);
+  const trip = discoveryIntentModule().interpretTripComponents(planText, taxonomy, intent);
   // Build My Trip V3 (Step 2): chips the visitor edited. Without overrides
   // (every existing caller) nothing below changes.
   if (overrides) {
