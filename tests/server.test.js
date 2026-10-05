@@ -14953,95 +14953,86 @@ test('Browse hub: /browse/classic is the unchanged wizard page, noindex, and /br
   assert.doesNotMatch(sitemap, /okanaganroam\.com\/browse[\/<?]/, 'the sitemap is unchanged');
 })));
 
-// ---- Second pass (2026-10-05): card actions, head metadata, no Favorites link -----------
-// Runs the REAL app.js code (initBlock11's link building, and the delegated
-// outbound_click handler) against a minimal fake DOM, so the server-rendered
-// card actions are compared with what the wizard page's own script produced.
-const browseAppJs = () => fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
-function wizardCardLinks(name, regionSlug, phone) {
-  const src = browseAppJs();
-  const vm = require('node:vm');
-  const body = src.slice(src.indexOf('function initBlock11(){'), src.indexOf('/* ---------- Live Google Places search (beta) ---------- */'));
-  const en = (key) => { const m = src.match(new RegExp(`'${key.replace('.', '\\.')}': '((?:[^'\\\\]|\\\\.)*)'`)); return JSON.parse(`"${m[1].replace(/\\u/g, '\\u').replace(/\\'/g, "'")}"`); };
-  const mk = (tag) => ({ tag, dataset: {}, style: {}, children: [], attrs: {}, className: '', href: '', textContent: '', appendChild(c) { this.children.push(c); return c; }, setAttribute(k, v) { this.attrs[k] = v; }, insertAdjacentElement(_w, c) { this.children.push(c); return c; }, set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; } });
-  const card = mk('li'); card.dataset = { name, region: regionSlug, phone: phone || '' };
-  card.querySelector = () => null;
-  const ctx = { document: { querySelectorAll: () => [card], createElement: mk }, window: {}, t: en, encodeURIComponent };
-  vm.createContext(ctx);
-  vm.runInContext(`${body}\ninitBlock11();`, ctx);
-  const row = card.children.find((c) => c.className === 'card-links');
-  // (With no number the wizard added an invisible aria-hidden placeholder, only to keep card heights equal; it was never shown.)
-  return row.children.filter((c) => c.tag === 'a' && c.attrs['aria-hidden'] !== 'true').map((a) => ({ cls: a.className, href: a.href || '', text: a.textContent, target: a.target || '', rel: a.rel || '' }));
-}
+// ---- Browse cards are DISCOVERY cards (2026-10-05 correction) ----------------------------
+// Operational actions (directions, phone, website, menu, booking) live only on the venue
+// detail page. The whole card opens the venue page through one stretched title link.
+const unHtml = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 const browseCardHtmlFor = (html, id) => {
   const i = html.indexOf(`data-venue-id="${id}"`);
   const start = html.lastIndexOf('<li class="venue-card"', i);
   return html.slice(start, html.indexOf('</li>', i));
 };
-const unHtml = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+const OPERATIONAL = /Get directions|Find menu|online booking|Visit website|Visit Website|Book now|Call now|Reserve|phone-link|directions-link|menu-link|booking-link|bh-card-links|href="tel:|google\.com\/maps|google\.com\/search|href="https?:\/\/(?!okanaganroam)/i;
 
-test('Browse hub: every card shows Get directions, Find menu, Check for online booking and the phone, exactly as the wizard cards did', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+test('Browse hub: cards are discovery cards -- badges, Favorite and Add to Trip, and no operational action of any kind', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
   const f = seedBrowseFixture();
   const html = await (await fetch(`${base}/browse`)).text();
   const venues = app.getBrowseHubVenues();
-  // Every venue, in the list and in the template: a link row with the three Google links, in this order.
-  const rows = html.match(/<div class="bh-card-links">[\s\S]*?<\/div>/g) || [];
-  assert.equal(rows.length, venues.length, 'one action row per venue (list and template alike)');
-  for (const r of rows) {
-    assert.deepEqual([...r.matchAll(/<a class="([a-z-]+)"/g)].map((m) => m[1]).filter((c) => c !== 'phone-link'), ['directions-link', 'menu-link', 'booking-link']);
+  const cards = html.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
+  assert.equal(cards.length, venues.length, 'every venue renders one card (list and template)');
+  for (const c of cards) {
+    assert.doesNotMatch(c, OPERATIONAL, 'no operational action on a Browse card');
+    assert.doesNotMatch(c, /<img\b/, 'no images or placeholders');
+    assert.equal((c.match(/<button type="button" class="card-action fav-btn"/g) || []).length, 1, 'Favorite');
+    assert.equal((c.match(/<button type="button" class="card-action trip-btn"/g) || []).length, 1, 'Add to Trip');
+    assert.match(c, /<h2><a class="venue-card-link" href="\/[a-z-]+\/[a-z-]+\/[^"]+">/, 'title links to the venue page');
   }
-  // Compared with the wizard's own script (the real initBlock11) for fixtures with a phone, none, and awkward characters.
-  for (const v of [f.bistro, f.winery, f.naramata]) {
-    const card = browseCardHtmlFor(html, v.id);
-    const mine = [...card.matchAll(/<a class="(directions-link|menu-link|booking-link|phone-link)" href="([^"]*)"([^>]*)>([^<]*)<\/a>/g)].map((m) => ({ cls: m[1], href: unHtml(m[2]), text: unHtml(m[4]), target: /target="_blank"/.test(m[3]) ? '_blank' : '', rel: /rel="noopener"/.test(m[3]) ? 'noopener' : '' }));
-    const theirs = wizardCardLinks(v.name, v.region, v.phone || '');
-    assert.deepEqual(mine, theirs, `${v.name}: same links, labels and targets as the wizard card`);
-  }
-  // The phone is a tel: link carrying digits and +, only when a number is on file.
-  assert.match(browseCardHtmlFor(html, f.bistro.id), /<a class="phone-link" href="tel:\+12505550100">\u{1F4DE} \+1 \(250\) 555-0100<\/a>/u);
-  assert.match(browseCardHtmlFor(html, f.naramata.id), /href="tel:2505550199"/);
-  assert.doesNotMatch(browseCardHtmlFor(html, f.winery.id), /phone-link/, 'no number, no phone link');
-  // The venue-page link is still there, and the Favorite / Add to Trip controls follow the actions.
-  const card = browseCardHtmlFor(html, f.bistro.id);
-  assert.match(card, /<a class="venue-card-link" href="\/kelowna\/restaurants\/browse-fixture-bistro">/);
-  assert.ok(card.indexOf('bh-card-links') > card.indexOf('class="chips"') && card.indexOf('bh-card-links') < card.indexOf('card-actions'), 'between the chips and the buttons');
-  // Visible (not the hidden .card-links row app.js injects): the page style gives the row a 44px tap height.
-  assert.match(html, /body\.browse-page \.bh-card-links a \{ display: inline-flex; align-items: center; min-height: 44px;/);
-  assert.doesNotMatch(html, /\.bh-card-links[^{]*\{[^}]*display: none/);
+  const bistro = browseCardHtmlFor(html, f.bistro.id);
+  assert.match(bistro, /class="chips"/, 'badges stay');
+  assert.doesNotMatch(bistro, /555-0100|tel:/, 'the phone number is not on the card, even when on file');
+  assert.doesNotMatch(html, /\.bh-card-links|data-name="Browse Fixture/, 'the removed row, its CSS and its data-name are gone');
+  assert.equal(app.BROWSE_CARD_REGION_LABEL, undefined);
+  assert.equal(app.browseCardActionsHtml, undefined);
 })));
 
-test('Browse hub: the card links are wired to app.js\'s existing outbound_click handler (link_type + venue_name), with no new event', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+test('Browse hub: the whole card opens the venue page through one title link (no wrapping anchor, no nested interactive markup, no new script)', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
   const f = seedBrowseFixture();
   const html = await (await fetch(`${base}/browse`)).text();
-  const src = browseAppJs();
-  // Run the real handler: a click on each link type reports { link_type, venue_name } with the card's data-name.
-  const start = src.indexOf("document.addEventListener('click', function(e){\n  var link = e.target.closest('.directions-link, .menu-link, .booking-link');");
-  assert.ok(start !== -1, 'the delegated outbound handler is still in app.js');
-  const handler = src.slice(start, src.indexOf('\n});', start) + 4);
-  const events = [];
-  let click;
-  const vm = require('node:vm');
-  const ctx = { document: { addEventListener: (t, fn) => { if (t === 'click') click = fn; } }, window: { trackEvent: (n, p) => events.push([n, p]) } };
-  vm.createContext(ctx);
-  vm.runInContext(handler, ctx);
-  const card = browseCardHtmlFor(html, f.bistro.id);
-  const dataName = unHtml(card.match(/data-name="([^"]*)"/)[1]);
-  assert.equal(dataName, f.bistro.name, 'the card carries data-name for the handler');
-  const cardEl = { dataset: { name: dataName }, classList: { contains: () => false } };
-  for (const cls of ['directions-link', 'menu-link', 'booking-link']) {
-    assert.ok(card.includes(`class="${cls}"`), cls);
-    click({ target: { closest: (sel) => (sel.includes(cls) ? { classList: { contains: (c) => c === cls }, closest: () => cardEl } : null) } });
+  const cards = html.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
+  for (const c of cards) {
+    assert.equal((c.match(/<a\b/g) || []).filter(Boolean).length >= 1, true);
+    // Anchors never contain buttons or other anchors; buttons never sit inside an anchor.
+    for (const a of c.match(/<a\b[\s\S]*?<\/a>/g) || []) assert.doesNotMatch(a.slice(2), /<(a|button|input|select)\b/, 'no nested interactive markup in an anchor');
+    assert.doesNotMatch(c, /^<li[^>]*>\s*<a\b/, 'the card is not wrapped in an anchor');
+    assert.equal((c.match(/class="venue-card-link"/g) || []).length, 1, 'exactly one venue link');
+    // Favorite / Add to Trip are plain buttons beside (not inside) the link.
+    assert.ok(c.indexOf('</a>') < c.indexOf('class="card-actions"') || !c.includes('class="card-actions"'), 'buttons follow the link');
   }
-  assert.deepEqual(JSON.parse(JSON.stringify(events)), [
-    ['outbound_click', { link_type: 'directions', venue_name: 'Browse Fixture Bistro' }],
-    ['outbound_click', { link_type: 'menu', venue_name: 'Browse Fixture Bistro' }],
-    ['outbound_click', { link_type: 'booking', venue_name: 'Browse Fixture Bistro' }],
-  ]);
-  // The phone link has no analytics hook (it never did) and the hub script adds none of its own.
-  assert.doesNotMatch(src.slice(start, src.indexOf('\n});', start)), /phone/);
+  const bistro = browseCardHtmlFor(html, f.bistro.id);
+  assert.match(bistro, /<a class="venue-card-link" href="\/kelowna\/restaurants\/browse-fixture-bistro">/);
+  // The stretched link: one rule set on the Browse page only, with focus drawn on the card.
+  assert.match(html, /body\.browse-page #bhResults > \.venue-card h2 a\.venue-card-link::after \{ content: ""; position: absolute; inset: -1px;/);
+  assert.match(html, /body\.browse-page #bhResults > \.venue-card \.card-actions,[\s\S]*?\{ position: relative; z-index: 1; \}/);
+  assert.match(html, /a\.venue-card-link:focus-visible::after \{ outline: 3px solid var\(--teal\)/);
+  // Navigation is the browser's own: the page script never navigates on card clicks.
   const script = html.slice(html.lastIndexOf('<script>\n(function(){\n  var LABELS'), html.lastIndexOf('</script>'));
-  assert.doesNotMatch(script, /outbound_click/, 'no second outbound_click source on the page');
-  assert.ok(!/data-track=/.test(card), 'not the venue-page data-track hook');
+  assert.doesNotMatch(script, /location\.(href|assign)\s*=|location\.assign\(|window\.open\(/, 'no card-click navigation script');
+  // The overlay is Browse-only: the other hubs keep their cards exactly as they were.
+  const fd = await (await fetch(`${base}/food-drink`)).text();
+  assert.doesNotMatch(fd, /a\.venue-card-link::after/);
+})));
+
+test('Venue detail keeps the operational actions, data-dependent: Website / Directions / Call only when on file, never Find menu or online booking', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const f = seedBrowseFixture();
+  const listing = await (await fetch(`${base}/browse`)).text();
+  const page = async (v) => {
+    const href = browseCardHtmlFor(listing, v.id).match(/class="venue-card-link" href="([^"]*)"/)[1];
+    const r = await fetch(`${base}${href}`);
+    assert.equal(r.status, 200, href);
+    return r.text();
+  };
+  const bistro = await page(f.bistro);      // restaurant with a phone
+  assert.match(bistro, /href="tel:/, 'Call is offered because a phone is on file');
+  const winery = await page(f.winery);      // no phone
+  assert.doesNotMatch(winery, /href="tel:/, 'no phone, no Call');
+  for (const v of [f.bistro, f.winery, f.naramata, f.park, f.beach]) {
+    const h = await page(v);
+    assert.doesNotMatch(h, /Find menu|online booking|menu-link|booking-link/i, `${v.name}: no menu / booking link on the venue page`);
+    assert.match(h, /fav-btn/); assert.match(h, /trip-btn/);
+  }
+  for (const v of [f.park, f.beach]) assert.doesNotMatch(await page(v), /Reserve|Book a table|Menu</, `${v.name}: no restaurant actions`);
+  const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  if (golf) assert.doesNotMatch(app.renderVenuePage(golf, [], [], []), /Find menu|online booking/i, 'golf: no menu / booking');
 })));
 
 test('Browse hub: head metadata -- the wizard page\'s share-card, locale and WebSite / Organization data are back, without duplicates or conflicts', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {

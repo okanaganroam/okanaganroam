@@ -16123,31 +16123,6 @@ const BROWSE_HUB_SUMMARY_CLIENT_SRC = `function bhSummaryText(shown, total, filt
     return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' ' + noun);
   }`;
 
-// The wizard card's four actions, restored on the hub card. The same labels,
-// the same Google URLs (built from the same name + town label, so a visitor
-// lands exactly where the wizard sent them) and the same classes, so app.js's
-// own delegated handler -- document click on .directions-link / .menu-link /
-// .booking-link, venue_name read from the card's data-name -- still reports
-// outbound_click { link_type, venue_name } with no new code or event. The phone
-// number is a plain tel: link, as before, and shown only when one is on file.
-const BROWSE_CARD_REGION_LABEL = {
-  'kelowna': 'Kelowna', 'west-kelowna': 'West Kelowna', 'peachland': 'Peachland',
-  'naramata': 'Naramata Bench', 'penticton': 'Penticton', 'okanagan-falls': 'Okanagan Falls',
-  'summerland': 'Summerland', 'oliver': 'Oliver', 'osoyoos': 'Osoyoos', 'vernon': 'Vernon',
-  'big-white': 'Big White', 'silverstar': 'SilverStar', 'apex': 'Apex', 'baldy': 'Mount Baldy',
-  'lake-country': 'Lake Country', 'coldstream': 'Coldstream', 'lumby': 'Lumby',
-  'armstrong': 'Armstrong', 'enderby': 'Enderby', 'kaleden': 'Kaleden',
-};
-function browseCardActionsHtml(v) {
-  const town = BROWSE_CARD_REGION_LABEL[v.region] || v.region;
-  const maps = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(`${v.name}, ${town}, Okanagan Valley, BC`);
-  const menu = 'https://www.google.com/search?q=' + encodeURIComponent(`${v.name} ${town} menu`);
-  const booking = 'https://www.google.com/search?q=' + encodeURIComponent(`${v.name} ${town} reservations OpenTable`);
-  const tel = v.phone ? String(v.phone).replace(/[^\d+]/g, '') : '';
-  const phone = v.phone ? `<a class="phone-link" href="tel:${escapeHtml(tel)}">📞 ${escapeHtml(v.phone)}</a>` : '';
-  return `<div class="bh-card-links"><a class="directions-link" href="${escapeHtml(maps)}" target="_blank" rel="noopener">📍 Get directions</a><a class="menu-link" href="${escapeHtml(menu)}" target="_blank" rel="noopener">📋 Find menu</a><a class="booking-link" href="${escapeHtml(booking)}" target="_blank" rel="noopener">📅 Check for online booking</a>${phone}</div>`;
-}
-
 // The head items the wizard page carried from okanagan.html that the shared
 // server head (pageHead) does not write: the share-card image size, the
 // language locale, the site name, the Twitter image and the site-level
@@ -16288,11 +16263,20 @@ function renderBrowseHubStyles() {
   body.browse-page a.bh-map-link { text-decoration: none; }
   body.browse-page .fd-resultbar { flex-wrap: wrap; }
   body.browse-page .bh-sort { margin-left: auto; }
-  /* Directions / menu / booking / phone: quiet links under the chips, above the buttons. */
-  body.browse-page .bh-card-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 18px; margin: 8px 0 2px; }
-  body.browse-page .bh-card-links a { display: inline-flex; align-items: center; min-height: 44px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy, #1B2B3A); text-decoration: underline; text-decoration-color: rgba(27,43,58,0.35); text-underline-offset: 3px; }
-  body.browse-page .bh-card-links a:hover { color: var(--ref-gold, #E0A94E); text-decoration-color: currentColor; }
-  body.browse-page .bh-card-links a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; border-radius: 4px; }
+  /* Whole-card link. The card's one link -- the venue name, already pointing at the
+     venue page -- is stretched over the card by its own ::after, so there is no
+     wrapping <a>, no nested interactive markup and no script, middle-click and
+     "open in new tab" still work, and the accessible name stays the venue name.
+     Everything else interactive on the card sits above it (z-index) and keeps its
+     own click: Favorite, Add to Trip, Read more and an advisory's source link. */
+  body.browse-page #bhResults > .venue-card { position: relative; }
+  body.browse-page #bhResults > .venue-card h2 a.venue-card-link::after { content: ""; position: absolute; inset: -1px; border-radius: 14px; }
+  body.browse-page #bhResults > .venue-card .card-actions,
+  body.browse-page #bhResults > .venue-card .desc-toggle,
+  body.browse-page #bhResults > .venue-card .venue-advisory-source { position: relative; z-index: 1; }
+  /* Keyboard focus shows on the whole card, not just the name. */
+  body.browse-page #bhResults > .venue-card h2 a.venue-card-link:focus-visible { outline: none; }
+  body.browse-page #bhResults > .venue-card h2 a.venue-card-link:focus-visible::after { outline: 3px solid var(--teal); outline-offset: -3px; }
   body.browse-page .bh-list-venue { margin: 48px 0 8px; padding: 22px 24px; border: 1px solid rgba(27,43,58,0.14); border-radius: 16px; background: var(--paper); }
   body.browse-page .bh-list-venue h2 { margin: 0 0 6px; }
   body.browse-page .bh-list-venue p { margin: 0 0 12px; max-width: 64ch; }
@@ -16306,16 +16290,9 @@ function renderBrowseHubStyles() {
 // other card in an inert <template> (see the incremental-rendering note in
 // renderFoodDrinkHubPage). The card HTML is the shared server card, split.
 function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, openStatusById, orderById) {
-  const byId = new Map(venues.map((v) => [v.id, v]));
-  // data-name is what app.js's outbound_click handler reads as venue_name.
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true })
-    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}" data-name="${escapeHtml(byId.get(Number(id)).name)}"`);
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
   let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
-  // Directions / menu / booking / phone, above the Favorite / Add to Trip row.
-  cardChunks = cardChunks.map((chunk) => {
-    const v = byId.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
-    return chunk.replace('<div class="card-actions">', () => `${browseCardActionsHtml(v)}\n        <div class="card-actions">`);
-  });
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
@@ -20858,7 +20835,6 @@ module.exports = {
   FAVORITES_NAV_ITEM,
   FAVORITES_NAV_STYLE,
   BROWSE_HEAD_EXTRAS,
-  BROWSE_CARD_REGION_LABEL,
   mapAreaPins,
   discoverySearchVenues,
   selectDiscoveryEvents,
