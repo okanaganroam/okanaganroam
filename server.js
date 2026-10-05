@@ -7715,7 +7715,27 @@ function renderGolfTripTrayHtml() {
   return extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
 }
 
-const GOLF_APP_SCRIPT_TAG = '<script src="/scripts/app.js"></script>';
+// app.js cache busting (2026-10-05): every page loads /scripts/app.js with
+// its content hash in the URL (/scripts/app.js?v=<12 hex>). Browsers keep the
+// script for up to 4 hours (Cloudflare raises the origin's max-age=3600) and
+// Cloudflare's edge for an hour, so an unchanged URL could pair new HTML with
+// an old app.js after a deploy. A changed file is a new URL, fetched fresh by
+// the browser and the edge. The static route matches the path only, so the
+// query is ignored there; the Cache-Control header is unchanged.
+const APP_JS_PLAIN_TAG = '<script src="/scripts/app.js"></script>';
+function appJsSrcFor(content) {
+  return '/scripts/app.js?v=' + crypto.createHash('md5').update(content).digest('hex').slice(0, 12);
+}
+const APP_JS_SRC = (() => {
+  try { return appJsSrcFor(fs.readFileSync(path.join(__dirname, 'public', 'scripts', 'app.js'))); } catch (e) { return '/scripts/app.js'; }
+})();
+const APP_JS_SCRIPT_TAG = `<script src="${APP_JS_SRC}"></script>`;
+// okanagan.html (frozen; served for / and /browse) keeps its plain tag on
+// disk; the served copy gets the versioned one.
+function withVersionedAppJs(html) {
+  return html.replace(APP_JS_PLAIN_TAG, APP_JS_SCRIPT_TAG);
+}
+const GOLF_APP_SCRIPT_TAG = APP_JS_SCRIPT_TAG;
 
 // Body class for themed pages. Golf keeps exactly its deployed
 // `class="golf-page"`; Beach pages carry the same theme class (the
@@ -15403,7 +15423,7 @@ ${v2 ? renderTripPlannerV2HeroHtml() : TRIP_LEGACY_HERO_HTML}
 ${renderHomeFooterHTML(true)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="/scripts/app.js"></script>${v2 ? '\n' + renderTripPlannerV2Script() + '\n' + renderSavedSidecarScriptHtml() : ''}
+${APP_JS_SCRIPT_TAG}${v2 ? '\n' + renderTripPlannerV2Script() + '\n' + renderSavedSidecarScriptHtml() : ''}
 </body>
 </html>`;
 }
@@ -15465,6 +15485,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     analyticsHead: renderAnalyticsHeadHtml('trip_v3'),
     regions: VALID_REGIONS.map((slug) => ({ slug, label: REGION_LABELS[slug] })),
     regionImages: TRIP_V3_REGION_IMAGES,
+    appScriptSrc: APP_JS_SRC,
     preview,
   });
 }
@@ -17485,7 +17506,7 @@ const server = http.createServer(async (req, res) => {
     // of always rendering underneath the new homepage. See /browse below.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
-        let html = applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'));
+        let html = withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')));
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
         // not just via the sitemap (which some crawlers deprioritize). The
@@ -17663,7 +17684,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (fs.existsSync(SITE_PATH)) {
-        let html = applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'));
+        let html = withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')));
 
         // /browse redesign harmonization pass (2026-09-18): marks this
         // response so page-scoped CSS can tell it apart from / (same
@@ -19929,6 +19950,8 @@ module.exports = {
   tripPlannerV3ActiveFor,
   renderTripPlannerV3Page,
   TRIP_V3_REGION_IMAGES,
+  APP_JS_SRC,
+  appJsSrcFor,
   buildTripPlannerFacts,
   tripPlannerLabels,
   parseTripPlanBody,

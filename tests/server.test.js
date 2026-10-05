@@ -1870,7 +1870,7 @@ test('render404Page: mobile viewport, themed site shell, landmarks, original wor
   assert.match(html, /We couldn't find a venue or page at that address\./);
   assert.match(html, /<a class="app-btn" href="https:\/\/okanaganroam\.com\/">Back to Okanagan Roam<\/a>/);
   assert.match(html, /min-height: 44px/, 'the back link is a 44px tap target');
-  assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/, 'app.js drives the shared header menu and Trip tray');
+  assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/, 'app.js drives the shared header menu and Trip tray');
   assert.doesNotMatch(html, /font-family:-apple-system/, 'the old unstyled system-font page is gone');
 });
 
@@ -4395,7 +4395,7 @@ test('S6 #12/#13/#19: the client script keeps the date window on chip pushState,
     app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,
   ]) assert.ok(script.includes(needle), `script contains ${needle}`);
   const page = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'this-week' }));
-  assert.match(page, /<script src="\/scripts\/app\.js"><\/script>/, 'app.js (homepage favourites/trip modules) still loads');
+  assert.match(page, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/, 'app.js (homepage favourites/trip modules) still loads');
   assert.match(page, /data-venue-category="whatson"/, 'cards carry the holder attribute the shared fav/trip module keys off');
   assert.match(page, /var INVENTORY = true;/);
 });
@@ -4557,8 +4557,8 @@ test('Batch 4B Events: app.js loads before the inline Favorite / Add to Trip scr
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
   const heart = appJs.match(/var HEART_OUTLINE = '([^']+)';/)[1];
   for (const [kind, html] of batch4bEventPages()) {
-    assert.equal((html.match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1, kind);
-    const appAt = html.indexOf('<script src="/scripts/app.js"></script>');
+    assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1, kind);
+    const appAt = html.indexOf(`<script src="${app.APP_JS_SRC}"></script>`);
     const inlineAt = html.indexOf('var pageCtx');
     assert.ok(appAt > 0 && inlineAt > appAt, `${kind}: app.js precedes the inline script, so its hand-off branch runs`);
     assert.match(html, /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{/, `${kind}: hand-off branch present`);
@@ -4665,8 +4665,8 @@ test('Batch 4B Guides + Stage 5B: every guide card is the compact card -- View d
   // The full description stays in the page for every card (the clamp is visual only).
   for (const v of venues.filter((x) => x.description)) assert.ok(markup.includes(`<p>${app.escapeHtml(v.description)}</p>`), `full description of ${v.name}`);
   // Scripts: app.js exactly once, then the card script (guide holder: every venue type).
-  assert.equal((html.match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1);
-  const appAt = html.indexOf('<script src="/scripts/app.js"></script>');
+  assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1);
+  const appAt = html.indexOf(`<script src="${app.APP_JS_SRC}"></script>`);
   const guideScript = app.golfCardEngagementScriptHtml('guide', true, { impressionCards: '[data-venue-category="golf"]' });
   assert.ok(html.includes(guideScript), 'the guide card script, built by the shared function');
   assert.ok(html.indexOf(guideScript) > appAt, 'card script follows app.js, so it takes its hand-off branch');
@@ -4794,7 +4794,7 @@ test('Batch 4B Guides: winery venue and region pages keep their own presentation
   assert.match(venue, /<body class="golf-page winery-page">/);
   assert.doesNotMatch(venue, /guide-page/);
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
-  assert.doesNotMatch(region, /guide-page|golf-page|<script src="\/scripts\/app\.js">/);
+  assert.doesNotMatch(region, /guide-page|golf-page|<script src="\/scripts\/app\.js[?"]/);
 });
 
 // ---- /events index (2026-09-17, replaces the homepage's Happening Soon) --
@@ -6373,8 +6373,8 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">[\s\S]*<span id="tripTrayCount">0<\/span>/);
     assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), 'tray precedes the header, as on / and /trip');
     assert.match(html, /<div id="floatingTooltip"><\/div>/);
-    assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
-    assert.ok(html.indexOf('<script src="/scripts/app.js">') < html.lastIndexOf('<script>'), 'app.js loads before the Golf engagement script');
+    assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/);
+    assert.ok(html.indexOf(`<script src="${app.APP_JS_SRC}">`) < html.lastIndexOf('<script>'), 'app.js loads before the Golf engagement script');
     assert.match(html, /body\.golf-page \.venue-card \.card-links \{ display: none; \}/);
     assert.doesNotMatch(html, /getElementById\('navHamburger'\)/, 'no duplicate nav handlers alongside app.js');
   }
@@ -6384,7 +6384,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
   const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
   const wineryRegion = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   for (const html of [restaurants, wineryRegion]) {
-    assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js"><\/script>/);
+    assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js(\?v=[0-9a-f]{12})?"><\/script>/);
     assert.match(html, /<header class="top">/);
     assert.match(html, /<body>/);
   }
@@ -6594,7 +6594,7 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
     assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, `${type}: old shell header gone`);
     assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1, `${type}: one <main>`);
     assert.ok(html.indexOf('<main ') < html.indexOf('<nav class="breadcrumb"') && html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${type}: content inside <main>, footer after`);
-    assert.equal((html.match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1, type);
+    assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1, type);
     assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${type}: exactly one <h1>`);
     assert.match(html, new RegExp(`<div class="venue-hero venue-hero-fallback venue-hero-${type}">\\s*<span class="venue-hero-type">${label}</span>\\s*<h1>Test Trattoria</h1>\\s*</div>`), `${type}: hero carries the title`);
     assert.match(html, /<div class="venue-header">\s*<p class="venue-at-a-glance">/, `${type}: header does not repeat the name`);
@@ -6663,7 +6663,7 @@ test('Stage 4.1: winery venue pages render the themed shell with one hero <h1> a
   assert.match(html, /body\.golf-page \.venue-cta-row \.card-action \{/, 'the themed CTA-row button rules apply instead');
   assert.match(html, /<div class="venue-cta-row" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="winery" data-venue-name="Test Winery" data-surface="venue_page">/);
   // app.js loads first, so the engagement script takes its hand-off branch (as on Golf venue pages).
-  const appAt = html.indexOf('<script src="/scripts/app.js"></script>');
+  const appAt = html.indexOf(`<script src="${app.APP_JS_SRC}"></script>`);
   assert.ok(appAt > 0 && appAt < html.indexOf('var pageCtx'), 'app.js loads before the venue engagement script');
   assert.match(html, /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{/);
   assert.match(html, /okanaganFavorites/, 'standalone fallback still present');
@@ -6684,7 +6684,7 @@ test('Stage 4.1: the winery venue page keeps its SEO head; winery region pages k
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   assert.match(region, /<body>/);
   assert.match(region, /<header class="top">/);
-  assert.doesNotMatch(region, /golf-page|id="tripTray"|<main |<script src="\/scripts\/app\.js">/);
+  assert.doesNotMatch(region, /golf-page|id="tripTray"|<main |<script src="\/scripts\/app\.js[?"]/);
   assert.match(region, /class="card-action fav-btn"/);
   assert.match(region, /\.venue-card\[data-venue-category="winery"\] \.card-action/, 'region cards keep the engagement-only stylesheet');
   assert.match(region, /var HOLDER = '\[data-venue-category="winery"\]'/);
@@ -6897,7 +6897,7 @@ test('Beaches regional listing page reuses the Golf design system: theme, header
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
   assert.match(html, /<div id="tripTray">/, 'site-wide floating Trip tray fragment must be present');
   assert.match(html, /<header id="top">/, 'homepage header fragment must be reused');
-  assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+  assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/);
   assert.match(html, /<a class="category-back-link" href="\/beaches">← All Beaches<\/a>/);
   // Cards
   assert.match(html, /<li class="venue-card" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="category_card">/);
@@ -6954,7 +6954,7 @@ test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when p
   assert.match(cta[2], /data-track="website"/);
   assert.match(html, /"venue_category":"beach","surface":"venue_page"/);
   assert.match(html, /var HOLDER = '\[data-venue-category="beach"\]';/);
-  assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+  assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/);
 });
 
 test('Beach venue page with no address, coordinates, website or phone: Get Directions / Visit Website / Call are all omitted, Favorite + Add to Trip remain', () => {
@@ -7083,7 +7083,7 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
   assert.match(page, / data-track="phone"/, 'tracked links since Measurement Phase C');
   const category = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
   assert.match(category, /<body>/);
-  assert.doesNotMatch(category, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<script src="\/scripts\/app\.js">|Beach page theme/);
+  assert.doesNotMatch(category, /<link rel="stylesheet" href="\/styles\/app\.css">|id="tripTray"|<script src="\/scripts\/app\.js[?"]|Beach page theme/);
   assert.doesNotMatch(markupOnly(category), /golf-page|beach-page|venue-advisory|data-venue-category/);
 });
 
@@ -8562,7 +8562,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.match(list, /<span class="venue-card-name">/); assert.match(list, /<span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span>/);
   assert.match(list, /class="card-action fav-btn"/); assert.match(list, /class="card-action trip-btn"/);
   assert.doesNotMatch(list, /card-action-website|card-action-phone|tel:/, 'no website/phone buttons on list cards');
-  assert.match(html, /id="tripTray"|trip-tray/, 'Trip tray present'); assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+  assert.match(html, /id="tripTray"|trip-tray/, 'Trip tray present'); assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/);
   assert.match(html, /<footer class="home-footer"/);
 });
 
@@ -9047,7 +9047,7 @@ test("What's On shell: twelve categories in the approved order, tiles are multi-
   assert.match(markup, /<div class="whatson-pop-panel" id="whatsOnRegionsPanel" hidden>/, 'the Regions popover starts closed');
   assert.match(markup, /<p class="outdoor-no-results" id="whatsOnNoResults">/);
   // Page chrome: shared header, Trip tray, footer, app.js, analytics head; What's On script with the shared client snippets and both URL keys.
-  assert.match(html, /id="tripTray"|class="trip-tray"|trip-tray/); assert.match(html, /<footer class="home-footer"/); assert.match(html, /<script src="\/scripts\/app\.js"><\/script>/);
+  assert.match(html, /id="tripTray"|class="trip-tray"|trip-tray/); assert.match(html, /<footer class="home-footer"/); assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/);
   const script = app.renderWhatsOnFilterScriptHtml({ hasInventory: true, dateState: { when: '', from: '', to: '' } }); // the state this render carries (Step 6)
   for (const needle of [app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC, app.OUTDOOR_REGION_GROUP_CLIENT_SRC, "'.outdoor-filter-chip, .outdoor-activity-toggle'", '#whatsOnResults > .venue-card', 'regions=', 'categories=', 'pushState', 'popstate', "apply('push')", "apply('replace')", "apply('none')", 'whatsOnSelectedClear', 'data-remove-category', 'data-event-categories']) assert.ok(script.includes(needle), `script contains ${needle}`);
   assert.ok(html.includes(script));
@@ -9679,6 +9679,49 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
 });
 
+// app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
+// the file's MD5>, so a changed app.js is a new URL that neither a browser
+// (4 hours, through Cloudflare) nor Cloudflare's edge (1 hour) has cached.
+test('app.js cache busting: every page loads app.js by its content hash; a changed file is a new URL; the route serves it unchanged', async () => {
+  const crypto = require('node:crypto');
+  const file = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'));
+  // The version is the file's own hash, and changes with the content.
+  assert.match(app.APP_JS_SRC, /^\/scripts\/app\.js\?v=[0-9a-f]{12}$/);
+  assert.equal(app.APP_JS_SRC, '/scripts/app.js?v=' + crypto.createHash('md5').update(file).digest('hex').slice(0, 12));
+  assert.equal(app.appJsSrcFor(file), app.APP_JS_SRC, 'same content, same URL');
+  assert.notEqual(app.appJsSrcFor(Buffer.concat([file, Buffer.from('\n')])), app.APP_JS_SRC, 'changed content, new URL');
+  // The frozen okanagan.html keeps its plain tag on disk; only the served copy is versioned.
+  assert.equal((fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8').match(/<script src="\/scripts\/app\.js"><\/script>/g) || []).length, 1);
+  const tag = `<script src="${app.APP_JS_SRC}"></script>`;
+  const before = process.env.TRIP_PLANNER_V3;
+  process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    await withDiscoveryServer(async (base) => {
+      for (const p of ['/', '/browse', '/trip', '/golf', '/whats-on', '/favorites']) {
+        const html = await (await fetch(base + p)).text();
+        assert.ok(!/<script src="\/scripts\/app\.js"/.test(html), `${p}: no unversioned app.js`);
+        const tags = html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || [];
+        if (['/', '/browse', '/trip', '/golf'].includes(p)) assert.equal(tags.length, 1, `${p}: app.js once`);
+        for (const t of tags) assert.equal(t, tag, `${p}: the current version`);
+      }
+      assert.match(await (await fetch(base + '/trip')).text(), /id="tripV3"/, 'V3 /trip carries it too');
+      // The static route ignores the query: same file, same headers as before.
+      for (const u of [app.APP_JS_SRC, '/scripts/app.js']) {
+        const r = await fetch(base + u);
+        assert.equal(r.status, 200, u);
+        assert.equal(r.headers.get('cache-control'), 'public, max-age=3600', u);
+        assert.equal(await r.text(), file.toString('utf8'), u);
+      }
+    });
+  } finally {
+    if (before === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = before;
+  }
+  // The V3 page module falls back to the plain URL when no version is passed in.
+  const v3 = require('../trip-planner-v3-page.js');
+  const bare = v3.renderTripPlannerV3Page({ esc: (s) => String(s), title: '', description: '', canonical: '', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', analyticsHead: '', regions: [], regionImages: {}, preview: false });
+  assert.ok(bare.includes('<script src="/scripts/app.js"></script>'));
+});
+
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
 //
 // /api/discover and the Hero Search routing through /browse?q=. Everything is
@@ -9994,7 +10037,7 @@ test('Phase 3: with the flag on, /trip swaps only the hero; the wizard, tray and
   assert.match(v2, /id="tripPlanForm"/);
   assert.doesNotMatch(v2, /id="tripConvHero"/, 'the old conversational hero is replaced, so app.js leaves it alone');
   for (const id of ['tripWizardSection', 'tripPlannerForm', 'tripPlannerResult', 'tripRegenerateBtn']) assert.match(v2, new RegExp(`id="${id}"`), `${id} kept`);
-  assert.match(v2, /<script src="\/scripts\/app\.js"><\/script>/);
+  assert.match(v2, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/);
   // Everything outside the hero section and the added style/script blocks is identical.
   // (Stage 4.3: the V2 view also adds the saved-item capture script.)
   const strip = (html) => html.replace(/\n<style>\s*\/\* Build My Trip planner view[\s\S]*?<\/style>/, '').replace(/\n<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/, '')
@@ -13012,7 +13055,7 @@ test('Build My Trip V3: the page is the site shell + the V3 view; canonical /tri
   ga4Check(html, 'trip_v3', 'trip v3');
   assert.ok(!html.includes("page_type: 'trip'"), 'not the V2 label');
   assert.ok(html.includes('<header id="top">') && html.includes('id="tripTray"'), 'the homepage header and Trip tray');
-  assert.ok(html.includes('<script src="/scripts/app.js"></script>'), 'app.js unchanged, for Add to Trip / Favorites');
+  assert.ok(html.includes(`<script src="${app.APP_JS_SRC}"></script>`), 'app.js (versioned), for Add to Trip / Favorites');
   assert.ok(html.includes('id="t3Form"') && html.includes('id="t3Input"') && html.includes('fetch(\'/api/trip/plan\''));
   for (const ev of ["'trip_plan_start'", "'trip_plan_complete'", "'trip_plan_error'", "'trip_plan_regenerate'", "'add_whole_trip'", "'open_my_trip'"]) assert.ok(html.includes(ev), ev);
   assert.doesNotMatch(html, /\/api\/trip\/(generate|parse)/, 'the V3 view never uses the legacy endpoints');
