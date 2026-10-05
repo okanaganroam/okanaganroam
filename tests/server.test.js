@@ -5223,8 +5223,13 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // ---- /browse: the relocated directory (wizard + results/map + list
   // your venue + app teaser). Same markup/IDs/data as before -- nothing
   // deleted or duplicated, just no longer spliced under the new homepage.
-  const browsePage = await fetch(`${base}/browse`);
-  assert.equal(browsePage.status, 200, '/browse must exist and serve the relocated directory');
+  // 2026-10-05: /browse is now the hub-style directory; the wizard page this
+  // block describes is still served, unchanged, at /browse/classic.
+  const hubPage = await fetch(`${base}/browse`);
+  assert.equal(hubPage.status, 200, '/browse serves the hub-style directory');
+  assert.match(await hubPage.text(), /id="bhResults"/, '/browse is the hub-style directory');
+  const browsePage = await fetch(`${base}/browse/classic`);
+  assert.equal(browsePage.status, 200, '/browse/classic must exist and serve the relocated directory');
   const browseBody = await browsePage.text();
   assert.match(browseBody, /id="directory"/, 'the wizard must render on /browse');
   assert.match(browseBody, /Browse (&amp;|&) [Ss]earch the Okanagan/, '/browse must keep the existing reframing heading');
@@ -7521,7 +7526,8 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     const homeBefore = await (await fetch(`${base}/`)).text();
     const beachesBefore = await (await fetch(`${base}/beaches`)).text();
     const golfBefore = await (await fetch(`${base}/golf`)).text();
-    const browseBefore = await (await fetch(`${base}/browse`)).text();
+    // /browse is data-driven since 2026-10-05; the byte-identity check follows the wizard page, /browse/classic.
+    const browseBefore = await (await fetch(`${base}/browse/classic`)).text();
     const tripBefore = await (await fetch(`${base}/trip`)).text();
     const sitemapBefore = await (await fetch(`${base}/sitemap.xml`)).text();
     assert.equal((await fetch(`${base}/outdoors`)).status, 404, 'no outdoor venues yet -> /outdoors is a 404, never an empty page');
@@ -7547,7 +7553,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     const withFooterOutdoors = (html) => html.replace(/<li><a href="\/?#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, '<li><a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a></li>');
     assert.equal(await (await fetch(`${base}/beaches`)).text(), withFooterOutdoors(beachesBefore), '/beaches is byte-identical apart from the footer Outdoors link');
     assert.equal(await (await fetch(`${base}/golf`)).text(), withFooterOutdoors(golfBefore), '/golf is byte-identical apart from the footer Outdoors link');
-    assert.equal(await (await fetch(`${base}/browse`)).text(), withFooterOutdoors(browseBefore), '/browse is byte-identical apart from the footer Outdoors link');
+    assert.equal(await (await fetch(`${base}/browse/classic`)).text(), withFooterOutdoors(browseBefore), '/browse/classic is byte-identical apart from the footer Outdoors link');
     assert.equal(await (await fetch(`${base}/trip`)).text(), withFooterOutdoors(tripBefore), '/trip is byte-identical apart from the footer Outdoors link');
 
     // Routes now live.
@@ -7815,7 +7821,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     for (const [name, region, slug] of [['Fixture Canyon Park', 'kelowna', 'fixture-canyon-park'], ['Fixture Ridge Trail', 'penticton', 'fixture-ridge-trail'], ['Fixture Falls Park', 'vernon', 'fixture-falls-park']]) {
       outdoor.push(await post({ name, region, type: 'outdoor', description: `${name} fixture`, slug }));
     }
-    const snap = async () => Object.fromEntries(await Promise.all(['/', '/beaches', '/golf', '/browse', '/trip'].map(async (p) => [p, await (await fetch(`${base}${p}`)).text()])));
+    const snap = async () => Object.fromEntries(await Promise.all(['/', '/beaches', '/golf', '/browse/classic', '/trip'].map(async (p) => [p, await (await fetch(`${base}${p}`)).text()])));
     const before = await snap();
     assert.equal((await fetch(`${base}/outdoors/hiking`)).status, 404, 'no memberships yet -> 404');
     for (const v of outdoor) {
@@ -8691,10 +8697,11 @@ test('Food & Drink hub: the /food-drink route serves it, and /browse, the Wine h
     assert.match(pre.text, /data-fd-feature="patio" aria-pressed="true"/);
     assert.match(pre.text, /data-region="kelowna" aria-pressed="true"/);
     assert.match(outdoorMarkupOnly(pre.text), /id="fdResultsSummary" aria-live="polite">\d+ of \d+ places</);
-    // /browse still serves okanagan.html, untouched by this work.
+    // /browse is its own hub since 2026-10-05 (it reuses this hub's classes but
+    // none of its ids); the okanagan.html wizard page is /browse/classic.
     const browse = await get('/browse');
     assert.equal(browse.status, 200);
-    assert.doesNotMatch(browse.text, /fd-type-row|id="fdSearch"|fd-pop-btn/, 'the hub does not leak onto /browse');
+    assert.doesNotMatch(browse.text, /id="fdSearch"|id="fdResults"|id="fdVenueData"/, 'the F&D hub ids do not leak onto /browse');
     // Other directories are untouched by the new page. (The F&D category,
     // region and venue pages are asserted in-process below, where the full
     // project tree is available -- this child only carries the four files.)
@@ -9776,7 +9783,11 @@ test('Phase 2: with the flag off, /api/discover does not exist and /browse?q is 
   assert.equal(api.status, 404);
   const browse = await fetch(`${base}/browse?q=restaurants%20in%20Kelowna`, { redirect: 'manual' });
   assert.equal(browse.status, 200, 'no redirect when the flag is off');
-  const html = await browse.text();
+  assert.match(await browse.text(), /id="bhSearch"[^>]*value="restaurants in Kelowna"/, 'the hub directory carries the typed text');
+  // The wizard page (/browse/classic) keeps the original pre-fill script.
+  const classic = await fetch(`${base}/browse/classic?q=restaurants%20in%20Kelowna`, { redirect: 'manual' });
+  assert.equal(classic.status, 200);
+  const html = await classic.text();
   assert.ok(!html.includes("params.get('regions')"), 'the pre-fill script is the original one');
   // The pre-fill script with the flag off has no discovery parameters. Its
   // bytes changed deliberately in Stage 3.4.1 (2026-09-29): with the flag on
@@ -10977,16 +10988,18 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
   const pages = {
     '/': await (await fetch(`${base}/`)).text(),
     '/browse': await (await fetch(`${base}/browse`)).text(),
+    '/browse/classic': await (await fetch(`${base}/browse/classic`)).text(),
     '/trip': await (await fetch(`${base}/trip`)).text(),
     '/destinations': await (await fetch(`${base}/destinations`)).text(),
     themed: app.renderGolfHeaderHtml(),
   };
   // Stage 4.4: server-built headers (/trip, themed pages) add Favorites before
-  // the mobile-only Build My Trip row; / and /browse keep the template's own.
+  // the mobile-only Build My Trip row; /, /browse and /browse/classic keep the template's
+  // own (the hub-style /browse is a themed page but is deliberately served without it).
   const withFavorites = [...HEADER_SPEC.slice(0, -1), { href: '/favorites', key: null, label: 'Favorites' }, HEADER_SPEC[HEADER_SPEC.length - 1]];
   for (const [name, html] of Object.entries(pages)) {
     const nav = parseNav(html);
-    const spec = (name === '/' || name === '/browse') ? HEADER_SPEC : withFavorites;
+    const spec = (name === '/' || name === '/browse' || name === '/browse/classic') ? HEADER_SPEC : withFavorites;
     assert.deepEqual(nav.items.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: i.mobileOnly })),
       spec.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: !!i.mobileOnly })), name);
     // The desktop Build My Trip button is still the header CTA.
@@ -11433,8 +11446,12 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
 }));
 
 test('Footer link change: the old /browse form, protected assets, the page and the sitemap are untouched', () => withDiscoveryServer(async (base) => {
-  const browse = await (await fetch(`${base}/browse`)).text();
-  assert.match(browse, /<section class="list-venue" id="list-venue">/, 'old /browse#list-venue section still present');
+  const browse = await (await fetch(`${base}/browse/classic`)).text();
+  assert.match(browse, /<section class="list-venue" id="list-venue">/, 'old /browse#list-venue section still present (on /browse/classic)');
+  // The hub-style /browse keeps both anchors the old page had, as links to the real forms.
+  const hub = await (await fetch(`${base}/browse`)).text();
+  assert.match(hub, /id="list-venue"/); assert.match(hub, /id="app"/);
+  assert.match(hub, /href="\/list-your-venue"/); assert.match(hub, /href="\/list-an-event"/);
   assert.match(browse, /<form class="venue-form" id="venueForm">/);
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
@@ -12420,8 +12437,8 @@ const ga4Check = (html, pageType, label) => {
 };
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
-  // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip).
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
+  // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip). 2026-10-05: + 'browse' (the hub-style /browse).
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
@@ -12479,7 +12496,8 @@ test('Measurement Phase A (+ Analytics Cleanup C1): the homepage and /browse ser
     assert.equal(snippet.split(loader).length, 2, 'okanagan.html still has exactly one loader tag');
     assert.equal(snippet.split(config).length, 2, 'okanagan.html still has exactly one plain config');
     const expected = snippet.replace(loader, '').replace(config, `${app.renderGa4ConfigIifeJs('{}')}\n`);
-    for (const p of ['/', '/browse']) {
+    // 2026-10-05: the okanagan.html pages are / and /browse/classic; /browse is a themed hub (page_type 'browse', below).
+    for (const p of ['/', '/browse/classic']) {
       const r = await get(p);
       assert.equal(r.status, 200, p);
       assert.ok(r.text.includes(expected), `${p}: okanagan.html's snippet with only the two C1 swaps, byte-for-byte`);
@@ -12488,7 +12506,7 @@ test('Measurement Phase A (+ Analytics Cleanup C1): the homepage and /browse ser
       assert.doesNotMatch(r.text, /page_type/, `${p}: no page_type`);
     }
     // Routed server templates, end to end.
-    const routes = { '/kelowna': 'region', '/destinations': 'hub', '/categories': 'hub', '/wineries': 'hub', '/food-drink': 'hub', '/dog-friendly': 'hub', '/hidden-gems': 'hub', '/whats-on': 'hub',
+    const routes = { '/kelowna': 'region', '/destinations': 'hub', '/categories': 'hub', '/wineries': 'hub', '/food-drink': 'hub', '/dog-friendly': 'hub', '/browse': 'browse', '/hidden-gems': 'hub', '/whats-on': 'hub',
       '/kelowna/restaurants': 'category', '/kelowna/wineries': 'category', '/trip': 'trip', '/list-your-venue': 'listing_form', '/list-an-event': 'listing_form', '/no-such-page': 'not_found' };
     // Which fixture pages exist depends on the rows earlier tests left in the
     // copied DB, so a listing route that 404s here must be tagged not_found;
@@ -13799,8 +13817,11 @@ test('Stage 3.4: Map opens the map page -- on screen, with a visible close contr
   // to /browse?openMap=1, which the server now answers with /map; on /browse
   // itself the in-page map opens and its "Close the map view" toggle is no
   // longer hidden while the map is open.
-  const browse = await (await fetch(`${base}/browse`)).text();
+  // (2026-10-05: the in-page map belongs to the wizard page, /browse/classic;
+  // the hub-style /browse has a Map link to /map instead.)
+  const browse = await (await fetch(`${base}/browse/classic`)).text();
   assert.ok(browse.includes("var mapOpen = !!D.querySelector('#mapPanel.open');"));
+  assert.match(await (await fetch(`${base}/browse`)).text(), /<a class="fd-pop-btn bh-map-link" id="bhMapLink" href="\/map">/, 'the hub-style /browse links to /map');
   assert.ok(browse.includes("toHide[i].style.display = mapOpen ? '' : 'none';"));
   assert.ok(browse.includes('if (mapOpen && !window.__roamMapShown && toHide[0]) {'), 'the opened map is brought on screen');
   // A venue page's "View on map" is still Google Maps, in a new tab.
@@ -13838,7 +13859,7 @@ test('Stage 3.4.1: /browse applies ?q= as soon as app.js is ready -- no 5 s give
 });
 
 test('Stage 3.4.1: /browse "Read more" measures only displayed descriptions near the viewport, after the search is applied', () => withDiscoveryServer(async (base) => {
-  const html = await (await fetch(`${base}/browse?q=fixture`)).text();
+  const html = await (await fetch(`${base}/browse/classic?q=fixture`)).text();
   const i = html.indexOf("var mapOpen = !!D.querySelector('#mapPanel.open');");
   assert.ok(i !== -1);
   const script = html.slice(i, html.indexOf('</script>', i));
@@ -13975,13 +13996,24 @@ async function stage42Head(base, path) {
 
 for (const flag of ['on', undefined]) {
   test(`Stage 4.2: /browse has its own title and a self-canonical, for every query string (discovery search ${flag || 'off'})`, () => withDiscoveryFlag(flag, () => withDiscoveryServer(async (base) => {
-    for (const path of ['/browse', '/browse?types=restaurant', '/browse?features=patio', '/browse?regions=kelowna', '/browse?q=fixture&types=restaurant']) {
+    // 2026-10-05: the same title and canonical on the hub-style /browse (any query
+    // string) and on the wizard page kept at /browse/classic (which is also noindex).
+    const queries = ['', '?types=restaurant', '?features=patio', '?regions=kelowna', '?q=fixture&types=restaurant'];
+    for (const q of queries) {
+      const path = `/browse${q}`;
+      const { titles, canonicals } = await stage42Head(base, path);
+      assert.deepEqual(titles, [STAGE42_TITLE], `${path}: one title, the approved one`);
+      assert.deepEqual(canonicals, [STAGE42_CANONICAL], `${path}: one canonical, /browse`);
+    }
+    for (const q of queries) {
+      const path = `/browse/classic${q}`;
       const { html, titles, canonicals } = await stage42Head(base, path);
       assert.deepEqual(titles, [STAGE42_TITLE], `${path}: one title, the approved one`);
       assert.deepEqual(canonicals, [STAGE42_CANONICAL], `${path}: one canonical, /browse`);
       // Everything else in the head is the template's own (og:/twitter: unchanged).
       assert.match(html, /<meta property="og:url" content="https:\/\/okanaganroam\.com\/">/, path);
       assert.match(html, /<body class="wizard-active page-browse">/, path);
+      assert.match(html, /<meta name="robots" content="noindex">/, `${path}: the rollback copy is not indexed`);
     }
     // The homepage keeps its own title and canonical.
     const home = await stage42Head(base, '/');
@@ -14006,7 +14038,19 @@ const SEO2_DESCRIPTION = "A review-backed guide to 1,000+ wineries, restaurants,
 test('SEO-2: homepage descriptions match the approved text; share image is a 1200x630 PNG at the existing URL', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
   assert.equal(SEO2_DESCRIPTION.length, 152);
   const metaAll = (html, attr, key) => [...html.matchAll(new RegExp(`<meta ${attr}="${key}" content="([^"]*)">`, 'g'))].map((m) => m[1]);
-  for (const path of ['/', '/browse']) {
+  // 2026-10-05: /browse is the hub-style page (same approved description and share
+  // image); the okanagan.html copy of the template is /browse/classic.
+  // (Server-built pages write the apostrophe as &#39;, which reads back as the same text.)
+  const hubHtml = await (await fetch(`${base}/browse`)).text();
+  const decoded = (list) => list.map((v) => v.replace(/&#39;/g, "'"));
+  assert.deepEqual(decoded(metaAll(hubHtml, 'name', 'description')), [SEO2_DESCRIPTION], '/browse: one meta description, the approved one');
+  assert.deepEqual(decoded(metaAll(hubHtml, 'property', 'og:description')), [SEO2_DESCRIPTION], '/browse: og:description matches');
+  assert.deepEqual(decoded(metaAll(hubHtml, 'name', 'twitter:description')), [SEO2_DESCRIPTION], '/browse: twitter:description matches');
+  assert.deepEqual(metaAll(hubHtml, 'property', 'og:image'), ['https://okanaganroam.com/og-image.png'], '/browse: og:image absolute, unchanged URL');
+  assert.deepEqual(metaAll(hubHtml, 'name', 'twitter:image'), ['https://okanaganroam.com/og-image.png'], '/browse: twitter:image absolute, unchanged URL');
+  assert.deepEqual(metaAll(hubHtml, 'property', 'og:image:width'), ['1200'], '/browse');
+  assert.deepEqual(metaAll(hubHtml, 'property', 'og:image:height'), ['630'], '/browse');
+  for (const path of ['/', '/browse/classic']) {
     const html = await (await fetch(`${base}${path}`)).text();
     assert.deepEqual(metaAll(html, 'name', 'description'), [SEO2_DESCRIPTION], `${path}: one meta description, the approved one`);
     assert.deepEqual(metaAll(html, 'property', 'og:description'), [SEO2_DESCRIPTION], `${path}: og:description matches`);
@@ -14259,21 +14303,22 @@ test('Hero search loading state: the message and when it applies', () => {
   assert.equal(s({ regions: 'kelowna', q: 'poutine' }, false).message, 'Finding poutine…');
 });
 
+// 2026-10-05: /browse is the hub-style page; the loading state belongs to the wizard page, /browse/classic.
 for (const flag of ['on', undefined]) {
   test(`Hero search loading state: /browse with no query is unchanged; a query only adds the loading state (discovery search ${flag || 'off'})`, () => withDiscoveryFlag(flag, () => withDiscoveryServer(async (base) => {
     const page = async (p) => (await fetch(`${base}${p}`)).text();
-    const plain = await page('/browse');
+    const plain = await page('/browse/classic');
     assert.ok(plain.includes(PLAIN_DIRECTORY));
     assert.ok(!plain.includes('browse-results-loading') && !plain.includes('browse-loading-note'), 'no loading state without a query');
     assert.match(plain, /<input type="text" id="searchInput" data-i18n-placeholder=/, 'search box has no value');
-    for (const p of ['/browse?sort=rating-desc', '/browse?q=', ...(flag ? [] : ['/browse?regions=kelowna'])]) {
-      assert.equal(await page(p), plain, `${p}: byte-identical to /browse`);
+    for (const p of ['/browse/classic?sort=rating-desc', '/browse/classic?q=', ...(flag ? [] : ['/browse/classic?regions=kelowna'])]) {
+      assert.equal(await page(p), plain, `${p}: byte-identical to /browse/classic`);
     }
-    for (const p of ['/browse?types=restaurant', '/browse?q=fixture&types=restaurant', ...(flag ? ['/browse?regions=kelowna&q=poutine', '/browse?features=patio'] : [])]) {
+    for (const p of ['/browse/classic?types=restaurant', '/browse/classic?q=fixture&types=restaurant', ...(flag ? ['/browse/classic?regions=kelowna&q=poutine', '/browse/classic?features=patio'] : [])]) {
       const html = await page(p);
       assert.equal(html.split(LOADING_DIRECTORY).length, 2, `${p}: #directory marked loading once`);
       assert.equal(html.split('class="browse-loading-note"').length, 2, `${p}: one loading note`);
-      assert.equal(stripBrowseLoadingState(html), plain, `${p}: nothing else differs from /browse`);
+      assert.equal(stripBrowseLoadingState(html), plain, `${p}: nothing else differs from /browse/classic`);
       // The results section keeps its place but is invisible while loading (no
       // layout shift when results arrive); only with scripting, like the rest.
       const loadingCss = html.slice(html.indexOf('@media (scripting: enabled) {'), html.indexOf('.browse-loading-spinner {'));
@@ -14286,7 +14331,7 @@ for (const flag of ['on', undefined]) {
       assert.ok(html.includes('window.__roamPrefillPending = true;'), `${p}: prefill script still present`);
     }
     if (flag) {
-      const html = await page('/browse?regions=kelowna&q=poutine');
+      const html = await page('/browse/classic?regions=kelowna&q=poutine');
       assert.match(html, /<input type="text" id="searchInput" value="poutine" data-i18n-placeholder=/);
       assert.match(html, /<p class="browse-loading-note" role="status" aria-live="polite"><span class="browse-loading-spinner" aria-hidden="true"><\/span><span>Finding poutine in Kelowna…<\/span><\/p>/);
       assert.ok(html.indexOf('class="browse-loading-note"') > html.indexOf('id="searchBtn"') && html.indexOf('class="browse-loading-note"') < html.indexOf('id="wizardProgress"'), 'note sits between the search box and the wizard');
@@ -14296,7 +14341,7 @@ for (const flag of ['on', undefined]) {
 
 test('Hero search loading state: hostile query text is escaped everywhere it is written', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
   const hostile = `"><script>alert(1)</script>'<img src=x onerror=alert(2)>`;
-  const html = await (await fetch(`${base}/browse?types=restaurant&q=${encodeURIComponent(hostile)}`)).text();
+  const html = await (await fetch(`${base}/browse/classic?types=restaurant&q=${encodeURIComponent(hostile)}`)).text();
   assert.ok(!html.includes('<script>alert(1)') && !html.includes('<img src=x'), 'no raw markup from the query');
   const escaped = '&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;&#39;&lt;img src=x onerror=alert(2)&gt;';
   assert.ok(html.includes(`<input type="text" id="searchInput" value="${escaped}" `), 'input value escaped');
@@ -14333,19 +14378,20 @@ test('Hero search loading state: the loading mark is removed when the prefill fi
 });
 
 // ---- Directory redesign, Phase 1 (2026-10-03) ----------------------------------
+// (2026-10-05: these describe the wizard page, now at /browse/classic; the hub-style /browse carries none of this CSS.)
 // A /browse-only stylesheet. Every rule is scoped to body.page-browse, it never
 // styles .venue-desc or the Read-more button, never touches the card's
 // content-visibility, and appears on no other page.
 for (const flag of ['on', undefined]) {
   test(`Directory Phase 1: /browse alone carries the scoped Directory stylesheet (discovery search ${flag || 'off'})`, () => withDiscoveryFlag(flag, () => withDiscoveryServer(async (base) => {
     const page = async (p) => (await fetch(`${base}${p}`)).text();
-    const browse = await page('/browse');
-    assert.equal(browse.split('<style id="browse-directory-styles">').length, 2, 'exactly one Directory stylesheet on /browse');
-    assert.ok(browse.includes('<body class="wizard-active page-browse">'), 'the scope class is on /browse');
+    const browse = await page('/browse/classic');
+    assert.equal(browse.split('<style id="browse-directory-styles">').length, 2, 'exactly one Directory stylesheet on /browse/classic');
+    assert.ok(browse.includes('<body class="wizard-active page-browse">'), 'the scope class is on /browse/classic');
     const start = browse.indexOf('<style id="browse-directory-styles">');
     assert.ok(start < browse.indexOf('id="directory"'), 'placed before the Directory section');
-    assert.ok((await page('/browse?types=restaurant')).includes('<style id="browse-directory-styles">'), 'also with the F3 loading state');
-    for (const p of ['/', '/golf', '/trip', '/wineries']) {
+    assert.ok((await page('/browse/classic?types=restaurant')).includes('<style id="browse-directory-styles">'), 'also with the F3 loading state');
+    for (const p of ['/', '/browse', '/golf', '/trip', '/wineries']) {
       assert.ok(!(await page(p)).includes('browse-directory-styles'), `${p}: no Directory stylesheet`);
     }
     const css = browse.slice(start, browse.indexOf('</style>', start)).replace(/<style[^>]*>/, '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -14367,7 +14413,7 @@ for (const flag of ['on', undefined]) {
 // Revised after review: compact chips and natural-width actions above phone
 // width, and no four-column grid (cards would be ~324px wide at any width).
 test('Directory Phase 2: card hierarchy is CSS only, on the existing card markup', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
-  const browse = await (await fetch(`${base}/browse`)).text();
+  const browse = await (await fetch(`${base}/browse/classic`)).text();
   const start = browse.indexOf('<style id="browse-directory-styles">');
   const css = browse.slice(start, browse.indexOf('</style>', start)).replace(/\/\*[\s\S]*?\*\//g, '');
   assert.match(css, /body\.page-browse #venueGrid \.badge::after \{ content: attr\(aria-label\); \}/, 'badge text is the existing aria-label');
@@ -14391,7 +14437,7 @@ test('Directory Phase 2: card hierarchy is CSS only, on the existing card markup
 // (French "Ajouter au voyage" stays on one line), and 24px tap targets for the
 // utility links, Read more and Clear all.
 test('Directory Phase 3: two columns 941-1199px, no reserved lines, content-sized phone actions, 24px targets', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
-  const browse = await (await fetch(`${base}/browse`)).text();
+  const browse = await (await fetch(`${base}/browse/classic`)).text();
   const start = browse.indexOf('<style id="browse-directory-styles">');
   const css = browse.slice(start, browse.indexOf('</style>', start)).replace(/\/\*[\s\S]*?\*\//g, '');
   const block = (media) => { const i = css.indexOf(media + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('\n}', i)); };
@@ -14419,10 +14465,10 @@ const sidecarCount = (html) => html.split(SIDECAR_MARK).length - 1;
 
 test('Stage 4.3: the capture script is on pages with Favorite controls and nowhere else', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
   const page = async (p) => (await fetch(`${base}${p}`)).text();
-  for (const p of ['/kelowna/golf', '/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/wineries', '/food-drink', '/whats-on', '/kelowna/events/test-future-festival', '/kelowna/events/test-past-market', '/trip']) {
+  for (const p of ['/browse', '/kelowna/golf', '/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/wineries', '/food-drink', '/whats-on', '/kelowna/events/test-future-festival', '/kelowna/events/test-past-market', '/trip']) {
     assert.equal(sidecarCount(await page(p)), 1, `${p}: one capture script`);
   }
-  for (const p of ['/', '/browse', '/kelowna', '/kelowna/restaurants/test-trattoria', '/search?q=fixture', '/map', '/destinations', '/list-your-venue']) {
+  for (const p of ['/', '/browse/classic', '/kelowna', '/kelowna/restaurants/test-trattoria', '/search?q=fixture', '/map', '/destinations', '/list-your-venue']) {
     assert.equal(sidecarCount(await page(p)), 0, `${p}: no capture script`);
   }
   const guide = app.renderGuidePage('kelowna', 'patio', [app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria')]);
@@ -14706,10 +14752,10 @@ test('Stage 4.4: GET /favorites is a noindex, uncached shell page measured as pa
   assert.doesNotMatch(sitemap, /favorites|favourites/);
 }));
 
-test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile menu list) on shell pages and /trip, never on / or /browse', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile menu list) on shell pages and /trip, never on / or /browse (either version)', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
   const item = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
   const page = async (p) => (await fetch(`${base}${p}`)).text();
-  for (const p of ['/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/restaurants/test-trattoria', '/whats-on', '/kelowna', '/search?q=fixture', '/map', '/favorites', '/trip']) {
+  for (const p of ['/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/restaurants/test-trattoria', '/whats-on', '/kelowna', '/search?q=fixture', '/map', '/favorites', '/trip', '/food-drink', '/dog-friendly', '/destinations']) {
     const html = await page(p);
     assert.equal(html.split(item).length - 1, 1, `${p}: one Favorites nav item`);
     const links = html.slice(html.indexOf('<ul class="nav-links" id="navLinks">'), html.indexOf('</ul>', html.indexOf('<ul class="nav-links" id="navLinks">')) + 5);
@@ -14719,9 +14765,351 @@ test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile
     assert.equal(html.split(rule).length - 1, 1, `${p}: one 941-1099px rule`);
     assert.ok(html.indexOf(rule) > html.indexOf('</header>') && html.indexOf(rule) - html.indexOf('</header>') < 20, `${p}: right after the header`);
   }
-  for (const p of ['/', '/browse']) assert.doesNotMatch(await page(p), /href="\/favorites"|nav-links-favorites/, `${p}: unchanged`);
+  for (const p of ['/', '/browse', '/browse/classic']) assert.doesNotMatch(await page(p), /href="\/favorites"|nav-links-favorites/, `${p}: unchanged`);
   // The helper is idempotent and leaves a header without the marker alone.
   const once = app.withFavoritesNavLink('<ul><li class="nav-links-trip">x</li></ul>');
   assert.equal(app.withFavoritesNavLink(once), once);
   assert.equal(app.withFavoritesNavLink('<header></header>'), '<header></header>');
 }))));
+
+// ---- Hub-style /browse (2026-10-05) --------------------------------------------
+// /browse is the all-venue directory in the shape of the other server-rendered
+// hubs; the wizard page it replaced is still served, unchanged, at /browse/classic.
+// The old tests that describe the wizard page now fetch /browse/classic above.
+let browseFixture = null;
+function seedBrowseFixture() {
+  if (browseFixture) return browseFixture;
+  const add = (r) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, price, cuisine, patio, dog_friendly, kid_friendly, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(r.name, r.region, r.type, r.slug, r.description || `${r.name} is a fixture used only by the automated tests.`, r.rating ?? null, r.price ?? null, r.cuisine ?? null, r.patio ?? 0, r.dog_friendly ?? 0, r.kid_friendly ?? 0, r.phone ?? null);
+    return db.prepare('SELECT * FROM venues WHERE slug = ?').get(r.slug);
+  };
+  browseFixture = {
+    bistro: add({ name: 'Browse Fixture Bistro', region: 'kelowna', type: 'restaurant', slug: 'browse-fixture-bistro', cuisine: 'Zimbabwean', price: 2, rating: 4.9, patio: 1, dog_friendly: 1, phone: '+1 (250) 555-0100' }),
+    winery: add({ name: 'Browse Fixture Winery', region: 'penticton', type: 'winery', slug: 'browse-fixture-winery', rating: 3.1, patio: 1, kid_friendly: 1 }),
+    naramata: add({ name: 'Browse Fixture "Quote" & Co', region: 'naramata', type: 'winery', slug: 'browse-fixture-quote-co', phone: '250.555.0199' }),
+    park: add({ name: 'Browse Fixture Park', region: 'vernon', type: 'outdoor', slug: 'browse-fixture-park' }),
+    beach: add({ name: 'Browse Fixture Beach', region: 'kelowna', type: 'beach', slug: 'browse-fixture-beach', dog_friendly: 1 }),
+  };
+  return browseFixture;
+}
+const browseCardIds = (html) => {
+  const list = html.slice(html.indexOf('id="bhResults"'), html.indexOf('<template id="bhRest">'));
+  return [...list.matchAll(/<li class="venue-card"[^>]*data-venue-id="(\d+)"/g)].map((m) => Number(m[1]));
+};
+
+test('Browse hub: /browse lists every venue in the hub shape -- server-rendered cards linking to venue pages, the rest in an inert template, no wizard', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const f = seedBrowseFixture();
+  const total = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE redirect_to IS NULL').get().n;
+  const res = await fetch(`${base}/browse`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-robots-tag'), null, 'indexable, as before');
+  const html = await res.text();
+  assert.match(html, /<h1>Browse &amp; Search the Okanagan<\/h1>/);
+  assert.deepEqual(html.match(/<title>[^<]*<\/title>/g), [STAGE42_TITLE]);
+  assert.deepEqual(html.match(/<link rel="canonical" href="[^"]*">/g), [STAGE42_CANONICAL]);
+  assert.doesNotMatch(html, /<meta name="robots"/);
+  assert.ok(html.includes(`id="bhResultsSummary" aria-live="polite">${total} places<`), 'the summary counts every venue');
+  const ids = browseCardIds(html);
+  assert.equal(ids.length, Math.min(total, app.BROWSE_PAGE_SIZE), 'at most one page of cards in the render tree');
+  const rest = (html.match(/<template id="bhRest">([\s\S]*?)<\/template>/) || [])[1] || '';
+  assert.equal(ids.length + (rest.match(/<li class="venue-card"/g) || []).length, total, 'every other venue sits in the template');
+  assert.equal(html.includes(`id="bhShowMore"${total > app.BROWSE_PAGE_SIZE ? '' : ' hidden'}`), true);
+  // Cards link to the venue's own page (the wizard cards never did).
+  assert.match(html, /<a class="venue-card-link" href="\/kelowna\/restaurants\/browse-fixture-bistro">/);
+  // Every venue type and every wizard control is offered, as hub controls.
+  for (const t of app.BROWSE_HUB_TYPE_ORDER) assert.match(html, new RegExp(`data-bh-type="${t}"`), t);
+  for (const k of ['patio', 'dog_friendly', 'kid_friendly', 'vegetarian', 'vegan', 'gluten_free', 'live_music', 'lake_view', 'great_groups', 'happy_hour', 'sports_tv', 'nonalcoholic']) assert.match(html, new RegExp(`data-bh-feature="${k}"`), k);
+  assert.equal((html.match(/data-region="[a-z-]+"/g) || []).length, 20, 'the canonical 20 regions');
+  for (const id of ['bhSearch', 'bhCuisine', 'bhSort', 'bhOpenNow', 'bhFavOnly', 'bhMapLink', 'bhNearMe', 'list-venue', 'app']) assert.match(html, new RegExp(`id="${id}"`), id);
+  assert.match(html, /<option value="Zimbabwean">Zimbabwean<\/option>/, 'cuisines come from the data');
+  assert.match(html, /<a class="fd-pop-btn bh-map-link" id="bhMapLink" href="\/map">/);
+  // None of the wizard.
+  assert.doesNotMatch(html, /id="wizardStep1"|id="searchInput"|id="venueGrid"|<body class="wizard-active page-browse">|browse-directory-styles|__roamPrefill/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page browse-page">/);
+  // One GA4 tag with its own page type; one capture script; app.js once, versioned.
+  assert.equal((html.match(/page_type: '[a-z_]+'/g) || []).length, 1);
+  assert.ok(html.includes("var cfg = { page_type: 'browse' };"));
+  assert.equal(sidecarCount(html), 1);
+  assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1);
+  assert.ok(f.bistro.id > 0);
+})));
+
+test('Browse hub: URL filters are applied on the server (types OR, features AND, regions OR, cuisine, price, text), and bad values are dropped', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const f = seedBrowseFixture();
+  const get = async (q) => (await fetch(`${base}/browse${q}`)).text();
+  const venues = app.getBrowseHubVenues();
+  const total = venues.length;
+  const expectIds = (pred) => venues.filter(pred).map((v) => v.id);
+  const check = async (q, pred, label) => {
+    const html = await get(q);
+    const want = expectIds(pred);
+    assert.ok(html.includes(`id="bhResultsSummary" aria-live="polite">${want.length} of ${total} places<`), `${label}: summary`);
+    assert.deepEqual(browseCardIds(html).sort((a, b) => a - b), want.slice(0, app.BROWSE_PAGE_SIZE).sort((a, b) => a - b), `${label}: cards`);
+    return html;
+  };
+  await check('?types=winery', (v) => v.type === 'winery', 'type');
+  await check('?types=winery,beach', (v) => v.type === 'winery' || v.type === 'beach', 'two types are alternatives');
+  await check('?features=patio&features=x', (v) => v.patio === 1 || v.patio === true, 'feature (a repeated parameter keeps the first)');
+  await check('?features=patio,dog_friendly', (v) => Number(v.patio) === 1 && Number(v.dog_friendly) === 1, 'features are ANDed');
+  await check('?regions=kelowna,vernon', (v) => v.region === 'kelowna' || v.region === 'vernon', 'two regions are alternatives');
+  await check('?types=beach&regions=kelowna', (v) => v.type === 'beach' && v.region === 'kelowna', 'groups are ANDed');
+  await check('?cuisine=Zimbabwean&price=2', (v) => v.cuisine === 'Zimbabwean' && Number(v.price) === 2, 'cuisine and price');
+  const q = await check('?q=Fixture%20Bistro', (v) => `${v.name} ${v.description}`.toLowerCase().includes('fixture bistro'), 'text');
+  assert.match(q, /id="bhSearch"[^>]*value="Fixture Bistro"/, 'the search box carries the typed text');
+  // Unknown values are ignored, never an error page.
+  const bad = await get('?types=atlantis&features=nope&regions=mars&cuisine=Nope&price=9&sort=chaos');
+  assert.ok(bad.includes(`id="bhResultsSummary" aria-live="polite">${total} places<`));
+  // The old wizard links keep working: the discovery router's /browse URLs.
+  await check('?types=restaurant,cafe,brewery,pub,cocktail', (v) => ['restaurant', 'cafe', 'brewery', 'pub', 'cocktail'].includes(v.type) || (v.fd_categories || []).some((c) => ['restaurant', 'cafe', 'brewery', 'pub', 'cocktail'].includes(c)), 'Food & Drink types');
+  // Chips arrive pressed, the selected tags are written, sort is honoured.
+  const pressed = await get('?types=winery&features=patio&regions=penticton&cuisine=Zimbabwean&price=2');
+  for (const a of ['data-bh-type="winery" aria-pressed="true"', 'data-bh-feature="patio" aria-pressed="true"', 'data-region="penticton" aria-pressed="true"', 'data-bh-price="2" aria-pressed="true"']) assert.ok(pressed.includes(a), a);
+  assert.match(pressed, /<option value="Zimbabwean" selected>/);
+  const byRating = browseCardIds(await get('?sort=rating'));
+  const rating = new Map(venues.map((v) => [v.id, Number(v.rating) || -1]));
+  for (let i = 1; i < byRating.length; i++) assert.ok(rating.get(byRating[i - 1]) >= rating.get(byRating[i]), 'highest rated first');
+  assert.equal(byRating[0], f.bistro.id, 'the fixture bistro (4.9) leads');
+})));
+
+test('Browse hub: parseBrowseHubQuery -- values are validated, duplicates collapse, text is bounded', () => {
+  const cuisines = ['Italian', 'Thai'];
+  const p = (q) => app.parseBrowseHubQuery(q, cuisines);
+  assert.deepEqual(p({}), { types: [], features: [], regions: [], cuisine: '', price: '', q: '', openNow: false, sort: '', fav: false });
+  assert.deepEqual(p({ types: 'winery,winery,atlantis', features: 'patio,vegan,zzz', regions: 'kelowna,mars', cuisine: 'Thai', price: '3', q: '  pizza   please ', open: 'now', sort: 'rating', fav: '1' }),
+    { types: ['winery'], features: ['patio', 'vegan'], regions: ['kelowna'], cuisine: 'Thai', price: '3', q: 'pizza please', openNow: true, sort: 'rating', fav: true });
+  assert.equal(p({ cuisine: 'Klingon' }).cuisine, '');
+  assert.equal(p({ price: '0' }).price, '');
+  assert.equal(p({ q: 'x'.repeat(500) }).q.length, 120);
+  assert.deepEqual(p({ types: ['restaurant', 'cafe'] }).types, ['restaurant', 'cafe'], 'a repeated parameter');
+  assert.equal(p({ sort: 'name' }).sort, 'name');
+  assert.equal(p({ sort: 'price' }).sort, '');
+});
+
+test('Browse hub: the page script\'s filter predicate is the server\'s (checked over every venue and many selections)', () => {
+  seedBrowseFixture();
+  const vm = require('node:vm');
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(`${app.BROWSE_HUB_FILTER_CLIENT_PREDICATE_SRC}; this.bhMatches = bhMatches;`, ctx);
+  const venues = app.getBrowseHubVenues();
+  const FEATS = ['patio', 'dog_friendly', 'kid_friendly', 'vegan'];
+  const sel = [
+    { types: [], features: [], regions: [], cuisine: '', price: '' },
+    { types: ['winery', 'beach'], features: [], regions: [], cuisine: '', price: '' },
+    { types: ['restaurant'], features: ['patio'], regions: ['kelowna', 'vernon'], cuisine: '', price: '' },
+    { types: [], features: ['patio', 'dog_friendly'], regions: [], cuisine: '', price: '' },
+    { types: [], features: [], regions: [], cuisine: 'Zimbabwean', price: '2' },
+    { types: ['brewery'], features: ['vegan'], regions: ['penticton'], cuisine: 'Italian', price: '1' },
+  ];
+  for (const v of venues) {
+    const d = { c: (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type], f: FEATS.filter((k) => Number(v[k]) === 1), r: v.region, cu: v.cuisine || '', p: Number(v.price) || 0 };
+    for (const f of sel) assert.equal(ctx.bhMatches(f.types, f.features, f.regions, f.cuisine, f.price, JSON.parse(JSON.stringify(d))), app.browseFilterMatches(f, d), `${v.name} ${JSON.stringify(f)}`);
+  }
+});
+
+test('Browse hub: the page script keeps /browse\'s GA4 events (names and parameters) and the hub\'s filter_change; no venue_impression stream', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const html = await (await fetch(`${base}/browse`)).text();
+  const script = html.slice(html.lastIndexOf('<script>\n(function(){\n  var LABELS'), html.lastIndexOf('</script>'));
+  assert.ok(script.length > 5000, 'the page script is present');
+  // The wizard's events, with their parameters.
+  assert.ok(script.includes("window.trackEvent('select_venue_type', { venue_type: value })"));
+  assert.ok(script.includes("window.trackEvent('select_filter', { filter_name: FEATURE_CHIP[value] || value })"));
+  assert.ok(script.includes("window.trackEvent('select_region', { region: value })"));
+  assert.ok(script.includes("window.trackEvent('search', { search_term: searchTerm })"));
+  assert.ok(script.includes("window.trackEvent('open_map')"));
+  // Same chip names the wizard sent (kid_friendly -> kids, lake_view -> view, ...).
+  assert.ok(script.includes(`var FEATURE_CHIP = ${JSON.stringify(app.BROWSE_FEATURE_CHIP)};`));
+  // The hub's standard event, on its own surface.
+  assert.ok(script.includes('var FILTER_SURFACE = "browse";'));
+  assert.ok(script.includes("trackFilterChange(group, value, on ? 'add' : 'remove')"));
+  // Cards: the shared card engagement script is wired, with impressions switched off
+  // (the wizard never sent venue_impression; no card matches that selector).
+  assert.ok(html.includes("if (c.matches(\"[data-bh-no-impression]\")) io.observe(c);"));
+  assert.ok(!html.includes('data-bh-no-impression="'), 'no card carries the opt-in attribute');
+  assert.ok(html.includes("track('description_expand'") || html.includes("'description_expand'"), 'Read more events are the hub\'s own');
+  // Favorite / Add to Trip still come from app.js (add_to_favorites / add_to_trip) and the card script (venue_favorite).
+  assert.match(html, /<button type="button" class="card-action fav-btn"/); assert.match(html, /<button type="button" class="card-action trip-btn"/);
+  assert.doesNotMatch(script, /fetch\(|XMLHttpRequest|sendBeacon/, 'no network of its own');
+  assert.doesNotMatch(script, /MutationObserver/, 'no body-wide observer');
+  assert.equal((script.match(/setInterval\(/g) || []).length, 1, 'one 60-second clock tick, like the other hubs');
+})));
+
+test('Browse hub: /browse/classic is the unchanged wizard page, noindex, and /browse keeps its redirects', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const classic = await fetch(`${base}/browse/classic`);
+  assert.equal(classic.status, 200);
+  assert.equal(classic.headers.get('x-robots-tag'), 'noindex');
+  const html = await classic.text();
+  assert.match(html, /<body class="wizard-active page-browse">/);
+  assert.match(html, /id="wizardStep1"/); assert.match(html, /id="searchInput"/); assert.match(html, /id="venueGrid"/);
+  // The classic page never redirects: ?q is served in place (the hub page owns the routing).
+  const q = await fetch(`${base}/browse/classic?q=restaurants%20in%20Kelowna`, { redirect: 'manual' });
+  assert.equal(q.status, 200); await q.text();
+  const map = await fetch(`${base}/browse?openMap=1`, { redirect: 'manual' });
+  assert.equal(map.status, 302); assert.equal(map.headers.get('location'), '/map'); await map.text();
+  const routed = await fetch(`${base}/browse?q=restaurants%20in%20Kelowna`, { redirect: 'manual' });
+  assert.equal(routed.status, 302, 'discovery routing still runs first'); await routed.text();
+  const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+  assert.doesNotMatch(sitemap, /okanaganroam\.com\/browse[\/<?]/, 'the sitemap is unchanged');
+})));
+
+// ---- Second pass (2026-10-05): card actions, head metadata, no Favorites link -----------
+// Runs the REAL app.js code (initBlock11's link building, and the delegated
+// outbound_click handler) against a minimal fake DOM, so the server-rendered
+// card actions are compared with what the wizard page's own script produced.
+const browseAppJs = () => fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+function wizardCardLinks(name, regionSlug, phone) {
+  const src = browseAppJs();
+  const vm = require('node:vm');
+  const body = src.slice(src.indexOf('function initBlock11(){'), src.indexOf('/* ---------- Live Google Places search (beta) ---------- */'));
+  const en = (key) => { const m = src.match(new RegExp(`'${key.replace('.', '\\.')}': '((?:[^'\\\\]|\\\\.)*)'`)); return JSON.parse(`"${m[1].replace(/\\u/g, '\\u').replace(/\\'/g, "'")}"`); };
+  const mk = (tag) => ({ tag, dataset: {}, style: {}, children: [], attrs: {}, className: '', href: '', textContent: '', appendChild(c) { this.children.push(c); return c; }, setAttribute(k, v) { this.attrs[k] = v; }, insertAdjacentElement(_w, c) { this.children.push(c); return c; }, set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; } });
+  const card = mk('li'); card.dataset = { name, region: regionSlug, phone: phone || '' };
+  card.querySelector = () => null;
+  const ctx = { document: { querySelectorAll: () => [card], createElement: mk }, window: {}, t: en, encodeURIComponent };
+  vm.createContext(ctx);
+  vm.runInContext(`${body}\ninitBlock11();`, ctx);
+  const row = card.children.find((c) => c.className === 'card-links');
+  // (With no number the wizard added an invisible aria-hidden placeholder, only to keep card heights equal; it was never shown.)
+  return row.children.filter((c) => c.tag === 'a' && c.attrs['aria-hidden'] !== 'true').map((a) => ({ cls: a.className, href: a.href || '', text: a.textContent, target: a.target || '', rel: a.rel || '' }));
+}
+const browseCardHtmlFor = (html, id) => {
+  const i = html.indexOf(`data-venue-id="${id}"`);
+  const start = html.lastIndexOf('<li class="venue-card"', i);
+  return html.slice(start, html.indexOf('</li>', i));
+};
+const unHtml = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
+test('Browse hub: every card shows Get directions, Find menu, Check for online booking and the phone, exactly as the wizard cards did', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const f = seedBrowseFixture();
+  const html = await (await fetch(`${base}/browse`)).text();
+  const venues = app.getBrowseHubVenues();
+  // Every venue, in the list and in the template: a link row with the three Google links, in this order.
+  const rows = html.match(/<div class="bh-card-links">[\s\S]*?<\/div>/g) || [];
+  assert.equal(rows.length, venues.length, 'one action row per venue (list and template alike)');
+  for (const r of rows) {
+    assert.deepEqual([...r.matchAll(/<a class="([a-z-]+)"/g)].map((m) => m[1]).filter((c) => c !== 'phone-link'), ['directions-link', 'menu-link', 'booking-link']);
+  }
+  // Compared with the wizard's own script (the real initBlock11) for fixtures with a phone, none, and awkward characters.
+  for (const v of [f.bistro, f.winery, f.naramata]) {
+    const card = browseCardHtmlFor(html, v.id);
+    const mine = [...card.matchAll(/<a class="(directions-link|menu-link|booking-link|phone-link)" href="([^"]*)"([^>]*)>([^<]*)<\/a>/g)].map((m) => ({ cls: m[1], href: unHtml(m[2]), text: unHtml(m[4]), target: /target="_blank"/.test(m[3]) ? '_blank' : '', rel: /rel="noopener"/.test(m[3]) ? 'noopener' : '' }));
+    const theirs = wizardCardLinks(v.name, v.region, v.phone || '');
+    assert.deepEqual(mine, theirs, `${v.name}: same links, labels and targets as the wizard card`);
+  }
+  // The phone is a tel: link carrying digits and +, only when a number is on file.
+  assert.match(browseCardHtmlFor(html, f.bistro.id), /<a class="phone-link" href="tel:\+12505550100">\u{1F4DE} \+1 \(250\) 555-0100<\/a>/u);
+  assert.match(browseCardHtmlFor(html, f.naramata.id), /href="tel:2505550199"/);
+  assert.doesNotMatch(browseCardHtmlFor(html, f.winery.id), /phone-link/, 'no number, no phone link');
+  // The venue-page link is still there, and the Favorite / Add to Trip controls follow the actions.
+  const card = browseCardHtmlFor(html, f.bistro.id);
+  assert.match(card, /<a class="venue-card-link" href="\/kelowna\/restaurants\/browse-fixture-bistro">/);
+  assert.ok(card.indexOf('bh-card-links') > card.indexOf('class="chips"') && card.indexOf('bh-card-links') < card.indexOf('card-actions'), 'between the chips and the buttons');
+  // Visible (not the hidden .card-links row app.js injects): the page style gives the row a 44px tap height.
+  assert.match(html, /body\.browse-page \.bh-card-links a \{ display: inline-flex; align-items: center; min-height: 44px;/);
+  assert.doesNotMatch(html, /\.bh-card-links[^{]*\{[^}]*display: none/);
+})));
+
+test('Browse hub: the card links are wired to app.js\'s existing outbound_click handler (link_type + venue_name), with no new event', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const f = seedBrowseFixture();
+  const html = await (await fetch(`${base}/browse`)).text();
+  const src = browseAppJs();
+  // Run the real handler: a click on each link type reports { link_type, venue_name } with the card's data-name.
+  const start = src.indexOf("document.addEventListener('click', function(e){\n  var link = e.target.closest('.directions-link, .menu-link, .booking-link');");
+  assert.ok(start !== -1, 'the delegated outbound handler is still in app.js');
+  const handler = src.slice(start, src.indexOf('\n});', start) + 4);
+  const events = [];
+  let click;
+  const vm = require('node:vm');
+  const ctx = { document: { addEventListener: (t, fn) => { if (t === 'click') click = fn; } }, window: { trackEvent: (n, p) => events.push([n, p]) } };
+  vm.createContext(ctx);
+  vm.runInContext(handler, ctx);
+  const card = browseCardHtmlFor(html, f.bistro.id);
+  const dataName = unHtml(card.match(/data-name="([^"]*)"/)[1]);
+  assert.equal(dataName, f.bistro.name, 'the card carries data-name for the handler');
+  const cardEl = { dataset: { name: dataName }, classList: { contains: () => false } };
+  for (const cls of ['directions-link', 'menu-link', 'booking-link']) {
+    assert.ok(card.includes(`class="${cls}"`), cls);
+    click({ target: { closest: (sel) => (sel.includes(cls) ? { classList: { contains: (c) => c === cls }, closest: () => cardEl } : null) } });
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(events)), [
+    ['outbound_click', { link_type: 'directions', venue_name: 'Browse Fixture Bistro' }],
+    ['outbound_click', { link_type: 'menu', venue_name: 'Browse Fixture Bistro' }],
+    ['outbound_click', { link_type: 'booking', venue_name: 'Browse Fixture Bistro' }],
+  ]);
+  // The phone link has no analytics hook (it never did) and the hub script adds none of its own.
+  assert.doesNotMatch(src.slice(start, src.indexOf('\n});', start)), /phone/);
+  const script = html.slice(html.lastIndexOf('<script>\n(function(){\n  var LABELS'), html.lastIndexOf('</script>'));
+  assert.doesNotMatch(script, /outbound_click/, 'no second outbound_click source on the page');
+  assert.ok(!/data-track=/.test(card), 'not the venue-page data-track hook');
+})));
+
+test('Browse hub: head metadata -- the wizard page\'s share-card, locale and WebSite / Organization data are back, without duplicates or conflicts', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  seedBrowseFixture();
+  const html = await (await fetch(`${base}/browse`)).text();
+  const head = html.slice(0, html.indexOf('</head>'));
+  const template = fs.readFileSync(path.join(__dirname, '..', 'okanagan.html'), 'utf8');
+  // The restored items are exactly the template's own lines / blocks.
+  const extras = app.BROWSE_HEAD_EXTRAS.split('\n');
+  for (const line of extras.filter((l) => l.startsWith('<meta'))) assert.ok(template.includes(line), `okanagan.html has: ${line}`);
+  const blocks = app.BROWSE_HEAD_EXTRAS.match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g);
+  assert.equal(blocks.length, 2);
+  for (const b of blocks) assert.ok(template.includes(b), 'the JSON-LD block is okanagan.html\'s own');
+  // Exactly one of every social / SEO tag; nothing conflicts.
+  const one = (re, label) => assert.equal((head.match(re) || []).length, 1, label);
+  one(/<title>/g, 'title'); one(/<link rel="canonical"/g, 'canonical'); one(/<meta name="description"/g, 'description');
+  for (const k of ['og:title', 'og:description', 'og:type', 'og:url', 'og:image', 'og:image:width', 'og:image:height', 'og:locale', 'og:site_name']) one(new RegExp(`<meta property="${k}"`, 'g'), k);
+  for (const k of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image']) one(new RegExp(`<meta name="${k}"`, 'g'), k);
+  assert.doesNotMatch(head, /og:locale:alternate/, 'the hub page is English-only: no fr_CA alternate');
+  const val = (re) => unHtml(head.match(re)[1]);
+  assert.equal(val(/<title>([^<]*)<\/title>/), 'Browse & Search the Okanagan | Okanagan Roam');
+  assert.equal(val(/<link rel="canonical" href="([^"]*)"/), 'https://okanaganroam.com/browse');
+  assert.equal(val(/<meta property="og:url" content="([^"]*)"/), 'https://okanaganroam.com/browse');
+  assert.equal(val(/<meta property="og:title" content="([^"]*)"/), 'Browse & Search the Okanagan | Okanagan Roam');
+  assert.equal(val(/<meta name="twitter:title" content="([^"]*)"/), 'Browse & Search the Okanagan | Okanagan Roam');
+  assert.equal(val(/<meta name="description" content="([^"]*)"/), SEO2_DESCRIPTION);
+  assert.equal(val(/<meta property="og:description" content="([^"]*)"/), SEO2_DESCRIPTION);
+  assert.equal(val(/<meta name="twitter:description" content="([^"]*)"/), SEO2_DESCRIPTION);
+  assert.equal(val(/<meta property="og:image:width" content="([^"]*)"/), '1200'); assert.equal(val(/<meta property="og:image:height" content="([^"]*)"/), '630');
+  assert.equal(val(/<meta name="twitter:image" content="([^"]*)"/), 'https://okanaganroam.com/og-image.png');
+  assert.equal(val(/<meta property="og:locale" content="([^"]*)"/), 'en_CA');
+  // Structured data: one block each, all valid JSON, one of each type -- the breadcrumb is /browse's own.
+  const ld = [...head.matchAll(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/g)].map((m) => JSON.parse(m[1]));
+  assert.deepEqual(ld.map((j) => j['@type']).sort(), ['BreadcrumbList', 'Organization', 'WebSite']);
+  assert.equal(ld.find((j) => j['@type'] === 'BreadcrumbList').itemListElement.at(-1).item, 'https://okanaganroam.com/browse');
+  // The classic page keeps exactly the template's own two blocks and one of each tag (nothing doubled by this).
+  const classic = await (await fetch(`${base}/browse/classic`)).text();
+  const classicHead = classic.slice(0, classic.indexOf('</head>'));
+  assert.equal((classicHead.match(/application\/ld\+json/g) || []).length, 2);
+  assert.equal((classicHead.match(/og:image:width/g) || []).length, 1);
+  // Scoped to /browse: the other hubs' heads are unchanged.
+  const fd = await (await fetch(`${base}/food-drink`)).text();
+  assert.doesNotMatch(fd.slice(0, fd.indexOf('</head>')), /og:locale|twitter:image|"@type": "WebSite"|og:image:width/);
+})));
+
+test('Browse hub: /browse keeps its previous header -- no Favorites link -- while every other themed page keeps the link', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const html = await (await fetch(`${base}/browse`)).text();
+  assert.ok(!html.includes('nav-links-favorites') && !html.includes('href="/favorites"'), '/browse: no Favorites link and no rule for it');
+  assert.ok(!html.includes(app.FAVORITES_NAV_STYLE), 'the 941-1099px rule is gone with it');
+  // Exactly the shared themed header, minus what withFavoritesNavLink adds.
+  const themed = app.renderGolfHeaderHtml();
+  assert.ok(themed.includes('nav-links-favorites'), 'the shared header still carries it');
+  const stripped = app.withoutFavoritesNavLink(themed);
+  assert.ok(html.includes(stripped), '/browse\'s header is the shared header without the link');
+  assert.ok(themed.replace(app.FAVORITES_NAV_ITEM + '\n      ', '').replace('\n' + app.FAVORITES_NAV_STYLE, '') === stripped);
+  // The shared themed shell is unchanged for everyone else.
+  for (const p of ['/food-drink', '/dog-friendly', '/favorites', '/trip']) assert.ok((await (await fetch(base + p)).text()).includes('nav-links-favorites'), `${p}: still has the link`);
+  // Same header items, in the same order, as the previous /browse (the wizard page, byte-for-byte nav).
+  const classic = await (await fetch(`${base}/browse/classic`)).text();
+  const items = (h) => [...h.slice(h.indexOf('<ul class="nav-links" id="navLinks">'), h.indexOf('</ul>', h.indexOf('<ul class="nav-links" id="navLinks">'))).matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(items(html).filter((h) => h !== '/trip'), items(classic).filter((h) => h !== '/trip'));
+})));
+
+test('Browse hub: /browse/classic is untouched by the second pass -- no hub markup, only the intended noindex', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
+  const classic = await (await fetch(`${base}/browse/classic`)).text();
+  for (const s of ['bhResults', 'bh-card-links', 'bhVenueData', 'og:site_name" content="Okanagan Roam">\n<meta property="og:image:width"']) assert.ok(!classic.includes(s) || s.startsWith('og:site_name'), s);
+  assert.equal((classic.match(/<meta property="og:site_name"/g) || []).length, 1, 'one og:site_name, the template\'s own');
+  assert.equal((classic.match(/<meta name="robots" content="noindex">/g) || []).length, 1);
+  assert.match(classic, /<body class="wizard-active page-browse">/);
+  assert.match(classic, /id="wizardStep1"/);
+})));

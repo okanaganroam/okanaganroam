@@ -7341,10 +7341,12 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // so site search is measurable separately from the legacy /browse directory.
 // Stage 4.4 (2026-10-01): 'favorites' labels the /favorites page (page_view
 // only; no new events).
+// 2026-10-05: 'browse' labels the hub-style /browse (the all-venue directory),
+// so it is measured on its own; /browse/classic, the wizard page, still has none.
 // Stage 5A (F12, 2026-10-01): 'trip_v3' labels the Build My Trip V3 view, so
 // V3 page views and its trip_plan_* events are told apart from V2's ('trip').
 // Same URL (/trip), served only while TRIP_PLANNER_V3 allows it.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites']);
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -15981,6 +15983,833 @@ function applyBrowseLoadingState(html, state) {
   return html;
 }
 
+// ---------- Browse hub (2026-10-05): the all-venue directory at /browse ----------
+//
+// /browse used to be okanagan.html (the frozen homepage file) with its
+// client-side three-step wizard: ~2 MB of venue JSON fetched, every card built
+// in the browser, filter state never in the URL. This is the same all-venue
+// directory in the shape of the other server-rendered hubs (/food-drink,
+// /dog-friendly, /outdoors): the first BROWSE_PAGE_SIZE matching cards are in
+// the HTML, the rest sit in an inert <template> (so search and filters still
+// run over every venue), filters are chips that live in the URL
+// (pushState/popstate), and cards are the shared server card with a link to
+// the venue's own page. Nothing in okanagan.html, app.js or app.css changes;
+// the previous wizard page is still served, unchanged, at /browse/classic.
+//
+// Filter model (AND between the groups):
+//   venue type  (OR)  -- effective category: a brewery that is also a
+//                        restaurant answers to both, as /api/venues does
+//   features    (AND) -- the twelve verified BOOL_FIELDS /browse always had
+//   region      (OR)
+//   cuisine, price (single choice) -- carried over from the wizard's refine row
+//   Open now, Favourites only, text search, sort (Featured = A-Z, Highest
+//   rated, A-Z), "Use my location" (nearest region) -- carried over too.
+const BROWSE_PAGE_SIZE = 75;
+// Display order of the type chips (every venue type there is).
+const BROWSE_HUB_TYPE_ORDER = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', 'golf', 'beach', 'outdoor'];
+const BROWSE_PRICES = [{ value: '1', label: '$' }, { value: '2', label: '$$' }, { value: '3', label: '$$$' }];
+const BROWSE_SORTS = [
+  { value: '', label: 'Featured order' },
+  { value: 'rating', label: 'Highest rated' },
+  { value: 'name', label: 'A\u2013Z' },
+];
+const BROWSE_SORT_KEYS = new Set(['rating', 'name']);
+// Town-centre coordinates "Use my location" measures against (the same
+// points the wizard's Near me button always used).
+const BROWSE_NEAR_ME_COORDS = {
+  'kelowna': [49.8880, -119.4960], 'west-kelowna': [49.8600, -119.6053], 'peachland': [49.7729, -119.7370],
+  'lake-country': [50.0730, -119.4048], 'naramata': [49.5990, -119.5860], 'penticton': [49.5008, -119.5939],
+  'kaleden': [49.4028, -119.6122], 'okanagan-falls': [49.3438, -119.5620], 'summerland': [49.5988, -119.6772],
+  'oliver': [49.1822, -119.5506], 'osoyoos': [49.0325, -119.4683], 'vernon': [50.2683, -119.2676],
+  'coldstream': [50.2213, -119.2138], 'lumby': [50.2504, -118.9668], 'armstrong': [50.4498, -119.1968],
+  'enderby': [50.5504, -119.1414], 'big-white': [49.7314, -118.9339], 'silverstar': [50.3597, -119.0567],
+  'apex': [49.3775, -119.9033], 'baldy': [49.1167, -119.3167],
+};
+function browseTypeLabel(type) {
+  return FD_HUB_LABEL_BY_TYPE[type] || (CATEGORY_LABELS[type] && CATEGORY_LABELS[type].plural) || type;
+}
+
+// The directory's universe: every non-redirected venue, A-Z (what
+// /api/venues?limit=5000 returned), with the Food & Drink effective
+// categories attached.
+function getBrowseHubVenues() {
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL ORDER BY name ASC').all().map(rowToVenue);
+  return attachFoodDrinkCategories(rows);
+}
+function browseCategoriesByVenue(venues) {
+  const map = new Map();
+  for (const v of venues) map.set(v.id, (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type]);
+  return map;
+}
+function browseFeaturesByVenue(venues) {
+  const map = new Map();
+  for (const v of venues) map.set(v.id, FD_HUB_FEATURES.filter((f) => Number(v[f.key]) === 1).map((f) => f.key));
+  return map;
+}
+function browseCuisines(venues) {
+  const counts = new Map();
+  for (const v of venues) if (v.cuisine) counts.set(v.cuisine, (counts.get(v.cuisine) || 0) + 1);
+  return [...counts.keys()].sort((a, b) => a.localeCompare(b));
+}
+// Everything the text search looks at, lower-cased, for one venue (the client
+// builds the same words from the card, so server and browser agree).
+function browseSearchText(v, cats, feats) {
+  return [v.name, REGION_LABELS[v.region] || '', cats.map(browseTypeLabel).join(' '),
+    feats.map((k) => FD_HUB_LABEL_BY_FEATURE[k] || k).join(' '), v.cuisine || '', v.description || ''].join(' ').toLowerCase();
+}
+
+// Shared verbatim by the server render and the inline client script
+// (BROWSE_HUB_FILTER_CLIENT_PREDICATE_SRC): types OR, regions OR, features
+// AND, cuisine and price exact; an empty group imposes no constraint.
+function browseFilterMatches(f, d) {
+  const typeOk = !f.types.length || f.types.some((t) => d.c.includes(t));
+  const regionOk = !f.regions.length || f.regions.includes(d.r);
+  const featureOk = f.features.every((k) => d.f.includes(k));
+  const cuisineOk = !f.cuisine || d.cu === f.cuisine;
+  const priceOk = !f.price || String(d.p) === f.price;
+  return typeOk && regionOk && featureOk && cuisineOk && priceOk;
+}
+const BROWSE_HUB_FILTER_CLIENT_PREDICATE_SRC = `function bhMatches(types, features, regions, cuisine, price, d){
+    var typeOk = !types.length, regionOk = !regions.length || regions.indexOf(d.r) !== -1;
+    for (var i = 0; i < types.length && !typeOk; i++) { if (d.c.indexOf(types[i]) !== -1) typeOk = true; }
+    var featureOk = true;
+    for (var j = 0; j < features.length && featureOk; j++) { if (d.f.indexOf(features[j]) === -1) featureOk = false; }
+    return typeOk && regionOk && featureOk && (!cuisine || d.cu === cuisine) && (!price || String(d.p) === price);
+  }`;
+// ?types=a,b&features=x,y&regions=c,d&cuisine=Italian&price=2&q=words&open=now
+// &sort=rating&fav=1 -- unknown values are dropped, so a hand-edited or old
+// link degrades to "fewer constraints", never an error page.
+function parseBrowseHubQuery(query, cuisines = []) {
+  const one = (v) => (Array.isArray(v) ? v[0] : v);
+  const split = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : '').split(',').map((x) => x.trim()).filter(Boolean);
+  const types = [], features = [], regions = [];
+  for (const t of split(query && query.types)) if (CATEGORY_LABELS[t] && !types.includes(t)) types.push(t);
+  for (const k of split(query && query.features)) if (FD_HUB_FEATURE_KEYS.has(k) && !features.includes(k)) features.push(k);
+  for (const r of split(query && query.regions)) if (REGION_LABELS[r] && !regions.includes(r)) regions.push(r);
+  const cuisineRaw = one(query && query.cuisine);
+  const cuisine = typeof cuisineRaw === 'string' && cuisines.includes(cuisineRaw) ? cuisineRaw : '';
+  const priceRaw = one(query && query.price);
+  const price = BROWSE_PRICES.some((p) => p.value === priceRaw) ? priceRaw : '';
+  const qRaw = one(query && query.q);
+  const q = typeof qRaw === 'string' ? qRaw.trim().replace(/\s+/g, ' ').slice(0, 120) : '';
+  const sortRaw = one(query && query.sort);
+  return {
+    types, features, regions, cuisine, price, q,
+    openNow: one(query && query.open) === 'now',
+    sort: BROWSE_SORT_KEYS.has(sortRaw) ? sortRaw : '',
+    fav: one(query && query.fav) === '1',
+  };
+}
+// Contextual counts: each chip shows how many venues it would contribute given
+// the OTHER groups' selection, so a count never promises results a tap won't
+// deliver.
+function browseChipCounts(pool, f, dataById) {
+  const types = {}, features = {}, regions = {};
+  const without = (patch) => ({ ...f, ...patch });
+  for (const v of pool) {
+    const d = dataById.get(v.id);
+    if (browseFilterMatches(without({ types: [] }), d)) for (const t of d.c) types[t] = (types[t] || 0) + 1;
+    if (browseFilterMatches(without({ regions: [] }), d)) regions[d.r] = (regions[d.r] || 0) + 1;
+    if (browseFilterMatches(without({ features: [] }), d)) for (const k of d.f) features[k] = (features[k] || 0) + 1;
+  }
+  return { types, features, regions };
+}
+function browseSummaryText(shown, total, filtered) {
+  const noun = total === 1 ? 'place' : 'places';
+  return filtered ? `${shown} of ${total} ${noun}` : `${total} ${noun}`;
+}
+const BROWSE_HUB_SUMMARY_CLIENT_SRC = `function bhSummaryText(shown, total, filtered){
+    var noun = total === 1 ? 'place' : 'places';
+    return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' ' + noun);
+  }`;
+
+// The wizard card's four actions, restored on the hub card. The same labels,
+// the same Google URLs (built from the same name + town label, so a visitor
+// lands exactly where the wizard sent them) and the same classes, so app.js's
+// own delegated handler -- document click on .directions-link / .menu-link /
+// .booking-link, venue_name read from the card's data-name -- still reports
+// outbound_click { link_type, venue_name } with no new code or event. The phone
+// number is a plain tel: link, as before, and shown only when one is on file.
+const BROWSE_CARD_REGION_LABEL = {
+  'kelowna': 'Kelowna', 'west-kelowna': 'West Kelowna', 'peachland': 'Peachland',
+  'naramata': 'Naramata Bench', 'penticton': 'Penticton', 'okanagan-falls': 'Okanagan Falls',
+  'summerland': 'Summerland', 'oliver': 'Oliver', 'osoyoos': 'Osoyoos', 'vernon': 'Vernon',
+  'big-white': 'Big White', 'silverstar': 'SilverStar', 'apex': 'Apex', 'baldy': 'Mount Baldy',
+  'lake-country': 'Lake Country', 'coldstream': 'Coldstream', 'lumby': 'Lumby',
+  'armstrong': 'Armstrong', 'enderby': 'Enderby', 'kaleden': 'Kaleden',
+};
+function browseCardActionsHtml(v) {
+  const town = BROWSE_CARD_REGION_LABEL[v.region] || v.region;
+  const maps = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(`${v.name}, ${town}, Okanagan Valley, BC`);
+  const menu = 'https://www.google.com/search?q=' + encodeURIComponent(`${v.name} ${town} menu`);
+  const booking = 'https://www.google.com/search?q=' + encodeURIComponent(`${v.name} ${town} reservations OpenTable`);
+  const tel = v.phone ? String(v.phone).replace(/[^\d+]/g, '') : '';
+  const phone = v.phone ? `<a class="phone-link" href="tel:${escapeHtml(tel)}">📞 ${escapeHtml(v.phone)}</a>` : '';
+  return `<div class="bh-card-links"><a class="directions-link" href="${escapeHtml(maps)}" target="_blank" rel="noopener">📍 Get directions</a><a class="menu-link" href="${escapeHtml(menu)}" target="_blank" rel="noopener">📋 Find menu</a><a class="booking-link" href="${escapeHtml(booking)}" target="_blank" rel="noopener">📅 Check for online booking</a>${phone}</div>`;
+}
+
+// The head items the wizard page carried from okanagan.html that the shared
+// server head (pageHead) does not write: the share-card image size, the
+// language locale, the site name, the Twitter image and the site-level
+// WebSite / Organization structured data. Copied verbatim from okanagan.html
+// (a test pins them to it). og:locale:alternate fr_CA is NOT carried: that
+// page switched to French in place; this one is English-only.
+const BROWSE_HEAD_EXTRAS = [
+  '<meta property="og:site_name" content="Okanagan Roam">',
+  '<meta property="og:image:width" content="1200">',
+  '<meta property="og:image:height" content="630">',
+  '<meta property="og:locale" content="en_CA">',
+  '<meta name="twitter:image" content="https://okanaganroam.com/og-image.png">',
+  `<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Okanagan Roam",
+  "url": "https://okanaganroam.com/",
+  "description": "A real, review-backed directory of wineries, breweries, restaurants, cafes, and pubs across the Okanagan Valley, BC, filterable by dog-friendly, kid-friendly, vegan, and gluten-free options."
+}
+</script>`,
+  `<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Okanagan Roam",
+  "url": "https://okanaganroam.com/",
+  "areaServed": {
+    "@type": "Place",
+    "name": "Okanagan Valley, British Columbia, Canada"
+  },
+  "sameAs": [
+    "https://www.instagram.com/okanaganroam"
+  ]
+}
+</script>`,
+].join('\n');
+// /browse alone keeps its previous header: no Favorites link (owner decision,
+// recorded in AI_HANDOFF.md). Every other themed page still gets it from
+// withFavoritesNavLink(); this takes back exactly what that helper added.
+function withoutFavoritesNavLink(headerHtml) {
+  return String(headerHtml)
+    .replace(`${FAVORITES_NAV_ITEM}\n      `, '')
+    .replace(`\n${FAVORITES_NAV_STYLE}`, '');
+}
+
+function browseSearchHtml(q) {
+  return `<div class="fd-search">
+    <label class="visually-hidden" for="bhSearch">Search all places</label>
+    <input type="search" id="bhSearch" class="fd-search-input" placeholder="Search a place, cuisine, or what you're craving" autocomplete="off" spellcheck="false" value="${escapeHtml(q || '')}">
+    <button type="button" class="fd-search-clear" id="bhSearchClear" aria-label="Clear search"${q ? '' : ' hidden'}>&#215;</button>
+  </div>`;
+}
+function browseTypeChipsHtml(state = {}) {
+  const selected = new Set(state.types || []);
+  const counts = state.counts && state.counts.types ? state.counts.types : null;
+  const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-bh-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
+  const chips = BROWSE_HUB_TYPE_ORDER.map((t) => {
+    const n = counts ? (counts[t] || 0) : null;
+    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-bh-type="${t}" aria-pressed="${selected.has(t) ? 'true' : 'false'}">${escapeHtml(browseTypeLabel(t))}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+  }).join('');
+  return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="bh-type">${all}${chips}</div>`;
+}
+function browseFeatureChipsHtml(state = {}) {
+  const selected = new Set(state.features || []);
+  const counts = state.counts && state.counts.features ? state.counts.features : null;
+  const chips = FD_HUB_FEATURES.map((f) => {
+    const n = counts ? (counts[f.key] || 0) : null;
+    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-bh-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+  }).join('');
+  return `<div class="fd-feature-grid" role="group" aria-label="Choose what matters to you" data-filter="bh-feature">${chips}</div>`;
+}
+function browseCuisinePriceHtml(cuisines, state = {}) {
+  const options = ['<option value="">Any cuisine</option>']
+    .concat(cuisines.map((c) => `<option value="${escapeHtml(c)}"${state.cuisine === c ? ' selected' : ''}>${escapeHtml(c)}</option>`)).join('');
+  const price = [{ value: '', label: 'Any price' }].concat(BROWSE_PRICES)
+    .map((p) => `<button type="button" class="outdoor-filter-chip" data-bh-price="${p.value}" aria-pressed="${(state.price || '') === p.value ? 'true' : 'false'}">${escapeHtml(p.label)}</button>`).join('');
+  return `<div class="bh-cuisine-price">
+      <label class="bh-field-label" for="bhCuisine">Cuisine</label>
+      <select id="bhCuisine" class="bh-select">${options}</select>
+      <span class="bh-field-label" id="bhPriceLabel">Price</span>
+      <div class="fd-feature-grid" role="group" aria-labelledby="bhPriceLabel" data-filter="bh-price">${price}</div>
+    </div>`;
+}
+function browseFilterBarHtml(venues, cuisines, state = {}, openCount = 0) {
+  const nF = (state.features || []).length, nR = (state.regions || []).length;
+  const nM = (state.cuisine ? 1 : 0) + (state.price ? 1 : 0);
+  const pop = (id, label, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${label}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-bh-apply>Show results</button></div>
+      </div>
+    </div>`;
+  const nearMe = `<div class="bh-near-me"><button type="button" class="outdoor-filter-chip bh-near-me-btn" id="bhNearMe">\ud83d\udccd Use my location</button><span class="bh-near-me-status" id="bhNearMeStatus" role="status" aria-live="polite" hidden></span></div>`;
+  return `<div class="fd-controls">
+    ${pop('bhFeatures', 'What matters to you?', '\u2728', nF || '', browseFeatureChipsHtml(state))}
+    ${pop('bhRegions', 'Regions', '\ud83d\udccd', nR || '', nearMe + renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
+    ${pop('bhMore', 'Cuisine &amp; price', '\ud83c\udf7d\ufe0f', nM || '', browseCuisinePriceHtml(cuisines, state))}
+    <button type="button" class="fd-pop-btn fd-open-toggle" id="bhOpenNow" aria-pressed="${state.openNow ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">\ud83d\udd52</span> Open now<span class="outdoor-activity-count" id="bhOpenNowCount">${openCount}</span></button>
+    <button type="button" class="fd-pop-btn bh-fav-toggle" id="bhFavOnly" aria-pressed="${state.fav ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">\u2665</span> My favourites</button>
+    <a class="fd-pop-btn bh-map-link" id="bhMapLink" href="/map"><span class="fd-pop-icon" aria-hidden="true">\ud83d\uddfa\ufe0f</span> Map</a>
+  </div>`;
+}
+function browseSelectedTagsHtml(state = {}) {
+  const tag = (kind, v, label) => `<button type="button" class="outdoor-selected-tag" data-bh-remove-${kind}="${escapeHtml(v)}" aria-label="Remove ${escapeHtml(label)}">${escapeHtml(label)}<span class="outdoor-selected-x" aria-hidden="true">\u00d7</span></button>`;
+  const row = (label, tags) => (tags.length ? `<div class="outdoor-selected-row"><span class="outdoor-selected-label">${label}</span> ${tags.join(' ')}</div>` : '');
+  const t = (state.types || []).map((x) => tag('type', x, browseTypeLabel(x)));
+  const f = (state.features || []).map((x) => tag('feature', x, FD_HUB_LABEL_BY_FEATURE[x] || x));
+  const r = (state.regions || []).map((x) => tag('region', x, REGION_LABELS[x] || x));
+  const m = [].concat(state.cuisine ? [tag('cuisine', state.cuisine, state.cuisine)] : [], state.price ? [tag('price', state.price, `Price ${(BROWSE_PRICES.find((p) => p.value === state.price) || {}).label || ''}`)] : []);
+  const o = [].concat(state.openNow ? [tag('open', 'now', 'Open now')] : [], state.fav ? [tag('fav', '1', 'My favourites')] : []);
+  const any = t.length + f.length + r.length + m.length + o.length > 0;
+  return `<div class="outdoor-selected" id="bhSelected"${any ? '' : ' hidden'}>${row('Types', t)}${row('Looking for', f)}${row('Regions', r)}${row('Cuisine &amp; price', m)}${row('Also', o)}${any ? '<button type="button" class="outdoor-selected-clear" id="bhSelectedClear">Clear all</button>' : ''}</div>`;
+}
+function browseResultBarHtml(summary, state) {
+  const sort = `<label class="visually-hidden" for="bhSort">Sort results</label><select id="bhSort" class="bh-select bh-sort">${BROWSE_SORTS.map((s) => `<option value="${s.value}"${(state.sort || '') === s.value ? ' selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}</select>`;
+  return `<div class="fd-resultbar">
+    <p class="fd-count" id="bhResultsSummary" aria-live="polite">${escapeHtml(summary)}</p>
+    ${sort}
+  </div>
+  ${browseSelectedTagsHtml(state)}`;
+}
+
+// Page-scoped additions only. The chips, popovers, result bar, Show more and
+// open-status rules all come from renderFoodDrinkHubStyles() /
+// renderFoodDrinkOpenNowStyles() (scoped to body.fd-page), unchanged.
+function renderBrowseHubStyles() {
+  return `<style>
+  body.browse-page .bh-select { font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; max-width: 100%; }
+  body.browse-page .bh-select:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.browse-page .bh-cuisine-price { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  body.browse-page .bh-field-label { font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ref-navy, #1B2B3A); }
+  body.browse-page .bh-near-me { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
+  body.browse-page .bh-near-me-status { font-family: 'Nunito', sans-serif; font-size: 0.82rem; opacity: 0.8; }
+  body.browse-page .bh-near-me-status[hidden] { display: none; }
+  body.browse-page .region-distance { font-weight: 600; opacity: 0.7; margin-left: 4px; }
+  body.browse-page .bh-fav-toggle[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--teal, #2A6B67); }
+  body.browse-page a.bh-map-link { text-decoration: none; }
+  body.browse-page .fd-resultbar { flex-wrap: wrap; }
+  body.browse-page .bh-sort { margin-left: auto; }
+  /* Directions / menu / booking / phone: quiet links under the chips, above the buttons. */
+  body.browse-page .bh-card-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 18px; margin: 8px 0 2px; }
+  body.browse-page .bh-card-links a { display: inline-flex; align-items: center; min-height: 44px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy, #1B2B3A); text-decoration: underline; text-decoration-color: rgba(27,43,58,0.35); text-underline-offset: 3px; }
+  body.browse-page .bh-card-links a:hover { color: var(--ref-gold, #E0A94E); text-decoration-color: currentColor; }
+  body.browse-page .bh-card-links a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; border-radius: 4px; }
+  body.browse-page .bh-list-venue { margin: 48px 0 8px; padding: 22px 24px; border: 1px solid rgba(27,43,58,0.14); border-radius: 16px; background: var(--paper); }
+  body.browse-page .bh-list-venue h2 { margin: 0 0 6px; }
+  body.browse-page .bh-list-venue p { margin: 0 0 12px; max-width: 64ch; }
+  body.browse-page .bh-list-venue-links { display: flex; flex-wrap: wrap; gap: 10px; }
+  body.browse-page .bh-list-venue-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 18px; border-radius: 999px; font-family: 'Nunito', sans-serif; font-weight: 800; text-decoration: none; background: var(--ref-navy, #1B2B3A); color: var(--paper); }
+  body.browse-page .bh-list-venue-links a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+</style>`;
+}
+
+// The card list: the first BROWSE_PAGE_SIZE matching cards in the list, every
+// other card in an inert <template> (see the incremental-rendering note in
+// renderFoodDrinkHubPage). The card HTML is the shared server card, split.
+function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, openStatusById, orderById) {
+  const byId = new Map(venues.map((v) => [v.id, v]));
+  // data-name is what app.js's outbound_click handler reads as venue_name.
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true })
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}" data-name="${escapeHtml(byId.get(Number(id)).name)}"`);
+  let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
+  // Directions / menu / booking / phone, above the Favorite / Add to Trip row.
+  cardChunks = cardChunks.map((chunk) => {
+    const v = byId.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
+    return chunk.replace('<div class="card-actions">', () => `${browseCardActionsHtml(v)}\n        <div class="card-actions">`);
+  });
+  if (openStatusById) {
+    cardChunks = cardChunks.map((chunk) => {
+      const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
+      if (!st || !st.eligible) return chunk;
+      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
+    });
+  }
+  const firstBatch = [], deferred = [];
+  for (const chunk of cardChunks) {
+    const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
+    if (matchIds.has(id) && firstBatch.length < BROWSE_PAGE_SIZE) firstBatch.push(chunk);
+    else deferred.push(chunk);
+  }
+  return `<ul class="card-grid" id="bhResults"${firstBatch.length === 0 ? ' hidden' : ''}>
+    ${firstBatch.join('\n')}
+  </ul>
+  <div class="fd-more-row"><button type="button" class="fd-show-more" id="bhShowMore"${matchCount > firstBatch.length ? '' : ' hidden'}>Show more</button></div>
+  <template id="bhRest">${deferred.join('\n')}</template>`;
+}
+
+// The inline script: the Food & Drink hub's interaction contract (chips,
+// popovers, URL sync with pushState/popstate, Show more over a template-held
+// pool) plus what /browse always had: cuisine, price, favourites-only, sort,
+// nearest-region, and its original GA4 events (select_venue_type,
+// select_filter, select_region, search, open_map), fired on the same actions
+// with the same parameters alongside the hub's filter_change.
+function renderBrowseHubScriptHtml() {
+  const labels = {
+    regions: { ...REGION_LABELS },
+    types: Object.fromEntries(BROWSE_HUB_TYPE_ORDER.map((t) => [t, browseTypeLabel(t)])),
+    features: { ...FD_HUB_LABEL_BY_FEATURE },
+  };
+  return `<script>
+(function(){
+  var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  var FEATURE_CHIP = ${JSON.stringify(BROWSE_FEATURE_CHIP)};
+  var NEAR_ME = ${JSON.stringify(BROWSE_NEAR_ME_COORDS)};
+  var dataEl = document.getElementById('bhVenueData');
+  var DATA = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
+  var typeChips = Array.prototype.slice.call(document.querySelectorAll('[data-bh-type]'));
+  var featureChips = Array.prototype.slice.call(document.querySelectorAll('[data-bh-feature]'));
+  var regionChips = Array.prototype.slice.call(document.querySelectorAll('[data-region]'));
+  var priceChips = Array.prototype.slice.call(document.querySelectorAll('[data-bh-price]'));
+  var allChip = document.querySelector('[data-bh-type-all]');
+  var tpl = document.getElementById('bhRest');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#bhResults > .venue-card'))
+    .concat(tpl ? Array.prototype.slice.call(tpl.content.querySelectorAll('.venue-card')) : [])
+    .sort(function(a, b){ return Number(a.getAttribute('data-bh-i')) - Number(b.getAttribute('data-bh-i')); });
+  if (!cards.length) return;
+  var PAGE_SIZE = ${BROWSE_PAGE_SIZE};
+  var page = 1;
+  var showMore = document.getElementById('bhShowMore');
+  var searchInput = document.getElementById('bhSearch');
+  var searchClear = document.getElementById('bhSearchClear');
+  var summary = document.getElementById('bhResultsSummary');
+  var selectedBox = document.getElementById('bhSelected');
+  var empty = document.getElementById('bhNoResults');
+  var results = document.getElementById('bhResults');
+  var featuresCount = document.getElementById('bhFeaturesCount');
+  var regionsCount = document.getElementById('bhRegionsCount');
+  var moreCount = document.getElementById('bhMoreCount');
+  var cuisineSel = document.getElementById('bhCuisine');
+  var sortSel = document.getElementById('bhSort');
+  var openToggle = document.getElementById('bhOpenNow');
+  var openCountEl = document.getElementById('bhOpenNowCount');
+  var favToggle = document.getElementById('bhFavOnly');
+  var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-bh-apply]'));
+  var searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  var openOn = false, favOn = false, cuisine = '', price = '', sortKey = '';
+  var ordered = cards;
+  ${renderFilterChangeClientSrc('browse')}
+  function activeFilterCount(){ return pressed(typeChips, 'data-bh-type').length + pressed(featureChips, 'data-bh-feature').length + pressed(regionChips, 'data-region').length + (cuisine ? 1 : 0) + (price ? 1 : 0) + (openOn ? 1 : 0) + (favOn ? 1 : 0); }
+  ${BROWSE_HUB_FILTER_CLIENT_PREDICATE_SRC}
+  ${BROWSE_HUB_SUMMARY_CLIENT_SRC}
+  ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
+  // Open now: hours.js and okanaganClock() themselves, so the browser reads
+  // hours exactly as the server does, on the America/Vancouver clock.
+  var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(OKANAGAN_CLOCK_FORMAT)});
+  ${okanaganClock.toString()}
+  ${hoursModule ? hoursModule.HOURS_CLIENT_SRC : ''}
+  var OPEN_IDS = {};
+  function refreshOpen(){
+    if (!${hoursModule ? 'true' : 'false'}) return;
+    var clock = okanaganClock(new Date());
+    OPEN_IDS = {};
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-venue-id'), d = DATA[id];
+      if (!d || !d.h) return;
+      var label = hoursStatusLabel(statusAt(parseHours(d.h), clock), clock);
+      if (label.state === 'open') OPEN_IDS[id] = true;
+      var el = card.querySelector('.fd-open-status');
+      if (el) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+    });
+  }
+  // Favourites: the saved-items rule itself (window.__roamFav), read once per
+  // change, not once per filter pass.
+  var favIds = null;
+  function favSet(){
+    if (favIds) return favIds;
+    favIds = {};
+    var names = [];
+    try { names = JSON.parse(window.localStorage.getItem('okanaganFavorites') || '[]'); } catch (e) {}
+    cards.forEach(function(card){
+      var b = card.querySelector('.fav-btn'), id = card.getAttribute('data-venue-id');
+      if (!b) return;
+      var on = window.__roamFav ? window.__roamFav.isOn(b) : names.indexOf(b.getAttribute('data-fav-name')) !== -1;
+      if (on) favIds[id] = true;
+    });
+    return favIds;
+  }
+  // Searchable text per card, built once from data already in the markup.
+  cards.forEach(function(card){
+    var id = card.getAttribute('data-venue-id');
+    var d = DATA[id] || { c: [], f: [], r: '' };
+    var meta = card.querySelector('.venue-meta'), desc = card.querySelector('.golf-desc');
+    var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
+                 d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
+                 d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
+                 d.cu || '', meta ? meta.textContent : '', desc ? desc.textContent : ''];
+    card.__bh = parts.join(' ').toLowerCase();
+  });
+  function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
+  function dataOf(card){ return DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '', cu: '', p: 0, rt: 0 }; }
+  function sortCards(){
+    ordered = cards.slice();
+    if (sortKey === 'rating') ordered.sort(function(a, b){ var x = dataOf(a).rt || -1, y = dataOf(b).rt || -1; return y - x || Number(a.getAttribute('data-bh-i')) - Number(b.getAttribute('data-bh-i')); });
+    else if (sortKey === 'name') ordered.sort(function(a, b){ return (a.getAttribute('data-venue-name') || '').localeCompare(b.getAttribute('data-venue-name') || ''); });
+  }
+  var groupsRoot = document.querySelector('.outdoor-region-groups');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.outdoor-region-group-block'));
+  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 899px)') : null;
+  function setGroupOpen(block, open){ var t = block.querySelector('.outdoor-region-group-toggle'), l = block.querySelector('.outdoor-region-group-chips'); if (!t || !l) return; t.setAttribute('aria-expanded', open ? 'true' : 'false'); l.hidden = !open; }
+  function updateGroupHeaders(){
+    groups.forEach(function(block){
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      var sel = block.querySelector('.outdoor-region-group-selected');
+      if (sel) { sel.textContent = groupSelectedText(n); sel.hidden = n === 0; }
+      block.classList.toggle('has-selection', n > 0);
+    });
+  }
+  if (groupsRoot) groupsRoot.classList.add('js');
+  groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
+  function updateCounts(types, features, regions){
+    var tC = {}, fC = {}, rC = {}, oC = 0;
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-venue-id'), d = dataOf(card);
+      var skip = (openOn && !OPEN_IDS[id]) || (favOn && !favSet()[id]);
+      if (!skip) {
+        if (bhMatches([], features, regions, cuisine, price, d)) d.c.forEach(function(t){ tC[t] = (tC[t] || 0) + 1; });
+        if (bhMatches(types, features, [], cuisine, price, d)) rC[d.r] = (rC[d.r] || 0) + 1;
+        if (bhMatches(types, [], regions, cuisine, price, d)) d.f.forEach(function(k){ fC[k] = (fC[k] || 0) + 1; });
+      }
+      if (OPEN_IDS[id] && bhMatches(types, features, regions, cuisine, price, d) && !(favOn && !favSet()[id])) oC++;
+    });
+    function paint(list, attr, counts){ list.forEach(function(c){ var n = c.querySelector('.outdoor-activity-count'); if (n) n.textContent = String(counts[c.getAttribute(attr)] || 0); }); }
+    paint(typeChips, 'data-bh-type', tC); paint(featureChips, 'data-bh-feature', fC); paint(regionChips, 'data-region', rC);
+    if (openCountEl) openCountEl.textContent = String(oC);
+  }
+  function renderSelected(types, features, regions){
+    if (!selectedBox) return;
+    var any = types.length || features.length || regions.length || cuisine || price || openOn || favOn;
+    function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-bh-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
+    function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
+    var priceLabel = price ? ('Price ' + new Array(Number(price) + 1).join('$')) : '';
+    var html = row('Types', types.map(function(v){ return tag('type', v, LABELS.types[v] || v); }))
+      + row('Looking for', features.map(function(v){ return tag('feature', v, LABELS.features[v] || v); }))
+      + row('Regions', regions.map(function(v){ return tag('region', v, LABELS.regions[v] || v); }))
+      + row('Cuisine &amp; price', (cuisine ? [tag('cuisine', cuisine.replace(/"/g, '&quot;'), cuisine)] : []).concat(price ? [tag('price', price, priceLabel)] : []))
+      + row('Also', (openOn ? [tag('open', 'now', 'Open now')] : []).concat(favOn ? [tag('fav', '1', 'My favourites')] : []));
+    if (any) html += '<button type="button" class="outdoor-selected-clear" id="bhSelectedClear">Clear all</button>';
+    selectedBox.innerHTML = html;
+    selectedBox.hidden = !any;
+  }
+  function queryFor(types, features, regions){
+    var q = [];
+    if (types.length) q.push('types=' + types.join(','));
+    if (features.length) q.push('features=' + features.join(','));
+    if (regions.length) q.push('regions=' + regions.join(','));
+    if (cuisine) q.push('cuisine=' + encodeURIComponent(cuisine));
+    if (price) q.push('price=' + price);
+    if (searchTerm) q.push('q=' + encodeURIComponent(searchTerm));
+    if (openOn) q.push('open=now');
+    if (favOn) q.push('fav=1');
+    if (sortKey) q.push('sort=' + sortKey);
+    return q.length ? '?' + q.join('&') : '';
+  }
+  function apply(historyMode){
+    var types = pressed(typeChips, 'data-bh-type'), features = pressed(featureChips, 'data-bh-feature'), regions = pressed(regionChips, 'data-region');
+    var favs = favOn ? favSet() : null;
+    var matches = ordered.filter(function(card){
+      var id = card.getAttribute('data-venue-id'), d = dataOf(card);
+      return bhMatches(types, features, regions, cuisine, price, d) && (!openOn || !!OPEN_IDS[id]) && (!favs || !!favs[id]) && (!searchTerm || (card.__bh || '').indexOf(searchTerm) !== -1);
+    });
+    var shown = matches.length;
+    // Only the current page of MATCHING cards goes into the render tree; the
+    // rest stay detached (or in the template) until "Show more" asks for them.
+    var visible = matches.slice(0, page * PAGE_SIZE);
+    if (results) {
+      var fresh = visible.filter(function(c){ return c.parentNode !== results; });
+      results.replaceChildren.apply(results, visible);
+      if (fresh.length && window.__ogWireVenueCards) window.__ogWireVenueCards(fresh);
+    }
+    if (showMore) {
+      showMore.hidden = visible.length >= shown;
+      showMore.textContent = 'Show more (' + visible.length + ' of ' + shown + ')';
+    }
+    var total = cards.length, filtered = types.length || features.length || regions.length || cuisine || price || !!searchTerm || openOn || favOn;
+    if (allChip) allChip.setAttribute('aria-pressed', types.length ? 'false' : 'true');
+    if (featuresCount) { featuresCount.textContent = features.length ? (' \\u00b7 ' + features.length) : ''; featuresCount.hidden = features.length === 0; }
+    if (regionsCount) { regionsCount.textContent = regions.length ? (' \\u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
+    var moreN = (cuisine ? 1 : 0) + (price ? 1 : 0);
+    if (moreCount) { moreCount.textContent = moreN ? (' \\u00b7 ' + moreN) : ''; moreCount.hidden = moreN === 0; }
+    if (cuisineSel) cuisineSel.value = cuisine;
+    priceChips.forEach(function(c){ c.setAttribute('aria-pressed', c.getAttribute('data-bh-price') === price ? 'true' : 'false'); });
+    if (sortSel) sortSel.value = sortKey;
+    if (searchClear) searchClear.hidden = !searchTerm;
+    if (summary) summary.textContent = bhSummaryText(shown, total, filtered);
+    applyBtns.forEach(function(b){ b.textContent = 'Show ' + shown + ' result' + (shown === 1 ? '' : 's'); });
+    updateGroupHeaders(); updateCounts(types, features, regions); renderSelected(types, features, regions);
+    if (openToggle) openToggle.setAttribute('aria-pressed', openOn ? 'true' : 'false');
+    if (favToggle) favToggle.setAttribute('aria-pressed', favOn ? 'true' : 'false');
+    if (empty) empty.hidden = shown !== 0;
+    if (results) results.hidden = shown === 0;
+    var next = window.location.pathname + queryFor(types, features, regions) + window.location.hash;
+    if (window.history && historyMode !== 'none') {
+      if (historyMode === 'push' && window.history.pushState && next !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState({ bh: true }, '', next);
+      else if (window.history.replaceState) window.history.replaceState({ bh: true }, '', next);
+    }
+  }
+  // The wizard's original events, on the same actions with the same
+  // parameters (select_* only when a choice is turned ON).
+  function legacyEvent(group, value){
+    if (!window.trackEvent) return;
+    if (group === 'type') window.trackEvent('select_venue_type', { venue_type: value });
+    else if (group === 'feature') window.trackEvent('select_filter', { filter_name: FEATURE_CHIP[value] || value });
+    else if (group === 'region') window.trackEvent('select_region', { region: value });
+  }
+  function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); page = 1; apply('push'); }
+  if (showMore) showMore.addEventListener('click', function(){ page += 1; apply('none'); });
+  [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){
+    var on = c.getAttribute('aria-pressed') !== 'true';
+    toggle(c);
+    var group = c.hasAttribute('data-bh-type') ? 'type' : (c.hasAttribute('data-bh-feature') ? 'feature' : 'region');
+    var value = c.getAttribute(group === 'region' ? 'data-region' : 'data-bh-' + group);
+    trackFilterChange(group, value, on ? 'add' : 'remove');
+    if (on) legacyEvent(group, value);
+  }); }); });
+  function clearAll(){
+    [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); });
+    searchTerm = ''; if (searchInput) searchInput.value = '';
+    openOn = false; favOn = false; cuisine = ''; price = '';
+    page = 1;
+    apply('push');
+  }
+  function clearAllByVisitor(){ var had = activeFilterCount(); clearAll(); if (had) trackFilterChange('all', 'all', 'clear_all'); }
+  if (allChip) allChip.addEventListener('click', function(){ var had = pressed(typeChips, 'data-bh-type').length; typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); page = 1; apply('push'); if (had) trackFilterChange('type', 'all', 'clear_all'); });
+  if (cuisineSel) cuisineSel.addEventListener('change', function(){ cuisine = cuisineSel.value; page = 1; apply('push'); trackFilterChange('cuisine', cuisine || 'all', cuisine ? 'add' : 'clear_all'); });
+  priceChips.forEach(function(c){ c.addEventListener('click', function(){ price = c.getAttribute('data-bh-price'); page = 1; apply('push'); trackFilterChange('price', price || 'all', price ? 'add' : 'clear_all'); }); });
+  if (sortSel) sortSel.addEventListener('change', function(){ sortKey = sortSel.value; sortCards(); page = 1; apply('push'); });
+  if (openToggle) openToggle.addEventListener('click', function(){ openOn = !openOn; page = 1; apply('push'); trackFilterChange('open_now', 'now', openOn ? 'add' : 'remove'); });
+  if (favToggle) favToggle.addEventListener('click', function(){ favOn = !favOn; favIds = null; page = 1; apply('push'); trackFilterChange('favourites', 'mine', favOn ? 'add' : 'remove'); });
+  // A Favorite changed (here or in another tab): re-read the saved list.
+  document.addEventListener('click', function(e){
+    if (!(e.target.closest && e.target.closest('.fav-btn'))) return;
+    setTimeout(function(){ favIds = null; if (favOn) apply('none'); }, 0);
+  });
+  window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganFavorites' || ev.key === 'okanaganSaved') { favIds = null; if (favOn) apply('none'); } });
+  if (searchInput) {
+    var timer = null;
+    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); page = 1; apply('replace'); }, 120); });
+    // The wizard reported a search when it was submitted; Enter is the same moment here.
+    searchInput.addEventListener('keydown', function(e){
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      clearTimeout(timer);
+      searchTerm = searchInput.value.trim().toLowerCase(); page = 1; apply('replace');
+      if (searchTerm && window.trackEvent) window.trackEvent('search', { search_term: searchTerm });
+    });
+  }
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; if (searchInput) { searchInput.value = ''; searchInput.focus(); } page = 1; apply('replace'); });
+  if (selectedBox) selectedBox.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
+    if (t.id === 'bhSelectedClear') { clearAllByVisitor(); return; }
+    if (t.getAttribute('data-bh-remove-open')) { openOn = false; page = 1; apply('push'); trackFilterChange('open_now', 'now', 'remove'); return; }
+    if (t.getAttribute('data-bh-remove-fav')) { favOn = false; page = 1; apply('push'); trackFilterChange('favourites', 'mine', 'remove'); return; }
+    if (t.hasAttribute('data-bh-remove-cuisine')) { var old = cuisine; cuisine = ''; page = 1; apply('push'); trackFilterChange('cuisine', old, 'remove'); return; }
+    if (t.hasAttribute('data-bh-remove-price')) { var oldP = price; price = ''; page = 1; apply('push'); trackFilterChange('price', oldP, 'remove'); return; }
+    var map = [['data-bh-remove-type', typeChips, 'data-bh-type', 'type'], ['data-bh-remove-feature', featureChips, 'data-bh-feature', 'feature'], ['data-bh-remove-region', regionChips, 'data-region', 'region']];
+    for (var i = 0; i < map.length; i++) {
+      var v = t.getAttribute(map[i][0]);
+      if (v) { map[i][1].forEach(function(c){ if (c.getAttribute(map[i][2]) === v) c.setAttribute('aria-pressed', 'false'); }); page = 1; apply('push'); trackFilterChange(map[i][3], v, 'remove'); return; }
+    }
+  });
+  var emptyClear = document.getElementById('bhNoResultsClear');
+  if (emptyClear) emptyClear.addEventListener('click', function(e){ e.preventDefault(); clearAllByVisitor(); });
+  var mapLink = document.getElementById('bhMapLink');
+  if (mapLink) mapLink.addEventListener('click', function(){ if (window.trackEvent) window.trackEvent('open_map'); });
+  // Use my location: the wizard's Near me. Distance to each town centre is
+  // shown on its region chip and the closest region is selected.
+  var nearBtn = document.getElementById('bhNearMe'), nearStatus = document.getElementById('bhNearMeStatus');
+  function nearSay(text){ if (nearStatus) { nearStatus.textContent = text; nearStatus.hidden = false; } }
+  function haversineKm(lat1, lon1, lat2, lon2){
+    var R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  if (nearBtn) nearBtn.addEventListener('click', function(){
+    if (!navigator.geolocation) { nearSay('Location isn\\u2019t supported in this browser.'); return; }
+    nearBtn.disabled = true;
+    nearBtn.textContent = 'Finding you\\u2026';
+    navigator.geolocation.getCurrentPosition(function(pos){
+      var closest = null, closestKm = Infinity, dist = {};
+      Object.keys(NEAR_ME).forEach(function(slug){
+        var km = haversineKm(pos.coords.latitude, pos.coords.longitude, NEAR_ME[slug][0], NEAR_ME[slug][1]);
+        dist[slug] = km;
+        if (km < closestKm) { closestKm = km; closest = slug; }
+      });
+      regionChips.forEach(function(chip){
+        var slug = chip.getAttribute('data-region');
+        if (!(slug in dist)) return;
+        var old = chip.querySelector('.region-distance'); if (old) old.parentNode.removeChild(old);
+        var span = document.createElement('span');
+        span.className = 'region-distance';
+        span.textContent = '\\u00b7 ' + Math.round(dist[slug]) + ' km';
+        chip.appendChild(span);
+      });
+      nearBtn.disabled = false;
+      nearBtn.textContent = '\\ud83d\\udccd Use my location';
+      nearSay('Closest: ' + (LABELS.regions[closest] || closest) + ' \\u2014 selected below.');
+      var target = regionChips.filter(function(c){ return c.getAttribute('data-region') === closest; })[0];
+      if (target && target.getAttribute('aria-pressed') !== 'true') target.click();
+    }, function(err){
+      nearBtn.disabled = false;
+      nearBtn.textContent = '\\ud83d\\udccd Use my location';
+      nearSay(err && err.code === 1 ? 'Location access was denied \\u2014 you can still pick a region manually.' : 'Couldn\\u2019t determine your location right now.');
+    }, { timeout: 10000 });
+  });
+  var popsRoot = document.querySelector('.fd-controls');
+  var pops = Array.prototype.slice.call(document.querySelectorAll('.fd-pop'));
+  if (popsRoot) popsRoot.classList.add('js');
+  function closePops(except){
+    pops.forEach(function(pop){
+      if (pop === except) return;
+      var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+      if (b) b.setAttribute('aria-expanded', 'false');
+      if (pnl) pnl.hidden = true;
+    });
+  }
+  pops.forEach(function(pop){
+    var b = pop.querySelector('.fd-pop-btn'), pnl = pop.querySelector('.fd-pop-panel');
+    if (!b || !pnl) return;
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = b.getAttribute('aria-expanded') === 'true';
+      closePops(pop);
+      b.setAttribute('aria-expanded', open ? 'false' : 'true');
+      pnl.hidden = open;
+    });
+    pnl.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  applyBtns.forEach(function(b){ b.addEventListener('click', function(e){ e.stopPropagation(); closePops(null); }); });
+  if (pops.length) {
+    document.addEventListener('click', function(){ closePops(null); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePops(null); });
+  }
+  function readUrlIntoState(){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var pre = { t: (params.get('types') || '').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
+      typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-bh-type')) !== -1 ? 'true' : 'false'); });
+      featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-bh-feature')) !== -1 ? 'true' : 'false'); });
+      regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
+      var wantCuisine = params.get('cuisine') || '';
+      cuisine = cuisineSel && Array.prototype.some.call(cuisineSel.options, function(o){ return o.value === wantCuisine; }) ? wantCuisine : '';
+      var wantPrice = params.get('price') || '';
+      price = ['1', '2', '3'].indexOf(wantPrice) !== -1 ? wantPrice : '';
+      searchTerm = (params.get('q') || '').trim().toLowerCase();
+      if (searchInput) searchInput.value = params.get('q') ? params.get('q').trim() : '';
+      openOn = params.get('open') === 'now';
+      favOn = params.get('fav') === '1';
+      var wantSort = params.get('sort');
+      sortKey = wantSort === 'rating' || wantSort === 'name' ? wantSort : '';
+    } catch (e) {}
+  }
+  function openGroupsForSelection(){
+    groups.forEach(function(block){
+      var isDefault = block.getAttribute('data-region-group') === '${OUTDOOR_REGION_GROUP_DEFAULT_OPEN}';
+      var n = block.querySelectorAll('.outdoor-filter-chip[aria-pressed="true"]').length;
+      setGroupOpen(block, (mobileQuery && mobileQuery.matches) ? groupShouldOpen(isDefault, n) : true);
+    });
+  }
+  window.addEventListener('popstate', function(){ readUrlIntoState(); sortCards(); openGroupsForSelection(); page = 1; apply('none'); });
+  var hadQuery = !!(new URLSearchParams(window.location.search).get('q') || '').trim();
+  readUrlIntoState();
+  refreshOpen();
+  sortCards();
+  openGroupsForSelection();
+  setInterval(function(){ refreshOpen(); if (openOn) apply('none'); else updateCounts(pressed(typeChips, 'data-bh-type'), pressed(featureChips, 'data-bh-feature'), pressed(regionChips, 'data-region')); }, 60000);
+  apply('replace');
+  // A link that arrives with ?q= ran the wizard's search (and its event).
+  if (hadQuery && searchTerm && window.trackEvent) window.trackEvent('search', { search_term: searchTerm });
+})();
+</script>`;
+}
+
+function renderBrowseHubPage(venues, filter = null, now = new Date()) {
+  const cuisines = browseCuisines(venues);
+  const f = filter || parseBrowseHubQuery({}, cuisines);
+  const catsById = browseCategoriesByVenue(venues);
+  const featsById = browseFeaturesByVenue(venues);
+  const dataById = new Map(venues.map((v) => [v.id, {
+    c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, cu: v.cuisine || '', p: Number(v.price) || 0, rt: Number(v.rating) || 0,
+  }]));
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now);
+  const q = f.q.toLowerCase();
+  const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || []).includes(q);
+  const pool = f.openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
+  // Favourites live in the visitor's browser: the server cannot apply them, the
+  // page script does on load.
+  const matching = pool.filter((v) => browseFilterMatches(f, dataById.get(v.id)) && textMatch(v));
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = browseChipCounts(pool, f, dataById);
+  const openCount = venues.filter((v) => openInfo.openIds.has(v.id) && browseFilterMatches(f, dataById.get(v.id))).length;
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0 || !!f.cuisine || !!f.price || !!q || f.openNow || f.fav;
+  const state = { types: f.types, features: f.features, regions: f.regions, cuisine: f.cuisine, price: f.price, openNow: f.openNow, fav: f.fav, sort: f.sort, counts };
+
+  const heading = 'Browse & Search the Okanagan';
+  const title = 'Browse & Search the Okanagan | Okanagan Roam';
+  // The owner-approved SEO-2 description for / and /browse, unchanged.
+  const description = "A review-backed guide to 1,000+ wineries, restaurants, breweries and cafes across BC's Okanagan Valley, plus local events and a day-by-day trip planner.";
+  const canonical = 'https://okanaganroam.com/browse';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Browse & Search', url: canonical },
+  ]);
+  const payload = {};
+  for (const v of venues) {
+    const d = dataById.get(v.id);
+    payload[String(v.id)] = { c: d.c, f: d.f, r: d.r, cu: d.cu, p: d.p, rt: d.rt };
+    const st = openInfo.byId.get(v.id);
+    if (st && st.eligible) payload[String(v.id)].h = st.hours;
+  }
+  // Sort the server-rendered list the same way the page script will (stable
+  // against the A-Z order the venues arrive in), so ?sort= has no reorder jump.
+  let listVenues = venues;
+  if (f.sort === 'rating') listVenues = venues.slice().sort((a, b) => ((Number(b.rating) || -1) - (Number(a.rating) || -1)));
+  const orderById = new Map(venues.map((v, i) => [v.id, i]));
+  const cardsHtml = browseBatchedCardsHtml(listVenues, matchIds, matching.length, advisoryNotes, openInfo.byId, orderById);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${renderOutdoorThemeStyles()}
+${renderFoodDrinkHubStyles()}
+${renderFoodDrinkOpenNowStyles()}
+${renderBrowseHubStyles()}
+${BROWSE_HEAD_EXTRAS}
+${golfEngagementHeadHtml('fd', true, 'browse')}
+</head>
+<body class="golf-page outdoor-page fd-page browse-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${withoutFavoritesNavLink(renderGolfHeaderHtml())}
+  <main class="wrap-wide golf-main" id="directory">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Browse & Search' }])}
+  <h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">Every place in the valley, filterable by region, category, and what matters to you.</p>
+  ${browseSearchHtml(f.q)}
+  ${browseTypeChipsHtml(state)}
+  ${browseFilterBarHtml(venues, cuisines, state, openCount)}
+  <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="bhResultsTop">
+  <h2 class="visually-hidden" id="bhResultsTop">Results</h2>
+  ${browseResultBarHtml(browseSummaryText(matching.length, venues.length, filtered), state)}
+  <p class="fd-no-results" id="bhNoResults"${matching.length === 0 ? '' : ' hidden'}>No places match that combination yet. <a href="/browse" id="bhNoResultsClear">Clear the filters</a> to see everything.</p>
+  ${cardsHtml}
+  <script type="application/json" id="bhVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  <section class="bh-list-venue" id="list-venue" aria-labelledby="bhListVenueHeading">
+    <h2 id="bhListVenueHeading">Know a place we&rsquo;re missing?</h2>
+    <p id="app">Tell us about a venue or an event and we&rsquo;ll add it to the valley&rsquo;s directory. The Okanagan Roam app is coming soon.</p>
+    <div class="bh-list-venue-links"><a href="/list-your-venue">List your venue</a><a href="/list-an-event">List an event</a></div>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('guide', true, { impressionCards: '[data-bh-no-impression]' })}
+  ${renderBrowseHubScriptHtml()}
+</body>
+</html>`;
+}
+
 // Directory redesign, Phase 1 (2026-10-03): a /browse-only visual layer.
 // Every rule is scoped to body.page-browse (the class only the /browse route
 // adds), so the homepage -- which renders from the same okanagan.html and
@@ -17658,11 +18487,15 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
 
-    if (pathname === '/browse' && method === 'GET') {
+    // /browse (2026-10-05) is the hub-style all-venue directory
+    // (renderBrowseHubPage). The previous wizard page -- okanagan.html with the
+    // swaps below -- is still served, unchanged, at /browse/classic (noindex).
+    if ((pathname === '/browse' || pathname === '/browse/classic') && method === 'GET') {
+      const classicBrowse = pathname === '/browse/classic';
       // Stage 3.4: the old "open the map" deep link (/browse?openMap=1, still
       // in bookmarks and cached pages) now opens the map itself, not the
       // directory with the map hidden below it.
-      if (Object.keys(query).length === 1 && query.openMap === '1') {
+      if (!classicBrowse && Object.keys(query).length === 1 && query.openMap === '1') {
         res.writeHead(302, { Location: '/map', 'Cache-Control': 'no-store' });
         return res.end();
       }
@@ -17672,7 +18505,7 @@ const server = http.createServer(async (req, res) => {
       // request; anything that cannot be routed safely falls through to the
       // unchanged /browse below. Requests with any other parameter (including
       // the pre-filtered /browse URLs this produces) are never intercepted.
-      if (isDiscoverySearchEnabled()) {
+      if (!classicBrowse && isDiscoverySearchEnabled()) {
         const keys = Object.keys(query);
         if (keys.length === 1 && keys[0] === 'q' && typeof query.q === 'string' && query.q.trim()
           && query.q.length <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
@@ -17684,6 +18517,15 @@ const server = http.createServer(async (req, res) => {
             return res.end();
           }
         }
+      }
+      if (!classicBrowse) {
+        const browseVenues = getBrowseHubVenues();
+        if (browseVenues.length) {
+          const html = renderBrowseHubPage(browseVenues, parseBrowseHubQuery(query, browseCuisines(browseVenues)));
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
+        // No venues to list (an empty database): fall back to the wizard page.
       }
       if (fs.existsSync(SITE_PATH)) {
         let html = withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')));
@@ -17707,6 +18549,9 @@ const server = http.createServer(async (req, res) => {
         html = html
           .replace(/<title>[^<]*<\/title>/, () => '<title>Browse &amp; Search the Okanagan | Okanagan Roam</title>')
           .replace(/<link rel="canonical" href="[^"]*">/, () => '<link rel="canonical" href="https://okanaganroam.com/browse">');
+        // The classic wizard page is a rollback copy, not a page to index: the
+        // canonical above already names /browse, and it carries noindex.
+        if (classicBrowse) html = html.replace('</head>', () => '<meta name="robots" content="noindex">\n</head>');
 
         // Same broken-anchor problem as the footer fix below, found in the
         // same audit: the shared header's "Discover"/"Things to Do" nav
@@ -17768,7 +18613,7 @@ const server = http.createServer(async (req, res) => {
           : html + footer + openNowScript + hiddenElementsScript + prefillScript;
         // Hero search loading state: only for a query the prefill script applies.
         html = applyBrowseLoadingState(html, browseLoadingState(query, isDiscoverySearchEnabled()));
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, classicBrowse ? { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' } : { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -19890,6 +20735,14 @@ module.exports = {
   renderOutdoorRegionFilterChips,
   FD_HUB_TYPES,
   FD_PAGE_SIZE,
+  BROWSE_PAGE_SIZE,
+  BROWSE_HUB_FILTER_CLIENT_PREDICATE_SRC,
+  BROWSE_HUB_TYPE_ORDER,
+  browseCuisines,
+  browseFilterMatches,
+  getBrowseHubVenues,
+  parseBrowseHubQuery,
+  renderBrowseHubPage,
   golfCardEngagementScriptHtml,
   // Measurement Phase A
   renderAnalyticsHeadHtml,
@@ -20001,6 +20854,11 @@ module.exports = {
   renderMapPage,
   renderFavoritesPage,
   withFavoritesNavLink,
+  withoutFavoritesNavLink,
+  FAVORITES_NAV_ITEM,
+  FAVORITES_NAV_STYLE,
+  BROWSE_HEAD_EXTRAS,
+  BROWSE_CARD_REGION_LABEL,
   mapAreaPins,
   discoverySearchVenues,
   selectDiscoveryEvents,
