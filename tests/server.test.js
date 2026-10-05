@@ -10614,6 +10614,47 @@ test('Open Now on /food-drink: honest per-card status on the Okanagan clock, and
   }
 });
 
+test('Open Now on /browse follows stored hours + the Okanagan clock with no provenance; /food-drink still requires it; no hours and advisories stay excluded', () => {
+  const pool = app.getBrowseHubVenues();
+  const picks = pool.slice(0, 6).map((v) => v.id);
+  const saved = picks.map((id) => db.prepare('SELECT id, hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id));
+  const W = (r) => JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, r])));
+  const [A, B, C, D, E, F] = picks;
+  const setRow = (id, hours, src, chk) => db.prepare('UPDATE venues SET hours = ?, hours_source = ?, hours_checked_at = ? WHERE id = ?').run(hours, src, chk, id);
+  try {
+    setRow(A, W([['06:00', '21:00']]), null, null);                          // never verified
+    setRow(B, W([['06:00', '21:00']]), 'official_website', '2026-01-01');    // stale check
+    setRow(C, W([['06:00', '25:00']]), 'initial_import', '2026-09-20');      // past-midnight notation, bad source
+    setRow(D, null, null, null);                                             // no stored hours
+    setRow(E, W([['06:00', '21:00']]), null, null);                          // open, but under an advisory
+    setRow(F, W([['11:00', '21:00']]), null, null);                          // closed at the test time
+    const venues = app.getBrowseHubVenues();
+    // Monday 2026-10-05 06:51 PDT
+    const now = new Date('2026-10-05T13:51:00Z');
+    const advisory = new Map([[E, 'Temporary closure.']]);
+    const browse = app.foodDrinkOpenNowInfo(venues, advisory, now, { requireVerified: false });
+    assert.deepEqual([...browse.openIds].filter((id) => picks.includes(id)).sort((x, y) => x - y), [A, B, C].sort((x, y) => x - y));
+    assert.equal(browse.byId.get(D).eligible, false, 'no stored hours: excluded');
+    assert.equal(browse.byId.get(E).eligible, false, 'advisory: no Open Now');
+    assert.equal(browse.byId.get(F).state, 'closed');
+    // Default (the /food-drink call): the same venues stay ineligible without provenance.
+    const fd = app.foodDrinkOpenNowInfo(venues, new Map(), now);
+    for (const id of [A, B, C]) assert.equal(fd.openIds.has(id), false, `food-drink: ${id} unverified/stale stays out`);
+    // The rendered /browse page: status line, payload hours and count.
+    const html = app.renderBrowseHubPage(venues, app.parseBrowseHubQuery({}, app.browseCuisines(venues)), now);
+    const card = (id) => (html.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${id}"[\\s\\S]*?</li>`)) || [''])[0];
+    for (const id of [A, B, C]) assert.match(card(id), /<p class="fd-open-status" data-fd-open="open">/, `card ${id} shows Open now`);
+    assert.ok(!card(D).includes('fd-open-status'), 'no hours: no status line');
+    const data = JSON.parse(html.match(/<script type="application\/json" id="[^"]*">([\s\S]*?)<\/script>/)[1]);
+    assert.ok(data[String(A)].h && !data[String(D)].h);
+    const onHtml = app.renderBrowseHubPage(venues, { ...app.parseBrowseHubQuery({}, app.browseCuisines(venues)), openNow: true }, now);
+    const openCount = Number(onHtml.match(/id="bhOpenNowCount">(\d+)</)[1]);
+    assert.ok(openCount >= 3, 'count includes the unverified open venues');
+  } finally {
+    for (const r of saved) db.prepare('UPDATE venues SET hours = ?, hours_source = ?, hours_checked_at = ? WHERE id = ?').run(r.hours, r.hours_source, r.hours_checked_at, r.id);
+  }
+});
+
 test('Open Now is /food-drink only: destination category pages carry none of it, and the browser clock equals okanaganClock()', () => {
   const v = app.getFoodDrinkHubVenues().find((x) => ['restaurant', 'cafe', 'pub'].includes(x.type));
   const scoped = app.renderFoodDrinkHubPage(app.getVenuesByRegionCategory(v.region, v.type), { types: [], features: [], regions: [] }, { region: v.region, type: v.type, categoryCounts: app.getRegionCategoryCounts(v.region) });

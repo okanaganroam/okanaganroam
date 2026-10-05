@@ -11257,13 +11257,21 @@ const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered
 // status live in the browser with the same hours.js functions, so the
 // render-time status here is the no-script / first-paint value.
 const FD_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
-function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date()) {
+// opts.requireVerified (default true: /food-drink) gates on recorded hours
+// verification. /browse passes false: stored hours and the Okanagan clock
+// decide, so only a venue with no hours, or with a temporary-closure advisory,
+// is left without a status.
+function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}) {
+  const { requireVerified = true } = opts;
   const byId = new Map();
   const openIds = new Set();
-  const provenance = getHoursProvenanceById(venues.map((v) => v.id));
+  const provenance = requireVerified ? getHoursProvenanceById(venues.map((v) => v.id)) : new Map();
   const clock = okanaganClock(now);
   for (const v of venues) {
-    const e = openNowEligibility(v, provenance.get(v.id), { policy: 'food_drink', now, hasAdvisory: advisoryNotes.has(v.id) });
+    const hasAdvisory = advisoryNotes.has(v.id);
+    const e = requireVerified
+      ? openNowEligibility(v, provenance.get(v.id), { policy: 'food_drink', now, hasAdvisory })
+      : !v.hours ? { eligible: false, reason: 'no_hours' } : hasAdvisory ? { eligible: false, reason: 'advisory' } : { eligible: true, reason: 'ok' };
     if (!e.eligible || !hoursModule) {
       byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null });
       continue;
@@ -16928,7 +16936,7 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
     c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, cu: v.cuisine || '', p: Number(v.price) || 0, rt: Number(v.rating) || 0,
   }]));
   const advisoryNotes = getAdvisoryNotes();
-  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now);
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
   const q = f.q.toLowerCase();
   const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || []).includes(q);
   const pool = f.openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
