@@ -9675,7 +9675,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved /browse performance change F4a: one open-status date formatter (computeOpenStatus only), 2026-10-03.
   // Approved /browse performance change F5: the sort reads each rating once (initBlock4 only), 2026-10-03.
   // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
-  assert.equal(md5('public/scripts/app.js'), 'f171925702447b5295cc4174a59a32f9', 'public/scripts/app.js (F6: Favorites rewrite only changed buttons, 2026-10-03)');
+  // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
+  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
 });
 
 // ---- Discovery search (Phase 2, 2026-09-25) --------------------------------
@@ -11385,8 +11386,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41'); // SEO-2 (2026-10-02) descriptions
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
-  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons.
-  assert.equal(md5('public/scripts/app.js'), 'f171925702447b5295cc4174a59a32f9');
+  // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
+  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -13035,7 +13036,7 @@ test('Stage 5A F12: V3 reports edits, shares, Map this day and shared-link opens
   assert.ok(js.includes("shared('clipboard')") && js.includes("shared('manual')"));
   // Map this day: the established outbound_click, with fixed values.
   assert.deepEqual(byName('outbound_click'), ["track('outbound_click', { link_type: 'trip_day_map', surface: 'trip_planner' })"]);
-  assert.ok(js.includes('data-t3-map-day>Map this day</a>'));
+  assert.ok(js.includes("data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>"));
   // Opening a shared link: trip_plan_start (input_method link), then the
   // plan request reported as request_type shared_link; an unreadable link
   // is trip_plan_error invalid_share. Stage 5H: a reload / Back-Forward of
@@ -13085,7 +13086,7 @@ test('Stage 5G: V3 whole-trip map -- collapsed, loaded on demand, attributed, ke
   const openFn = js.slice(js.indexOf('function openMap()'), js.indexOf('function loadLeaflet('));
   assert.ok(openFn.includes('loadLeaflet(') && js.indexOf('loadLeaflet(') > js.indexOf('function setMapOpen('), 'Leaflet is requested only from opening the map');
   // Collapsed by default, on every screen size.
-  assert.ok(js.includes('aria-expanded="false" aria-controls="t3MapPanel">Show trip map</button>') && js.includes('<div class="t3-map-panel" id="t3MapPanel" hidden>'));
+  assert.ok(js.includes(`aria-expanded="false" aria-controls="t3MapPanel">' + esc(tx('tripv3.map.show')) + '</button>`) && js.includes('<div class="t3-map-panel" id="t3MapPanel" hidden>'));
   assert.ok(js.includes("var tripMap = { box: null, open: false,"));
   // render(): the map slot only in day plans; the map is detached before the
   // result is rewritten and placed back after.
