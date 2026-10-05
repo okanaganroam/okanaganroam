@@ -5927,7 +5927,8 @@ const FOOTER_REGION_GROUPS = [
 //   About: App coming soon -> /browse#app (real anchor on /browse's
 //     app-teaser section), List your venue -> /list-your-venue (the
 //     submission page, 2026-09-25), List an Event -> /list-an-event (no
-//     data-i18n key yet, so it stays English in FR), Contact -> the existing mailto link
+//     data-i18n key yet, so it stays English in FR), Contact -> a button that opens
+//     the Contact dialog (renderContactDialogHtml; it was a mailto link)
 //   Regions: ALL 20 real regions (FOOTER_REGION_GROUPS above), not a
 //     curated subset -- grouped exactly like the wizard's own region
 //     picker so a returning user recognizes the same four groups. This
@@ -6010,7 +6011,7 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
-          <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
+          <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
         </ul>
       </div>
       <div class="home-footer-col home-footer-col-regions">
@@ -6040,6 +6041,7 @@ function renderHomeFooterHTML(fromBrowse) {
     <p class="home-footer-copyright" data-i18n="homeFooter.copyright">&copy; 2026 Okanagan Roam. Built for the whole crew, dog included.</p>
   </div>
   ${renderAppTeaserDialogHtml()}
+  ${renderContactDialogHtml()}
 </footer>`;
 }
 
@@ -6083,6 +6085,144 @@ function renderAppTeaserDialogHtml() {
   </script>`;
 }
 
+// Contact dialog (footer "Contact"): replaces the mailto link. A second native
+// <dialog>, built like the app teaser above (same shell, close button and
+// backdrop behaviour) with a small form. The browser sends name, email and
+// message to POST /api/contact (handleContactMessage); no recipient or key is
+// ever in the page. Native showModal() supplies the focus trap, Escape and
+// focus-return; the script only opens/closes it, validates, and posts. A
+// failed send keeps the visitor's text; the form is only cleared after a
+// successful send. No analytics event is sent.
+function renderContactDialogHtml() {
+  const field = (id, label, control) => `<div class="contact-field">
+        <label for="${id}">${label}</label>
+        ${control}
+        <p class="contact-field-error" id="${id}Error" hidden></p>
+      </div>`;
+  return `<dialog class="app-teaser-dialog contact-dialog" id="contactDialog" aria-labelledby="contactTitle">
+    <div class="app-teaser-dialog-inner">
+      <button type="button" class="app-teaser-dialog-close" data-contact-close aria-label="Close">&times;</button>
+      <div id="contactFormView">
+        <span class="app-teaser-dialog-eyebrow">Contact</span>
+        <h2 id="contactTitle">Get in touch</h2>
+        <p>Questions, ideas, a correction or a hello? Send us a note and we will read it. We reply by email.</p>
+        <form id="contactForm" novalidate>
+          ${field('contactName', 'Your name', '<input type="text" id="contactName" name="name" required minlength="2" maxlength="100" autocomplete="name" autofocus>')}
+          ${field('contactEmail', 'Your email', '<input type="email" id="contactEmail" name="email" required maxlength="254" autocomplete="email">')}
+          ${field('contactMessage', 'Your message', '<textarea id="contactMessage" name="message" required minlength="10" maxlength="2000" rows="5" placeholder="What would you like to tell us?"></textarea>')}
+          <div class="contact-hp" aria-hidden="true"><label>Leave this empty <input type="text" id="contactCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off"></label></div>
+          <p class="contact-form-error" id="contactFormError" role="alert" hidden></p>
+          <button type="submit" class="contact-submit">Send message</button>
+        </form>
+      </div>
+      <div id="contactSuccess" hidden>
+        <span class="app-teaser-dialog-eyebrow">Message sent</span>
+        <h2 id="contactSuccessTitle" tabindex="-1">Thank you!</h2>
+        <p>Okanagan Roam received your message. We will reply by email as soon as we can.</p>
+        <button type="button" class="contact-submit" data-contact-close>Close</button>
+      </div>
+    </div>
+  </dialog>
+  <script>
+  (function(){
+    var d = document.getElementById('contactDialog');
+    if (!d) return;
+    var form = document.getElementById('contactForm');
+    var formView = document.getElementById('contactFormView');
+    var success = document.getElementById('contactSuccess');
+    var formError = document.getElementById('contactFormError');
+    var button = form.querySelector('button[type="submit"]');
+    var fields = { name: 'contactName', email: 'contactEmail', message: 'contactMessage' };
+    var EMAIL = ${SUBMISSION_EMAIL_PATTERN.toString()};
+    var startedAt = Date.now();
+    var downOnBackdrop = false;
+    function close(){ if (typeof d.close === 'function') d.close(); else d.removeAttribute('open'); }
+    function clearErrors(){
+      Object.keys(fields).forEach(function(key){
+        var input = document.getElementById(fields[key]);
+        var msg = document.getElementById(fields[key] + 'Error');
+        input.removeAttribute('aria-invalid');
+        input.removeAttribute('aria-describedby');
+        msg.hidden = true; msg.textContent = '';
+      });
+      formError.hidden = true; formError.textContent = '';
+    }
+    function showErrors(errors){
+      var first = null;
+      Object.keys(errors).forEach(function(key){
+        if (!fields[key]) return;
+        var input = document.getElementById(fields[key]);
+        var msg = document.getElementById(fields[key] + 'Error');
+        input.setAttribute('aria-invalid', 'true');
+        input.setAttribute('aria-describedby', msg.id);
+        msg.textContent = errors[key]; msg.hidden = false;
+        if (!first) first = input;
+      });
+      if (first) first.focus();
+    }
+    function validate(v){
+      var errors = {};
+      if (v.name.length < 2) errors.name = v.name ? 'Your name needs at least 2 characters.' : 'Please enter your name.';
+      if (!v.email) errors.email = 'Please enter your email address.';
+      else if (v.email.length > 254 || !EMAIL.test(v.email)) errors.email = 'Please enter a valid email address, like name@example.com.';
+      if (v.message.length < 10) errors.message = v.message ? 'Your message needs at least 10 characters.' : 'Please tell us what you would like to say.';
+      return errors;
+    }
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('[data-contact-open]')) {
+        e.preventDefault();
+        startedAt = Date.now();
+        if (typeof d.showModal === 'function') { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
+        return;
+      }
+      if (t.closest('[data-contact-close]')) { close(); return; }
+      // Backdrop: only when the press started there too (a text selection dragged out of a field must not close it).
+      if (t === d && downOnBackdrop) close();
+    });
+    d.addEventListener('mousedown', function(e){ downOnBackdrop = e.target === d; });
+    // After a sent message, the next opening is a fresh form.
+    d.addEventListener('close', function(){
+      if (!success.hidden) { form.reset(); clearErrors(); success.hidden = true; formView.hidden = false; }
+    });
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      clearErrors();
+      var values = {
+        name: document.getElementById('contactName').value.trim(),
+        email: document.getElementById('contactEmail').value.trim(),
+        message: document.getElementById('contactMessage').value.trim()
+      };
+      var errors = validate(values);
+      if (Object.keys(errors).length) { showErrors(errors); return; }
+      var payload = { name: values.name, email: values.email, message: values.message, started_at: startedAt, company_website: document.getElementById('contactCompanyWebsite').value };
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'Sending...';
+      fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function(res){ return res.json().catch(function(){ return {}; }).then(function(body){ return { status: res.status, body: body }; }); })
+        .then(function(r){
+          if (r.body.ok === true && r.status === 201) {
+            formView.hidden = true;
+            success.hidden = false;
+            document.getElementById('contactSuccessTitle').focus();
+            return;
+          }
+          if (r.body.errors) showErrors(r.body.errors);
+          formError.textContent = r.body.error || 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+          formError.hidden = false;
+        })
+        .catch(function(){
+          formError.textContent = 'Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at okanaganroam@gmail.com.';
+          formError.hidden = false;
+        })
+        .then(function(){ button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = 'Send message'; });
+    });
+  })();
+  </script>`;
+}
+
 // Canonical footer + floating Trip button styles (consolidated 2026-09-19):
 // the SINGLE shared implementation of the approved home-footer-* markup's
 // CSS and the body:not(.page-browse) trip-button restyle, used verbatim by
@@ -6121,6 +6261,34 @@ function renderCanonicalFooterStyles() {
     background: rgba(255,252,246,0.12); color: inherit; font-size: 1.4rem; line-height: 1;
   }
   .app-teaser-dialog-close:hover, .app-teaser-dialog-close:focus-visible { background: rgba(255,252,246,0.22); }
+  /* Contact dialog: the app teaser's shell with a form. Scrolls on short
+     screens; 16px controls so phones do not zoom on focus. */
+  .contact-dialog { overflow-y: auto; overscroll-behavior: contain; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
+  .contact-dialog, .contact-dialog * { box-sizing: border-box; }
+  .contact-dialog h2:focus { outline: none; }
+  .contact-field { margin: 0 0 14px; }
+  .contact-field label { display: block; font-size: 0.88rem; font-weight: 700; margin: 0 0 6px; color: var(--ref-cream, #F5F3ED); }
+  .contact-dialog input[type="text"], .contact-dialog input[type="email"], .contact-dialog textarea {
+    display: block; width: 100%; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; line-height: 1.4;
+    color: var(--ref-cream, #F5F3ED); background: rgba(255,252,246,0.08); border: 1px solid rgba(255,252,246,0.3); border-radius: 12px;
+  }
+  .contact-dialog textarea { min-height: 120px; resize: vertical; }
+  .contact-dialog ::placeholder { color: rgba(245,243,237,0.5); }
+  .contact-dialog input:focus-visible, .contact-dialog textarea:focus-visible { outline: 2px solid var(--ref-gold, #E0A94E); outline-offset: 1px; border-color: transparent; }
+  .contact-dialog [aria-invalid="true"] { border-color: #FFB4A8; }
+  .contact-field-error, .contact-form-error { margin: 6px 0 0; font-size: 0.85rem; line-height: 1.4; color: #FFB4A8; }
+  .contact-dialog .contact-field-error, .contact-dialog .contact-form-error { margin: 6px 0 0; color: #FFB4A8; }
+  .contact-dialog .contact-form-error { margin: 0 0 14px; }
+  .contact-field-error[hidden], .contact-form-error[hidden], .contact-dialog [hidden] { display: none; }
+  .contact-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .contact-submit {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 26px; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--ref-gold, #E0A94E); color: var(--ref-navy-deep, #16233a); font-family: 'Nunito', sans-serif; font-size: 1rem; font-weight: 800;
+  }
+  .contact-submit:hover { filter: brightness(1.06); }
+  .contact-submit:focus-visible { outline: 2px solid var(--ref-cream, #F5F3ED); outline-offset: 3px; }
+  .contact-submit[disabled] { opacity: 0.65; cursor: progress; }
+  @media (max-width: 480px) { .contact-dialog .app-teaser-dialog-inner { padding: 30px 20px 22px; } .contact-submit { width: 100%; } }
   /* Homepage footer redesign (2026-09-17, revised again same day): full-
      width navy band using the same --ref-navy/--ref-gold/--ref-cream
      system as the header/hero, replacing the old footer's --ink/--sand
@@ -18043,6 +18211,187 @@ function listEventSubmissions(status) {
   }));
 }
 
+// ---------- Contact form (footer "Contact" dialog) ----------
+//   POST /api/contact -- validate, spam checks, then email okanaganroam@gmail.com
+//
+// Same shape as the venue / event submission endpoints and the same FormSubmit
+// relay, with three differences: nothing is stored (no table, no database
+// write), the visitor's name, email and message are never logged, and the
+// rate limit counts messages actually sent. The recipient is the fixed
+// VENUE_SUBMISSION_NOTIFY_URL; the browser supplies only name, email, message
+// and the two anti-spam fields, and the server builds the whole outgoing
+// payload (no recipient, _cc, _next, _subject or other routing field is read
+// from the request).
+
+const CONTACT_MAX_BODY_BYTES = 8 * 1024;
+const CONTACT_MIN_FILL_MS = 3000;
+const CONTACT_MAX_FORM_AGE_MS = 24 * 60 * 60 * 1000;
+const CONTACT_RATE_LIMIT = 5; // messages per IP ...
+const CONTACT_RATE_WINDOW_MS = 60 * 60 * 1000; // ... per hour
+const CONTACT_GLOBAL_LIMIT = 100; // messages from everyone, per rolling 24 hours
+const CONTACT_GLOBAL_WINDOW_MS = 24 * 60 * 60 * 1000;
+const CONTACT_KEYS = new Set(['name', 'email', 'message', 'company_website', 'started_at']);
+const CONTACT_FALLBACK_NOTE = 'email us at okanaganroam@gmail.com';
+
+async function sendContactViaFormSubmit(payload) {
+  const res = await fetch(VENUE_SUBMISSION_NOTIFY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Origin: 'https://okanaganroam.com',
+      Referer: 'https://okanaganroam.com/',
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10000),
+  });
+  let result = null;
+  try { result = await res.json(); } catch (_) { /* non-JSON reply is a failure below */ }
+  if (!res.ok || !result || String(result.success) !== 'true') {
+    throw new Error(`FormSubmit HTTP ${res.status}`);
+  }
+}
+
+// Swapped out by the test suite so tests never send real email.
+let contactTransport = sendContactViaFormSubmit;
+function setContactTransport(fn) {
+  contactTransport = fn || sendContactViaFormSubmit;
+}
+
+const contactSendsByIp = new Map(); // ip -> [timestamps of messages sent]
+let contactSends = []; // timestamps of every message sent
+function resetContactLimits() {
+  contactSendsByIp.clear();
+  contactSends = [];
+}
+function contactIpLimited(ip, now = Date.now()) {
+  return (contactSendsByIp.get(ip) || []).filter((t) => now - t < CONTACT_RATE_WINDOW_MS).length >= CONTACT_RATE_LIMIT;
+}
+function contactGloballyLimited(now = Date.now()) {
+  contactSends = contactSends.filter((t) => now - t < CONTACT_GLOBAL_WINDOW_MS);
+  return contactSends.length >= CONTACT_GLOBAL_LIMIT;
+}
+function recordContactSend(ip, now = Date.now()) {
+  const recent = (contactSendsByIp.get(ip) || []).filter((t) => now - t < CONTACT_RATE_WINDOW_MS);
+  recent.push(now);
+  contactSendsByIp.set(ip, recent);
+  contactSends.push(now);
+  if (contactSendsByIp.size > 5000) {
+    for (const [key, times] of contactSendsByIp) {
+      if (!times.some((t) => now - t < CONTACT_RATE_WINDOW_MS)) contactSendsByIp.delete(key);
+    }
+  }
+}
+
+// Returns { data, errors }. Name and email may not contain any control
+// character (CR/LF especially): they are rejected, not cleaned, because they
+// end up in the email subject and Reply-To header.
+function validateContactMessage(body) {
+  const errors = {};
+  const data = {};
+  const text = (key) => (typeof body[key] === 'string' ? body[key] : null);
+
+  const rawName = text('name');
+  if (rawName === null || !rawName.trim()) errors.name = 'Please enter your name.';
+  else if (/[\u0000-\u001F\u007F\u2028\u2029]/.test(rawName)) errors.name = 'Your name can only be one line of plain text.';
+  else {
+    const name = rawName.normalize('NFC').replace(/[ \t]+/g, ' ').trim();
+    if (name.length < 2) errors.name = 'Your name needs at least 2 characters.';
+    else if (name.length > 100) errors.name = 'Your name can be at most 100 characters.';
+    else data.name = name;
+  }
+
+  const rawEmail = text('email');
+  if (rawEmail === null || !rawEmail.trim()) errors.email = 'Please enter your email address.';
+  else if (/[\u0000-\u001F\u007F\u2028\u2029]/.test(rawEmail)) errors.email = 'Please enter a valid email address, like name@example.com.';
+  else {
+    const email = rawEmail.trim();
+    if (email.length > 254 || !SUBMISSION_EMAIL_PATTERN.test(email)) errors.email = 'Please enter a valid email address, like name@example.com.';
+    else data.email = email;
+  }
+
+  const rawMessage = text('message');
+  if (rawMessage === null || !rawMessage.trim()) errors.message = 'Please tell us what you would like to say.';
+  else {
+    const message = cleanSubmissionText(rawMessage, { multiline: true });
+    if (message.length < 10) errors.message = 'Your message needs at least 10 characters.';
+    else if (message.length > 2000) errors.message = 'Your message can be at most 2,000 characters.';
+    else data.message = message;
+  }
+  return { data, errors };
+}
+
+function buildContactEmail(data, now = new Date()) {
+  return {
+    _subject: `[Contact] Message from ${data.name}`,
+    _template: 'table',
+    _captcha: 'false',
+    _replyto: data.email,
+    'Name': data.name,
+    'Email': data.email,
+    'Message': data.message,
+    'Sent': formatSubmissionTimestamp(now.toISOString().slice(0, 19).replace('T', ' ')),
+  };
+}
+
+async function handleContactMessage(req, res) {
+  const generic = `Sorry, something went wrong. Please try again, or ${CONTACT_FALLBACK_NOTE}.`;
+  if (!isSameOriginSubmission(req)) {
+    return sendSubmissionResponse(res, 403, { ok: false, error: 'Messages are only accepted from the Okanagan Roam website.' });
+  }
+  const ip = requestClientIp(req);
+  if (contactIpLimited(ip)) {
+    return sendSubmissionResponse(res, 429, { ok: false, error: `You have sent several messages recently. Please try again in an hour, or ${CONTACT_FALLBACK_NOTE}.` });
+  }
+  if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) {
+    return sendSubmissionResponse(res, 415, { ok: false, error: generic });
+  }
+  let body;
+  try {
+    body = await readLimitedJsonBody(req, CONTACT_MAX_BODY_BYTES);
+  } catch (err) {
+    if (err.status === 413) {
+      return sendSubmissionResponse(res, 413, { ok: false, error: 'Your message is too large. Please shorten it and try again.' }, true);
+    }
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !CONTACT_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+
+  // Honeypot: answer like a success, send nothing.
+  if (body.company_website !== undefined && body.company_website !== '') {
+    return sendSubmissionResponse(res, 201, { ok: true });
+  }
+  const startedAt = Number(body.started_at);
+  const elapsed = Date.now() - startedAt;
+  if (!Number.isFinite(startedAt) || elapsed > CONTACT_MAX_FORM_AGE_MS || elapsed < -60000) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'This form has expired. Please close it, reopen it and send your message again.' });
+  }
+  if (elapsed < CONTACT_MIN_FILL_MS) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check your details and press Send again.' });
+  }
+
+  const { data, errors } = validateContactMessage(body);
+  if (Object.keys(errors).length) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
+  }
+  if (contactGloballyLimited()) {
+    return sendSubmissionResponse(res, 429, { ok: false, error: `We are receiving a lot of messages right now. Please try again later, or ${CONTACT_FALLBACK_NOTE}.` });
+  }
+
+  // Counted before the send, so a failing relay cannot be hammered.
+  recordContactSend(ip);
+  try {
+    await contactTransport(buildContactEmail(data));
+  } catch (err) {
+    // Never the visitor's text, and only the provider's status line.
+    console.error(`[contact] relay failed: ${String((err && err.message) || err).split(':')[0].slice(0, 60)}`);
+    return sendSubmissionResponse(res, 502, { ok: false, error: `Sorry, we could not send your message just now. Your message is still here, so please try again, or ${CONTACT_FALLBACK_NOTE}.` });
+  }
+  return sendSubmissionResponse(res, 201, { ok: true, message: 'Thanks! Okanagan Roam has received your message.' });
+}
+
 function renderListAnEventPage(now = new Date()) {
   const title = 'List an Event | Okanagan Roam';
   const description = 'Organizing a festival, concert, market, tasting or community event in the Okanagan? Send us the details and we will review them for What’s On.';
@@ -20175,6 +20524,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/event-submissions' && method === 'POST') {
       return await handleEventSubmission(req, res);
     }
+    if (pathname === '/api/contact' && method === 'POST') {
+      return await handleContactMessage(req, res);
+    }
     if (pathname === '/admin/event-submissions' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
       const status = query.status || 'pending';
@@ -20480,6 +20832,12 @@ module.exports = {
   validateVenueSubmission,
   buildVenueSubmissionEmail,
   setVenueSubmissionTransport,
+  setContactTransport,
+  resetContactLimits,
+  validateContactMessage,
+  buildContactEmail,
+  CONTACT_RATE_LIMIT,
+  CONTACT_GLOBAL_LIMIT,
   getVenueSubmission,
   VENUE_SUBMISSION_TYPES,
   VENUE_SUBMISSION_REGIONS,
