@@ -10547,7 +10547,7 @@ test('Open Now eligibility: verified provenance within the Food & Drink freshnes
   assert.deepEqual(e({ hours }, ok), { eligible: true, reason: 'ok' });
 });
 
-test('Open Now on /food-drink: honest per-card status on the Okanagan clock, and an Open now filter that only shows proven-open verified venues', () => {
+test('Open Now on /food-drink: per-card status from stored hours on the Okanagan clock (no provenance requirement), and an Open now filter that shows every proven-open venue', () => {
   const pool = app.getFoodDrinkHubVenues();
   const picks = pool.slice(0, 7).map((v) => v.id);
   const saved = picks.map((id) => db.prepare('SELECT id, hours, hours_source, hours_checked_at FROM venues WHERE id = ?').get(id));
@@ -10560,8 +10560,8 @@ test('Open Now on /food-drink: honest per-card status on the Okanagan clock, and
     setRow(C, W([['16:00', '25:00']]), 'official_website', '2026-09-20');           // past-midnight notation
     setRow(D, W([['03:30', '23:00']]), 'official_website', '2026-09-20');           // early opening
     setRow(E, '{"mon":[["09:00","17:00"]],"tue":[["09:00","17:00"]]}', 'venue_phone', '2026-09-20'); // Friday not listed
-    setRow(F, W([['11:00', '21:00']]), 'official_website', '2026-01-01');           // stale
-    setRow(G, W([['00:00', '24:00']]), null, null);                                 // never verified
+    setRow(F, W([['11:00', '21:00']]), 'official_website', '2026-01-01');           // stale check: no longer matters
+    setRow(G, W([['00:00', '24:00']]), null, null);                                 // never verified: no longer matters
     const venues = app.getFoodDrinkHubVenues();
     const none = { types: [], features: [], regions: [] };
     const render = (iso, f = none) => app.renderFoodDrinkHubPage(venues, f, null, new Date(iso));
@@ -10574,14 +10574,14 @@ test('Open Now on /food-drink: honest per-card status on the Okanagan clock, and
     assert.deepEqual(statusOf(fri, D), ['open', 'Open now · Closes 11 PM']);
     assert.deepEqual(statusOf(fri, E), ['unknown', 'Hours not listed for today'], 'an unlisted day is unknown, never "Closed"');
     const card = (html, id) => (html.match(new RegExp(`<li class="venue-card" data-fd-i="\\d+" data-venue-id="${id}"[\\s\\S]*?</li>`)) || [''])[0];
-    assert.ok(card(fri, F) && !card(fri, F).includes('fd-open-status'), 'stale check: no status line at all');
-    assert.ok(card(fri, G) && !card(fri, G).includes('fd-open-status'), '24-hour listing without provenance: no status, never claimed open');
-    // Unverified venues never carry a Closed status and never ship hours to the browser.
+    assert.deepEqual(statusOf(fri, F), ['open', 'Open now · Closes 9 PM'], 'stale check: stored hours decide');
+    assert.deepEqual(statusOf(fri, G), ['open', 'Open 24 hours'], '24-hour listing without provenance: open on stored hours');
+    assert.ok(card(fri, F) && card(fri, G));
+    // Stored hours ship to the browser for every venue that has them.
     const data = JSON.parse(fri.match(/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/)[1]);
     assert.ok(data[String(A)].h && data[String(B)].h && data[String(E)].h);
-    assert.equal(data[String(F)].h, undefined);
-    assert.equal(data[String(G)].h, undefined);
-    assert.equal((fri.match(/<p class="fd-open-status"/g) || []).length, 5, 'only the five eligible venues carry a status line');
+    assert.ok(data[String(F)].h && data[String(G)].h);
+    for (const id of [A, B, C, D, E, F, G]) assert.ok(statusOf(fri, id), `venue ${id} has stored hours: it carries a status line`);
     assert.ok(!fri.includes('Hours not verified') && !/data-fd-open="unverified"/.test(fri));
     // After midnight: Saturday 01:30 PDT -- Friday night's overnight venue is open.
     const sat = render('2026-09-26T08:30:00Z');
@@ -10592,14 +10592,14 @@ test('Open Now on /food-drink: honest per-card status on the Okanagan clock, and
     // The filter: only proven-open, verified venues; counts and summary follow.
     const onFri = render('2026-09-25T20:00:00Z', { ...none, openNow: true });
     const live = (html) => [...html.split('<template id="fdRest">')[0].matchAll(/<li class="venue-card" data-fd-i="\d+" data-venue-id="(\d+)"/g)].map((m) => Number(m[1])).sort((x, y) => x - y);
-    assert.deepEqual(live(onFri), [A, D].sort((x, y) => x - y));
-    assert.match(onFri, new RegExp(`id="fdResultsSummary"[^>]*>2 of ${venues.length} places<`));
-    assert.match(onFri, /id="fdOpenNow" data-fd-open-now aria-pressed="true">[\s\S]*?id="fdOpenNowCount">2</);
+    assert.deepEqual(live(onFri), [A, D, F, G].sort((x, y) => x - y));
+    assert.match(onFri, new RegExp(`id="fdResultsSummary"[^>]*>4 of ${venues.length} places<`));
+    assert.match(onFri, /id="fdOpenNow" data-fd-open-now aria-pressed="true">[\s\S]*?id="fdOpenNowCount">4</);
     assert.match(onFri, /data-fd-remove-open="now"/, 'removable Open now tag');
-    assert.match(fri, /id="fdOpenNow" data-fd-open-now aria-pressed="false">[\s\S]*?id="fdOpenNowCount">2</, 'the toggle shows how many are open');
+    assert.match(fri, /id="fdOpenNow" data-fd-open-now aria-pressed="false">[\s\S]*?id="fdOpenNowCount">4</, 'the toggle shows how many are open');
     // AND with the existing groups, over the same set.
     const regionA = venues.find((v) => v.id === A).region;
-    const inRegion = venues.filter((v) => v.region === regionA && [A, D].includes(v.id)).length;
+    const inRegion = venues.filter((v) => v.region === regionA && [A, D, F, G].includes(v.id)).length;
     const both = render('2026-09-25T20:00:00Z', { types: [], features: [], regions: [regionA], openNow: true });
     assert.match(both, new RegExp(`id="fdResultsSummary"[^>]*>${inRegion} of ${venues.length} places<`));
     // Open now off: the existing filters behave exactly as before.
@@ -10607,7 +10607,12 @@ test('Open Now on /food-drink: honest per-card status on the Okanagan clock, and
     assert.equal(plainIds.length, Math.min(app.FD_PAGE_SIZE, venues.length));
     assert.match(fri, new RegExp(`id="fdResultsSummary"[^>]*>${venues.length} places<`));
     // The note and the hub-only script pieces.
-    assert.ok(fri.includes('<p class="fd-open-note">Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.</p>'));
+    assert.ok(fri.includes('<p class="fd-open-note">Open Now is based on each place’s listed hours. Hours can change for holidays, seasons or special closures — check with the venue before you go.</p>'));
+    assert.ok(!fri.includes('recently verified hours'));
+    // No hours, or an advisory: still no status, never counted open.
+    const advInfo = app.foodDrinkOpenNowInfo(venues, new Map([[A, 'Temporary closure.']]), new Date('2026-09-25T20:00:00Z'), { requireVerified: false });
+    assert.equal(advInfo.byId.get(A).eligible, false);
+    assert.equal(advInfo.openIds.has(A), false);
     assert.ok(fri.includes('function hoursStatusLabel(') && fri.includes('function okanaganClock(') && fri.includes("q.push('open=now')"));
   } finally {
     for (const r of saved) db.prepare('UPDATE venues SET hours = ?, hours_source = ?, hours_checked_at = ? WHERE id = ?').run(r.hours, r.hours_source, r.hours_checked_at, r.id);

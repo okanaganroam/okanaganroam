@@ -11250,15 +11250,16 @@ const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered
   }`;
 
 // ---------- Open Now on the Food & Drink hub (2026-09-26) ----------
-// Per-venue status for /food-drink: eligible venues (openNowEligibility) get
-// hours.js's open/closed status on the Okanagan clock; every other venue gets
-// NO status line at all (owner decision 2026-09-26) -- never "Closed", and it
-// is never counted as open. The page script recomputes the eligible venues'
+// Per-venue status for /food-drink: venues with stored hours and no advisory get
+// hours.js's open/closed status on the Okanagan clock (no provenance requirement,
+// as /browse); every other venue gets NO status line at all -- never "Closed",
+// and it is never counted as open. The page script recomputes the eligible venues'
 // status live in the browser with the same hours.js functions, so the
 // render-time status here is the no-script / first-paint value.
-const FD_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
-// opts.requireVerified (default true: /food-drink) gates on recorded hours
-// verification. /browse passes false: stored hours and the Okanagan clock
+const BROWSE_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
+const FD_OPEN_NOTE = 'Open Now is based on each place\u2019s listed hours. Hours can change for holidays, seasons or special closures \u2014 check with the venue before you go.';
+// opts.requireVerified (default true) gates on recorded hours verification.
+// /food-drink and /browse both pass false: stored hours and the Okanagan clock
 // decide, so only a venue with no hours, or with a temporary-closure advisory,
 // is left without a status.
 function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}) {
@@ -11906,9 +11907,10 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   const catsById = foodDrinkCategoriesByVenue(venues);
   const featsById = foodDrinkFeaturesByVenue(venues);
   const advisoryNotes = getAdvisoryNotes();
-  // Open Now: an extra AND group. Unknown / unverified venues are never "open",
-  // so they drop out when it is on; the chip counts are taken over the same set.
-  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now);
+  // Open Now: an extra AND group over stored hours (no provenance requirement).
+  // Venues with no hours, or under an advisory, are never "open" and drop out
+  // when it is on; the chip counts are taken over the same set.
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
   const pool = openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
   const matching = filterFoodDrinkVenues(pool, f, catsById, featsById);
   const matchIds = new Set(matching.map((v) => v.id));
@@ -16994,7 +16996,7 @@ ${withoutFavoritesNavLink(renderGolfHeaderHtml())}
   ${browseSearchHtml(f.q)}
   ${browseTypeChipsHtml(state)}
   ${browseFilterBarHtml(venues, cuisines, state, openCount)}
-  <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <p class="fd-open-note">${escapeHtml(BROWSE_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="bhResultsTop">
   <h2 class="visually-hidden" id="bhResultsTop">Results</h2>
   ${browseResultBarHtml(browseSummaryText(matching.length, venues.length, filtered), state)}
