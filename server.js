@@ -8755,7 +8755,9 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
       venue_region: card.dataset.venueRegion,
       venue_category: ${(type === 'outdoor' || type === 'fd' || type === 'guide') ? `card.dataset.venueCategory || '${type}'` : `'${type}'`},
       surface: card.dataset.surface || 'category_card',
-      page_path: location.pathname
+      // Not "page_path": gtag treats page_path as its own field (sent as the
+      // hit's dp), so it never reached GA4 as an event parameter (2026-10-05).
+      card_page_path: location.pathname
     };
   }
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }

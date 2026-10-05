@@ -4689,6 +4689,20 @@ test('Stage 5B: the guide card script covers every venue type, reports the card\
   new Function(s.replace(/^<script>/, '').replace(/<\/script>$/, '')); // parses
 });
 
+// 2026-10-05: gtag treats a "page_path" event parameter as its own page-path
+// field (the hit's dp), so it never reached GA4. The card events -- the
+// impression, Read more and Favorite events built from ctx() -- carry the
+// path as card_page_path instead.
+test('Card events send the page path as card_page_path, never page_path (which gtag consumes)', () => {
+  for (const [type, themed, opts] of [['golf', true, {}], ['outdoor', true, {}], ['fd', true, {}], ['dog', true, {}], ['lf', true, {}], ['guide', true, { impressionCards: '[data-venue-category="golf"]' }]]) {
+    const s = app.golfCardEngagementScriptHtml(type, themed, opts);
+    assert.ok(s.includes('card_page_path: location.pathname'), `${type}: card_page_path`);
+    assert.doesNotMatch(s.replace(/\/\/[^\n]*/g, ''), /[^_]page_path:/, `${type}: no page_path parameter`);
+    assert.ok(s.includes("track('venue_impression', ctx(en.target));"), `${type}: the impression uses ctx()`);
+    new Function(s.replace(/^<script>/, '').replace(/<\/script>$/, '')); // parses
+  }
+});
+
 test('Stage 5B: every other page\'s card script is unchanged (no impression limit unless a caller asks for one)', () => {
   for (const [type, themed] of [['golf'], ['beach'], ['outdoor'], ['fd', true], ['dog', true], ['lf', true], ['winery', true]]) {
     const s = themed === undefined ? app.golfCardEngagementScriptHtml(type) : app.golfCardEngagementScriptHtml(type, themed);
@@ -14495,9 +14509,9 @@ test('Stage 4.3 + 5E: winery region page (no app.js) -- a venue favourite record
   assert.deepEqual(h.names(), []); assert.deepEqual(h.saved().items, []);
   assert.ok(!h.on(fav));
   assert.deepEqual(JSON.parse(JSON.stringify(h.events)), [
-    ['venue_favorite', { venue_id: 571, venue_name: 'Sandhill Wines', venue_region: 'kelowna', venue_category: 'winery', surface: 'category_card', page_path: '/kelowna/wineries' }],
-    ['venue_unfavorite', { venue_id: 571, venue_name: 'Sandhill Wines', venue_region: 'kelowna', venue_category: 'winery', surface: 'category_card', page_path: '/kelowna/wineries' }],
-  ], 'the same events and parameters as before Stage 5E');
+    ['venue_favorite', { venue_id: 571, venue_name: 'Sandhill Wines', venue_region: 'kelowna', venue_category: 'winery', surface: 'category_card', card_page_path: '/kelowna/wineries' }],
+    ['venue_unfavorite', { venue_id: 571, venue_name: 'Sandhill Wines', venue_region: 'kelowna', venue_category: 'winery', surface: 'category_card', card_page_path: '/kelowna/wineries' }],
+  ], 'the same events and parameters as before Stage 5E (page_path renamed card_page_path, 2026-10-05)');
 });
 
 test('Stage 5E: winery region page -- two same-name places are two Favorites; removing one keeps the other and the shared name; venue 583 never matches event 583', () => {
