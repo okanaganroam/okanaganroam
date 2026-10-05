@@ -5407,6 +5407,8 @@ function renderGuidePage(region, badge, venues) {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, savedSidecar: true })}
 ${renderAnalyticsHeadHtml('guide')}
+<style>/* 2026-10-05: the guide subtitle stacked a 0.65 colour on a 0.66 opacity (about 2.6:1). */
+body.guide-page .subtitle { color: rgb(42,32,25); opacity: 0.8; }</style>
 </head>
 <body class="golf-page guide-page">
   ${renderGolfTripTrayHtml()}
@@ -6635,6 +6637,10 @@ function renderHomepageDiscoveryStyles() {
     text-decoration: none; white-space: nowrap;
   }
   .discover-heading-link:hover { color: var(--ref-gold); }
+  @media (max-width: 1024px) {
+    .discover-heading-link { position: relative; }
+    .discover-heading-link::after { content: ""; position: absolute; inset: -22px -2px 0; }
+  }
   .discover-subtitle {
     font-family: 'Nunito', sans-serif; font-weight: 500; font-size: 0.85rem;
     color: rgba(42,32,25,0.6); margin-left: 10px; vertical-align: middle;
@@ -6948,7 +6954,9 @@ function renderHomepageDiscoveryStyles() {
        align:center here is homepage-hero-specific -- .hero-title has no
        text-align at wider widths (reads left-to-right in its own
        centered column instead, per the desktop hero layout, untouched). */
-    .hero-title { max-width: 100%; font-size: 17px; text-align: center; margin: 0 0 8px; padding: 0 8px; }
+    /* 2026-10-05 responsive refinement: 26px (was 17px, which sat below the
+       19.2px section headings under it at 375-430px). */
+    .hero-title { max-width: 100%; font-size: 26px; text-align: center; margin: 0 0 8px; padding: 0 8px; }
     /* Mobile supporting copy (2026-09-18): swaps the long desktop
        paragraph (.hero-lead-full, completely unchanged, hidden here) for
        the short mobile-only one (.hero-lead-mobile, hidden everywhere
@@ -7184,7 +7192,7 @@ const SEO_PAGE_CSS = `
   header.top a:not(.brand):hover { text-decoration: underline; }
 
   nav.breadcrumb {
-    font-size: 0.8rem; color: var(--ink); opacity: 0.62;
+    font-size: 0.8rem; color: var(--ink); opacity: 0.85;
     margin-bottom: 22px; letter-spacing: 0.01em;
   }
   nav.breadcrumb a { color: var(--teal-deep); text-decoration: none; opacity: 1; }
@@ -7815,7 +7823,7 @@ function renderGolfHeaderHtml() {
     // need app.js and turn the trip button into a real link to /trip.
     .replace(/<button class="nav-search-btn"[\s\S]*?<\/button>\s*/, '')
     .replace(/<button class="lang-toggle"[\s\S]*?<\/button>\s*/, '')
-    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>'));
+    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>')) + '\n' + RESPONSIVE_REFINEMENT_STYLE;
 }
 
 // Stage 4.4 (2026-10-01): "Favorites" in the shared navigation (desktop links
@@ -7830,6 +7838,49 @@ function renderGolfHeaderHtml() {
 // the mobile menu (940px and below). The rule travels with the header it
 // belongs to, so every page carrying the link carries it too.
 const FAVORITES_NAV_ITEM = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
+
+// Responsive refinement (2026-10-05). Rides with the shell header and the
+// homepage so it never edits the frozen public/styles/app.css.
+//  1. Header: app.css collapses the nav to the hamburger at max-width: 940px,
+//     but the desktop row (logo, five labels, search, EN/FR, CTA) needs about
+//     1200px, so 941-1200px wrapped the logo, labels and EN/FR (header up to
+//     124px). The same collapsed rules now apply through 1200px (1280px on
+//     /trip, whose header keeps the search icon and EN/FR).
+//  2. Touch targets through 1024px for the header controls and the Trip
+//     tray: a 44px hit area from a transparent ::after, so nothing looks
+//     bigger. The page-level controls get theirs next to their own styles.
+function responsiveRefinementStyle(collapseMax = 1200) {
+  return `<style id="responsive-refinement">
+@media (min-width: 941px) and (max-width: ${collapseMax}px) {
+  .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0; background: var(--ref-cream); border-bottom: 1px solid rgba(27,43,58,0.12); box-shadow: 0 14px 20px -14px var(--shadow); z-index: 20; }
+  .nav-links.open { display: flex; }
+  .nav-links > li { border-top: 1px solid rgba(27,43,58,0.08); }
+  .nav-links a, .nav-links > li > span.nav-link-label { display: block; padding: 16px 20px; }
+  .nav-dropdown-panel { display: block; position: static; transform: none; box-shadow: none; background: none; padding: 0 0 8px 20px; min-width: 0; }
+  .nav-dropdown-panel a { padding: 10px 0; font-size: 0.86rem; color: rgba(27,43,58,0.8); }
+  .nav-link-caret { display: none; }
+  .nav-hamburger { display: flex; }
+  .nav { position: relative; gap: 14px; }
+  .nav-search-btn { display: none; }
+  .nav .app-btn { display: none; }
+  .nav-links .nav-links-trip { display: block; }
+  #navLinks li[class*="-favorites"] { display: list-item; }
+}
+@media (max-width: ${collapseMax}px) {
+  .nav-hamburger, .lang-toggle { position: relative; }
+  .nav-hamburger::after { content: ""; position: absolute; inset: -5px -2px; }
+  .lang-toggle::after { content: ""; position: absolute; inset: -10px -3px; }
+}
+@media (max-width: 1024px) {
+  #tripTrayToggle { position: relative; }
+  #tripTrayToggle::after { content: ""; position: absolute; inset: -7px; }
+}
+</style>`;
+}
+// 1200px covers every page but /trip, whose header also keeps the search icon and
+// EN/FR and wraps until 1280px; /trip collapses through 1280px.
+const RESPONSIVE_REFINEMENT_STYLE = responsiveRefinementStyle(1200);
+const RESPONSIVE_REFINEMENT_STYLE_TRIP = responsiveRefinementStyle(1280);
 const FAVORITES_NAV_STYLE = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
 function withFavoritesNavLink(headerHtml) {
   const marker = '<li class="nav-links-trip">';
@@ -8073,6 +8124,10 @@ function buildOutdoorThemeStyles() {
   body.outdoor-page .outdoor-selected-clear { background: transparent; border: 0; padding: 6px 4px; font: inherit; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: underline; cursor: pointer; }
   /* Phones: comfortable tap targets for every filter control (44px+),
      and the action buttons span the width so they are easy to hit. */
+  @media (min-width: 900px) and (max-width: 1024px) {
+    body.outdoor-page .outdoor-filter-chip { min-height: 44px; padding: 10px 16px; font-size: 0.92rem; }
+    body.outdoor-page .outdoor-region-group-chips { gap: 10px; }
+  }
   @media (max-width: 899px) {
     body.outdoor-page .outdoor-filter-chip { min-height: 44px; padding: 10px 16px; font-size: 0.92rem; }
     body.outdoor-page .outdoor-region-group-chips { gap: 10px; }
@@ -8247,7 +8302,7 @@ function renderGolfThemeStyles() {
   body.golf-page .home-footer-col a, body.golf-page .home-footer-region-group a { color: rgba(245,243,237,0.78); }
   body.golf-page .home-footer-col a:hover, body.golf-page .home-footer-region-group a:hover { color: var(--ref-gold); }
   body.golf-page a.app-btn, body.golf-page a.app-btn:hover { color: var(--ref-white); text-decoration: none; }
-  body.golf-page nav.breadcrumb { font-size: 0.8rem; color: rgba(42,32,25,0.62); margin-bottom: 18px; }
+  body.golf-page nav.breadcrumb { font-size: 0.8rem; color: rgb(42,32,25); margin-bottom: 18px; }
   body.golf-page nav.breadcrumb a { color: var(--ref-navy); }
   body.golf-page .category-back-link, body.golf-page .venue-back-link {
     display: inline-block; font-weight: 700; font-size: 0.86rem; color: var(--ref-navy);
@@ -8368,6 +8423,10 @@ function renderGolfThemeStyles() {
      3. On phones those two buttons and "Read more" are 44px tap targets. */
   body.golf-page .venue-card > .card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: auto; }
   body.golf-page .venue-card > .chips:not(:empty) + .card-actions { margin-top: auto; }
+  @media (max-width: 1024px) {
+    body.golf-page .card-action { position: relative; }
+    body.golf-page .card-action::after { content: ""; position: absolute; inset: -8px -2px; }
+  }
   body.golf-page .venue-card .card-actions .card-action {
     display: inline-flex; align-items: center; gap: 5px; margin: 0;
     font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
@@ -11423,6 +11482,7 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.fd-page .fd-pop { position: relative; }
   body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  @media (max-width: 1024px) { body.fd-page .fd-pop-btn { min-height: 44px; } }
   body.fd-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.fd-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -14583,7 +14643,7 @@ function renderTripPlannerStyles() {
      header/nav it shares with / and /browse (which style themselves via
      the separate --ref-* token set, unaffected by anything here). */
   .trip-planner-main { padding: 28px 20px 72px; max-width: 900px; margin: 0 auto; }
-  .trip-planner-breadcrumb { font-size: 0.8rem; color: var(--ink); opacity: 0.62; margin-bottom: 18px; }
+  .trip-planner-breadcrumb { font-size: 0.8rem; color: var(--ink); opacity: 0.85; margin-bottom: 18px; }
   .trip-planner-breadcrumb a { color: var(--teal-deep); text-decoration: none; }
   .trip-planner-breadcrumb a:hover { text-decoration: underline; }
   .trip-planner-intro h1, .trip-planner-intro h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
@@ -14617,6 +14677,7 @@ function renderTripPlannerStyles() {
     color: var(--teal-deep); cursor: pointer; text-align: left;
   }
   .trip-conv-example-chip:hover { background: var(--sand); border-color: var(--teal); }
+  @media (max-width: 1024px) { .trip-conv-example-chip { min-height: 44px; display: inline-flex; align-items: center; } }
 
   .trip-conv-status { font-size: 0.92rem; color: var(--ink); opacity: 0.75; margin: 0 0 8px; min-height: 1.2em; }
   .trip-conv-status.is-error { color: #9C3B3B; opacity: 1; font-weight: 700; }
@@ -14674,9 +14735,10 @@ function renderTripPlannerStyles() {
   .trip-conv-wizard-toggle {
     display: block; margin-top: 20px; background: none; border: none; padding: 0;
     font-family: 'Nunito', sans-serif; font-size: 0.88rem; font-weight: 700; color: var(--teal-deep);
-    cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+    cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-align: left;
   }
   .trip-conv-wizard-toggle:hover { color: var(--teal); }
+  @media (max-width: 1024px) { .trip-conv-wizard-toggle { margin-top: 6px; padding: 6px 0; min-height: 44px; display: flex; align-items: center; } }
 
   @media (max-width: 560px) {
     .trip-conv-hero { padding: 22px 18px; }
@@ -14848,7 +14910,8 @@ function renderTripPlannerStyles() {
        margin stops their boxes from intersecting at all. The link simply
        wraps onto an extra line at these widths; nothing is hidden or
        removed. */
-    .trip-conv-wizard-toggle { max-width: calc(100% - 130px); box-sizing: border-box; }
+    /* 2026-10-05: full card width, left-aligned (was calc(100% - 130px), which wrapped it into three centred lines). */
+    .trip-conv-wizard-toggle { max-width: 100%; box-sizing: border-box; text-align: left; margin-top: 14px; }
   }
   </style>`;
 }
@@ -15487,7 +15550,7 @@ function renderTripPlannerPage(v2 = false) {
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
       // Same dead-anchor fix as /browse: the logo goes home from here.
-      .replace(/href="#top"/g, 'href="/"'));
+      .replace(/href="#top"/g, 'href="/"')) + '\n' + RESPONSIVE_REFINEMENT_STYLE_TRIP;
   }
 
   const regionOptions = VALID_REGIONS
@@ -15651,7 +15714,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
-      .replace(/href="#top"/g, 'href="/"'));
+      .replace(/href="#top"/g, 'href="/"')) + '\n' + RESPONSIVE_REFINEMENT_STYLE_TRIP;
   }
   return tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
@@ -16483,6 +16546,7 @@ function browseResultBarHtml(summary, state) {
 function renderBrowseHubStyles() {
   return `<style>
   body.browse-page .bh-select { font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; max-width: 100%; }
+  @media (max-width: 1024px) { body.browse-page .bh-select { min-height: 44px; } }
   body.browse-page .bh-select:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.browse-page .bh-cuisine-price { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
   body.browse-page .bh-field-label { font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ref-navy, #1B2B3A); }
@@ -18769,7 +18833,7 @@ const server = http.createServer(async (req, res) => {
         // page. Happening Soon was removed the same way on 2026-09-17 --
         // events now live at their own destination, /events, linked to
         // from the What's On mood card.
-        const discoveryStyles = renderHomepageDiscoveryStyles();
+        const discoveryStyles = renderHomepageDiscoveryStyles() + '\n' + RESPONSIVE_REFINEMENT_STYLE;
         const moodCards = renderMoodCardsHTML();
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
         const exploreRegions = renderExploreRegionsHTML();
@@ -18989,7 +19053,7 @@ const server = http.createServer(async (req, res) => {
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${renderHomepageDiscoveryStyles()}\n${renderBrowseDirectoryStyles()}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${renderHomepageDiscoveryStyles()}\n${renderBrowseDirectoryStyles()}\n${RESPONSIVE_REFINEMENT_STYLE}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
@@ -21258,6 +21322,9 @@ module.exports = {
   withoutFavoritesNavLink,
   FAVORITES_NAV_ITEM,
   FAVORITES_NAV_STYLE,
+  RESPONSIVE_REFINEMENT_STYLE,
+  renderHomepageDiscoveryStyles,
+  RESPONSIVE_REFINEMENT_STYLE_TRIP,
   BROWSE_HEAD_EXTRAS,
   mapAreaPins,
   discoverySearchVenues,

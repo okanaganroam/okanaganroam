@@ -14818,6 +14818,26 @@ test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile
   assert.equal(app.withFavoritesNavLink('<header></header>'), '<header></header>');
 }))));
 
+// ---- Responsive refinement (2026-10-05) ----------------------------------------
+test('Responsive refinement: the header collapses to the hamburger through 1200px (1280px on /trip), the hero title is 26px on phones, breadcrumbs and the guide subtitle are darker, and the Trip wizard link is full width and left-aligned', () => {
+  const css = app.RESPONSIVE_REFINEMENT_STYLE;
+  assert.match(css, /@media \(min-width: 941px\) and \(max-width: 1200px\) \{\s*\.nav-links \{ display: none;[\s\S]*\.nav-hamburger \{ display: flex; \}/);
+  assert.match(app.RESPONSIVE_REFINEMENT_STYLE_TRIP, /@media \(min-width: 941px\) and \(max-width: 1280px\)/);
+  // It travels with the header, adds no Favorites text (the Favorites tests pin that), and keeps the menu entry visible.
+  assert.ok(app.renderGolfHeaderHtml().includes(css));
+  assert.ok(!css.includes('nav-links-favorites'));
+  assert.match(css, /#navLinks li\[class\*="-favorites"\] \{ display: list-item; \}/);
+  // 44px hit areas for the header controls and the tray through 1024px.
+  assert.match(css, /\.nav-hamburger::after/);
+  assert.match(css, /@media \(max-width: 1024px\) \{\s*#tripTrayToggle \{ position: relative; \}/);
+  // Homepage hero title on phones: 26px (was 17px, below the 19.2px section headings).
+  assert.match(app.renderHomepageDiscoveryStyles(), /\.hero-title \{ max-width: 100%; font-size: 26px; text-align: center;/);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /nav\.breadcrumb \{\s*font-size: 0\.8rem; color: var\(--ink\); opacity: 0\.85;/);
+  assert.match(src, /body\.guide-page \.subtitle \{ color: rgb\(42,32,25\); opacity: 0\.8; \}/);
+  assert.match(src, /\.trip-conv-wizard-toggle \{ max-width: 100%; box-sizing: border-box; text-align: left; margin-top: 14px; \}/);
+});
+
 // ---- Hub-style /browse (2026-10-05) --------------------------------------------
 // /browse is the all-venue directory in the shape of the other server-rendered
 // hubs; the wizard page it replaced is still served, unchanged, at /browse/classic.
