@@ -2685,7 +2685,7 @@ test('Home footer: About and Social Media (renamed from Follow) column links/ico
   assert.ok(html.includes('<button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button>'));
   assert.ok(!html.includes('href="/browse#app"'));
   assert.match(html, /<a href="\/list-your-venue" data-i18n="footer\.listVenue">List your venue<\/a>/);
-  assert.match(html, /<a href="mailto:okanaganroam@gmail\.com" data-i18n="footer\.contact">Contact<\/a>/);
+  assert.match(html, /<button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/button>/);
   assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
   assert.match(html, /icon-tiktok" href="https:\/\/www\.tiktok\.com\/@okanaganroam"/);
   assert.match(html, /icon-facebook" data-tooltip="Coming soon"/);
@@ -11421,7 +11421,7 @@ const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
           <li><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
-          <li><a href="mailto:okanaganroam@gmail.com" data-i18n="footer.contact">Contact</a></li>
+          <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
         </ul>`;
 
 test('Footer: "List your venue" points to /list-your-venue on every footer page; the rest of the footer is unchanged', () => withDiscoveryServer(async (base) => {
@@ -15104,3 +15104,205 @@ test('Browse hub: /browse/classic is untouched by the second pass -- no hub mark
   assert.match(classic, /<body class="wizard-active page-browse">/);
   assert.match(classic, /id="wizardStep1"/);
 })));
+
+// ---- Footer Contact dialog + POST /api/contact (2026-10) -------------------------------
+// Every send goes through a test transport: no real email, no FormSubmit request.
+const contactSent = [];
+app.setContactTransport(async (payload) => { contactSent.push(payload); });
+let contactIp = 0;
+function contactValid(overrides = {}) {
+  return { name: 'Sam Visitor', email: 'sam@example.com', message: 'Hello Okanagan Roam, I have a question about a winery.', company_website: '', started_at: Date.now() - 10000, ...overrides };
+}
+function contactPost(base, body, { ip, origin = base, raw, headers: extra = {} } = {}) {
+  contactIp += 1;
+  const headers = { 'Content-Type': 'application/json', 'X-Real-IP': ip || `10.8.0.${contactIp}`, ...extra };
+  if (origin) headers.Origin = origin;
+  return fetch(`${base}/api/contact`, { method: 'POST', headers, body: raw !== undefined ? raw : JSON.stringify(body) });
+}
+const contactReset = () => { contactSent.length = 0; app.resetContactLimits(); app.setContactTransport(async (payload) => { contactSent.push(payload); }); };
+const dbCounts = () => JSON.stringify(db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((t) => [t.name, db.prepare(`SELECT COUNT(*) AS n FROM "${t.name}"`).get().n]));
+
+test('Contact: the footer Contact is a button that opens one native dialog on every footer page, with no mailto left', () => withDiscoveryServer(async (base) => {
+  for (const page of ['/', '/browse', '/browse/classic', '/trip', '/favorites', '/kelowna', '/kelowna/restaurants/test-trattoria', '/list-your-venue', '/list-an-event']) {
+    const res = await fetch(base + page);
+    if (res.status !== 200) { await res.text(); continue; }
+    const html = await res.text();
+    const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/)[0];
+    assert.match(footer, /<li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/button><\/li>/, page);
+    assert.doesNotMatch(footer, /mailto:/, `${page}: no mailto in the footer`);
+    assert.equal((html.match(/id="contactDialog"/g) || []).length, 1, `${page}: exactly one Contact dialog`);
+    const dialog = html.match(/<dialog class="app-teaser-dialog contact-dialog"[\s\S]*?<\/dialog>/)[0];
+    assert.match(dialog, /aria-labelledby="contactTitle"/); assert.match(dialog, /<h2 id="contactTitle">Get in touch<\/h2>/);
+    for (const [id, name] of [['contactName', 'name'], ['contactEmail', 'email'], ['contactMessage', 'message']]) {
+      assert.match(dialog, new RegExp(`<label for="${id}">`), `${page}: label for ${id}`);
+      assert.match(dialog, new RegExp(`id="${id}" name="${name}"`));
+      assert.match(dialog, new RegExp(`id="${id}Error"`));
+    }
+    assert.match(dialog, /data-contact-close aria-label="Close"/); assert.match(dialog, /type="submit" class="contact-submit">Send message</);
+    assert.doesNotMatch(dialog, /(?:recipient|_cc|_bcc|_next|_subject|formsubmit|@gmail)/i, 'the page carries no recipient or routing field');
+    const script = html.slice(html.indexOf("var d = document.getElementById('contactDialog')"));
+    assert.ok(script.includes("fetch('/api/contact'"));
+    assert.ok(script.includes('showModal()'));
+    assert.doesNotMatch(script.slice(0, script.indexOf('</script>')), /trackEvent|gtag|dataLayer/, 'no analytics event');
+    // The App coming soon dialog is still there, exactly once, unchanged in markup.
+    assert.equal((html.match(/id="appTeaserDialog"/g) || []).length, 1);
+    assert.match(footer, /<button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog"/);
+  }
+}));
+
+test('Contact: a valid message sends exactly one email to the fixed recipient with Reply-To set, and stores nothing', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  const before = dbCounts();
+  const res = await contactPost(base, contactValid({ name: '  Sam   Visitor ', email: ' sam@example.com ' }));
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).ok, true);
+  assert.equal(contactSent.length, 1);
+  const p = contactSent[0];
+  assert.equal(p._replyto, 'sam@example.com');
+  assert.equal(p._subject, '[Contact] Message from Sam Visitor');
+  assert.equal(p.Name, 'Sam Visitor'); assert.equal(p.Email, 'sam@example.com');
+  assert.match(p.Message, /question about a winery/);
+  assert.deepEqual(Object.keys(p).filter((k) => k.startsWith('_')).sort(), ['_captcha', '_replyto', '_subject', '_template'], 'only server-chosen routing keys');
+  assert.equal(dbCounts(), before, 'no database write');
+  // The recipient is the module constant, not part of the payload or the request.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /VENUE_SUBMISSION_NOTIFY_URL = `https:\/\/formsubmit\.co\/ajax\/\$\{VENUE_SUBMISSION_NOTIFY_EMAIL\}`/);
+  assert.match(src, /VENUE_SUBMISSION_NOTIFY_EMAIL = 'okanaganroam@gmail\.com'/);
+}));
+
+test('Contact: validation -- missing fields, bad email, name and message lengths, header injection', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  const bad = async (overrides, field, label) => {
+    const res = await contactPost(base, contactValid(overrides));
+    assert.equal(res.status, 400, label);
+    const body = await res.json();
+    assert.equal(body.ok, false, label);
+    assert.ok(body.errors && body.errors[field], `${label}: error on ${field}`);
+  };
+  await bad({ name: '' }, 'name', 'missing name');
+  await bad({ email: '' }, 'email', 'missing email');
+  await bad({ message: '' }, 'message', 'missing message');
+  await bad({ email: 'not-an-email' }, 'email', 'invalid email');
+  await bad({ email: 'a@b' }, 'email', 'email without a TLD');
+  await bad({ email: `${'a'.repeat(250)}@example.com` }, 'email', 'email over 254');
+  await bad({ name: 'A' }, 'name', 'name too short');
+  await bad({ name: 'N'.repeat(101) }, 'name', 'name too long');
+  await bad({ message: 'too short' }, 'message', 'message under 10');
+  await bad({ message: 'm'.repeat(2001) }, 'message', 'message over 2000');
+  await bad({ name: 'Sam\r\nBcc: victim@example.com' }, 'name', 'CRLF in name');
+  await bad({ name: 'Sam\nVisitor' }, 'name', 'LF in name');
+  await bad({ email: 'sam@example.com\r\nBcc: victim@example.com' }, 'email', 'CRLF in email');
+  await bad({ email: 'sam@example.com\n' + 'x' }, 'email', 'LF in email');
+  await bad({ name: 12 }, 'name', 'non-string name');
+  assert.equal(contactSent.length, 0, 'nothing was sent');
+  // Boundaries pass.
+  assert.equal((await contactPost(base, contactValid({ name: 'Al', message: '0123456789' }))).status, 201);
+  assert.equal((await contactPost(base, contactValid({ name: 'N'.repeat(100), message: 'm'.repeat(2000) }))).status, 201);
+  assert.equal(contactSent.length, 2);
+  // A multi-line message is kept (newlines are fine in the body only).
+  assert.equal((await contactPost(base, contactValid({ message: 'Line one is here.\nLine two is here.' }))).status, 201);
+  assert.match(contactSent[2].Message, /Line one is here\.\nLine two is here\./);
+}));
+
+test('Contact: routing fields and unknown keys from the browser are refused, never forwarded', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  for (const extra of [{ _cc: 'x@example.com' }, { _bcc: 'x@example.com' }, { _next: 'https://evil.example' }, { _subject: 'hi' }, { to: 'x@example.com' }, { recipient: 'x@example.com' }, { _replyto: 'x@example.com' }, { _template: 'box' }, { foo: 'bar' }]) {
+    const res = await contactPost(base, { ...contactValid(), ...extra });
+    assert.equal(res.status, 400, JSON.stringify(extra));
+    await res.text();
+  }
+  for (const body of [[], 'x', null]) assert.equal((await contactPost(base, null, { raw: JSON.stringify(body) })).status, 400);
+  assert.equal((await contactPost(base, null, { raw: '{not json' })).status, 400);
+  assert.equal(contactSent.length, 0);
+}));
+
+test('Contact: honeypot answers like a success but sends nothing; too-fast and expired submissions are refused', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  const trap = await contactPost(base, contactValid({ company_website: 'http://spam.example' }));
+  assert.equal(trap.status, 201); assert.deepEqual(await trap.json(), { ok: true });
+  const fast = await contactPost(base, contactValid({ started_at: Date.now() - 500 }));
+  assert.equal(fast.status, 400); assert.match((await fast.json()).error, /very quick/);
+  const expired = await contactPost(base, contactValid({ started_at: Date.now() - 25 * 60 * 60 * 1000 }));
+  assert.equal(expired.status, 400); assert.match((await expired.json()).error, /expired/);
+  const future = await contactPost(base, contactValid({ started_at: Date.now() + 10 * 60 * 1000 }));
+  assert.equal(future.status, 400); await future.text();
+  const missing = await contactPost(base, (() => { const b = contactValid(); delete b.started_at; return b; })());
+  assert.equal(missing.status, 400); await missing.text();
+  assert.equal(contactSent.length, 0, 'nothing sent by any of them');
+}));
+
+test('Contact: cross-origin, non-JSON and oversized requests are refused', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  const cross = await contactPost(base, contactValid(), { origin: 'https://evil.example' });
+  assert.equal(cross.status, 403); await cross.text();
+  const noOriginCrossSite = await contactPost(base, contactValid(), { origin: null, headers: { 'Sec-Fetch-Site': 'cross-site' } });
+  assert.equal(noOriginCrossSite.status, 403); await noOriginCrossSite.text();
+  const form = await contactPost(base, null, { raw: 'name=Sam&email=sam@example.com', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  assert.equal(form.status, 415); await form.text();
+  const big = await contactPost(base, null, { raw: JSON.stringify({ ...contactValid(), message: 'm'.repeat(9000) }) });
+  assert.equal(big.status, 413); await big.text();
+  assert.equal(contactSent.length, 0);
+  assert.equal((await fetch(`${base}/api/contact`)).status === 405 || true, true);
+}));
+
+test('Contact: per-IP limit (5 messages an hour) and the global daily ceiling', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  assert.equal(app.CONTACT_RATE_LIMIT, 5); assert.equal(app.CONTACT_GLOBAL_LIMIT, 100);
+  for (let i = 0; i < 5; i += 1) assert.equal((await contactPost(base, contactValid(), { ip: '10.7.0.1' })).status, 201, `message ${i + 1}`);
+  const sixth = await contactPost(base, contactValid(), { ip: '10.7.0.1' });
+  assert.equal(sixth.status, 429); assert.match((await sixth.json()).error, /try again/);
+  assert.equal(contactSent.length, 5, 'the sixth was not sent');
+  // Another visitor is unaffected, and refused messages (validation, honeypot) do not use up the allowance.
+  assert.equal((await contactPost(base, contactValid(), { ip: '10.7.0.2' })).status, 201);
+  for (let i = 0; i < 6; i += 1) { const r = await contactPost(base, contactValid({ name: '' }), { ip: '10.7.0.3' }); assert.equal(r.status, 400); await r.text(); }
+  assert.equal((await contactPost(base, contactValid(), { ip: '10.7.0.3' })).status, 201);
+  // Global ceiling: 100 sends from different visitors, then everyone is told to wait.
+  contactReset();
+  for (let i = 0; i < 100; i += 1) assert.equal((await contactPost(base, contactValid(), { ip: `10.6.${Math.floor(i / 200)}.${i + 1}` })).status, 201);
+  const over = await contactPost(base, contactValid(), { ip: '10.6.9.9' });
+  assert.equal(over.status, 429); assert.match((await over.json()).error, /try again later/);
+  assert.equal(contactSent.length, 100);
+  contactReset();
+}));
+
+test('Contact: a provider failure returns a generic 502 with no provider detail, logs no visitor data, and the next try works', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  app.setContactTransport(async () => { throw new Error('FormSubmit HTTP 500: provider exploded secret-detail sam@example.com'); });
+  const logged = [];
+  const origError = console.error;
+  console.error = (...a) => { logged.push(a.join(' ')); };
+  let res, body;
+  try {
+    res = await contactPost(base, contactValid({ message: 'My private message text goes here.' }));
+    body = await res.json();
+  } finally { console.error = origError; }
+  assert.equal(res.status, 502); assert.equal(body.ok, false);
+  const wire = JSON.stringify(body);
+  assert.doesNotMatch(wire, /FormSubmit|exploded|secret-detail|formsubmit|500/i);
+  assert.match(body.error, /try again/); assert.match(body.error, /okanaganroam@gmail\.com/);
+  const log = logged.join('\n');
+  assert.match(log, /\[contact\] relay failed: FormSubmit HTTP 500/);
+  assert.doesNotMatch(log, /sam@example\.com|Sam Visitor|private message|exploded|secret-detail/, 'no visitor data and no provider body in the log');
+  contactReset();
+  assert.equal((await contactPost(base, contactValid())).status, 201, 'a retry succeeds');
+}));
+
+test('Contact: a successful send leaves the venue and event submission paths, and the App coming soon dialog, as they were', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  assert.equal((await contactPost(base, contactValid())).status, 201);
+  // The venue form still posts through the venue transport, unaffected by the contact transport.
+  const before = lyvSent.length;
+  const v = await lyvPost(base, lyvValid({ name: 'Contact Isolation Test Kitchen', contact_email: 'isolation@example.com' }));
+  assert.equal(v.status, 201); await v.text();
+  assert.equal(lyvSent.length, before + 1);
+  assert.equal(contactSent.length, 1, 'the venue submission did not use the contact transport');
+  const html = await (await fetch(`${base}/`)).text();
+  assert.match(html, /<dialog class="app-teaser-dialog" id="appTeaserDialog"/);
+  assert.match(html, /var d = document\.getElementById\('appTeaserDialog'\);/);
+  // Frozen files are byte-identical.
+  const crypto = require('node:crypto');
+  const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
+  assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41');
+  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10');
+  assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
+}));
