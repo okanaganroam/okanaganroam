@@ -1169,7 +1169,8 @@ function renderScript(d) {
 
 // The whole page. deps: { esc, title, description, canonical, breadcrumbJson,
 // headerHtml, tripTrayHtml, footerHtml, footerStyles, analyticsHead, regions,
-// regionImages, preview }
+// regionImages, preview, appScriptSrc }. appScriptSrc is the versioned
+// /scripts/app.js URL from server.js (plain /scripts/app.js when absent).
 function renderTripPlannerV3Page(d) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1207,7 +1208,7 @@ ${renderBody(d)}
 
 ${d.footerHtml}
 
-<script src="/scripts/app.js"></script>
+<script src="${d.esc(d.appScriptSrc || '/scripts/app.js')}"></script>
 ${renderScript(d)}
 </body>
 </html>`;
