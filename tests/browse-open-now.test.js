@@ -42,7 +42,14 @@ function mockBrowse(venues) {
   const cards = venues.map((v) => ({
     dataset: { name: v.name, region: v.region, type: v.type },
     style: { display: '' },
-    querySelector: (sel) => (sel === '.open-status-open' && v.open ? {} : null),
+    // v.open: true = badge "Open now", 'soon' = badge "Closing soon", false = "Closed".
+    // The selector may list several classes (comma-separated), like the real querySelector.
+    querySelector: (sel) => {
+      const wanted = sel.split(',').map((x) => x.trim());
+      if (wanted.includes('.open-status-open') && v.open === true) return {};
+      if (wanted.includes('.open-status-closing-soon') && v.open === 'soon') return {};
+      return null;
+    },
   }));
   let button = null;
   const countEl = { text: '' };
@@ -192,4 +199,17 @@ test('homepage: its Open Now script is byte-identical to before the /browse fix'
   assert.match(browseScript, /var SHOW_OPEN_NOW_BUTTON = true;/);
   assert.match(browseScript, /function refilter\(\)/);
   assert.match(browseScript, /window\.__applyFilters/);
+});
+
+test('/browse/classic: Open Now keeps Closing Soon cards (they are open) and still hides closed ones', () => {
+  const { page, context } = mockBrowse([
+    { name: 'Open Cafe', region: 'kelowna', type: 'cafe', open: true },
+    { name: 'Closing Soon Pub', region: 'kelowna', type: 'pub', open: 'soon' },
+    { name: 'Closed Winery', region: 'kelowna', type: 'winery', open: false },
+  ]);
+  runScript(renderOpenNowScript(), context);
+  page.flush();
+  page.setFilter(() => true);
+  page.toggleOpenNow(); // on
+  assert.deepEqual(page.visibleNames(), ['Open Cafe', 'Closing Soon Pub']);
 });

@@ -15306,3 +15306,97 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10');
   assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
 }));
+
+// ---- /browse/classic Open Now status from the canonical hours engine (2026-10) -----------
+// app.js's computeOpenStatus() / formatWeeklyHoursTooltip() (frozen) mis-read 25:00+ closes,
+// call a missing day "Closed" and print 25:00 as "1 PM". renderClassicOpenStatusScript()
+// replaces both on /browse/classic with versions built from hours.js.
+{
+  const vm = require('node:vm');
+  const appSrc = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const legacyBlock = appSrc.slice(appSrc.indexOf("var DAY_ORDER = ['sun'"), appSrc.indexOf('var CARD_REGION_LABEL'))
+    + appSrc.slice(appSrc.indexOf('function formatTime12h'), appSrc.indexOf('function escapeAttr'));
+  const hoursMod = require('../hours.js');
+  const WD = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const classicCtx = (override) => {
+    const ctx = { Intl, Date, parseInt, JSON, console };
+    ctx.window = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(legacyBlock, ctx);
+    if (override) vm.runInContext(app.renderClassicOpenStatusScript().replace(/^\s*<script>/, '').replace(/<\/script>\s*$/, ''), ctx);
+    return ctx;
+  };
+  // Mon 2026-10-05 00:00 PDT = 07:00Z
+  const when = (wd, hhmm) => { const [h, m] = hhmm.split(':').map(Number); return new Date(Date.UTC(2026, 9, 5 + wd, 7, 0) + (h * 60 + m) * 60000); };
+  const week = (f) => JSON.stringify(Object.fromEntries(WD.map((d, i) => [d, f(d, i)])));
+
+  test('Classic Open Now: 25:00+ closes read as the next morning (the legacy function got these wrong)', () => {
+    const legacy = classicCtx(false), fixed = classicCtx(true);
+    const late = week(() => [['21:00', '25:00']]);
+    assert.equal(legacy.computeOpenStatus(late, when(1, '00:30')), 'closed', 'the legacy bug is real (guards the test)');
+    assert.equal(fixed.computeOpenStatus(late, when(0, '23:30')), 'open', 'Monday 23:30, 90 minutes to the 01:00 close');
+    assert.equal(fixed.computeOpenStatus(late, when(1, '00:30')), 'closing-soon', 'Tuesday 00:30 is still Monday night: 30 minutes to the close');
+    assert.equal(fixed.computeOpenStatus(late, when(1, '01:00')), 'closed');
+    const later = week(() => [['12:00', '26:00']]);
+    assert.equal(fixed.computeOpenStatus(later, when(0, '00:30')), 'open', 'Sunday night run into Monday');
+    assert.equal(fixed.computeOpenStatus(later, when(1, '01:10')), 'closing-soon');
+    assert.equal(fixed.computeOpenStatus(later, when(1, '02:00')), 'closed');
+  });
+
+  test('Classic Open Now: unknown or missing hours show no badge, never "Closed"; closed days still say Closed', () => {
+    const legacy = classicCtx(false), fixed = classicCtx(true);
+    const noMon = JSON.stringify({ tue: [['11:00', '21:00']], wed: null, thu: null, fri: null, sat: null, sun: null });
+    assert.equal(legacy.computeOpenStatus(noMon, when(0, '12:00')), 'closed', 'legacy called a missing day Closed (guards the test)');
+    assert.equal(fixed.computeOpenStatus(noMon, when(0, '12:00')), null, 'missing Monday: no claim');
+    assert.equal(fixed.computeOpenStatus(noMon, when(2, '12:00')), 'closed', 'a day listed null is Closed');
+    for (const bad of [null, '', '{not json', '[1,2]', '{}']) assert.equal(fixed.computeOpenStatus(bad, when(0, '12:00')), null, String(bad));
+    assert.equal(fixed.computeOpenStatus(week(() => [['00:00', '00:00']]), when(3, '15:00')), 'open', '24-hour day');
+  });
+
+  test('Classic Open Now: for every hours shape and 15-minute step, the result agrees with hours.js (open/closing-soon <=> open, closed <=> closed, null <=> unknown)', () => {
+    const fixed = classicCtx(true);
+    const shapes = [
+      week(() => [['11:00', '21:00']]), week(() => [['9:00', '17:00']]), week((d) => (d === 'mon' ? null : [['11:00', '21:00']])),
+      week(() => [['11:00', '14:00'], ['17:00', '22:00']]), week(() => [['18:00', '02:00']]), week(() => [['23:00', '01:00']]),
+      week(() => [['12:00', '26:00']]), week(() => [['21:00', '25:00']]), week(() => [['00:00', '00:00']]), week(() => [['00:00', '24:00']]),
+      week(() => [['00:00', '23:59']]), week(() => [['10:00', '00:00']]), week((d) => (d === 'sun' ? undefined : [['11:00', '21:00']])),
+    ];
+    for (const raw of shapes) {
+      const parsed = hoursMod.parseHours(raw);
+      for (let wd = 0; wd < 7; wd++) for (let m = 0; m < 1440; m += 15) {
+        const want = hoursMod.statusAt(parsed, { weekday: WD[wd], minutes: m }).state;
+        const got = fixed.computeOpenStatus(raw, when(wd, String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')));
+        const mapped = got === 'open' || got === 'closing-soon' ? 'open' : (got === 'closed' ? 'closed' : 'unknown');
+        assert.equal(mapped, want, `${raw.slice(0, 60)} ${WD[wd]} ${m}`);
+      }
+    }
+  });
+
+  test('Classic Open Now: the hours tooltip prints 25:00+ as the next morning, and a missing day as not listed', () => {
+    const legacy = classicCtx(false), fixed = classicCtx(true);
+    const raw = JSON.stringify({ mon: [['21:00', '25:00']], tue: [['12:00', '26:00']], wed: [['18:00', '02:00']], thu: null, fri: [['11:00', '14:00'], ['17:00', '22:00']], sat: [['00:00', '23:59']] });
+    assert.match(legacy.formatWeeklyHoursTooltip(raw), /Mon: 9 PM\u20131 PM/, 'the legacy tooltip bug is real (guards the test)');
+    assert.equal(fixed.formatWeeklyHoursTooltip(raw), [
+      'Mon: 9 PM\u20131 AM', 'Tue: 12 PM\u20132 AM', 'Wed: 6 PM\u20132 AM', 'Thu: Closed', 'Fri: 11 AM\u20132 PM, 5 PM\u201310 PM', 'Sat: 12 AM\u201311:59 PM', 'Sun: Hours not listed',
+    ].join('\n'));
+    assert.equal(fixed.formatWeeklyHoursTooltip(null), ''); assert.equal(fixed.formatWeeklyHoursTooltip('{bad'), '');
+  });
+
+  test('Classic Open Now: the override is injected on /browse/classic only, after app.js; the filter keeps Closing Soon there', () => withDiscoveryServer(async (base) => {
+    const classic = await (await fetch(`${base}/browse/classic`)).text();
+    const appAt = classic.indexOf('<script src="/scripts/app.js');
+    const overrideAt = classic.indexOf('window.computeOpenStatus = function');
+    const filterAt = classic.indexOf('var SHOW_OPEN_NOW_BUTTON = true;');
+    assert.ok(appAt > 0 && overrideAt > appAt && filterAt > overrideAt, 'app.js, then the override, then the Open Now filter');
+    assert.equal((classic.match(/window\.computeOpenStatus = function/g) || []).length, 1);
+    assert.match(classic, /card\.querySelector\('\.open-status-open, \.open-status-closing-soon'\)/);
+    for (const page of ['/', '/browse', '/food-drink', '/trip']) {
+      const html = await (await fetch(base + page)).text();
+      assert.doesNotMatch(html, /window\.computeOpenStatus = function/, `${page}: untouched`);
+    }
+    const crypto = require('node:crypto');
+    const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
+    assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10', 'app.js is untouched');
+  }));
+}
+

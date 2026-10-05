@@ -15694,6 +15694,59 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// /browse/classic Open Now status (2026-10): the classic cards' badge and tooltip
+// are drawn by public/scripts/app.js (frozen), whose computeOpenStatus() reads
+// "21:00-25:00" as ending at midnight, calls a missing day "Closed", and whose
+// tooltip prints 25:00 as "1 PM". This script is injected after app.js on
+// /browse/classic only and replaces those two top-level functions (they are
+// plain global function declarations, called by name from the venue-fetch
+// callbacks, which run after this script) with versions built from hours.js --
+// the engine the hubs and venue pages already use, as browser source. The
+// result keeps app.js's four outcomes: 'open', 'closing-soon' (closes within 60
+// minutes, as before), 'closed', and null (no hours or unknown day: no badge,
+// never a "Closed" claim the listing does not make). The Open Now filter keeps
+// both open classes (see renderOpenNowScript).
+function renderClassicOpenStatusScript() {
+  if (!hoursModule) return '';
+  return `
+<script>
+(function(){
+  var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(OKANAGAN_CLOCK_FORMAT)});
+  ${okanaganClock.toString()}
+  ${hoursModule.HOURS_CLIENT_SRC}
+  var CLOSING_SOON_MINUTES = 60;
+  window.computeOpenStatus = function(hoursJson, testDate){
+    if (!hoursJson) return null;
+    var clock = okanaganClock(testDate || new Date());
+    var status = statusAt(parseHours(hoursJson), clock);
+    if (status.state === 'open') {
+      if (status.closesAt) {
+        var days = (WEEKDAYS.indexOf(status.closesAt.weekday) - WEEKDAYS.indexOf(clock.weekday) + 7) % 7;
+        if (days * DAY_MINUTES + status.closesAt.minutes - clock.minutes <= CLOSING_SOON_MINUTES) return 'closing-soon';
+      }
+      return 'open';
+    }
+    return status.state === 'closed' ? 'closed' : null;
+  };
+  window.formatWeeklyHoursTooltip = function(hoursJson){
+    if (!hoursJson) return '';
+    var parsed = parseHours(hoursJson);
+    if (!parsed.known) return '';
+    var labels = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
+    return WEEKDAYS.map(function(d){
+      var day = parsed.days[d], text;
+      if (day.status === 'open') {
+        text = day.ranges.map(function(r){
+          return (r[0] === 0 && r[1] >= DAY_MINUTES) ? '12 AM–11:59 PM' : formatClockMinutes(r[0]) + '–' + formatClockMinutes(r[1]);
+        }).join(', ');
+      } else text = day.status === 'closed' ? 'Closed' : 'Hours not listed';
+      return labels[d] + ': ' + text;
+    }).join('\\n');
+  };
+})();
+</script>`;
+}
+
 function renderOpenNowScript(opts) {
   // Self-contained "Open Now" toggle. Deliberately does NOT touch the app's
   // own filter/search logic (activeFilters Set, applyFilters(), etc.) —
@@ -15736,7 +15789,7 @@ function renderOpenNowScript(opts) {
     for (var i = 0; i < cards.length; i++) {
       var card = cards[i];
       if (card.style.display === 'none') continue;
-      if (!card.querySelector('.open-status-open')) card.style.display = 'none';
+      if (!card.querySelector('.open-status-open, .open-status-closing-soon')) card.style.display = 'none';
     }
   }
 
@@ -18931,7 +18984,8 @@ const server = http.createServer(async (req, res) => {
         }
 
         const footer = renderGuideFooterHTML();
-        const openNowScript = renderOpenNowScript();
+        // After app.js (the tag is earlier in the page): Open Now status from hours.js.
+        const openNowScript = renderClassicOpenStatusScript() + renderOpenNowScript();
         const hiddenElementsScript = renderHiddenElementsScript();
         const prefillScript = renderBrowsePrefillScript(isDiscoverySearchEnabled());
         html = html.includes('</body>')
@@ -21151,6 +21205,8 @@ module.exports = {
   okanaganClock,
   venueHoursStatusAt,
   openNowEligibility,
+  renderClassicOpenStatusScript,
+  renderOpenNowScript,
   OPEN_NOW_MAX_CHECK_AGE_DAYS,
   foodDrinkOpenNowInfo,
   OKANAGAN_CLOCK_FORMAT,
