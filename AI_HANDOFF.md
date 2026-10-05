@@ -13,7 +13,7 @@ This file is the shared coordination point for AI assistants working on this rep
 
 ## Current Status
 
-* **Current status (2026-10-02): read "Stage 0–4 Program" below first, then the "Stage 5" sections.** The Stage 0–4 section holds the current production baseline, the frozen files and the standing rules (updated for Stage 5); the Stage 5 sections record what changed since. The dated baselines in this list are kept as history.
+* **Current status (2026-10-05): read "Stage 0–4 Program" below first, then the "Stage 5" sections and "V3 French support".** The Stage 0–4 section holds the current production status, the frozen files and the standing rules (updated for the V3 French launch); the later sections record what changed since. PRs #19–#30 (Stage 5F–5H, SEO-1/SEO-2, the `/browse` performance and Directory redesign work) are not described in this file beyond the frozen-file notes. The dated baselines in this list are kept as history.
 * Repository: `okanaganroam/okanaganroam`
 * Default branch: `main`
 * Shared AI handoff file established: September 8, 2026
@@ -27,10 +27,11 @@ This file is the shared coordination point for AI assistants working on this rep
 
 A gated program run by Claude for the owner. Every step went through the same gates: a read-only preflight, owner approval, implementation with local validation, owner approval, then commit, push, deploy and full production verification, then a stop and report. Nothing in it was committed, pushed or deployed without explicit approval. Anything unexpected was stopped and reported, not fixed on the spot.
 
-### Current production status (verified 2026-10-02, after Stage 5E)
+### Current production status (verified 2026-10-05, after the V3 French launch)
 
-* **Live commit:** `73ec8e78b7f6498b1288432439e520723adbae62` (the Stage 5E merge, PR #18). **Railway deployment:** `e8ee3f87-b9fe-4d1a-946b-68edc071a96d`, SUCCESS. Railway deploys automatically on every push to `main`, docs-only pushes included. (At Stage 4.4 it was `f915bb8`, Railway `5ab00cf0-f05a-4691-9c5b-a1ba30930bf2`.)
-* **Feature flags (Railway variables, names only, never values):** `DISCOVERY_SEARCH=on`, `TRIP_PLANNER_V2=on`, `TRIP_PLANNER_V3=preview`. Under `preview`, V3 is served only to a browser that opted in with `/trip?trip_v3=on`, which sets the `roam_trip_v3=1` cookie; the opt-in view is noindex. The service has 19 variable names.
+* **Live commit:** `55de8e66d86966a5c3a5b3ea70d5a91725081d93` (the V3 French merge, PR #31). **Railway deployment:** `6fd9d9fa-e491-410e-a8f5-d4b9cf5b606a`, SUCCESS. Railway deploys automatically on every push to `main`, docs-only pushes included. (After Stage 5E it was `73ec8e7`, Railway `e8ee3f87-b9fe-4d1a-946b-68edc071a96d`; at Stage 4.4 `f915bb8`, Railway `5ab00cf0-f05a-4691-9c5b-a1ba30930bf2`.)
+* **Build My Trip V3 is graduated (public), by owner decision.** Verified 2026-10-05: production `/trip` serves the V3 planner to every visitor, with no opt-in cookie and no `noindex` (GA4 `page_type: 'trip_v3'`). The `TRIP_PLANNER_V3` value was not read; in `server.js` only `on` serves V3 to everyone. The owner's instruction (2026-10-04): keep V3 public; do not roll it back to `preview`.
+* **Other feature flags (Railway variables, names only, never values), as last recorded on 2026-10-02 and not re-read since:** `DISCOVERY_SEARCH=on`, `TRIP_PLANNER_V2=on`. The service had 19 variable names then.
 * **Cloudflare** sits in front of Railway. Its email-obfuscation token changes per request, so page captures must normalise it before hashing.
 
 ### Production and integrity baseline (re-verified 2026-10-02, after Stage 5E)
@@ -45,7 +46,7 @@ All hashes below are the first 16 hex characters of SHA-256, except the frozen f
 | `/robots.txt` | `bb6f51a8b54cc3e6` |
 | Page capture | 2,183 URLs: every sitemap URL plus extras (2,184 since Stage 5E, which also captures `/scripts/app.js`) |
 | Discovery corpus | 9,173 queries plus the `/browse?q=` routing set |
-| Planner corpus | 929 queries plus 300 seeded runs. The 11 "tonight / right now / this evening" queries depend on the clock and change minute to minute |
+| Planner corpus | 929 queries plus 300 seeded runs. The 11 "tonight / right now / this evening" queries depend on the clock and change minute to minute. The harness was a scratch script and is no longer available (found missing 2026-10-04); see "V3 French support" for the English regression set used in its place |
 | Redirected venue IDs | 41 in production (e.g. `38` → `40`) |
 
 ### History and commits
@@ -122,17 +123,19 @@ All hashes below are the first 16 hex characters of SHA-256, except the frozen f
 
 ### Frozen files (must not change without explicit owner approval)
 
-Each Stage 5 change to a frozen file was approved for that stage only; the file is frozen again afterwards. `tests/server.test.js` pins the `public/scripts/app.js` MD5 in two places, so an approved change also updates those pins.
+Each change to a frozen file was approved for that change only; the file is frozen again afterwards. `tests/server.test.js` pins the `public/scripts/app.js` MD5 in two places (and the `okanagan.html`, `app.css` and `tokens.css` MD5s), so an approved change also updates those pins.
 
-| File | MD5 at `73ec8e7` (after Stage 5E) | Changed since `f915bb8` by |
+| File | MD5 at `55de8e6` (after the V3 French launch) | Changed after `73ec8e7` (Stage 5E) by |
 |---|---|---|
-| `okanagan.html` (the homepage) | `b42d6ef9d201947ad109b8b6d8b4f28d` | — |
-| `public/scripts/app.js` (the **served** script; the root `app.js` is an old copy that is not served) | `24ae2e487942f753816241591de4985e` | 5C, W14, 5E (was `db7b8c66f1cd176b3be54bc0f760cc6b`) |
+| `okanagan.html` (the homepage) | `0ca718cfebebd822300f6095b5182d41` | PR #23, SEO-2 (was `b42d6ef9d201947ad109b8b6d8b4f28d`) |
+| `public/scripts/app.js` (the **served** script; the root `app.js` is an old copy that is not served) | `1015c86ba1f2025b913319ee50ebcd10` | PR #27 (F4a/F5/F6), PR #31 V3 French (`tripv3.*` strings only) (was `24ae2e487942f753816241591de4985e`) |
 | `public/styles/app.css` | `f2e72558306fba5cdaac92f6d525f58b` | — |
 | `public/styles/tokens.css` | `d7ce492fa551ea500eb8868cc47d347f` | — |
-| `trip-planner-v3-page.js` | `72d47b1f0d4fceb957391a52b7d8e31f` | 5A, 5C, W14 (was `e41e6ea420b425948a823540ac2a6e5c`) |
+| `trip-planner-v3-page.js` | `910f63bd56d5c3aa096809daa6b47fe1` | PR #20 (5G map), PR #21 (5H analytics), PR #25 (card alignment), PR #31 V3 French (was `72d47b1f0d4fceb957391a52b7d8e31f`) |
 
-Also treated as frozen throughout Stage 5 (owner instruction), unchanged: root `app.js` (`ba75b23f8f2e81ef1fe227f21cbb626b`) and `app.css` (`629976cc1e092c67145fc2c0c8667f9e`), `db.js` (`ea23fbcf7dfa0dd445aeb6fe5210d87d`), `saved-items.js` (`f65f2d511d8af6cef89e2719a306d74a`), `favorites-page.js` (`a629c591bcb7081094ee59f2cd595f88`), `discovery-intent.js` (`8c7220db54c700867a332e32fb43399d`), `discovery-search.js` (`4d3dc72525bf85fe936719ba8f9862b7`), `trip-planner.js` (`4ae7ee3c5d42ed0adf3cb66f099f1737`), `hours.js` (`26fefb8276bee42a6909014a5616a87d`), `golf-data.js` (`b8c3a9ac01961afb14b081b7bd9b5bf2`), and this file (edited only with explicit approval, as in Phase 4.5 and Stage 5F).
+`trip-planner-fr.js` (new in PR #31, MD5 `847a7ea9515f668f6b4b550d247ae641`) is not on the frozen list; the owner has not said either way.
+
+Also treated as frozen (owner instruction), unchanged at `55de8e6`: root `app.js` (`ba75b23f8f2e81ef1fe227f21cbb626b`) and `app.css` (`629976cc1e092c67145fc2c0c8667f9e`), `db.js` (`ea23fbcf7dfa0dd445aeb6fe5210d87d`), `saved-items.js` (`f65f2d511d8af6cef89e2719a306d74a`), `favorites-page.js` (`a629c591bcb7081094ee59f2cd595f88`), `discovery-intent.js` (`8c7220db54c700867a332e32fb43399d`), `discovery-search.js` (`4d3dc72525bf85fe936719ba8f9862b7`), `trip-planner.js` (`4ae7ee3c5d42ed0adf3cb66f099f1737`), `hours.js` (`26fefb8276bee42a6909014a5616a87d`), `golf-data.js` (`b8c3a9ac01961afb14b081b7bd9b5bf2`), and this file (edited only with explicit approval, as in Phase 4.5 and Stage 5F).
 
 The shell header and trip tray are extracted from `okanagan.html` at render time (`renderGolfHeaderHtml`, `renderGolfTripTrayHtml`). Changes to them are made in `server.js` by rewriting the extracted copy; the frozen file itself is never edited.
 
@@ -141,7 +144,7 @@ The shell header and trip tray are extracted from `okanagan.html` at render time
 * **No commit, push or deploy without explicit owner approval.** Product decisions belong to the owner. Anything unexpected is a stop-and-report, not an automatic fix.
 * **Secrets:** never expose credentials. Railway variable *names* may be read; *values* may not. The admin token is used only through `railway run …`.
 * **Out of bounds unless the owner says otherwise:**
-  * GA4, Cloudflare, IndexNow, the sitemap and robots logic, Railway configuration and environment variables. `TRIP_PLANNER_V3` stays `preview`.
+  * GA4, Cloudflare, IndexNow, the sitemap and robots logic, Railway configuration and environment variables. V3 stays graduated (public); do not roll `TRIP_PLANNER_V3` back to `preview` (owner, 2026-10-04).
   * The saved-item format and resolver, and the analytics event definitions.
 * **Tests only in isolated copies.** Never run `tests/server.test.js` in a real checkout, because it replaces the tracked `okanagan.db`. Run the suite in a `git archive` export in a scratch directory, and never `require` `server.js` in the working checkout.
 * **Leave alone:** Pinterest work in the main checkout (`docs/PINTEREST_CONTENT_PLAN.md`, `pinterest-assets/`) and unrelated projects outside this repo.
@@ -160,7 +163,7 @@ The shell header and trip tray are extracted from `okanagan.html` at render time
    * compare page hashes after stripping **only** the intended additions;
    * any other difference must be explained (for example, `/food-drink`'s server-rendered Open Now state flips at closing times) or the deploy is reported as a failure.
 4. **Corpora:**
-   * the planner corpus (929 + 300 seeded): only the clock-sensitive queries may differ;
+   * the planner corpus (929 + 300 seeded): only the clock-sensitive queries may differ. That harness is gone; since the V3 French work, the English regression set (3,109 runs, see "V3 French support") is used instead;
    * the discovery sweep (9,173 queries plus `/browse?q=` routing, concurrency 3, about 25–58 minutes).
 5. **Integrity:** `/api/venues` count and hash, sitemap, robots, the served frozen-file MD5s, and the Railway variable names.
 6. **Browser checks:**
@@ -185,6 +188,8 @@ The capture and sweep harnesses are scratch scripts kept outside the repo; the b
 * **Undo (W14) only for the tray's ✕:** not for card-button removals or Clear trip, by decision. The ~10-second timer restarts in full when hover or focus ends (approved).
 * **`/browse` "My favorites (n)"** counts distinct favourites (5E), the way `/favorites` lists them.
 * **Single social-share image:** pages use `og:image` `/og-image.png`; of the pages checked (home, a venue, an event, a guide), only the homepage has `twitter:image`.
+* **V3 in French: the planner's own text stays English.** The interface is French, but the plan's headline, summary, reasons, notes, warnings, interest chips ("Wineries", "Golf courses"), theme text, month names and server validation errors come from `trip-planner.js` / `server.js` in English. Translating them would mean changing `trip-planner.js`.
+* **French detection edge:** an English request containing "sans" (e.g. "sans serif cafe") is read as French. No real trip request was found that does this.
 
 **Known gaps, unchanged by Stage 5 (not regressions):**
 
@@ -198,6 +203,7 @@ The capture and sweep harnesses are scratch scripts kept outside the repo; the b
 
 **Test-only hygiene issues (not production defects, not a Stage 4 regression):**
 
+* **Suite result at `55de8e6`: 950/952** on an isolated copy with `--test-force-exit`. The 2 failures are this golf-selector test (now `tests/server.test.js:4896`) and `Stage 2: the Okanagan clock across 2026-11-01` (`:10263`), which fails only on a machine with older tzdata (the dev Mac has 2026a; Railway has 2026c, see the What's On baseline). Both fail identically at `30bc37a`, before PR #31.
 * **Suite result: 899/900 at `73ec8e7` (855/856 at `f915bb8`), run on an isolated copy with `--test-force-exit`.** The one failing test is `HTTP routes: region, category, venue, guide, and 404 all respond correctly` (`tests/server.test.js:4835`; `:4715` at `f915bb8`). It stops at its first failure: line 4944 (`4824` at `f915bb8`) expects the `/golf` region selector *not* to list Osoyoos. But the Build My Trip fixture "Trip Golf Course" is in Osoyoos, so the selector correctly lists it. Line numbers below are at `73ec8e7`; each is exactly 120 lines later than at `f915bb8`.
 * **The test has failed since the assertion was added** (`92564f3`, 2026-09-19): the fixture arrived in `0e22562` the day before. The 2026-09-24 Change Log entries call it "the pre-existing golf-selector assertion".
 * **More stale expectations sit behind the first.** With each assertion in that test made non-fatal (scratch copies only), 9 fail. The same 9 fail at `6a0ad06`, before Stage 4, and after every Stage 5 change; 8 already failed at `b1dead1`, before Stage 0.
@@ -212,10 +218,11 @@ The capture and sweep harnesses are scratch scripts kept outside the repo; the b
 * **The test never closes its server.** It starts the server on port 3001 and leaves it open, so without `--test-force-exit` the run never exits. A left-over run held port 3001 from 2026-09-27 until it was ended on 2026-10-01. While it did, this test failed with EADDRINUSE instead.
 * **The fix would be test-only** (`tests/server.test.js`), with no production code change. It is deliberately **not** done; see the roadmap.
 
-### Open roadmap (updated 2026-10-02)
+### Open roadmap (updated 2026-10-05)
 
 * **Done in Stage 5 (2026-10-01 → 10-02):** 5A V3 share link and analytics (F09, F12); 5B guide-page Favorites; 5C trip-tray ids (Trip half of W07); 5D W14 tray Undo; 5E same-name Favorites (Favorites half of W07); 5F this record. See the Stage 5 sections below.
-* **Next, owner decision pending:** a read-only **V3 trip-planner graduation readiness review**. `TRIP_PLANNER_V3` stays `preview` until the owner decides otherwise; while it does, V3 share links reach only opted-in browsers.
+* **Done (2026-10-05):** V3 is graduated (public, owner decision), and V3 French support shipped (PR #31). See "V3 French support".
+* **Optional V3 French follow-up (not scheduled, needs `trip-planner.js` unfrozen):** French plan text (headline, reasons, notes, interest chips, month names).
 * **Blocked by the freeze on `okanagan.html`:** a homepage Favorites link.
 * **Optional follow-ups from Stage 5 (not scheduled):** repaint the 14 winery region pages on `okanaganSaved` storage events; two more CI tests (the three Favorite scripts together on an `app.js` page; items written by `app.js` read back through `favoritesCore`); distinguishing same-name, same-region events in the tray/Undo label; `aria-pressed` on `/whats-on`.
 * **SEO / share, not scheduled:** the Search Console checkpoint (see Open Tasks → SEO backlog); per-page social-share images; whether hub `lastmod` should keep the rolling "today" date.
@@ -249,7 +256,7 @@ Scope authorised by the owner on 2026-10-01: F09 and F12 only. `trip-planner-v3-
 * **Older links:** links without `pin`, `avoid` or `rm` restore exactly as before (kept stops pinned).
 * **Limitations:**
   * The link is the request, not a frozen copy of the plan. A link opened on a later day can differ where the plan depends on the date or time ("tonight", events, the season) or where listings changed. An unknown or closed venue id is simply not used.
-  * While `TRIP_PLANNER_V3` is `preview`, a recipient who has not opted in gets the V2 planner, which ignores these parameters. The opt-in redirect (`/trip?trip_v3=on`) also drops other parameters. Both are unchanged by Stage 5A.
+  * While `TRIP_PLANNER_V3` is `preview`, a recipient who has not opted in gets the V2 planner, which ignores these parameters. The opt-in redirect (`/trip?trip_v3=on`) also drops other parameters. Both are unchanged by Stage 5A. (No longer applies since V3 graduated: every visitor gets V3, so share links reach everyone.)
 
 ### F12: V3 analytics taxonomy
 
@@ -323,6 +330,39 @@ Notes:
 ### Stage 5 validation (each stage)
 
 Each stage followed the standing gates: read-only preflight, approval, implementation, local validation (full suite on an isolated copy; targeted unit tests; headless-browser checks with real mouse, touch and keyboard at 1280px and 390px; planner, seeded and discovery corpora; route comparison against the previous `main`), exact diff review, then commit, PR, merge, Railway's automatic deploy and production verification (deployment SUCCESS, served assets equal to `main`, full capture compared with the pre-deploy baseline, live browser checks, 0 5xx). Results at Stage 5E: full suite 899/900 (the known golf-selector assertion), planner 929/929, seeded 300/300, discovery 9,173/9,173, production capture 906 identical + 1,275 differing only by the intended script text.
+
+## V3 French support (PR #31, 2026-10-04 → 10-05)
+
+**Shipped:** commits `b459669` (feature) and `dd3d32e` (review fixes), PR #31, merge `55de8e6` (2026-10-05 06:29 UTC), Railway `6fd9d9fa-e491-410e-a8f5-d4b9cf5b606a`, SUCCESS. Files: `public/scripts/app.js` and `trip-planner-v3-page.js` (frozen, unfrozen for this PR only), `server.js`, `tests/server.test.js`, new `trip-planner-fr.js`, new `tests/trip-french.test.js`. Not changed: `trip-planner.js`, `discovery-intent.js`, `discovery-search.js`, `okanagan.db`, this file (until this record).
+
+Scope authorised by the owner on 2026-10-04: French planner understanding, the V3 interface in French, and visible edit errors on mobile. V3 stays graduated (public).
+
+### French requests (`trip-planner-fr.js`)
+
+* `runTripPlan()` passes the request through `tripPlannerText(text, taxonomy)` before the interpreter. A French request is rewritten into the English the interpreter already reads ("3 jours à Kelowna avec des vignobles" → "3 days in kelowna with some vineyards"); the planner itself is unchanged, so a French request can reach only the places, rules and facts an English one can.
+* **Vocabulary:** length (jours, journée, nuits, week-end, fin de semaine, longue fin de semaine), party (enfants, chien), food and drink (vin, vignobles, dégustation, souper = dinner, dîner = lunch, déjeuner = breakfast, café, resto, microbrasserie), outdoors (randonnée, plage, sentiers, vélo, ski, raquette, points de vue), weather (pluie, s'il pleut), time (ce soir, demain, days, months, seasons), occasions, budget, the site's own French collection names (Trésors cachés, Coups de cœur locaux, Coins secrets), negation and routes ("de Kelowna à Penticton").
+* **Detection:** a standalone "à" (not "à la carte" / "à la mode"), one unmistakably French word, or two different French function words. Words English visitors also type are not used as strong markers (pour, propose, organise, distilleries, belvedere, cave, peche, plein).
+* **English is never rewritten:** anything not detected as French is returned as the same string. A request with no French marker anywhere returns before the venue list is read (about 0.002 ms per request). The words of a venue's full name are not counted as markers and are never translated ("Le Vieux Pin", "La Frenz Winery").
+* **Only the planner uses it:** site search and `/browse` are unchanged. `plan.query`, the request shown and the share link keep the visitor's own words.
+* **Loading:** `server.js` loads the module like the interpreter, with no try/catch. If it is missing or broken, `/api/trip/plan` returns 500 with an error naming `trip-planner-fr`, instead of quietly planning in English only. A child-process test copy of `server.js` therefore needs `trip-planner-fr.js` (the V3 routes test copies it).
+
+### V3 interface in French
+
+* 150 `tripv3.*` keys in `TRANSLATIONS` (English and French) in `public/scripts/app.js`, through the existing `t()` / `getCurrentLang()` / `data-i18n` system. The English values are the page's previous text, so English rendering is byte-identical.
+* Static markup carries `data-i18n` / `data-i18n-placeholder`. Script strings go through `tx(key, vars)`. Fixed labels the planner sends (badges via the site's `badge.*` keys, types, parts of the day, kids / dog, the occasion, collections) keep the planner's English and are replaced only in French (`frLabel`).
+* The French example chips plan exactly like the English examples (tested). The header's EN / FR switch redraws a plan on screen in the new language (same plan, same kept and removed stops).
+
+### Edit errors on mobile
+
+* When Swap, Regenerate day, a changed setting or Regenerate plan fails, the same message also appears next to the control that made it (`.t3-edit-error`, under the card's buttons or under the day header). The hero's status line is unchanged and still announces it. The note is cleared by the next request or render.
+
+### Validation
+
+* **English regression (replaces the lost 929 harness):** 2,487 English requests (every text the test suite sends to the interpreter, plus the V3 examples) at seed 0, plus seeds 1 and 7 on every 8th request: **3,109 runs**, each hashing the full intent, trip, plan and understood output on the production snapshot in `tests/fixtures/trip-golden-inputs.json.gz`, compared with `30bc37a`: **3,109/3,109 identical**. The French layer also returns as the same string every one of those requests, every venue name in three phrasings, and the 731 interpreter vocabulary phrases. The harness is a scratch script outside the repo; the rule it checks (English returned unchanged) is also in `tests/trip-french.test.js`.
+* **`tests/trip-french.test.js` (16 tests):** the required vocabulary; 68 French requests understood exactly like their English counterparts with identical stops; the French example chips; venue names protected; English returned unchanged and never reading the venue list; the module loads; translation completeness. `tests/server.test.js` adds a child-process test (French plans through the real server; a clear 500 without the module).
+* **Browser (headless Chromium, real clicks, GA blocked), local:** English V3 rendering identical to `30bc37a` across 14 interaction steps; French UI at 390px; EN → FR → EN restores identical HTML; failed Swap and Regenerate day at 390px showed no visible error before and an in-view error after.
+* **Production (2026-10-05):** served `app.js` equal to `main`; `/trip` V3 for everyone; 10 English requests normal; 8 of 8 French requests give the same plan and stops as their English versions; browser checks at 390px and 1280px with 0 console errors and no horizontal page scroll; Railway HTTP log after the deploy all 200 apart from a bot `favicon.ico` 404, planner requests 43–167 ms; no errors at startup.
+* Suite at `55de8e6`: 950/952; see Test-only hygiene issues for the 2 known failures.
 
 ## Authentication / Admin API Notes
 
@@ -661,3 +701,4 @@ Each stage followed the standing gates: read-only preflight, approval, implement
 * 2026-09-24 — Claude completed the **Local Favourites membership update** (data only, production via the audited `POST /admin/collection-membership` route, batch `local-favourites-2026-09-v1`; no code, schema, venue, event or other-collection change). Applied the owner-defined standard from `300ea4c` (locally rooted + credible evidence that locals value/recommend/preserve it + worthwhile for visitors; popularity, ratings, heritage, awards or tourism importance alone do not satisfy the second test). **The `local_favorite` collection went from 11 to 26 members:** **+19 added** — 719 Theo's Restaurant, 121 Cannery Brewing Co., 1214 Skaha Bluffs Provincial Park (Penticton); 1429 Tickleberry's (Okanagan Falls); 805 Zias Stonehouse Restaurant, 1227 Giant's Head Mountain Park (Summerland); 1231 Pincushion Mountain Trail (Peachland); 1141 Gellatly Nut Farm Regional Park (West Kelowna); 1226 Knox Mountain Park, 1217 Mission Creek Regional Park (Kelowna); 1250 Okanagan Rail Trail (Lake Country); 1146 Kalamalka Lake Provincial Park – Cosens Bay, 15 Alexander's Beach Pub (Coldstream); 407 Midtown Bistro, 978 Winston Pub, 62 Bean Scene Coffee House, 1144 Hurlburt Park (Vernon); 1339 Nk'Mip Desert Cultural Centre (Osoyoos) — and 1437 Shuswap River Float, which was added and then **removed again the same day** after review (its only evidence was tourism framing, the same basis that put 1215 Enderby Cliffs on HOLD); **−3 removed** (HOLD: poll-only or thin evidence; venues untouched) — 1103 The Harvest Golf Club, 1106 Two Eagles Golf Course & Academy, 1132 Okanagan Virtual Golf; **8 kept** — 1107, 1109, 1111, 1114, 1118, 1122, 1136, 1167. Arithmetic: 11 + 19 − 3 − 1 = 26. Each new membership stores a concise, sourced rationale in `collection_items.note` (**internal only — no page renders `local_favorite` notes; the badge code reads IDs only**). 1136 Boyce-Gyro and 1167 Paddlewheel still have no stored note. **Deliberately NOT added (HOLD/NO):** 1215 Enderby Cliffs, 210 Farmhouse Cafe (Davison Orchards; owner-only statement, record is the café only), 246 Granny's (café operation after Dec 2023 unconfirmed), 1159 Manitou Park (sources inaccessible), 1437, 1147 (second record for the Kal Park — one membership only, on 1146), and 1163/1164 Okanagan Beach / Okanagan Lake Park Beach (possible duplicate pair, left untouched). **Evidence:** every YES was re-verified against the underlying page (Castanet, kelowna.ca and RDOS block automated fetches; Castanet and kelowna.ca were read in a real browser, read-only); the full evidence record lives in the session's scratchpad `local-favorites/LOCAL_FAVOURITES_DISCOVERY.md/.tsv`. visitsummerland.com and exploringenderby.com now serve spam — do not cite them. **Verification:** production backup `/data/backups/okanagan-raw-20260924T124339Z.db` taken first; integrity ok; all 26 point at active, non-redirected venues; no duplicate memberships; venues, events and every non-Local-Favourite membership identical to the backup; 23 audit rows (19 adds + 4 removes); homepage, `/browse` and `/trip` byte-identical (the frozen homepage does not read `local_favorite`); only the ♥ Local Favourite badge appears/disappears on hub, category and venue pages. Build My Trip already treats `local_favorite` as a discovery kind, so trip suggestions reflect the new set with no code change.
 * 2026-10-01 — Claude recorded the **Stage 0–4 Program** (Stages 0–3, the Stage 4 decisions and Phases 4.0–4.4: commits `e8b7999` … `f915bb8`; Stages 0 and 1 had no commits), the current production and integrity baseline, the frozen files, the standing rules, the validation method, known limitations and the open roadmap in the new "Stage 0–4 Program" section (Phase 4.5, documentation only). Ended a left-over local test run (since 2026-09-27) that held port 3001. With the port free, the isolated suite is 855/856 (with `--test-force-exit`). The one failing test, HTTP routes, carries 9 pre-existing stale or test-environment assertions plus an unclosed server. Test-only, not a production defect; recorded under Known limitations, and its cleanup is on the roadmap as a separate approval-required task.
 * 2026-10-02 — Claude recorded **Stage 5** in this file (Stage 5F, documentation only): the 5A shipping record, new sections for 5B (guide-page Favorites), 5C (trip-tray ids), 5D/W14 (tray Undo) and 5E (same-name Favorites) with their commits, PRs, Railway deployments, decisions, storage contracts and validation; and updated the current production status (`73ec8e7`, Railway `e8ee3f87`), the baseline, the frozen-file MD5s, the known limitations (four resolved, new ones recorded), the test-suite result (899/900) and stale-assertion line numbers, and the open roadmap. No code, test, data, SEO, analytics, Pinterest or Railway change.
+* 2026-10-05 — Claude recorded the **V3 French launch** in this file (documentation only): PR #31 (`b459669`, `dd3d32e`, merge `55de8e6`, Railway `6fd9d9fa`, SUCCESS) adds French trip requests (`trip-planner-fr.js`, planner only; English requests returned unchanged), the V3 interface in French (150 `tripv3.*` strings in `app.js`) and visible edit errors on mobile. Also updated: current production status (V3 graduated and public by owner decision; do not roll back to `preview`), the frozen-file MD5s at `55de8e6`, the standing rules, the planner-regression method (the 929 harness is gone; a 3,109-run English regression set replaces it), known limitations (French plan text stays English) and the suite result (950/952, the 2 known failures). PRs #19–#30 are noted only where they changed frozen files.
