@@ -966,8 +966,8 @@ test('Stage 3.5: exclusions hold in day plans, multi-day plans, outings and mult
   assert.ok(!stops.some((s) => s.venue.region === 'kelowna'), 'no part in Kelowna');
 });
 
-test('Stage 3.5: exclusions the planner does not apply stay unapplied -- "without kids", "no alcohol", other budgets', () => {
-  for (const [control, q] of [['wineries', 'wineries without kids'], ['wineries', 'wineries, no alcohol'], ['wineries', 'wineries that are not cheap'], ['restaurants in Kelowna', 'restaurants in Kelowna without kids']]) {
+test('Stage 3.5: exclusions the planner does not apply stay unapplied -- "without kids", other budgets (a refusal of alcohol is applied since 2026-10-06, see below)', () => {
+  for (const [control, q] of [['wineries', 'wineries without kids'], ['wineries', 'wineries that are not cheap'], ['restaurants in Kelowna', 'restaurants in Kelowna without kids']]) {
     assert.deepEqual(stopIds(plan(q)), stopIds(plan(control)), `${q}: same picks as "${control}"`);
   }
   assert.deepEqual(intentOf('wineries without kids').excluded.features, ['kid_friendly']);
@@ -1101,4 +1101,89 @@ test('Stage 3.5 D6: a day plan reports a named place it does not use; its days a
   // One place, or no day information: unchanged.
   assert.deepEqual(plan('a day in Kelowna').unsupported, []);
   assert.ok(!tp.buildUnderstood(intentOf('a day in Kelowna and Penticton'), null, LABELS, {}).notUsed.includes('Penticton'), 'without day places nothing is claimed');
+});
+
+
+// ---- explicit "no alcohol" (2026-10-06) -----------------------------------------
+// A refusal of alcohol is a hard rule that outranks every positive signal:
+// venues whose PRIMARY type is alcohol (winery, brewery, distillery, pub,
+// cocktail lounge) are never recommended, while a restaurant or cafe that
+// merely serves it, and every outdoor type, stay eligible.
+const ALCOHOL_FIRST = ['winery', 'brewery', 'distillery', 'pub', 'cocktail'];
+const NO_ALCOHOL_PHRASES = [
+  "We don't drink alcohol", "We don't drink.", 'No alcohol.', "We're sober.", 'We want alcohol-free activities.',
+  "We don't drink but love good food.", "We don't drink, but restaurants are fine.", 'no booze', 'we are teetotal',
+];
+const stopTypes = (p) => Array.from(new Set(allStops(p).map((s) => s.venue.type)));
+const alcoholStops = (p) => allStops(p).filter((s) => ALCOHOL_FIRST.includes(s.venue.type)).map((s) => s.venue.name);
+
+test('no alcohol: every way of saying it is recognised, and a bare statement still gets alcohol-free recommendations', () => {
+  for (const q of NO_ALCOHOL_PHRASES) {
+    assert.deepEqual(intentOf(q).excluded.concepts, ['alcohol'], q);
+    const p = plan(q);
+    assert.ok(allStops(p).length > 0, `${q}: still recommends something`);
+    assert.deepEqual(alcoholStops(p), [], `${q}: no alcohol-first venue`);
+    assert.ok(tp.buildUnderstood(intentOf(q), null, LABELS, {}).party.includes('alcohol-free'), `${q}: shown as understood`);
+    assert.deepEqual(intentOf(q).unsupported, [], `${q}: nothing left "not used"`);
+  }
+});
+
+test('no alcohol: no winery, brewery, distillery, pub or cocktail lounge in any kind of plan', () => {
+  for (const base of ['2 days in Kelowna', 'a relaxed day in Penticton', 'a weekend around Vernon with hidden gems', 'things to do in Kelowna', 'plan 3 days in Penticton with kids', 'date night in Kelowna', 'a romantic evening in Penticton']) {
+    for (const phrase of ["we don't drink alcohol", 'no alcohol', "we're sober", "we don't drink but love food"]) {
+      const q = `${base}, ${phrase}`;
+      const p = plan(q);
+      assert.ok(allStops(p).length > 0, `${q}: recommends something`);
+      assert.deepEqual(alcoholStops(p), [], q);
+    }
+  }
+  // Pinned and regenerated plans obey it too.
+  const regen = plan("2 days in Kelowna, we don't drink alcohol", { seed: 7 });
+  assert.deepEqual(alcoholStops(regen), []);
+});
+
+test('no alcohol: an explicit refusal outranks a positive wish ("we love wine country but we don\'t drink")', () => {
+  for (const q of ["a weekend in Kelowna, we love wine country but we don't drink alcohol", "wineries and breweries in Kelowna, we're sober", 'wineries, no alcohol', "wine tasting in Penticton, we don't drink"]) {
+    assert.deepEqual(alcoholStops(plan(q)), [], q);
+  }
+  assert.deepEqual(alcoholStops(plan('plan 2 days around Kelowna with wineries and breweries, and a hockey game, we do not drink alcohol')), []);
+});
+
+test('no alcohol: food-first, outdoor and other non-alcohol places stay eligible', () => {
+  const p = plan("2 days in Kelowna, we don't drink alcohol");
+  const types = stopTypes(p);
+  for (const t of ['cafe', 'restaurant']) assert.ok(types.includes(t), `${t} stays`);
+  assert.ok(types.some((t) => ['beach', 'outdoor', 'golf'].includes(t)), `an outdoor type stays (${types})`);
+  // "alcohol is merely available": a restaurant that is also filed as a pub keeps its place.
+  const gastro = fact({ name: 'Kelowna Gastropub Kitchen', region: 'kelowna', type: 'restaurant', fdTypes: ['pub'], rating: 4.9, reviews: 900 });
+  const facts = [...FACTS, gastro];
+  const withGastro = tp.planTrip({ intent: intentOf("restaurants in Kelowna, we don't drink alcohol"), facts, labels: LABELS });
+  assert.ok(allStops(withGastro).some((s) => s.venue.id === gastro.id), 'a restaurant that also serves alcohol is still recommended');
+  // Coffee, bakeries and the like are untouched.
+  assert.ok(allStops(plan("coffee in Kelowna, we're sober")).every((s) => s.venue.type === 'cafe'));
+});
+
+test('no alcohol: the refusal is not applied globally -- without it, or with a different drink, alcohol venues still appear', () => {
+  assert.ok(alcoholStops(plan('wineries and breweries in Kelowna')).length >= 2);
+  assert.ok(alcoholStops(plan('3 days in Kelowna with wine and hidden gems')).length > 0);
+  assert.ok(alcoholStops(plan('plan a wine tour in Penticton')).length > 0);
+  for (const q of ["we don't drink coffee but we love wine in Kelowna", 'we do not drink coffee, wineries in Penticton']) {
+    assert.equal(intentOf(q).excluded.concepts, undefined, `${q}: not a refusal of alcohol`);
+    assert.ok(alcoholStops(plan(q)).length > 0, q);
+  }
+  // An intent that never mentions it carries exactly the excluded shape it always had.
+  assert.deepEqual(Object.keys(intentOf('wineries in Kelowna').excluded).sort(), ['activities', 'budget', 'collections', 'cuisines', 'features', 'phrases', 'regions', 'textTerms', 'types']);
+});
+
+test('negation reaches the thing after a recommending verb ("don\'t recommend wineries or breweries")', () => {
+  for (const q of ["Don't recommend wineries or breweries.", 'please do not suggest wineries or breweries', "don't include wineries or breweries"]) {
+    assert.deepEqual(intentOf(q).excluded.types, ['winery', 'brewery'], q);
+    assert.deepEqual(intentOf(q).types, [], q);
+  }
+  const p = plan("Kelowna day trip. Don't recommend wineries or breweries.");
+  assert.ok(allStops(p).length > 0);
+  assert.ok(!allStops(p).some((s) => ['winery', 'brewery'].includes(s.venue.type)));
+  // Unchanged: a plain "no wineries" and "recommend wineries".
+  assert.deepEqual(intentOf('no wineries').excluded.types, ['winery']);
+  assert.deepEqual(intentOf('recommend wineries in Kelowna').types, ['winery']);
 });

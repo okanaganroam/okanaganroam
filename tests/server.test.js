@@ -14818,6 +14818,37 @@ test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile
   assert.equal(app.withFavoritesNavLink('<header></header>'), '<header></header>');
 }))));
 
+// ---- Build My Trip: an explicit "no alcohol" (2026-10-06) -----------------------
+// The whole pipeline (runTripPlan: French rewrite, interpreter, planner, the
+// applied-exclusion report) against the real test database.
+test('Build My Trip: "we don\'t drink alcohol" keeps alcohol-first venues out of every recommendation, and a request for them still works', () => {
+  const ALCOHOL_FIRST = ['winery', 'brewery', 'distillery', 'pub', 'cocktail'];
+  const venueTypes = (plan) => {
+    const found = new Map();
+    const walk = (o) => {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (o.venue && o.venue.type) found.set(o.venue.id, o.venue.type);
+      for (const [k, val] of Object.entries(o)) if (k !== 'understood' && k !== 'intent') walk(val);
+    };
+    walk(plan);
+    return [...found.values()];
+  };
+  for (const text of ["We don't drink alcohol", 'No alcohol', "We don't drink but love food", "We're sober",
+    "2 days in Kelowna, we don't drink alcohol", "A weekend in Kelowna, we love wine country but we don't drink alcohol", "a relaxed day in Penticton, we're sober",
+    "Don't recommend wineries or breweries, 2 days in Kelowna"]) {
+    const plan = app.runTripPlan({ text });
+    const types = venueTypes(plan);
+    assert.ok(types.length > 0, `${text}: recommends something (${plan.kind})`);
+    const banned = /wineries or breweries/.test(text) ? ['winery', 'brewery'] : ALCOHOL_FIRST;
+    assert.deepEqual(types.filter((t) => banned.includes(t)), [], text);
+    if (!/wineries or breweries/.test(text)) assert.ok(plan.understood.party.includes('alcohol-free'), `${text}: reported as understood`);
+  }
+  // Not applied globally.
+  assert.ok(venueTypes(app.runTripPlan({ text: '3 days in Kelowna' })).some((t) => ALCOHOL_FIRST.includes(t)), 'control: a plain trip still includes them');
+  assert.ok(venueTypes(app.runTripPlan({ text: 'wineries and breweries in Kelowna' })).some((t) => ALCOHOL_FIRST.includes(t)), 'control: asking for them still works');
+});
+
 // ---- Hub-style /browse (2026-10-05) --------------------------------------------
 // /browse is the all-venue directory in the shape of the other server-rendered
 // hubs; the wizard page it replaced is still served, unchanged, at /browse/classic.

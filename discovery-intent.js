@@ -307,7 +307,9 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'not have has had coming come them they their explore exploring experience experiences anything everything nothing easy '
   // Stage 3.1 (2026-09-29): conversational filler that reached the planner as
   // unmatched search words ("spend time on the lake", "a mix of activities").
-  + 'spend mix').split(/\s+/));
+  + 'spend mix '
+  // 2026-10-06: "restaurants are fine" and "don't include wineries" -- filler, not search words.
+  + 'fine include includes including').split(/\s+/));
 
 // ---------- polarity (Stage 3.1, 2026-09-29) ----------
 // A negation word that no phrase claims ("not", "no", "nothing", "without",
@@ -328,6 +330,32 @@ const NEGATION_MAX_SPAN = 6;
 const NEGATION_DISPLAY_FILLER = new Set(['want', 'wants', 'wanted', 'need', 'needs', 'like', 'looking', 'anything', 'something', 'any', 'really', 'too', 'very', 'do', 'does', 'did', 'have', 'has', 'had', 'the', 'a', 'an']);
 // Fields a negated phrase is recorded under in intent.excluded.
 const EXCLUDED_LIST_FIELDS = { region: 'regions', type: 'types', feature: 'features', collection: 'collections', activity: 'activities', cuisine: 'cuisines' };
+
+// Excluded CONCEPTS (2026-10-06). Some things a visitor rules out are not a
+// category, a feature or a place name: "we don't drink alcohol", "no booze",
+// "we're sober". The phrases below carry the refusal themselves (they are
+// matched, longest first, before any bare negation word can claim them), and
+// each records a concept id in intent.excluded.concepts. discovery-search.js
+// CONCEPT_PRIMARY_TYPES says which venues a concept rules out; the planner and
+// /search both read it through exclusionPlan(). Words are written the way
+// normalizeDiscoveryText() leaves them ("don't" -> "do not").
+const CONCEPT_ALIASES = {
+  alcohol: [
+    'do not drink alcohol', 'does not drink alcohol', 'dont drink alcohol', 'doesnt drink alcohol',
+    'do not drink', 'does not drink', 'dont drink', 'doesnt drink', 'none of us drink', 'no one drinks', 'nobody drinks',
+    'not drinking alcohol', 'not drinking', 'no drinking', 'no alcohol', 'no booze', 'no liquor',
+    'without alcohol', 'without booze', 'without drinking', 'avoid alcohol', 'avoid drinking', 'skip alcohol', 'skip the alcohol',
+    'not interested in alcohol', 'not interested in drinking', 'no interest in alcohol', 'not into drinking', 'not a drinker',
+    'non drinker', 'non drinkers', 'nondrinker', 'nondrinkers', 'sober', 'teetotal', 'teetotaler', 'teetotalers', 'teetotaller', 'teetotallers',
+    // "alcohol free" alone is the badge ("alcohol free restaurants"); said about
+    // the trip itself it is a refusal.
+    'alcohol free activities', 'alcohol free activity', 'alcohol free trip', 'alcohol free day', 'alcohol free weekend',
+    'alcohol free itinerary', 'alcohol free vacation', 'alcohol free getaway', 'alcohol free things to do', 'alcohol free fun',
+    'alcohol free experiences', 'non alcoholic activities', 'non alcoholic trip',
+  ],
+};
+// "we don't drink coffee" is not a refusal of alcohol.
+const NON_ALCOHOLIC_DRINK_WORDS = new Set(['coffee', 'coffees', 'tea', 'teas', 'water', 'milk', 'soda', 'sodas', 'pop', 'juice', 'juices', 'smoothie', 'smoothies', 'caffeine', 'coke']);
 
 function emptyExcluded() {
   return { regions: [], types: [], features: [], collections: [], activities: [], cuisines: [], textTerms: [], budget: null, phrases: [] };
@@ -362,8 +390,11 @@ function findNegations(tokens, accepted, claimed) {
       if (tok === '\u0000' || NEGATION_BREAKS.has(tok) || triggerAt(k)) break;
       if (NEGATION_CONTINUE.has(tok)) { listOpen = true; k++; continue; }
       if (claimed[k]) {
-        if (!listOpen) break;
         const hit = hitAt.get(k);
+        // "don't recommend wineries": the verb is not what is ruled out, the
+        // thing after it is. (Other claimed words keep the rule below.)
+        if (hit.assign.length && hit.assign.every((a) => a.field === 'recommend')) { k = hit.end; continue; }
+        if (!listOpen) break;
         out.negatedHits.add(hit);
         last = hit.end - 1;
         listOpen = false;
@@ -405,6 +436,7 @@ function buildPhraseTable(taxonomy) {
     for (const extra of REGION_EXTRA_ALIASES[slug] || []) add(extra, 'region', slug);
   }
   for (const p of VALLEY_WIDE_PHRASES) add(p, 'scope', 'valley');
+  for (const [concept, phrases] of Object.entries(CONCEPT_ALIASES)) for (const p of phrases) add(p, 'concept', concept);
   for (const [type, phrases] of Object.entries(TYPE_ALIASES)) if (t.types.includes(type)) for (const p of phrases) add(p, 'type', type);
   for (const [feature, phrases] of Object.entries(FEATURE_ALIASES)) if (t.features.includes(feature)) for (const p of phrases) add(p, 'feature', feature);
   for (const [kind, phrases] of Object.entries(COLLECTION_ALIASES)) if (t.collections.includes(kind)) for (const p of phrases) add(p, 'collection', kind);
@@ -908,7 +940,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
 
   const flags = { event: false, plan: false, recommend: false, scopeAnything: false };
   const lengthMentions = lengths.map((l) => ({ days: l.days, phrase: l.phrase, start: l.start }));
-  const budgetMentions = [], paceMentions = [], occasionMentions = [], whenMentions = [], daypartMentions = [];
+  const budgetMentions = [], paceMentions = [], occasionMentions = [], whenMentions = [], daypartMentions = [], conceptMentions = [];
   const monthMentions = [], seasonMentions = [];
   const eventCats = [];
   const orderedTypes = [];
@@ -931,6 +963,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
         case 'collection': intent.collections.push(value); break;
         case 'activity': intent.activities.push(value); break;
         case 'cuisine': intent.cuisines.push(value); break;
+        case 'concept': conceptMentions.push({ value, end: hit.end, phrase: hit.phrase }); break;
         case 'budget': budgetMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
         case 'pace': paceMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
         case 'occasion': occasionMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
@@ -1081,6 +1114,14 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     intent.conflicts.push({ field: 'excluded.budget', values: [ex.budget] });
     intent.budget = null;
   }
+  // 6a'. Excluded concepts ("we don't drink alcohol"). Recorded only when
+  // present, so every other intent keeps exactly the excluded shape it had.
+  for (const m of conceptMentions) {
+    if (NON_ALCOHOLIC_DRINK_WORDS.has(tokens[m.end])) continue;
+    if (!ex.concepts) ex.concepts = [];
+    if (!ex.concepts.includes(m.value)) ex.concepts.push(m.value);
+    intent.matched.push({ phrase: m.phrase, field: 'excluded.concept', value: m.value });
+  }
   for (const c of neg.clauses) {
     // The visitor's own words, minus verb filler: "don't want anything
     // fancy" is reported as "not fancy", "wineries but not in Kelowna" as
@@ -1114,7 +1155,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     intent.mode = 'recommend';
   } else if (intent.regions.length || intent.types.length || intent.features.length || intent.collections.length
     || intent.activities.length || intent.cuisines.length || intent.textTerms.length || occasion || flags.scopeAnything
-    || intent.budget || intent.when || intent.pace) {
+    || intent.budget || intent.when || intent.pace || (intent.excluded.concepts && intent.excluded.concepts.length)) {
     intent.mode = 'find';
   }
   // Outside an events request, event category words are just words; inside

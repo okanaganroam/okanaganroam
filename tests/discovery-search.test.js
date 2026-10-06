@@ -159,3 +159,17 @@ test('Stage 3.3 ranking: deterministic, the pre-3.3 order (score, rating, review
   const tie = [venue(21, 'B', 'kelowna', 'cafe', { rating: 4 }), venue(20, 'A', 'kelowna', 'cafe', { rating: 4 }), venue(19, 'A', 'kelowna', 'cafe', { rating: 4 })];
   assert.deepEqual(s.searchVenues(d.interpretDiscoveryQuery('cafes', TAXONOMY), tie).items.map((x) => x.venue.id), [19, 20, 21]);
 });
+
+
+// ---- excluded concepts (2026-10-06) -----------------------------------------------
+test('an excluded alcohol concept rules out venues whose PRIMARY type is alcohol, and nothing else', () => {
+  const plan = s.exclusionPlan({ concepts: ['alcohol'] });
+  assert.deepEqual(plan.applied.map((a) => `${a.field}:${a.value}`), s.CONCEPT_PRIMARY_TYPES.alcohol.map((t) => `primary_type:${t}`));
+  assert.deepEqual(plan.notApplied, []);
+  const v = (type, fdTypes = []) => ({ type, fdTypes });
+  for (const t of ['winery', 'brewery', 'distillery', 'pub', 'cocktail']) assert.ok(s.isExcluded(v(t), plan), t);
+  for (const t of ['restaurant', 'cafe', 'golf', 'beach', 'outdoor']) assert.ok(!s.isExcluded(v(t), plan), t);
+  assert.ok(!s.isExcluded(v('restaurant', ['pub', 'brewery']), plan), 'a restaurant that is also filed as a pub is not alcohol-first');
+  assert.deepEqual(s.exclusionPlan({ concepts: ['unknown'] }).applied, []);
+  assert.deepEqual(s.exclusionPlan({}).applied, []);
+});

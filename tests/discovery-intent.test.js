@@ -909,3 +909,31 @@ test('Stage 3.5 D4: "italian dinner" / "italian lunch" are one cuisine meal; sup
   assert.deepEqual(ex.excluded.regions, ['kelowna']);
   assert.deepEqual(ex.cuisines, ['italian']);
 });
+
+
+// ---- excluded concepts: "we don't drink alcohol" (2026-10-06) ----------------------
+test('refusing alcohol is recorded as the alcohol concept, however it is said', () => {
+  for (const q of ["We don't drink alcohol", "We don't drink.", "We do not drink", 'No alcohol.', 'no booze please', 'without alcohol', "We're sober.", 'we are teetotal',
+    'We want alcohol-free activities.', 'an alcohol free weekend in Kelowna', "We don't drink but love good food.", "We don't drink, but restaurants are fine.", 'avoid alcohol', 'none of us drink']) {
+    assert.deepEqual(I(q).excluded.concepts, ['alcohol'], q);
+    assert.deepEqual(I(q).unsupported, [], `${q}: nothing is left "not used"`);
+  }
+  // It is not a venue feature or a text term.
+  assert.deepEqual(I("We don't drink alcohol").features, []);
+  assert.deepEqual(I("We don't drink alcohol").textTerms, []);
+  assert.deepEqual(I('We want alcohol-free activities.').features, []);
+  // A bare refusal is still something to plan for.
+  assert.equal(I("We don't drink alcohol").mode, 'find');
+  assert.equal(I('2 days in Kelowna, no alcohol').mode, 'plan');
+  assert.deepEqual(I('2 days in Kelowna, no alcohol').regions, ['kelowna']);
+});
+
+test('the alcohol concept is not triggered by other drinks, other negations or the badge', () => {
+  for (const q of ["we don't drink coffee", 'we do not drink tea', 'no coffee', 'wineries in Kelowna', "we don't want to drive", 'not too far from Kelowna']) {
+    assert.equal(I(q).excluded.concepts, undefined, q);
+  }
+  // "alcohol free restaurants" is still the badge.
+  assert.deepEqual(I('alcohol free restaurants in Kelowna').features, ['nonalcoholic']);
+  assert.equal(I('alcohol free restaurants in Kelowna').excluded.concepts, undefined);
+  assert.deepEqual(I('non alcoholic drinks in Kelowna').excluded, EMPTY_EXCLUDED);
+});

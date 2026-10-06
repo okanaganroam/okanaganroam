@@ -107,7 +107,7 @@ function kmBetween(a, b) { return hasCoords(a) && hasCoords(b) ? haversineKm(a.l
 // retrieval module (discovery-search.js) -- the same functions, unchanged.
 // Stage 3.5 (2026-09-29): so do the visitor's exclusions ("not in Kelowna",
 // "no wineries", "nothing fancy"), applied exactly as /search applies them.
-const { textHas, foodMatch, exclusionPlan, isExcluded } = require('./discovery-search.js');
+const { textHas, foodMatch, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES } = require('./discovery-search.js');
 // Deterministic per-(seed, venue) jitter in [0, 1): regeneration variety
 // without randomness.
 function jitter(seed, id) {
@@ -287,13 +287,19 @@ const CAFE_SLOT_ADJUST = {
 
 function buildContext(intent, labels, options) {
   const opts = options || {};
+  // 2026-10-06: an excluded concept ("we don't drink alcohol") rules out venues
+  // in eligible() through ctx.exclusions. Types it rules out are also dropped
+  // from what the visitor is asking for, so "we love wine country but we don't
+  // drink" is read as the rest of the request, never as a wish for wineries.
+  const ruledOutTypes = new Set(((intent.excluded && intent.excluded.concepts) || []).flatMap((c) => CONCEPT_PRIMARY_TYPES[c] || []));
   const occasion = intent.occasion || null;
   const pace = intent.pace || (occasion && OCCASION_DEFAULT_PACE[occasion]) || 'standard';
   return {
     intent,
     labels: labels || {},
     regions: intent.regions || [],
-    types: new Set(intent.types || []),
+    types: new Set((intent.types || []).filter((t) => !ruledOutTypes.has(t))),
+    alcoholFree: !!(intent.excluded && Array.isArray(intent.excluded.concepts) && intent.excluded.concepts.includes('alcohol')),
     activities: new Set(intent.activities || []),
     collections: new Set(intent.collections || []),
     features: (intent.features || []).slice(),
@@ -652,6 +658,7 @@ function buildUnderstood(intent, trip, labels, extras) {
   const party = [];
   if (ctx.kids) party.push('with kids');
   if (ctx.dog) party.push('with a dog');
+  if (ctx.alcoholFree) party.push('alcohol-free');
   const regions = (trip && trip.multi && trip.regions && trip.regions.length ? trip.regions : ctx.regions);
   // Stage 3.5: an exclusion the plan applied is no longer "not used".
   const applied = new Set(x.appliedExclusions || []);

@@ -65,11 +65,24 @@ const hasType = (v, types) => types.includes(v.type) || (v.fdTypes || []).some((
 const hasFeature = (v, f) => !!(v.features && v.features[f]) || (f === 'dog_friendly' && v.collections.includes('dog_friendly'));
 const UPSCALE_PRICE = 4;
 
+// Excluded CONCEPTS (2026-10-06). A visitor can rule out a whole kind of
+// place without naming a category ("we don't drink alcohol", "we're sober").
+// discovery-intent.js recognises the concept and records its id in
+// excluded.concepts; this table says which venues it rules out. The test is
+// the venue's PRIMARY type only: a venue is left out when alcohol is the
+// reason to visit (a winery, brewery, distillery, pub or cocktail lounge), and
+// a restaurant or cafe that merely serves it stays, even when it also carries
+// a secondary Food & Drink category such as "pub".
+const CONCEPT_PRIMARY_TYPES = Object.freeze({
+  alcohol: Object.freeze(['winery', 'brewery', 'distillery', 'pub', 'cocktail']),
+});
+
 // Which of the request's exclusions retrieval applies, and which it does not.
 // Applied: excluded types (a venue's type or its secondary Food & Drink
 // type), regions, stored cuisines, curated lists, activities, and an excluded
 // upscale budget (a stored price of 4; a venue without a price is never
-// excluded). Not applied: excluded badge features -- "without kids" / "no
+// excluded), and excluded concepts (CONCEPT_PRIMARY_TYPES, by primary type).
+// Not applied: excluded badge features -- "without kids" / "no
 // dogs" usually describe the visitor's party, not the venue -- excluded free
 // text, and any other excluded budget.
 function exclusionPlan(excluded) {
@@ -78,6 +91,9 @@ function exclusionPlan(excluded) {
   const applied = [], notApplied = [];
   for (const [field, key] of [['type', 'types'], ['region', 'regions'], ['cuisine', 'cuisines'], ['collection', 'collections'], ['activity', 'activities']]) {
     for (const value of list(key)) applied.push({ field, value });
+  }
+  for (const concept of list('concepts')) {
+    for (const value of CONCEPT_PRIMARY_TYPES[concept] || []) applied.push({ field: 'primary_type', value });
   }
   if (ex.budget === 'upscale') applied.push({ field: 'budget', value: 'upscale' });
   else if (ex.budget) notApplied.push({ field: 'budget', value: ex.budget });
@@ -88,6 +104,7 @@ function exclusionPlan(excluded) {
 function isExcluded(v, plan) {
   for (const { field, value } of plan.applied) {
     if (field === 'type' && hasType(v, [value])) return true;
+    if (field === 'primary_type' && v.type === value) return true;
     if (field === 'region' && v.region === value) return true;
     if (field === 'cuisine' && v.cuisine === value) return true;
     if (field === 'collection' && v.collections.includes(value)) return true;
@@ -171,4 +188,4 @@ function searchVenues(intent, venues) {
   return { total: scored.length, items: scored.map(({ venue, matchedOn }) => ({ venue, matchedOn })), exclusions: plan };
 }
 
-module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
+module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
