@@ -7813,7 +7813,7 @@ function renderGolfHeaderHtml() {
   if (!headerHtml) {
     return siteHeader('https://okanaganroam.com/', 'Explore the full directory →');
   }
-  return withFavoritesNavLink(headerHtml
+  return withBuildMyTripPlacements(withFavoritesNavLink(headerHtml
     .replace(/href="#moodCards"/g, 'href="/#moodCards"')
     .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
     .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
@@ -7825,7 +7825,7 @@ function renderGolfHeaderHtml() {
     // need app.js and turn the trip button into a real link to /trip.
     .replace(/<button class="nav-search-btn"[\s\S]*?<\/button>\s*/, '')
     .replace(/<button class="lang-toggle"[\s\S]*?<\/button>\s*/, '')
-    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>'));
+    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>'))) + '\n' + renderBuildMyTripStrip();
 }
 
 // Stage 4.4 (2026-10-01): "Favorites" in the shared navigation (desktop links
@@ -7839,6 +7839,100 @@ function renderGolfHeaderHtml() {
 // there and the header stays exactly as before; it shows from 1100px, and in
 // the mobile menu (940px and below). The rule travels with the header it
 // belongs to, so every page carrying the link carries it too.
+
+// ---------- Build My Trip discoverability (2026-10-06) ----------
+// Build My Trip is the feature that sets Okanagan Roam apart, so it is shown
+// without opening a menu: the header button (desktop, unchanged), a compact
+// strip under the header that says what it does, and the first row of the
+// mobile menu. Everything here is added at render time to the header extracted
+// from okanagan.html, which stays frozen.
+//  * withBuildMyTripPlacements(): appends the mobile-menu ordering and the click
+//    listener to a header fragment (the planner pages' own header too, which have
+//    no strip). The listener sends build_my_trip_click { placement, destination }
+//    through the page's existing window.trackEvent (GA4 config, internal-traffic
+//    flag and page_type are the existing ones). Placements, read from the link
+//    itself: header, menu, promo_strip, homepage_section.
+//  * renderBuildMyTripStrip(): the strip, with a dismiss button on pages other
+//    than the homepage.
+const BMT_MENU_STYLE = `<style id="bmt-menu">
+@media (max-width: 940px) {
+  .nav-links .nav-links-trip { order: -1; border-top: 0; padding: 12px 20px 4px; }
+  #navLinks .nav-links-trip a, #navLinks .nav-links-trip a:visited { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-radius: 12px; background: var(--ref-navy); color: var(--ref-cream); font-weight: 800; text-decoration: none; }
+  .nav-links .nav-links-trip a::after { content: "\\2192"; font-weight: 700; }
+  .nav-links .nav-links-trip a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+}
+</style>`;
+const BMT_TRACK_SCRIPT = `<script>
+(function(){
+  // Where on the page each Build My Trip link sits, read from the link itself.
+  var PLACEMENTS = [['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['.bmt-strip-cta', 'promo_strip'], ['#tripCtaOpenTrip', 'homepage_section']];
+  document.addEventListener('click', function(e){
+    try {
+      var t = e.target;
+      if (!t || !t.closest || !window.trackEvent) return;
+      for (var i = 0; i < PLACEMENTS.length; i++) {
+        if (t.closest(PLACEMENTS[i][0])) { window.trackEvent('build_my_trip_click', { placement: PLACEMENTS[i][1], destination: '/trip' }); return; }
+      }
+    } catch (err) { /* analytics must never break the site */ }
+  }, true);
+})();
+</script>`;
+// Menu ordering and the click listener, appended after a header fragment (or
+// placed after </header> on the homepage). The planner pages use it without the strip.
+const BMT_HEADER_ADDONS = `${BMT_MENU_STYLE}\n${BMT_TRACK_SCRIPT}`;
+function withBuildMyTripPlacements(headerFragment) {
+  return `${headerFragment}\n${BMT_HEADER_ADDONS}`;
+}
+const BMT_STRIP_STYLE = `<style id="bmt-strip-style">
+.bmt-strip { background: var(--ref-cream-deep, #EAE6D9); border-bottom: 1px solid rgba(27,43,58,0.10); }
+.bmt-strip[hidden] { display: none; }
+.bmt-strip-inner { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 16px; padding-top: 12px; padding-bottom: 12px; }
+.bmt-strip-title { margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 1rem; line-height: 1.25; color: var(--ref-navy, #1B2B3A); text-wrap: balance; }
+.bmt-strip-sub { display: none; margin: 2px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.88rem; line-height: 1.45; color: rgba(27,43,58,0.78); max-width: 62ch; }
+body .bmt-strip a.bmt-strip-cta, body .bmt-strip a.bmt-strip-cta:visited, body .bmt-strip a.bmt-strip-cta:hover { color: var(--ref-cream, #F5F3ED); text-decoration: none; }
+.bmt-strip-cta { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: var(--ref-cream, #F5F3ED); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.9rem; text-decoration: none; white-space: nowrap; }
+.bmt-strip-cta:hover { background: var(--ref-navy-deep, #101B24); }
+.bmt-strip-cta:focus-visible, .bmt-strip-close:focus-visible { outline: 2px solid var(--ref-gold, #C9A227); outline-offset: 2px; }
+.bmt-strip-close { position: absolute; top: 0; right: 0; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; color: rgba(27,43,58,0.6); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.bmt-strip-close:hover { color: var(--ref-navy, #1B2B3A); }
+.bmt-strip.has-close .bmt-strip-inner { padding-right: 28px; }
+@media (min-width: 641px) {
+  .bmt-strip-sub { display: block; }
+  .bmt-strip-title { font-size: 1.15rem; }
+  .bmt-strip-inner { padding-top: 14px; padding-bottom: 14px; gap: 2px 28px; }
+  .bmt-strip.has-close .bmt-strip-inner { padding-right: 44px; }
+  .bmt-strip-text { grid-column: 1; }
+  .bmt-strip-cta { grid-column: 2; }
+}
+@media (max-width: 380px) { .bmt-strip-cta { padding: 0 14px; font-size: 0.86rem; } }
+</style>`;
+function renderBuildMyTripStrip() {
+  return `${BMT_STRIP_STYLE}
+<aside class="bmt-strip" id="bmtStrip" aria-label="Build My Trip">
+  <div class="wrap bmt-strip-inner">
+    <div class="bmt-strip-text">
+      <p class="bmt-strip-title">Tell us what you&rsquo;re into. We&rsquo;ll build your Okanagan trip.</p>
+      <p class="bmt-strip-sub">Wine, food, beaches, golf, hidden gems, family fun&mdash;or a little of everything. Tell us what you want and we&rsquo;ll put it together.</p>
+    </div>
+    <a class="bmt-strip-cta" href="/trip">Build My Trip <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <button type="button" class="bmt-strip-close" id="bmtStripClose" aria-label="Hide the Build My Trip banner" hidden>&times;</button>
+  </div>
+</aside>
+<script>
+(function(){
+  var s = document.getElementById('bmtStrip'), x = document.getElementById('bmtStripClose');
+  if (s && x && location.pathname !== '/') {
+    var gone = false;
+    try { gone = window.localStorage.getItem('okrBmtStrip') === 'hidden'; } catch (e) {}
+    if (gone) s.hidden = true;
+    else {
+      x.hidden = false; s.classList.add('has-close');
+      x.addEventListener('click', function(){ s.hidden = true; try { window.localStorage.setItem('okrBmtStrip', 'hidden'); } catch (e) {} });
+    }
+  }
+})();
+</script>`;
+}
 const FAVORITES_NAV_ITEM = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
 const FAVORITES_NAV_STYLE = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
 function withFavoritesNavLink(headerHtml) {
@@ -15492,12 +15586,12 @@ function renderTripPlannerPage(v2 = false) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
     tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
     headerHtml = extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '';
-    headerHtml = withFavoritesNavLink(headerHtml
+    headerHtml = withBuildMyTripPlacements(withFavoritesNavLink(headerHtml
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
       // Same dead-anchor fix as /browse: the logo goes home from here.
-      .replace(/href="#top"/g, 'href="/"'));
+      .replace(/href="#top"/g, 'href="/"')));
   }
 
   const regionOptions = VALID_REGIONS
@@ -15657,11 +15751,11 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
   if (fs.existsSync(SITE_PATH)) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
     tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
-    headerHtml = withFavoritesNavLink((extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '')
+    headerHtml = withBuildMyTripPlacements(withFavoritesNavLink((extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '')
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
-      .replace(/href="#top"/g, 'href="/"'));
+      .replace(/href="#top"/g, 'href="/"')));
   }
   return tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
@@ -18818,6 +18912,11 @@ const server = http.createServer(async (req, res) => {
         if (oldFooterMatch) {
           html = html.replace(oldFooterMatch[0], renderHomeFooterHTML());
         }
+
+        // Build My Trip discoverability (2026-10-06): placement tags on the
+        // header button and menu link, the mobile-menu ordering, and the strip
+        // under the header (see renderBuildMyTripStrip).
+        html = html.replace('</header>', `</header>\n${BMT_HEADER_ADDONS}\n${renderBuildMyTripStrip()}`);
 
         // Anything still pointing at the now-removed sections (the header's
         // "Browse & Search" dropdown link and every homepage module's own
