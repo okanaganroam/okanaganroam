@@ -3209,6 +3209,14 @@ function discoveryVenueItem(v, matchedOn) {
   };
 }
 
+// 2026-10-06: an explicit refusal ("we don't drink alcohol", excluded.concepts)
+// rules out alcohol-first events the same way it rules out alcohol-first
+// venues (discovery-search.js isEventExcluded). Without one nothing is removed.
+function eventsAllowedByExclusions(events, excluded) {
+  if (!excluded || !Array.isArray(excluded.concepts) || !excluded.concepts.length) return events;
+  const ds = discoverySearchModule();
+  return events.filter((e) => !ds.isEventExcluded(e, excluded));
+}
 // Real, scheduled events from the What's On data for an events intent.
 function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date()) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
@@ -3220,6 +3228,7 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
       return intent.textTerms.every((t) => discoveryTextHas(text, t));
     });
   }
+  events = eventsAllowedByExclusions(events, intent.excluded);
   const items = events.slice(0, limit).map((e) => ({
     id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
     categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '',
@@ -3807,7 +3816,7 @@ function getHoursProvenanceById(ids) {
 // Events for one event part of a multi-part trip request ("a hockey game",
 // "a concert"): the same What's On window, region and category helpers the
 // events request uses, narrowed by that part's own words. Soonest first.
-function selectTripEvents(component, regions, when, now = new Date()) {
+function selectTripEvents(component, regions, when, now = new Date(), excluded = null) {
   const win = resolveWhatsOnWindow(discoveryWhatsOnWindowParams(when, now), now);
   const ev = component.event || {};
   let events = filterWhatsOnEvents(getWhatsOnEvents(win), regions || [], ev.category ? [ev.category] : []);
@@ -3817,6 +3826,7 @@ function selectTripEvents(component, regions, when, now = new Date()) {
       return ev.terms.every((t) => discoveryTextHas(text, t));
     });
   }
+  events = eventsAllowedByExclusions(events, excluded);
   return {
     window: { from: win.from, to: win.to, preset: win.preset },
     // The planner picks from these (event kind, requested time of day), so pass
@@ -3888,7 +3898,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     let eventWindow = null;
     const tripEvents = trip.components.map((c) => {
       if (c.kind !== 'event') return null;
-      const sel = selectTripEvents(c, eventRegions, trip.when, now);
+      const sel = selectTripEvents(c, eventRegions, trip.when, now, intent.excluded);
       eventWindow = eventWindow || sel.window;
       return sel.items;
     });

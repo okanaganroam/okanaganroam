@@ -173,3 +173,25 @@ test('an excluded alcohol concept rules out venues whose PRIMARY type is alcohol
   assert.deepEqual(s.exclusionPlan({ concepts: ['unknown'] }).applied, []);
   assert.deepEqual(s.exclusionPlan({}).applied, []);
 });
+
+test('an excluded alcohol concept rules out alcohol-first EVENTS by category and title, and keeps the rest', () => {
+  const ex = { concepts: ['alcohol'] };
+  const ev = (name, categories = [], description = '') => ({ name, categories, description });
+  // Alcohol-first: the stored wine-events category, or a title that names alcohol.
+  for (const e of [ev('Fall Wine Festival', ['wineries-wine-events']), ev('Open House', ['wineries-wine-events']), ev('Craft Beer Festival', ['events-festivals']),
+    ev('Brewery Open House and Tap Takeover', ['nightlife']), ev('Cocktail Night at the Lounge', ['nightlife']), ev('Whisky & Cigars', ['nightlife']), ev('The Great Okanagan Brewfest', []),
+    ev('Cidery Weekend', []), ev('Hard Cider Tasting', [])]) {
+    assert.ok(s.isEventExcluded(e, ex), e.name);
+  }
+  // Not alcohol-first: markets, family and community events, concerts, food festivals, and alcohol only in the description.
+  for (const e of [ev('Kelowna Farmers Market', ['markets-fairs']), ev('Wine Country Farmers Market', ['markets-fairs']), ev('Family Fall Fair', ['family-kids']), ev('Beer Garden Family Day', ['family-kids']),
+    ev('Community Cleanup Day', ['community-events']), ev('Lakeside Summer Concert', ['live-music']), ev('Harvest Food Festival', ['food-drink-events']),
+    ev('Ginger Festival', ['events-festivals']), ev('Fall Harvest Festival', ['events-festivals'], 'Local wine and beer available at the venue.'), ev('Trail Run', ['sports-recreation'])]) {
+    assert.ok(!s.isEventExcluded(e, ex), e.name);
+  }
+  // Without the refusal (or with an unknown concept) nothing is removed.
+  assert.equal(s.isEventExcluded(ev('Craft Beer Festival'), {}), false);
+  assert.equal(s.isEventExcluded(ev('Craft Beer Festival'), null), false);
+  assert.equal(s.isEventExcluded(ev('Craft Beer Festival'), { concepts: ['unknown'] }), false);
+  assert.equal(s.isEventExcluded(null, ex), false);
+});

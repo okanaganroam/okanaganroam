@@ -77,6 +77,46 @@ const CONCEPT_PRIMARY_TYPES = Object.freeze({
   alcohol: Object.freeze(['winery', 'brewery', 'distillery', 'pub', 'cocktail']),
 });
 
+// The same concepts for EVENTS (2026-10-06). An event is alcohol-first when
+// its stored category says so (the What's On "wineries-wine-events" category)
+// or its TITLE names alcohol as the point of the event ("Craft Beer Festival",
+// "Brewery Open House", "Cocktail Night"). Only the title is read, never the
+// description: a market or a concert that merely mentions a winery is not
+// alcohol-first. An event whose categories mark it a market, a family event
+// or a community event keeps its place unless its category is the alcohol one
+// ("Wine Country Farmers Market"). Concerts, outdoor events and food festivals
+// are untouched. Matching is by whole word (no substring: "ginger" is not "gin").
+const CONCEPT_EVENT_RULES = Object.freeze({
+  alcohol: Object.freeze({
+    categories: Object.freeze(['wineries-wine-events']),
+    keepCategories: Object.freeze(['markets-fairs', 'family-kids', 'community-events']),
+    titleWords: Object.freeze(['wine', 'wines', 'winery', 'wineries', 'vintner', 'vintners', 'sommelier',
+      'beer', 'beers', 'brew', 'brews', 'brewery', 'breweries', 'brewing', 'brewfest', 'brewpub', 'taproom', 'taprooms', 'ale', 'ales',
+      'cocktail', 'cocktails', 'mixology', 'distillery', 'distilleries', 'distilling', 'whisky', 'whiskey', 'bourbon', 'scotch',
+      'gin', 'rum', 'mead', 'cidery', 'cideries', 'liquor']),
+    titlePhrases: Object.freeze(['tap takeover', 'hard cider']),
+  }),
+});
+const eventTitleWords = (event) => String((event && event.name) || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+// True when the request's excluded concepts rule this event out. `excluded` is
+// intent.excluded; an intent without concepts excludes nothing.
+function isEventExcluded(event, excluded) {
+  const concepts = excluded && Array.isArray(excluded.concepts) ? excluded.concepts : [];
+  if (!concepts.length || !event) return false;
+  const cats = Array.isArray(event.categories) ? event.categories : [];
+  for (const concept of concepts) {
+    const rule = CONCEPT_EVENT_RULES[concept];
+    if (!rule) continue;
+    if (cats.some((c) => rule.categories.includes(c))) return true;
+    if (cats.some((c) => rule.keepCategories.includes(c))) continue;
+    const words = eventTitleWords(event);
+    if (words.some((w) => rule.titleWords.includes(w))) return true;
+    const title = ` ${words.join(' ')} `;
+    if (rule.titlePhrases.some((p) => title.includes(` ${p} `))) return true;
+  }
+  return false;
+}
+
 // Which of the request's exclusions retrieval applies, and which it does not.
 // Applied: excluded types (a venue's type or its secondary Food & Drink
 // type), regions, stored cuisines, curated lists, activities, and an excluded
@@ -188,4 +228,4 @@ function searchVenues(intent, venues) {
   return { total: scored.length, items: scored.map(({ venue, matchedOn }) => ({ venue, matchedOn })), exclusions: plan };
 }
 
-module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
+module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };

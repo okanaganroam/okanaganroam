@@ -14849,6 +14849,85 @@ test('Build My Trip: "we don\'t drink alcohol" keeps alcohol-first venues out of
   assert.ok(venueTypes(app.runTripPlan({ text: 'wineries and breweries in Kelowna' })).some((t) => ALCOHOL_FIRST.includes(t)), 'control: asking for them still works');
 });
 
+// ---- Build My Trip: an explicit "no alcohol" also applies to EVENTS (2026-10-06) --
+// Fixture events are inserted for the test and removed afterwards. "Now" is
+// fixed (Wednesday 2026-10-07) so "this weekend" is Saturday 2026-10-10.
+test('Build My Trip: "we don\'t drink alcohol" keeps alcohol-first events out of event and itinerary plans, and requests for them still work', () => {
+  const now = new Date('2026-10-07T17:00:00Z');
+  const FIXTURES = [
+    ['NoAlc Okanagan Fall Wine Festival', 'wineries-wine-events', 'Sample wines from forty wineries.'],
+    ['NoAlc Wine Tasting Evening at the Cellar', 'wineries-wine-events', 'A guided wine tasting.'],
+    ['NoAlc Craft Beer Festival', 'events-festivals', 'Beer from thirty breweries.'],
+    ['NoAlc Brewery Open House and Tap Takeover', 'nightlife', 'Tour the brewery and try new beers.'],
+    ['NoAlc Cocktail Night at the Lounge', 'nightlife', 'Cocktail tasting.'],
+    ['NoAlc Fall Harvest Festival', 'events-festivals', 'Pumpkins, hayrides and local food.'],
+    ['NoAlc Kelowna Farmers Market', 'markets-fairs', 'Fresh produce and crafts.'],
+    ['NoAlc Wine Country Farmers Market', 'markets-fairs', 'Produce from the valley.'],
+    ['NoAlc Family Fall Fair', 'family-kids', 'Rides and games.'],
+    ['NoAlc Lakeside Summer Concert', 'live-music', 'Live music by the water.'],
+    ['NoAlc Harvest Food Festival', 'food-drink-events', 'Local chefs and food trucks.'],
+    ['NoAlc Community Fall Cleanup Day', 'community-events', 'Help tidy the park.'],
+  ];
+  const ALCOHOL_EVENTS = ['NoAlc Okanagan Fall Wine Festival', 'NoAlc Wine Tasting Evening at the Cellar', 'NoAlc Craft Beer Festival', 'NoAlc Brewery Open House and Tap Takeover', 'NoAlc Cocktail Night at the Lounge'];
+  const KEPT_EVENTS = FIXTURES.map((f) => f[0]).filter((n) => !ALCOHOL_EVENTS.includes(n));
+  const ids = [];
+  const eventNames = (plan) => {
+    const found = new Set();
+    const walk = (o) => {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (o.event && o.event.name) found.add(o.event.name);
+      for (const [k, v] of Object.entries(o)) if (k !== 'understood' && k !== 'intent') walk(v);
+    };
+    walk(plan);
+    for (const e of plan.events || []) found.add(e.name);
+    return [...found].filter((n) => n.startsWith('NoAlc '));
+  };
+  try {
+    for (const [name, cat, desc] of FIXTURES) {
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const r = db.prepare("INSERT INTO events (name, slug, region, description, start_datetime, end_datetime, status, event_confidence, valley_wide) VALUES (?, ?, 'kelowna', ?, '2026-10-10 12:00:00', '2026-10-10 20:00:00', 'scheduled', 'high', 0)").run(name, slug, desc);
+      const id = Number(r.lastInsertRowid);
+      ids.push(id);
+      db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time) VALUES (?, ?, ?, ?, ?)').run(id, '2026-10-10', '2026-10-10', '12:00', '20:00');
+      db.prepare('INSERT INTO event_categories (event_id, category_key, position) VALUES (?, ?, 0)').run(id, cat);
+    }
+    const run = (text) => app.runTripPlan({ text }, now);
+    const noAlcohol = (text) => {
+      const names = eventNames(run(text));
+      assert.deepEqual(names.filter((n) => ALCOHOL_EVENTS.includes(n)), [], `${text}: no alcohol-first event`);
+      return names;
+    };
+    // Controls: without a refusal everything is offered, and a request for them still works.
+    const everything = eventNames(run("What's on this weekend in Kelowna"));
+    for (const n of FIXTURES.map((f) => f[0])) assert.ok(everything.includes(n), `control: ${n} is listed`);
+    assert.ok(eventNames(run('Wine events in Kelowna this weekend')).includes('NoAlc Okanagan Fall Wine Festival'), 'a request for wine events still returns them');
+    assert.ok(eventNames(run('Brewery events this weekend in Kelowna')).some((n) => ALCOHOL_EVENTS.includes(n)), 'a request for brewery events still returns them');
+    // With the refusal: general, weekend and region requests keep every non-alcohol event.
+    for (const text of ["What's on this weekend in Kelowna, we don't drink alcohol", "We don't drink — find events this weekend in Kelowna", "events in Kelowna this weekend, we're sober"]) {
+      const names = noAlcohol(text);
+      for (const n of KEPT_EVENTS) assert.ok(names.includes(n), `${text}: ${n} stays`);
+    }
+    // The alcohol event the visitor asked about is not recommended despite the request.
+    for (const text of ["Wine events in Kelowna this weekend, we don't drink alcohol", "Wine festivals in Kelowna this weekend, we don't drink alcohol", 'Brewery events this weekend, no alcohol', "Cocktail events this weekend, we don't drink", "beer festival this weekend in Kelowna, we're sober"]) noAlcohol(text);
+    // Dinner + an event: the festival is a non-alcohol one (the reported failure was the Craft Beer Festival).
+    const dinner = run("Dinner and a festival in Kelowna this weekend, we don't drink alcohol");
+    assert.equal(dinner.kind, 'itinerary');
+    const festival = noAlcohol("Dinner and a festival in Kelowna this weekend, we don't drink alcohol");
+    assert.ok(!festival.includes('NoAlc Craft Beer Festival'));
+    assert.deepEqual(festival, ['NoAlc Fall Harvest Festival']);
+    assert.ok(eventNames(run('Dinner and a festival in Kelowna this weekend')).length >= 1, 'control: without the refusal an event is still chosen');
+    // Venues stay as the venue fix left them.
+    assert.ok(dinner.understood.party.includes('alcohol-free'));
+  } finally {
+    for (const id of ids) {
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
+});
+
 // ---- Hub-style /browse (2026-10-05) --------------------------------------------
 // /browse is the all-venue directory in the shape of the other server-rendered
 // hubs; the wizard page it replaced is still served, unchanged, at /browse/classic.
