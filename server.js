@@ -7851,10 +7851,13 @@ function renderGolfHeaderHtml() {
 //    no strip). The listener sends build_my_trip_click { placement, destination }
 //    through the page's existing window.trackEvent (GA4 config, internal-traffic
 //    flag and page_type are the existing ones). Placements, read from the link
-//    itself: header, menu, promo_strip, homepage_section.
+//    itself: menu, promo_strip, homepage_section (the header's own button is
+//    hidden, so it no longer has one).
 //  * renderBuildMyTripStrip(): the strip, with a dismiss button on pages other
 //    than the homepage.
 const BMT_MENU_STYLE = `<style id="bmt-menu">
+/* The strip under the header is the page's Build My Trip CTA, so the header's own #navTripBtn is hidden (its markup stays). */
+.nav #navTripBtn { display: none; }
 @media (max-width: 940px) {
   .nav-links .nav-links-trip { order: -1; border-top: 0; padding: 12px 20px 4px; }
   #navLinks .nav-links-trip a, #navLinks .nav-links-trip a:visited { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-radius: 12px; background: var(--ref-navy); color: var(--ref-cream); font-weight: 800; text-decoration: none; }
@@ -7865,7 +7868,7 @@ const BMT_MENU_STYLE = `<style id="bmt-menu">
 const BMT_TRACK_SCRIPT = `<script>
 (function(){
   // Where on the page each Build My Trip link sits, read from the link itself.
-  var PLACEMENTS = [['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['.bmt-strip-cta', 'promo_strip'], ['#tripCtaOpenTrip', 'homepage_section']];
+  var PLACEMENTS = [['.nav-links-trip a', 'menu'], ['.bmt-strip-cta', 'promo_strip'], ['#tripCtaOpenTrip', 'homepage_section']];
   document.addEventListener('click', function(e){
     try {
       var t = e.target;

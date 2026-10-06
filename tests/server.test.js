@@ -14929,10 +14929,10 @@ test('Build My Trip: "we don\'t drink alcohol" keeps alcohol-first events out of
 });
 
 // ---- Build My Trip discoverability (2026-10-06) --------------------------------
-test('Build My Trip is prominent: the header button, a strip under the header, first in the mobile menu, tracked by placement', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
+test('Build My Trip is prominent: a strip under the header (the header button is hidden), first in the mobile menu, tracked by placement', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
   const count = (html, s) => html.split(s).length - 1;
   const page = async (p) => (await fetch(`${base}${p}`)).text();
-  // The homepage: header button, menu link, strip and the existing deeper section.
+  // The homepage: menu link, strip and the existing deeper section. The header's own button stays in the markup but is hidden.
   const home = await page('/');
   assert.equal(count(home, 'id="bmtStrip"'), 1);
   assert.ok(home.indexOf('</header>') < home.indexOf('id="bmtStrip"') && home.indexOf('id="bmtStrip"') < home.indexOf('class="hero'), 'the strip sits between the header and the hero');
@@ -14941,12 +14941,15 @@ test('Build My Trip is prominent: the header button, a strip under the header, f
   assert.match(home, /<a class="bmt-strip-cta" href="\/trip">Build My Trip/);
   assert.ok(home.includes('id="tripCtaOpenTrip"'), 'the existing homepage section is kept');
   assert.ok(home.includes('id="navTripBtn"') && home.includes('<li class="nav-links-trip"><a href="/trip"'));
+  const HIDE_HEADER_CTA = '.nav #navTripBtn { display: none; }';
+  assert.equal(count(home, HIDE_HEADER_CTA), 1, 'the header button is hidden by one rule');
   // On phones the menu link is the first row.
   assert.match(home, /\.nav-links \.nav-links-trip \{ order: -1;/);
   assert.ok(home.indexOf('</header>') < home.indexOf('id="bmt-menu"'), 'menu style follows the header');
-  // One listener reports through the page's own trackEvent, with the four placements.
+  // One listener reports through the page's own trackEvent, with the three placements that still exist.
   assert.equal(count(home, "window.trackEvent('build_my_trip_click'"), 1);
-  for (const placement of ['header', 'menu', 'promo_strip', 'homepage_section']) assert.ok(home.includes(`'${placement}']`), placement);
+  for (const placement of ['menu', 'promo_strip', 'homepage_section']) assert.ok(home.includes(`'${placement}']`), placement);
+  assert.ok(!home.includes("'header']") && !home.includes("['#navTripBtn'"), 'the hidden header button has no placement of its own');
   assert.ok(home.includes("destination: '/trip'"));
   // Shell pages carry the same strip (dismissible there, never on the homepage) and listener.
   for (const p of ['/browse', '/food-drink', '/hidden-gems', '/kelowna']) {
@@ -14955,16 +14958,19 @@ test('Build My Trip is prominent: the header button, a strip under the header, f
     assert.equal(count(html, "window.trackEvent('build_my_trip_click'"), 1, p);
     assert.ok(html.includes("location.pathname !== '/'"), `${p}: dismiss is skipped on the homepage`);
     assert.match(html, /\.nav-links \.nav-links-trip \{ order: -1;/, p);
+    assert.ok(html.includes('id="navTripBtn"') && count(html, HIDE_HEADER_CTA) === 1, `${p}: the header button is kept in the markup and hidden`);
   }
   // The planner pages keep their own header: menu ordering and the listener, no strip.
   const trip = await page('/trip');
   assert.equal(count(trip, 'id="bmtStrip"'), 0);
   assert.match(trip, /id="bmt-menu"/);
   assert.equal(count(trip, "window.trackEvent('build_my_trip_click'"), 1);
+  assert.equal(count(trip, HIDE_HEADER_CTA), 1, '/trip: the header button is hidden too');
   // /browse/classic is untouched.
   const classic = await page('/browse/classic');
   assert.equal(count(classic, 'bmtStrip'), 0);
   assert.equal(count(classic, 'build_my_trip_click'), 0);
+  assert.equal(count(classic, HIDE_HEADER_CTA), 0, '/browse/classic keeps its header button');
   // The existing Favorites rule still sits right after the shell header (the add-ons come after it).
   const fd = await page('/food-drink');
   const rule = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
