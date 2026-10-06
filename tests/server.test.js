@@ -14978,6 +14978,52 @@ test('Build My Trip is prominent: a strip under the header (the header button is
   assert.ok(fd.indexOf(rule) < fd.indexOf('id="bmt-menu"') && fd.indexOf('id="bmt-menu"') < fd.indexOf('id="bmtStrip"'));
 }))));
 
+// ---- Homepage hero: panoramic sunset photo (2026-10-06) ------------------------
+test('homepage hero uses the 3:1 sunset panorama with its own crop and type, scoped so /browse/classic keeps hero.webp', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
+  const page = async (p) => (await fetch(`${base}${p}`)).text();
+  const NEW = '/images/okanagan-valley-sunset-hero.webp';
+  const home = await page('/');
+  assert.match(home, /<section class="hero-scenic hero-scenic-home" id="heroScenic">/);
+  assert.ok(home.includes(`src="${NEW}" width="2000" height="667"`), 'the homepage hero image is the panorama, at its real size');
+  assert.ok(!home.includes('src="/images/hero.webp"'), 'the old hero image is gone from the homepage');
+  // Phones get their own near-square crop of the same scene; everything wider keeps the panorama.
+  const MOBILE = '/images/okanagan-valley-sunset-hero-mobile.webp';
+  assert.ok(home.includes(`<picture><source media="(max-width: 640px)" srcset="${MOBILE}" width="1159" height="1358"><img class="hero-media-img" src="${NEW}"`), 'the mobile image is a <source> for 640px and below only');
+  assert.equal(home.split(MOBILE).length - 1, 1);
+  assert.equal(home.split('id="home-hero"').length - 1, 1, 'one scoped hero style');
+  const css = home.slice(home.indexOf('id="home-hero"'), home.indexOf('</style>', home.indexOf('id="home-hero"')));
+  for (const sel of css.match(/^[^{}@\n]+(?=\{)/gm) || []) assert.match(sel.trim(), /^\.hero-scenic-home/, `every hero rule is scoped to the homepage: ${sel.trim()}`);
+  assert.match(css, /object-position:/, 'the crop is tuned with object-position');
+  assert.match(css, /font-size: clamp\(/, 'the headline scales with the viewport');
+  assert.ok(!/font-family/.test(css), 'no new font: the headline keeps its existing Fraunces rule');
+  // The rest of the homepage hero is as before: copy, search form, strip.
+  assert.ok(home.includes('data-i18n="hero.headline">Explore the Okanagan</h1>') && home.includes('id="heroSearchForm"') && home.includes('id="bmtStrip"'));
+  // /browse and /browse/classic are not touched.
+  for (const p of ['/browse', '/browse/classic']) {
+    const html = await page(p);
+    assert.ok(!html.includes('hero-scenic-home') && !html.includes('id="home-hero"') && !html.includes(NEW) && !html.includes(MOBILE), `${p}: unchanged`);
+  }
+  assert.ok((await page('/browse/classic')).includes('src="/images/hero.webp"'), '/browse/classic (the other page that uses this hero) keeps hero.webp');
+  // The image is served, is a real 2000x667 WebP and stays a sensible download.
+  const res = await fetch(`${base}${NEW}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'image/webp');
+  const buf = Buffer.from(await res.arrayBuffer());
+  assert.equal(buf.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(buf.toString('ascii', 8, 12), 'WEBP');
+  const dims = buf.toString('ascii', 12, 16) === 'VP8X' ? [1 + buf.readUIntLE(24, 3), 1 + buf.readUIntLE(27, 3)] : null;
+  if (dims) assert.deepEqual(dims, [2000, 667]);
+  assert.ok(buf.length > 50000 && buf.length < 400000, `reasonable size (${buf.length} bytes)`);
+  assert.equal((await fetch(`${base}/images/hero.webp`)).status, 200, 'hero.webp still exists');
+  const mob = await fetch(`${base}${MOBILE}`);
+  assert.equal(mob.status, 200);
+  assert.equal(mob.headers.get('content-type'), 'image/webp');
+  const mbuf = Buffer.from(await mob.arrayBuffer());
+  assert.equal(mbuf.toString('ascii', 8, 12), 'WEBP');
+  if (mbuf.toString('ascii', 12, 16) === 'VP8X') assert.deepEqual([1 + mbuf.readUIntLE(24, 3), 1 + mbuf.readUIntLE(27, 3)], [1159, 1358]);
+  assert.ok(mbuf.length > 50000 && mbuf.length < 400000, `reasonable mobile size (${mbuf.length} bytes)`);
+}))));
+
 // ---- Hub-style /browse (2026-10-05) --------------------------------------------
 // /browse is the all-venue directory in the shape of the other server-rendered
 // hubs; the wizard page it replaced is still served, unchanged, at /browse/classic.

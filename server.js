@@ -7865,6 +7865,26 @@ const BMT_MENU_STYLE = `<style id="bmt-menu">
   .nav-links .nav-links-trip a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 }
 </style>`;
+// Homepage hero (2026-10-06). A 3:1 panorama (2000x667), so the hero is tall
+// enough to show it (about 3:1 at laptop widths, never taller than 600px) and
+// object-position keeps the sunset, which sits at about 83% of the width, in
+// view when a narrow screen has to crop the sides. Phones (640px and below)
+// get their own portrait crop of the same scene (okanagan-valley-sunset-hero-mobile.webp,
+// 1159x1358) through <picture>, so the panorama is no longer cut to a third.
+// One-line headline in the
+// existing Fraunces, centred over the centred copy and search box.
+const HOME_HERO_STYLE = `<style id="home-hero">
+.hero-scenic-home { min-height: 0; height: clamp(420px, 34vw, 600px); }
+.hero-scenic-home .hero-media picture { display: block; width: 100%; height: 100%; }
+.hero-scenic-home .hero-media-img { object-position: 74% 46%; }
+.hero-scenic-home .hero-scrim { background: radial-gradient(ellipse 50% 44% at 50% 46%, rgba(18,12,8,0.30) 0%, rgba(18,12,8,0) 100%), linear-gradient(180deg, rgba(18,12,8,0.34) 0%, rgba(18,12,8,0.24) 42%, rgba(18,12,8,0.44) 100%); }
+.hero-scenic-home .hero-title { max-width: none; margin: 0 0 12px; text-align: center; font-weight: 500; font-size: clamp(1.15rem, 2.1vw + 0.55rem, 2rem); letter-spacing: 0.09em; line-height: 1.15; white-space: nowrap; text-shadow: 0 1px 2px rgba(15,10,6,0.25), 0 2px 18px rgba(15,10,6,0.45); }
+.hero-scenic-home .hero-lead { text-shadow: 0 1px 2px rgba(15,10,6,0.25), 0 1px 12px rgba(15,10,6,0.4); }
+@media (max-width: 1099px) { .hero-scenic-home { height: clamp(400px, 52vw, 460px); } .hero-scenic-home .hero-media-img { object-position: 78% 46%; } }
+@media (max-width: 640px) { .hero-scenic-home { height: clamp(340px, 92vw, 400px); } .hero-scenic-home .hero-media-img { object-position: 50% 100%; } .hero-scenic-home .hero-scrim { background: radial-gradient(ellipse 90% 50% at 50% 42%, rgba(18,12,8,0.32) 0%, rgba(18,12,8,0) 100%), linear-gradient(180deg, rgba(18,12,8,0.24) 0%, rgba(18,12,8,0.14) 42%, rgba(18,12,8,0.34) 100%); } }
+@media (min-width: 471px) and (max-width: 640px) { .hero-scenic-home .hero-media-img { object-position: 50% 78%; } }
+@media (min-width: 561px) and (max-width: 640px) { .hero-scenic-home .hero-media-img { object-position: 50% 66%; } }
+</style>`;
 const BMT_TRACK_SCRIPT = `<script>
 (function(){
   // Where on the page each Build My Trip link sits, read from the link itself.
@@ -18920,6 +18940,15 @@ const server = http.createServer(async (req, res) => {
         // header button and menu link, the mobile-menu ordering, and the strip
         // under the header (see renderBuildMyTripStrip).
         html = html.replace('</header>', `</header>\n${BMT_HEADER_ADDONS}\n${renderBuildMyTripStrip()}`);
+
+        // Homepage hero (2026-10-06): the panoramic sunset photo, with its own
+        // crop, height and type. Everything is scoped to .hero-scenic-home, a
+        // class only this route adds, so /browse/classic (which shares the hero
+        // CSS and keeps hero.webp) is unchanged.
+        html = html
+          .replace('<section class="hero-scenic" id="heroScenic">', '<section class="hero-scenic hero-scenic-home" id="heroScenic">')
+          .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile.webp" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
+          .replace('</head>', `${HOME_HERO_STYLE}\n</head>`);
 
         // Anything still pointing at the now-removed sections (the header's
         // "Browse & Search" dropdown link and every homepage module's own
