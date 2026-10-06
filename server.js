@@ -5596,6 +5596,7 @@ function renderExploreByCategoryHTML() {
 </section>`;
 }
 
+const EXPLORE_REGION_PHOTOS = Object.freeze({ kelowna: '/images/regions/kelowna-explore.webp', penticton: '/images/regions/penticton-explore.webp' });
 function renderExploreRegionsHTML() {
   // Zero database queries — a curated subset of the existing, authoritative
   // REGION_LABELS taxonomy (no new destination schema, nothing invented).
@@ -5616,11 +5617,16 @@ function renderExploreRegionsHTML() {
   // ends right after the card row, so that link is removed rather than
   // kept pointing at a since-removed #directory anchor.
   const curated = ['kelowna', 'west-kelowna', 'lake-country', 'penticton', 'naramata', 'vernon'];
+  // Kelowna and Penticton (2026-10-06): new 960x375 photos made for these
+  // cards. They have their own files so the shared 640px thumbnails (which
+  // /trip's day headers also use) stay as they were.
+  const exploreImage = (region) => (EXPLORE_REGION_PHOTOS[region] ? { src: EXPLORE_REGION_PHOTOS[region], w: 960, h: 375 } : { src: `/images/regions/${region}.webp`, w: 640, h: 250 });
   const cardHtml = curated
     .filter((region) => REGION_LABELS[region])
     .map((region) => {
+      const img = exploreImage(region);
       return `<a class="region-card" href="/${region}">
-      <img class="region-card-img" src="/images/regions/${region}.webp" width="640" height="250" alt="" loading="lazy">
+      <img class="region-card-img" src="${img.src}" width="${img.w}" height="${img.h}" alt="" loading="lazy">
       <span class="region-card-scrim" aria-hidden="true"></span>
       <span class="region-card-overlay">
         <span class="region-card-label">${escapeHtml(REGION_LABELS[region])}</span>

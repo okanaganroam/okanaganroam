@@ -2020,9 +2020,14 @@ test('Reference redesign: Explore the Okanagan shows exactly the 6 approved feat
 
 test('Reference redesign: Explore the Okanagan cards each include a real, servable destination image', () => {
   const html = app.renderExploreRegionsHTML();
+  // Kelowna and Penticton have their own 960x375 photos (2026-10-06); the other four keep their 640px thumbnails.
+  const OWN_PHOTO = { kelowna: 'kelowna-explore', penticton: 'penticton-explore' };
   for (const region of REFERENCE_EXPLORE_REGIONS) {
-    assert.match(html, new RegExp(`src="/images/regions/${region}\\.webp"`), `expected a destination image for ${region}`);
+    const file = OWN_PHOTO[region] || region;
+    assert.match(html, new RegExp(`src="/images/regions/${file}\\.webp"`), `expected a destination image for ${region}`);
+    if (OWN_PHOTO[region]) assert.match(html, new RegExp(`src="/images/regions/${file}\\.webp" width="960" height="375"`), `${region}: the new photo's real size`);
   }
+  for (const region of Object.keys(OWN_PHOTO)) assert.ok(!html.includes(`src="/images/regions/${region}.webp"`), `${region}: the old thumbnail is not used on the homepage cards`);
 });
 
 test('Reference redesign: Explore the Okanagan cards still link to their real, unchanged region pages', () => {
