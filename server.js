@@ -7825,7 +7825,7 @@ function renderGolfHeaderHtml() {
     // need app.js and turn the trip button into a real link to /trip.
     .replace(/<button class="nav-search-btn"[\s\S]*?<\/button>\s*/, '')
     .replace(/<button class="lang-toggle"[\s\S]*?<\/button>\s*/, '')
-    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>'))) + '\n' + renderBuildMyTripStrip();
+    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>')));
 }
 
 // Stage 4.4 (2026-10-01): "Favorites" in the shared navigation (desktop links
@@ -7840,24 +7840,73 @@ function renderGolfHeaderHtml() {
 // the mobile menu (940px and below). The rule travels with the header it
 // belongs to, so every page carrying the link carries it too.
 
-// ---------- Build My Trip discoverability (2026-10-06) ----------
-// Build My Trip is the feature that sets Okanagan Roam apart, so it is shown
-// without opening a menu: the header button (desktop, unchanged), a compact
-// strip under the header that says what it does, and the first row of the
-// mobile menu. Everything here is added at render time to the header extracted
-// from okanagan.html, which stays frozen.
-//  * withBuildMyTripPlacements(): appends the mobile-menu ordering and the click
-//    listener to a header fragment (the planner pages' own header too, which have
-//    no strip). The listener sends build_my_trip_click { placement, destination }
-//    through the page's existing window.trackEvent (GA4 config, internal-traffic
-//    flag and page_type are the existing ones). Placements, read from the link
-//    itself: menu, promo_strip, homepage_section (the header's own button is
-//    hidden, so it no longer has one).
-//  * renderBuildMyTripStrip(): the strip, with a dismiss button on pages other
-//    than the homepage.
-const BMT_MENU_STYLE = `<style id="bmt-menu">
-/* The strip under the header is the page's Build My Trip CTA, so the header's own #navTripBtn is hidden (its markup stays). */
-.nav #navTripBtn { display: none; }
+// ---------- Build My Trip in the header (2026-10-06) ----------
+// Build My Trip is the feature that sets Okanagan Roam apart, so it is a
+// permanent part of the header: a compact navy pill beside the search icon and
+// EN / FR on desktop and next to the hamburger on phones, plus the first row of
+// the mobile menu. (A strip under the header carried it briefly; it is gone.)
+// Everything here is added at render time to the header extracted from
+// okanagan.html, which stays frozen.
+//  * BMT_HEADER_STYLE: shows and sizes the header button (app.css hides it at
+//    940px and below) and orders the mobile menu link first.
+//  * withBuildMyTripPlacements(): appends that style and the click listener to a
+//    header fragment. The listener sends build_my_trip_click { placement,
+//    destination } through the page's existing window.trackEvent (GA4 config,
+//    internal-traffic flag and page_type are the existing ones). Placements, read
+//    from the link itself: header, menu, homepage_section.
+const BMT_HEADER_STYLE = `<style id="bmt-header">
+.nav #navTripBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; position: relative; flex-shrink: 0; min-height: 40px; padding: 0 18px; white-space: nowrap; text-decoration: none; }
+.nav #navTripBtn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+.nav #navTripBtn::after { content: ""; position: absolute; inset: -2px; }
+.nav .logo-wordmark, .nav .lang-toggle { white-space: nowrap; }
+.nav .lang-toggle, .nav .nav-search-btn { flex-shrink: 0; }
+/* 941-1100px: the links, search, EN / FR and the button have to share one line, so the logo and links tighten a little. */
+@media (min-width: 941px) and (max-width: 1100px) {
+  .nav { gap: 12px; }
+  .nav-links { gap: 12px; margin-left: 0; font-size: 0.84rem; }
+  .nav-links > li { white-space: nowrap; }
+  .nav .logo-wordmark { font-size: 1.05rem; }
+  .nav #navTripBtn { padding: 0 12px; font-size: 0.82rem; }
+}
+@media (min-width: 1101px) and (max-width: 1200px) {
+  .nav { gap: 22px; }
+  .nav-links { gap: 18px; }
+  .nav-links > li { white-space: nowrap; }
+}
+/* Phones and tablets: the button sits between EN / FR and the hamburger. */
+@media (max-width: 940px) {
+  .nav { gap: 8px; }
+  .nav-brand { flex: 1 1 0; min-width: 0; }
+  .nav .lang-toggle { padding: 6px 6px; }
+  .nav-hamburger { padding: 8px 4px; flex-shrink: 0; }
+  .nav #navTripBtn { min-height: 36px; padding: 0 12px; font-size: 0.8rem; gap: 4px; }
+  .nav #navTripBtn::after { inset: -4px -2px; }
+}
+/* The search icon returns from 481px, where there is room for it (app.css hides it at 940px and below; under 481px the hero's own search box sits right below the header). */
+@media (min-width: 481px) and (max-width: 940px) {
+  .nav .nav-search-btn { display: flex; }
+}
+/* app.css zeroes the header's vertical padding at 560px and below, which leaves the 36px pill no room for a 44px tap area. */
+@media (max-width: 560px) {
+  .nav.wrap { padding-top: 4px; padding-bottom: 4px; }
+}
+@media (max-width: 480px) {
+  .nav .logo-wordmark { font-size: 1.15rem; }
+  .nav #navTripBtn svg { display: none; }
+}
+/* French is longer ("Planifiez mon voyage"), so on small screens it takes two short lines. */
+@media (max-width: 560px) {
+  html[lang="fr"] .nav #navTripBtn { max-width: 92px; padding: 0 10px; white-space: normal; text-align: center; line-height: 1.05; font-size: 0.7rem; }
+  html[lang="fr"] .nav #navTripBtn svg { display: none; }
+}
+/* Narrowest phones: the full label would squeeze the logo, so the pill reads "Trip" ("Voyage") while its accessible name stays the full label. */
+@media (max-width: 419px) {
+  .nav .logo-wordmark { font-size: 1.1rem; }
+  .nav #navTripBtn { max-width: none; padding: 0 12px; white-space: nowrap; font-size: 0.82rem; line-height: normal; }
+  .nav #navTripBtn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .nav #navTripBtn::before { content: "Trip" / ""; }
+  html[lang="fr"] .nav #navTripBtn::before { content: "Voyage" / ""; }
+}
 @media (max-width: 940px) {
   .nav-links .nav-links-trip { order: -1; border-top: 0; padding: 12px 20px 4px; }
   #navLinks .nav-links-trip a, #navLinks .nav-links-trip a:visited { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-radius: 12px; background: var(--ref-navy); color: var(--ref-cream); font-weight: 800; text-decoration: none; }
@@ -7865,6 +7914,27 @@ const BMT_MENU_STYLE = `<style id="bmt-menu">
   .nav-links .nav-links-trip a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 }
 </style>`;
+const BMT_TRACK_SCRIPT = `<script>
+(function(){
+  // Where on the page each Build My Trip link sits, read from the link itself.
+  var PLACEMENTS = [['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['#tripCtaOpenTrip', 'homepage_section']];
+  document.addEventListener('click', function(e){
+    try {
+      var t = e.target;
+      if (!t || !t.closest || !window.trackEvent) return;
+      for (var i = 0; i < PLACEMENTS.length; i++) {
+        if (t.closest(PLACEMENTS[i][0])) { window.trackEvent('build_my_trip_click', { placement: PLACEMENTS[i][1], destination: '/trip' }); return; }
+      }
+    } catch (err) { /* analytics must never break the site */ }
+  }, true);
+})();
+</script>`;
+// The header button's styling and the click listener, appended after a header
+// fragment (or placed after </header> on the homepage).
+const BMT_HEADER_ADDONS = `${BMT_HEADER_STYLE}\n${BMT_TRACK_SCRIPT}`;
+function withBuildMyTripPlacements(headerFragment) {
+  return `${headerFragment}\n${BMT_HEADER_ADDONS}`;
+}
 // Homepage hero (2026-10-06). A 3:1 panorama (2000x667), so the hero is tall
 // enough to show it (about 3:1 at laptop widths, never taller than 600px) and
 // object-position keeps the sunset, which sits at about 83% of the width, in
@@ -7885,77 +7955,6 @@ const HOME_HERO_STYLE = `<style id="home-hero">
 @media (min-width: 471px) and (max-width: 640px) { .hero-scenic-home .hero-media-img { object-position: 50% 78%; } }
 @media (min-width: 561px) and (max-width: 640px) { .hero-scenic-home .hero-media-img { object-position: 50% 66%; } }
 </style>`;
-const BMT_TRACK_SCRIPT = `<script>
-(function(){
-  // Where on the page each Build My Trip link sits, read from the link itself.
-  var PLACEMENTS = [['.nav-links-trip a', 'menu'], ['.bmt-strip-cta', 'promo_strip'], ['#tripCtaOpenTrip', 'homepage_section']];
-  document.addEventListener('click', function(e){
-    try {
-      var t = e.target;
-      if (!t || !t.closest || !window.trackEvent) return;
-      for (var i = 0; i < PLACEMENTS.length; i++) {
-        if (t.closest(PLACEMENTS[i][0])) { window.trackEvent('build_my_trip_click', { placement: PLACEMENTS[i][1], destination: '/trip' }); return; }
-      }
-    } catch (err) { /* analytics must never break the site */ }
-  }, true);
-})();
-</script>`;
-// Menu ordering and the click listener, appended after a header fragment (or
-// placed after </header> on the homepage). The planner pages use it without the strip.
-const BMT_HEADER_ADDONS = `${BMT_MENU_STYLE}\n${BMT_TRACK_SCRIPT}`;
-function withBuildMyTripPlacements(headerFragment) {
-  return `${headerFragment}\n${BMT_HEADER_ADDONS}`;
-}
-const BMT_STRIP_STYLE = `<style id="bmt-strip-style">
-.bmt-strip { background: var(--ref-cream-deep, #EAE6D9); border-bottom: 1px solid rgba(27,43,58,0.10); }
-.bmt-strip[hidden] { display: none; }
-.bmt-strip-inner { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 16px; padding-top: 12px; padding-bottom: 12px; }
-.bmt-strip-title { margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 1rem; line-height: 1.25; color: var(--ref-navy, #1B2B3A); text-wrap: balance; }
-.bmt-strip-sub { display: none; margin: 2px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.88rem; line-height: 1.45; color: rgba(27,43,58,0.78); max-width: 62ch; }
-body .bmt-strip a.bmt-strip-cta, body .bmt-strip a.bmt-strip-cta:visited, body .bmt-strip a.bmt-strip-cta:hover { color: var(--ref-cream, #F5F3ED); text-decoration: none; }
-.bmt-strip-cta { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: var(--ref-cream, #F5F3ED); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.9rem; text-decoration: none; white-space: nowrap; }
-.bmt-strip-cta:hover { background: var(--ref-navy-deep, #101B24); }
-.bmt-strip-cta:focus-visible, .bmt-strip-close:focus-visible { outline: 2px solid var(--ref-gold, #C9A227); outline-offset: 2px; }
-.bmt-strip-close { position: absolute; top: 0; right: 0; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; color: rgba(27,43,58,0.6); font-size: 1.3rem; line-height: 1; cursor: pointer; }
-.bmt-strip-close:hover { color: var(--ref-navy, #1B2B3A); }
-.bmt-strip.has-close .bmt-strip-inner { padding-right: 28px; }
-@media (min-width: 641px) {
-  .bmt-strip-sub { display: block; }
-  .bmt-strip-title { font-size: 1.15rem; }
-  .bmt-strip-inner { padding-top: 14px; padding-bottom: 14px; gap: 2px 28px; }
-  .bmt-strip.has-close .bmt-strip-inner { padding-right: 44px; }
-  .bmt-strip-text { grid-column: 1; }
-  .bmt-strip-cta { grid-column: 2; }
-}
-@media (max-width: 380px) { .bmt-strip-cta { padding: 0 14px; font-size: 0.86rem; } }
-</style>`;
-function renderBuildMyTripStrip() {
-  return `${BMT_STRIP_STYLE}
-<aside class="bmt-strip" id="bmtStrip" aria-label="Build My Trip">
-  <div class="wrap bmt-strip-inner">
-    <div class="bmt-strip-text">
-      <p class="bmt-strip-title">Tell us what you&rsquo;re into. We&rsquo;ll build your Okanagan trip.</p>
-      <p class="bmt-strip-sub">Wine, food, beaches, golf, hidden gems, family fun&mdash;or a little of everything. Tell us what you want and we&rsquo;ll put it together.</p>
-    </div>
-    <a class="bmt-strip-cta" href="/trip">Build My Trip <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-    <button type="button" class="bmt-strip-close" id="bmtStripClose" aria-label="Hide the Build My Trip banner" hidden>&times;</button>
-  </div>
-</aside>
-<script>
-(function(){
-  var s = document.getElementById('bmtStrip'), x = document.getElementById('bmtStripClose');
-  if (s && x && location.pathname !== '/') {
-    var gone = false;
-    try { gone = window.localStorage.getItem('okrBmtStrip') === 'hidden'; } catch (e) {}
-    if (gone) s.hidden = true;
-    else {
-      x.hidden = false; s.classList.add('has-close');
-      x.addEventListener('click', function(){ s.hidden = true; try { window.localStorage.setItem('okrBmtStrip', 'hidden'); } catch (e) {} });
-    }
-  }
-})();
-</script>`;
-}
 const FAVORITES_NAV_ITEM = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
 const FAVORITES_NAV_STYLE = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
 function withFavoritesNavLink(headerHtml) {
@@ -18936,10 +18935,9 @@ const server = http.createServer(async (req, res) => {
           html = html.replace(oldFooterMatch[0], renderHomeFooterHTML());
         }
 
-        // Build My Trip discoverability (2026-10-06): placement tags on the
-        // header button and menu link, the mobile-menu ordering, and the strip
-        // under the header (see renderBuildMyTripStrip).
-        html = html.replace('</header>', `</header>\n${BMT_HEADER_ADDONS}\n${renderBuildMyTripStrip()}`);
+        // Build My Trip in the header (2026-10-06): the header button's styling,
+        // the mobile-menu ordering and the click listener (see BMT_HEADER_ADDONS).
+        html = html.replace('</header>', `</header>\n${BMT_HEADER_ADDONS}`);
 
         // Homepage hero (2026-10-06): the panoramic sunset photo, with its own
         // crop, height and type. Everything is scoped to .hero-scenic-home, a

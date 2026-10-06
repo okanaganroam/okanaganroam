@@ -14928,54 +14928,53 @@ test('Build My Trip: "we don\'t drink alcohol" keeps alcohol-first events out of
   }
 });
 
-// ---- Build My Trip discoverability (2026-10-06) --------------------------------
-test('Build My Trip is prominent: a strip under the header (the header button is hidden), first in the mobile menu, tracked by placement', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
+// ---- Build My Trip in the header (2026-10-06) ----------------------------------
+test('Build My Trip is a permanent header button (no strip under the header), first in the mobile menu, tracked by placement', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
   const count = (html, s) => html.split(s).length - 1;
   const page = async (p) => (await fetch(`${base}${p}`)).text();
-  // The homepage: menu link, strip and the existing deeper section. The header's own button stays in the markup but is hidden.
+  const STRIP_LEFTOVERS = ['bmtStrip', 'bmt-strip', 'okrBmtStrip', 'promo_strip', 'Tell us what you&rsquo;re into', 'Hide the Build My Trip banner'];
+  // The homepage: the header button and the menu link, and the existing deeper section; the hero follows the header directly.
   const home = await page('/');
-  assert.equal(count(home, 'id="bmtStrip"'), 1);
-  assert.ok(home.indexOf('</header>') < home.indexOf('id="bmtStrip"') && home.indexOf('id="bmtStrip"') < home.indexOf('class="hero'), 'the strip sits between the header and the hero');
-  assert.ok(home.includes('Tell us what you&rsquo;re into. We&rsquo;ll build your Okanagan trip.'));
-  assert.ok(home.includes('Wine, food, beaches, golf, hidden gems, family fun&mdash;or a little of everything.'));
-  assert.match(home, /<a class="bmt-strip-cta" href="\/trip">Build My Trip/);
   assert.ok(home.includes('id="tripCtaOpenTrip"'), 'the existing homepage section is kept');
-  assert.ok(home.includes('id="navTripBtn"') && home.includes('<li class="nav-links-trip"><a href="/trip"'));
-  const HIDE_HEADER_CTA = '.nav #navTripBtn { display: none; }';
-  assert.equal(count(home, HIDE_HEADER_CTA), 1, 'the header button is hidden by one rule');
-  // On phones the menu link is the first row.
-  assert.match(home, /\.nav-links \.nav-links-trip \{ order: -1;/);
-  assert.ok(home.indexOf('</header>') < home.indexOf('id="bmt-menu"'), 'menu style follows the header');
-  // One listener reports through the page's own trackEvent, with the three placements that still exist.
+  assert.match(home, /<a class="app-btn" id="navTripBtn" href="\/trip">|<button class="app-btn" id="navTripBtn" type="button">/);
+  assert.ok(home.includes('<li class="nav-links-trip"><a href="/trip"'));
+  assert.equal(count(home, 'id="bmt-header"'), 1, 'one header style');
+  assert.ok(home.indexOf('</header>') < home.indexOf('id="bmt-header"') && home.indexOf('id="bmt-header"') < home.indexOf('class="hero'), 'the header add-ons sit between the header and the hero, with nothing visible in between');
+  assert.match(home, /\.nav #navTripBtn \{ display: inline-flex;/, 'the header button is shown (app.css hides it at 940px and below)');
+  assert.ok(!home.includes('.nav #navTripBtn { display: none; }'), 'the old hide rule is gone');
+  assert.match(home, /\.nav-links \.nav-links-trip \{ order: -1;/, 'on phones the menu link is still the first row');
+  // Narrow phones: the pill reads "Trip" ("Voyage") while its accessible name stays the full label.
+  assert.ok(home.includes('content: "Trip" / ""') && home.includes('content: "Voyage" / ""'));
+  // The pill keeps a 44px tap area on phones (app.css zeroes the header's vertical padding there).
+  assert.ok(home.includes('.nav.wrap { padding-top: 4px; padding-bottom: 4px; }') && home.includes('inset: -4px -2px'));
+  for (const bit of STRIP_LEFTOVERS) assert.ok(!home.includes(bit), `the strip is gone from the homepage (${bit})`);
+  // One listener reports through the page's own trackEvent, with the three placements.
   assert.equal(count(home, "window.trackEvent('build_my_trip_click'"), 1);
-  for (const placement of ['menu', 'promo_strip', 'homepage_section']) assert.ok(home.includes(`'${placement}']`), placement);
-  assert.ok(!home.includes("'header']") && !home.includes("['#navTripBtn'"), 'the hidden header button has no placement of its own');
+  assert.ok(home.includes("[['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['#tripCtaOpenTrip', 'homepage_section']]"));
   assert.ok(home.includes("destination: '/trip'"));
-  // Shell pages carry the same strip (dismissible there, never on the homepage) and listener.
+  // Shell pages carry the same header style and listener, and no strip.
   for (const p of ['/browse', '/food-drink', '/hidden-gems', '/kelowna']) {
     const html = await page(p);
-    assert.equal(count(html, 'id="bmtStrip"'), 1, p);
+    assert.equal(count(html, 'id="bmt-header"'), 1, p);
     assert.equal(count(html, "window.trackEvent('build_my_trip_click'"), 1, p);
-    assert.ok(html.includes("location.pathname !== '/'"), `${p}: dismiss is skipped on the homepage`);
     assert.match(html, /\.nav-links \.nav-links-trip \{ order: -1;/, p);
-    assert.ok(html.includes('id="navTripBtn"') && count(html, HIDE_HEADER_CTA) === 1, `${p}: the header button is kept in the markup and hidden`);
+    assert.match(html, /<a class="app-btn" id="navTripBtn" href="\/trip">/, p);
+    for (const bit of STRIP_LEFTOVERS) assert.ok(!html.includes(bit), `${p}: no strip (${bit})`);
   }
-  // The planner pages keep their own header: menu ordering and the listener, no strip.
+  // The planner pages keep their own header: the same header style and listener.
   const trip = await page('/trip');
-  assert.equal(count(trip, 'id="bmtStrip"'), 0);
-  assert.match(trip, /id="bmt-menu"/);
+  assert.equal(count(trip, 'id="bmt-header"'), 1);
   assert.equal(count(trip, "window.trackEvent('build_my_trip_click'"), 1);
-  assert.equal(count(trip, HIDE_HEADER_CTA), 1, '/trip: the header button is hidden too');
+  for (const bit of STRIP_LEFTOVERS) assert.ok(!trip.includes(bit), `/trip: no strip (${bit})`);
   // /browse/classic is untouched.
   const classic = await page('/browse/classic');
-  assert.equal(count(classic, 'bmtStrip'), 0);
+  assert.equal(count(classic, 'bmt-header'), 0);
   assert.equal(count(classic, 'build_my_trip_click'), 0);
-  assert.equal(count(classic, HIDE_HEADER_CTA), 0, '/browse/classic keeps its header button');
   // The existing Favorites rule still sits right after the shell header (the add-ons come after it).
   const fd = await page('/food-drink');
   const rule = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
   assert.ok(fd.indexOf(rule) - fd.indexOf('</header>') < 20);
-  assert.ok(fd.indexOf(rule) < fd.indexOf('id="bmt-menu"') && fd.indexOf('id="bmt-menu"') < fd.indexOf('id="bmtStrip"'));
+  assert.ok(fd.indexOf(rule) < fd.indexOf('id="bmt-header"'));
 }))));
 
 // ---- Homepage hero: panoramic sunset photo (2026-10-06) ------------------------
@@ -14996,8 +14995,8 @@ test('homepage hero uses the 3:1 sunset panorama with its own crop and type, sco
   assert.match(css, /object-position:/, 'the crop is tuned with object-position');
   assert.match(css, /font-size: clamp\(/, 'the headline scales with the viewport');
   assert.ok(!/font-family/.test(css), 'no new font: the headline keeps its existing Fraunces rule');
-  // The rest of the homepage hero is as before: copy, search form, strip.
-  assert.ok(home.includes('data-i18n="hero.headline">Explore the Okanagan</h1>') && home.includes('id="heroSearchForm"') && home.includes('id="bmtStrip"'));
+  // The rest of the homepage hero is as before: copy and search form.
+  assert.ok(home.includes('data-i18n="hero.headline">Explore the Okanagan</h1>') && home.includes('id="heroSearchForm"'));
   // /browse and /browse/classic are not touched.
   for (const p of ['/browse', '/browse/classic']) {
     const html = await page(p);
