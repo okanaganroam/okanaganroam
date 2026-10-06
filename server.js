@@ -15755,6 +15755,21 @@ const tripPlannerV3PageModule = (() => { try { return require('./trip-planner-v3
 // the same-size WebP of the current PNG. Native widths are listed here for
 // srcset; phones get the 640px thumbnail where one exists.
 const TRIP_V3_WIDE_REGION_WIDTHS = { kelowna: 1648, 'lake-country': 1648, naramata: 1648, penticton: 1648, vernon: 1648, 'west-kelowna': 1648, oliver: 1376, osoyoos: 928, summerland: 928 };
+// Build My Trip real-map day header (prototype, one region): the region's
+// stored town-centre coordinates (BROWSE_NEAR_ME_COORDS, the same points "Near
+// me" measures against) and the group the footer lists it under. Evaluated
+// when the page is rendered, because that table is defined further down.
+function tripV3MapHeaders() {
+  const out = {};
+  for (const slug of ['penticton']) {
+    const c = BROWSE_NEAR_ME_COORDS[slug];
+    if (!Array.isArray(c) || c.length !== 2) continue;
+    const g = FOOTER_REGION_GROUPS.find((x) => x.regions.includes(slug));
+    // Framing: zoom 13, nudged north so the marker sits in the lower third and Okanagan Lake fills the rest.
+    out[slug] = { center: c, view: [c[0] + 0.0042, c[1]], zoom: 13, group: g ? { key: g.labelKey, label: g.label === 'Ski resorts' ? g.label : `${g.label} Okanagan` } : null };
+  }
+  return out;
+}
 const TRIP_V3_REGION_IMAGES = (() => {
   const out = {};
   const has = (rel) => fs.existsSync(path.join(__dirname, 'public', 'images', rel));
@@ -15799,6 +15814,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     analyticsHead: renderAnalyticsHeadHtml('trip_v3'),
     regions: VALID_REGIONS.map((slug) => ({ slug, label: REGION_LABELS[slug] })),
     regionImages: TRIP_V3_REGION_IMAGES,
+    mapHeaders: tripV3MapHeaders(),
     appScriptSrc: APP_JS_SRC,
     preview,
   });
@@ -21349,6 +21365,7 @@ module.exports = {
   tripPlannerV3ActiveFor,
   renderTripPlannerV3Page,
   TRIP_V3_REGION_IMAGES,
+  tripV3MapHeaders,
   APP_JS_SRC,
   appJsSrcFor,
   buildTripPlannerFacts,

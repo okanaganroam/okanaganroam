@@ -13368,6 +13368,30 @@ test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails cl
   });
 });
 
+// ---- Build My Trip real-map day header: Penticton prototype (2026-10-06) -------
+test('map day header prototype: only Penticton, from the stored town centre; other regions and the homepage are untouched', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
+  const mh = app.tripV3MapHeaders();
+  assert.deepEqual(Object.keys(mh), ['penticton'], 'one region only');
+  assert.deepEqual(mh.penticton.center, [49.5008, -119.5939], "Penticton's stored town-centre coordinates (the ones Near me uses)");
+  assert.deepEqual(mh.penticton.group, { key: 'wizard.south', label: 'South Okanagan' });
+  assert.equal(mh.penticton.zoom, 13, 'tight framing');
+  assert.ok(mh.penticton.view[0] > mh.penticton.center[0] && mh.penticton.view[0] - mh.penticton.center[0] < 0.01 && mh.penticton.view[1] === mh.penticton.center[1], 'view nudged north only, town marker stays at the real centre');
+  const page = app.renderTripPlannerV3Page({ preview: true });
+  assert.ok(page.includes('var MAP_HEADERS = {"penticton":{"center":[49.5008,-119.5939]'), 'the real coordinates reach the page');
+  assert.ok(page.includes('var head = MAP_HEADERS[d.region] ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('), 'every other region keeps its existing header');
+  // The existing map stack is reused: the same Leaflet, the same tiles, one attribution link beside the map.
+  assert.equal(page.split('leaflet/1.9.4/').length - 1, 1, 'Leaflet is still defined in one pinned place (no second mapping library or provider)');
+  assert.ok(page.includes("L.tileLayer(MAP_TILES, { maxZoom: 15 })") && page.includes('https://www.openstreetmap.org/copyright'));
+  // Context only: not interactive, no keyboard stops, hidden from assistive technology, no route line.
+  for (const bit of ['dragging: false', 'scrollWheelZoom: false', 'doubleClickZoom: false', 'keyboard: false', 'zoomControl: false', 'attributionControl: false', 'interactive: false', 'aria-hidden="true"']) assert.ok(page.includes(bit), bit);
+  assert.ok(!/mapHeadHtml[\s\S]{0,4000}polyline/.test(page), 'no invented route line in the header map');
+  // "Map this day" is unchanged.
+  assert.ok(page.includes('data-t3-map-day') && page.includes("esc(tx('tripv3.mapDay'))"));
+  // The homepage does not carry any of it.
+  const home = await (await fetch(`${base}/`)).text();
+  assert.ok(!home.includes('t3-day-head--map') && !home.includes('MAP_HEADERS'));
+}))));
+
 test('Build My Trip V3 images: day headers map to the full-size copies with srcset widths that match the files; phones get the 640px thumbnail', () => {
   const m = app.TRIP_V3_REGION_IMAGES;
   for (const slug of ['kelowna', 'lake-country', 'naramata', 'penticton', 'vernon', 'west-kelowna']) {

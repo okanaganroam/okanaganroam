@@ -259,6 +259,41 @@ function renderStyles() {
   .t3-day-head { position: relative; border-radius: 16px; overflow: hidden; min-height: 150px; display: flex; align-items: flex-end; background: var(--ref-navy); color: #fff; margin-bottom: 14px; }
   .t3-day-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .t3-day-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 20%, rgba(16,27,36,0.85) 100%); }
+  /* Map day header (prototype): a cream card, the day's details on the left and a real map on the right. */
+  .t3-day .t3-day-head--map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-areas: "info map" "actions map"; align-items: end; gap: 0 18px; min-height: 0; padding: 0; background: var(--ref-cream, #F5F3ED); color: var(--ref-navy, #1B2B3A); border: 1px solid rgba(27,43,58,0.14); }
+  .t3-dh-info { grid-area: info; align-self: start; padding: 20px 0 0 22px; min-width: 0; }
+  .t3-day-head--map .t3-eyebrow { margin: 0 0 4px; color: var(--teal-deep, #1E4F4C); }
+  .t3-day-head--map .t3-day-title { color: var(--ref-navy, #1B2B3A); }
+  .t3-dh-sub { margin: 2px 0 0; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(27,43,58,0.62); }
+  .t3-dh-meta { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy, #1B2B3A); }
+  .t3-day-head--map .t3-day-theme { color: var(--teal-deep, #1E4F4C); }
+  .t3-day-head--map .t3-day-actions { grid-area: actions; padding: 14px 0 18px 22px; }
+  .t3-day-head--map .t3-day-actions .t3-btn { background: #fff; border: 1px solid rgba(27,43,58,0.16); }
+  .t3-dh-map { grid-area: map; position: relative; margin: 10px 10px 10px 0; min-height: 200px; border-radius: 12px; overflow: hidden; background: #E8E3D3; }
+  .t3-dh-canvas { position: absolute; inset: 0; background: #E8E3D3; }
+  .t3-dh-canvas .leaflet-tile-pane { filter: saturate(0.55) sepia(0.18) contrast(0.96); }
+  .t3-dh-map.is-failed::after { content: attr(data-unavailable); position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: rgba(27,43,58,0.55); }
+  .t3-dh-attr { position: absolute; right: 0; bottom: 0; z-index: 800; padding: 1px 6px; font-size: 0.66rem; line-height: 1.5; color: rgba(27,43,58,0.78); background: rgba(245,243,237,0.88); text-decoration: none; border-top-left-radius: 6px; }
+  .t3-dh-attr:hover, .t3-dh-attr:focus-visible { text-decoration: underline; }
+  .t3-dh-pin span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%; background: var(--ref-navy, #1B2B3A); color: var(--ref-cream, #F5F3ED); border: 2px solid #fff; font-size: 0.7rem; font-weight: 800; box-shadow: 0 1px 4px rgba(16,27,36,0.35); }
+  /* The destination is a hollow ring so the map's own town label stays readable underneath it. */
+  .t3-dh-pin--town span { background: transparent; border: 2.5px solid var(--ref-gold, #C9A227); box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8), inset 0 0 0 1.5px rgba(255,255,255,0.55); }
+  @media (max-width: 720px) {
+    .t3-day .t3-day-head--map { grid-template-columns: minmax(0, 1fr); grid-template-areas: "info" "map" "actions"; gap: 0; }
+    .t3-dh-info { padding: 10px 16px 0; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "day sub" "title title" "meta meta" "theme theme"; column-gap: 10px; align-items: baseline; }
+    .t3-dh-info .t3-eyebrow { grid-area: day; }
+    .t3-dh-info .t3-dh-sub { grid-area: sub; margin: 0; }
+    .t3-dh-info .t3-day-title { grid-area: title; }
+    .t3-dh-info .t3-dh-meta { grid-area: meta; margin-top: 2px; }
+    .t3-dh-info .t3-day-theme { grid-area: theme; }
+    .t3-dh-map { margin: 6px 12px 0; min-height: 0; height: auto; overflow: visible; background: none; border-radius: 0; }
+    .t3-dh-canvas { position: relative; inset: auto; height: 120px; border-radius: 12px; overflow: hidden; }
+    /* Attribution sits in its own quiet strip beneath the map, never over it. */
+    .t3-dh-attr { position: static; display: flex; align-items: center; justify-content: flex-end; min-height: 22px; padding: 0 2px; background: none; border-radius: 0; font-size: 0.68rem; color: rgba(27,43,58,0.66); }
+    .t3-day-head--map .t3-day-actions { padding: 0 12px 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .t3-day-head--map .t3-day-actions .t3-btn { justify-content: center; text-align: center; min-height: 44px; padding: 6px 4px; font-size: 0.78rem; line-height: 1.15; }
+    .t3-day-head--map .t3-day-actions [data-t3-map-day] { order: -1; }
+  }
   .t3-day-headin { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; width: 100%; padding: 18px 20px; }
   .t3-day-title { font-family: 'Fraunces', serif; font-size: clamp(1.3rem, 2.4vw, 1.7rem); margin: 0; color: #fff; }
   .t3-day-theme { margin: 4px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-gold); }
@@ -411,6 +446,8 @@ function renderScript(d) {
   var REGIONS = ${JSON.stringify(d.regions)};
   var REGION_SLUGS = REGIONS.map(function(r){ return r.slug; });
   var REGION_IMAGES = ${JSON.stringify(d.regionImages)};
+  // Day headers that show a real map instead of a photograph (a prototype for one region): { slug: { center: [lat, lng], group: { key, label } } }.
+  var MAP_HEADERS = ${JSON.stringify(d.mapHeaders || {})};
   var TRIP_MAX_STOPS = 10; // My Trip's own limit (MAX_STOPS in /scripts/app.js)
   ${CLIENT_HELPERS_SRC}
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
@@ -432,6 +469,13 @@ function renderScript(d) {
   }
   function frLabel(key, english){ if (lang() !== 'fr') return english; var s = tx(key); return s === key ? english : s; }
   function num(n){ return lang() === 'fr' ? String(n).replace('.', ',') : String(n); }
+  // Strings for the map day header (new; kept here so the shared dictionary in app.js stays untouched).
+  var DH_TEXT = { en: { stop1: '1 stop', stopN: '{n} stops', attr: '\u00a9 OpenStreetMap contributors', unavailable: 'Map unavailable' }, fr: { stop1: '1 arr\u00eat', stopN: '{n} arr\u00eats', attr: '\u00a9 contributeurs OpenStreetMap', unavailable: 'Carte indisponible' } };
+  function dh(key, vars){
+    var s = (DH_TEXT[lang()] || DH_TEXT.en)[key] || DH_TEXT.en[key] || key;
+    if (vars) Object.keys(vars).forEach(function(k){ s = s.split('{' + k + '}').join(String(vars[k])); });
+    return s;
+  }
   function kmText(km){
     if (km === null || km === undefined) return null;
     return km < 1 ? tx('tripv3.kmUnder') : tx('tripv3.kmAbout', { n: num(km < 10 ? Math.round(km * 10) / 10 : Math.round(km)) });
@@ -845,6 +889,80 @@ function renderScript(d) {
     });
     return html + '</ol>';
   }
+  // ---- real-map day header (prototype, one region) ----
+  // The header's map is context, not a second "Map this day": Leaflet and the
+  // OpenStreetMap tiles are the ones the whole-trip map already uses, loaded the
+  // same lazy way and only for the days that show a map. It is not interactive
+  // (no dragging, zoom, keyboard or controls), is hidden from assistive
+  // technology (the day's name is already text, "Map this day" is the way into
+  // a map) and its attribution is a plain link beside it. Pins are the day's
+  // real stops, numbered as the cards are; a stop without a stored location is
+  // simply not drawn. No route line is drawn: none exists.
+  var dayMaps = [], dayMapData = {}, dayMapObserver = null;
+  function mapHeadHtml(d, mh, maps){
+    var shown = d.stops.filter(function(s){ return (s.venue || (s.kind === 'event' && s.event)) && !state.removed[d.day + '-' + s.daypart]; }).length;
+    var pts = ((t3MapPoints([d], state.removed).days[0] || {}).points) || [];
+    dayMapData[d.day] = { center: mh.center, view: mh.view || mh.center, zoom: mh.zoom || 13, points: pts };
+    var km = 0;
+    for (var i = 1; i < pts.length; i++) km += t3Km({ latitude: pts[i - 1].lat, longitude: pts[i - 1].lng }, { latitude: pts[i].lat, longitude: pts[i].lng }) || 0;
+    // Straight-line distance, and only when every shown stop has a location.
+    var meta = [shown === 1 ? dh('stop1') : dh('stopN', { n: shown })];
+    if (shown > 1 && pts.length === shown) meta.push(kmText(km));
+    var group = mh.group ? (lang() === 'fr' ? tx(mh.group.key) : mh.group.label) : '';
+    return '<div class="t3-day-head t3-day-head--map" data-t3-map-header>'
+      + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + (group ? '<p class="t3-dh-sub">' + esc(group) + '</p>' : '')
+      + '<p class="t3-dh-meta">' + meta.map(esc).join(' · ') + '</p>'
+      + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
+      + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
+      + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
+      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div>'
+      + '<div class="t3-dh-map"><div class="t3-dh-canvas" data-t3-dhmap="' + d.day + '" aria-hidden="true"></div>'
+      + '<a class="t3-dh-attr" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' + esc(dh('attr')) + '</a></div>'
+      + '</div>';
+  }
+  function destroyDayMaps(){
+    if (dayMapObserver) { dayMapObserver.disconnect(); dayMapObserver = null; }
+    dayMaps.forEach(function(m){ try { m.remove(); } catch (e) {} });
+    dayMaps = [];
+  }
+  function initDayMaps(){
+    var els = resultEl.querySelectorAll('[data-t3-dhmap]');
+    if (!els.length) return;
+    function boot(el){
+      loadLeaflet(function(ok){
+        if (!el.parentNode || el.getAttribute('data-ready')) return;
+        if (!ok) { el.parentNode.classList.add('is-failed'); el.parentNode.setAttribute('data-unavailable', dh('unavailable')); return; }
+        var data = dayMapData[el.getAttribute('data-t3-dhmap')];
+        if (!data) return;
+        try {
+          var m = L.map(el, { zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false, zoomAnimation: false, fadeAnimation: false, inertia: false, zoomSnap: 0.25 });
+          L.tileLayer(MAP_TILES, { maxZoom: 15 }).addTo(m);
+          var inert = { interactive: false, keyboard: false };
+          var bounds = [data.center];
+          L.marker(data.center, Object.assign({ icon: L.divIcon({ className: 't3-dh-pin t3-dh-pin--town', html: '<span></span>', iconSize: [20, 20], iconAnchor: [10, 10] }), zIndexOffset: -100 }, inert)).addTo(m);
+          data.points.forEach(function(p){
+            var at = [p.lat, p.lng];
+            bounds.push(at);
+            L.marker(at, Object.assign({ icon: L.divIcon({ className: 't3-dh-pin', html: '<span>' + p.n + '</span>', iconSize: [22, 22], iconAnchor: [11, 11] }) }, inert)).addTo(m);
+          });
+          // Penticton itself is always in view, so the lakes keep their context.
+          var b = L.latLngBounds(bounds);
+          if (bounds.length === 1) m.setView(data.view, data.zoom); else m.fitBounds(b, { padding: [26, 26], maxZoom: 13 });
+          el.setAttribute('data-ready', '1');
+          dayMaps.push(m);
+        } catch (e) { el.parentNode.classList.add('is-failed'); el.parentNode.setAttribute('data-unavailable', dh('unavailable')); }
+      });
+    }
+    if ('IntersectionObserver' in window) {
+      dayMapObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){ if (e.isIntersecting) { dayMapObserver.unobserve(e.target); boot(e.target); } });
+      }, { rootMargin: '300px 0px' });
+      Array.prototype.forEach.call(els, function(el){ dayMapObserver.observe(el); });
+    } else {
+      Array.prototype.forEach.call(els, boot);
+    }
+  }
   function dayHtml(d, counts){
     var img = REGION_IMAGES[d.region];
     // The day header spans the content width (16px / 32px side padding, at
@@ -853,18 +971,20 @@ function renderScript(d) {
     var imgHtml = img ? '<img class="t3-day-img" src="' + esc(img.src) + '"' + (img.srcset ? ' srcset="' + esc(img.srcset) + '" sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1180px) calc(100vw - 64px), 1116px"' : '') + ' alt="" loading="lazy" decoding="async">' : '';
     var dayStops = d.stops.filter(function(s){ return s.venue && !state.removed[d.day + '-' + s.daypart]; });
     var maps = t3MapsUrl(dayStops.map(function(s){ return tripQuery(s.venue); }));
-    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-labelledby="t3-day-title-' + d.day + '">'
-      + '<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
+    var head = MAP_HEADERS[d.region] ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
       + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
-      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>'
+      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>');
+    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-labelledby="t3-day-title-' + d.day + '">'
+      + head
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
       + '</section>';
   }
   function render(focus){
     var p = state.last;
+    dayMapData = {};
     var counts = nameCounts();
     var planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';
     var hasStops = planKinds || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary && (p.itinerary.stops || []).length);
@@ -912,9 +1032,11 @@ function renderScript(d) {
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" href="' + esc(p.seeAll.url) + '">' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';
     detachMap();
+    destroyDayMaps();
     resultEl.innerHTML = html;
     resultEl.hidden = false;
     placeMap();
+    initDayMaps();
     if (howEl) howEl.hidden = true;
     if (window.__syncFavButtons) window.__syncFavButtons();
     if (window.__syncTripButtons) window.__syncTripButtons();
