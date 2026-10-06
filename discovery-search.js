@@ -77,6 +77,25 @@ const CONCEPT_PRIMARY_TYPES = Object.freeze({
   alcohol: Object.freeze(['winery', 'brewery', 'distillery', 'pub', 'cocktail']),
 });
 
+// Words that stand for an excluded concept itself. When a request carries the
+// refusal, none of these may also be searched for as if the visitor wanted
+// them: a refusal worded in a way no alias recognises must not leave
+// "alcohol" behind as a positive search word ("Nothing matching 'alcohol'...").
+// discovery-intent.js keeps an identical list (it is a standalone module) and
+// applies it when interpreting; the planner applies this one again, so the
+// rule holds for any intent it is handed. A test pins the two lists together.
+const CONCEPT_STRAY_WORDS = Object.freeze({
+  alcohol: Object.freeze(['alcohol', 'alcohols', 'alcoholic', 'booze', 'boozy', 'liquor', 'liquors', 'drink', 'drinks', 'drinking', 'drinker', 'drinkers', 'nobody']),
+});
+// Removes an excluded concept's stray words from a list of search terms
+// (strings, or { term, cuisine } objects). Stored cuisines are never removed.
+function withoutConceptStrays(terms, excluded) {
+  const concepts = excluded && Array.isArray(excluded.concepts) ? excluded.concepts : [];
+  if (!concepts.length) return terms;
+  const strays = new Set(concepts.flatMap((c) => CONCEPT_STRAY_WORDS[c] || []));
+  return terms.filter((t) => (typeof t === 'string' ? !strays.has(t) : !!t.cuisine || !strays.has(t.term)));
+}
+
 // The same concepts for EVENTS (2026-10-06). An event is alcohol-first when
 // its stored category says so (the What's On "wineries-wine-events" category)
 // or its TITLE names alcohol as the point of the event ("Craft Beer Festival",
@@ -228,4 +247,4 @@ function searchVenues(intent, venues) {
   return { total: scored.length, items: scored.map(({ venue, matchedOn }) => ({ venue, matchedOn })), exclusions: plan };
 }
 
-module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
+module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_STRAY_WORDS, withoutConceptStrays, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };

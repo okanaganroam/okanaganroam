@@ -937,3 +937,47 @@ test('the alcohol concept is not triggered by other drinks, other negations or t
   assert.equal(I('alcohol free restaurants in Kelowna').excluded.concepts, undefined);
   assert.deepEqual(I('non alcoholic drinks in Kelowna').excluded, EMPTY_EXCLUDED);
 });
+
+// ---- alcohol refusal: more ways of saying it (2026-10-06, follow-up) ---------------
+test('more natural refusals of alcohol are recorded as the alcohol concept', () => {
+  for (const q of ['alcohol is not our thing', 'Nobody wants alcohol.', "We don't want alcohol", "we don't want to drink", "We're not into alcohol", "alcohol isn't for us", 'no wine or beer please',
+    'no beer or wine', 'No one wants to drink', 'we do not want any alcohol', 'alcohol is not for me', 'no wine, beer or spirits',
+    'alcohol free, Kelowna', 'an alcohol-free weekend', 'we want an alcohol-free trip', 'alcohol free']) {
+    const x = I(q);
+    assert.deepEqual(x.excluded.concepts, ['alcohol'], q);
+    assert.deepEqual(x.features, [], `${q}: not the venue badge`);
+    assert.deepEqual(x.textTerms, [], `${q}: nothing left as a search word`);
+    assert.deepEqual(x.unsupported, [], q);
+    assert.notEqual(x.mode, 'unknown', q);
+  }
+  assert.deepEqual(I('alcohol free, Kelowna').regions, ['kelowna']);
+});
+
+test('the alcohol refusal does not catch other drinks, a venue badge, or a positive wish', () => {
+  for (const q of ["we don't want to drink coffee", "we don't want coffee", 'nobody wants coffee', "we're not into coffee", 'wine or beer in Kelowna', 'wineries and breweries in Penticton', 'we love beer', 'no wineries']) {
+    assert.equal(I(q).excluded.concepts, undefined, q);
+  }
+  // "alcohol free" describing a venue is still the badge, before or after the noun.
+  for (const q of ['alcohol-free restaurant in Kelowna', 'alcohol free restaurants in Kelowna', 'restaurants in Kelowna that are alcohol free', 'alcohol free drinks in Kelowna', 'alcohol free options in Penticton', 'a cafe that is alcohol free']) {
+    assert.equal(I(q).excluded.concepts, undefined, q);
+    assert.deepEqual(I(q).features, ['nonalcoholic'], q);
+  }
+  assert.deepEqual(I('we love beer').types, ['brewery']);
+  assert.deepEqual(I('no wineries').excluded.types, ['winery']);
+});
+
+test('structural guard: a recorded alcohol refusal never leaves "alcohol" (or its synonyms) behind as a search word', () => {
+  // The refusal is recognised ("we do not want to drink") but the sentence also names alcohol in a way no alias covers.
+  for (const q of ['we do not want to drink, alcohol sounds awful', 'we do not want to drink, the booze scene is not for us', 'no alcohol, alcohol is boring in Kelowna']) {
+    const x = I(q);
+    assert.deepEqual(x.excluded.concepts, ['alcohol'], q);
+    for (const w of ['alcohol', 'booze', 'liquor', 'drink', 'drinking']) {
+      assert.ok(!x.textTerms.includes(w), `${q}: "${w}" is not a search term`);
+      assert.ok(!x.foodTerms.some((f) => f.term === w), `${q}: "${w}" is not a food term`);
+    }
+  }
+  // Without the refusal the same words are untouched.
+  assert.ok(I('alcohol sounds great').textTerms.includes('alcohol'));
+  // Stored cuisines are never stripped by the guard.
+  assert.equal(d.DISCOVERY_CONCEPT_STRAY_WORDS.alcohol.includes('italian'), false);
+});

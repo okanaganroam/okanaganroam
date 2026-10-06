@@ -352,8 +352,43 @@ const CONCEPT_ALIASES = {
     'alcohol free activities', 'alcohol free activity', 'alcohol free trip', 'alcohol free day', 'alcohol free weekend',
     'alcohol free itinerary', 'alcohol free vacation', 'alcohol free getaway', 'alcohol free things to do', 'alcohol free fun',
     'alcohol free experiences', 'non alcoholic activities', 'non alcoholic trip',
+    // Other ways of saying it (2026-10-06, follow-up).
+    'alcohol is not our thing', 'alcohol is not my thing', 'alcohol is not for us', 'alcohol is not for me',
+    'nobody wants alcohol', 'no one wants alcohol', 'nobody wants to drink', 'no one wants to drink',
+    'do not want alcohol', 'does not want alcohol', 'do not want any alcohol', 'do not want booze', 'do not need alcohol',
+    'do not want to drink', 'does not want to drink',
+    'not into alcohol', 'not into booze',
+    'no wine or beer', 'no beer or wine', 'no wine and beer', 'no beer and wine',
+    'no wine beer or spirits', 'no wine or beer or spirits', 'no beer wine or spirits',
   ],
 };
+// "alcohol free" is a venue badge ("alcohol free restaurants") unless it is
+// said about the trip itself ("alcohol free, Kelowna"). It is the badge when a
+// venue or drink word sits right after it or shortly before it.
+const ALCOHOL_FREE_BADGE_AFTER = new Set(['restaurant', 'restaurants', 'cafe', 'cafes', 'bar', 'bars', 'pub', 'pubs', 'lounge', 'lounges', 'place', 'places', 'spot', 'spots',
+  'venue', 'venues', 'patio', 'patios', 'eatery', 'eateries', 'bistro', 'bistros', 'dining', 'food', 'menu', 'menus', 'option', 'options', 'drink', 'drinks', 'beverage', 'beverages',
+  'beer', 'beers', 'wine', 'wines', 'cocktail', 'cocktails', 'mocktail', 'mocktails', 'spirits', 'coffee', 'tea']);
+const ALCOHOL_FREE_BADGE_BEFORE = new Set(['restaurant', 'restaurants', 'cafe', 'cafes', 'bar', 'bars', 'pub', 'pubs', 'lounge', 'lounges', 'place', 'places', 'spot', 'spots',
+  'venue', 'venues', 'patio', 'patios', 'eatery', 'eateries', 'bistro', 'bistros', 'menu', 'menus']);
+function isTripLevelAlcoholFree(hit, tokens) {
+  if (hit.phrase !== 'alcohol free') return false;
+  if (ALCOHOL_FREE_BADGE_AFTER.has(tokens[hit.end])) return false;
+  for (let k = Math.max(0, hit.start - 6); k < hit.start; k++) if (ALCOHOL_FREE_BADGE_BEFORE.has(tokens[k])) return false;
+  return true;
+}
+// Words that stand for an excluded concept itself: with the refusal recorded,
+// none may remain as a positive search term (see the guard at the end of
+// interpretDiscoveryQuery). discovery-search.js keeps the same list for the
+// planner; a test pins the two together.
+const CONCEPT_STRAY_WORDS = Object.freeze({
+  alcohol: Object.freeze(['alcohol', 'alcohols', 'alcoholic', 'booze', 'boozy', 'liquor', 'liquors', 'drink', 'drinks', 'drinking', 'drinker', 'drinkers', 'nobody']),
+});
+function withoutConceptStrays(terms, excluded) {
+  const concepts = excluded && Array.isArray(excluded.concepts) ? excluded.concepts : [];
+  if (!concepts.length) return terms;
+  const strays = new Set(concepts.flatMap((c) => CONCEPT_STRAY_WORDS[c] || []));
+  return terms.filter((t) => (typeof t === 'string' ? !strays.has(t) : !!t.cuisine || !strays.has(t.term)));
+}
 // "we don't drink coffee" is not a refusal of alcohol.
 const NON_ALCOHOLIC_DRINK_WORDS = new Set(['coffee', 'coffees', 'tea', 'teas', 'water', 'milk', 'soda', 'sodas', 'pop', 'juice', 'juices', 'smoothie', 'smoothies', 'caffeine', 'coke']);
 
@@ -959,7 +994,10 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
       switch (field) {
         case 'region': intent.regions.push(value); break;
         case 'type': intent.types.push(value); orderedTypes.push({ type: value, start: hit.start }); break;
-        case 'feature': intent.features.push(value); break;
+        case 'feature':
+          // "alcohol free, Kelowna" is the visitor's trip, not a venue badge.
+          if (value === 'nonalcoholic' && isTripLevelAlcoholFree(hit, tokens)) { conceptMentions.push({ value: 'alcohol', end: hit.end, phrase: hit.phrase }); continue; }
+          intent.features.push(value); break;
         case 'collection': intent.collections.push(value); break;
         case 'activity': intent.activities.push(value); break;
         case 'cuisine': intent.cuisines.push(value); break;
@@ -1220,6 +1258,11 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   if (occasion && DISCOVERY_OCCASION_NOTES[occasion]) intent.heuristics.push({ field: 'occasion', value: occasion, note: DISCOVERY_OCCASION_NOTES[occasion] });
   if (intent.budget) intent.heuristics.push({ field: 'budget', value: intent.budget, note: 'Budget ranks venues with a known price; venues without price data are never excluded and their price is never inferred.' });
 
+  // Structural guard (2026-10-06, follow-up): an excluded concept wins over
+  // anything the parser left behind. However the refusal was worded, the words
+  // that stand for the thing refused never remain as positive search terms.
+  intent.textTerms = withoutConceptStrays(intent.textTerms, intent.excluded);
+  intent.foodTerms = withoutConceptStrays(intent.foodTerms, intent.excluded);
   return finalizeIntent(intent, t);
 }
 
@@ -1678,6 +1721,7 @@ module.exports = {
   DISCOVERY_OCCASIONS,
   DISCOVERY_OCCASION_NOTES,
   DISCOVERY_COLLECTION_KINDS,
+  DISCOVERY_CONCEPT_STRAY_WORDS: CONCEPT_STRAY_WORDS,
   normalizeDiscoveryText,
   buildPhraseTable,
   interpretDiscoveryQuery,

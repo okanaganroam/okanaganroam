@@ -107,7 +107,7 @@ function kmBetween(a, b) { return hasCoords(a) && hasCoords(b) ? haversineKm(a.l
 // retrieval module (discovery-search.js) -- the same functions, unchanged.
 // Stage 3.5 (2026-09-29): so do the visitor's exclusions ("not in Kelowna",
 // "no wineries", "nothing fancy"), applied exactly as /search applies them.
-const { textHas, foodMatch, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES } = require('./discovery-search.js');
+const { textHas, foodMatch, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, withoutConceptStrays } = require('./discovery-search.js');
 // Deterministic per-(seed, venue) jitter in [0, 1): regeneration variety
 // without randomness.
 function jitter(seed, id) {
@@ -303,7 +303,8 @@ function buildContext(intent, labels, options) {
     activities: new Set(intent.activities || []),
     collections: new Set(intent.collections || []),
     features: (intent.features || []).slice(),
-    foodTerms: (intent.foodTerms || []).slice(),
+    // A refused concept's own words are never a search focus, whatever produced them.
+    foodTerms: withoutConceptStrays((intent.foodTerms || []).slice(), intent.excluded),
     occasion,
     // Mentioning kids applies the family heuristic to ranking (labelled as a
     // heuristic in the notes) without claiming the visitor chose "family".

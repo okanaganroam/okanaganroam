@@ -195,3 +195,13 @@ test('an excluded alcohol concept rules out alcohol-first EVENTS by category and
   assert.equal(s.isEventExcluded(ev('Craft Beer Festival'), { concepts: ['unknown'] }), false);
   assert.equal(s.isEventExcluded(null, ex), false);
 });
+
+test('withoutConceptStrays removes an excluded concept\'s own words from search terms and nothing else', () => {
+  const ex = { concepts: ['alcohol'] };
+  assert.deepEqual(s.withoutConceptStrays(['alcohol', 'poutine', 'booze'], ex), ['poutine']);
+  assert.deepEqual(s.withoutConceptStrays([{ term: 'alcohol', cuisine: null }, { term: 'poutine', cuisine: null }, { term: 'drinks', cuisine: 'bar' }], ex).map((f) => f.term), ['poutine', 'drinks']);
+  const terms = ['alcohol', 'poutine'];
+  assert.equal(s.withoutConceptStrays(terms, {}), terms, 'no concept: the same list');
+  assert.equal(s.withoutConceptStrays(terms, null), terms);
+  assert.deepEqual(s.withoutConceptStrays(terms, { concepts: ['unknown'] }), terms);
+});
