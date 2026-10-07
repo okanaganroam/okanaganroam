@@ -1,0 +1,1641 @@
+{
+  "provider": "Geoapify Static Maps",
+  "style": "osm-carto",
+  "sourceFormat": "png",
+  "outputFormat": "webp",
+  "webpQuality": 82,
+  "scaleFactor": 2,
+  "attributionParam": "mandatory",
+  "attribution": [
+    {
+      "text": "© OpenStreetMap contributors",
+      "href": "https://www.openstreetmap.org/copyright"
+    },
+    {
+      "text": "Powered by Geoapify",
+      "href": "https://www.geoapify.com/"
+    }
+  ],
+  "regions": {
+    "penticton": {
+      "slug": "penticton",
+      "marker": [
+        49.5008,
+        -119.5939
+      ],
+      "desktop": {
+        "file": "penticton-d.webp",
+        "version": "8e692552ed",
+        "view": [
+          49.5042,
+          -119.5939
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 48648,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 30.5
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 65.3
+        }
+      },
+      "narrow": {
+        "file": "penticton-n.webp",
+        "version": "29d989cc83",
+        "view": [
+          49.5042,
+          -119.5939
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 33646,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 30.5
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 75.4
+        }
+      }
+    },
+    "kelowna": {
+      "slug": "kelowna",
+      "marker": [
+        49.888,
+        -119.496
+      ],
+      "desktop": {
+        "file": "kelowna-d.webp",
+        "version": "b4807a1765",
+        "view": [
+          49.8888,
+          -119.5035
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 50632,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 43.7,
+          "dy": 7.2
+        },
+        "markerPct": {
+          "x": 56.8,
+          "y": 53.6
+        }
+      },
+      "narrow": {
+        "file": "kelowna-n.webp",
+        "version": "6bb43c780d",
+        "view": [
+          49.8888,
+          -119.5035
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 35292,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 43.7,
+          "dy": 7.2
+        },
+        "markerPct": {
+          "x": 56.8,
+          "y": 56
+        }
+      }
+    },
+    "west-kelowna": {
+      "slug": "west-kelowna",
+      "marker": [
+        49.8625,
+        -119.5833
+      ],
+      "desktop": {
+        "file": "west-kelowna-d.webp",
+        "version": "40a9e39afa",
+        "view": [
+          49.863,
+          -119.545
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 43028,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": -223.1,
+          "dy": 4.5
+        },
+        "markerPct": {
+          "x": 15.5,
+          "y": 52.3
+        }
+      },
+      "narrow": {
+        "file": "west-kelowna-n.webp",
+        "version": "f5f392cf59",
+        "view": [
+          49.8607,
+          -119.5583
+        ],
+        "zoom": 11,
+        "displayWindow": {
+          "w": 640,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 480
+        },
+        "webpBytes": 42206,
+        "generated": "2026-10-07",
+        "switchBelowPx": 1100,
+        "markerOffsetPx": {
+          "dx": -72.8,
+          "dy": -8.1
+        },
+        "markerPct": {
+          "x": 38.6,
+          "y": 46
+        }
+      }
+    },
+    "peachland": {
+      "slug": "peachland",
+      "marker": [
+        49.7729,
+        -119.737
+      ],
+      "desktop": {
+        "file": "peachland-d.webp",
+        "version": "e345f12b87",
+        "view": [
+          49.7715,
+          -119.7255
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 22154,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": -67,
+          "dy": -12.6
+        },
+        "markerPct": {
+          "x": 39.6,
+          "y": 43.7
+        }
+      },
+      "narrow": {
+        "file": "peachland-n.webp",
+        "version": "04fd8eaa31",
+        "view": [
+          49.7715,
+          -119.7255
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 15088,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": -67,
+          "dy": -12.6
+        },
+        "markerPct": {
+          "x": 39.5,
+          "y": 39.5
+        }
+      }
+    },
+    "lake-country": {
+      "slug": "lake-country",
+      "marker": [
+        50.03,
+        -119.4022
+      ],
+      "desktop": {
+        "file": "lake-country-d.webp",
+        "version": "1024af2267",
+        "view": [
+          50.03,
+          -119.4022
+        ],
+        "zoom": 11,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 25972,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      },
+      "narrow": {
+        "file": "lake-country-n.webp",
+        "version": "9486560812",
+        "view": [
+          50.03,
+          -119.4022
+        ],
+        "zoom": 11,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 17106,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      }
+    },
+    "naramata": {
+      "slug": "naramata",
+      "marker": [
+        49.599,
+        -119.586
+      ],
+      "desktop": {
+        "file": "naramata-d.webp",
+        "version": "70f7e6da09",
+        "view": [
+          49.5995,
+          -119.593
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 24622,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 40.8,
+          "dy": 4.5
+        },
+        "markerPct": {
+          "x": 56.3,
+          "y": 52.3
+        }
+      },
+      "narrow": {
+        "file": "naramata-n.webp",
+        "version": "b0391f5e35",
+        "view": [
+          49.5995,
+          -119.593
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 16956,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 40.8,
+          "dy": 4.5
+        },
+        "markerPct": {
+          "x": 56.4,
+          "y": 53.8
+        }
+      }
+    },
+    "kaleden": {
+      "slug": "kaleden",
+      "marker": [
+        49.394,
+        -119.601
+      ],
+      "desktop": {
+        "file": "kaleden-d.webp",
+        "version": "647817c07a",
+        "view": [
+          49.3945,
+          -119.59
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 19850,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": -64.1,
+          "dy": 4.5
+        },
+        "markerPct": {
+          "x": 40.1,
+          "y": 52.3
+        }
+      },
+      "narrow": {
+        "file": "kaleden-n.webp",
+        "version": "01dff34a16",
+        "view": [
+          49.3945,
+          -119.59
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 14024,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": -64.1,
+          "dy": 4.5
+        },
+        "markerPct": {
+          "x": 40,
+          "y": 53.8
+        }
+      }
+    },
+    "okanagan-falls": {
+      "slug": "okanagan-falls",
+      "marker": [
+        49.35,
+        -119.5667
+      ],
+      "desktop": {
+        "file": "okanagan-falls-d.webp",
+        "version": "e2738652db",
+        "view": [
+          49.349,
+          -119.5667
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 26110,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -8.9
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 45.5
+        }
+      },
+      "narrow": {
+        "file": "okanagan-falls-n.webp",
+        "version": "b200f0fae9",
+        "view": [
+          49.349,
+          -119.5667
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 18426,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -8.9
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 42.6
+        }
+      }
+    },
+    "summerland": {
+      "slug": "summerland",
+      "marker": [
+        49.5988,
+        -119.6772
+      ],
+      "desktop": {
+        "file": "summerland-d.webp",
+        "version": "606b33c847",
+        "view": [
+          49.5995,
+          -119.66
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 35324,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": -100.2,
+          "dy": 6.3
+        },
+        "markerPct": {
+          "x": 34.5,
+          "y": 53.1
+        }
+      },
+      "narrow": {
+        "file": "summerland-n.webp",
+        "version": "96484b3017",
+        "view": [
+          49.5995,
+          -119.66
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 25034,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": -100.2,
+          "dy": 6.3
+        },
+        "markerPct": {
+          "x": 34.3,
+          "y": 55.3
+        }
+      }
+    },
+    "oliver": {
+      "slug": "oliver",
+      "marker": [
+        49.1822,
+        -119.5506
+      ],
+      "desktop": {
+        "file": "oliver-d.webp",
+        "version": "f2a42bb8ae",
+        "view": [
+          49.183,
+          -119.5506
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 30854,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 7.1
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 53.5
+        }
+      },
+      "narrow": {
+        "file": "oliver-n.webp",
+        "version": "4c8200c866",
+        "view": [
+          49.183,
+          -119.5506
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 22330,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 7.1
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 55.9
+        }
+      }
+    },
+    "osoyoos": {
+      "slug": "osoyoos",
+      "marker": [
+        49.0325,
+        -119.4683
+      ],
+      "desktop": {
+        "file": "osoyoos-d.webp",
+        "version": "d3c59446fa",
+        "view": [
+          49.0275,
+          -119.4683
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 38570,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -44.4
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 27.8
+        }
+      },
+      "narrow": {
+        "file": "osoyoos-n.webp",
+        "version": "741ccb455c",
+        "view": [
+          49.0275,
+          -119.4683
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 26598,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -44.4
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 13
+        }
+      }
+    },
+    "vernon": {
+      "slug": "vernon",
+      "marker": [
+        50.2683,
+        -119.2676
+      ],
+      "desktop": {
+        "file": "vernon-d.webp",
+        "version": "ba789eeb45",
+        "view": [
+          50.262,
+          -119.2676
+        ],
+        "zoom": 11,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 40586,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -28.7
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 35.6
+        }
+      },
+      "narrow": {
+        "file": "vernon-n.webp",
+        "version": "9741bc19e6",
+        "view": [
+          50.262,
+          -119.2676
+        ],
+        "zoom": 11,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 27198,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -28.7
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 26.1
+        }
+      }
+    },
+    "coldstream": {
+      "slug": "coldstream",
+      "marker": [
+        50.2236,
+        -119.23
+      ],
+      "desktop": {
+        "file": "coldstream-d.webp",
+        "version": "23fc74a984",
+        "view": [
+          50.2185,
+          -119.245
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 37694,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 87.4,
+          "dy": -46.4
+        },
+        "markerPct": {
+          "x": 63.5,
+          "y": 26.8
+        }
+      },
+      "narrow": {
+        "file": "coldstream-n.webp",
+        "version": "88753d5f96",
+        "view": [
+          50.2185,
+          -119.245
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 27268,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 87.4,
+          "dy": -46.4
+        },
+        "markerPct": {
+          "x": 63.7,
+          "y": 11.3
+        }
+      }
+    },
+    "lumby": {
+      "slug": "lumby",
+      "marker": [
+        50.2504,
+        -118.9668
+      ],
+      "desktop": {
+        "file": "lumby-d.webp",
+        "version": "0aa3b20aa6",
+        "view": [
+          50.2504,
+          -118.9668
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 26332,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      },
+      "narrow": {
+        "file": "lumby-n.webp",
+        "version": "bbb3290eb1",
+        "view": [
+          50.2504,
+          -118.9668
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 19094,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      }
+    },
+    "armstrong": {
+      "slug": "armstrong",
+      "marker": [
+        50.4498,
+        -119.1968
+      ],
+      "desktop": {
+        "file": "armstrong-d.webp",
+        "version": "0bc5c4efe5",
+        "view": [
+          50.4498,
+          -119.1968
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 33886,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      },
+      "narrow": {
+        "file": "armstrong-n.webp",
+        "version": "8bd28bfee1",
+        "view": [
+          50.4498,
+          -119.1968
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 22856,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      }
+    },
+    "enderby": {
+      "slug": "enderby",
+      "marker": [
+        50.5504,
+        -119.1414
+      ],
+      "desktop": {
+        "file": "enderby-d.webp",
+        "version": "d08babd757",
+        "view": [
+          50.5495,
+          -119.1414
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 37430,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -8.3
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 45.9
+        }
+      },
+      "narrow": {
+        "file": "enderby-n.webp",
+        "version": "9846f30282",
+        "view": [
+          50.5495,
+          -119.1414
+        ],
+        "zoom": 12,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 27010,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": -8.3
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 43.1
+        }
+      }
+    },
+    "big-white": {
+      "slug": "big-white",
+      "marker": [
+        49.7219,
+        -118.9289
+      ],
+      "desktop": {
+        "file": "big-white-d.webp",
+        "version": "1256130b15",
+        "view": [
+          49.7219,
+          -118.9289
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 45498,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      },
+      "narrow": {
+        "file": "big-white-n.webp",
+        "version": "143456a8bd",
+        "view": [
+          49.7219,
+          -118.9289
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 30998,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      }
+    },
+    "silverstar": {
+      "slug": "silverstar",
+      "marker": [
+        50.3597,
+        -119.0581
+      ],
+      "desktop": {
+        "file": "silverstar-d.webp",
+        "version": "142bad7b18",
+        "view": [
+          50.3597,
+          -119.0581
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 48386,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      },
+      "narrow": {
+        "file": "silverstar-n.webp",
+        "version": "33358d6aff",
+        "view": [
+          50.3597,
+          -119.0581
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 33970,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      }
+    },
+    "apex": {
+      "slug": "apex",
+      "marker": [
+        49.391,
+        -119.904
+      ],
+      "desktop": {
+        "file": "apex-d.webp",
+        "version": "5a0ff83f31",
+        "view": [
+          49.3909,
+          -119.9081
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 42488,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 47.8,
+          "dy": -1.8
+        },
+        "markerPct": {
+          "x": 57.4,
+          "y": 49.1
+        }
+      },
+      "narrow": {
+        "file": "apex-n.webp",
+        "version": "24df7043fe",
+        "view": [
+          49.3909,
+          -119.9081
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 29770,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 47.8,
+          "dy": -1.8
+        },
+        "markerPct": {
+          "x": 57.5,
+          "y": 48.5
+        }
+      }
+    },
+    "baldy": {
+      "slug": "baldy",
+      "marker": [
+        49.1539,
+        -119.2394
+      ],
+      "desktop": {
+        "file": "baldy-d.webp",
+        "version": "8f19b1c93d",
+        "view": [
+          49.1539,
+          -119.2394
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 646,
+          "h": 200
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 646,
+          "h": 240
+        },
+        "sourceSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "outputSize": {
+          "w": 1292,
+          "h": 480
+        },
+        "webpBytes": 20702,
+        "generated": "2026-10-07",
+        "switchBelowPx": null,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      },
+      "narrow": {
+        "file": "baldy-n.webp",
+        "version": "6deb32de68",
+        "view": [
+          49.1539,
+          -119.2394
+        ],
+        "zoom": 13,
+        "displayWindow": {
+          "w": 640,
+          "h": 120
+        },
+        "cropMarginPx": 20,
+        "cssSize": {
+          "w": 640,
+          "h": 160
+        },
+        "sourceSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "outputSize": {
+          "w": 1280,
+          "h": 320
+        },
+        "webpBytes": 15366,
+        "generated": "2026-10-07",
+        "switchBelowPx": 721,
+        "markerOffsetPx": {
+          "dx": 0,
+          "dy": 0
+        },
+        "markerPct": {
+          "x": 50,
+          "y": 50
+        }
+      }
+    }
+  }
+}

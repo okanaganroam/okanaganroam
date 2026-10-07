@@ -1,0 +1,25 @@
+{
+  "_comment": "LOCKED geographic configuration for the Build My Trip day-header maps. marker = the true destination coordinate (never moved for composition); view = the image centre (composition); zoom = Geoapify zoom (its scale is one level tighter than Leaflet/OSM). 'narrow' defaults to the desktop framing; West Kelowna alone has its own narrow framing, which also serves the 200px-high maps below switchBelow px.",
+  "regions": {
+    "kelowna":        { "marker": [49.8880, -119.4960], "desktop": { "view": [49.8888, -119.5035], "zoom": 12 } },
+    "west-kelowna":   { "marker": [49.8625, -119.5833], "desktop": { "view": [49.8630, -119.5450], "zoom": 12 }, "narrow": { "view": [49.8607, -119.5583], "zoom": 11, "height": 200, "switchBelow": 1100 } },
+    "peachland":      { "marker": [49.7729, -119.7370], "desktop": { "view": [49.7715, -119.7255], "zoom": 12 } },
+    "lake-country":   { "marker": [50.0300, -119.4022], "desktop": { "view": [50.0300, -119.4022], "zoom": 11 } },
+    "naramata":       { "marker": [49.5990, -119.5860], "desktop": { "view": [49.5995, -119.5930], "zoom": 12 } },
+    "penticton":      { "marker": [49.5008, -119.5939], "desktop": { "view": [49.5042, -119.5939], "zoom": 12 } },
+    "kaleden":        { "marker": [49.3940, -119.6010], "desktop": { "view": [49.3945, -119.5900], "zoom": 12 } },
+    "okanagan-falls": { "marker": [49.3500, -119.5667], "desktop": { "view": [49.3490, -119.5667], "zoom": 12 } },
+    "summerland":     { "marker": [49.5988, -119.6772], "desktop": { "view": [49.5995, -119.6600], "zoom": 12 } },
+    "oliver":         { "marker": [49.1822, -119.5506], "desktop": { "view": [49.1830, -119.5506], "zoom": 12 } },
+    "osoyoos":        { "marker": [49.0325, -119.4683], "desktop": { "view": [49.0275, -119.4683], "zoom": 12 } },
+    "vernon":         { "marker": [50.2683, -119.2676], "desktop": { "view": [50.2620, -119.2676], "zoom": 11 } },
+    "coldstream":     { "marker": [50.2236, -119.2300], "desktop": { "view": [50.2185, -119.2450], "zoom": 12 } },
+    "lumby":          { "marker": [50.2504, -118.9668], "desktop": { "view": [50.2504, -118.9668], "zoom": 12 } },
+    "armstrong":      { "marker": [50.4498, -119.1968], "desktop": { "view": [50.4498, -119.1968], "zoom": 12 } },
+    "enderby":        { "marker": [50.5504, -119.1414], "desktop": { "view": [50.5495, -119.1414], "zoom": 12 } },
+    "big-white":      { "marker": [49.7219, -118.9289], "desktop": { "view": [49.7219, -118.9289], "zoom": 13 } },
+    "silverstar":     { "marker": [50.3597, -119.0581], "desktop": { "view": [50.3597, -119.0581], "zoom": 13 } },
+    "apex":           { "marker": [49.3910, -119.9040], "desktop": { "view": [49.3909, -119.9081], "zoom": 13 } },
+    "baldy":          { "marker": [49.1539, -119.2394], "desktop": { "view": [49.1539, -119.2394], "zoom": 13 } }
+  }
+}

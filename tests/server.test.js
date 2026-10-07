@@ -13368,29 +13368,135 @@ test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails cl
   });
 });
 
-// ---- Build My Trip real-map day header: Penticton prototype (2026-10-06) -------
-test('map day header prototype: only Penticton, from the stored town centre; other regions and the homepage are untouched', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
-  const mh = app.tripV3MapHeaders();
-  assert.deepEqual(Object.keys(mh), ['penticton'], 'one region only');
-  assert.deepEqual(mh.penticton.center, [49.5008, -119.5939], "Penticton's stored town-centre coordinates (the ones Near me uses)");
-  assert.deepEqual(mh.penticton.group, { key: 'wizard.south', label: 'South Okanagan' });
-  assert.equal(mh.penticton.zoom, 13, 'tight framing');
-  assert.ok(mh.penticton.view[0] > mh.penticton.center[0] && mh.penticton.view[0] - mh.penticton.center[0] < 0.01 && mh.penticton.view[1] === mh.penticton.center[1], 'view nudged north only, town marker stays at the real centre');
+// ---- Build My Trip static map day headers (2026-10-07) --------------------------
+// 20 pre-rendered OSM Carto maps (Geoapify Static Maps, osm-carto), two per region, built by
+// scripts/build-region-maps.js. The day header makes no tile, Leaflet or API request.
+const MAPS_DIR = path.join(__dirname, '..', 'public', 'images', 'regions', 'maps');
+const MAPS_CONFIG = require('../scripts/region-maps.config.json');
+const MAPS_MANIFEST = () => JSON.parse(fs.readFileSync(path.join(MAPS_DIR, 'manifest.json'), 'utf8'));
+// Pixel size of a WebP (lossy VP8, lossless VP8L or extended VP8X).
+const webpDims = (file) => {
+  const b = fs.readFileSync(file);
+  assert.equal(b.toString('ascii', 0, 4), 'RIFF'); assert.equal(b.toString('ascii', 8, 12), 'WEBP');
+  const t = b.toString('ascii', 12, 16);
+  if (t === 'VP8 ') return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff];
+  if (t === 'VP8X') return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
+  const v = b.readUInt32LE(21); return [(v & 0x3fff) + 1, ((v >> 14) & 0x3fff) + 1];
+};
+
+test('map day headers: exactly the 20 locked configs, the approved Penticton and West Kelowna values, markers inside BC', () => {
+  const slugs = Object.keys(MAPS_CONFIG.regions);
+  assert.equal(slugs.length, 20);
+  assert.deepEqual([...slugs].sort(), Object.keys(app.REGION_LABELS).sort(), 'one config per planner region, no extras');
+  assert.deepEqual(MAPS_CONFIG.regions.penticton, { marker: [49.5008, -119.5939], desktop: { view: [49.5042, -119.5939], zoom: 12 } }, 'Penticton is the approved reference');
+  const wk = MAPS_CONFIG.regions['west-kelowna'];
+  assert.deepEqual(wk.marker, [49.8625, -119.5833]);
+  assert.deepEqual(wk.desktop, { view: [49.8630, -119.5450], zoom: 12 });
+  assert.deepEqual(wk.narrow, { view: [49.8607, -119.5583], zoom: 11, height: 200, switchBelow: 1100 }, 'West Kelowna alone has its own narrow framing, through 1099px');
+  for (const [slug, r] of Object.entries(MAPS_CONFIG.regions)) {
+    const [lat, lng] = r.marker;
+    assert.ok(lat > 48.9 && lat < 50.8 && lng > -120.1 && lng < -118.7, `${slug}: marker inside the Okanagan/BC bounds`);
+    assert.ok(Math.abs(r.desktop.view[0] - lat) < 0.03 && Math.abs(r.desktop.view[1] - lng) < 0.06, `${slug}: the view only nudges the composition, it never moves the marker`);
+    assert.ok(Number.isInteger(r.desktop.zoom) && r.desktop.zoom >= 11 && r.desktop.zoom <= 13, `${slug}: zoom`);
+    if (slug !== 'west-kelowna') assert.equal(r.narrow, undefined, `${slug}: the narrow map uses the locked framing`);
+  }
+  // The documented decisions for the points that changed during QA.
+  assert.deepEqual(MAPS_CONFIG.regions['lake-country'].marker, [50.0300, -119.4022]);
+  assert.deepEqual(MAPS_CONFIG.regions.coldstream.marker, [50.2236, -119.2300]);
+  assert.deepEqual(MAPS_CONFIG.regions.apex.marker, [49.3910, -119.9040]);
+});
+
+test('map day headers: 40 WebP assets (2 per region at 2x), valid manifest, ring inside every window, no secrets', () => {
+  const m = MAPS_MANIFEST();
+  assert.equal(m.provider, 'Geoapify Static Maps'); assert.equal(m.style, 'osm-carto');
+  assert.equal(m.sourceFormat, 'png'); assert.equal(m.outputFormat, 'webp'); assert.equal(m.webpQuality, 82); assert.equal(m.scaleFactor, 2);
+  assert.notEqual(m.attributionParam, 'none', 'attribution=none is for white-label paid plans only');
+  assert.deepEqual(m.attribution, [
+    { text: '© OpenStreetMap contributors', href: 'https://www.openstreetmap.org/copyright' },
+    { text: 'Powered by Geoapify', href: 'https://www.geoapify.com/' },
+  ]);
+  const slugs = Object.keys(MAPS_CONFIG.regions);
+  assert.deepEqual(Object.keys(m.regions).sort(), [...slugs].sort());
+  let files = 0, bytes = 0;
+  for (const slug of slugs) {
+    const r = m.regions[slug];
+    assert.deepEqual(r.marker, MAPS_CONFIG.regions[slug].marker, `${slug}: manifest marker equals the locked marker`);
+    for (const kind of ['desktop', 'narrow']) {
+      const x = r[kind];
+      const full = path.join(MAPS_DIR, x.file);
+      assert.ok(fs.existsSync(full), x.file);
+      const [w, h] = webpDims(full);
+      const wantH = kind === 'desktop' ? 480 : (slug === 'west-kelowna' ? 480 : 320);
+      assert.deepEqual([w, h], [kind === 'desktop' ? 1292 : 1280, wantH], `${x.file}: 2x of the CSS size, nothing upscaled`);
+      assert.deepEqual([x.sourceSize.w, x.sourceSize.h], [w, h]);
+      assert.deepEqual([x.cssSize.w * 2, x.cssSize.h * 2], [w, h]);
+      assert.ok(x.webpBytes === fs.statSync(full).size && x.webpBytes < 90000, `${x.file}: a small download`);
+      files++; bytes += x.webpBytes;
+      // The true marker must sit inside the displayed window with the ring fully visible (desktop 646x200; narrow 317x120, or 200 for West Kelowna).
+      const win = kind === 'desktop' ? { w: 646, h: 200 } : { w: 317, h: x.displayWindow.h };
+      assert.ok(Math.abs(x.markerOffsetPx.dx) <= win.w / 2 - 10 && Math.abs(x.markerOffsetPx.dy) <= win.h / 2 - 10, `${slug} ${kind}: ring fully inside the window`);
+    }
+  }
+  assert.equal(files, 40); assert.ok(bytes < 2 * 1024 * 1024, 'all 40 maps together stay under 2 MB');
+  assert.equal(fs.readdirSync(MAPS_DIR).filter((f) => f.endsWith('.webp')).length, 40, 'no stray map files');
+  assert.equal(m.regions['west-kelowna'].narrow.switchBelowPx, 1100);
+  for (const slug of slugs.filter((x) => x !== 'west-kelowna')) assert.equal(m.regions[slug].narrow.switchBelowPx, 721);
+  // No credential or authenticated URL anywhere we ship.
+  const shipped = [fs.readFileSync(path.join(MAPS_DIR, 'manifest.json'), 'utf8'), fs.readFileSync(path.join(__dirname, '..', 'scripts', 'region-maps.config.json'), 'utf8'), fs.readFileSync(path.join(__dirname, '..', 'scripts', 'build-region-maps.js'), 'utf8')];
+  for (const t of shipped) assert.ok(!/apiKey=[0-9a-f]{16,}/i.test(t) && !/GEOAPIFY_API_KEY\s*=\s*['"]?[0-9a-f]{16,}/i.test(t) && !/\b[0-9a-f]{32}\b/i.test(t), 'no API key');
+  assert.ok(!/apiKey|maps\.geoapify\.com/i.test(shipped[0]), 'the manifest holds no request URL');
+});
+
+test('map day headers: the page uses static <picture> maps with both credits as links, makes no live map request, and keeps its other behaviour', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
   const page = app.renderTripPlannerV3Page({ preview: true });
-  assert.ok(page.includes('var MAP_HEADERS = {"penticton":{"center":[49.5008,-119.5939]'), 'the real coordinates reach the page');
-  assert.ok(page.includes('var head = MAP_HEADERS[d.region] ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('), 'every other region keeps its existing header');
-  // The existing map stack is reused: the same Leaflet, the same tiles, one attribution link beside the map.
-  assert.equal(page.split('leaflet/1.9.4/').length - 1, 1, 'Leaflet is still defined in one pinned place (no second mapping library or provider)');
-  assert.ok(page.includes("L.tileLayer(MAP_TILES, { maxZoom: 15 })") && page.includes('https://www.openstreetmap.org/copyright'));
-  // Context only: not interactive, no keyboard stops, hidden from assistive technology, no route line.
-  for (const bit of ['dragging: false', 'scrollWheelZoom: false', 'doubleClickZoom: false', 'keyboard: false', 'zoomControl: false', 'attributionControl: false', 'interactive: false', 'aria-hidden="true"']) assert.ok(page.includes(bit), bit);
-  assert.ok(!/mapHeadHtml[\s\S]{0,4000}polyline/.test(page), 'no invented route line in the header map');
-  // "Map this day" is unchanged.
-  assert.ok(page.includes('data-t3-map-day') && page.includes("esc(tx('tripv3.mapDay'))"));
-  // The homepage does not carry any of it.
+  const mh = JSON.parse(page.match(/var MAP_HEADERS = (\{.*?\});\n/s)[1]);
+  assert.equal(Object.keys(mh).length, 20, 'every region has a map header config');
+  assert.deepEqual(mh['west-kelowna'].assets.narrow.below, 1100);
+  assert.equal(mh.penticton.assets.narrow.below, 721);
+  assert.match(mh.penticton.assets.desktop.src, /^\/images\/regions\/maps\/penticton-d\.webp\?v=[0-9a-f]+$/);
+  assert.deepEqual(mh.penticton.group, { key: 'wizard.south', label: 'South Okanagan' });
+  assert.deepEqual(mh['big-white'].group, { key: 'wizard.skiResorts', label: 'Ski resorts' });
+  // Responsive loading: one <picture>, only the matching file downloads; the ring is an HTML overlay.
+  for (const bit of ['function staticMapHtml', '<picture>', "'<source media=\"(max-width: '", 'class="t3-dh-ring"', 'aria-hidden="true"', 'alt=""', 'width="', "loading=\"' + (first ? 'eager' : 'lazy')", 'function watchStaticMaps', 't3-dh-nomap', '(max-width: 1099px)']) assert.ok(page.includes(bit), bit);
+  // Both required credits are real links beside the map.
+  assert.ok(page.includes('href="https://www.openstreetmap.org/copyright"') && page.includes('href="https://www.geoapify.com/"'));
+  assert.ok(page.includes("Powered by Geoapify") && page.includes('\u00a9 OpenStreetMap contributors'));
+  // No live map or API traffic for day headers: no Leaflet bootstrap for headers, no tile or Geoapify request, no key.
+  for (const gone of ['initDayMaps', 'destroyDayMaps', 'data-t3-dhmap', 't3-dh-canvas', 't3-dh-pin', 'dayMapData']) assert.ok(!page.includes(gone), `${gone} is gone`);
+  assert.ok(!/maps\.geoapify\.com|apiKey/i.test(page), 'the browser never talks to the Geoapify API');
+  // The whole-trip interactive map and "Map this day" are unchanged.
+  assert.ok(page.includes('function loadLeaflet') && page.includes('L.tileLayer(MAP_TILES') && page.includes('tripMap'));
+  assert.ok(page.includes('data-t3-map-day') && page.includes("esc(tx('tripv3.mapDay'))") && page.includes('data-t3-regen-day') && page.includes('data-t3-add-day'));
+  assert.ok(page.includes("var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml("), 'a region without a map keeps the existing photo header');
+  // The served images are real WebP, and nothing else carries any of it.
+  const res = await fetch(`${base}${mh.penticton.assets.desktop.src}`);
+  assert.equal(res.status, 200); assert.equal(res.headers.get('content-type'), 'image/webp');
   const home = await (await fetch(`${base}/`)).text();
-  assert.ok(!home.includes('t3-day-head--map') && !home.includes('MAP_HEADERS'));
+  assert.ok(!home.includes('t3-dh-') && !home.includes('MAP_HEADERS') && !home.includes('regions/maps/'), 'homepage untouched');
+  const classic = await fetch(`${base}/browse/classic`);
+  assert.ok(!(await classic.text()).includes('regions/maps/'), '/browse/classic untouched');
 }))));
+
+test('map day headers: a region whose config or image is missing falls back to the existing photo header', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'maps-fallback-'));
+  try {
+    const m = MAPS_MANIFEST();
+    fs.writeFileSync(path.join(tmp, 'manifest.json'), JSON.stringify(m));
+    for (const f of fs.readdirSync(MAPS_DIR).filter((x) => x.endsWith('.webp'))) fs.copyFileSync(path.join(MAPS_DIR, f), path.join(tmp, f));
+    assert.equal(Object.keys(app.tripV3MapHeaders(tmp)).length, 20, 'a complete set is all listed');
+    fs.unlinkSync(path.join(tmp, 'kelowna-n.webp'));
+    const out = app.tripV3MapHeaders(tmp);
+    assert.equal(out.kelowna, undefined, 'a missing narrow image drops that region (no broken image, no blank shell)');
+    assert.equal(Object.keys(out).length, 19);
+    const bad = MAPS_MANIFEST(); bad.regions.penticton.desktop.file = '../server.js'; bad.regions.atlantis = bad.regions.oliver;
+    fs.writeFileSync(path.join(tmp, 'manifest.json'), JSON.stringify(bad));
+    const out2 = app.tripV3MapHeaders(tmp);
+    assert.equal(out2.penticton, undefined, 'an unsafe file name is refused'); assert.equal(out2.atlantis, undefined, 'an unknown region is ignored');
+    fs.writeFileSync(path.join(tmp, 'manifest.json'), '{not json');
+    assert.deepEqual(app.tripV3MapHeaders(tmp), {}, 'an unreadable manifest means no map headers at all');
+    assert.deepEqual(app.tripV3MapHeaders(path.join(tmp, 'nope')), {});
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
 
 test('Build My Trip V3 images: day headers map to the full-size copies with srcset widths that match the files; phones get the 640px thumbnail', () => {
   const m = app.TRIP_V3_REGION_IMAGES;
