@@ -15755,6 +15755,40 @@ const tripPlannerV3PageModule = (() => { try { return require('./trip-planner-v3
 // the same-size WebP of the current PNG. Native widths are listed here for
 // srcset; phones get the 640px thumbnail where one exists.
 const TRIP_V3_WIDE_REGION_WIDTHS = { kelowna: 1648, 'lake-country': 1648, naramata: 1648, penticton: 1648, vernon: 1648, 'west-kelowna': 1648, oliver: 1376, osoyoos: 928, summerland: 928 };
+// Build My Trip real-map day headers: pre-rendered OSM Carto maps (Geoapify Static
+// Maps, built by scripts/build-region-maps.js into public/images/regions/maps/,
+// described by manifest.json). Two images per region -- desktop and narrow -- each
+// at 2x its CSS size, so the page makes no tile, Leaflet or API request for them.
+// A region is only listed when the manifest names it AND both image files exist;
+// any other region (or a missing file) keeps the existing photo day header.
+// The destination ring is drawn by the page from markerOffsetPx (CSS px from the
+// image centre to the true coordinate), so the images stay clean.
+const TRIP_V3_MAPS_DIR = path.join(__dirname, 'public', 'images', 'regions', 'maps');
+let tripV3MapHeadersCache = null;
+function tripV3MapHeaders(dir = TRIP_V3_MAPS_DIR) {
+  if (dir === TRIP_V3_MAPS_DIR && tripV3MapHeadersCache) return tripV3MapHeadersCache;
+  const out = {};
+  let regions = {};
+  try { regions = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')).regions || {}; } catch (e) { regions = {}; }
+  for (const slug of Object.keys(regions)) {
+    const m = regions[slug];
+    if (!VALID_REGIONS.includes(slug) || !m || !m.desktop || !m.narrow) continue;
+    const asset = (k) => {
+      const x = m[k];
+      if (!x || !/^[a-z-]+-[dn]\.webp$/.test(String(x.file)) || !x.cssSize || !x.markerOffsetPx) return null;
+      const n = [x.cssSize.w, x.cssSize.h, x.markerOffsetPx.dx, x.markerOffsetPx.dy, x.switchBelowPx || 721].map(Number);
+      if (!n.every(Number.isFinite) || n[0] < 1 || n[1] < 1) return null; // these numbers go into inline CSS on the page
+      if (!fs.existsSync(path.join(dir, x.file))) return null;
+      return { src: `/images/regions/maps/${x.file}?v=${encodeURIComponent(String(x.version || ''))}`, w: n[0], h: n[1], dx: n[2], dy: n[3], below: n[4] };
+    };
+    const desktop = asset('desktop'), narrow = asset('narrow');
+    if (!desktop || !narrow) continue;
+    const g = FOOTER_REGION_GROUPS.find((x) => x.regions.includes(slug));
+    out[slug] = { group: g ? { key: g.labelKey, label: g.label === 'Ski resorts' ? g.label : `${g.label} Okanagan` } : null, assets: { desktop, narrow } };
+  }
+  if (dir === TRIP_V3_MAPS_DIR) tripV3MapHeadersCache = out;
+  return out;
+}
 const TRIP_V3_REGION_IMAGES = (() => {
   const out = {};
   const has = (rel) => fs.existsSync(path.join(__dirname, 'public', 'images', rel));
@@ -15799,6 +15833,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     analyticsHead: renderAnalyticsHeadHtml('trip_v3'),
     regions: VALID_REGIONS.map((slug) => ({ slug, label: REGION_LABELS[slug] })),
     regionImages: TRIP_V3_REGION_IMAGES,
+    mapHeaders: tripV3MapHeaders(),
     appScriptSrc: APP_JS_SRC,
     preview,
   });
@@ -21349,6 +21384,7 @@ module.exports = {
   tripPlannerV3ActiveFor,
   renderTripPlannerV3Page,
   TRIP_V3_REGION_IMAGES,
+  tripV3MapHeaders,
   APP_JS_SRC,
   appJsSrcFor,
   buildTripPlannerFacts,
