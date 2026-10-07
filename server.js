@@ -5897,6 +5897,7 @@ function renderMoodCardsHTML() {
     <div class="discover-heading discover-heading-split">
       <h2 data-i18n="mood.heading">What are you in the mood for?</h2>
       <a class="discover-heading-link" href="/categories" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>
+      <span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>
     </div>
     <div class="mood-card-grid">${cardsHtml}</div>
   </div>
@@ -7016,11 +7017,25 @@ function renderHomepageDiscoveryStyles() {
     .mood-card-grid { grid-template-columns: repeat(6, 1fr); }
   }
 
+  /* Phones (640px and below, where the six cards stop fitting as a grid): a native horizontal scroll-snap strip. It bleeds to the
+     right edge of the screen so the third card is visibly cut by the screen edge rather than by the page margin, and the cards are
+     sized so 2 cards + 2 gaps + a quarter of the third fill the width from the left margin to the screen edge. The last card
+     ends one page margin short of the edge. */
+  .mood-swipe-cue { display: none; }
+  /* app.js (frozen) has no key for the cue, so the French text is swapped by the page language (html[lang]) instead. */
+  .mood-swipe-fr { display: none; }
+  html[lang="fr"] .mood-swipe-fr { display: inline; }
+  html[lang="fr"] .mood-swipe-en { display: none; }
   @media (max-width: 640px) {
     .mood-card-grid {
-      display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; padding-bottom: 4px;
+      --mood-gap: 12px; --mood-pad: 24px;
+      display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: var(--mood-gap); padding-bottom: 4px;
+      margin-right: calc(-1 * var(--mood-pad)); padding-right: var(--mood-pad);
+      scrollbar-width: none;
     }
-    .mood-card { flex: 0 0 46%; scroll-snap-align: start; aspect-ratio: 1.59 / 1; }
+    .mood-card-grid::-webkit-scrollbar { display: none; }
+    .mood-card { flex: 0 0 calc((100% + var(--mood-pad) - 2 * var(--mood-gap)) / 2.25); scroll-snap-align: start; aspect-ratio: 1.59 / 1; }
+    .mood-swipe-cue { display: inline-block; margin-left: auto; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.02em; color: rgba(42,32,25,0.62); white-space: nowrap; }
   }
 
   /* Reference redesign, forensic-comparison rebuild (supersedes the
@@ -7886,6 +7901,8 @@ const BMT_HEADER_STYLE = `<style id="bmt-header">
   .nav .lang-toggle { display: none; }
   .nav-hamburger { padding: 8px 4px; flex-shrink: 0; }
   .nav #navTripBtn { min-height: 36px; padding: 0 12px; font-size: 0.8rem; gap: 4px; }
+  /* The phone header button is text only: a trailing arrow there reads like a menu or a next-step control. (Desktop keeps its arrow; the menu's Build My Trip row keeps its own.) */
+  .nav #navTripBtn svg { display: none; }
   .nav #navTripBtn::after { inset: -4px -2px; }
 }
 /* The search icon returns from 481px, where there is room for it (app.css hides it at 940px and below; under 481px the hero's own search box sits right below the header). */
@@ -7899,11 +7916,11 @@ const BMT_HEADER_STYLE = `<style id="bmt-header">
 @media (max-width: 480px) {
   .nav .logo-wordmark { font-size: 1.1rem; }
 }
-/* Narrow phones: the full "Build My Trip" label and its arrow always stay. Spacing tightens first, then the wordmark scales with the width left
-   after the button and hamburger (9.3 = wordmark width per px of font size), so the logo never runs under the button (320px: about 13px). */
+/* Narrow phones: the full "Build My Trip" label always stays. Spacing tightens first, then the wordmark scales with the width left
+   after the button and hamburger (9.3 = wordmark width per px of font size), so the logo never runs under the button. */
 @media (max-width: 400px) {
   .nav { gap: 6px; }
-  .nav .logo-wordmark { font-size: min(1.1rem, calc((100vw - 200px) / 9.3)); }
+  .nav .logo-wordmark { font-size: min(1.1rem, calc((100vw - 184px) / 9.3)); }
   .nav #navTripBtn { padding: 0 8px; font-size: 0.76rem; }
 }
 /* French is longer ("Planifiez mon voyage"), so on small screens it takes two short lines (arrow hidden, as before). */

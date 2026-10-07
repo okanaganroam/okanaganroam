@@ -15085,6 +15085,29 @@ test('Build My Trip: "we don\'t drink alcohol" keeps alcohol-first events out of
   }
 });
 
+// ---- Mobile polish: text-only header CTA, mood carousel peek + swipe cue (2026-10-07) -----------------
+test('Mobile polish: the phone header button has no arrow (desktop keeps it); the mood strip peeks the third card and carries a mobile-only swipe cue', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
+  const home = await (await fetch(`${base}/`)).text();
+  const count = (html, t) => html.split(t).length - 1;
+  // Header: the arrow is hidden at 940px and below only; the SVG is still in the markup, and the label is unchanged.
+  assert.match(home, /@media \(max-width: 940px\) \{[^@]*\.nav #navTripBtn svg \{ display: none; \}/);
+  assert.ok(!/@media \(min-width: 941px\)[^@]*#navTripBtn svg \{ display: none/.test(home), 'desktop keeps its arrow');
+  assert.match(home, /id="navTripBtn"[^>]*><span data-i18n="trip\.buildMyTrip">Build My Trip<\/span> <svg/);
+  assert.equal(count(home, "window.trackEvent('build_my_trip_click'"), 1, 'one analytics listener');
+  // Mood strip: the six cards in their existing order, still a native scroll-snap strip, sized for 2.25 visible, bleeding to the screen edge.
+  const order = [...home.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)].map((m) => m[1]);
+  assert.equal(order.length, 6); assert.equal(order[0], 'food-drink');
+  assert.match(home, /@media \(max-width: 640px\) \{\s*\.mood-card-grid \{[^}]*overflow-x: auto; scroll-snap-type: x mandatory;/);
+  assert.match(home, /\.mood-card \{ flex: 0 0 calc\(\(100% \+ var\(--mood-pad\) - 2 \* var\(--mood-gap\)\) \/ 2\.25\); scroll-snap-align: start;/);
+  assert.match(home, /margin-right: calc\(-1 \* var\(--mood-pad\)\); padding-right: var\(--mood-pad\);/);
+  assert.ok(home.includes('.mood-card-grid::-webkit-scrollbar { display: none; }') && !/mood-card-grid[^}]*(animation|scroll-behavior)/.test(home), 'no motion or auto-scroll');
+  // The cue: one decorative, translated span in the heading row, hidden except at the carousel breakpoint.
+  assert.equal(count(home, 'class="mood-swipe-cue"'), 1);
+  assert.ok(home.includes('<span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>'));
+  assert.ok(home.includes('html[lang="fr"] .mood-swipe-fr { display: inline; }') && home.includes('html[lang="fr"] .mood-swipe-en { display: none; }'), 'French by page language, no change to the frozen app.js');
+  assert.match(home, /\.mood-swipe-cue \{ display: none; \}/);
+}))));
+
 // ---- Build My Trip in the header (2026-10-06) ----------------------------------
 test('Build My Trip is a permanent header button (no strip under the header), first in the mobile menu, tracked by placement', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
   const count = (html, s) => html.split(s).length - 1;
