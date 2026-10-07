@@ -7879,11 +7879,11 @@ const BMT_HEADER_STYLE = `<style id="bmt-header">
   .nav-links { gap: 18px; }
   .nav-links > li { white-space: nowrap; }
 }
-/* Phones and tablets: the button sits between EN / FR and the hamburger. */
+/* Phones and tablets: logo, the full Build My Trip button, then the hamburger. EN / FR moves into the menu (the header button stays in the DOM, hidden, and the menu's EN / FR buttons press it, so there is one language handler). */
 @media (max-width: 940px) {
   .nav { gap: 8px; }
   .nav-brand { flex: 1 1 0; min-width: 0; }
-  .nav .lang-toggle { padding: 6px 6px; }
+  .nav .lang-toggle { display: none; }
   .nav-hamburger { padding: 8px 4px; flex-shrink: 0; }
   .nav #navTripBtn { min-height: 36px; padding: 0 12px; font-size: 0.8rem; gap: 4px; }
   .nav #navTripBtn::after { inset: -4px -2px; }
@@ -7897,21 +7897,33 @@ const BMT_HEADER_STYLE = `<style id="bmt-header">
   .nav.wrap { padding-top: 4px; padding-bottom: 4px; }
 }
 @media (max-width: 480px) {
-  .nav .logo-wordmark { font-size: 1.15rem; }
-  .nav #navTripBtn svg { display: none; }
+  .nav .logo-wordmark { font-size: 1.1rem; }
 }
-/* French is longer ("Planifiez mon voyage"), so on small screens it takes two short lines. */
+/* Narrow phones: the full "Build My Trip" label and its arrow always stay. Spacing tightens first, then the wordmark scales with the width left
+   after the button and hamburger (9.3 = wordmark width per px of font size), so the logo never runs under the button (320px: about 13px). */
+@media (max-width: 400px) {
+  .nav { gap: 6px; }
+  .nav .logo-wordmark { font-size: min(1.1rem, calc((100vw - 200px) / 9.3)); }
+  .nav #navTripBtn { padding: 0 8px; font-size: 0.76rem; }
+}
+/* French is longer ("Planifiez mon voyage"), so on small screens it takes two short lines (arrow hidden, as before). */
 @media (max-width: 560px) {
   html[lang="fr"] .nav #navTripBtn { max-width: 92px; padding: 0 10px; white-space: normal; text-align: center; line-height: 1.05; font-size: 0.7rem; }
   html[lang="fr"] .nav #navTripBtn svg { display: none; }
 }
-/* Narrowest phones: the full label would squeeze the logo, so the pill reads "Trip" ("Voyage") while its accessible name stays the full label. */
-@media (max-width: 419px) {
-  .nav .logo-wordmark { font-size: 1.1rem; }
-  .nav #navTripBtn { max-width: none; padding: 0 12px; white-space: nowrap; font-size: 0.82rem; line-height: normal; }
-  .nav #navTripBtn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .nav #navTripBtn::before { content: "Trip" / ""; }
-  html[lang="fr"] .nav #navTripBtn::before { content: "Voyage" / ""; }
+@media (max-width: 400px) {
+  html[lang="fr"] .nav .logo-wordmark { font-size: min(1.1rem, calc((100vw - 188px) / 9.3)); }
+  html[lang="fr"] .nav #navTripBtn { padding: 0 8px; }
+}
+.nav-links .nav-links-lang { display: none; }
+@media (max-width: 940px) {
+  .nav-links .nav-links-lang { display: flex; order: -1; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 20px 10px; border-top: 0; }
+  .nav-lang-label { font-size: 0.86rem; font-weight: 700; color: rgba(27,43,58,0.8); }
+  .nav-lang-group { display: inline-flex; gap: 8px; }
+  .nav-lang-opt { min-width: 56px; min-height: 44px; padding: 0 14px; border: 1px solid rgba(27,43,58,0.2); border-radius: 8px; background: transparent; color: var(--ref-navy); font: inherit; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; }
+  .nav-lang-opt:hover { background: rgba(27,43,58,0.06); }
+  .nav-lang-opt.is-current { background: var(--ref-navy); border-color: var(--ref-navy); color: var(--ref-cream); }
+  .nav-lang-opt:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 }
 @media (max-width: 940px) {
   .nav-links .nav-links-trip { order: -1; border-top: 0; padding: 12px 20px 4px; }
@@ -7920,6 +7932,14 @@ const BMT_HEADER_STYLE = `<style id="bmt-header">
   .nav-links .nav-links-trip a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 }
 </style>`;
+// Phones and tablets keep EN / FR in the mobile menu rather than the header row, in the second row right under Build My Trip: the menu is a long, always-expanded list in a sticky header, so a row at its foot could not be reached. The header's own #langToggle stays in the
+// DOM (hidden below 941px) and remains the one language handler, language_change event and /trip re-render hook: the menu's
+// EN and FR buttons press it. Only pages that carry #langToggle (the ones with app.js) get the menu item.
+const NAV_LANG_ITEM = '<li class="nav-links-lang"><span class="nav-lang-label" id="navLangLabel" data-i18n="nav.switchLanguage">Switch language</span><span class="nav-lang-group" role="group" aria-labelledby="navLangLabel"><button type="button" class="nav-lang-opt" data-lang="en" lang="en" aria-pressed="false">EN</button><button type="button" class="nav-lang-opt" data-lang="fr" lang="fr" aria-pressed="false">FR</button></span></li>';
+function withMobileLanguageItem(html) {
+  if (!html.includes('id="langToggle"') || html.includes('nav-links-lang')) return html;
+  return html.replace(/(<li class="nav-links-trip">[\s\S]*?<\/li>)/, `$1\n      ${NAV_LANG_ITEM}`);
+}
 const BMT_TRACK_SCRIPT = `<script>
 (function(){
   // Where on the page each Build My Trip link sits, read from the link itself.
@@ -7933,13 +7953,26 @@ const BMT_TRACK_SCRIPT = `<script>
       }
     } catch (err) { /* analytics must never break the site */ }
   }, true);
+  // Mobile-menu EN / FR: press the header's (hidden) #langToggle so there is a single handler and a single language_change event.
+  var opts = document.querySelectorAll('.nav-lang-opt');
+  if (opts.length) {
+    var cur = function(){ return document.documentElement.lang === 'fr' ? 'fr' : 'en'; };
+    var sync = function(){ for (var i = 0; i < opts.length; i++) { var on = opts[i].getAttribute('data-lang') === cur(); opts[i].setAttribute('aria-pressed', String(on)); opts[i].classList.toggle('is-current', on); } };
+    for (var k = 0; k < opts.length; k++) opts[k].addEventListener('click', function(){
+      if (this.getAttribute('data-lang') === cur()) return;
+      var t = document.getElementById('langToggle'); if (t) t.click();
+      sync();
+    });
+    try { new MutationObserver(sync).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] }); } catch (err) {}
+    sync();
+  }
 })();
 </script>`;
 // The header button's styling and the click listener, appended after a header
 // fragment (or placed after </header> on the homepage).
 const BMT_HEADER_ADDONS = `${BMT_HEADER_STYLE}\n${BMT_TRACK_SCRIPT}`;
 function withBuildMyTripPlacements(headerFragment) {
-  return `${headerFragment}\n${BMT_HEADER_ADDONS}`;
+  return `${withMobileLanguageItem(headerFragment)}\n${BMT_HEADER_ADDONS}`;
 }
 // Homepage hero (2026-10-06). A 3:1 panorama (2000x667), so the hero is tall
 // enough to show it (about 3:1 at laptop widths, never taller than 600px) and
@@ -18978,7 +19011,7 @@ const server = http.createServer(async (req, res) => {
 
         // Build My Trip in the header (2026-10-06): the header button's styling,
         // the mobile-menu ordering and the click listener (see BMT_HEADER_ADDONS).
-        html = html.replace('</header>', `</header>\n${BMT_HEADER_ADDONS}`);
+        html = withMobileLanguageItem(html).replace('</header>', `</header>\n${BMT_HEADER_ADDONS}`);
 
         // Homepage hero (2026-10-06): the panoramic sunset photo, with its own
         // crop, height and type. Everything is scoped to .hero-scenic-home, a

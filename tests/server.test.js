@@ -11023,7 +11023,8 @@ const HEADER_SPEC = [
 function parseNav(html) {
   const header = (html.match(/<header id="top">[\s\S]*?<\/header>/) || [''])[0];
   const ul = (header.match(/<ul class="nav-links" id="navLinks">([\s\S]*?)\n\s*<\/ul>/) || ['', ''])[1];
-  const items = ul.split(/\n\s*<li/).slice(1).map((li) => '<li' + li);
+  // The mobile menu's EN / FR row is a control, not a navigation item.
+  const items = ul.split(/\n\s*<li/).slice(1).map((li) => '<li' + li).filter((li) => !/class="nav-links-lang"/.test(li));
   return { header, items: items.map((li) => {
     if (/class="nav-dropdown"/.test(li)) {
       const m = li.match(/<span data-i18n="([^"]+)">([^<]+)<\/span>/);
@@ -15099,8 +15100,15 @@ test('Build My Trip is a permanent header button (no strip under the header), fi
   assert.match(home, /\.nav #navTripBtn \{ display: inline-flex;/, 'the header button is shown (app.css hides it at 940px and below)');
   assert.ok(!home.includes('.nav #navTripBtn { display: none; }'), 'the old hide rule is gone');
   assert.match(home, /\.nav-links \.nav-links-trip \{ order: -1;/, 'on phones the menu link is still the first row');
-  // Narrow phones: the pill reads "Trip" ("Voyage") while its accessible name stays the full label.
-  assert.ok(home.includes('content: "Trip" / ""') && home.includes('content: "Voyage" / ""'));
+  // Narrow phones keep the FULL label and arrow (never "Trip" / "Voyage" / icon-only); EN / FR moves into the menu.
+  assert.ok(!home.includes('content: "Trip"') && !home.includes('content: "Voyage"') && !home.includes('#navTripBtn::before'), 'no shortened label');
+  assert.ok(!/@media \(max-width: 480px\) \{[^}]*#navTripBtn svg \{ display: none; \}/.test(home), 'the arrow stays on phones in English');
+  assert.match(home, /@media \(max-width: 940px\) \{[^@]*\.nav \.lang-toggle \{ display: none; \}/, 'the header EN / FR is hidden at 940px and below only');
+  assert.ok(home.includes('<li class="nav-links-lang">') && count(home, 'class="nav-lang-opt"') === 2, 'one EN and one FR button in the menu');
+  assert.ok(home.indexOf('class="nav-links-trip"') < home.indexOf('class="nav-links-lang"'), 'the language row sits right after Build My Trip');
+  assert.match(home, /\.nav-links \.nav-links-lang \{ display: none; \}/, 'hidden on desktop');
+  assert.ok(home.includes('id="langToggle"') && count(home, 'document.getElementById(\'langToggle\'); if (t) t.click();') === 1, 'the menu buttons press the one header handler');
+  assert.equal(count(home, "window.trackEvent('build_my_trip_click'"), 1);
   // The pill keeps a 44px tap area on phones (app.css zeroes the header's vertical padding there).
   assert.ok(home.includes('.nav.wrap { padding-top: 4px; padding-bottom: 4px; }') && home.includes('inset: -4px -2px'));
   for (const bit of STRIP_LEFTOVERS) assert.ok(!home.includes(bit), `the strip is gone from the homepage (${bit})`);
