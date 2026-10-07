@@ -25,7 +25,7 @@
       ],
       "desktop": {
         "file": "penticton-d.webp",
-        "version": "8e692552ed",
+        "version": "f3cee93915",
         "view": [
           49.5042,
           -119.5939
@@ -48,7 +48,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 48648,
+        "webpBytes": 43604,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -62,7 +62,7 @@
       },
       "narrow": {
         "file": "penticton-n.webp",
-        "version": "29d989cc83",
+        "version": "adb9a273ec",
         "view": [
           49.5042,
           -119.5939
@@ -85,7 +85,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 33646,
+        "webpBytes": 29704,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -106,7 +106,7 @@
       ],
       "desktop": {
         "file": "kelowna-d.webp",
-        "version": "b4807a1765",
+        "version": "9ac509c07b",
         "view": [
           49.8888,
           -119.5035
@@ -129,7 +129,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 50632,
+        "webpBytes": 45928,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -143,7 +143,7 @@
       },
       "narrow": {
         "file": "kelowna-n.webp",
-        "version": "6bb43c780d",
+        "version": "bfa7a401ca",
         "view": [
           49.8888,
           -119.5035
@@ -166,7 +166,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 35292,
+        "webpBytes": 33052,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -187,7 +187,7 @@
       ],
       "desktop": {
         "file": "west-kelowna-d.webp",
-        "version": "40a9e39afa",
+        "version": "61881787f9",
         "view": [
           49.863,
           -119.545
@@ -210,7 +210,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 43028,
+        "webpBytes": 37492,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -224,7 +224,7 @@
       },
       "narrow": {
         "file": "west-kelowna-n.webp",
-        "version": "f5f392cf59",
+        "version": "549a78b00d",
         "view": [
           49.8607,
           -119.5583
@@ -247,7 +247,7 @@
           "w": 1280,
           "h": 480
         },
-        "webpBytes": 42206,
+        "webpBytes": 37376,
         "generated": "2026-10-07",
         "switchBelowPx": 1100,
         "markerOffsetPx": {
@@ -268,7 +268,7 @@
       ],
       "desktop": {
         "file": "peachland-d.webp",
-        "version": "e345f12b87",
+        "version": "e6b4be1873",
         "view": [
           49.7715,
           -119.7255
@@ -291,7 +291,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 22154,
+        "webpBytes": 19408,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -305,7 +305,7 @@
       },
       "narrow": {
         "file": "peachland-n.webp",
-        "version": "04fd8eaa31",
+        "version": "cae3314c5b",
         "view": [
           49.7715,
           -119.7255
@@ -328,7 +328,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 15088,
+        "webpBytes": 13656,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -349,7 +349,7 @@
       ],
       "desktop": {
         "file": "lake-country-d.webp",
-        "version": "1024af2267",
+        "version": "2c533dc5a7",
         "view": [
           50.03,
           -119.4022
@@ -372,7 +372,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 25972,
+        "webpBytes": 22220,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -386,7 +386,7 @@
       },
       "narrow": {
         "file": "lake-country-n.webp",
-        "version": "9486560812",
+        "version": "bf29fd240f",
         "view": [
           50.03,
           -119.4022
@@ -409,7 +409,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 17106,
+        "webpBytes": 15710,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -430,7 +430,7 @@
       ],
       "desktop": {
         "file": "naramata-d.webp",
-        "version": "70f7e6da09",
+        "version": "4e7570310c",
         "view": [
           49.5995,
           -119.593
@@ -453,7 +453,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 24622,
+        "webpBytes": 21948,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -467,7 +467,7 @@
       },
       "narrow": {
         "file": "naramata-n.webp",
-        "version": "b0391f5e35",
+        "version": "3d852aaab2",
         "view": [
           49.5995,
           -119.593
@@ -490,7 +490,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 16956,
+        "webpBytes": 15558,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -511,7 +511,7 @@
       ],
       "desktop": {
         "file": "kaleden-d.webp",
-        "version": "647817c07a",
+        "version": "f54f77cb16",
         "view": [
           49.3945,
           -119.59
@@ -534,7 +534,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 19850,
+        "webpBytes": 17936,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -548,7 +548,7 @@
       },
       "narrow": {
         "file": "kaleden-n.webp",
-        "version": "01dff34a16",
+        "version": "432b35977d",
         "view": [
           49.3945,
           -119.59
@@ -571,7 +571,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 14024,
+        "webpBytes": 13458,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -592,7 +592,7 @@
       ],
       "desktop": {
         "file": "okanagan-falls-d.webp",
-        "version": "e2738652db",
+        "version": "e36604fb71",
         "view": [
           49.349,
           -119.5667
@@ -615,7 +615,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 26110,
+        "webpBytes": 23698,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -629,7 +629,7 @@
       },
       "narrow": {
         "file": "okanagan-falls-n.webp",
-        "version": "b200f0fae9",
+        "version": "04ec622933",
         "view": [
           49.349,
           -119.5667
@@ -652,7 +652,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 18426,
+        "webpBytes": 17134,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -673,7 +673,7 @@
       ],
       "desktop": {
         "file": "summerland-d.webp",
-        "version": "606b33c847",
+        "version": "dbdf43fe96",
         "view": [
           49.5995,
           -119.66
@@ -696,7 +696,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 35324,
+        "webpBytes": 30514,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -710,7 +710,7 @@
       },
       "narrow": {
         "file": "summerland-n.webp",
-        "version": "96484b3017",
+        "version": "f01a7c46d7",
         "view": [
           49.5995,
           -119.66
@@ -733,7 +733,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 25034,
+        "webpBytes": 21988,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -754,7 +754,7 @@
       ],
       "desktop": {
         "file": "oliver-d.webp",
-        "version": "f2a42bb8ae",
+        "version": "edc2854a95",
         "view": [
           49.183,
           -119.5506
@@ -777,7 +777,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 30854,
+        "webpBytes": 27720,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -791,7 +791,7 @@
       },
       "narrow": {
         "file": "oliver-n.webp",
-        "version": "4c8200c866",
+        "version": "2768a59768",
         "view": [
           49.183,
           -119.5506
@@ -814,7 +814,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 22330,
+        "webpBytes": 20306,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -835,7 +835,7 @@
       ],
       "desktop": {
         "file": "osoyoos-d.webp",
-        "version": "d3c59446fa",
+        "version": "61d9bbf2d2",
         "view": [
           49.0275,
           -119.4683
@@ -858,7 +858,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 38570,
+        "webpBytes": 33484,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -872,7 +872,7 @@
       },
       "narrow": {
         "file": "osoyoos-n.webp",
-        "version": "741ccb455c",
+        "version": "745e344beb",
         "view": [
           49.0275,
           -119.4683
@@ -895,7 +895,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 26598,
+        "webpBytes": 24360,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -916,7 +916,7 @@
       ],
       "desktop": {
         "file": "vernon-d.webp",
-        "version": "ba789eeb45",
+        "version": "1b6efd037f",
         "view": [
           50.262,
           -119.2676
@@ -939,7 +939,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 40586,
+        "webpBytes": 35658,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -953,7 +953,7 @@
       },
       "narrow": {
         "file": "vernon-n.webp",
-        "version": "9741bc19e6",
+        "version": "17c1013b5e",
         "view": [
           50.262,
           -119.2676
@@ -976,7 +976,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 27198,
+        "webpBytes": 24150,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -997,7 +997,7 @@
       ],
       "desktop": {
         "file": "coldstream-d.webp",
-        "version": "23fc74a984",
+        "version": "0456ca54c0",
         "view": [
           50.2185,
           -119.245
@@ -1020,7 +1020,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 37694,
+        "webpBytes": 33056,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1034,7 +1034,7 @@
       },
       "narrow": {
         "file": "coldstream-n.webp",
-        "version": "88753d5f96",
+        "version": "b5042d9413",
         "view": [
           50.2185,
           -119.245
@@ -1057,7 +1057,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 27268,
+        "webpBytes": 24438,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1078,7 +1078,7 @@
       ],
       "desktop": {
         "file": "lumby-d.webp",
-        "version": "0aa3b20aa6",
+        "version": "3144fd269c",
         "view": [
           50.2504,
           -118.9668
@@ -1101,7 +1101,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 26332,
+        "webpBytes": 22238,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1115,7 +1115,7 @@
       },
       "narrow": {
         "file": "lumby-n.webp",
-        "version": "bbb3290eb1",
+        "version": "5abb33b830",
         "view": [
           50.2504,
           -118.9668
@@ -1138,7 +1138,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 19094,
+        "webpBytes": 16706,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1159,7 +1159,7 @@
       ],
       "desktop": {
         "file": "armstrong-d.webp",
-        "version": "0bc5c4efe5",
+        "version": "6a00c5f50a",
         "view": [
           50.4498,
           -119.1968
@@ -1182,7 +1182,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 33886,
+        "webpBytes": 28952,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1196,7 +1196,7 @@
       },
       "narrow": {
         "file": "armstrong-n.webp",
-        "version": "8bd28bfee1",
+        "version": "91a08fb8de",
         "view": [
           50.4498,
           -119.1968
@@ -1219,7 +1219,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 22856,
+        "webpBytes": 20736,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1240,7 +1240,7 @@
       ],
       "desktop": {
         "file": "enderby-d.webp",
-        "version": "d08babd757",
+        "version": "1dd2e943fa",
         "view": [
           50.5495,
           -119.1414
@@ -1263,7 +1263,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 37430,
+        "webpBytes": 33396,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1277,7 +1277,7 @@
       },
       "narrow": {
         "file": "enderby-n.webp",
-        "version": "9846f30282",
+        "version": "9ef4b3e2d1",
         "view": [
           50.5495,
           -119.1414
@@ -1300,7 +1300,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 27010,
+        "webpBytes": 24760,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1321,7 +1321,7 @@
       ],
       "desktop": {
         "file": "big-white-d.webp",
-        "version": "1256130b15",
+        "version": "7700a89a19",
         "view": [
           49.7219,
           -118.9289
@@ -1344,7 +1344,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 45498,
+        "webpBytes": 39472,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1358,7 +1358,7 @@
       },
       "narrow": {
         "file": "big-white-n.webp",
-        "version": "143456a8bd",
+        "version": "c4cb831c6f",
         "view": [
           49.7219,
           -118.9289
@@ -1381,7 +1381,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 30998,
+        "webpBytes": 26752,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1402,7 +1402,7 @@
       ],
       "desktop": {
         "file": "silverstar-d.webp",
-        "version": "142bad7b18",
+        "version": "6460563f26",
         "view": [
           50.3597,
           -119.0581
@@ -1425,7 +1425,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 48386,
+        "webpBytes": 41428,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1439,7 +1439,7 @@
       },
       "narrow": {
         "file": "silverstar-n.webp",
-        "version": "33358d6aff",
+        "version": "962993775c",
         "view": [
           50.3597,
           -119.0581
@@ -1462,7 +1462,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 33970,
+        "webpBytes": 29708,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1483,7 +1483,7 @@
       ],
       "desktop": {
         "file": "apex-d.webp",
-        "version": "5a0ff83f31",
+        "version": "8095d72bce",
         "view": [
           49.3909,
           -119.9081
@@ -1506,7 +1506,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 42488,
+        "webpBytes": 36092,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1520,7 +1520,7 @@
       },
       "narrow": {
         "file": "apex-n.webp",
-        "version": "24df7043fe",
+        "version": "a330c6956f",
         "view": [
           49.3909,
           -119.9081
@@ -1543,7 +1543,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 29770,
+        "webpBytes": 26108,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1564,7 +1564,7 @@
       ],
       "desktop": {
         "file": "baldy-d.webp",
-        "version": "8f19b1c93d",
+        "version": "9fcfd22c50",
         "view": [
           49.1539,
           -119.2394
@@ -1587,7 +1587,7 @@
           "w": 1292,
           "h": 480
         },
-        "webpBytes": 20702,
+        "webpBytes": 17672,
         "generated": "2026-10-07",
         "switchBelowPx": null,
         "markerOffsetPx": {
@@ -1601,7 +1601,7 @@
       },
       "narrow": {
         "file": "baldy-n.webp",
-        "version": "6deb32de68",
+        "version": "6355c34cdd",
         "view": [
           49.1539,
           -119.2394
@@ -1624,7 +1624,7 @@
           "w": 1280,
           "h": 320
         },
-        "webpBytes": 15366,
+        "webpBytes": 13546,
         "generated": "2026-10-07",
         "switchBelowPx": 721,
         "markerOffsetPx": {
@@ -1637,5 +1637,6 @@
         }
       }
     }
-  }
+  },
+  "treatment": "okanagan-roam-1"
 }

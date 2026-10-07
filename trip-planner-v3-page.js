@@ -259,20 +259,21 @@ function renderStyles() {
   .t3-day-head { position: relative; border-radius: 16px; overflow: hidden; min-height: 150px; display: flex; align-items: flex-end; background: var(--ref-navy); color: #fff; margin-bottom: 14px; }
   .t3-day-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .t3-day-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 20%, rgba(16,27,36,0.85) 100%); }
-  /* Map day header: a cream card, the day's details on the left and a pre-rendered real map (OSM Carto) on the right. */
-  .t3-day .t3-day-head--map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-areas: "info map" "actions map"; align-items: end; gap: 0 18px; min-height: 0; padding: 0; background: var(--ref-cream, #F5F3ED); color: var(--ref-navy, #1B2B3A); border: 1px solid rgba(27,43,58,0.14); }
+  /* Map day header: a navy panel (same navy as the trip summary), the day's details on the left and a pre-rendered, colour-treated real map (OSM Carto) on the right. */
+  .t3-day .t3-day-head--map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-areas: "info map" "actions map"; align-items: end; gap: 0 18px; min-height: 0; padding: 0; background: var(--ref-navy, #1B2B3A); color: #F5F3ED; border: 1px solid var(--ref-navy, #1B2B3A); }
   .t3-dh-info { grid-area: info; align-self: start; padding: 20px 0 0 22px; min-width: 0; }
-  .t3-day-head--map .t3-eyebrow { margin: 0 0 4px; color: var(--teal-deep, #1E4F4C); }
-  .t3-day-head--map .t3-day-title { color: var(--ref-navy, #1B2B3A); }
-  .t3-dh-sub { margin: 2px 0 0; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(27,43,58,0.62); }
-  .t3-dh-meta { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy, #1B2B3A); }
-  .t3-day-head--map .t3-day-theme { color: var(--teal-deep, #1E4F4C); }
+  .t3-day-head--map .t3-eyebrow { margin: 0 0 4px; color: #E0A94E; }
+  .t3-day-head--map .t3-day-title { color: #FBF8F0; }
+  .t3-dh-sub { margin: 2px 0 0; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #E0A94E; }
+  .t3-dh-meta { margin: 10px 0 0; font-size: 0.88rem; font-weight: 600; color: rgba(245,243,237,0.80); }
+  .t3-day-head--map .t3-day-theme { color: var(--ref-gold, #C9A227); }
   .t3-day-head--map .t3-day-actions { grid-area: actions; padding: 14px 0 18px 22px; }
-  .t3-day-head--map .t3-day-actions .t3-btn { background: #fff; border: 1px solid rgba(27,43,58,0.16); }
+  .t3-day-head--map .t3-day-actions .t3-btn { background: #fff; color: var(--ref-navy-deep, #101B24); border: 1px solid rgba(255,255,255,0.55); }
+  .t3-day-head--map .t3-day-actions .t3-btn:hover { background: var(--ref-cream, #F5F3ED); }
   .t3-dh-map { grid-area: map; position: relative; margin: 10px 10px 10px 0; min-height: 200px; border-radius: 12px; overflow: hidden; background: #E8E3D3; }
   /* The map image is centred at its natural CSS size (it is 2x, so never upscaled) and cropped by the frame; the ring is placed from the true marker offset. */
-  .t3-dh-frame { position: absolute; inset: 0; background: #E8E3D3; overflow: hidden; }
-  .t3-dh-frame img { position: absolute; left: 50%; top: 50%; width: var(--dw); height: var(--dh); max-width: none; transform: translate(-50%, -50%); display: block; filter: saturate(0.55) sepia(0.18) contrast(0.96); }
+  .t3-dh-frame { position: absolute; inset: 0; background: #E8E3D3; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(245,243,237,0.12); }
+  .t3-dh-frame img { position: absolute; left: 50%; top: 50%; width: var(--dw); height: var(--dh); max-width: none; transform: translate(-50%, -50%); display: block; filter: none; }
   /* The destination is a hollow ring so the map's own town label stays readable underneath it. */
   .t3-dh-ring { position: absolute; left: calc(50% + var(--ddx)); top: calc(50% + var(--ddy)); width: 20px; height: 20px; margin: -10px 0 0 -10px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid var(--ref-gold, #C9A227); box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8), inset 0 0 0 1.5px rgba(255,255,255,0.55); }
   .t3-dh-attr { position: absolute; right: 0; bottom: 0; z-index: 800; padding: 1px 6px; font-size: 0.66rem; line-height: 1.5; color: rgba(27,43,58,0.78); background: rgba(245,243,237,0.88); text-decoration: none; border-top-left-radius: 6px; }
@@ -292,7 +293,7 @@ function renderStyles() {
     .t3-dh-frame img { width: var(--nw); height: var(--nh); }
     .t3-dh-ring { left: calc(50% + var(--ndx)); top: calc(50% + var(--ndy)); }
     /* Attribution sits in its own quiet strip beneath the map, never over it. */
-    .t3-dh-attr { position: static; display: flex; align-items: center; justify-content: flex-end; min-height: 22px; padding: 0 2px; background: none; border-radius: 0; font-size: 0.68rem; color: rgba(27,43,58,0.66); }
+    .t3-dh-attr { position: static; display: flex; align-items: center; justify-content: flex-end; min-height: 22px; padding: 0 2px; background: none; border-radius: 0; font-size: 0.68rem; color: rgba(245,243,237,0.74); }
     .t3-day-head--map .t3-day-actions { padding: 0 12px 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
     .t3-day-head--map .t3-day-actions .t3-btn { justify-content: center; text-align: center; min-height: 44px; padding: 6px 4px; font-size: 0.78rem; line-height: 1.15; }
     .t3-day-head--map .t3-day-actions [data-t3-map-day] { order: -1; }

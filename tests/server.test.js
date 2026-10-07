@@ -13477,6 +13477,27 @@ test('map day headers: the page uses static <picture> maps with both credits as 
   assert.ok(!(await classic.text()).includes('regions/maps/'), '/browse/classic untouched');
 }))));
 
+test('map day headers: the baked colour treatment is the one recorded in the manifest, and maps carry no CSS tint', () => {
+  const T = require('../scripts/map-treatment.js');
+  assert.equal(MAPS_MANIFEST().treatment, T.TREATMENT_ID);
+  const near = (a, b, tol) => a.every((v, i) => Math.abs(v - b[i]) <= tol);
+  assert.ok(near(T.mapPixel(0xa8, 0xd0, 0xdc), [0xA7, 0xC4, 0xC9], 6), 'water becomes the approved muted teal');
+  const road = T.mapPixel(0xf8, 0xb0, 0x9c); assert.ok(road[1] > 0xA0 && road[0] - road[2] < 60, 'the trunk road is sand, no longer pink');
+  assert.ok(T.mapPixel(0, 0, 0)[2] > T.mapPixel(0, 0, 0)[0], 'label text is navy, not black');
+  assert.deepEqual(T.mapPixel(0xa8, 0xd0, 0xdc), T.mapPixel(0xa8, 0xd0, 0xdc), 'deterministic');
+  const buf = Buffer.from([0xf8, 0xb0, 0x9c, 0xa8, 0xd0, 0xdc]);
+  assert.deepEqual([...T.treatRgb(buf)].slice(0, 3), T.mapPixel(0xf8, 0xb0, 0x9c), 'treatRgb is the per-pixel map');
+  const page = app.renderTripPlannerV3Page({ preview: true });
+  const rule = (sel) => { const m = page.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' \\{([^}]*)\\}')); assert.ok(m, sel); return m[1]; };
+  assert.match(rule('.t3-dh-frame img'), /filter: none/);
+  assert.ok(!/saturate\(|sepia\(/.test(rule('.t3-dh-frame img')), 'no CSS map tint');
+  assert.match(rule('.t3-day .t3-day-head--map'), /background: var\(--ref-navy, #1B2B3A\)/);
+  assert.match(rule('.t3-day-head--map .t3-eyebrow'), /#E0A94E/);
+  assert.match(rule('.t3-dh-sub'), /#E0A94E/);
+  assert.ok(!/#E0A94E/.test(rule('.t3-day-head--map .t3-day-title')), 'the destination name is not gold');
+  assert.match(rule('.t3-day-head--map .t3-day-actions .t3-btn'), /background: #fff; color: var\(--ref-navy-deep/);
+});
+
 test('map day headers: a region whose config or image is missing falls back to the existing photo header', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'maps-fallback-'));
   try {
