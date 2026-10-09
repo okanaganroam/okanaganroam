@@ -15838,3 +15838,47 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   }));
 }
 
+
+// ---- Reviewed event batches (2026-10-09) ---------------------------------------
+test('Event batches: the reviewed batch goes in through createEvent, adds a missing date to an existing event, and is idempotent', () => {
+  const batchDir = path.join(__dirname, '..', 'data', 'event-batches');
+  const batch = JSON.parse(fs.readFileSync(path.join(batchDir, '2026-10-09-tourism-kelowna-harvest-bites-sips.json'), 'utf8'));
+  const names = [...batch.events.map((e) => e.name), 'Oktoberfest at The Hatching Post'];
+  const cleanup = () => {
+    const ids = db.prepare(`SELECT id FROM events WHERE name IN (${names.map(() => '?').join(',')})`).all(...names).map((r) => r.id);
+    for (const id of ids) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  };
+  cleanup();
+  try {
+    // An existing event (as Visit Westside lists it) that only has Oct 16.
+    const existing = app.createEvent({
+      name: 'Oktoberfest at The Hatching Post', region: 'west-kelowna', venue_name_text: 'The Hatching Post', categories: ['food-drink-events', 'holiday-seasonal'],
+      source_type: 'tourism_org', source_name: 'Visit Westside', source_url: 'https://example.com/batch-test/oktoberfest', occurrences: [{ start_date: '2026-10-16', start_time: '15:00', end_time: '21:00' }],
+    }, { reason: 'batch test fixture', batch_id: 'batch-test' });
+    assert.equal(existing.ok, true, JSON.stringify(existing));
+    const first = app.importEventBatches(batchDir);
+    assert.deepEqual(first.failed, []);
+    assert.equal(first.created.length, batch.events.length + 1, 'every new event plus the added Oct 17 date');
+    const okt = db.prepare("SELECT id FROM events WHERE name = 'Oktoberfest at The Hatching Post'").get();
+    assert.deepEqual(db.prepare('SELECT start_date FROM event_occurrences WHERE event_id = ? ORDER BY start_date').all(okt.id).map((r) => r.start_date), ['2026-10-16', '2026-10-17']);
+    const whisky = app.queryWhatsOnEvents({ from: '2026-10-17', to: '2026-10-17' }).find((e) => e.name === 'Whisky Global');
+    assert.ok(whisky, 'Whisky Global shows on What’s On for Oct 17');
+    assert.equal(whisky.attribution, 'Tourism Kelowna');
+    assert.ok(app.queryWhatsOnEvents({ from: '2026-10-18', to: '2026-10-18' }).some((e) => e.name === 'Lake Country Cider Fest'));
+    assert.ok(app.queryWhatsOnEvents({ from: '2026-10-24', to: '2026-10-24' }).some((e) => e.name === 'Brewphoria 2026'));
+    // Idempotent: a second run (every deploy) creates and changes nothing.
+    const second = app.importEventBatches(batchDir);
+    assert.deepEqual([second.created.length, second.failed.length], [0, 0]);
+    assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM events WHERE name IN (${names.map(() => '?').join(',')})`).get(...names).n, names.length);
+    // A missing directory or file is harmless.
+    assert.deepEqual(app.importEventBatches(path.join(batchDir, 'nope')), { created: [], skipped: [], failed: [] });
+  } finally {
+    cleanup();
+  }
+  assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM events WHERE name IN (${names.map(() => '?').join(',')})`).get(...names).n, 0);
+});

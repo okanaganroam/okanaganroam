@@ -1,0 +1,126 @@
+{
+  "batch_id": "2026-10-09-tourism-kelowna-harvest-bites-sips",
+  "reason": "Events listed in Tourism Kelowna's 'Harvest, Bites & Sips' October carousel that were not yet on What's On. Dates and venues as published there; no times or prices were given, so none are listed. source_url is Tourism Kelowna's Instagram account with a per-event anchor, because the carousel post's own link was not available and the duplicate guard needs a distinct source per event.",
+  "reviewed_by": "owner-approved 2026-10-09",
+  "events": [
+    {
+      "name": "Whisky Global",
+      "region": "kelowna",
+      "venue_name_text": "Kelowna Event Centre",
+      "description": "Whisky Global at Kelowna Event Centre, Kelowna — Oct 16 + 17. Listed by Tourism Kelowna; confirm details with the organizer before you go.",
+      "categories": [
+        "food-drink-events",
+        "events-festivals"
+      ],
+      "occurrences": [
+        {
+          "start_date": "2026-10-16"
+        },
+        {
+          "start_date": "2026-10-17"
+        }
+      ],
+      "source_type": "tourism_org",
+      "source_name": "Tourism Kelowna",
+      "source_url": "https://www.instagram.com/tourismkelowna/#harvest-bites-sips-whisky-global",
+      "source_checked_at": "2026-10-09",
+      "event_confidence": "medium"
+    },
+    {
+      "name": "The Spark Friendsgiving Feast",
+      "region": "kelowna",
+      "venue_name_text": "Porter's Kelowna",
+      "description": "The Spark Friendsgiving Feast at Porter's Kelowna, Kelowna — Fri Oct 16. Listed by Tourism Kelowna; confirm details with the organizer before you go.",
+      "categories": [
+        "food-drink-events",
+        "holiday-seasonal"
+      ],
+      "occurrences": [
+        {
+          "start_date": "2026-10-16"
+        }
+      ],
+      "source_type": "tourism_org",
+      "source_name": "Tourism Kelowna",
+      "source_url": "https://www.instagram.com/tourismkelowna/#harvest-bites-sips-the-spark-friendsgiving-feast",
+      "source_checked_at": "2026-10-09",
+      "event_confidence": "medium"
+    },
+    {
+      "name": "Lake Country Cider Fest",
+      "region": "lake-country",
+      "venue_name_text": "Lake Country Cider Trail",
+      "description": "Lake Country Cider Fest at Lake Country Cider Trail, Lake Country — Oct 17 + 18. Listed by Tourism Kelowna; confirm details with the organizer before you go.",
+      "categories": [
+        "food-drink-events",
+        "events-festivals"
+      ],
+      "occurrences": [
+        {
+          "start_date": "2026-10-17"
+        },
+        {
+          "start_date": "2026-10-18"
+        }
+      ],
+      "source_type": "tourism_org",
+      "source_name": "Tourism Kelowna",
+      "source_url": "https://www.instagram.com/tourismkelowna/#harvest-bites-sips-lake-country-cider-fest",
+      "source_checked_at": "2026-10-09",
+      "event_confidence": "medium"
+    },
+    {
+      "name": "Brewphoria 2026",
+      "region": "kelowna",
+      "venue_name_text": "Kelowna Beer Institute",
+      "description": "Brewphoria 2026 at Kelowna Beer Institute, Kelowna — Sat Oct 24. Listed by Tourism Kelowna; confirm details with the organizer before you go.",
+      "categories": [
+        "food-drink-events",
+        "events-festivals"
+      ],
+      "occurrences": [
+        {
+          "start_date": "2026-10-24"
+        }
+      ],
+      "source_type": "tourism_org",
+      "source_name": "Tourism Kelowna",
+      "source_url": "https://www.instagram.com/tourismkelowna/#harvest-bites-sips-brewphoria-2026",
+      "source_checked_at": "2026-10-09",
+      "event_confidence": "medium"
+    },
+    {
+      "name": "Central Okanagan Food Bank: Bake the World a Better Place",
+      "region": "kelowna",
+      "venue_name_text": "Various locations",
+      "description": "Central Okanagan Food Bank: Bake the World a Better Place at Various locations, Kelowna — all of October. Listed by Tourism Kelowna; confirm details with the organizer before you go.",
+      "categories": [
+        "community-events",
+        "food-drink-events"
+      ],
+      "occurrences": [
+        {
+          "start_date": "2026-10-01",
+          "end_date": "2026-10-31"
+        }
+      ],
+      "source_type": "tourism_org",
+      "source_name": "Tourism Kelowna",
+      "source_url": "https://www.instagram.com/tourismkelowna/#harvest-bites-sips-central-okanagan-food-bank-bake-the-worl",
+      "source_checked_at": "2026-10-09",
+      "event_confidence": "medium"
+    }
+  ],
+  "add_occurrences": [
+    {
+      "region": "west-kelowna",
+      "name": "Oktoberfest at The Hatching Post",
+      "occurrences": [
+        {
+          "start_date": "2026-10-17",
+          "label": "Oct 17 per Tourism Kelowna's October list"
+        }
+      ]
+    }
+  ]
+}

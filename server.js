@@ -21062,6 +21062,41 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Reviewed event batches (2026-10-09). A batch is a JSON file in data/event-batches/ holding events that have been checked by a person; it is
+// applied through createEvent() / upsertEventOccurrences(), so every rule (provenance, categories, duplicates, change log) still applies. It is
+// idempotent (an event that already exists by region + name, or an occurrence that already exists, is skipped) and never throws: a failing
+// entry is logged and the rest carry on. It runs once the server is listening, on Railway (or with EVENT_BATCH_IMPORT=on), never in tests.
+function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches')) {
+  const out = { created: [], skipped: [], failed: [] };
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort(); } catch (e) { return out; }
+  for (const file of files) {
+    let batch;
+    try { batch = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')); } catch (e) { out.failed.push({ file, reason: 'unreadable' }); continue; }
+    const meta = { reason: batch.reason, batch_id: batch.batch_id, reviewed_by: batch.reviewed_by };
+    for (const ev of Array.isArray(batch.events) ? batch.events : []) {
+      try {
+        if (db.prepare('SELECT id FROM events WHERE region = ? AND name = ?').get(ev.region, ev.name)) { out.skipped.push(ev.name); continue; }
+        const r = createEvent(ev, meta);
+        if (r.ok) out.created.push(ev.name);
+        else if (r.reason === 'duplicate_event') out.skipped.push(ev.name);
+        else out.failed.push({ name: ev.name, reason: r.reason, detail: r.detail });
+      } catch (e) { out.failed.push({ name: ev && ev.name, reason: 'error', detail: String(e && e.message) }); }
+    }
+    for (const add of Array.isArray(batch.add_occurrences) ? batch.add_occurrences : []) {
+      try {
+        const row = db.prepare('SELECT id FROM events WHERE region = ? AND name = ?').get(add.region, add.name);
+        if (!row) { out.skipped.push(add.name); continue; }
+        const r = upsertEventOccurrences(row.id, add.occurrences, meta);
+        if (r.ok && r.inserted.length) out.created.push(`${add.name} (+${r.inserted.length} date)`);
+        else if (r.ok) out.skipped.push(add.name);
+        else out.failed.push({ name: add.name, reason: r.reason, detail: r.detail });
+      } catch (e) { out.failed.push({ name: add && add.name, reason: 'error', detail: String(e && e.message) }); }
+    }
+  }
+  return out;
+}
+
 function startServer() {
   server.listen(PORT, () => {
     console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
@@ -21088,6 +21123,17 @@ function startServer() {
     } catch (err) {
       console.error('[seo] slug backfill failed unexpectedly (site remains up):', err);
     }
+
+    if (process.env.RAILWAY_ENVIRONMENT_ID || process.env.EVENT_BATCH_IMPORT === 'on') {
+      try {
+        const r = importEventBatches();
+        console.log(`[event-batches] created ${r.created.length}, skipped ${r.skipped.length}, failed ${r.failed.length}`);
+        for (const n of r.created) console.log(`[event-batches] + ${n}`);
+        for (const f of r.failed) console.error(`[event-batches] FAILED ${JSON.stringify(f)}`);
+      } catch (err) {
+        console.error('[event-batches] import failed unexpectedly (site remains up):', err);
+      }
+    }
   });
 }
 
@@ -21113,6 +21159,7 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   startServer,
+  importEventBatches,
   // List an Event, Phase 1
   renderListAnEventPage,
   validateEventSubmission,
