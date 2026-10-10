@@ -1826,6 +1826,49 @@ test('venueCardHtml links to the venue when it has a slug and known type', () =>
 });
 
 // ---- Route/render smoke tests (via the real HTML-producing functions) --
+function kinFolkPageFixture(overrides = {}) {
+  return { ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'),
+    name: 'Kin & Folk', region: 'penticton', slug: 'kin-folk',
+    description: 'Original venue description.', phone: '+1 778-531-6170',
+    address: '557 Main St, Penticton, BC V2A 5C6', website: 'https://www.kinandfolk.ca/', ...overrides };
+}
+
+test('Kin & Folk page: Penticton dining information reaches search, visible copy and schema without data mutation', () => {
+  const venue = kinFolkPageFixture();
+  const before = JSON.stringify(venue);
+  const html = app.renderVenuePage(venue, [], [], []);
+  assert.match(html, /<title>Kin &amp; Folk Penticton: Menu &amp; Reservations \| Okanagan Roam<\/title>/);
+  assert.match(html, /<meta name="description" content="Visit Kin &amp; Folk in Penticton at 557 Main Street/);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/penticton\/restaurants\/kin-folk"/);
+  assert.match(html, /<h1>Kin &amp; Folk<\/h1>/);
+  assert.match(html, /Asian-inspired food/);
+  const schemas = [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
+  const restaurant = schemas.find((s) => s['@type'] === 'Restaurant');
+  assert.match(restaurant.description, /557 Main Street in downtown Penticton/);
+  assert.equal(restaurant.telephone, '+1 778-531-6170');
+  assert.equal(JSON.stringify(venue), before);
+});
+
+test('Kin & Folk page: official reservations and local planning links are available without invented menu URLs', () => {
+  const html = app.renderVenuePage(kinFolkPageFixture(), [], [], []);
+  assert.match(html, /href="https:\/\/www.kinandfolk.ca\/reservations"/);
+  assert.match(html, /groups of eight or fewer/);
+  assert.match(html, /href="https:\/\/www.kinandfolk.ca\/"/);
+  assert.match(html, /href="tel:\+1 778-531-6170"/);
+  assert.match(html, /href="\/penticton\/cafes"/);
+  assert.match(html, /href="\/whats-on\?regions=penticton"/);
+  assert.match(html, /href="\/trip"/);
+  assert.doesNotMatch(html, /kinandfolk.ca\/menu|Happy hour daily from/);
+});
+
+test('Kin & Folk page: copy does not leak to Kelowna, other venues, types or redirects', () => {
+  for (const overrides of [{ region: 'kelowna', slug: 'kin-folk-kelowna' }, { region: 'vernon' }, { type: 'winery' }, { slug: 'another-restaurant' }, { redirect_to: 123 }]) {
+    const html = app.renderVenuePage(kinFolkPageFixture(overrides), [], [], []);
+    assert.match(html, /Original venue description/);
+    assert.doesNotMatch(html, /Menu &amp; Reservations|kinandfolk.ca\/reservations/);
+  }
+});
+
 function eloraPageFixture(overrides = {}) {
   return { ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'),
     name: 'Elora Restaurant & Bar', region: 'vernon', slug: 'elora-restaurant-bar',

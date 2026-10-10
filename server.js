@@ -14100,8 +14100,12 @@ ${renderGolfHeaderHtml()}
 // GET /:region/:category/:slug — individual venue page
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // Page-only editorial copy: no database changes or effects on other venues.
-  const editorial = !venue.redirect_to && venue.region === 'vernon' && venue.type === 'restaurant'
-    && venue.slug === 'elora-restaurant-bar' ? require('./data/elora-dining.json') : null;
+  const editorial = !venue.redirect_to && venue.type === 'restaurant'
+    ? venue.region === 'vernon' && venue.slug === 'elora-restaurant-bar'
+      ? require('./data/elora-dining.json')
+      : venue.region === 'penticton' && venue.slug === 'kin-folk'
+        ? require('./data/kin-folk-penticton.json') : null
+    : null;
   const regionLabel = REGION_LABELS[venue.region];
   const catSlug = CATEGORY_SLUGS[venue.type];
   const label = CATEGORY_LABELS[venue.type];
