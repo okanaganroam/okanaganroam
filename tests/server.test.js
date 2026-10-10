@@ -15955,3 +15955,43 @@ test('Page weight: Food & Drink and guide ItemLists keep url + name per venue bu
     assert.ok(list.itemListElement.every((x) => x.item && x.item.name && !('description' in x.item)), 'name kept, description dropped');
   }
 });
+
+// ---- SEO audit (2026-10-10): share images, ski resort wording, badge ----
+test('SEO audit: region pages get their own share image; ski resorts get après-ski wording', () => {
+  const ogImage = (html) => (html.match(/<meta property="og:image" content="([^"]*)">/) || [])[1];
+  const kelowna = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []);
+  assert.equal(ogImage(kelowna), 'https://okanaganroam.com/images/regions/wide/kelowna.webp');
+  assert.match(kelowna, /<title>Kelowna Restaurants, Wineries &amp; More, BC \| Okanagan Roam<\/title>/);
+
+  const bigWhite = app.renderRegionPage('big-white', app.getRegionCategoryCounts('big-white') || {}, []);
+  assert.match(bigWhite, /<title>Big White Restaurants, Bars &amp; Après-Ski, BC \| Okanagan Roam<\/title>/);
+  assert.doesNotMatch(bigWhite.match(/<meta name="description" content="([^"]*)">/)[1], /golf|winer/i);
+  assert.equal(ogImage(bigWhite), 'https://okanaganroam.com/images/outdoors/winter.webp');
+});
+
+test('SEO audit: single-venue pages keep the brand share image (decision #8)', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const html = app.renderVenuePage(venue, [], [], []);
+  assert.deepEqual([...html.matchAll(/<meta property="og:image" content="([^"]*)">/g)].map((m) => m[1]), ['https://okanaganroam.com/og-image.png']);
+  assert.doesNotMatch(html, /<meta name="twitter:image"/);
+});
+
+test('SEO audit: every share image referenced by pageHead exists on disk', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const block = src.slice(src.indexOf('const REGION_SHARE_IMAGES'), src.indexOf('});', src.indexOf('const REGION_SHARE_IMAGES')));
+  const paths = [...block.matchAll(/'(\/images\/[^']+)'/g)].map((m) => m[1]).concat([
+    '/images/outdoors/winter.webp', '/images/okanagan-valley-sunset-hero.webp', '/images/mood/eat.webp',
+    '/images/hidden-gems/dog-friendly.webp', '/images/mood/whats-on.webp', '/images/whats-on/live-music.webp',
+  ]);
+  for (const p of paths) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', p)), `${p} exists`);
+});
+
+test('SEO audit: "Featured on Okanagan Roam" badge is served as SVG and PNG', async () => {
+  const svg = await s4request('GET', '/badges/featured-on-okanagan-roam.svg');
+  assert.equal(svg.status, 200);
+  assert.match(svg.text, /^<svg[^>]*aria-label="Featured on Okanagan Roam"/);
+  const png = await s4request('GET', '/badges/featured-on-okanagan-roam.png');
+  assert.equal(png.status, 200);
+  const missing = await s4request('GET', '/badges/../server.js');
+  assert.notEqual(missing.status, 200);
+});
