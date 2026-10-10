@@ -2583,7 +2583,7 @@ test('Build Your Perfect Okanagan Trip: entire visible/accessible section is i18
   assert.match(html, /data-i18n-aria="trip\.openMap"/);
 });
 
-test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beaches, Hidden Gems, social aria-labels, Facebook tooltip, copyright, logo aria-label) are all now i18n-wired', () => {
+test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beaches, Hidden Gems, social aria-labels, copyright, logo aria-label) are all now i18n-wired', () => {
   const html = app.renderHomeFooterHTML();
   assert.match(html, /class="home-footer-tagline" data-i18n="homeFooter\.taglineFull"/);
   assert.match(html, /data-i18n="homeFooter\.foodDrinks">Food &amp; Drinks</);
@@ -2591,8 +2591,6 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
   assert.match(html, /data-i18n="gems\.heading">Hidden Gems</);
   assert.match(html, /data-i18n-aria="homeFooter\.instagramAria"/);
   assert.match(html, /data-i18n-aria="homeFooter\.tiktokAria"/);
-  assert.match(html, /data-i18n-tooltip="homeFooter\.comingSoon"/);
-  assert.match(html, /data-i18n-title="homeFooter\.comingSoon"/);
   assert.match(html, /data-i18n-aria="homeFooter\.facebookAria"/);
   assert.match(html, /class="home-footer-copyright" data-i18n="homeFooter\.copyright"/);
   assert.match(html, /class="home-footer-logo" href="\/" aria-label="Okanagan Roam home" data-i18n-aria="nav\.homeAriaLabel"/);
@@ -2693,7 +2691,8 @@ test('Home footer: About and Social Media (renamed from Follow) column links/ico
   assert.match(html, /<button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/button>/);
   assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
   assert.match(html, /icon-tiktok" href="https:\/\/www\.tiktok\.com\/@okanaganroam"/);
-  assert.match(html, /icon-facebook" data-tooltip="Coming soon"/);
+  assert.ok(html.includes('<a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">'));
+  assert.doesNotMatch(html, /Facebook, coming soon|icon-facebook[^>]*data-tooltip/);
 });
 
 // ==== Phase 2 Sprint 1 (Golf) =============================================
@@ -9685,8 +9684,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
-  assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
+  assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
+  assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
   assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
   // fetches the full venue list (/api/venues?limit=5000, ~2 MB) on pages
@@ -9702,7 +9701,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved /browse performance change F5: the sort reads each rating once (initBlock4 only), 2026-10-03.
   // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
   // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
-  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
+  assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11124,7 +11123,7 @@ test('Header: okanagan.html outside <header id="top"> is byte-identical to the a
   const outside = html.replace(/<header id="top">[\s\S]*?<\/header>/, '');
   const crypto = require('node:crypto');
   // SEO-2 (2026-10-02): approved description/og:/twitter: description change.
-  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), '54597c2b2c95e986f935f3158fcfc349');
+  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), '0ee01b6fd6ec97f4f6fa45b663813998');
   assert.match(html, /<a href="#top" class="logo"/, 'the logo keeps its in-page #top anchor on the homepage');
 });
 
@@ -11509,12 +11508,12 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41'); // SEO-2 (2026-10-02) descriptions
+  assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8'); // SEO-2 (2026-10-02) descriptions
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10');
-  assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
+  assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719');
+  assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
   assert.doesNotMatch(sitemap, /list-your-venue/, 'sitemap unchanged: the page is not listed');
@@ -15740,9 +15739,9 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   // Frozen files are byte-identical.
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '0ca718cfebebd822300f6095b5182d41');
-  assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10');
-  assert.equal(md5('public/styles/app.css'), 'f2e72558306fba5cdaac92f6d525f58b');
+  assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8');
+  assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719');
+  assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
 // ---- /browse/classic Open Now status from the canonical hours engine (2026-10) -----------
@@ -15834,7 +15833,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '1015c86ba1f2025b913319ee50ebcd10', 'app.js is untouched');
+    assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719', 'app.js is untouched');
   }));
 }
 

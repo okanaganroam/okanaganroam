@@ -786,7 +786,7 @@
     color: #fff; opacity: 1;
   }
   .icon-instagram:hover{ opacity: 0.85; }
-  .icon-facebook{ background: #1877F2; color: #fff; opacity: 0.55; }
+  .icon-facebook{ background: #1877F2; color: #fff; }
   .icon-facebook:hover{ background: #1877F2; opacity: 1; }
   .icon-tiktok{ background: #010101; color: #25F4EE; opacity: 1; }
   .icon-tiktok:hover{ background: #010101; opacity: 0.85; }

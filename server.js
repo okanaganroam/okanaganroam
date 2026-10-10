@@ -5955,8 +5955,7 @@ const FOOTER_REGION_GROUPS = [
 //     now an equal-width 4-column CSS grid specifically so Regions can't
 //     visually dominate the row the way an auto-sized flex column would.
 //   Social Media (renamed from "Follow"): Instagram/TikTok -> the
-//     existing real profile URLs, Facebook stays the existing
-//     non-clickable "coming soon" treatment.
+//     existing real profile URLs, including the Okanagan Roam Facebook Page.
 // fromBrowse (2026-09-18, /browse redesign): this footer was written
 // assuming it only ever renders on / , where #exploreRegions/#hiddenGems
 // are real in-page anchors -- true for its original call site, but not
@@ -6044,9 +6043,9 @@ function renderHomeFooterHTML(fromBrowse) {
           <a class="home-footer-social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram" data-i18n-aria="homeFooter.instagramAria">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
           </a>
-          <span class="home-footer-social-icon icon-facebook" data-tooltip="Coming soon" title="Coming soon" aria-label="Facebook, coming soon" data-i18n-tooltip="homeFooter.comingSoon" data-i18n-title="homeFooter.comingSoon" data-i18n-aria="homeFooter.facebookAria">
+          <a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 4h-2a4 4 0 0 0-4 4v3H6v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3z"/></svg>
-          </span>
+          </a>
           <a class="home-footer-social-icon icon-tiktok" href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on TikTok" data-i18n-aria="homeFooter.tiktokAria">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c0 2.5 2 4.5 4.5 4.5"/></svg>
           </a>
@@ -6457,7 +6456,7 @@ function renderCanonicalFooterStyles() {
     color: #fff; opacity: 1;
   }
   .home-footer-social-icon.icon-instagram:hover { opacity: 0.85; }
-  .home-footer-social-icon.icon-facebook { background: #1877F2; color: #fff; opacity: 0.5; }
+  .home-footer-social-icon.icon-facebook { background: #1877F2; color: #fff; }
   .home-footer-social-icon.icon-tiktok { background: #010101; color: #25F4EE; opacity: 1; }
   .home-footer-social-icon.icon-tiktok:hover { opacity: 0.85; }
   .home-footer-social-icon::after {

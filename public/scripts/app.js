@@ -101,7 +101,7 @@ var TRANSLATIONS = {
     'homeFooter.instagramAria': 'Okanagan Roam on Instagram',
     'homeFooter.tiktokAria': 'Okanagan Roam on TikTok',
     'homeFooter.comingSoon': 'Coming soon',
-    'homeFooter.facebookAria': 'Facebook, coming soon',
+    'homeFooter.facebookAria': 'Okanagan Roam on Facebook',
     'homeFooter.copyright': '\u00a9 2026 Okanagan Roam. Built for the whole crew, dog included.',
 
     'search.placeholder': "Search a place, cuisine, or what you're craving",
@@ -551,7 +551,7 @@ var TRANSLATIONS = {
     'homeFooter.instagramAria': 'Okanagan Roam sur Instagram',
     'homeFooter.tiktokAria': 'Okanagan Roam sur TikTok',
     'homeFooter.comingSoon': 'Bient\u00f4t disponible',
-    'homeFooter.facebookAria': 'Facebook, bient\u00f4t disponible',
+    'homeFooter.facebookAria': 'Okanagan Roam sur Facebook',
     'homeFooter.copyright': '\u00a9 2026 Okanagan Roam. Con\u00e7u pour toute la bande, chien inclus.',
     'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
     'search.mainLine': 'Que recherchez-vous\u00a0?',
