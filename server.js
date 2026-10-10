@@ -1311,6 +1311,59 @@ const REGION_SHARE_IMAGES = Object.freeze({
   'west-kelowna': '/images/regions/wide/west-kelowna.webp',
 });
 
+// Region intros (SEO audit, 2026-10-10): 230-280 words of local copy under
+// the H1 on the busiest region hubs, which were otherwise only counts and
+// lists. Each paragraph is [lead, html]; the html is our own trusted copy
+// and every link is a live on-site page. A region listed here also gets a
+// "Things to Do in ..." title and its own description.
+const REGION_INTROS = Object.freeze({
+  kelowna: {
+    titleTail: 'Beaches, Wineries & Food',
+    describe: (n) => `Things to do in Kelowna, BC: lakefront beaches, Lakeshore wineries, the Myra Canyon trestles and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Kelowna is the Okanagan's biggest city, spread along the east shore of Okanagan Lake. Most visitors base themselves here, and it's easy to see why: beaches, wineries, trails and a lively downtown are all within a 20-minute drive.`],
+      ['Downtown and the waterfront.', `Start on the lakefront boardwalk, which runs from <a href="/kelowna/beaches/city-park-hot-sands-beach">City Park and Hot Sands Beach</a> past the marina to <a href="/kelowna/beaches/waterfront-park-tugboat-bay-beach">Waterfront Park</a>. Bernard Avenue and the Cultural District have most of the city's <a href="/kelowna/restaurants">restaurants</a>, <a href="/kelowna/cocktail-lounges">cocktail bars</a> and <a href="/kelowna/breweries">craft breweries</a>. For the classic view over the bridge and lake, walk up <a href="/kelowna/outdoors/knox-mountain-park">Knox Mountain</a>.`],
+      ['Lakeshore and the Mission.', `South of downtown, Pandosy Village and the Lakeshore Road beaches lead into wine country. <a href="/kelowna/wineries/cedarcreek-estate-winery">CedarCreek</a>, <a href="/kelowna/wineries/martin-s-lane-winery">Martin's Lane</a>, <a href="/kelowna/wineries/summerhill-pyramid-winery">Summerhill Pyramid</a> and <a href="/kelowna/wineries/tantalus-vineyards">Tantalus</a> are all close together. See all <a href="/kelowna/wineries">Kelowna wineries</a>.`],
+      ['Up the hill.', `The <a href="/kelowna/outdoors/myra-canyon-myra-bellevue-provincial-park">Myra Canyon trestles</a> on the old Kettle Valley Railway are an easy, flat bike ride with big canyon views. The <a href="/kelowna/outdoors/mission-creek-greenway-regional-park">Mission Creek Greenway</a> is a shady walk in town.`],
+      ['When to go.', `July and August are hot, busy and best for the lake. September and October bring harvest, cooler days and easier patio tables. In winter, Kelowna is the closest city to <a href="/big-white">Big White</a>, about an hour's drive away.`],
+      [null, `Travelling with a dog? Start with our <a href="/guide/kelowna/dog_friendly">dog-friendly Kelowna guide</a>.`],
+    ],
+  },
+  penticton: {
+    titleTail: 'Beaches, Wine & Breweries',
+    describe: (n) => `Things to do in Penticton, BC: Okanagan and Skaha beaches, the channel float, Naramata Bench wineries and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Penticton sits between two lakes: Okanagan Lake on its north edge and Skaha Lake to the south. It's a laid-back beach town with serious wine country on its doorstep.`],
+      ['Two beaches, one channel.', `<a href="/penticton/beaches/okanagan-beach">Okanagan Beach</a> runs along Lakeshore Drive, a short walk from downtown. <a href="/penticton/beaches/skaha-beach">Skaha Beach</a> is wider, sandier and great for families. In summer, you can float the river channel between the two lakes on a tube with <a href="/penticton/outdoors/coyote-cruises-penticton-channel-float">Coyote Cruises</a>.`],
+      ['Downtown and the Ale Trail.', `Main Street and Front Street are lined with <a href="/penticton/restaurants">restaurants</a> and <a href="/penticton/cafes">cafes</a>. Penticton punches above its size for beer: <a href="/penticton/breweries/cannery-brewing-co">Cannery</a>, <a href="/penticton/breweries/neighbourhood-brewing">Neighbourhood</a>, <a href="/penticton/breweries/tin-whistle-brewing">Tin Whistle</a> and <a href="/penticton/breweries/yellow-dog-brewing-co">Yellow Dog</a> are all nearby.`],
+      ['The Naramata Bench.', `Just northeast of town, Naramata Road winds past dozens of tasting rooms above the lake. <a href="/penticton/wineries/la-frenz-winery">La Frenz</a>, <a href="/penticton/wineries/poplar-grove-winery">Poplar Grove</a> and <a href="/penticton/wineries/upper-bench-estate-winery-and-creamery">Upper Bench</a> make an easy afternoon. See all <a href="/naramata/wineries">33 Naramata Bench wineries</a>.`],
+      ['Outdoors.', `Climbers come from across Canada for the <a href="/penticton/outdoors/skaha-bluffs-provincial-park">Skaha Bluffs</a>. The <a href="/penticton/outdoors/kvr-trail-skaha-lake-penticton-to-okanagan-falls">KVR Trail along Skaha Lake</a> is a flat ride or walk with lake views the whole way. <a href="/penticton/outdoors/munson-mountain">Munson Mountain</a> is a 10-minute hike to a view over both lakes.`],
+      ['When to go.', `July and August are prime beach and float season. Late summer brings peach season, and fall is harvest on the Bench. In winter, <a href="/apex">Apex Mountain</a> is about 40 minutes away.`],
+    ],
+  },
+  vernon: {
+    titleTail: 'Lakes, Trails & Golf',
+    describe: (n) => `Things to do in Vernon, BC: Kalamalka Lake, Ellison Park, Predator Ridge golf, trails and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Vernon is the North Okanagan's hub, surrounded by three lakes: Okanagan, Kalamalka and Swan. It's quieter than Kelowna, with more parks, more lake access and some of the valley's best golf.`],
+      ['Kalamalka Lake.', `Kal Lake is famous for its turquoise and green water, which shifts colour with the season. Swim at <a href="/vernon/beaches/kekuli-bay-provincial-park">Kekuli Bay</a> or <a href="/vernon/beaches/kin-beach">Kin Beach</a> on Okanagan Lake. For the lake from above, walk the <a href="/vernon/outdoors/kal-crystal-waters-trail">Kal Crystal Waters Trail</a> or the <a href="/vernon/outdoors/grey-canal-trail">Grey Canal Trail</a>.`],
+      ['Parks and nature.', `<a href="/vernon/beaches/ellison-provincial-park">Ellison Provincial Park</a> has sheltered coves on Okanagan Lake. <a href="/vernon/outdoors/bx-creek-trail-bx-falls">BX Falls</a> is a short, shady hike to a waterfall. The <a href="/vernon/outdoors/allan-brooks-nature-centre">Allan Brooks Nature Centre</a> is a good stop with kids. Birders head to the <a href="/vernon/outdoors/swan-lake-nature-reserve-trail">Swan Lake Nature Reserve</a>.`],
+      ['Downtown.', `Historic downtown Vernon is known for its outdoor murals. It's packed with <a href="/vernon/restaurants">restaurants</a> and <a href="/vernon/cafes">cafes</a>. For a local drink, try <a href="/vernon/breweries/bna-brewing-vernon-40">BNA Brewing</a> or <a href="/vernon/breweries/cambium-cider-co">Cambium Cider</a>.`],
+      ['Golf.', `<a href="/vernon/golf/predator-ridge-predator-course">Predator Ridge</a> is one of BC's best-known resort courses. <a href="/vernon/golf/rise-golf-course">The Rise</a> has big views over Okanagan Lake. See all <a href="/vernon/golf">Vernon golf courses</a>.`],
+      ['When to go.', `Summer is for the lakes. In fall, Vernon gets its Halloween events, including <a href="/vernon/events/field-of-screams-xiii-the-unlucky">Field of Screams</a>. In winter, <a href="/silverstar">SilverStar</a> is about 30 minutes up the hill. The Vernon Winter Carnival runs every February.`],
+    ],
+  },
+});
+
+function regionIntroHtml(region) {
+  const intro = REGION_INTROS[region];
+  if (!intro) return '';
+  return `<div class="region-intro">
+${intro.paragraphs.map(([lead, html]) => `    <p>${lead ? `<strong>${escapeHtml(lead)}</strong> ` : ''}${html}</p>`).join('\n')}
+  </div>`;
+}
+const REGION_INTRO_STYLE = '<style>body.region-page .region-intro { max-width: 68ch; margin: 0 0 26px; }\nbody.region-page .region-intro p { font-size: 1.02rem; line-height: 1.65; margin: 0 0 12px; }</style>';
+
 // One JS source of truth for the compact-band accent colors used by
 // Design Sprint 4's new compact visual band (Hidden Gems homepage cards,
 // related/nearby venue cards). Mirrors -- but does not modify -- the
@@ -9519,12 +9572,17 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
   // Ski resorts (SEO audit, 2026-10-10): the generic "Wineries ... golf
   // courses" wording doesn't match what people search for on a ski hill.
   const isSkiResort = SKI_RESORT_REGIONS.has(region);
-  const title = isSkiResort
-    ? `${regionLabel} Restaurants, Bars & Après-Ski, BC | Okanagan Roam`
-    : `${regionLabel} Restaurants, Wineries & More, BC | Okanagan Roam`;
-  const description = isSkiResort
-    ? `${totalVenues} verified spots at ${regionLabel}, BC: restaurants, bars, cafés and après-ski, all reviewed and badge-checked by Okanagan Roam.`
-    : `${totalVenues} verified venues in ${regionLabel}, BC — restaurants, wineries, breweries, golf courses, and more, all reviewed and badge-checked by Okanagan Roam.`;
+  const intro = REGION_INTROS[region];
+  const title = intro
+    ? `Things to Do in ${regionLabel}: ${intro.titleTail} | Okanagan Roam`
+    : isSkiResort
+      ? `${regionLabel} Restaurants, Bars & Après-Ski, BC | Okanagan Roam`
+      : `${regionLabel} Restaurants, Wineries & More, BC | Okanagan Roam`;
+  const description = intro
+    ? intro.describe(totalVenues)
+    : isSkiResort
+      ? `${totalVenues} verified spots at ${regionLabel}, BC: restaurants, bars, cafés and après-ski, all reviewed and badge-checked by Okanagan Roam.`
+      : `${totalVenues} verified venues in ${regionLabel}, BC — restaurants, wineries, breweries, golf courses, and more, all reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}`;
   const shareImage = isSkiResort ? '/images/outdoors/winter.webp' : (REGION_SHARE_IMAGES[region] || null);
 
@@ -9593,6 +9651,7 @@ ${upcomingEvents.map((e) => {
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
 ${renderDestinationCategoryStyles()}
+${intro ? REGION_INTRO_STYLE : ''}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head>
 <body class="golf-page outdoor-page region-page">
@@ -9606,7 +9665,7 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${totalVenues} verified venues across ${Object.keys(categoryCounts).length} categories in ${escapeHtml(regionLabel)}.</p>
-  ${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}${regionCategoryTabsHtml(region, categoryCounts, null, categories)}
+  ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}${regionCategoryTabsHtml(region, categoryCounts, null, categories)}
   ${categorySections}
   ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
   <a class="cta" href="https://okanaganroam.com/">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
