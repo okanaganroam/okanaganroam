@@ -15944,6 +15944,18 @@ test('Event batches: the reviewed batch goes in through createEvent, adds a miss
   assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM events WHERE name IN (${names.map(() => '?').join(',')})`).get(...names).n, 0);
 });
 
+// ---- Page weight (2026-10-10): listing ItemLists don't repeat descriptions ----
+test('Page weight: Food & Drink and guide ItemLists keep url + name per venue but no repeated description', () => {
+  const venues = app.listVenues({ limit: 1000 }).venues;
+  const parseItemList = (html) => html.split('<script type="application/ld+json">').map((b) => b.split('</script>')[0].trim())
+    .filter((b) => b.startsWith('{') && b.includes('"@type":"ItemList"')).map((b) => JSON.parse(b))[0];
+  for (const html of [app.renderFoodDrinkHubPage(venues.filter((v) => ['restaurant', 'cafe', 'brewery', 'pub', 'cocktail'].includes(v.type))), app.renderGuidePage('kelowna', 'patio', venues.filter((v) => v.region === 'kelowna'))]) {
+    const list = parseItemList(html);
+    assert.ok(list && list.itemListElement.length > 0, 'ItemList present');
+    assert.ok(list.itemListElement.every((x) => x.item && x.item.name && !('description' in x.item)), 'name kept, description dropped');
+  }
+});
+
 // ---- SEO audit (2026-10-10): share images, ski resort wording, badge ----
 test('SEO audit: region pages get their own share image; ski resorts get après-ski wording', () => {
   const ogImage = (html) => (html.match(/<meta property="og:image" content="([^"]*)">/) || [])[1];

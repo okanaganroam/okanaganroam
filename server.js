@@ -5425,7 +5425,6 @@ function renderGuidePage(region, badge, venues) {
       item: {
         '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
         name: v.name,
-        description: v.description || undefined,
       },
     })),
   };
@@ -10333,7 +10332,6 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
       item: {
         '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
         name: v.name,
-        description: v.description || undefined,
       },
     })),
   };
@@ -11116,7 +11114,7 @@ function renderOutdoorActivityPage(activity, venues) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
     })),
   };
   const hiddenGemIds = getHiddenGemVenueIds();
@@ -11268,7 +11266,6 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
       item: {
         '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
         name: v.name,
-        description: v.description || undefined,
       },
     })),
   };
@@ -12047,7 +12044,6 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
       item: {
         '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
         name: v.name,
-        description: v.description || undefined,
       },
     })),
   };
@@ -12141,6 +12137,10 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
     { name: 'Home', url: 'https://okanaganroam.com/' },
     { name: 'Food & Drink', url: canonical },
   ]);
+  // Page weight (2026-10-10): ItemList entries carry position, url, type and
+  // name only, here and on every listing page. The full description used to
+  // be repeated for every venue (~466 KB of /food-drink's 2.9 MB) although
+  // it is already in each card and on each venue's own page.
   const itemList = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -12150,7 +12150,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
     })),
   };
   // id -> { c: categories, f: features, r: region } for the client script,
@@ -12764,7 +12764,7 @@ function renderDogHubPage(venues, filter = null) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
     })),
   };
   // id -> { c: types, f: features, r: region } for the client script.
@@ -13144,7 +13144,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name, description: v.description || undefined },
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
     })),
   };
   const payload = {};
