@@ -15995,3 +15995,36 @@ test('SEO audit: "Featured on Okanagan Roam" badge is served as SVG and PNG', as
   const missing = await s4request('GET', '/badges/../server.js');
   assert.notEqual(missing.status, 200);
 });
+
+// ---- Ski season guide (2026-10-10) ----
+test('Ski guide: renders the article head, links only venues that exist, and drops the rest', () => {
+  insert.run({
+    name: 'Fat Marmot', region: 'big-white', type: 'restaurant', cuisine: null, phone: null, price: 2, reviews: 10, rating: 4.5,
+    description: 'Ski guide fixture.', address: null, latitude: null, longitude: null, hours: null, slug: 'fat-marmot',
+  });
+  const html = app.renderSkiGuidePage();
+  const head = html.split('</head>')[0];
+  assert.match(head, /<title>Big White &amp; SilverStar Ski Guide 2026\/27/);
+  assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/ski-season-big-white-silverstar">/);
+  assert.match(head, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/outdoors\/winter\.webp">/);
+  const ld = [...head.matchAll(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/g)].map((m) => JSON.parse(m[1]));
+  assert.deepEqual(ld.map((j) => j['@type']).sort(), ['Article', 'BreadcrumbList']);
+  assert.equal((html.match(/<h1>/g) || []).length, 1);
+  // The seeded venue is linked, with its live name; unseeded ones are left out, and empty sections vanish.
+  assert.match(html, /<a href="\/big-white\/restaurants\/fat-marmot">Fat Marmot<\/a><\/strong> \(Inn at Big White\): ramen/);
+  assert.doesNotMatch(html, /moose-lounge|sopra-sam-s-italian-kitchen/);
+  assert.doesNotMatch(html, /<h3>Dinner worth booking<\/h3>/);
+  assert.match(html, /<h2>Plan your ski trip<\/h2>/);
+});
+
+test('Ski guide: served at its path, listed in the sitemap, and linked from the ski resort region pages only', async () => {
+  const page = await s4request('GET', app.SKI_GUIDE_PATH);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /Where to eat, drink and play at Big White and SilverStar this winter/);
+  const sitemap = await s4request('GET', '/sitemap.xml');
+  assert.match(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/guides\/ski-season-big-white-silverstar<\/loc>/);
+  const bigWhite = app.renderRegionPage('big-white', app.getRegionCategoryCounts('big-white') || {}, []);
+  assert.match(bigWhite, /href="\/guides\/ski-season-big-white-silverstar#big-white">Read our ski season guide/);
+  const kelowna = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []);
+  assert.doesNotMatch(kelowna, /ski-season-big-white-silverstar/);
+});

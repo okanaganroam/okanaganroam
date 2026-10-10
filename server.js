@@ -9606,7 +9606,7 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${totalVenues} verified venues across ${Object.keys(categoryCounts).length} categories in ${escapeHtml(regionLabel)}.</p>
-  ${regionCategoryTabsHtml(region, categoryCounts, null, categories)}
+  ${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}${regionCategoryTabsHtml(region, categoryCounts, null, categories)}
   ${categorySections}
   ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
   <a class="cta" href="https://okanaganroam.com/">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
@@ -17903,6 +17903,182 @@ function listVenueSubmissions(status) {
   }));
 }
 
+// ---------- Ski season guide (2026-10-10): /guides/ski-season-big-white-silverstar ----------
+// The first editorial article page. The words are fixed here (approved copy);
+// every venue mention is looked up live by region + slug, so the link always
+// points at the venue's current page, ratings come from the database, and a
+// venue that is removed or redirected simply drops out of the guide rather
+// than leaving a broken link. Item `name` overrides the venue name when one
+// line covers a place under a plainer label; `rating: true` shows the live
+// rating after the name.
+const SKI_GUIDE_PATH = '/guides/ski-season-big-white-silverstar';
+const SKI_GUIDE = {
+  heading: 'Where to eat, drink and play at Big White and SilverStar this winter',
+  title: 'Big White & SilverStar Ski Guide 2026/27: Après, Food & Fun | Okanagan Roam',
+  description: 'Where to eat, drink and play at Big White and SilverStar this winter: après-ski, on-mountain lunch, dinner and things to do off the slopes.',
+  shareImage: '/images/outdoors/winter.webp',
+  intro: [
+    'The Okanagan’s two big mountains sit just up the road from Kelowna and Vernon, and the skiing is only half the trip. This guide covers the other half: where to warm up for lunch, the best après-ski, dinner worth booking, and what to do when the lifts stop.',
+    'Every place here is listed and badge-checked on Okanagan Roam. Hours change through the season, so check before you go.',
+  ],
+  resorts: [
+    {
+      region: 'big-white',
+      name: 'Big White',
+      lead: 'Big White is the Okanagan’s big mountain, with 2,834 acres of patrolled terrain and a village built for staying put once you arrive.',
+      sections: [
+        { heading: 'Après-ski', items: [
+          { slug: 'fat-marmot', where: 'Inn at Big White', text: 'ramen and Korean chicken, with a fire-table patio made for sunset après. Ramen isn’t served patio-side.' },
+          { slug: 'moose-lounge', where: 'Happy Valley Day Lodge', text: 'a revitalized lounge bringing back the longtime après traditions regulars missed.' },
+          { slug: 'snowshoe-sam-s', text: 'the mountain’s liveliest night out, with pool tables, sports TVs and a Monday pool night that’s become village tradition.' },
+          { slug: 'black-diamond-bar-grill', text: 'an alpine-lodge room with a beer list deep enough for a serious craft crowd.' },
+        ] },
+        { heading: 'Lunch on the mountain', items: [
+          { slug: 'vista-at-black-forest-day-lodge', text: 'ski-in, ski-out, with a mountain view and outdoor seating. Season pass holders get 10% off.' },
+          { slug: 'fourth-ace-bar-smokehouse', text: 'a hidden gem off the main strip. Ski in from Perfection run and share a platter like The Meat Sweats.' },
+          { slug: 'spuds-at-the-ridge-day-lodge', text: 'a lineup of six poutines and a relaxed, open eating area.' },
+          { slug: 'moonlight-bistro', text: 'a cabin-style stop at the base of Gem Lake chair for a warm drink between runs.' },
+        ] },
+        { heading: 'Dinner worth booking', items: [
+          { slug: 'sopra-sam-s-italian-kitchen', rating: true, text: 'cozy, upscale Italian above Snowshoe Sam’s. Try the eggplant parmigiana or chicken scallopini.' },
+          { slug: 'kettle-valley-steakhouse', rating: true, text: 'an award-winning steakhouse at the top of Happy Valley Day Lodge, back after a five-year break, with tenderloin, bison and an Okanagan wine list.' },
+          { slug: '6-bistro', text: 'an intimate tasting menu by an outdoor fireplace, with vegetarian options. Made for a celebration.' },
+          { slug: 'cabin-kitchen-bar-at-whitefoot-lodge', text: 'the family pick, with a real kids menu, trivia nights and a braised-beef mac and cheese.' },
+        ] },
+        { heading: 'Coffee and treats', items: [
+          { slug: 'toasty', text: 'oversized donuts reviewers say stay soft for days.' },
+          { slug: 'clocktower-coffee-co', text: 'ski-in, ski-out coffee from 7 am in the Village Centre Mall. Arrive early on busy mornings.' },
+        ] },
+        { heading: 'Off the slopes', items: [
+          { slug: 'happy-valley-ice-skating-rink', name: 'Happy Valley skating rink', text: 'billed as Canada’s highest outdoor rink, lit for night skating.' },
+          { slug: 'big-white-tube-park', name: 'Tube Park', text: 'five groomed lanes in Happy Valley. No skill or gear needed.' },
+          { slug: 'twinkling-trail-big-white', name: 'Twinkling Trail', text: 'a lit evening walk through the forest, a hit with kids.' },
+          { slug: 'candle-creek-kennels-dog-sled-tours', name: 'Candle Creek Kennels', text: 'dog-sled tours with a team of Alaskan huskies.' },
+          { slug: 'big-white-horse-drawn-sleigh-rides', name: 'Horse-drawn sleigh rides', text: 'from outside Happy Valley Day Lodge, December 14, 2026 to March 30, 2027.' },
+          { slug: 'big-white-nordic-wilderness-trails', name: 'Nordic and wilderness trails', text: '25 km for cross-country skiing and snowshoeing. Leashed dogs are welcome on the wilderness trails.' },
+        ] },
+      ],
+    },
+    {
+      region: 'silverstar',
+      name: 'SilverStar',
+      lead: 'SilverStar, above Vernon, is a whole winter village: 3,304 acres and 133 runs, plus one of Canada’s biggest daily-groomed cross-country networks right next door.',
+      sections: [
+        { heading: 'Après-ski', items: [
+          { slug: 'long-john-s-pub', rating: true, text: 'a longtime favourite with what regulars call the best burger and onion rings on the hill. Get the gravy fries.' },
+          { slug: 'the-bulldog-grand-cafe-silver-star', name: 'The Bulldog Grand Cafe', text: 'a split patio, four gas fireplaces and TVs, the village’s warm-up stop.' },
+          { slug: 'la-plata', text: 'tapas and cocktails made with homemade spruce syrup, plus a prickly pear mocktail reviewers rave about.' },
+          { slug: 'black-pine', text: 'upscale-casual après with live bingo nights and room for a table of 12.' },
+        ] },
+        { heading: 'Lunch on the mountain', items: [
+          { slug: 'paradise-camp', text: 'the backside lodge on the Putnam Creek side, known for its soups and wild-meat mountain stew, with views to the Monashees.' },
+          { slug: 'pizza-gratta', rating: true, text: 'sourdough pizza by the slice, with plenty of vegetarian and vegan options.' },
+          { slug: 'bugaboos-bakery-cafe', text: 'the village’s only bakery-café, with a view locals call magical, vegan soy mochas and a vegan banana lava cake.' },
+        ] },
+        { heading: 'Dinner', items: [
+          { slug: 'd-argento', text: 'premium-casual Italian with wine-paired dinners. The squid ink pasta is the splurge.' },
+          { slug: 'the-red-antler', text: 'a crowd-pleaser with something for everyone, from a quinoa avocado power bowl to a brownie regulars recommend.' },
+        ] },
+        { heading: 'Off the slopes', items: [
+          { slug: 'brewers-pond-skating-silverstar', name: 'Brewer’s Pond', text: '2.5 acres of natural ice for skating, with a fire and music at the edge.' },
+          { slug: 'tube-town-silverstar-tube-park', name: 'Tube Town', text: 'a proper tube park beside Brewer’s Pond. Warm up after with mulled wine at Tube Town Café & Bar.' },
+          { slug: 'ravenwood-snowshoe-dinner-tours', name: 'Ravenwood Snowshoe Dinner Tours', text: 'a guided snowshoe through the forest at dusk to the Ravenwood Cabin, where dinner is waiting.' },
+          { slug: 'silverstar-cross-country-ski-trails', name: 'Cross-country and snowshoeing', text: '55 km of trails from the village, linking with Sovereign Lake Nordic Centre for 105 km in all, plus 16 km of snowshoe trails.' },
+          { slug: 'silverstar-fat-bike-trails', name: 'Fat biking', text: '15 km of packed trail, with bike rentals in the village.' },
+        ] },
+      ],
+    },
+  ],
+  tips: [
+    { lead: 'Let Build My Trip do it.', html: 'Type something like “A ski weekend at Big White with good food and après” into <a href="/trip">Build My Trip</a> and get a day-by-day plan from these places.' },
+    { lead: 'Book dinner early', html: 'on weekends and holidays, especially Sopra, Kettle Valley Steakhouse and 6° Bistro.' },
+    { lead: 'Check hours before you go.', html: 'Mountain restaurants often change hours through the season.' },
+    { lead: 'Browse everything:', html: 'all <a href="/big-white">Big White spots</a> and all <a href="/silverstar">SilverStar spots</a>.' },
+  ],
+};
+
+// The live venue row behind a guide mention, or null when it no longer has
+// a public page (removed, redirected, or a type with no category URL).
+function skiGuideVenue(region, slug) {
+  const v = db.prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL').get(region, slug);
+  return v && CATEGORY_SLUGS[v.type] ? v : null;
+}
+
+function renderSkiGuidePage() {
+  const g = SKI_GUIDE;
+  const canonical = `https://okanaganroam.com${SKI_GUIDE_PATH}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Ski Season Guide', url: canonical },
+  ]);
+  const article = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: g.heading,
+    description: g.description,
+    image: `https://okanaganroam.com${g.shareImage}`,
+    mainEntityOfPage: canonical,
+    publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
+  };
+  const itemHtml = (region, item) => {
+    const v = skiGuideVenue(region, item.slug);
+    if (!v) return '';
+    const href = `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+    const rating = item.rating && v.rating ? ` (${Number(v.rating).toFixed(1)}★)` : '';
+    const where = item.where ? ` (${escapeHtml(item.where)})` : '';
+    return `\n          <li><strong><a href="${escapeHtml(href)}">${escapeHtml(item.name || v.name)}</a></strong>${where}${rating}: ${escapeHtml(item.text)}</li>`;
+  };
+  const resortsHtml = g.resorts.map((r) => {
+    const sections = r.sections.map((s) => {
+      const items = s.items.map((it) => itemHtml(r.region, it)).join('');
+      return items ? `\n        <h3>${escapeHtml(s.heading)}</h3>\n        <ul class="ski-guide-list">${items}\n        </ul>` : '';
+    }).join('');
+    return `\n      <section class="ski-guide-resort" id="${r.region}">\n        <h2>${escapeHtml(r.name)}</h2>\n        <p>${escapeHtml(r.lead)}</p>${sections}\n      </section>`;
+  }).join('');
+  const tipsHtml = g.tips.map((t) => `\n          <li><strong>${escapeHtml(t.lead)}</strong> ${t.html}</li>`).join('');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: g.shareImage })}
+<style>
+  body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
+  body.ski-guide-page .ski-guide h1 { margin-bottom: 16px; }
+  body.ski-guide-page .ski-guide-intro p { font-size: 1.05rem; line-height: 1.6; }
+  body.ski-guide-page .ski-guide-jump { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+  body.ski-guide-page .ski-guide-jump a { background: var(--paper); border-radius: 999px; padding: 8px 16px; font-weight: 700; text-decoration: none; }
+  body.ski-guide-page .ski-guide-resort { margin-top: 36px; }
+  body.ski-guide-page .ski-guide h3 { margin: 24px 0 10px; font-size: 1.1rem; }
+  body.ski-guide-page .ski-guide-list { padding-left: 1.2em; margin: 0; }
+  body.ski-guide-page .ski-guide-list li { margin: 0 0 10px; line-height: 1.55; }
+</style>
+</head>
+<body class="golf-page ski-guide-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Ski Season Guide' },
+  ])}
+    <article class="ski-guide">
+      <h1>${escapeHtml(g.heading)}</h1>
+      <div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
+      </div>
+      <nav class="ski-guide-jump" aria-label="Jump to a resort">${g.resorts.map((r) => `<a href="#${r.region}">${escapeHtml(r.name)}</a>`).join('')}</nav>${resortsHtml}
+      <section class="ski-guide-tips">
+        <h2>Plan your ski trip</h2>
+        <ul class="ski-guide-list">${tipsHtml}
+        </ul>
+      </section>
+    </article>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
   const description = 'Own a restaurant, winery, cafe, brewery or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
@@ -19370,6 +19546,8 @@ const server = http.createServer(async (req, res) => {
           ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        // Editorial guides (2026-10-10).
+        `  <url>\n    <loc>https://okanaganroam.com${SKI_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...(getSecretSpotVenues().length >= MIN_CATEGORY_VENUES
           ? [`  <url>\n    <loc>https://okanaganroam.com/secret-spots</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
           : []),
@@ -20843,6 +21021,11 @@ const server = http.createServer(async (req, res) => {
 
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
+    // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if ((pathname === SKI_GUIDE_PATH || pathname === `${SKI_GUIDE_PATH}/`) && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderSkiGuidePage());
+    }
     if ((pathname === '/list-your-venue' || pathname === '/list-your-venue/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderListYourVenuePage());
@@ -21233,6 +21416,9 @@ module.exports = {
   EVENT_SUBMISSION_MAX_FUTURE_DAYS,
   EVENT_SUBMISSION_MAX_SPAN_DAYS,
   // List Your Venue, Phase 1
+  renderSkiGuidePage,
+  SKI_GUIDE,
+  SKI_GUIDE_PATH,
   renderListYourVenuePage,
   validateVenueSubmission,
   buildVenueSubmissionEmail,
