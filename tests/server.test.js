@@ -1826,6 +1826,54 @@ test('venueCardHtml links to the venue when it has a slug and known type', () =>
 });
 
 // ---- Route/render smoke tests (via the real HTML-producing functions) --
+function tonciniPageFixture(overrides = {}) {
+  return { ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'),
+    name: 'Toncini Modern Italian', slug: 'toncini-modern-italian',
+    description: 'Original Toncini description.', phone: '+1 236-361-5008',
+    address: '140-1855 Kirschner Rd, Kelowna, BC V1Y 4N7', website: 'https://toncinimodernitalian.com/',
+    hours: JSON.stringify({ mon: [['11:00', '18:00']], sun: [] }), ...overrides };
+}
+
+test('Toncini page: official menu and pickup links accompany Kelowna search and dining copy', () => {
+  const html = app.renderVenuePage(tonciniPageFixture(), [], [], []);
+  assert.match(html, /<title>Toncini Modern Italian Kelowna: Pasta Bar &amp; Menu \| Okanagan Roam<\/title>/);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/kelowna\/restaurants\/toncini-modern-italian"/);
+  assert.match(html, /href="https:\/\/toncinimodernitalian.com\/pasta-bar"/);
+  assert.match(html, /href="https:\/\/www.clover.com\/online-ordering\/toncini-pasta-bar-kelowna"/);
+  assert.match(html, /href="https:\/\/toncinimodernitalian.com\/catering"/);
+  assert.match(html, /href="https:\/\/toncinimodernitalian.com\/private-chef"/);
+  assert.match(html, /href="\/kelowna\/cafes"/);
+  assert.match(html, /href="\/whats-on\?regions=kelowna"/);
+  assert.match(html, /href="\/trip"/);
+});
+
+test('Toncini page: verified hours agree between visible rows and schema without mutating stored venue', () => {
+  const venue = tonciniPageFixture();
+  const before = JSON.stringify(venue);
+  const html = app.renderVenuePage(venue, [], [], []);
+  const schemas = [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
+  const restaurant = schemas.find((s) => s['@type'] === 'Restaurant');
+  assert.match(restaurant.description, /fresh pasta/);
+  for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']) {
+    assert.match(html, new RegExp(`<li><span>${day}</span><span>11:00–20:00</span></li>`));
+    const spec = restaurant.openingHoursSpecification.find((s) => s.dayOfWeek === `https://schema.org/${day}`);
+    assert.ok(spec, `${day} needs a schema hours entry`);
+    assert.equal(spec.opens, '11:00');
+    assert.equal(spec.closes, '20:00');
+  }
+  assert.match(html, /<li><span>Sunday<\/span><span>Hours not listed<\/span><\/li>/);
+  assert.equal(JSON.stringify(venue), before);
+});
+
+test('Toncini page: editorial and hours overrides do not affect other regions, types, slugs or redirects', () => {
+  for (const overrides of [{ region: 'penticton' }, { type: 'winery' }, { slug: 'other-restaurant' }, { redirect_to: 123 }]) {
+    const html = app.renderVenuePage(tonciniPageFixture(overrides), [], [], []);
+    assert.match(html, /Original Toncini description/);
+    assert.match(html, /<li><span>Monday<\/span><span>11:00–18:00<\/span><\/li>/);
+    assert.doesNotMatch(html, /toncinimodernitalian.com\/pasta-bar|clover.com\/online-ordering/);
+  }
+});
+
 function kinFolkPageFixture(overrides = {}) {
   return { ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'),
     name: 'Kin & Folk', region: 'penticton', slug: 'kin-folk',

@@ -14104,8 +14104,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     ? venue.region === 'vernon' && venue.slug === 'elora-restaurant-bar'
       ? require('./data/elora-dining.json')
       : venue.region === 'penticton' && venue.slug === 'kin-folk'
-        ? require('./data/kin-folk-penticton.json') : null
+        ? require('./data/kin-folk-penticton.json')
+        : venue.region === 'kelowna' && venue.slug === 'toncini-modern-italian'
+          ? require('./data/toncini-pasta-bar.json') : null
     : null;
+  const pageHours = editorial && editorial.hours ? JSON.stringify(editorial.hours) : venue.hours;
   const regionLabel = REGION_LABELS[venue.region];
   const catSlug = CATEGORY_SLUGS[venue.type];
   const label = CATEGORY_LABELS[venue.type];
@@ -14152,7 +14155,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
       ratingValue: venue.rating,
       reviewCount: venue.reviews,
     } : undefined,
-    openingHoursSpecification: buildOpeningHoursSpecification(venue.hours),
+    openingHoursSpecification: buildOpeningHoursSpecification(pageHours),
   };
 
   const attributeChips = badgeChipsHtml(venue);
@@ -14168,7 +14171,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // an all-day day stays 00:00–23:59 (the list restates the stored hours, it
   // never rewords them as "Open 24 hours"). No list when nothing is readable.
   let hoursHtml = '';
-  const parsedHours = venue.hours && hoursModule ? hoursModule.parseHours(venue.hours) : null;
+  const parsedHours = pageHours && hoursModule ? hoursModule.parseHours(pageHours) : null;
   if (parsedHours && parsedHours.known) {
     const dayNames = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
     const rows = hoursModule.HOURS_WEEKDAYS.map((d) => {
