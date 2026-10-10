@@ -1,0 +1,33 @@
+{
+  "verifiedOn": "2026-10-10",
+  "sources": [
+    "https://www.bestwestern.com/en_US/book/hotels-in-vernon/best-western-premier-route-97-vernon/propertyCode.62143.html",
+    "https://www.instagram.com/elora.dining/"
+  ],
+  "title": "Elora Restaurant & Bar Vernon: Menu & Dining Info | Okanagan Roam",
+  "metaDescription": "Find Elora Restaurant & Bar in Vernon at 5350 Anderson Way. Explore breakfast and dinner information, menu updates, directions and contact details.",
+  "intro": "Elora Restaurant & Bar is inside the Best Western Premier Route 97 in Vernon, at 5350 Anderson Way. It serves breakfast and dinner, making it an option for a morning meal or an evening out in the North Okanagan.",
+  "sections": [
+    {
+      "heading": "Menu and dining information",
+      "text": "Looking for Elora’s current menu? Check the restaurant’s Instagram updates or use the Call link below to ask about the latest dine-in menu, prices and reservations. Confirm dietary requirements directly with the restaurant before visiting.",
+      "links": [
+        { "label": "View Elora’s Instagram updates", "href": "https://www.instagram.com/elora.dining/" }
+      ]
+    },
+    {
+      "heading": "Before you visit",
+      "text": "Find Elora inside the Best Western Premier Route 97 at 5350 Anderson Way. Breakfast and dinner are separate service periods; check the listed hours and confirm service times with the restaurant when planning your visit.",
+      "links": []
+    },
+    {
+      "heading": "Make a day of Vernon",
+      "text": "Pair your meal with a café stop or a local event, or use Build My Trip to plan an Okanagan day around your interests.",
+      "links": [
+        { "label": "Explore Vernon cafés", "href": "/vernon/cafes" },
+        { "label": "See what’s on in Vernon", "href": "/whats-on?regions=vernon" },
+        { "label": "Build My Trip", "href": "/trip" }
+      ]
+    }
+  ]
+}

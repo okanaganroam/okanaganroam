@@ -1826,6 +1826,47 @@ test('venueCardHtml links to the venue when it has a slug and known type', () =>
 });
 
 // ---- Route/render smoke tests (via the real HTML-producing functions) --
+function eloraPageFixture(overrides = {}) {
+  return { ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'),
+    name: 'Elora Restaurant & Bar', region: 'vernon', slug: 'elora-restaurant-bar',
+    description: 'Expect the chef to visit every table.', phone: '+1 778-943-4212', ...overrides };
+}
+
+test('Elora page: search and visible copy answer dining intent without altering venue data', () => {
+  const venue = eloraPageFixture();
+  const before = JSON.stringify(venue);
+  const html = app.renderVenuePage(venue, [], [], []);
+  assert.match(html, /<title>Elora Restaurant &amp; Bar Vernon: Menu &amp; Dining Info \| Okanagan Roam<\/title>/);
+  assert.match(html, /<meta name="description" content="Find Elora Restaurant &amp; Bar in Vernon at 5350 Anderson Way\./);
+  assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/vernon\/restaurants\/elora-restaurant-bar"/);
+  assert.match(html, /<h1>Elora Restaurant &amp; Bar<\/h1>/);
+  assert.match(html, /inside the Best Western Premier Route 97/);
+  assert.doesNotMatch(html, /Expect the chef to visit every table/);
+  const schemas = [...html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
+  const restaurant = schemas.find((s) => s['@type'] === 'Restaurant');
+  assert.match(restaurant.description, /^Elora Restaurant & Bar is inside/);
+  assert.equal(restaurant.telephone, '+1 778-943-4212');
+  assert.equal(JSON.stringify(venue), before);
+});
+
+test('Elora page: menu guidance uses verified social updates and existing contact link', () => {
+  const html = app.renderVenuePage(eloraPageFixture(), [], [], []);
+  assert.match(html, /href="https:\/\/www.instagram.com\/elora.dining\/"/);
+  assert.match(html, /View Elora’s Instagram updates/);
+  assert.match(html, /href="tel:\+1 778-943-4212"/);
+  assert.match(html, /href="\/trip"/);
+  assert.match(html, /href="\/whats-on\?regions=vernon"/);
+  assert.doesNotMatch(html, /doordash\.com|Download.*menu|View.*official menu/);
+});
+
+test('Elora page: editorial copy is limited to the active Vernon restaurant', () => {
+  for (const overrides of [{ region: 'kelowna' }, { type: 'winery' }, { slug: 'other-restaurant' }, { redirect_to: 123 }]) {
+    const html = app.renderVenuePage(eloraPageFixture(overrides), [], [], []);
+    assert.match(html, /Expect the chef to visit every table/);
+    assert.doesNotMatch(html, /Menu &amp; Dining Info|elora\.dining/);
+  }
+});
+
 test('renderVenuePage produces a page with the venue name as H1 and a canonical link', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);

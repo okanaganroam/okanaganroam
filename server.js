@@ -14099,13 +14099,23 @@ ${renderGolfHeaderHtml()}
 
 // GET /:region/:category/:slug — individual venue page
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
+  // Page-only editorial copy: no database changes or effects on other venues.
+  const editorial = !venue.redirect_to && venue.region === 'vernon' && venue.type === 'restaurant'
+    && venue.slug === 'elora-restaurant-bar' ? require('./data/elora-dining.json') : null;
   const regionLabel = REGION_LABELS[venue.region];
   const catSlug = CATEGORY_SLUGS[venue.type];
   const label = CATEGORY_LABELS[venue.type];
   const canonical = `https://okanaganroam.com/${venue.region}/${catSlug}/${venue.slug}`;
-  const title = `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`;
+  const title = editorial ? editorial.title : `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`;
   const rawDesc = venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`;
-  const description = rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc;
+  const description = editorial ? editorial.metaDescription
+    : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
+  const editorialHtml = editorial ? editorial.sections.map((section) => `
+  <section class="venue-section" style="max-width:72ch">
+    <h2>${escapeHtml(section.heading)}</h2>
+    <p>${escapeHtml(section.text)}</p>
+    ${section.links.length ? `<ul>${section.links.map((link) => `<li><a href="${escapeHtml(link.href)}"${link.href.startsWith('https://') ? ' rel="nofollow noopener" target="_blank" data-track="website"' : ''}>${escapeHtml(link.label)}</a></li>`).join('')}</ul>` : ''}
+  </section>`).join('') : '';
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -14122,7 +14132,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     '@context': 'https://schema.org',
     '@type': SCHEMA_TYPE_MAP[venue.type] || 'LocalBusiness',
     name: venue.name,
-    description: venue.description || undefined,
+    description: editorial ? editorial.intro : (venue.description || undefined),
     url: canonical,
     telephone: venue.phone || undefined,
     address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
@@ -14349,7 +14359,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
-  <p class="venue-description">${escapeHtml(venue.description || '')}</p>${venueAdvisoryHtml}
+  <p class="venue-description">${escapeHtml(editorial ? editorial.intro : (venue.description || ''))}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}
   <div class="venue-section venue-key-info">
     <h2>Good to Know</h2>
