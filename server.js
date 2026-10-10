@@ -1293,6 +1293,24 @@ const REGION_TAGLINES = {
   apex: 'A small ski resort near Penticton.',
 };
 
+// SEO audit (2026-10-10): region hubs whose venues are on a ski hill, so
+// their title/description talk about après-ski rather than wineries/golf.
+const SKI_RESORT_REGIONS = new Set(['big-white', 'silverstar', 'apex', 'baldy']);
+
+// SEO audit (2026-10-10): per-region share images (og:image), reusing the
+// existing wide region photography. Regions without one keep og-image.png.
+const REGION_SHARE_IMAGES = Object.freeze({
+  kelowna: '/images/regions/wide/kelowna.webp',
+  'lake-country': '/images/regions/wide/lake-country.webp',
+  naramata: '/images/regions/wide/naramata.webp',
+  oliver: '/images/regions/wide/oliver.webp',
+  osoyoos: '/images/regions/wide/osoyoos.webp',
+  penticton: '/images/regions/wide/penticton.webp',
+  summerland: '/images/regions/wide/summerland.webp',
+  vernon: '/images/regions/wide/vernon.webp',
+  'west-kelowna': '/images/regions/wide/west-kelowna.webp',
+});
+
 // One JS source of truth for the compact-band accent colors used by
 // Design Sprint 4's new compact visual band (Hidden Gems homepage cards,
 // related/nearby venue cards). Mirrors -- but does not modify -- the
@@ -5415,7 +5433,7 @@ function renderGuidePage(region, badge, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: badge === 'dog_friendly' ? '/images/hidden-gems/dog-friendly.webp' : badge === 'live_music' ? '/images/whats-on/live-music.webp' : (REGION_SHARE_IMAGES[region] || null), golfTheme: true, savedSidecar: true })}
 ${renderAnalyticsHeadHtml('guide')}
 </head>
 <body class="golf-page guide-page">
@@ -9311,7 +9329,14 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // byte-identical to before.
   // savedSidecar (Stage 4.3): pages that render Favorite controls opt in to
   // the hidden saved-item capture script; every other page's head is unchanged.
-  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false } = opts;
+  // shareImage (SEO audit, 2026-10-10): a site-relative path to a category,
+  // region or guide photo, so shared links stop all showing the same
+  // og-image.png. Never set it on single-venue pages: decision #8 forbids
+  // a photo that reads as a specific business. Pages that don't pass it
+  // keep the exact previous head. No twitter:image is added: X falls back
+  // to og:image, and other hubs' heads are pinned to have none.
+  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null } = opts;
+  const ogImage = shareImage ? `https://okanaganroam.com${shareImage}` : 'https://okanaganroam.com/og-image.png';
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
@@ -9319,7 +9344,7 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
 ${canonical === null ? '' : `<link rel="canonical" href="${canonical}">\n`}${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
-<meta property="og:image" content="https://okanaganroam.com/og-image.png">
+<meta property="og:image" content="${ogImage}">
 ${canonical === null ? '' : `<meta property="og:url" content="${canonical}">\n`}<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
@@ -9492,9 +9517,17 @@ function venueCardHtml(venue, opts = {}) {
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
   const totalVenues = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
-  const title = `${regionLabel} Restaurants, Wineries & More, BC | Okanagan Roam`;
-  const description = `${totalVenues} verified venues in ${regionLabel}, BC — restaurants, wineries, breweries, golf courses, and more, all reviewed and badge-checked by Okanagan Roam.`;
+  // Ski resorts (SEO audit, 2026-10-10): the generic "Wineries ... golf
+  // courses" wording doesn't match what people search for on a ski hill.
+  const isSkiResort = SKI_RESORT_REGIONS.has(region);
+  const title = isSkiResort
+    ? `${regionLabel} Restaurants, Bars & Après-Ski, BC | Okanagan Roam`
+    : `${regionLabel} Restaurants, Wineries & More, BC | Okanagan Roam`;
+  const description = isSkiResort
+    ? `${totalVenues} verified spots at ${regionLabel}, BC: restaurants, bars, cafés and après-ski, all reviewed and badge-checked by Okanagan Roam.`
+    : `${totalVenues} verified venues in ${regionLabel}, BC — restaurants, wineries, breweries, golf courses, and more, all reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}`;
+  const shareImage = isSkiResort ? '/images/outdoors/winter.webp' : (REGION_SHARE_IMAGES[region] || null);
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -9558,7 +9591,7 @@ ${upcomingEvents.map((e) => {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
 ${renderDestinationCategoryStyles()}
 ${golfEngagementHeadHtml('fd', true, 'region')}
@@ -9773,7 +9806,7 @@ function destinationRegionEntries() {
 }
 function renderDestinationsPage(entries = destinationRegionEntries()) {
   const title = 'Okanagan Destinations | Okanagan Roam';
-  const description = 'Choose an Okanagan destination, from Enderby to Osoyoos and the ski resorts, and see its restaurants, wineries, beaches, outdoor places, events and more on Okanagan Roam.';
+  const description = 'Pick an Okanagan destination, from Enderby to Osoyoos and the ski hills, and find its restaurants, wineries, beaches and events.';
   const canonical = 'https://okanaganroam.com/destinations';
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -9790,7 +9823,7 @@ function renderDestinationsPage(entries = destinationRegionEntries()) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+${pageHead(title, description, canonical, [breadcrumb], { shareImage: '/images/okanagan-valley-sunset-hero.webp', golfTheme: true })}
 ${renderOutdoorThemeStyles()}
 ${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
@@ -11264,7 +11297,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: HIDDEN_GEM_TYPE_IMAGE[type] || null, golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
 ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
@@ -12102,7 +12135,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
 
   const heading = 'Food & Drink in the Okanagan';
   const title = `${heading} | Okanagan Roam`;
-  const description = `${venues.length} restaurants, cafes, pubs, cocktail lounges and breweries across the Okanagan Valley — filter by what you are looking for, from patios and dog-friendly rooms to vegan, vegetarian and gluten-free options.`;
+  const description = `${venues.length} restaurants, cafés, pubs and breweries across the Okanagan Valley. Filter by patio, dog-friendly, vegan or gluten-free.`;
   const canonical = 'https://okanaganroam.com/food-drink';
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -12150,7 +12183,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: '/images/mood/eat.webp', golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
@@ -12716,7 +12749,7 @@ function renderDogHubPage(venues, filter = null) {
 
   const heading = 'Dog Friendly Finds';
   const title = `Dog Friendly Finds in the Okanagan | Okanagan Roam`;
-  const description = `${venues.length} dog-friendly places across the Okanagan Valley — patios, cafes, taprooms and tasting rooms that welcome your dog, plus ${beachCount} designated dog beaches with their official on-leash and off-leash rules.`;
+  const description = `${venues.length} dog-friendly places across the Okanagan Valley: patios, cafés and tasting rooms, plus ${beachCount} designated dog beaches.`;
   const canonical = 'https://okanaganroam.com/dog-friendly';
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -12752,7 +12785,7 @@ function renderDogHubPage(venues, filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: '/images/hidden-gems/dog-friendly.webp', golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderDogHubStyles()}
 ${golfEngagementHeadHtml('dog', true, 'hub')}
@@ -14027,7 +14060,7 @@ function renderWhatsOnPage(filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, outdoorTheme: true, noindex: !hasInventory, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb], { shareImage: '/images/mood/whats-on.webp', golfTheme: true, outdoorTheme: true, noindex: !hasInventory, savedSidecar: true })}
 ${renderWhatsOnStyles()}
 ${renderAnalyticsHeadHtml('hub')}
 </head>
@@ -15871,7 +15904,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
   return tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
     title: 'Build My Trip \u2014 Okanagan Roam',
-    description: 'Describe your Okanagan trip in your own words and get a day-by-day plan built from real places on Okanagan Roam \u2014 wineries, restaurants, beaches, golf and more \u2014 with the reason each stop fits. No invented places.',
+    description: 'Describe your Okanagan trip and get a day-by-day plan built from real wineries, restaurants, beaches and more, with why each stop fits.',
     canonical,
     faviconLink: '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Crect width=\'40\' height=\'40\' rx=\'8\' fill=\'%23F5EDDD\'/%3E%3Ccircle cx=\'26\' cy=\'11\' r=\'3\' fill=\'%23D9A441\'/%3E%3Cpath d=\'M26 4v2M31 6.5l-1.4 1.4M33.5 11h-2M26 18v-2M20.5 6.5l1.4 1.4\' stroke=\'%23D9A441\' stroke-width=\'1.3\' stroke-linecap=\'round\'/%3E%3Cpath d=\'M6 27L15 13l6 9\' stroke=\'%231F5C5C\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' opacity=\'0.5\'/%3E%3Cpath d=\'M10 27L20 11l10 16\' stroke=\'%231F5C5C\' stroke-width=\'2.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3Cpath d=\'M5 27.5h30\' stroke=\'%231F5C5C\' stroke-width=\'1.5\' stroke-linecap=\'round\' opacity=\'0.3\'/%3E%3C/svg%3E">',
     breadcrumbJson: JSON.stringify(breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Build My Trip', url: canonical }])),
@@ -19382,6 +19415,24 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('og-image.png not found on server');
+    }
+
+    // "Featured on Okanagan Roam" badge (2026-10-10) that listed venues
+    // embed on their own sites, linking back to their venue page. Fixed
+    // allowlist, same read-from-disk pattern as og-image.png above; cached
+    // for a day since venues hotlink it.
+    const BADGE_ASSETS = {
+      '/badges/featured-on-okanagan-roam.svg': { file: 'public/badges/featured-on-okanagan-roam.svg', type: 'image/svg+xml' },
+      '/badges/featured-on-okanagan-roam.png': { file: 'public/badges/featured-on-okanagan-roam.png', type: 'image/png' },
+    };
+    if (BADGE_ASSETS[pathname] && method === 'GET') {
+      const badgePath = path.join(__dirname, BADGE_ASSETS[pathname].file);
+      if (fs.existsSync(badgePath)) {
+        res.writeHead(200, { 'Content-Type': BADGE_ASSETS[pathname].type, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
+        return res.end(fs.readFileSync(badgePath));
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end(`${pathname} not found on server`);
     }
 
     // Phase 5 Sprint 1 — shared static assets. These three files are the
