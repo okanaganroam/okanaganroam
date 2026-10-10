@@ -4494,6 +4494,68 @@ test('S6 cleanup: remove every Step 6 fixture event', () => {
 });
 
 // ---- Event page rendering + SEO (noindex) --------------------------------
+// The editorial copy must apply only to the verified 2026 Vernon season.
+function withFieldOfScreamsFixture(overrides, check) {
+  const event = s5create({
+    name: 'Field of Screams XIII: The Unlucky', region: 'vernon', venue_id: null,
+    venue_name_text: "Historic O'Keefe Ranch, 9380 Hwy 97 N, Vernon",
+    description: 'Original stored event description.',
+    categories: ['holiday-seasonal'],
+    occurrences: [{ start_date: '2026-09-25', end_date: '2026-11-01', start_time: '18:30' }],
+    ...overrides,
+  });
+  try { check(event); } finally {
+    db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(event.id);
+    db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(event.id);
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(event.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(event.id);
+  }
+}
+
+test('Field of Screams: active page has practical SEO copy and official visitor links without data changes', () => {
+  withFieldOfScreamsFixture({}, (event) => {
+    const before = JSON.stringify(app.getEventById(event.id));
+    const html = app.renderEventPage(event, null, { now: new Date('2026-10-10T19:00:00Z') });
+    assert.match(html, /<title>Field of Screams Vernon 2026: Dates &amp; Tickets \| Okanagan Roam<\/title>/);
+    assert.match(html, /<meta name="description" content="Explore Field of Screams in Vernon, September 25–November 1, 2026\./);
+    assert.match(html, /rel="canonical" href="https:\/\/okanaganroam.com\/vernon\/events\/field-of-screams-xiii-the-unlucky"/);
+    assert.match(html, /<h1>Field of Screams XIII: The Unlucky<\/h1>/);
+    assert.match(html, /href="https:\/\/fosvernon.fearticket.com\/"/);
+    assert.match(html, /href="https:\/\/fosokanagan.com\/plan-your-visit\/ticket-availability\/"/);
+    assert.match(html, /St\. Anne’s Road/);
+    assert.match(html, /not recommended for children under 12/);
+    assert.match(html, /href="\/trip"/);
+    assert.doesNotMatch(html, /Original stored event description\./);
+    const schema = s5jsonLd(html).find((s) => s['@type'] === 'Event');
+    assert.match(schema.description, /^Field of Screams returns to Historic O’Keefe Ranch/);
+    assert.match(schema.startDate, /^2026-09-25T18:30/);
+    assert.match(schema.endDate, /^2026-11-01/);
+    assert.equal(JSON.stringify(app.getEventById(event.id)), before);
+  });
+});
+
+test('Field of Screams: expired page retains archived copy and noindex instead of current-season promotion', () => {
+  withFieldOfScreamsFixture({}, (event) => {
+    const html = app.renderEventPage(event, null, { now: new Date('2026-11-03T19:00:00Z') });
+    assert.match(html, /name="robots" content="noindex"/);
+    assert.match(html, /Original stored event description\./);
+    assert.doesNotMatch(html, /Dates &amp; Tickets|<h2>Tickets and available nights<\/h2>/);
+  });
+});
+
+test('Field of Screams: other regions and seasons keep their original event content', () => {
+  for (const overrides of [
+    { region: 'kelowna' },
+    { occurrences: [{ start_date: '2027-09-25', end_date: '2027-11-01', start_time: '18:30' }] },
+  ]) {
+    withFieldOfScreamsFixture(overrides, (event) => {
+      const html = app.renderEventPage(event, null, { now: new Date('2026-10-10T19:00:00Z') });
+      assert.match(html, /Original stored event description\./);
+      assert.doesNotMatch(html, /Dates &amp; Tickets|<h2>Tickets and available nights<\/h2>/);
+    });
+  }
+});
+
 test('renderEventPage renders the event name as H1 and a correct canonical', () => {
   const event = app.findEventBySlug('kelowna', 'test-future-festival');
   const html = app.renderEventPage(event, testVenue);

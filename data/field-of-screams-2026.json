@@ -1,0 +1,43 @@
+{
+  "verifiedOn": "2026-10-10",
+  "sources": [
+    "https://fosokanagan.com/",
+    "https://fosokanagan.com/plan-your-visit/faq/",
+    "https://fosokanagan.com/plan-your-visit/ticket-availability/"
+  ],
+  "title": "Field of Screams Vernon 2026: Dates & Tickets | Okanagan Roam",
+  "metaDescription": "Explore Field of Screams in Vernon, September 25–November 1, 2026. Find haunted-maze details, ticket links, arrival times and practical visiting tips.",
+  "intro": "Field of Screams returns to Historic O’Keefe Ranch north of Vernon for its September 25–November 1, 2026 season. Explore four themed haunted mazes with live scare actors: The Village, Distortion, Chocolate Factory and Hotel. Check the official ticket calendar for operating nights; the season range does not mean the attraction is open every evening.",
+  "sections": [
+    {
+      "heading": "Tickets and available nights",
+      "text": "Choose a single-maze, double-maze, all-maze or VIP ticket. Prices vary by night and pass, with Wednesday offers and premium nights. Check current prices and availability with the organizer before planning your visit.",
+      "links": [
+        { "label": "Buy tickets from the official ticket provider", "href": "https://fosvernon.fearticket.com/" },
+        { "label": "Check available nights", "href": "https://fosokanagan.com/plan-your-visit/ticket-availability/" },
+        { "label": "See official ticket prices", "href": "https://fosokanagan.com/plan-your-visit/ticket-prices/" }
+      ]
+    },
+    {
+      "heading": "Arrival and parking",
+      "text": "The venue is Historic O’Keefe Ranch, 9380 Highway 97 North, Vernon. Enter the parking area via St. Anne’s Road and follow the signs and attendants. Parking opens at 6 p.m.; ticket check-in and the mazes open at 6:30 p.m. Confirm your booked date and entry time before leaving.",
+      "links": []
+    },
+    {
+      "heading": "Age suitability and what to wear",
+      "text": "This scare attraction is best suited to teens and adults and is not recommended for children under 12. Expect darkness, loud sounds, strobe lighting and uneven ground. Most of the experience is outdoors and operates in rain, shine or snow. Wear warm layers, waterproof outerwear and sturdy shoes or boots. Check official updates during severe weather.",
+      "links": [
+        { "label": "Read the organizer’s visitor FAQ", "href": "https://fosokanagan.com/plan-your-visit/faq/" }
+      ]
+    },
+    {
+      "heading": "Plan your Vernon outing",
+      "text": "Make an autumn evening of it: find a café or restaurant in Vernon, then plan your travel to the ranch around your booked entry time.",
+      "links": [
+        { "label": "Explore Vernon cafés", "href": "/vernon/cafes" },
+        { "label": "Explore Vernon restaurants", "href": "/vernon/restaurants" },
+        { "label": "Build My Trip", "href": "/trip" }
+      ]
+    }
+  ]
+}
