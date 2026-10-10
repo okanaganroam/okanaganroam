@@ -1,0 +1,36 @@
+{
+  "verifiedOn": "2026-10-10",
+  "sources": [
+    "https://www.kinandfolk.ca/",
+    "https://www.kinandfolk.ca/about",
+    "https://www.kinandfolk.ca/reservations"
+  ],
+  "title": "Kin & Folk Penticton: Menu & Reservations | Okanagan Roam",
+  "metaDescription": "Visit Kin & Folk in Penticton at 557 Main Street. Find official menu information, reservations, group booking guidance, directions and local trip ideas.",
+  "intro": "Kin & Folk is a restaurant at 557 Main Street in downtown Penticton, serving Asian-inspired food and cocktails. Its approach centres on sharing a meal with family and friends, making it an option for lunch, dinner or a group celebration in the South Okanagan.",
+  "sections": [
+    {
+      "heading": "Menu and cocktails",
+      "text": "The kitchen draws on Asian flavours, global influences and local producers. For the current Penticton food and drinks menu, visit the restaurant’s official website. Confirm prices, dietary requirements and non-alcoholic choices directly with the restaurant before visiting.",
+      "links": [
+        { "label": "Visit Kin & Folk’s official website for menu information", "href": "https://www.kinandfolk.ca/" }
+      ]
+    },
+    {
+      "heading": "Reservations and group bookings",
+      "text": "The official reservation page accepts bookings for groups of eight or fewer. For larger groups, events or buyouts, contact the Penticton restaurant directly using the Call link below. Confirm current hours and happy-hour details when booking.",
+      "links": [
+        { "label": "View official reservation options", "href": "https://www.kinandfolk.ca/reservations" }
+      ]
+    },
+    {
+      "heading": "Make a day of Penticton",
+      "text": "Combine your meal with a café stop or a local event. Use Build My Trip to put together an Okanagan day around your interests.",
+      "links": [
+        { "label": "Explore Penticton cafés", "href": "/penticton/cafes" },
+        { "label": "See what’s on in Penticton", "href": "/whats-on?regions=penticton" },
+        { "label": "Build My Trip", "href": "/trip" }
+      ]
+    }
+  ]
+}
