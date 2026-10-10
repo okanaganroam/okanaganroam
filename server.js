@@ -14467,14 +14467,27 @@ function renderEventPage(event, hostVenue, opts = {}) {
   const full = getEventById(event.id) || event; // status/source/venue text when the caller passed a bare rowToEvent()
   const regionLabel = REGION_LABELS[full.region];
   const canonical = `https://okanaganroam.com/${full.region}/events/${full.slug}`;
-  const rawDesc = full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`;
-  const description = rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc;
   const expired = isEventExpired(full, now);
   const occurrences = listEventOccurrences(full.id, { includeCancelled: false });
+  // Verified editorial copy is limited to this one active 2026 season.
+  // Stored event data, dates and other event pages retain their existing behavior.
+  const editorial = !expired && full.status === 'scheduled' && full.region === 'vernon'
+    && full.slug === 'field-of-screams-xiii-the-unlucky' && occurrences.length === 1
+    && occurrences[0].start_date === '2026-09-25' && occurrences[0].end_date === '2026-11-01'
+    ? require('./data/field-of-screams-2026.json') : null;
+  const rawDesc = full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`;
+  const description = editorial ? editorial.metaDescription
+    : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
+  const editorialHtml = editorial ? editorial.sections.map((section) => `
+  <section class="event-editorial" style="max-width:72ch">
+    <h2>${escapeHtml(section.heading)}</h2>
+    <p>${escapeHtml(section.text)}</p>
+    ${section.links.length ? `<ul>${section.links.map((link) => `<li><a href="${escapeHtml(link.href)}"${link.href.startsWith('https://') ? ' rel="nofollow noopener" target="_blank"' : ''}>${escapeHtml(link.label)}</a></li>`).join('')}</ul>` : ''}
+  </section>`).join('') : '';
   const categories = getEventCategoryKeys(full.id);
   const isSeries = occurrences.length > 1;
   const upcoming = occurrences.filter((o) => o.end_date >= todayStr);
-  const title = eventPageTitle(full, regionLabel, upcoming[0] || occurrences[0]);
+  const title = editorial ? editorial.title : eventPageTitle(full, regionLabel, upcoming[0] || occurrences[0]);
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -14482,6 +14495,7 @@ function renderEventPage(event, hostVenue, opts = {}) {
     { name: full.name, url: canonical },
   ]);
   const eventSchema = eventJsonLd(full, occurrences, categories, hostVenue, canonical, todayStr);
+  if (editorial && eventSchema) eventSchema.description = editorial.intro;
 
   // When: single date / span, or the series list; legacy rows fall back to
   // the stored span text exactly as before.
@@ -14614,10 +14628,10 @@ ${renderGolfHeaderHtml()}
   <p class="subtitle">${isSeries ? 'Event series' : 'Event'} in ${escapeHtml(regionLabel)}, BC${statusNote}</p>
   ${chips ? `<p class="chips">${chips}</p>` : ''}
   ${actionsHtml}
-  <p>${escapeHtml(full.description || '')}</p>
+  <p>${escapeHtml(editorial ? editorial.intro : (full.description || ''))}</p>
   ${detailRows}
   ${datesListHtml}
-  ${attribution}
+  ${attribution}${editorialHtml}
   ${relatedHtml}
   <a class="cta" href="/${full.region}">Explore all of ${escapeHtml(regionLabel)}</a>
   </main>
