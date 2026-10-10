@@ -16093,12 +16093,35 @@ test('SEO audit: region pages get their own share image; ski resorts get après-
   const ogImage = (html) => (html.match(/<meta property="og:image" content="([^"]*)">/) || [])[1];
   const kelowna = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []);
   assert.equal(ogImage(kelowna), 'https://okanaganroam.com/images/regions/wide/kelowna.webp');
-  assert.match(kelowna, /<title>Kelowna Restaurants, Wineries &amp; More, BC \| Okanagan Roam<\/title>/);
+  assert.match(kelowna, /<title>Things to Do in Kelowna: Beaches, Wineries &amp; Food \| Okanagan Roam<\/title>/);
 
   const bigWhite = app.renderRegionPage('big-white', app.getRegionCategoryCounts('big-white') || {}, []);
   assert.match(bigWhite, /<title>Big White Restaurants, Bars &amp; Après-Ski, BC \| Okanagan Roam<\/title>/);
   assert.doesNotMatch(bigWhite.match(/<meta name="description" content="([^"]*)">/)[1], /golf|winer/i);
   assert.equal(ogImage(bigWhite), 'https://okanaganroam.com/images/outdoors/winter.webp');
+});
+
+test('Region intros: Kelowna, Penticton and Vernon carry local copy, a "Things to Do" title and their own description', () => {
+  const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const [region, label] of [['kelowna', 'Kelowna'], ['penticton', 'Penticton'], ['vernon', 'Vernon']]) {
+    const html = app.renderRegionPage(region, app.getRegionCategoryCounts(region) || {}, []);
+    assert.match(html, new RegExp(`<title>Things to Do in ${label}: `));
+    const desc = html.match(/<meta name="description" content="([^"]*)">/)[1];
+    assert.ok(desc.startsWith(`Things to do in ${label}, BC:`), desc);
+    assert.ok(desc.length <= 160, `${region} description is ${desc.length} chars`);
+    const intro = html.match(/<div class="region-intro">([\s\S]*?)<\/div>/);
+    assert.ok(intro, `${region} has an intro`);
+    const words = text(intro[1]).split(' ').length;
+    assert.ok(words >= 180 && words <= 320, `${region} intro is ${words} words`);
+    const hrefs = [...intro[1].matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+    assert.ok(hrefs.length >= 8, `${region} intro links on-site pages`);
+    assert.ok(hrefs.every((h) => /^\/[a-z0-9_\/-]+$/.test(h)), `${region} intro links are on-site paths`);
+    // The intro sits between the count subtitle and the category tiles.
+    assert.ok(html.indexOf('class="region-intro"') > html.indexOf('verified venues across'));
+  }
+  const oliver = app.renderRegionPage('oliver', app.getRegionCategoryCounts('oliver') || {}, []);
+  assert.doesNotMatch(oliver, /class="region-intro"/);
+  assert.match(oliver, /<title>Oliver Restaurants, Wineries &amp; More, BC \| Okanagan Roam<\/title>/);
 });
 
 test('SEO audit: single-venue pages keep the brand share image (decision #8)', () => {
