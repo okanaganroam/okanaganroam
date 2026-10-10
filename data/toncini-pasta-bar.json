@@ -1,0 +1,50 @@
+{
+  "verifiedOn": "2026-10-10",
+  "sources": [
+    "https://toncinimodernitalian.com/",
+    "https://toncinimodernitalian.com/pasta-bar"
+  ],
+  "title": "Toncini Modern Italian Kelowna: Pasta Bar & Menu | Okanagan Roam",
+  "metaDescription": "Explore Toncini Modern Italian’s Kelowna pasta bar: fresh pasta, ravioli, pizza by the slice, the official menu, pickup ordering and visiting information.",
+  "intro": "Toncini Modern Italian’s pasta bar is a fast-casual Italian eatery at 140–1855 Kirschner Road in Kelowna. It serves fresh pasta, homemade ravioli, Roman-style pizza by the slice and Italian desserts, with an official online menu and order-ahead pickup options.",
+  "hours": {
+    "mon": [["11:00", "20:00"]],
+    "tue": [["11:00", "20:00"]],
+    "wed": [["11:00", "20:00"]],
+    "thu": [["11:00", "20:00"]],
+    "fri": [["11:00", "20:00"]],
+    "sat": [["11:00", "20:00"]]
+  },
+  "sections": [
+    {
+      "heading": "Pasta bar menu and pickup ordering",
+      "text": "Browse the official pasta bar menu for fresh pasta, ravioli, pizza and desserts. The menu changes with the seasons, so check current choices and prices before ordering. Use Toncini’s linked ordering service to order ahead for pickup; confirm dietary requirements directly with the team.",
+      "links": [
+        { "label": "View the official pasta bar menu", "href": "https://toncinimodernitalian.com/pasta-bar" },
+        { "label": "Order ahead for pickup", "href": "https://www.clover.com/online-ordering/toncini-pasta-bar-kelowna" }
+      ]
+    },
+    {
+      "heading": "Before you visit",
+      "text": "Find the pasta bar at unit 140, 1855 Kirschner Road. The official pasta bar page lists Monday–Saturday hours of 11 a.m.–8 p.m. Sunday hours are not listed on that page; call to confirm Sunday service, holiday hours or arrangements for your visit.",
+      "links": []
+    },
+    {
+      "heading": "Catering and private-chef services",
+      "text": "Toncini also offers catering and private-chef services separately from a visit to the pasta bar. For a celebration, office meal or private gathering, contact the team through its official service pages to discuss availability and arrangements.",
+      "links": [
+        { "label": "Explore Toncini catering", "href": "https://toncinimodernitalian.com/catering" },
+        { "label": "Explore private-chef services", "href": "https://toncinimodernitalian.com/private-chef" }
+      ]
+    },
+    {
+      "heading": "Make a day of Kelowna",
+      "text": "Pair your meal with a café stop or a local event. Build My Trip can help you plan an Okanagan day around your interests.",
+      "links": [
+        { "label": "Explore Kelowna cafés", "href": "/kelowna/cafes" },
+        { "label": "See what’s on in Kelowna", "href": "/whats-on?regions=kelowna" },
+        { "label": "Build My Trip", "href": "/trip" }
+      ]
+    }
+  ]
+}
