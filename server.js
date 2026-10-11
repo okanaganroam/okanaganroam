@@ -701,6 +701,94 @@ function guardedPhoneCorrectUpdate(id, expectedCurrentPhone, correctedPhone, met
   }
 }
 
+// ---------- Guarded single-field website enrichment (2026-10-11) ----------
+//
+// A SEPARATE, standalone code path, like guardedPhoneCorrectUpdate() above.
+// It fills venues.website ONLY when the live value is empty (NULL or ''),
+// the same empty-only rule guardedEnrichUpdate() applies to address and
+// coordinates: the "is it empty" check and the write are one atomic UPDATE,
+// so a stale caller can never overwrite a website that is already set.
+// Correcting an existing website is deliberately out of scope.
+//
+// The URL must pass validateVenueWebsite() first: an absolute http(s) URL to
+// the venue's own site, never a social, review, booking or delivery page
+// (those are not the venue's website and would send visitors to a third
+// party). One venue_enrichment_log row is written per real change.
+//
+// Returns one of:
+//   { found: false }
+//   { found: true, changed: false, live: {...} }   -- website already set; nothing written
+//   { found: true, changed: true, venue }          -- written, one audit row
+const NON_WEBSITE_HOSTS = [
+  'facebook.com', 'fb.com', 'instagram.com', 'tiktok.com', 'twitter.com', 'x.com', 'linktr.ee',
+  'google.com', 'goo.gl', 'g.page', 'yelp.com', 'yelp.ca', 'tripadvisor.com', 'tripadvisor.ca',
+  'opentable.com', 'opentable.ca', 'doordash.com', 'skipthedishes.com', 'ubereats.com',
+  'restaurantji.com', 'wanderlog.com', 'okanaganroam.com',
+];
+
+function validateVenueWebsite(website) {
+  if (typeof website !== 'string') return { ok: false, error: 'website must be a string.' };
+  const trimmed = website.trim();
+  if (trimmed === '' || trimmed.length > 300) return { ok: false, error: 'website must be a non-empty URL of at most 300 characters.' };
+  let url;
+  try {
+    url = new URL(trimmed);
+  } catch (_) {
+    return { ok: false, error: 'website must be an absolute URL.' };
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return { ok: false, error: 'website must use http or https.' };
+  if (url.username || url.password) return { ok: false, error: 'website must not contain credentials.' };
+  const host = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (!host.includes('.')) return { ok: false, error: 'website must have a real domain.' };
+  if (NON_WEBSITE_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    return { ok: false, error: `${host} is a social, review or booking site, not the venue's own website.` };
+  }
+  return { ok: true, website: trimmed };
+}
+
+function guardedWebsiteEnrichUpdate(id, website, meta) {
+  const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  if (!existing) return { found: false };
+
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+
+    const info = db
+      .prepare(
+        `UPDATE venues SET website = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND (website IS NULL OR website = '')`
+      )
+      .run(website, id);
+
+    if (info.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { found: true, changed: false, live: getVenue(id) };
+    }
+
+    db.prepare(
+      `INSERT INTO venue_enrichment_log
+         (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+       VALUES (?, 'website', ?, ?, 'manual_research', ?, 'high', ?, 0, ?)`
+    ).run(id, existing.website === null ? null : String(existing.website), website, meta.reason, meta.batch_id, meta.reviewed_by || null);
+
+    db.exec('COMMIT');
+    txOpen = false;
+    return { found: true, changed: true, venue: getVenue(id) };
+  } catch (err) {
+    if (txOpen) {
+      try {
+        db.exec('ROLLBACK');
+      } catch (_) {
+        // Nothing left to roll back; the original error is what matters.
+      }
+    }
+    throw err;
+  }
+}
+
 // ---------- Open Now Phase 2 (2026-09-26): audited, verified hours write ----------
 //
 // A SEPARATE, standalone code path, like guardedPhoneCorrectUpdate() above.
@@ -20498,6 +20586,74 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // POST /admin/enrich-website (2026-10-11)
+    //
+    // The HTTP route for guardedWebsiteEnrichUpdate(): fills a venue's
+    // website only when it is currently empty. Same bearer-token check and
+    // strict key allowlist as every admin route; reason and batch_id are
+    // required for the audit row. 200 { changed: true } on a write,
+    // 409 when the venue already has a website (nothing written).
+    if (pathname === '/admin/enrich-website' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Enrich-website endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+
+      const ALLOWED_ENRICH_WEBSITE_KEYS = ['id', 'website', 'reason', 'batch_id'];
+      const unexpectedWebsiteKeys = Object.keys(body).filter((k) => !ALLOWED_ENRICH_WEBSITE_KEYS.includes(k));
+      if (unexpectedWebsiteKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedWebsiteKeys.join(', ')}` });
+      }
+
+      const id = body.id;
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (typeof body.reason !== 'string' || body.reason.trim() === '') {
+        return sendJSON(res, 400, { error: 'reason is required and must be a non-empty string.' });
+      }
+      if (typeof body.batch_id !== 'string' || body.batch_id.trim() === '') {
+        return sendJSON(res, 400, { error: 'batch_id is required and must be a non-empty string.' });
+      }
+      const checked = validateVenueWebsite(body.website);
+      if (!checked.ok) {
+        return sendJSON(res, 400, { error: checked.error });
+      }
+
+      let result;
+      try {
+        result = guardedWebsiteEnrichUpdate(id, checked.website, {
+          reason: body.reason.trim(),
+          batch_id: body.batch_id.trim(),
+          reviewed_by: null,
+        });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Website enrichment failed and was rolled back.', detail: String(err.message || err) });
+      }
+
+      if (!result.found) {
+        return sendJSON(res, 404, { error: 'Venue not found.' });
+      }
+      if (!result.changed) {
+        return sendJSON(res, 409, {
+          error: 'The venue already has a website; nothing was changed.',
+          live: { website: result.live.website },
+        });
+      }
+      return sendJSON(res, 200, { id, changed: true, venue: { website: result.venue.website } });
+    }
+
     // POST /admin/verify-hours (Stage 2, 2026-09-29)
     //
     // The HTTP route for guardedHoursVerifyUpdate(): records that a venue's
@@ -21695,6 +21851,8 @@ module.exports = {
   slugify,
   escapeHtml,
   normalizeWebsiteUrl,
+  validateVenueWebsite,
+  guardedWebsiteEnrichUpdate,
   breadcrumbListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,
