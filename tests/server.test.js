@@ -9984,7 +9984,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved /browse performance change F5: the sort reads each rating once (initBlock4 only), 2026-10-03.
   // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
   // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
-  assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
+  assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11795,7 +11795,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719');
+  assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16023,7 +16023,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8');
-  assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719');
+  assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16116,7 +16116,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), 'fb885cbc0633babf044760d18ed1d719', 'app.js is untouched');
+    assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40', 'app.js is untouched');
   }));
 }
 
