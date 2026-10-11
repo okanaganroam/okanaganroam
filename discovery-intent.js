@@ -4,7 +4,7 @@
 // "plan 3 days in Penticton with kids", "events this weekend") into a
 // validated DiscoveryIntent: a plain object whose every value is drawn from
 // Okanagan Roam's EXISTING taxonomy -- the region slugs, venue types, the
-// twelve badge features, the live collection kinds, the outdoor activities,
+// badge features (BOOL_FIELDS), the live collection kinds, the outdoor activities,
 // the cuisines already in the database, the What's On presets and event
 // categories. Hero Search and Build My Trip will both consume this object in
 // later phases; nothing consumes it yet.
@@ -123,6 +123,10 @@ const FEATURE_ALIASES = {
   live_music: ['live music', 'live band', 'live bands', 'live entertainment'],
   great_groups: ['great for groups', 'good for groups', 'large group', 'large groups', 'big group', 'big groups', 'group dinner', 'groups'],
   happy_hour: ['happy hour', 'happy hours', 'drink specials'],
+  // Derived from stored hours (server.js deriveHoursBadges). "breakfast" and
+  // "brunch" stay meal words (TRIP_MEALS), not this badge.
+  open_early: ['open early', 'opens early', 'early opening'],
+  open_late: ['open late', 'opens late', 'late night', 'late night spot', 'late night spots'],
 };
 
 const COLLECTION_ALIASES = {
@@ -240,7 +244,7 @@ const SUPERLATIVE_PHRASES = ['best', 'top', 'greatest', 'great', 'nicest', 'favo
 // Travel-related concepts Okanagan Roam knowingly cannot satisfy today.
 const UNSUPPORTED_PHRASES = [
   'wheelchair', 'wheelchair accessible', 'wheelchair access', 'accessible', 'accessibility', 'mobility',
-  'open now', 'open late', 'open 24 hours', 'late night', 'reservation', 'reservations', 'book a table', 'booking',
+  'open now', 'open 24 hours', 'reservation', 'reservations', 'book a table', 'booking',
   'hotel', 'hotels', 'accommodation', 'accommodations', 'lodging', 'airbnb', 'where to stay', 'place to stay',
   'car rental', 'rental car', 'taxi', 'uber', 'shuttle', 'weather', 'forecast',
   'helicopter', 'helicopter tour', 'private jet', 'michelin', 'michelin star',

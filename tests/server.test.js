@@ -5821,25 +5821,25 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
       assert.match(body.error, /at least one amenity field/);
     }
 
-    // 400 — unapproved field name (a real column, but not one of the four
-    // approved amenity fields). Must be rejected wholesale, and must not
-    // partially apply any field in the same request.
+    // 400 — unapproved field name (a real badge column, but a derived one,
+    // outside the twelve researched amenity fields). Must be rejected
+    // wholesale, and must not partially apply any field in the same request.
     {
       const before = app.getVenue(amenityFixture.id);
       const { status, body } = await correctAmenities({
         id: amenityFixture.id,
         fields: {
           vegan: { expected_current: false, corrected: true },
-          dog_friendly: { expected_current: false, corrected: true },
+          open_early: { expected_current: false, corrected: true },
         },
         reason: 'test', batch_id: 'test-batch',
       });
       assert.equal(status, 400);
       assert.match(body.error, /Unexpected amenity field/);
-      assert.deepEqual(body.allowed, ['vegan', 'vegetarian', 'patio', 'gluten_free']);
+      assert.deepEqual(body.allowed, app.RESEARCHED_BOOL_FIELDS);
       const after = app.getVenue(amenityFixture.id);
       assert.equal(after.vegan, before.vegan, 'a request containing ANY unapproved field must write NOTHING, including the valid field in the same call');
-      assert.equal(after.dog_friendly, false, 'dog_friendly must remain untouched -- it is not a writable field via this endpoint');
+      assert.equal(after.open_early, false, 'open_early must remain untouched -- it is derived from hours, never writable via this endpoint');
     }
 
     // 400 — an attempt to reach an arbitrary, sensitive column (redirect_to)
@@ -5936,7 +5936,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
       assert.equal(live.phone, '+1 250-555-0199', 'phone must be unaffected by an amenities call');
       assert.equal(live.address, '789 Amenity Ave, Kelowna, BC V1Y 0C0', 'address must be unaffected by an amenities call');
       assert.equal(live.name, 'Test Amenity Fixture');
-      assert.equal(live.dog_friendly, false, 'a boolean field outside the four-field allowlist must be unaffected');
+      assert.equal(live.dog_friendly, false, 'an allowlisted field not named in this call must be unaffected');
       assert.equal(live.redirect_to, null, 'redirect_to must be unaffected');
     }
 
@@ -8856,7 +8856,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.ok(venues.every((v) => v.type !== 'winery'), 'the hub universe excludes wineries entirely');
 
   // Features: every chip is a real BOOL_FIELDS column, never an invented one.
-  assert.equal(app.FD_HUB_FEATURES.length, 12);
+  assert.equal(app.FD_HUB_FEATURES.length, 14, 'the twelve researched badges plus Open Early / Open Late');
   for (const f of app.FD_HUB_FEATURES) assert.ok(app.BOOL_FIELDS.includes(f.key), `${f.key} is a real venue column`);
   assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key));
 
@@ -16473,6 +16473,172 @@ test('POST /admin/set-season: auth, validation and a write, on a private server 
     const cleared = await post({ ...good, season: null });
     assert.equal(cleared.status, 200);
     assert.equal(cleared.body.showing, null);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+// ---- Derived hours badges: Open Early / Open Late (2026-10-11) ----------
+// Computed only from stored hours (deriveHoursBadges), never set by hand.
+// These tests run last and use their own fixtures in 'summerland', so no
+// earlier count assertion is affected.
+const HB_WEEK = (sat, sun, other = [['11:00', '21:00']]) => JSON.stringify({ mon: other, tue: other, wed: other, thu: other, fri: other, sat, sun });
+
+test('Derived hours badges: open_early / open_late rules and their edge cases', () => {
+  const d = app.deriveHoursBadges;
+  // open_early: earliest Saturday or Sunday opening at or before 09:00.
+  assert.equal(d('cafe', HB_WEEK([['09:00', '15:00']], null)).open_early, 1, 'exactly 09:00 on Saturday counts');
+  assert.equal(d('cafe', HB_WEEK(null, [['08:00', '14:00']])).open_early, 1, 'Sunday alone counts');
+  assert.equal(d('cafe', HB_WEEK([['09:30', '15:00']], [['09:30', '15:00']])).open_early, 0, '09:30 does not');
+  assert.equal(d('cafe', HB_WEEK([['12:00', '14:00'], ['08:30', '10:00']], null)).open_early, 1, 'the earliest of several periods is used');
+  assert.equal(d('cafe', JSON.stringify({ mon: [['06:00', '14:00']], sat: [['10:00', '14:00']], sun: null })).open_early, 0, 'a weekday early opening does not count');
+  // open_late: a period ending strictly after 22:00, or running past midnight.
+  assert.equal(d('pub', HB_WEEK(null, null, [['11:00', '22:00']])).open_late, 0, 'exactly 22:00 does not count');
+  assert.equal(d('pub', HB_WEEK(null, null, [['11:00', '22:30']])).open_late, 1, '22:30 does');
+  assert.equal(d('pub', HB_WEEK(null, null, [['18:00', '02:00']])).open_late, 1, 'a close earlier than the open runs past midnight');
+  assert.equal(d('pub', HB_WEEK(null, null, [['18:00', '00:00']])).open_late, 1, '"00:00" is midnight');
+  assert.equal(d('pub', HB_WEEK(null, null, [['18:00', '24:00']])).open_late, 1, '"24:00" is midnight');
+  assert.equal(d('pub', HB_WEEK(null, null, [['12:00', '25:30']])).open_late, 1, '"25:30" is past midnight');
+  assert.equal(d('pub', JSON.stringify({ fri: [['11:00', '23:00']] })).open_late, 1, 'one late day is enough');
+  // Every food & drink type qualifies; nothing else ever does.
+  const both = HB_WEEK([['07:00', '23:00']], [['07:00', '23:00']]);
+  for (const t of ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'winery', 'distillery']) {
+    assert.deepEqual(d(t, both), { open_early: 1, open_late: 1 }, t);
+  }
+  for (const t of ['golf', 'beach', 'outdoor']) assert.deepEqual(d(t, both), { open_early: 0, open_late: 0 }, t);
+  // Missing / invalid hours -> both false.
+  for (const raw of [null, undefined, '', 'not json', '[]', '{}', JSON.stringify({ sat: [['7am', '11pm']] }), JSON.stringify({ sat: 'open' })]) {
+    assert.deepEqual(d('restaurant', raw), { open_early: 0, open_late: 0 }, String(raw));
+  }
+});
+
+const hbInsert = db.prepare(`
+  INSERT INTO venues (name, region, type, description, hours, slug, open_early, open_late, updated_at)
+  VALUES (@name, 'summerland', @type, 'A fixture for the derived hours badge tests.', @hours, @slug, @open_early, @open_late, '2020-01-01 00:00:00')
+`);
+const hbRow = (slug) => db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(slug, 'summerland');
+
+test('Derived hours badges: startup recompute fixes every venue, is idempotent and never touches updated_at', () => {
+  hbInsert.run({ name: 'HB Early Cafe', type: 'cafe', hours: HB_WEEK([['07:00', '14:00']], [['08:00', '14:00']]), slug: 'hb-early-cafe', open_early: 0, open_late: 1 });
+  hbInsert.run({ name: 'HB Late Pub', type: 'pub', hours: HB_WEEK(null, null, [['16:00', '01:00']]), slug: 'hb-late-pub', open_early: 0, open_late: 0 });
+  hbInsert.run({ name: 'HB Golf', type: 'golf', hours: HB_WEEK([['06:00', '23:00']], null), slug: 'hb-golf', open_early: 1, open_late: 1 });
+  const first = app.recomputeAllDerivedHoursBadges();
+  assert.ok(first.changed >= 3, 'the three stale rows were corrected');
+  assert.deepEqual([hbRow('hb-early-cafe').open_early, hbRow('hb-early-cafe').open_late], [1, 0]);
+  assert.deepEqual([hbRow('hb-late-pub').open_early, hbRow('hb-late-pub').open_late], [0, 1]);
+  assert.deepEqual([hbRow('hb-golf').open_early, hbRow('hb-golf').open_late], [0, 0], 'golf never gets them, even stored as 1');
+  for (const s of ['hb-early-cafe', 'hb-late-pub', 'hb-golf']) assert.equal(hbRow(s).updated_at, '2020-01-01 00:00:00', `${s}: updated_at untouched`);
+  assert.equal(app.recomputeAllDerivedHoursBadges().changed, 0, 'a second pass changes nothing');
+  // startServer() runs it before the slug backfill.
+  assert.match(app.startServer.toString(), /recomputeAllDerivedHoursBadges\(\)/);
+});
+
+test('Derived hours badges: recomputed by the verify-hours path and by type changes; JSON, chips and hub filters show them', () => {
+  const v = app.findVenueBySlug('summerland', 'cafe', 'hb-early-cafe');
+  const lateWeek = { mon: [['07:00', '23:30']], tue: null, wed: null, thu: null, fri: null, sat: [['10:00', '14:00']], sun: [['10:00', '14:00']] };
+  const r = app.guardedHoursVerifyUpdate(v.id, hbRow('hb-early-cafe').hours, { hours: lateWeek, hours_source: 'official_website', hours_checked_at: app.todayLocal() }, { reason: 'hb test', batch_id: 'hb' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  let got = app.getVenue(v.id);
+  assert.equal(got.open_early, false, 'weekend now opens at 10:00');
+  assert.equal(got.open_late, true, 'Monday now closes at 23:30');
+  // A stale verify (mismatch) leaves the derived values alone.
+  const stale = app.guardedHoursVerifyUpdate(v.id, 'not the current hours', { hours: HB_WEEK([['07:00', '14:00']], null), hours_source: 'official_website', hours_checked_at: app.todayLocal() }, { reason: 'hb', batch_id: 'hb' });
+  assert.equal(stale.reason, 'mismatch');
+  assert.equal(app.getVenue(v.id).open_late, true);
+
+  // In the venue JSON, the badge chips and the Food & Drink hub filter.
+  assert.equal(typeof got.open_early, 'boolean');
+  assert.match(app.badgeChipsHtml(got), /<span class="chip">Open Late<\/span>/);
+  assert.doesNotMatch(app.badgeChipsHtml(got), /Open Early/);
+  const hub = app.FD_HUB_FEATURES.map((f) => f.key);
+  assert.deepEqual(hub.slice(hub.indexOf('happy_hour'), hub.indexOf('happy_hour') + 3), ['happy_hour', 'open_early', 'open_late']);
+  assert.ok(!app.DOG_HUB_FEATURES.some((f) => /open_/.test(f.key)), 'not on the dog hub');
+  assert.ok(!app.VENUE_SUBMISSION_AMENITIES.includes('open_early') && !app.VENUE_SUBMISSION_AMENITIES.includes('open_late'), 'never claimable on the submission form');
+  assert.doesNotMatch(app.renderListYourVenuePage(), /value="open_(early|late)"/);
+  assert.ok(app.listVenues({ region: 'summerland', open_late: '1' }).venues.some((x) => x.id === v.id), '/api/venues filters on it like any badge');
+  assert.ok(app.buildDiscoveryTaxonomy().features.includes('open_late'));
+  assert.deepEqual(app.deterministicTripParserProvider('3 days in Kelowna, brunch and late-night bars').raw.amenities, ['open_early', 'open_late']);
+
+  // A type change re-derives them (cafe -> golf clears both).
+  app.updateVenue(v.id, { type: 'golf' });
+  got = app.getVenue(v.id);
+  assert.deepEqual([got.open_early, got.open_late], [false, false]);
+  app.updateVenue(v.id, { type: 'cafe' });
+  assert.equal(app.getVenue(v.id).open_late, true);
+});
+
+test('Derived hours badges: PUT/POST /api/venues cannot set them, and PUT re-derives them from new hours (private server)', async () => {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` };
+  try {
+    // POST: hand-set values are ignored; the derived ones come from hours.
+    const created = await fetch(`${base}/api/venues`, { method: 'POST', headers, body: JSON.stringify({
+      name: 'HB Posted Bistro', region: 'summerland', type: 'restaurant', description: 'fixture', slug: 'hb-posted-bistro',
+      hours: HB_WEEK([['08:00', '15:00']], null, [['11:00', '21:00']]), open_early: false, open_late: true,
+    }) });
+    assert.equal(created.status, 201);
+    const c = await created.json();
+    assert.equal(c.open_early, true, 'derived from Saturday 08:00, not the posted false');
+    assert.equal(c.open_late, false, 'the posted true is ignored');
+    const noHours = await (await fetch(`${base}/api/venues`, { method: 'POST', headers, body: JSON.stringify({
+      name: 'HB Posted No Hours', region: 'summerland', type: 'pub', description: 'fixture', slug: 'hb-posted-no-hours', open_early: true, open_late: true,
+    }) })).json();
+    assert.deepEqual([noHours.open_early, noHours.open_late], [false, false]);
+
+    // PUT of only the badges changes nothing.
+    const put = (body) => fetch(`${base}/api/venues/${c.id}`, { method: 'PUT', headers, body: JSON.stringify(body) }).then((r) => r.json());
+    let u = await put({ open_early: false, open_late: true });
+    assert.deepEqual([u.open_early, u.open_late], [true, false]);
+    // PUT of new hours re-derives both in the same write.
+    u = await put({ hours: HB_WEEK([['10:00', '15:00']], [['10:00', '15:00']], [['17:00', '23:00']]), open_early: true });
+    assert.deepEqual([u.open_early, u.open_late], [false, true]);
+    u = await put({ hours: null });
+    assert.deepEqual([u.open_early, u.open_late], [false, false], 'clearing hours clears both');
+
+    // GET JSON and the venue page chip.
+    await put({ hours: HB_WEEK(null, null, [['16:00', '02:00']]) });
+    const json = await (await fetch(`${base}/api/venues/${c.id}`)).json();
+    assert.equal(json.open_late, true);
+    const page = await (await fetch(`${base}/summerland/restaurants/hb-posted-bistro`)).text();
+    assert.match(page, /<span class="chip">Open Late<\/span>/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('POST /admin/correct-amenities: accepts all twelve researched badges (e.g. dog_friendly), still refuses true->false and the derived badges (private server)', async () => {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const v = app.createVenue({ name: 'HB Amenity Fixture', region: 'summerland', type: 'restaurant', description: 'fixture', slug: 'hb-amenity-fixture', lake_view: true });
+  const post = (fields) => fetch(`${base}/admin/correct-amenities`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` },
+    body: JSON.stringify({ id: v.id, fields, reason: 'hb test', batch_id: 'hb-amenities' }),
+  }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  try {
+    assert.deepEqual(app.AMENITY_GUARDED_FIELDS, app.RESEARCHED_BOOL_FIELDS);
+    const ok = await post({ dog_friendly: { expected_current: false, corrected: true }, lake_view: { expected_current: true, corrected: false } });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.body.results, { dog_friendly: 'written', lake_view: 'rejected_true_to_false' });
+    assert.deepEqual(Object.keys(ok.body.venue), app.RESEARCHED_BOOL_FIELDS, 'the response echoes all twelve fields');
+    assert.equal(ok.body.venue.dog_friendly, true);
+    assert.equal(ok.body.venue.lake_view, true);
+    const live = app.getVenue(v.id);
+    assert.equal(live.dog_friendly, true);
+    assert.equal(live.lake_view, true);
+    const log = db.prepare("SELECT * FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'dog_friendly'").all(v.id);
+    assert.equal(log.length, 1);
+    assert.equal(log[0].batch_id, 'hb-amenities');
+    // Compare-and-set still guards: a stale expected_current writes nothing.
+    assert.equal((await post({ dog_friendly: { expected_current: false, corrected: true } })).body.results.dog_friendly, 'rejected_expected_mismatch');
+    // Derived badges are never writable here.
+    const bad = await post({ open_late: { expected_current: false, corrected: true } });
+    assert.equal(bad.status, 400);
+    assert.equal(app.getVenue(v.id).open_late, false);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }

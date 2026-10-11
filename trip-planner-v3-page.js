@@ -794,11 +794,14 @@ function renderScript(d) {
   }
   // The site's own badge names (the same keys as /browse).
   var BADGE_KEYS = { dog_friendly: 'badge.dogFriendly', vegan: 'badge.vegan', vegetarian: 'badge.vegetarian', gluten_free: 'badge.glutenFree', patio: 'badge.patio', kid_friendly: 'badge.kidFriendly', lake_view: 'badge.lakeView', nonalcoholic: 'badge.nonalcoholic', sports_tv: 'badge.sportsTv', live_music: 'badge.liveMusic', great_groups: 'badge.greatGroups', happy_hour: 'badge.happyHour' };
+  // The hours-derived badges have no key in app.js's frozen dictionary, so
+  // their French names live here (same approach as DH_TEXT above).
+  var BADGE_FR_EXTRA = { open_early: 'Ouvert t\u00f4t', open_late: 'Ouvert tard' };
   var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', evening: 'Evening' };
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
   function whenLabel(s){ return DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; }
   function badgesHtml(v){
-    var items = (v.badges || []).map(function(b){ return '<li>' + esc(frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; })
+    var items = (v.badges || []).map(function(b){ return '<li>' + esc(BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; })
       .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }));
     return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
   }
