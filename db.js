@@ -56,6 +56,11 @@ const newColumns = [
   ['happy_hour', 'INTEGER DEFAULT 0'],
   ['hours', 'TEXT'],
   ['description_fr', 'TEXT'],
+  // Derived badges (2026-10-11): computed from `hours` by server.js
+  // (deriveHoursBadges), never researched or set by hand. Recomputed at
+  // startup and on every write of hours or type.
+  ['open_early', 'INTEGER DEFAULT 0'],
+  ['open_late', 'INTEGER DEFAULT 0'],
 ];
 for (const [col, type] of newColumns) {
   if (!existingCols.includes(col)) {

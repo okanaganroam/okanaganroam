@@ -88,17 +88,105 @@ function safeTokenEquals(provided, expected) {
   return crypto.timingSafeEqual(a, b);
 }
 
-const BOOL_FIELDS = [
+// The twelve researched amenity badges: verified per venue from real
+// listings and written by hand (PUT/POST, the guarded admin paths).
+const RESEARCHED_BOOL_FIELDS = [
   'dog_friendly', 'vegan', 'vegetarian', 'patio', 'kid_friendly',
   'gluten_free', 'lake_view', 'nonalcoholic', 'sports_tv', 'live_music',
   'great_groups', 'happy_hour',
 ];
 
+// Derived badges (2026-10-11): computed ONLY from the venue's stored hours
+// by deriveHoursBadges() below -- never researched, never set by hand. They
+// are ordinary 0/1 columns (db.js) so every badge surface (chips, guide
+// pages, hub filters, search, sitemap, counts) treats them like any other
+// badge, but they are deliberately outside ALL_FIELDS: PUT/POST
+// /api/venues silently ignore them, and createVenue()/updateVenue() write
+// the derived values themselves whenever hours or type is written.
+const DERIVED_BOOL_FIELDS = ['open_early', 'open_late'];
+
+const BOOL_FIELDS = [...RESEARCHED_BOOL_FIELDS, ...DERIVED_BOOL_FIELDS];
+
 const ALL_FIELDS = [
   'name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating',
   'description', 'description_fr', 'hours', 'address', 'website', 'image_url',
-  'latitude', 'longitude', ...BOOL_FIELDS,
+  'latitude', 'longitude', ...RESEARCHED_BOOL_FIELDS,
 ];
+
+// ---------- Derived hours badges (Open Early / Open Late) ----------
+//
+// Food & drink venue types only; golf, beaches and outdoors never get them.
+// Read through the canonical hours engine (hours.js parseHours), so a day
+// it reads as unknown (malformed) contributes nothing, and a venue with no
+// valid hours at all gets neither badge. Minutes are hours.js's: a close
+// past midnight (or "00:00"/"24:00") is > 1440 / = 1440.
+//   open_early -- the earliest opening on Saturday or Sunday is at or
+//                 before 09:00.
+//   open_late  -- on at least one day a period ends after 22:00 (strictly)
+//                 or runs past midnight.
+const HOURS_BADGE_TYPES = new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'winery', 'distillery']);
+const OPEN_EARLY_BY_MINUTES = 9 * 60;
+const OPEN_LATE_AFTER_MINUTES = 22 * 60;
+
+// -> { open_early: 0|1, open_late: 0|1 }, or null when hours.js is not
+// available (callers then leave the stored values untouched rather than
+// clear them).
+function deriveHoursBadges(type, hoursRaw) {
+  if (!hoursModule) return null;
+  const out = { open_early: 0, open_late: 0 };
+  if (!HOURS_BADGE_TYPES.has(type)) return out;
+  const parsed = hoursModule.parseHours(hoursRaw);
+  if (!parsed.known) return out;
+  for (const d of ['sat', 'sun']) {
+    const day = parsed.days[d];
+    if (day.status === 'open' && day.ranges.some(([from]) => from <= OPEN_EARLY_BY_MINUTES)) out.open_early = 1;
+  }
+  for (const d of hoursModule.HOURS_WEEKDAYS) {
+    const day = parsed.days[d];
+    if (day.status === 'open' && day.ranges.some(([, to]) => to > OPEN_LATE_AFTER_MINUTES)) out.open_late = 1;
+  }
+  return out;
+}
+
+// Re-derives one venue's badges from its CURRENT stored type and hours.
+// Only touches the two derived columns, and only when they differ, and
+// never updated_at (a derived value catching up is not an edit). Safe to
+// call inside a caller's open transaction.
+function syncDerivedHoursBadges(id) {
+  const row = db.prepare('SELECT type, hours FROM venues WHERE id = ?').get(id);
+  if (!row) return false;
+  const derived = deriveHoursBadges(row.type, row.hours);
+  if (!derived) return false;
+  const info = db
+    .prepare('UPDATE venues SET open_early = ?, open_late = ? WHERE id = ? AND (open_early IS NOT ? OR open_late IS NOT ?)')
+    .run(derived.open_early, derived.open_late, id, derived.open_early, derived.open_late);
+  return info.changes === 1;
+}
+
+// Startup pass over every venue (redirected ones included, so a venue that
+// is later un-retired is already right). Idempotent: rows already holding
+// the derived values are not written, and updated_at is never changed.
+// Returns { checked, changed }.
+function recomputeAllDerivedHoursBadges() {
+  if (!hoursModule) return { checked: 0, changed: 0 };
+  const rows = db.prepare('SELECT id, type, hours, open_early, open_late FROM venues').all();
+  const update = db.prepare('UPDATE venues SET open_early = ?, open_late = ? WHERE id = ?');
+  let changed = 0;
+  db.exec('BEGIN');
+  try {
+    for (const row of rows) {
+      const derived = deriveHoursBadges(row.type, row.hours);
+      if (Number(row.open_early) === derived.open_early && Number(row.open_late) === derived.open_late) continue;
+      update.run(derived.open_early, derived.open_late, row.id);
+      changed++;
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    throw err;
+  }
+  return { checked: rows.length, changed };
+}
 
 function rowToVenue(row) {
   const v = { id: row.id, created_at: row.created_at, updated_at: row.updated_at };
@@ -245,8 +333,13 @@ function createVenue(data) {
     slug = data.slug;
   }
 
-  const cols = ALL_FIELDS;
+  // The derived hours badges are written in the same INSERT, computed from
+  // the new venue's own type and hours (any open_early/open_late in `data`
+  // is ignored -- they are not in ALL_FIELDS).
+  const derived = deriveHoursBadges(data.type, data.hours !== undefined ? data.hours : null);
+  const cols = derived ? [...ALL_FIELDS, ...DERIVED_BOOL_FIELDS] : ALL_FIELDS;
   const values = cols.map((f) => {
+    if (DERIVED_BOOL_FIELDS.includes(f)) return derived[f];
     if (BOOL_FIELDS.includes(f)) return data[f] ? 1 : 0;
     return data[f] !== undefined ? data[f] : null;
   });
@@ -282,8 +375,21 @@ function updateVenue(id, data) {
   const cols = ALL_FIELDS.filter((f) => data[f] !== undefined);
   if (cols.length === 0) return rowToVenue(existing);
 
-  const setClause = cols.map((f) => `${f} = ?`).join(', ');
   const values = cols.map((f) => (BOOL_FIELDS.includes(f) ? (data[f] ? 1 : 0) : data[f]));
+  // Derived hours badges: re-derived from the row's NEW type and hours in
+  // the same UPDATE whenever either is written (open_early/open_late in
+  // `data` are ignored -- they are not in ALL_FIELDS).
+  const setCols = cols.slice();
+  if (cols.includes('hours') || cols.includes('type')) {
+    const derived = deriveHoursBadges(
+      cols.includes('type') ? data.type : existing.type,
+      cols.includes('hours') ? data.hours : existing.hours
+    );
+    if (derived) {
+      for (const f of DERIVED_BOOL_FIELDS) { setCols.push(f); values.push(derived[f]); }
+    }
+  }
+  const setClause = setCols.map((f) => `${f} = ?`).join(', ');
   // Hours provenance (Open Now Phase 2): hours changed through this plain,
   // unaudited path are no longer the hours that were verified, so any
   // recorded hours_source / hours_checked_at is cleared with them. A no-op
@@ -879,6 +985,9 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
       const live = db.prepare('SELECT hours FROM venues WHERE id = ?').get(id);
       return { ok: false, reason: 'mismatch', live: { hours: live ? live.hours : null } };
     }
+    // Derived hours badges follow the verified hours, inside this same
+    // transaction (rolled back with it on any later failure).
+    syncDerivedHoursBadges(id);
     const changedFields = ['hours', 'hours_source', 'hours_checked_at'].filter((f) => existing[f] !== next[f]);
     const logStmt = db.prepare(
       `INSERT INTO venue_enrichment_log
@@ -907,8 +1016,13 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
 // its MERGEABLE_FIELDS allowlist -- in any way, and is not reachable
 // through any of their routes.
 //
-// Scoped to exactly four boolean amenity flags: vegan, vegetarian, patio,
-// gluten_free. These columns are `INTEGER DEFAULT 0` (db.js) and are never
+// Scoped to the twelve researched boolean amenity badges
+// (RESEARCHED_BOOL_FIELDS: dog_friendly, vegan, vegetarian, patio,
+// kid_friendly, gluten_free, lake_view, nonalcoholic, sports_tv, live_music,
+// great_groups, happy_hour) -- widened from the original four (vegan,
+// vegetarian, patio, gluten_free) on 2026-10-11. The derived hours badges
+// (open_early/open_late) are deliberately NOT included: they only ever
+// follow the stored hours. These columns are `INTEGER DEFAULT 0` (db.js) and are never
 // NULL in practice, so there is no "empty" sentinel to guard an overwrite
 // against the way guardedMergeAndRetireUpdate()'s NULL-check does for
 // phone/price/reviews/description_fr. Instead, exactly like
@@ -923,7 +1037,11 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
 // positive amenity data forward (e.g. from a duplicate being retired) onto
 // a canonical record -- it is not a general-purpose amenity editor, and
 // must never be used to erase a true value.
-const AMENITY_GUARDED_FIELDS = ['vegan', 'vegetarian', 'patio', 'gluten_free'];
+const AMENITY_GUARDED_FIELDS = [
+  'dog_friendly', 'vegan', 'vegetarian', 'patio', 'kid_friendly',
+  'gluten_free', 'lake_view', 'nonalcoholic', 'sports_tv', 'live_music',
+  'great_groups', 'happy_hour',
+];
 
 // fieldValues: { [fieldName]: { expectedCurrent: boolean, corrected: boolean } }
 // -- only keys already present in AMENITY_GUARDED_FIELDS are ever written;
@@ -1202,6 +1320,9 @@ const BADGE_LABELS = {
   live_music: { title: 'Live Music', noun: 'venues with live music', adj: 'live-music' },
   great_groups: { title: 'Great for Groups', noun: 'venues that are great for groups', adj: 'group-friendly' },
   happy_hour: { title: 'Happy Hour', noun: 'venues with happy hour', adj: 'happy-hour' },
+  // Derived from stored hours (deriveHoursBadges), not researched.
+  open_early: { title: 'Open Early', noun: 'spots open early for breakfast & brunch', adj: 'early-opening' },
+  open_late: { title: 'Open Late', noun: 'late-night spots', adj: 'late-night' },
 };
 
 // ---------- SEO architecture: regions / categories / venue pages ----------
@@ -5468,6 +5589,8 @@ const TRIP_PARSER_AMENITY_ALIASES = {
   live_music: ['live music'],
   great_groups: ['great for groups', 'good for groups', 'large groups'],
   happy_hour: ['happy hour'],
+  open_early: ['breakfast', 'brunch', 'early', 'open early'],
+  open_late: ['late night', 'open late'],
 };
 
 const TRIP_PARSER_PACE_ALIASES = {
@@ -11841,9 +11964,11 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
 // venue types or two regions read as alternatives.
 //
 // Every feature below is an existing BOOL_FIELDS column with real coverage in
-// production -- nothing here is inferred or invented. Requests for Breakfast /
-// Takeout / Delivery are deliberately NOT offered: no column represents them,
-// and guessing would put false claims on venue cards. "Cocktails" and "Craft
+// production -- nothing here is inferred or invented. Open Early / Open Late
+// are derived mechanically from each venue's stored hours (deriveHoursBadges),
+// not guessed. Requests for Takeout / Delivery are deliberately NOT offered:
+// no column represents them, and guessing would put false claims on venue
+// cards. "Cocktails" and "Craft
 // Beer" are the Cocktail Lounges and Breweries venue types.
 const FD_HUB_TYPES = [
   { type: 'restaurant', label: 'Restaurants' },
@@ -11866,6 +11991,8 @@ const FD_HUB_FEATURES = [
   { key: 'lake_view', label: 'Lake View', icon: '🌊' },
   { key: 'great_groups', label: 'Great for Groups', icon: '👥' },
   { key: 'happy_hour', label: 'Happy Hour', icon: '🍸' },
+  { key: 'open_early', label: 'Open Early', icon: '🌅' },
+  { key: 'open_late', label: 'Open Late', icon: '🌙' },
   { key: 'sports_tv', label: 'Sports on TV', icon: '📺' },
   { key: 'nonalcoholic', label: 'Non-Alcoholic Options', icon: '🥤' },
 ];
@@ -12056,7 +12183,7 @@ function foodDrinkTypeChipsHtml(state = {}) {
   }).join('');
   return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="fd-type">${all}${chips}</div>`;
 }
-// "What are you looking for?" -- the twelve verified feature columns, as
+// "What are you looking for?" -- the FD_HUB_FEATURES badge columns, as
 // toggles inside a popover so the page does not become a wall of controls.
 function foodDrinkFeatureChipsHtml(state = {}, onlyKeys = null) {
   const selected = new Set(state.features || []);
@@ -17021,7 +17148,8 @@ function applyBrowseLoadingState(html, state) {
 // Filter model (AND between the groups):
 //   venue type  (OR)  -- effective category: a brewery that is also a
 //                        restaurant answers to both, as /api/venues does
-//   features    (AND) -- the twelve verified BOOL_FIELDS /browse always had
+//   features    (AND) -- FD_HUB_FEATURES: the twelve verified BOOL_FIELDS
+//                        /browse always had, plus the two hours-derived ones
 //   region      (OR)
 //   cuisine, price (single choice) -- carried over from the wizard's refine row
 //   Open now, Favourites only, text search, sort (Featured = A-Z, Highest
@@ -17955,7 +18083,8 @@ const VENUE_SUBMISSION_ORIGINS = new Set(['https://okanaganroam.com', 'https://w
 const VENUE_SUBMISSION_TYPES = Object.keys(CATEGORY_LABELS);
 const VENUE_SUBMISSION_REGIONS = Object.keys(REGION_LABELS)
   .sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
-const VENUE_SUBMISSION_AMENITIES = BOOL_FIELDS.filter((f) => BADGE_LABELS[f]);
+// Researched badges only: the derived hours badges are never claimable.
+const VENUE_SUBMISSION_AMENITIES = RESEARCHED_BOOL_FIELDS.filter((f) => BADGE_LABELS[f]);
 const VENUE_SUBMISSION_TEXT_FIELDS = {
   name: { label: 'Business / venue name', required: true, min: 2, max: 120 },
   description: { label: 'Description', required: true, min: 20, max: 500 },
@@ -20964,9 +21093,11 @@ const server = http.createServer(async (req, res) => {
     // POST /admin/correct-amenities
     //
     // Scoped to the Phase 2.9 need: carrying verified-true amenity flags
-    // (vegan/vegetarian/patio/gluten_free) from a duplicate onto a
-    // canonical venue, independent of a merge-and-retire call, since these
-    // four fields are outside MERGEABLE_FIELDS and cannot be written by
+    // (originally vegan/vegetarian/patio/gluten_free; since 2026-10-11 all
+    // twelve researched badges in AMENITY_GUARDED_FIELDS, never the derived
+    // open_early/open_late) from a duplicate onto a canonical venue,
+    // independent of a merge-and-retire call, since these fields are
+    // outside MERGEABLE_FIELDS and cannot be written by
     // /admin/merge-and-retire-duplicate (see guardedAmenityCorrectUpdate()'s
     // comment for why). Reuses the exact same bearer-token check as every
     // other admin endpoint. Does not alter /admin/merge-and-retire-duplicate,
@@ -21060,12 +21191,8 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, {
         id,
         results: result.results,
-        venue: {
-          vegan: result.venue.vegan,
-          vegetarian: result.venue.vegetarian,
-          patio: result.venue.patio,
-          gluten_free: result.venue.gluten_free,
-        },
+        // Echoes every field this endpoint can write.
+        venue: Object.fromEntries(AMENITY_GUARDED_FIELDS.map((f) => [f, result.venue[f]])),
       });
     }
 
@@ -21999,6 +22126,17 @@ function startServer() {
     // affected, never the whole site. The migration/schema setup in db.js
     // (adding columns, fixing the index) still runs at module-load — that
     // part is purely additive/idempotent and has been safe in every test.
+    // Derived hours badges (Open Early / Open Late): re-derived for every
+    // venue from its stored hours, so rows written outside this process
+    // (seed.js, scripts, direct SQL) and any rule change catch up. Same
+    // site-stays-up reasoning as the slug backfill below.
+    try {
+      const { changed } = recomputeAllDerivedHoursBadges();
+      if (changed > 0) console.log(`[hours-badges] re-derived open_early/open_late for ${changed} venue(s)`);
+    } catch (err) {
+      console.error('[hours-badges] recompute failed unexpectedly (site remains up):', err);
+    }
+
     try {
       const { count, errors } = backfillSlugs();
       if (count > 0) {
@@ -22048,6 +22186,14 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Derived hours badges (Open Early / Open Late)
+  RESEARCHED_BOOL_FIELDS,
+  DERIVED_BOOL_FIELDS,
+  deriveHoursBadges,
+  syncDerivedHoursBadges,
+  createVenue,
+  recomputeAllDerivedHoursBadges,
+  AMENITY_GUARDED_FIELDS,
   REGION_INTROS,
   REGION_INTRO_STYLE,
   SKI_RESORT_REGIONS,
