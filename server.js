@@ -4483,6 +4483,9 @@ const ADVISORY_COLLECTION_KIND = 'advisory';
 // homepage embeds, so flipping it would change '/'. Rendered with the
 // existing .chip style used by every other badge -- no new visual design.
 const DOG_FRIENDLY_COLLECTION_KIND = 'dog_friendly';
+// Venues of other types that are also good indoor / rainy-day options,
+// listed in their own section of the /indoor hub (db.js bootstrap).
+const INDOOR_ALSO_COLLECTION_KIND = 'indoor_also';
 // Outdoor activity tags (2026-09-20): eight collection kinds bootstrapped
 // in db.js (activity_hiking ... activity_adventure) that classify an
 // outdoor destination by what a visitor can do there. Like the two
@@ -4519,7 +4522,7 @@ const FD_CATEGORY_COLLECTION_KINDS = Object.values(FD_CATEGORY_KIND_BY_TYPE);
 // would surface as Build My Trip `discovery` options the moment the first
 // membership row exists, because that list is queried live from
 // collections.kind rather than hardcoded.
-const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS, ...FD_CATEGORY_COLLECTION_KINDS]);
+const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, INDOOR_ALSO_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS, ...FD_CATEGORY_COLLECTION_KINDS]);
 
 // venue id -> Set of SECONDARY Food & Drink category types, for a given set
 // of venue ids, in ONE query (never per-venue: listVenues serves up to 2000
@@ -11940,6 +11943,9 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   // simulators and a "coming soon" line, never a 404 (see the route).
   const isIndoorHub = type === 'indoor';
   const indoorGolf = isIndoorHub ? (opts.indoorGolf || []) : [];
+  // Other-type venues tagged indoor_also, minus any simulator already listed
+  // in the golf section.
+  const indoorAlso = isIndoorHub ? (opts.indoorAlso || []).filter((v) => !indoorGolf.some((g) => g.id === v.id)) : [];
   const heading = isOutdoorLanding ? 'Outdoor Adventures' : isIndoorHub ? 'Indoor & Rainy Day in the Okanagan' : `${label.plural} in the Okanagan`;
   const title = `${heading} | Okanagan Roam`;
   const description = isOutdoorLanding
@@ -12003,7 +12009,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
     '@type': 'ItemList',
     name: title,
     description,
-    itemListElement: [...venues, ...indoorGolf].map((v, i) => ({
+    itemListElement: [...venues, ...indoorGolf, ...indoorAlso].map((v, i) => ({
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
@@ -12021,6 +12027,10 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   <h2 class="category-subsection-heading" id="indoorGolfHeading">Indoor golf &amp; simulators</h2>
   <p class="indoor-golf-lead">Year-round golf simulators, listed with the rest of the <a href="/${CATEGORY_SLUGS.golf}">Okanagan golf</a>.</p>
   ${renderCategoryCardsHtml('indoor', indoorGolf, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true })}
+  </section>` : ''}${indoorAlso.length ? `<section class="indoor-golf-section indoor-also-section" aria-labelledby="indoorAlsoHeading">
+  <h2 class="category-subsection-heading" id="indoorAlsoHeading">Also good on a rainy day</h2>
+  <p class="indoor-golf-lead">Arenas, bowling, board games and more, listed with their own categories.</p>
+  ${renderCategoryCardsHtml('indoor', indoorAlso, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true })}
   </section>` : ''}`
     : '';
   // Okanagan-wide listing: cards carry their community so same-named
@@ -12045,7 +12055,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: HIDDEN_GEM_TYPE_IMAGE[type] || null, golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', ...(isIndoorHub ? { indoorTheme: true, noindex: venues.length + indoorGolf.length === 0 } : {}), advisoryStyles: [...venues, ...indoorGolf].some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: HIDDEN_GEM_TYPE_IMAGE[type] || null, golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', ...(isIndoorHub ? { indoorTheme: true, noindex: venues.length + indoorGolf.length + indoorAlso.length === 0 } : {}), advisoryStyles: [...venues, ...indoorGolf, ...indoorAlso].some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
 ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
@@ -13594,6 +13604,21 @@ ${renderGolfHeaderHtml()}
 // The page's styles are derived from renderDogHubStyles() by re-scoping the
 // selector, so the two directories share one visual language and
 // /dog-friendly's own output is untouched.
+// The /indoor hub's "Also good on a rainy day" section: live venues of any
+// other type in the indoor_also collection (an `indoor` venue is already in
+// the hub's main list, so it is never repeated here).
+function getIndoorAlsoVenues() {
+  return db.prepare(`
+    SELECT v.* FROM venues v
+    WHERE v.redirect_to IS NULL AND v.type != 'indoor' AND EXISTS (
+      SELECT 1 FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id
+      WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = ?
+    )
+    ORDER BY v.name ASC
+  `).all(INDOOR_ALSO_COLLECTION_KIND).map(rowToVenue);
+}
+
 function getLocalFavouriteVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
@@ -22254,7 +22279,7 @@ const server = http.createServer(async (req, res) => {
       if (venues.length >= MIN_CATEGORY_VENUES || type === 'indoor') {
         // /outdoors?regions=..&activities=.. renders pre-filtered (see
         // parseOutdoorFilterQuery); other categories ignore the query.
-        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined });
+        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -22830,6 +22855,8 @@ module.exports = {
   getSkiSnowEatVenues,
   renderSkiSnowPage,
   getIndoorGolfVenues,
+  getIndoorAlsoVenues,
+  INDOOR_ALSO_COLLECTION_KIND,
   countIndoorHubVenues,
   buildTripPlannerTaxonomy,
   // Design Sprint 4 (Visual & Editorial Polish)
