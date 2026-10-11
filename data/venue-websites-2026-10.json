@@ -1,0 +1,3351 @@
+{
+  "batch_id": "venue-websites-2026-10",
+  "verifiedOn": "2026-10-11",
+  "about": "Websites found for venues listed without one. Each URL was found by web search, matched to the venue by name and town, and loaded successfully on 2026-10-11. Social, review, booking and delivery pages are excluded. Applied with scripts/apply-venue-websites.js, which only fills empty websites.",
+  "venues": [
+    {
+      "id": 1069,
+      "region": "apex",
+      "slug": "pit-stop-cafeteria",
+      "name": "Pit Stop Cafeteria",
+      "website": "https://apexresort.com/dining/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 661,
+      "region": "apex",
+      "slug": "the-artisan-s-den-at-apex",
+      "name": "The Artisan's Den at Apex",
+      "website": "https://apexresort.com/dining/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1067,
+      "region": "apex",
+      "slug": "the-edge-bistro",
+      "name": "The Edge Bistro",
+      "website": "https://the-edge-bistro.square.site/",
+      "kind": "own site"
+    },
+    {
+      "id": 688,
+      "region": "apex",
+      "slug": "the-gunbarrel-saloon",
+      "name": "The Gunbarrel Saloon",
+      "website": "https://www.thegunbarrelsaloon.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 194,
+      "region": "armstrong",
+      "slug": "edge-of-the-earth-vineyards",
+      "name": "Edge of the Earth Vineyards",
+      "website": "https://edgeearth.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 211,
+      "region": "armstrong",
+      "slug": "farmstrong-cider-company",
+      "name": "Farmstrong Cider Company",
+      "website": "https://www.farmstrongcider.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 297,
+      "region": "armstrong",
+      "slug": "jj-s-pizza-plus",
+      "name": "JJ's Pizza Plus",
+      "website": "https://jjspizzaplus.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 371,
+      "region": "armstrong",
+      "slug": "log-barn-1912",
+      "name": "Log Barn 1912",
+      "website": "https://www.logbarn.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 529,
+      "region": "armstrong",
+      "slug": "pv-blvd-coffee",
+      "name": "Pv Blvd Coffee",
+      "website": "https://www.pvblvdcoffee.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 151,
+      "region": "baldy",
+      "slug": "corduroy-cafe",
+      "name": "Corduroy Cafe",
+      "website": "https://baldyresort.com/mountain/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1055,
+      "region": "big-white",
+      "slug": "6-bistro",
+      "name": "6° Bistro",
+      "website": "https://sixdegreesbistro.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 71,
+      "region": "big-white",
+      "slug": "black-diamond-bar-grill",
+      "name": "Black Diamond Bar & Grill",
+      "website": "https://blackdiamondbarandgrill.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 103,
+      "region": "big-white",
+      "slug": "bullwheel",
+      "name": "Bullwheel",
+      "website": "https://thebullwheel.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 112,
+      "region": "big-white",
+      "slug": "cabin-kitchen-bar-at-whitefoot-lodge",
+      "name": "Cabin Kitchen + Bar at Whitefoot Lodge",
+      "website": "https://www.cabinkitchenbar.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1047,
+      "region": "big-white",
+      "slug": "clocktower-coffee-co",
+      "name": "Clocktower Coffee Co.",
+      "website": "https://www.bigwhite.com/explore-big-white/food-dining/restaurants/clocktower-coffee-co",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1056,
+      "region": "big-white",
+      "slug": "fourth-ace-bar-smokehouse",
+      "name": "Fourth Ace Bar & Smokehouse",
+      "website": "https://fourthace.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1049,
+      "region": "big-white",
+      "slug": "kettle-valley-steakhouse",
+      "name": "Kettle Valley Steakhouse",
+      "website": "https://www.bigwhite.com/explore/food-dining/restaurants-food-trucks-market/kettle-valley-steakhouse",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1048,
+      "region": "big-white",
+      "slug": "moonlight-bistro",
+      "name": "Moonlight Bistro",
+      "website": "https://www.bigwhite.com/explore/food-dining/restaurants-food-trucks-market/moonlight-bistro",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1051,
+      "region": "big-white",
+      "slug": "moose-lounge",
+      "name": "Moose Lounge",
+      "website": "https://www.bigwhite.com/explore-big-white/food-dining/restaurants/moose-lounge",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1058,
+      "region": "big-white",
+      "slug": "sasquatch-sushi",
+      "name": "Sasquatch Sushi",
+      "website": "https://www.sasquatchsushi.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1054,
+      "region": "big-white",
+      "slug": "sopra-sam-s-italian-kitchen",
+      "name": "Sopra: Sam's Italian Kitchen",
+      "website": "https://www.sopraitaliankitchen.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1052,
+      "region": "big-white",
+      "slug": "spuds-at-the-ridge-day-lodge",
+      "name": "SPUDS at The Ridge Day Lodge",
+      "website": "https://www.bigwhite.com/explore/food-dining/restaurants-food-trucks-market/spuds-ridge-day-lodge",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1057,
+      "region": "big-white",
+      "slug": "the-market",
+      "name": "The Market",
+      "website": "https://www.bigwhite.com/explore/food-dining/restaurants-food-trucks-market/market-liquor-wine-cellar",
+      "kind": "host-site page"
+    },
+    {
+      "id": 718,
+      "region": "big-white",
+      "slug": "the-woods-restaurant",
+      "name": "The Woods Restaurant",
+      "website": "https://www.bigwhite.com/explore/food-dining/restaurants-food-trucks-market/woods",
+      "kind": "host-site page"
+    },
+    {
+      "id": 728,
+      "region": "big-white",
+      "slug": "toasty",
+      "name": "Toasty",
+      "website": "https://www.toastycafe.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1046,
+      "region": "big-white",
+      "slug": "vista-at-black-forest-day-lodge",
+      "name": "VISTA at Black Forest Day Lodge",
+      "website": "https://www.bigwhite.com/explore/food-dining/restaurants-food-trucks-market/vista-black-forest-day-lodge",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1431,
+      "region": "enderby",
+      "slug": "riverfront-pub-grill",
+      "name": "Riverfront Pub & Grill",
+      "website": "https://www.theriverfrontpub.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 368,
+      "region": "kaleden",
+      "slug": "linden-gardens",
+      "name": "Linden Gardens",
+      "website": "https://lindengardens.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 20,
+      "region": "kelowna",
+      "slug": "anarchy-coffee-roasters",
+      "name": "Anarchy Coffee Roasters",
+      "website": "https://anarchycoffeeroasters.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 28,
+      "region": "kelowna",
+      "slug": "aomi-sushi-japanese-restaurant",
+      "name": "Aomi Sushi Japanese Restaurant",
+      "website": "https://aomisushi.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 33,
+      "region": "kelowna",
+      "slug": "ask-pablo-cocktail-bar-kitchen",
+      "name": "Ask Pablo Cocktail Bar + Kitchen",
+      "website": "https://askpablo.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 886,
+      "region": "kelowna",
+      "slug": "bagel-boys-bagel-shop",
+      "name": "Bagel Boys Bagel Shop",
+      "website": "https://www.bagelboys.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 887,
+      "region": "kelowna",
+      "slug": "bamboo-chopsticks-downtown",
+      "name": "Bamboo Chopsticks Downtown",
+      "website": "https://bamboochopsticks.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 59,
+      "region": "kelowna",
+      "slug": "basil-leaf-asian-fusion-restaurant-glenmore",
+      "name": "Basil Leaf Asian Fusion Restaurant - Glenmore",
+      "website": "https://basilleaf.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 60,
+      "region": "kelowna",
+      "slug": "basil-leaf-asian-fusion-restaurant-gyro-beach",
+      "name": "Basil Leaf Asian Fusion Restaurant - Gyro Beach",
+      "website": "https://basilleaf.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 67,
+      "region": "kelowna",
+      "slug": "bernie-s-supper-club-cinema",
+      "name": "Bernie's Supper Club & Cinema",
+      "website": "https://bernieskelowna.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 889,
+      "region": "kelowna",
+      "slug": "blenz-innovation-centre",
+      "name": "Blenz Innovation Centre",
+      "website": "https://www.blenz.com/find-a-store/",
+      "kind": "own site"
+    },
+    {
+      "id": 888,
+      "region": "kelowna",
+      "slug": "blenz-bernard",
+      "name": "Blenz – Bernard",
+      "website": "https://www.blenz.com/find-a-store/",
+      "kind": "own site"
+    },
+    {
+      "id": 83,
+      "region": "kelowna",
+      "slug": "blue-gator-bar",
+      "name": "Blue Gator Bar",
+      "website": "https://bluegator.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 39,
+      "region": "kelowna",
+      "slug": "bna-brewing-kelowna",
+      "name": "BNA Brewing Kelowna",
+      "website": "https://www.bnabrewing.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 88,
+      "region": "kelowna",
+      "slug": "bohemian-cafe",
+      "name": "Bohemian Cafe",
+      "website": "https://www.bohemiancafe.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 89,
+      "region": "kelowna",
+      "slug": "bon-ga-korean-cuisine",
+      "name": "Bon Ga Korean Cuisine",
+      "website": "https://bongabbq.wordpress.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 890,
+      "region": "kelowna",
+      "slug": "bread-company",
+      "name": "Bread Company",
+      "website": "https://thebreadcompany.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 96,
+      "region": "kelowna",
+      "slug": "bright-jenny-coffee-glenmore",
+      "name": "Bright Jenny Coffee (Glenmore)",
+      "website": "https://www.brightjenny.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 99,
+      "region": "kelowna",
+      "slug": "broken-anchor-cafe-and-catering",
+      "name": "Broken Anchor Cafe and Catering",
+      "website": "https://www.brokenanchorseafood.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 44,
+      "region": "kelowna",
+      "slug": "bts-cocktail-bar-kitchen",
+      "name": "BTS Cocktail Bar & Kitchen",
+      "website": "https://www.borntoshake.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 105,
+      "region": "kelowna",
+      "slug": "butter-co",
+      "name": "Butter & Co.",
+      "website": "https://www.butterandco.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 891,
+      "region": "kelowna",
+      "slug": "cactus-club-cafe",
+      "name": "Cactus Club Café",
+      "website": "https://www.cactusclubcafe.com/locations/kelowna/",
+      "kind": "own site"
+    },
+    {
+      "id": 122,
+      "region": "kelowna",
+      "slug": "cantina-del-centro-kelowna",
+      "name": "Cantina del Centro - Kelowna",
+      "website": "https://cantinadelcentro.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 123,
+      "region": "kelowna",
+      "slug": "casa-de-frida",
+      "name": "Casa de Frida",
+      "website": "https://casadefridakelowna.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 124,
+      "region": "kelowna",
+      "slug": "cecil-s-perogy-palace",
+      "name": "Cecil's Perogy Palace",
+      "website": "https://cecilsperogies.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 126,
+      "region": "kelowna",
+      "slug": "central-kitchen-bar",
+      "name": "Central Kitchen + Bar",
+      "website": "https://centralkelowna.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 134,
+      "region": "kelowna",
+      "slug": "cherry-hill-coffee-inc",
+      "name": "Cherry Hill Coffee Inc",
+      "website": "https://cherryhillcoffee.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 139,
+      "region": "kelowna",
+      "slug": "chocolats-favoris-kelowna",
+      "name": "Chocolats Favoris Kelowna",
+      "website": "https://www.chocolatsfavoris.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 147,
+      "region": "kelowna",
+      "slug": "codfather-s-seafood-market",
+      "name": "Codfather's Seafood Market",
+      "website": "https://www.codfathersseafood.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 154,
+      "region": "kelowna",
+      "slug": "craft-42-roasters",
+      "name": "Craft 42 Roasters",
+      "website": "https://craft42roasters.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 109,
+      "region": "kelowna",
+      "slug": "craft-beer-market-kelowna",
+      "name": "CRAFT Beer Market Kelowna",
+      "website": "https://www.craftbeermarket.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 157,
+      "region": "kelowna",
+      "slug": "crepe-delicious-urban-cafe",
+      "name": "Crepe Delicious Urban Cafe",
+      "website": "https://www.crepedelicious.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 162,
+      "region": "kelowna",
+      "slug": "crumbs-and-roses-bakery",
+      "name": "Crumbs and Roses Bakery",
+      "website": "https://crumbs-and-roses.square.site/",
+      "kind": "own site"
+    },
+    {
+      "id": 170,
+      "region": "kelowna",
+      "slug": "dawett-fine-indian-cuisine",
+      "name": "Dawett Fine Indian Cuisine",
+      "website": "https://dawett.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 173,
+      "region": "kelowna",
+      "slug": "derrick-s-steakhouse",
+      "name": "Derrick's Steakhouse",
+      "website": "https://www.derrickssteakhouse.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 175,
+      "region": "kelowna",
+      "slug": "deville-coffee-bernard",
+      "name": "Deville Coffee Bernard",
+      "website": "https://www.devillecoffee.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 183,
+      "region": "kelowna",
+      "slug": "donair-dude-scoopville-ice-cream",
+      "name": "Donair Dude / Scoopville Ice Cream",
+      "website": "https://donairdude.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 187,
+      "region": "kelowna",
+      "slug": "double-j-hong-kong-fusion",
+      "name": "Double J Hong Kong Fusion",
+      "website": "http://doublejfusion.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 190,
+      "region": "kelowna",
+      "slug": "dunnenzies-pizza-downtown",
+      "name": "DunnEnzies Pizza Downtown",
+      "website": "https://www.dunnenzies.com/downtown",
+      "kind": "own site"
+    },
+    {
+      "id": 191,
+      "region": "kelowna",
+      "slug": "dunnenzies-pizza-mission",
+      "name": "DunnEnzies Pizza Mission",
+      "website": "https://www.dunnenzies.com/mission",
+      "kind": "own site"
+    },
+    {
+      "id": 192,
+      "region": "kelowna",
+      "slug": "earls-kitchen-bar",
+      "name": "Earls Kitchen + Bar",
+      "website": "https://earls.ca/locations/kelowna/",
+      "kind": "own site"
+    },
+    {
+      "id": 202,
+      "region": "kelowna",
+      "slug": "empire-crepe",
+      "name": "Empire Crepe",
+      "website": "https://empirecrepe.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 204,
+      "region": "kelowna",
+      "slug": "erica-jane-restaurant",
+      "name": "Erica Jane Restaurant",
+      "website": "https://www.erica-jane.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 236,
+      "region": "kelowna",
+      "slug": "gather-restaurant",
+      "name": "Gather Restaurant",
+      "website": "https://www.gatherkelowna.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 244,
+      "region": "kelowna",
+      "slug": "golden-masala",
+      "name": "Golden Masala",
+      "website": "https://www.goldenmasala.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 245,
+      "region": "kelowna",
+      "slug": "goods-health-and-wellness",
+      "name": "Goods Health and Wellness",
+      "website": "https://www.goodshealth.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 248,
+      "region": "kelowna",
+      "slug": "grate-cheesery",
+      "name": "Grate Cheesery",
+      "website": "https://www.gratecheesery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 259,
+      "region": "kelowna",
+      "slug": "halfmoon-pizzeria-donair",
+      "name": "Halfmoon Pizzeria + Donair",
+      "website": "https://halfmoonpizzeria.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 262,
+      "region": "kelowna",
+      "slug": "happy-slice-pizza-airport",
+      "name": "Happy Slice Pizza (Airport)",
+      "website": "https://happyslice.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 263,
+      "region": "kelowna",
+      "slug": "happy-slice-pizza-downtown",
+      "name": "Happy Slice Pizza (Downtown)",
+      "website": "https://happyslice.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 265,
+      "region": "kelowna",
+      "slug": "happy-slice-pizza-orchardpark-mall",
+      "name": "Happy Slice Pizza (OrchardPark Mall)",
+      "website": "https://happyslice.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 274,
+      "region": "kelowna",
+      "slug": "hoang-gia-vietnamese-cuisine",
+      "name": "Hoang Gia Vietnamese Cuisine",
+      "website": "https://hoanggia.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 275,
+      "region": "kelowna",
+      "slug": "home-block-at-cedarcreek-estate-winery",
+      "name": "Home Block at CedarCreek Estate Winery",
+      "website": "https://cedarcreek.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1415,
+      "region": "kelowna",
+      "slug": "jackknife-brewing",
+      "name": "Jackknife Brewing",
+      "website": "https://jackknife.beer/",
+      "kind": "own site"
+    },
+    {
+      "id": 303,
+      "region": "kelowna",
+      "slug": "jeepney-republiq",
+      "name": "Jeepney Republiq",
+      "website": "https://jeepneyrepubliq.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 298,
+      "region": "kelowna",
+      "slug": "joey-kelowna",
+      "name": "JOEY Kelowna",
+      "website": "https://joeyrestaurants.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1074,
+      "region": "kelowna",
+      "slug": "journey-restaurant",
+      "name": "Journey Restaurant",
+      "website": "https://azhadivineyards.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 311,
+      "region": "kelowna",
+      "slug": "jugo-juice",
+      "name": "Jugo Juice",
+      "website": "https://jugojuice.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 324,
+      "region": "kelowna",
+      "slug": "kayan-shawarma-and-grill-house",
+      "name": "Kayan Shawarma and Grill House",
+      "website": "https://kayanshawarma.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 896,
+      "region": "kelowna",
+      "slug": "kelly-carlos-o-bryans-restaurant",
+      "name": "Kelly & Carlos O'Bryans Restaurant",
+      "website": "https://www.kobcob.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 334,
+      "region": "kelowna",
+      "slug": "kin-folk-kelowna",
+      "name": "Kin & Folk Kelowna",
+      "website": "https://www.kinandfolk.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 316,
+      "region": "kelowna",
+      "slug": "kinton-ramen-kelowna-downtown",
+      "name": "KINTON RAMEN KELOWNA DOWNTOWN",
+      "website": "https://kintonramen.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 358,
+      "region": "kelowna",
+      "slug": "lakeside-dining-room",
+      "name": "Lakeside Dining Room",
+      "website": "https://www.hoteleldoradokelowna.com/dining/lakeside-dining",
+      "kind": "own site"
+    },
+    {
+      "id": 361,
+      "region": "kelowna",
+      "slug": "laneway-canteen",
+      "name": "Laneway Canteen",
+      "website": "https://earls.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 364,
+      "region": "kelowna",
+      "slug": "leopold-s-tavern-kelowna-bernard",
+      "name": "Leopold's Tavern Kelowna - Bernard",
+      "website": "https://leopoldstavern.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 897,
+      "region": "kelowna",
+      "slug": "little-hobo-soup-sandwich-shop",
+      "name": "Little Hobo Soup & Sandwich Shop",
+      "website": "https://littlehobo.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 374,
+      "region": "kelowna",
+      "slug": "luckhurst-farm-distillery",
+      "name": "Luckhurst Farm & Distillery",
+      "website": "https://luckhurstfarm.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 384,
+      "region": "kelowna",
+      "slug": "mabui-kitchen",
+      "name": "Mabui Kitchen",
+      "website": "https://www.mabui.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 386,
+      "region": "kelowna",
+      "slug": "maestro-s-mediterranean-restaurant-and-terrace",
+      "name": "Maestro's Mediterranean Restaurant and Terrace",
+      "website": "https://www.manteo.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 389,
+      "region": "kelowna",
+      "slug": "mamma-rosa-restaurant",
+      "name": "Mamma Rosa Restaurant",
+      "website": "https://mammarosa.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 378,
+      "region": "kelowna",
+      "slug": "mashawi-shawarma-grill",
+      "name": "MASHAWI - Shawarma & Grill",
+      "website": "https://www.mashawi.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 402,
+      "region": "kelowna",
+      "slug": "memphis-blues-barbeque-house-catering-co",
+      "name": "Memphis Blues Barbeque House & Catering Co.",
+      "website": "https://www.memphisbluesbbq.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 406,
+      "region": "kelowna",
+      "slug": "micro-bar-bites",
+      "name": "Micro Bar + Bites",
+      "website": "https://microkelowna.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 408,
+      "region": "kelowna",
+      "slug": "milk-shed-coffeehouse",
+      "name": "Milk Shed Coffeehouse",
+      "website": "https://www.milkshedcoffeehouse.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 416,
+      "region": "kelowna",
+      "slug": "montana-s-bbq-bar",
+      "name": "Montana's BBQ & Bar",
+      "website": "https://www.montanas.ca",
+      "kind": "own site"
+    },
+    {
+      "id": 420,
+      "region": "kelowna",
+      "slug": "moxies-kelowna-restaurant",
+      "name": "Moxies Kelowna Restaurant",
+      "website": "https://moxies.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 382,
+      "region": "kelowna",
+      "slug": "mr-mikes-steakhousecasual",
+      "name": "MR MIKES SteakhouseCasual",
+      "website": "https://mrmikes.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 421,
+      "region": "kelowna",
+      "slug": "mr-lu-s-kitchen",
+      "name": "Mr. Lu's Kitchen",
+      "website": "https://www.mrluskitchen.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 426,
+      "region": "kelowna",
+      "slug": "murray-s-pizza-kelowna",
+      "name": "Murray's Pizza Kelowna",
+      "website": "https://murrays.pizza/kelowna/",
+      "kind": "own site"
+    },
+    {
+      "id": 432,
+      "region": "kelowna",
+      "slug": "nature-s-table-at-summerhill",
+      "name": "Nature's Table at Summerhill",
+      "website": "https://summerhill.bc.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 436,
+      "region": "kelowna",
+      "slug": "new-punjabsweets",
+      "name": "New PunjabSweets",
+      "website": "https://newpunjabkelowna.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 437,
+      "region": "kelowna",
+      "slug": "new-york-fries-orchard-park",
+      "name": "New York Fries Orchard Park",
+      "website": "https://www.newyorkfries.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 443,
+      "region": "kelowna",
+      "slug": "norman-s-diner-kelowna",
+      "name": "Norman's Diner - Kelowna",
+      "website": "https://normansdiner.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 903,
+      "region": "kelowna",
+      "slug": "o-flannigan-s-pub",
+      "name": "O'Flannigan's Pub",
+      "website": "https://www.oflanniganspub.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 446,
+      "region": "kelowna",
+      "slug": "o-zeki-japanese-restaurant",
+      "name": "O-Zeki Japanese Restaurant",
+      "website": "https://ozeki.ca",
+      "kind": "own site"
+    },
+    {
+      "id": 904,
+      "region": "kelowna",
+      "slug": "oak-cru",
+      "name": "Oak + Cru",
+      "website": "https://oakandcru.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 447,
+      "region": "kelowna",
+      "slug": "oeb-breakfast-co",
+      "name": "OEB Breakfast Co.",
+      "website": "https://eatoeb.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 456,
+      "region": "kelowna",
+      "slug": "okanagan-pizza",
+      "name": "Okanagan Pizza",
+      "website": "https://okanaganpizza.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 458,
+      "region": "kelowna",
+      "slug": "okanagan-spirits-craft-distillery-kelowna",
+      "name": "Okanagan Spirits Craft Distillery Kelowna",
+      "website": "https://okanaganspirits.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 466,
+      "region": "kelowna",
+      "slug": "original-joe-s",
+      "name": "Original Joe's",
+      "website": "https://www.originaljoes.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 480,
+      "region": "kelowna",
+      "slug": "pandosy-pizza",
+      "name": "Pandosy pizza",
+      "website": "http://www.pandosypizza.net/",
+      "kind": "own site"
+    },
+    {
+      "id": 496,
+      "region": "kelowna",
+      "slug": "perch-sky-lounge",
+      "name": "Perch Sky Lounge",
+      "website": "https://perchskylounge.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 498,
+      "region": "kelowna",
+      "slug": "perogy-hut",
+      "name": "Perogy Hut",
+      "website": "https://perogyhut.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 499,
+      "region": "kelowna",
+      "slug": "perseval-young-cheesemongers",
+      "name": "Perseval & Young Cheesemongers",
+      "website": "https://www.persevalandyoung.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 503,
+      "region": "kelowna",
+      "slug": "pho-soc-trang-vietnamese-cuisine",
+      "name": "Pho Soc Trang Vietnamese Cuisine",
+      "website": "https://www.phosoctrang.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 508,
+      "region": "kelowna",
+      "slug": "pita-land-shawarma-kelowna",
+      "name": "Pita Land Shawarma - Kelowna",
+      "website": "https://pitaland.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 522,
+      "region": "kelowna",
+      "slug": "porter-s",
+      "name": "Porter's",
+      "website": "https://porterskelowna.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 906,
+      "region": "kelowna",
+      "slug": "primetime-donair-poutine",
+      "name": "PrimeTime Donair & Poutine",
+      "website": "https://www.primetimedonair.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 907,
+      "region": "kelowna",
+      "slug": "pulp-fiction-pandosy",
+      "name": "Pulp Fiction – Pandosy",
+      "website": "https://pulpfictioncoffeehouse.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 528,
+      "region": "kelowna",
+      "slug": "pur-simple",
+      "name": "Pur & Simple",
+      "website": "https://pursimple.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 541,
+      "region": "kelowna",
+      "slug": "ramen-arashi-kelowna",
+      "name": "Ramen Arashi Kelowna",
+      "website": "https://www.ramenarashi.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 543,
+      "region": "kelowna",
+      "slug": "raw-action-oyster-co",
+      "name": "Raw Action Oyster Co.",
+      "website": "https://www.rawactionoysterco.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 545,
+      "region": "kelowna",
+      "slug": "red-bird-roasting",
+      "name": "Red Bird Roasting",
+      "website": "https://www.redbirdroasting.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 546,
+      "region": "kelowna",
+      "slug": "red-swan-pizza-kelowna-east",
+      "name": "Red Swan Pizza - Kelowna East",
+      "website": "https://redswanpizza.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 809,
+      "region": "kelowna",
+      "slug": "reggaefusionfood",
+      "name": "reggaefusionfood",
+      "website": "https://reggaefusionfood.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 552,
+      "region": "kelowna",
+      "slug": "rocket-subs",
+      "name": "Rocket Subs",
+      "website": "https://www.rocketsubs.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 556,
+      "region": "kelowna",
+      "slug": "roma-nord-bistro",
+      "name": "Roma Nord Bistro",
+      "website": "https://romanordbistro.com",
+      "kind": "own site"
+    },
+    {
+      "id": 557,
+      "region": "kelowna",
+      "slug": "room-272-bar-bites",
+      "name": "Room 272 Bar + Bites",
+      "website": "https://www.room272.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 571,
+      "region": "kelowna",
+      "slug": "sandhill-wines",
+      "name": "Sandhill Wines",
+      "website": "https://www.sandhillwines.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 575,
+      "region": "kelowna",
+      "slug": "scenic-road-cider-co",
+      "name": "Scenic Road Cider Co.",
+      "website": "https://scenicroadcider.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 582,
+      "region": "kelowna",
+      "slug": "shambhu-s-spice-house-cuisine-of-india",
+      "name": "Shambhu's Spice House Cuisine of India",
+      "website": "https://shambhusspicehouse.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 602,
+      "region": "kelowna",
+      "slug": "sol-korea-restaurant",
+      "name": "Sol Korea Restaurant",
+      "website": "https://solkorea.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 610,
+      "region": "kelowna",
+      "slug": "sprout-bread",
+      "name": "Sprout Bread",
+      "website": "https://www.sproutbread.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 645,
+      "region": "kelowna",
+      "slug": "table-nineteen-kelowna",
+      "name": "Table Nineteen Kelowna",
+      "website": "https://www.tablenineteen.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1080,
+      "region": "kelowna",
+      "slug": "tacotime-kelowna",
+      "name": "TacoTime (Kelowna)",
+      "website": "https://tacotimecanada.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 651,
+      "region": "kelowna",
+      "slug": "tahini-s-shawarma",
+      "name": "Tahini's Shawarma",
+      "website": "https://tahinis.com/locations/bc/kelowna-harvey-ave/",
+      "kind": "own site"
+    },
+    {
+      "id": 652,
+      "region": "kelowna",
+      "slug": "tak-oh",
+      "name": "Tak-Oh",
+      "website": "https://tak-oh.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 672,
+      "region": "kelowna",
+      "slug": "the-canadian-brewhouse-grill-kelowna",
+      "name": "The Canadian Brewhouse & Grill (Kelowna)",
+      "website": "https://thecanadianbrewhouse.com/locations/kelowna/",
+      "kind": "own site"
+    },
+    {
+      "id": 695,
+      "region": "kelowna",
+      "slug": "the-indian-eatery",
+      "name": "The Indian Eatery",
+      "website": "https://indianeatery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 696,
+      "region": "kelowna",
+      "slug": "the-jammery-city",
+      "name": "The Jammery City",
+      "website": "https://www.jammery.com/jammery-city/",
+      "kind": "own site"
+    },
+    {
+      "id": 698,
+      "region": "kelowna",
+      "slug": "the-keg-steakhouse-bar-kelowna",
+      "name": "The Keg Steakhouse + Bar - Kelowna",
+      "website": "https://thekeg.com/en/locations/kelowna",
+      "kind": "own site"
+    },
+    {
+      "id": 1416,
+      "region": "kelowna",
+      "slug": "the-office-brewery",
+      "name": "The Office Brewery",
+      "website": "https://www.officebrewery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 643,
+      "region": "kelowna",
+      "slug": "thyme-at-ellison-lake",
+      "name": "THYME at Ellison Lake",
+      "website": "https://sweetlife.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 911,
+      "region": "kelowna",
+      "slug": "tonics-pub-grill",
+      "name": "Tonics Pub & Grill",
+      "website": "https://www.tonicspub.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 912,
+      "region": "kelowna",
+      "slug": "train-station-pub",
+      "name": "Train Station Pub",
+      "website": "https://www.trainstationpub.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 742,
+      "region": "kelowna",
+      "slug": "twice-the-dice-board-game-cafe-and-bar",
+      "name": "Twice The Dice Board Game Cafe and bar",
+      "website": "https://twicethedice.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 743,
+      "region": "kelowna",
+      "slug": "twin-sparks-coffee-roasters",
+      "name": "Twin Sparks Coffee Roasters",
+      "website": "https://twinsparkscoffee.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 746,
+      "region": "kelowna",
+      "slug": "two-donkeys-bakery-kelowna-airport",
+      "name": "Two Donkeys Bakery (Kelowna Airport)",
+      "website": "https://www.twodonkeysbakery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 750,
+      "region": "kelowna",
+      "slug": "unleashed-brewing-company",
+      "name": "Unleashed Brewing Company",
+      "website": "https://unleashedbrewing.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 752,
+      "region": "kelowna",
+      "slug": "upside-cidery",
+      "name": "Upside Cidery",
+      "website": "https://www.upsidecider.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 749,
+      "region": "kelowna",
+      "slug": "ustaad-g76-kelowna",
+      "name": "USTAAD G76 KELOWNA",
+      "website": "https://www.ustaadg76.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 759,
+      "region": "kelowna",
+      "slug": "vice-virtue-brewing-co",
+      "name": "Vice & Virtue Brewing Co.",
+      "website": "https://www.viceandvirtuebrewing.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 761,
+      "region": "kelowna",
+      "slug": "villages-pizza-lower-mission",
+      "name": "Villages Pizza - Lower Mission",
+      "website": "https://villagespizza.com/locations",
+      "kind": "own site"
+    },
+    {
+      "id": 764,
+      "region": "kelowna",
+      "slug": "vintners",
+      "name": "Vintners",
+      "website": "https://www.coasthotels.com/coast-capri-hotel/services/vintners",
+      "kind": "own site"
+    },
+    {
+      "id": 913,
+      "region": "kelowna",
+      "slug": "von-schweets-treat-shop",
+      "name": "Von Schweets Treat Shop",
+      "website": "https://vonschweets.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 771,
+      "region": "kelowna",
+      "slug": "wa-skew-r-sushi-bar",
+      "name": "Wa Skew'r Sushi & Bar",
+      "website": "https://www.waskewr.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 779,
+      "region": "kelowna",
+      "slug": "west-coast-seafood-raw-bar-kelowna",
+      "name": "West Coast Seafood & Raw Bar Kelowna",
+      "website": "https://www.prestigehotelsandresorts.com/prestige-beach-house/west-coast-seafood/",
+      "kind": "own site"
+    },
+    {
+      "id": 782,
+      "region": "kelowna",
+      "slug": "white-spot-kelowna-airport",
+      "name": "White Spot Kelowna Airport",
+      "website": "https://www.whitespot.ca/location/kelowna-airport",
+      "kind": "own site"
+    },
+    {
+      "id": 785,
+      "region": "kelowna",
+      "slug": "wildling",
+      "name": "Wildling",
+      "website": "https://www.wildling.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 796,
+      "region": "kelowna",
+      "slug": "yamas-taverna",
+      "name": "Yamas Taverna",
+      "website": "https://www.yamastaverna.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 793,
+      "region": "kelowna",
+      "slug": "ylw-tacos",
+      "name": "YLW Tacos",
+      "website": "https://ylwtacos.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 97,
+      "region": "lake-country",
+      "slug": "britannia-brewing-co",
+      "name": "Britannia Brewing Co",
+      "website": "https://www.bbco.ca/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 119,
+      "region": "lake-country",
+      "slug": "canadian-2-for-1-pizza-winfield",
+      "name": "Canadian 2 For 1 Pizza Winfield",
+      "website": "https://canadian2for1pizza.com/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 218,
+      "region": "lake-country",
+      "slug": "folktale-cider",
+      "name": "Folktale Cider",
+      "website": "https://www.folktalecider.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 264,
+      "region": "lake-country",
+      "slug": "happy-slice-pizza-lake-country",
+      "name": "Happy Slice Pizza (Lake Country)",
+      "website": "https://happyslice.ca/locations/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 317,
+      "region": "lake-country",
+      "slug": "koha-vietnamese-kitchen",
+      "name": "KOHA VIETNAMESE KITCHEN",
+      "website": "https://kohakitchen.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1044,
+      "region": "lake-country",
+      "slug": "lookout-restaurant",
+      "name": "Lookout Restaurant",
+      "website": "https://graymonk.com/dine/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 444,
+      "region": "lake-country",
+      "slug": "norman-s-diner-lake-country",
+      "name": "Norman's Diner - Lake Country",
+      "website": "https://normansdiner.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 450,
+      "region": "lake-country",
+      "slug": "okf-grill",
+      "name": "OKF Grill",
+      "website": "https://okfgrill.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 559,
+      "region": "lake-country",
+      "slug": "row-188-o-rourke-family-estate",
+      "name": "Row 188 @ O'Rourke Family Estate",
+      "website": "https://orourkefamilyestate.com/row-188/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 765,
+      "region": "lake-country",
+      "slug": "viva-mexicana",
+      "name": "Viva Mexicana",
+      "website": "https://www.vivamexicana.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 84,
+      "region": "lumby",
+      "slug": "blue-ox-pub",
+      "name": "Blue Ox Pub",
+      "website": "https://blueoxpub.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1014,
+      "region": "naramata",
+      "slug": "bench-patio-bistro",
+      "name": "Bench Patio Bistro",
+      "website": "https://www.bench1775.com/visit/bench-patio-bistro/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 70,
+      "region": "naramata",
+      "slug": "bistro-lapin-perdu",
+      "name": "Bistro Lapin Perdu",
+      "website": "https://naramatainn.com/bistro-lapin-perdu/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 165,
+      "region": "naramata",
+      "slug": "d-angelo-estate-winery",
+      "name": "D'Angelo Estate Winery",
+      "website": "https://www.dangelowinery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 198,
+      "region": "naramata",
+      "slug": "elephant-island-winery",
+      "name": "Elephant Island Winery",
+      "website": "https://elephantislandwine.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 206,
+      "region": "naramata",
+      "slug": "evolve-sparkling-house",
+      "name": "Evolve Sparkling House",
+      "website": "https://www.timewines.ca/evolve-sparkling-house/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 391,
+      "region": "naramata",
+      "slug": "maple-leaf-spirits-inc",
+      "name": "Maple Leaf Spirits Inc.",
+      "website": "https://mapleleafspirits.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 431,
+      "region": "naramata",
+      "slug": "naramata-pub-grill",
+      "name": "Naramata Pub & Grill",
+      "website": "https://naramatapub.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 859,
+      "region": "naramata",
+      "slug": "origin-wines",
+      "name": "Origin Wines",
+      "website": "https://www.originwines.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 863,
+      "region": "naramata",
+      "slug": "red-rooster-winery",
+      "name": "Red Rooster Winery",
+      "website": "https://redroosterwinery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 660,
+      "region": "naramata",
+      "slug": "terroir-kitchen",
+      "name": "Terroir Kitchen",
+      "website": "https://www.terroirkitchen.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 666,
+      "region": "naramata",
+      "slug": "the-bistro-at-hillside-winery",
+      "name": "The Bistro at Hillside Winery",
+      "website": "https://www.hillsidewinery.ca/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 683,
+      "region": "naramata",
+      "slug": "the-farmstead",
+      "name": "The Farmstead",
+      "website": "https://www.lakebreeze.ca/Visit-Us/The-Farmstead",
+      "kind": "host-site page"
+    },
+    {
+      "id": 704,
+      "region": "naramata",
+      "slug": "the-patio-at-lake-breeze",
+      "name": "The Patio At Lake Breeze",
+      "website": "https://www.lakebreeze.ca/Visit-Us/The-Patio",
+      "kind": "host-site page"
+    },
+    {
+      "id": 879,
+      "region": "naramata",
+      "slug": "therapy-vineyards",
+      "name": "Therapy Vineyards",
+      "website": "https://therapyvineyards.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 813,
+      "region": "okanagan-falls",
+      "slug": "bc-wine-studio-carter-wine-co",
+      "name": "BC Wine Studio & Carter Wine Co",
+      "website": "https://bcwinestudio.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 102,
+      "region": "okanagan-falls",
+      "slug": "bullies-pizza",
+      "name": "Bullies Pizza",
+      "website": "https://bulliespizza.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 864,
+      "region": "okanagan-falls",
+      "slug": "rigour-and-whimsy",
+      "name": "Rigour and Whimsy",
+      "website": "https://www.rigourandwhimsy.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 763,
+      "region": "okanagan-falls",
+      "slug": "vineyard-kitchen-patio-at-nighthawk-vineyards",
+      "name": "Vineyard Kitchen & Patio at Nighthawk Vineyards",
+      "website": "https://nighthawkvineyards.com/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 68,
+      "region": "oliver",
+      "slug": "bharawan-da-dhaba-indian-cuisine",
+      "name": "Bharawan Da Dhaba Indian Cuisine",
+      "website": "https://www.bharawandadhaba.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 69,
+      "region": "oliver",
+      "slug": "big-al-s-bakery-deli",
+      "name": "Big Al's Bakery & Deli",
+      "website": "https://www.bigalsbakery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 72,
+      "region": "oliver",
+      "slug": "black-hills-estate-winery",
+      "name": "Black Hills Estate Winery",
+      "website": "https://www.blackhillswinery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 77,
+      "region": "oliver",
+      "slug": "blenz-coffee",
+      "name": "Blenz Coffee",
+      "website": "https://www.blenz.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 104,
+      "region": "oliver",
+      "slug": "burrowing-owl-estate-winery",
+      "name": "Burrowing Owl Estate Winery",
+      "website": "https://www.burrowingowlwine.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 821,
+      "region": "oliver",
+      "slug": "canter-cellars",
+      "name": "Canter Cellars",
+      "website": "https://www.cantercellars.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1421,
+      "region": "oliver",
+      "slug": "cassini-cellars",
+      "name": "Cassini Cellars",
+      "website": "http://www.cassini.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 133,
+      "region": "oliver",
+      "slug": "cherry-bomb-sandwiches",
+      "name": "Cherry Bomb Sandwiches",
+      "website": "https://www.cherrybombsandwiches.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1076,
+      "region": "oliver",
+      "slug": "domino-s-pizza-oliver",
+      "name": "Domino's Pizza Oliver",
+      "website": "https://www.dominos.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 237,
+      "region": "oliver",
+      "slug": "gehringer-brothers-estate-winery",
+      "name": "Gehringer Brothers Estate Winery",
+      "website": "https://www.gehringerwines.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 271,
+      "region": "oliver",
+      "slug": "here-s-the-thing-vineyards",
+      "name": "Here's the Thing Vineyards",
+      "website": "https://heresthethingvineyards.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 290,
+      "region": "oliver",
+      "slug": "intersection-estate-winery",
+      "name": "Intersection Estate Winery",
+      "website": "https://www.xwine.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 838,
+      "region": "oliver",
+      "slug": "jackson-triggs-inniskillin-okanagan",
+      "name": "Jackson-Triggs & Inniskillin Okanagan",
+      "website": "https://www.jacksontriggswinery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 840,
+      "region": "oliver",
+      "slug": "la-casa-bianca-winery",
+      "name": "La Casa Bianca Winery",
+      "website": "https://lacasabianca.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 390,
+      "region": "oliver",
+      "slug": "manzil-indian-restaurant-at-kismet-estate-winery",
+      "name": "Manzil Indian Restaurant at Kismet Estate Winery",
+      "website": "https://www.kismetestatewinery.com/kismet-indian-restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 850,
+      "region": "oliver",
+      "slug": "maverick-estate-winery",
+      "name": "Maverick Estate Winery",
+      "website": "https://www.maverickwine.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1029,
+      "region": "oliver",
+      "slug": "miradoro-restaurant-1029",
+      "name": "Miradoro Restaurant",
+      "website": "https://www.tinhorn.com/visit-us/miradoro-restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 460,
+      "region": "oliver",
+      "slug": "oliver-eats-ltd",
+      "name": "Oliver Eats Ltd",
+      "website": "https://www.olivereats.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 500,
+      "region": "oliver",
+      "slug": "phantom-creek-estates",
+      "name": "Phantom Creek Estates",
+      "website": "https://phantomcreekestates.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 509,
+      "region": "oliver",
+      "slug": "pizza-64-oliver",
+      "name": "Pizza 64 (Oliver)",
+      "website": "https://pizza64.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 534,
+      "region": "oliver",
+      "slug": "quinta-ferreira-estate-winery",
+      "name": "Quinta Ferreira Estate Winery",
+      "website": "https://www.quintaferreira.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 544,
+      "region": "oliver",
+      "slug": "red-barn-winery-at-jagged-rock",
+      "name": "Red Barn Winery at Jagged Rock",
+      "website": "https://www.redbarn.wine/",
+      "kind": "own site"
+    },
+    {
+      "id": 561,
+      "region": "oliver",
+      "slug": "rust-wine-co-oliver-osoyoos",
+      "name": "Rust Wine Co - Oliver/Osoyoos",
+      "website": "https://www.rustwine.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 574,
+      "region": "oliver",
+      "slug": "savvios-family-restaurant",
+      "name": "Savvios Family Restaurant",
+      "website": "https://www.savvios.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 604,
+      "region": "oliver",
+      "slug": "sonora-room-restaurant",
+      "name": "Sonora Room Restaurant",
+      "website": "https://www.burrowingowlwine.ca/the-restaurant/the-sonora-room/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 874,
+      "region": "oliver",
+      "slug": "sunrock-vineyards",
+      "name": "Sunrock Vineyards",
+      "website": "https://www.sunrockvineyards.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 647,
+      "region": "oliver",
+      "slug": "tacoriendo-mexican-cantina-inc-oliver",
+      "name": "TacoRiendo Mexican Cantina Inc (Oliver)",
+      "website": "https://www.tacoriendo.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 658,
+      "region": "oliver",
+      "slug": "terrafina-at-hester-creek",
+      "name": "Terrafina at Hester Creek",
+      "website": "https://www.hestercreek.com/visit/terrafina-restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 679,
+      "region": "oliver",
+      "slug": "the-dubh-glas-distillery-ltd",
+      "name": "The Dubh Glas Distillery Ltd.",
+      "website": "https://www.thedubhglasdistillery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 878,
+      "region": "oliver",
+      "slug": "the-opera-room",
+      "name": "The Opera Room",
+      "website": "https://districtwinevillage.com/winery/the-opera-room/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 881,
+      "region": "oliver",
+      "slug": "vasanti-estate-winery",
+      "name": "Vasanti Estate Winery",
+      "website": "https://vasantiwines.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 772,
+      "region": "oliver",
+      "slug": "ward-s-wine-country-kitchen",
+      "name": "Ward's Wine Country Kitchen",
+      "website": "https://wardskitchen.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 788,
+      "region": "oliver",
+      "slug": "wolf-tree-coffee",
+      "name": "Wolf Tree Coffee",
+      "website": "https://www.wolftreecoffee.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1,
+      "region": "osoyoos",
+      "slug": "15-park-bistro",
+      "name": "15 Park Bistro",
+      "website": "https://www.15parkbistro.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 13,
+      "region": "osoyoos",
+      "slug": "adega-on-45th-estate-winery",
+      "name": "Adega On 45th Estate Winery",
+      "website": "https://adegaon45.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 48,
+      "region": "osoyoos",
+      "slug": "backroads-brewing-co",
+      "name": "Backroads Brewing Co",
+      "website": "https://backroadsbrewing.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 55,
+      "region": "osoyoos",
+      "slug": "barn-owl-eatery-cafe",
+      "name": "Barn Owl Eatery & Cafe",
+      "website": "https://barnowleatery.square.site/",
+      "kind": "own site"
+    },
+    {
+      "id": 118,
+      "region": "osoyoos",
+      "slug": "campo-marina",
+      "name": "Campo Marina",
+      "website": "https://campomarina.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 176,
+      "region": "osoyoos",
+      "slug": "diamond-steak-seafood-house",
+      "name": "Diamond Steak & Seafood House",
+      "website": "https://diamondsteakhouseosoyoos.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 180,
+      "region": "osoyoos",
+      "slug": "dolci-thai-bistro",
+      "name": "Dolci Thai Bistro",
+      "website": "https://dolcithai.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 185,
+      "region": "osoyoos",
+      "slug": "dosa-crepe-cafe",
+      "name": "Dosa Crepe Cafe",
+      "website": "https://dosacrepecafe.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 241,
+      "region": "osoyoos",
+      "slug": "gino-s-coffee-house",
+      "name": "Gino's Coffee House",
+      "website": "https://ginoscoffeehouse.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1019,
+      "region": "osoyoos",
+      "slug": "greenside-bar-grill",
+      "name": "Greenside Bar & Grill",
+      "website": "https://golfosoyoos.com/dine-events/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 310,
+      "region": "osoyoos",
+      "slug": "joycraft-roasters",
+      "name": "Joycraft Roasters",
+      "website": "https://joycraftroasters.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 312,
+      "region": "osoyoos",
+      "slug": "junction-3-coffee-house",
+      "name": "Junction 3 Coffee House",
+      "website": "https://junction3.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 351,
+      "region": "osoyoos",
+      "slug": "la-marqueza-mexican-tacos-market",
+      "name": "La Marqueza Mexican Tacos & Market",
+      "website": "https://www.lamarqueza.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 841,
+      "region": "osoyoos",
+      "slug": "la-stella-winery",
+      "name": "La Stella Winery",
+      "website": "https://lastella.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 846,
+      "region": "osoyoos",
+      "slug": "liber-farms-winery",
+      "name": "Liber Farms & Winery",
+      "website": "https://www.liberestates.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1021,
+      "region": "osoyoos",
+      "slug": "miks-food-studio",
+      "name": "Miks Food Studio",
+      "website": "https://www.miksfoodstudio.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 438,
+      "region": "osoyoos",
+      "slug": "night-bird-estate-winery",
+      "name": "Night Bird Estate Winery",
+      "website": "https://www.nightbirdwine.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 440,
+      "region": "osoyoos",
+      "slug": "nisu-ramen-and-asian-fusion",
+      "name": "Nisu Ramen and Asian Fusion",
+      "website": "https://nisuramen.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 468,
+      "region": "osoyoos",
+      "slug": "over-the-fence-winery",
+      "name": "Over the Fence Winery",
+      "website": "https://www.overthefencewinery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 469,
+      "region": "osoyoos",
+      "slug": "owl-pub",
+      "name": "Owl Pub",
+      "website": "https://www.owlpubosoyoos.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 507,
+      "region": "osoyoos",
+      "slug": "pit-stop-smokery",
+      "name": "Pit Stop Smokery",
+      "website": "http://pitstopsmokery.sintra.site/",
+      "kind": "own site"
+    },
+    {
+      "id": 511,
+      "region": "osoyoos",
+      "slug": "pizza-factory",
+      "name": "Pizza Factory",
+      "website": "https://pizzafactoryosoyoos.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1023,
+      "region": "osoyoos",
+      "slug": "pointe-49-kitchen-bar",
+      "name": "Pointe 49 Kitchen & Bar",
+      "website": "https://www.walnutbeachresort.com/dining/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 551,
+      "region": "osoyoos",
+      "slug": "roberto-s-gelato",
+      "name": "Roberto's Gelato",
+      "website": "https://robertosgelato.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 593,
+      "region": "osoyoos",
+      "slug": "smitty-s-family-restaurant-osoyoos",
+      "name": "Smitty's Family Restaurant - Osoyoos",
+      "website": "https://smittys.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 609,
+      "region": "osoyoos",
+      "slug": "spirit-beach-cantina",
+      "name": "Spirit Beach Cantina",
+      "website": "https://www.spiritbeachcantina.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 619,
+      "region": "osoyoos",
+      "slug": "sugar-quail-bakeshop",
+      "name": "Sugar Quail Bakeshop",
+      "website": "https://www.sugarquailbakeshop.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 639,
+      "region": "osoyoos",
+      "slug": "sweetgrass-nk-mip-cellars",
+      "name": "Sweetgrass @ Nk'Mip Cellars",
+      "website": "https://www.nkmipcellars.com/The-Winery",
+      "kind": "host-site page"
+    },
+    {
+      "id": 738,
+      "region": "osoyoos",
+      "slug": "tumbleweed-distilling",
+      "name": "Tumbleweed Distilling",
+      "website": "https://tumbleweedspirits.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 4,
+      "region": "peachland",
+      "slug": "19-bistro-fitz",
+      "name": "19 Bistro @ Fitz",
+      "website": "https://www.fitzwine.com/Visit/Restaurant-Partners",
+      "kind": "host-site page"
+    },
+    {
+      "id": 61,
+      "region": "peachland",
+      "slug": "basil-leaf-asian-fusion-restaurant-peachland",
+      "name": "Basil Leaf Asian Fusion Restaurant - Peachland",
+      "website": "https://basilleaf.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 82,
+      "region": "peachland",
+      "slug": "bliss-bakery-and-bistro",
+      "name": "Bliss Bakery and Bistro",
+      "website": "https://www.blissbakery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 424,
+      "region": "peachland",
+      "slug": "murray-s-pizza-pasta-peachland",
+      "name": "Murray's Pizza & Pasta (Peachland)",
+      "website": "https://murrays.pizza/peachland/",
+      "kind": "own site"
+    },
+    {
+      "id": 487,
+      "region": "peachland",
+      "slug": "peachland-sushi",
+      "name": "Peachland Sushi",
+      "website": "https://peachlandsushi.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 668,
+      "region": "peachland",
+      "slug": "the-blind-angler-grill",
+      "name": "The Blind Angler Grill",
+      "website": "https://theblindangler.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 30,
+      "region": "penticton",
+      "slug": "apres-real-fruit-ice-cream-coffee-bar",
+      "name": "Apres | Real Fruit Ice Cream & Coffee Bar",
+      "website": "https://www.apresicecream.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 46,
+      "region": "penticton",
+      "slug": "baba-express",
+      "name": "BaBa Express",
+      "website": "https://www.babaexpress.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 998,
+      "region": "penticton",
+      "slug": "bear-s-den-restaurant",
+      "name": "Bear's Den Restaurant",
+      "website": "https://thebearsdenpenticton.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 984,
+      "region": "penticton",
+      "slug": "bench-market",
+      "name": "Bench Market",
+      "website": "https://www.thebenchmarket.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1016,
+      "region": "penticton",
+      "slug": "blue-heron-restaurant",
+      "name": "Blue Heron Restaurant",
+      "website": "https://www.pentictongolf.ca/the-club/#4",
+      "kind": "host-site page"
+    },
+    {
+      "id": 982,
+      "region": "penticton",
+      "slug": "bufflehead-cafe",
+      "name": "Bufflehead Café",
+      "website": "https://www.pentictonlakesideresort.com/dining/bufflehead/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 106,
+      "region": "penticton",
+      "slug": "buy-the-sea-seafood",
+      "name": "Buy The Sea Seafood",
+      "website": "https://www.buythesea.ca/penticton/index.php",
+      "kind": "own site"
+    },
+    {
+      "id": 140,
+      "region": "penticton",
+      "slug": "chronos-winery",
+      "name": "Chronos Winery",
+      "website": "https://www.timewines.ca/chronos-tasting-room/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 158,
+      "region": "penticton",
+      "slug": "creperie-ooolala-food-truck",
+      "name": "Creperie Ooolala - Food truck",
+      "website": "https://www.creperieooolala.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 159,
+      "region": "penticton",
+      "slug": "creperie-ooolala-bistro",
+      "name": "Creperie Ooolala Bistro",
+      "website": "https://www.creperieooolala.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 166,
+      "region": "penticton",
+      "slug": "dcs-chicken",
+      "name": "DCS CHICKEN",
+      "website": "https://dcschicken.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 186,
+      "region": "penticton",
+      "slug": "dosa-vilas",
+      "name": "Dosa Vilas",
+      "website": "https://dosavilas.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 189,
+      "region": "penticton",
+      "slug": "dragonboat-pub",
+      "name": "Dragonboat Pub",
+      "website": "https://dragonboatpub.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 990,
+      "region": "penticton",
+      "slug": "earls-kitchen-bar",
+      "name": "Earls Kitchen & Bar",
+      "website": "https://earls.ca/locations/penticton/",
+      "kind": "own site"
+    },
+    {
+      "id": 195,
+      "region": "penticton",
+      "slug": "edo-japan",
+      "name": "Edo Japan",
+      "website": "https://www.edojapan.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 199,
+      "region": "penticton",
+      "slug": "elma",
+      "name": "Elma",
+      "website": "https://eatatelma.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 225,
+      "region": "penticton",
+      "slug": "freshslice-pizza",
+      "name": "Freshslice Pizza",
+      "website": "https://freshslice.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 232,
+      "region": "penticton",
+      "slug": "ginza-sushi-poke",
+      "name": "GINZA SUSHI & POKE",
+      "website": "https://ginzasushi.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 278,
+      "region": "penticton",
+      "slug": "hooded-merganser-restaurant",
+      "name": "Hooded Merganser Restaurant",
+      "website": "https://www.pentictonlakesideresort.com/dining/hooded-merganser/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 292,
+      "region": "penticton",
+      "slug": "isshin-sushi-bar-asian-dining",
+      "name": "Isshin Sushi Bar & Asian Dining",
+      "website": "https://isshinsushi.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 304,
+      "region": "penticton",
+      "slug": "jeffer-s-fryzz",
+      "name": "Jeffer's Fryzz",
+      "website": "https://www.jeffersfryzz.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 348,
+      "region": "penticton",
+      "slug": "la-casa-ouzeria-restaurant",
+      "name": "La Casa Ouzeria Restaurant",
+      "website": "https://pentictonrestaurant.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 354,
+      "region": "penticton",
+      "slug": "lachi-fine-indian-cuisine",
+      "name": "Lachi Fine Indian Cuisine",
+      "website": "https://lachi.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 365,
+      "region": "penticton",
+      "slug": "lickity-splitz",
+      "name": "Lickity Splitz",
+      "website": "https://www.lickitysplitz.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 345,
+      "region": "penticton",
+      "slug": "local-public-eatery-penticton",
+      "name": "LOCAL Public Eatery Penticton",
+      "website": "https://localpubliceatery.com/neighbourhoods/penticton/",
+      "kind": "own site"
+    },
+    {
+      "id": 377,
+      "region": "penticton",
+      "slug": "maku",
+      "name": "MAKU",
+      "website": "https://makupenticton.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 399,
+      "region": "penticton",
+      "slug": "maui-s-teahouse-bubble-tea-cafe",
+      "name": "Maui's Teahouse Bubble Tea Cafe",
+      "website": "https://www.mauisteahouse.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 403,
+      "region": "penticton",
+      "slug": "mexicana-kitchen",
+      "name": "Mexicana Kitchen",
+      "website": "https://mexicanakitchen.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 467,
+      "region": "penticton",
+      "slug": "osmow-s-shawarma",
+      "name": "Osmow's Shawarma",
+      "website": "https://osmows.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 474,
+      "region": "penticton",
+      "slug": "painted-turtle-bistro",
+      "name": "Painted Turtle Bistro",
+      "website": "https://standrewsbythelake.com/the-painted-turtle-bistro/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 477,
+      "region": "penticton",
+      "slug": "palmer-kitchen-spirits",
+      "name": "Palmer Kitchen + Spirits",
+      "website": "https://palmerpenticton.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 485,
+      "region": "penticton",
+      "slug": "pasta-factory",
+      "name": "Pasta Factory",
+      "website": "https://thepastafactory.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 504,
+      "region": "penticton",
+      "slug": "pho-more-vietnamese-restaurant",
+      "name": "Pho&More Vietnamese Restaurant",
+      "website": "https://phoandmore.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 510,
+      "region": "penticton",
+      "slug": "pizza-64-penticton",
+      "name": "Pizza 64 (Penticton)",
+      "website": "https://pizza64.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 533,
+      "region": "penticton",
+      "slug": "quesada-burritos-tacos",
+      "name": "Quesada Burritos & Tacos",
+      "website": "https://quesada.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 866,
+      "region": "penticton",
+      "slug": "roche-wines",
+      "name": "Roche Wines",
+      "website": "https://rochewines.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 579,
+      "region": "penticton",
+      "slug": "shades-on-main-restaurant",
+      "name": "Shades on Main Restaurant",
+      "website": "https://www.shadesonmain.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 590,
+      "region": "penticton",
+      "slug": "skaha-pizza",
+      "name": "Skaha Pizza",
+      "website": "https://www.skahapizza.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 997,
+      "region": "penticton",
+      "slug": "sonetto",
+      "name": "Sonetto",
+      "website": "https://www.playwinery.com/visit/restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 616,
+      "region": "penticton",
+      "slug": "stillfood-bistro-cappuccino-bar",
+      "name": "Stillfood Bistro & Cappuccino Bar",
+      "website": "https://www.stillfoodbistro.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 631,
+      "region": "penticton",
+      "slug": "sushi-genki-ramen",
+      "name": "Sushi Genki+ Ramen",
+      "website": "https://www.sushigenki.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 648,
+      "region": "penticton",
+      "slug": "tacoriendo-mexican-cantina-penticton",
+      "name": "TacoRiendo Mexican Cantina Penticton",
+      "website": "https://www.tacoriendo.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 649,
+      "region": "penticton",
+      "slug": "tacos-del-norte",
+      "name": "Tacos del Norte",
+      "website": "https://www.tacosdelnorte.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1081,
+      "region": "penticton",
+      "slug": "tacotime-penticton",
+      "name": "TacoTime (Penticton)",
+      "website": "https://tacotime.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 656,
+      "region": "penticton",
+      "slug": "taste-of-mediterranean",
+      "name": "Taste of Mediterranean",
+      "website": "https://www.tasteofmediterranean.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 686,
+      "region": "penticton",
+      "slug": "the-forest",
+      "name": "The Forest",
+      "website": "https://www.theforestpenticton.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 694,
+      "region": "penticton",
+      "slug": "the-hub-on-martin",
+      "name": "The Hub on Martin",
+      "website": "https://thehubonmartin.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 715,
+      "region": "penticton",
+      "slug": "the-underdog",
+      "name": "The Underdog",
+      "website": "https://theunderdogpenticton.com/home",
+      "kind": "own site"
+    },
+    {
+      "id": 724,
+      "region": "penticton",
+      "slug": "tickleberry-s-at-the-peach",
+      "name": "Tickleberry's at the Peach",
+      "website": "https://www.tickleberrys.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 723,
+      "region": "penticton",
+      "slug": "tickleberry-s-downtown",
+      "name": "Tickleberry's Downtown",
+      "website": "https://www.tickleberrys.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 725,
+      "region": "penticton",
+      "slug": "tickleberry-s-on-the-beach",
+      "name": "Tickleberry's on the Beach",
+      "website": "https://www.tickleberrys.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 751,
+      "region": "penticton",
+      "slug": "upper-bench-estate-winery-and-creamery",
+      "name": "Upper Bench Estate Winery and Creamery",
+      "website": "https://upperbench.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 776,
+      "region": "penticton",
+      "slug": "wayne-freda",
+      "name": "Wayne & Freda",
+      "website": "https://www.wayneandfreda.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 783,
+      "region": "penticton",
+      "slug": "wild-ginger",
+      "name": "Wild Ginger",
+      "website": "https://wildgingerpenticton.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 798,
+      "region": "penticton",
+      "slug": "yellow-dog-brewing-co",
+      "name": "Yellow Dog Brewing Co",
+      "website": "https://yellowdogbeer.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 101,
+      "region": "silverstar",
+      "slug": "bugaboos-bakery-cafe",
+      "name": "Bugaboos Bakery Cafe",
+      "website": "https://www.bugaboosbakerycafe.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1061,
+      "region": "silverstar",
+      "slug": "d-argento",
+      "name": "d'argento",
+      "website": "https://www.skisilverstar.com/mountain-dining-shopping/restaurants-cafes/dargento/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 352,
+      "region": "silverstar",
+      "slug": "la-plata",
+      "name": "La Plata",
+      "website": "https://www.skisilverstar.com/mountain-dining-shopping/restaurants-cafes/la-plata/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1060,
+      "region": "silverstar",
+      "slug": "the-den",
+      "name": "The Den",
+      "website": "https://www.skisilverstar.com/mountain-dining-shopping/restaurants-cafes/the-den/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1062,
+      "region": "silverstar",
+      "slug": "town-hall",
+      "name": "Town Hall",
+      "website": "https://www.skisilverstar.com/mountain-dining-shopping/restaurants-cafes/town-hall/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1063,
+      "region": "silverstar",
+      "slug": "tube-town-cafe-bar",
+      "name": "Tube Town Café & Bar",
+      "website": "https://www.skisilverstar.com/mountain-dining-shopping/restaurants-cafes/tube-town-cafe/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 9,
+      "region": "summerland",
+      "slug": "8th-generation-vineyard",
+      "name": "8th Generation Vineyard",
+      "website": "https://8thgeneration.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 14,
+      "region": "summerland",
+      "slug": "alchemist-distiller",
+      "name": "Alchemist Distiller",
+      "website": "https://www.alchemistdistiller.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 94,
+      "region": "summerland",
+      "slug": "bread-cheese-co",
+      "name": "Bread & Cheese Co",
+      "website": "https://breadandcheeseco.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 1075,
+      "region": "summerland",
+      "slug": "canyonview-bar-grill",
+      "name": "Canyonview Bar & Grill",
+      "website": "https://www.summerlandgolf.com/restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 833,
+      "region": "summerland",
+      "slug": "garnet-valley-ranch-winery",
+      "name": "Garnet Valley Ranch Winery",
+      "website": "https://okanagancrushpad.com/discover-garnet-valley/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1037,
+      "region": "summerland",
+      "slug": "kitchen-ve-oh-lay-acres-honey-wine-farm",
+      "name": "Kitchen @ Ve Oh Lay Acres Honey Wine & Farm",
+      "website": "https://www.veohlayacres.com/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 425,
+      "region": "summerland",
+      "slug": "murray-s-pizza-pasta-summerland",
+      "name": "Murray's Pizza & Pasta (Summerland)",
+      "website": "https://murrays.pizza/",
+      "kind": "own site"
+    },
+    {
+      "id": 623,
+      "region": "summerland",
+      "slug": "summerland-cider-company-coffee-shop",
+      "name": "Summerland Cider Company Coffee Shop",
+      "website": "https://www.summerlandcider.com/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 624,
+      "region": "summerland",
+      "slug": "summerland-heritage-cider-company",
+      "name": "Summerland Heritage Cider Company",
+      "website": "https://www.summerlandcider.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 626,
+      "region": "summerland",
+      "slug": "summerland-smoke-shack",
+      "name": "Summerland Smoke Shack",
+      "website": "https://summerlandsmokeshack.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 664,
+      "region": "summerland",
+      "slug": "the-bistro-summerland-resort",
+      "name": "The Bistro (Summerland Resort)",
+      "website": "https://summerlandresorthotel.com/the-resort/resort-dining",
+      "kind": "host-site page"
+    },
+    {
+      "id": 1034,
+      "region": "summerland",
+      "slug": "sumac-ridge-golf-country-club",
+      "name": "The Sumac Ridge Restaurant & Lounge",
+      "website": "https://sumacridgegolf.ca/the-restaurant-lounge/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 720,
+      "region": "summerland",
+      "slug": "thornhaven-estates-winery",
+      "name": "Thornhaven Estates Winery",
+      "website": "https://www.thornhaven.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 735,
+      "region": "summerland",
+      "slug": "true-grain-bakehouse",
+      "name": "True Grain Bakehouse",
+      "website": "https://www.truegrain.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 757,
+      "region": "summerland",
+      "slug": "ve-oh-lay-acres-winery-farm",
+      "name": "Ve Oh Lay Acres Winery & Farm",
+      "website": "https://www.veohlayacres.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 934,
+      "region": "vernon",
+      "slug": "14th-ave-bar-grill",
+      "name": "14th Ave Bar & Grill",
+      "website": "https://www.hillviewgolf.ca/golf-course/restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 806,
+      "region": "vernon",
+      "slug": "barburrito",
+      "name": "barBURRITO",
+      "website": "https://www.barburrito.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 66,
+      "region": "vernon",
+      "slug": "bento-sushi",
+      "name": "Bento & Sushi",
+      "website": "https://www.bentosushi.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 78,
+      "region": "vernon",
+      "slug": "blenz-coffee-vernon-downtown",
+      "name": "Blenz Coffee (Vernon Downtown)",
+      "website": "https://www.blenz.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 40,
+      "region": "vernon",
+      "slug": "bna-brewing-vernon-40",
+      "name": "BNA Brewing Vernon",
+      "website": "https://www.bnabrewing.com/bna-vernon",
+      "kind": "own site"
+    },
+    {
+      "id": 92,
+      "region": "vernon",
+      "slug": "bourbon-street-bar-and-grill",
+      "name": "Bourbon Street Bar and Grill",
+      "website": "https://www.prestigehotelsandresorts.com/prestige-vernon-hotel-pages/dining-prestige-vernon-hotel/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 939,
+      "region": "vernon",
+      "slug": "browns-socialhouse",
+      "name": "Browns Socialhouse",
+      "website": "https://www.brownssocialhouse.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 940,
+      "region": "vernon",
+      "slug": "c-lovers-fish-chips",
+      "name": "C-Lovers Fish & Chips",
+      "website": "https://c-lovers.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 941,
+      "region": "vernon",
+      "slug": "cactus-club-cafe",
+      "name": "Cactus Club Café",
+      "website": "https://www.cactusclubcafe.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 942,
+      "region": "vernon",
+      "slug": "cora",
+      "name": "Cora",
+      "website": "https://www.chezcora.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 184,
+      "region": "vernon",
+      "slug": "dorians-greek-taverna-vernon",
+      "name": "Dorians Greek Taverna Vernon",
+      "website": "https://doriansgreektaverna.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 946,
+      "region": "vernon",
+      "slug": "earls-kitchen-bar",
+      "name": "Earls Kitchen & Bar",
+      "website": "https://earls.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 200,
+      "region": "vernon",
+      "slug": "elodie-s-playhouse-cafe",
+      "name": "Elodie's Playhouse Cafe",
+      "website": "https://elodiesplayhouse.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 210,
+      "region": "vernon",
+      "slug": "farmhouse-cafe",
+      "name": "Farmhouse Cafe",
+      "website": "https://www.davisonorchards.ca/farmhouse-cafe",
+      "kind": "host-site page"
+    },
+    {
+      "id": 948,
+      "region": "vernon",
+      "slug": "fig-bistro",
+      "name": "Fig Bistro",
+      "website": "https://www.thefigbistro.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 238,
+      "region": "vernon",
+      "slug": "gerni-s-farmhouse",
+      "name": "Gerni's Farmhouse",
+      "website": "https://www.sparklinghill.com/dining/gernis/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 951,
+      "region": "vernon",
+      "slug": "hot-spot-on-6th-restaurant",
+      "name": "Hot Spot on 6th Restaurant",
+      "website": "https://hotspoton6.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 954,
+      "region": "vernon",
+      "slug": "kelly-o-bryan-s-restaurant",
+      "name": "Kelly O Bryan's Restaurant",
+      "website": "https://www.kobcob.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 335,
+      "region": "vernon",
+      "slug": "kin-pod-chocolate-ice-cream-and-coffee",
+      "name": "Kin+Pod Chocolate, Ice Cream, and Coffee",
+      "website": "https://www.kinpod.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 347,
+      "region": "vernon",
+      "slug": "la-carraia-gelateria-cafe",
+      "name": "La Carraia Gelateria Cafe",
+      "website": "https://www.lacarraiavernon.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 392,
+      "region": "vernon",
+      "slug": "marble-slab-creamery",
+      "name": "Marble Slab Creamery",
+      "website": "https://www.marbleslab.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 383,
+      "region": "vernon",
+      "slug": "mr-mikes-steakhousecasual-vernon",
+      "name": "MR MIKES SteakhouseCasual (Vernon)",
+      "website": "https://mrmikes.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 435,
+      "region": "vernon",
+      "slug": "new-punjab-restaurant-bar-sweets-vernon",
+      "name": "New Punjab Restaurant, Bar & Sweets Vernon",
+      "website": "https://newpunjabvernon.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 453,
+      "region": "vernon",
+      "slug": "ogopogo-concessions",
+      "name": "Ogopogo Concessions",
+      "website": "https://ogopogoconcessions.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 457,
+      "region": "vernon",
+      "slug": "okanagan-spirits-craft-distillery-vernon",
+      "name": "Okanagan Spirits Craft Distillery (Vernon)",
+      "website": "https://okanaganspirits.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 961,
+      "region": "vernon",
+      "slug": "original-joe-s-restaurant",
+      "name": "Original Joe's Restaurant",
+      "website": "https://originaljoes.ca",
+      "kind": "own site"
+    },
+    {
+      "id": 963,
+      "region": "vernon",
+      "slug": "peakfine-at-sparkling-hill-resort",
+      "name": "PeakFine at Sparkling Hill Resort",
+      "website": "https://www.sparklinghill.com/dining/peakfine/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 542,
+      "region": "vernon",
+      "slug": "ratio-coffee-pastry",
+      "name": "Ratio Coffee & Pastry",
+      "website": "https://www.ratiocoffee.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 966,
+      "region": "vernon",
+      "slug": "rb-bar-grill",
+      "name": "RB Bar & Grill",
+      "website": "https://www.rbbarandgrill.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 547,
+      "region": "vernon",
+      "slug": "red-tomato-pies",
+      "name": "Red Tomato Pies",
+      "website": "https://www.redtomatopies.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 967,
+      "region": "vernon",
+      "slug": "rice-box",
+      "name": "Rice Box",
+      "website": "https://thericebox.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 969,
+      "region": "vernon",
+      "slug": "roster-sports-club",
+      "name": "Roster Sports Club",
+      "website": "https://www.rostersvernon.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 613,
+      "region": "vernon",
+      "slug": "station-bbq-smokehouse",
+      "name": "Station BBQ Smokehouse",
+      "website": "https://stationbbq.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 614,
+      "region": "vernon",
+      "slug": "status-nightclub-vernon",
+      "name": "Status Nightclub Vernon",
+      "website": "http://new.statusvernon.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 1082,
+      "region": "vernon",
+      "slug": "tacotime-vernon",
+      "name": "TacoTime (Vernon)",
+      "website": "https://www.tacotime.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 976,
+      "region": "vernon",
+      "slug": "teassential",
+      "name": "Teassential",
+      "website": "https://www.teassential.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 758,
+      "region": "vernon",
+      "slug": "vernon-golf-country-club",
+      "name": "The 1913 Restaurant",
+      "website": "https://vernongolf.com/Dining_Events",
+      "kind": "host-site page"
+    },
+    {
+      "id": 669,
+      "region": "vernon",
+      "slug": "the-boarding-house-cafe",
+      "name": "The Boarding House Cafe",
+      "website": "https://boardinghousecafe.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 676,
+      "region": "vernon",
+      "slug": "the-curry-pot-indian-nepalese-cuisine-restaurant",
+      "name": "The Curry Pot Indian & Nepalese Cuisine Restaurant",
+      "website": "https://currypotvernon.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 680,
+      "region": "vernon",
+      "slug": "the-edge-restaurant-bar",
+      "name": "The Edge Restaurant & Bar",
+      "website": "https://theriseresort.ca/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 701,
+      "region": "vernon",
+      "slug": "the-med-restaurant-vernon",
+      "name": "The Med Restaurant - Vernon",
+      "website": "https://www.themedvernon.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 709,
+      "region": "vernon",
+      "slug": "the-roxy-cafe-vegan-and-vegetarian-restaurant-cafe",
+      "name": "The Roxy Cafe - Vegan and Vegetarian Restaurant Cafe",
+      "website": "https://www.theroxycafe.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 732,
+      "region": "vernon",
+      "slug": "triumph-coffee",
+      "name": "Triumph Coffee",
+      "website": "https://www.triumphcoffee.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 745,
+      "region": "vernon",
+      "slug": "two-donkeys-bakery",
+      "name": "Two Donkeys Bakery",
+      "website": "https://www.twodonkeysbakery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 766,
+      "region": "vernon",
+      "slug": "viva-mexicana-taco-bar",
+      "name": "Viva Mexicana Taco Bar",
+      "website": "https://www.vivamexicana.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 774,
+      "region": "vernon",
+      "slug": "wasabi-sushi-grill",
+      "name": "Wasabi Sushi & Grill",
+      "website": "https://wasabivernon.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 777,
+      "region": "vernon",
+      "slug": "wedge-cheesery",
+      "name": "Wedge Cheesery",
+      "website": "https://www.wedgecheesery.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 977,
+      "region": "vernon",
+      "slug": "wings-tap-grill",
+      "name": "Wings Tap & Grill",
+      "website": "https://greatwings.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 978,
+      "region": "vernon",
+      "slug": "winston-pub",
+      "name": "Winston Pub",
+      "website": "https://woodsmangroup.com/winston-pub/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 5,
+      "region": "west-kelowna",
+      "slug": "19-okanagan-grill-bar",
+      "name": "19 Okanagan Grill + Bar",
+      "website": "https://dine19.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 25,
+      "region": "west-kelowna",
+      "slug": "annie-s-beach-cafe-lounge",
+      "name": "Annie's Beach Cafe & Lounge",
+      "website": "https://www.frindwinery.com/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 81,
+      "region": "west-kelowna",
+      "slug": "bliss-bakery-kitchen",
+      "name": "Bliss Bakery - Kitchen",
+      "website": "https://www.blissbakery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 45,
+      "region": "west-kelowna",
+      "slug": "buy-the-sea-seafood-west-kelowna",
+      "name": "BUY THE SEA SEAFOOD (West Kelowna)",
+      "website": "https://www.buythesea.ca/penticton/index.php",
+      "kind": "own site"
+    },
+    {
+      "id": 108,
+      "region": "west-kelowna",
+      "slug": "c-lovers-fish-chips-west-kelowna",
+      "name": "C-Lovers Fish & Chips (West Kelowna)",
+      "website": "https://c-lovers.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 320,
+      "region": "west-kelowna",
+      "slug": "kapi-chido-coffee-roasters",
+      "name": "Kapi Chido Coffee Roasters",
+      "website": "https://www.kapichido.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 326,
+      "region": "west-kelowna",
+      "slug": "kekuli-cafe-west-kelowna",
+      "name": "Kekuli Cafe - West Kelowna",
+      "website": "https://www.kekulicafe.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 328,
+      "region": "west-kelowna",
+      "slug": "kelly-o-bryan-s-restaurant-and-carlos-o-bryan-s-pub",
+      "name": "Kelly O'Bryan's Restaurant and Carlos O'Bryan's Pub",
+      "website": "https://www.kobcob.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 380,
+      "region": "west-kelowna",
+      "slug": "mj-asian-cuisine",
+      "name": "MJ Asian Cuisine",
+      "website": "https://www.mjasiancuisine.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 423,
+      "region": "west-kelowna",
+      "slug": "murray-s-pizza-pasta",
+      "name": "Murray's Pizza & Pasta",
+      "website": "https://murrays.pizza/",
+      "kind": "own site"
+    },
+    {
+      "id": 465,
+      "region": "west-kelowna",
+      "slug": "opa-of-greece",
+      "name": "Opa! Of Greece",
+      "website": "https://opaofgreece.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 924,
+      "region": "west-kelowna",
+      "slug": "original-joe-s-restaurant",
+      "name": "Original Joe's Restaurant",
+      "website": "https://originaljoes.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 925,
+      "region": "west-kelowna",
+      "slug": "pepper-pot-grill",
+      "name": "Pepper Pot Grill",
+      "website": "https://pepperpotgrill.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 570,
+      "region": "west-kelowna",
+      "slug": "sammy-j-s-grill-and-bar",
+      "name": "Sammy J's Grill and Bar",
+      "website": "https://www.sammyjs.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 583,
+      "region": "west-kelowna",
+      "slug": "shannon-lake-restaurant",
+      "name": "Shannon Lake Restaurant",
+      "website": "https://shannonlakegolf.com/restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 926,
+      "region": "west-kelowna",
+      "slug": "smitty-s",
+      "name": "Smitty's",
+      "website": "https://smittys.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 607,
+      "region": "west-kelowna",
+      "slug": "specialty-bakery",
+      "name": "Specialty Bakery",
+      "website": "https://specialtybakery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 931,
+      "region": "west-kelowna",
+      "slug": "terrace-restaurant",
+      "name": "Terrace Restaurant",
+      "website": "https://www.missionhillwinery.com/terrace-restaurant/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 690,
+      "region": "west-kelowna",
+      "slug": "the-hatching-post-brewery-smokery",
+      "name": "The Hatching Post Brewery & Smokery",
+      "website": "https://hatchingpostbeer.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 703,
+      "region": "west-kelowna",
+      "slug": "the-modest-butcher-kitchen-market",
+      "name": "The Modest Butcher Kitchen + Market",
+      "website": "https://modestbutcher.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 710,
+      "region": "west-kelowna",
+      "slug": "the-ryse-breadworks-coffeehouse",
+      "name": "The Ryse Breadworks & Coffeehouse",
+      "website": "https://theryse.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 734,
+      "region": "west-kelowna",
+      "slug": "truck-59-ciderhouse",
+      "name": "Truck 59 Ciderhouse",
+      "website": "https://truck59ciderhouse.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 740,
+      "region": "west-kelowna",
+      "slug": "turtle-jack-s-west-kelowna",
+      "name": "Turtle Jack's West Kelowna",
+      "website": "https://turtlejacks.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 744,
+      "region": "west-kelowna",
+      "slug": "two-brothers-mexican-restaurant",
+      "name": "Two Brothers Mexican Restaurant",
+      "website": "https://www.twobrothersrestaurant.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 747,
+      "region": "west-kelowna",
+      "slug": "two-donkeys-bakery-west-kelowna",
+      "name": "Two Donkeys Bakery (West Kelowna)",
+      "website": "https://www.twodonkeysbakery.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 762,
+      "region": "west-kelowna",
+      "slug": "villages-pizza-west-kelowna",
+      "name": "Villages Pizza - West Kelowna",
+      "website": "https://villagespizza.com/",
+      "kind": "own site"
+    },
+    {
+      "id": 933,
+      "region": "west-kelowna",
+      "slug": "vino-italian-restaurant",
+      "name": "Vino Italian Restaurant",
+      "website": "https://volcanichillswinery.com/",
+      "kind": "host-site page"
+    },
+    {
+      "id": 780,
+      "region": "west-kelowna",
+      "slug": "west-sakura-teriyaki-restaurant",
+      "name": "West Sakura Teriyaki Restaurant",
+      "website": "https://westsakura.ca/",
+      "kind": "own site"
+    },
+    {
+      "id": 929,
+      "region": "west-kelowna",
+      "slug": "wings-tap-grill",
+      "name": "Wings Tap & Grill",
+      "website": "https://greatwings.ca/",
+      "kind": "own site"
+    }
+  ]
+}

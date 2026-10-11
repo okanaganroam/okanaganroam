@@ -190,6 +190,22 @@ insert.run({
   slug: 'test-populated-phone-for-null-check',
 });
 
+// ---- seed fixtures for /admin/enrich-website tests -----------------------
+{
+  const websiteInsert = db.prepare(`
+    INSERT INTO venues (name, region, type, description, website, slug)
+    VALUES (@name, 'kelowna', 'restaurant', @description, @website, @slug)
+  `);
+  websiteInsert.run({
+    name: 'Test Website Empty Fixture', website: null, slug: 'test-website-empty-fixture',
+    description: 'A fixture venue with no website, used only by the /admin/enrich-website tests.',
+  });
+  websiteInsert.run({
+    name: 'Test Website Set Fixture', website: 'https://already-set.example.com/', slug: 'test-website-set-fixture',
+    description: 'A fixture venue that already has a website, used only by the /admin/enrich-website no-overwrite tests.',
+  });
+}
+
 // ---- seed fixture for /admin/correct-amenities tests ---------------------
 // vegan=false, vegetarian=true, patio=true, gluten_free=false -- a
 // deliberately mixed starting state so a single fixture can exercise all
@@ -5685,6 +5701,79 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     assert.equal(status, 200);
     assert.equal(body.changed, false);
     assert.equal(venue_enrichment_log_count(phoneFixture.id), before, 'a true no-op must not write an audit-log row');
+  }
+
+  // ---- /admin/enrich-website ---------------------------------------------
+  // Same start/close cycle as the blocks above. Fills website only when the
+  // live value is empty; never overwrites; rejects social/booking URLs.
+  {
+    const emptyFixture = app.findVenueBySlug('kelowna', 'restaurant', 'test-website-empty-fixture');
+    const setFixture = app.findVenueBySlug('kelowna', 'restaurant', 'test-website-set-fixture');
+    async function enrichWebsite(bodyObj, token = ADMIN_TOKEN) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${base}/admin/enrich-website`, { method: 'POST', headers, body: JSON.stringify(bodyObj) });
+      return { status: res.status, body: await res.json() };
+    }
+    const websiteLogCount = (venueId) =>
+      db.prepare('SELECT COUNT(*) AS n FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ?').get(venueId, 'website').n;
+    const good = { id: emptyFixture.id, website: 'https://example-bistro.ca/', reason: 'test research', batch_id: 'test-web-batch' };
+
+    assert.equal((await enrichWebsite(good, 'wrong-token')).status, 401, 'wrong bearer token must be rejected');
+    {
+      const { status, body } = await enrichWebsite({ ...good, extra: 'nope' });
+      assert.equal(status, 400);
+      assert.match(body.error, /Unexpected field/);
+    }
+    {
+      const { status, body } = await enrichWebsite({ ...good, reason: '  ' });
+      assert.equal(status, 400);
+      assert.match(body.error, /reason/);
+    }
+    for (const bad of ['example-bistro.ca', 'ftp://example-bistro.ca/', 'https://www.facebook.com/examplebistro', 'https://m.yelp.ca/biz/x', 'https://www.doordash.com/store/1', 'https://user:pw@example-bistro.ca/']) {
+      const { status } = await enrichWebsite({ ...good, website: bad });
+      assert.equal(status, 400, `${bad} must be rejected`);
+    }
+    assert.equal(app.getVenue(emptyFixture.id).website, null, 'rejected requests must not write anything');
+    assert.equal((await enrichWebsite({ ...good, id: 999999999 })).status, 404);
+
+    // 409 on a venue that already has a website; value and audit log untouched.
+    {
+      const { status, body } = await enrichWebsite({ ...good, id: setFixture.id });
+      assert.equal(status, 409);
+      assert.equal(body.live.website, 'https://already-set.example.com/');
+      assert.equal(app.getVenue(setFixture.id).website, 'https://already-set.example.com/');
+      assert.equal(websiteLogCount(setFixture.id), 0);
+    }
+
+    // 200 on the empty fixture, with exactly one audit row.
+    {
+      const { status, body } = await enrichWebsite(good);
+      assert.equal(status, 200);
+      assert.equal(body.changed, true);
+      assert.equal(app.getVenue(emptyFixture.id).website, 'https://example-bistro.ca/');
+      const rows = db.prepare('SELECT * FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ?').all(emptyFixture.id, 'website');
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].old_value, null);
+      assert.equal(rows[0].new_value, 'https://example-bistro.ca/');
+      assert.equal(rows[0].batch_id, 'test-web-batch');
+    }
+
+    // A second call is a 409, not an overwrite.
+    {
+      const { status } = await enrichWebsite({ ...good, website: 'https://another-site.example.com/' });
+      assert.equal(status, 409);
+      assert.equal(app.getVenue(emptyFixture.id).website, 'https://example-bistro.ca/');
+      assert.equal(websiteLogCount(emptyFixture.id), 1);
+    }
+
+    // The venue page now links to the new website.
+    {
+      const res = await fetch(`${base}/kelowna/restaurants/test-website-empty-fixture`);
+      const html = await res.text();
+      assert.equal(res.status, 200);
+      assert.match(html, /href="https:\/\/example-bistro\.ca\/"[^>]*>Visit Website</);
+    }
   }
 
   // ---- /admin/correct-amenities ------------------------------------------
@@ -16195,4 +16284,41 @@ test('Ski guide: served at its path, listed in the sitemap, and linked from the 
   assert.match(bigWhite, /href="\/guides\/ski-season-big-white-silverstar#big-white">Read our ski season guide/);
   const kelowna = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []);
   assert.doesNotMatch(kelowna, /ski-season-big-white-silverstar/);
+});
+
+test('Venue websites data file: every URL passes the enrich-website rules, one entry per venue', () => {
+  const data = require('../data/venue-websites-2026-10.json');
+  assert.ok(data.batch_id && data.verifiedOn);
+  assert.ok(data.venues.length > 0);
+  const ids = new Set();
+  for (const v of data.venues) {
+    assert.ok(Number.isInteger(v.id) && v.id > 0, `${v.name}: id`);
+    assert.ok(!ids.has(v.id), `${v.name}: duplicate id ${v.id}`);
+    ids.add(v.id);
+    assert.ok(app.REGION_INTROS && v.region && v.slug, `${v.name}: region/slug`);
+    const checked = app.validateVenueWebsite(v.website);
+    assert.ok(checked.ok, `${v.name}: ${v.website} ${checked.error || ''}`);
+  }
+});
+
+test('Listing removals data file: well-formed, no self-redirects, and no overlap with the websites file', () => {
+  const removals = require('../data/listing-removals-2026-10.json');
+  const websites = require('../data/venue-websites-2026-10.json');
+  const removed = new Set();
+  for (const r of removals.redirect) {
+    for (const v of [r.duplicate, r.canonical]) {
+      assert.ok(Number.isInteger(v.id) && v.id > 0 && v.region && v.slug, `${v.name}: id/region/slug`);
+    }
+    assert.notEqual(r.duplicate.id, r.canonical.id, `${r.duplicate.name}: self-redirect`);
+    assert.ok(r.reason, `${r.duplicate.name}: reason`);
+    removed.add(r.duplicate.id);
+  }
+  const canonicals = new Set(removals.redirect.map((r) => r.canonical.id));
+  for (const d of removals.delete) {
+    assert.ok(Number.isInteger(d.id) && d.id > 0 && d.region && d.slug && d.reason, `${d.name}: fields`);
+    assert.ok(!canonicals.has(d.id), `${d.name}: deleted venue is a redirect target`);
+    removed.add(d.id);
+  }
+  for (const id of removed) assert.ok(!canonicals.has(id), `#${id} is both removed and a redirect target`);
+  for (const v of websites.venues) assert.ok(!removed.has(v.id), `${v.name} is in both files`);
 });
