@@ -1352,6 +1352,12 @@ const CATEGORY_SLUGS = {
   // category architecture as Golf/Beaches; see THEMED_CATEGORY_TYPES and
   // ALL_REGIONS_CATEGORIES below.
   outdoor: 'outdoors',
+  // Indoor & Rainy Day (2026-10-11): museums, galleries, theatres, escape
+  // rooms, bowling, climbing gyms and the like, for grey or cold days. Same
+  // themed category architecture as Outdoors. The /indoor hub also lists
+  // the indoor golf simulators (type golf, see isIndoorGolfVenue) and
+  // renders with zero indoor venues (see the /:category route).
+  indoor: 'indoor',
 };
 // Regional category URLs that were published and later emptied by a type
 // correction (2026-09-24: Maple Leaf Spirits and Alchemist Distiller moved
@@ -1370,7 +1376,7 @@ const SLUG_TO_TYPE = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([typ
 // injected sections never enumerate CATEGORY_SLUGS, so adding a type here
 // cannot surface a tile, count, link or markup change on '/'. Enforced by
 // the "homepage byte-identity" tests.
-const THEMED_CATEGORY_TYPES = new Set(['golf', 'beach', 'outdoor']);
+const THEMED_CATEGORY_TYPES = new Set(['golf', 'beach', 'outdoor', 'indoor']);
 function usesThemedCategoryLayout(type) {
   return THEMED_CATEGORY_TYPES.has(type);
 }
@@ -1432,7 +1438,9 @@ function usesThemedVenueShell(type) {
 // Distilleries (2026-09-24) are excluded for the same reason as beaches: the
 // /trip client labels stops with app.js's type.* keys, and app.js is a frozen
 // homepage asset with no type.distillery entry.
-const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach', 'outdoor', 'distillery']);
+// Indoor & Rainy Day (2026-10-11) launches the same way as beaches: venue
+// pages, hubs and the Trip tray only; a planner interest comes later.
+const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach', 'outdoor', 'distillery', 'indoor']);
 const TRIP_INTEREST_TYPES = Object.keys(CATEGORY_SLUGS).filter((t) => !TRIP_PLANNER_EXCLUDED_TYPES.has(t));
 function isTripPlannerType(type) {
   return TRIP_INTEREST_TYPES.includes(type);
@@ -1448,7 +1456,7 @@ function isTripPlannerType(type) {
 // effect of this refactor. getVenuesByCategory()/renderCategoryAllRegionsPage()
 // below are already fully generic by `type`; only the route dispatch is
 // gated by this list.
-const ALL_REGIONS_CATEGORIES = ['golf', 'beach', 'outdoor', 'winery'];
+const ALL_REGIONS_CATEGORIES = ['golf', 'beach', 'outdoor', 'winery', 'indoor'];
 
 // Human-readable label per category, singular and plural, for titles/H1s
 const CATEGORY_LABELS = {
@@ -1462,6 +1470,7 @@ const CATEGORY_LABELS = {
   golf: { singular: 'Golf Course', plural: 'Golf Courses' },
   beach: { singular: 'Beach', plural: 'Beaches' },
   outdoor: { singular: 'Outdoor Destination', plural: 'Outdoor Destinations' },
+  indoor: { singular: 'Indoor Attraction', plural: 'Indoor & Rainy Day Spots' },
 };
 
 // Design Sprint 4: static editorial micro-copy, following the exact same
@@ -1481,6 +1490,7 @@ const CATEGORY_TAGLINES = {
   distillery: 'Small-batch spirits, poured where they are made.',
   golf: "Courses across the Okanagan's valleys and benches.",
   beach: 'Public beaches and swimming spots on the valley’s lakes.',
+  indoor: 'Museums, galleries, theatres, escape rooms, bowling, climbing gyms and more for grey or cold days.',
 };
 
 const REGION_TAGLINES = {
@@ -1782,6 +1792,9 @@ const TYPE_ACCENT_GRADIENTS = {
   // first stop, deepened to a darker second stop the same way every other
   // type's gradient deepens its base hue; no new hue family enters the site.
   outdoor: ['#4A3428', '#2F2118'],
+  // 'indoor' (2026-10-11): a dusk slate blue, the cool end of the homepage
+  // Indoor mood card's dusk-to-amber gradient.
+  indoor: ['#34425E', '#222C41'],
 };
 
 function compactBandCSSRules(className) {
@@ -1819,6 +1832,7 @@ const HIDDEN_GEM_TYPE_IMAGE = {
   distillery: '/images/mood/drink.webp',
   golf: '/images/mood/golf.webp',
   beach: '/images/mood/beaches.webp',
+  indoor: '/images/mood/indoor.jpg', // the homepage's winter Indoor tile photo (2026-10-11)
 };
 
 // Design Sprint 4 / reference redesign: the Hidden Gems homepage card has
@@ -1891,6 +1905,7 @@ const SCHEMA_TYPE_MAP = {
   distillery: 'Distillery', // schema.org/Distillery, a FoodEstablishment subtype
   golf: 'GolfCourse',
   beach: 'Beach', // schema.org/Beach (a CivicStructure), the exact type for a public beach
+  indoor: 'TouristAttraction', // museums, galleries, theatres, escape rooms, bowling and climbing gyms: no single narrower schema.org type fits them all
   outdoor: 'TouristAttraction', // parks, trails, viewpoints, nature centres and ski/Nordic areas are all Places a visitor seeks out; no single narrower schema.org type fits every seed record
 };
 
@@ -3322,7 +3337,7 @@ const BROWSE_FEATURE_CHIP = {
   kid_friendly: 'kids', live_music: 'music', nonalcoholic: 'nonalc', patio: 'patio',
   sports_tv: 'sports', vegan: 'vegan', vegetarian: 'vegetarian', lake_view: 'view',
 };
-const DISCOVERY_HUB_PAGES = { winery: '/wineries', golf: '/golf', beach: '/beaches', outdoor: '/outdoors' };
+const DISCOVERY_HUB_PAGES = { winery: '/wineries', golf: '/golf', beach: '/beaches', outdoor: '/outdoors', indoor: '/indoor' };
 const DISCOVERY_DEFAULT_LIMIT = 24;
 const DISCOVERY_MAX_LIMIT = 60;
 
@@ -3396,6 +3411,18 @@ function resolveDiscoveryDestination(intent) {
     const w = discoveryWhatsOnWindowParams(intent.when);
     return { url: `/whats-on${discoveryQueryString({ ...w, regions: R, categories: intent.eventCategories })}`, kind: 'events', reason: 'events' };
   }
+  // Indoor & Rainy Day (2026-10-11): a bare rainy-day / indoors request
+  // ("rainy day", "indoors", "something indoor in Kelowna") goes to the
+  // Indoor hub, or to that region's Indoor page when it has venues. The
+  // occasion stays a heuristic everywhere else (the trip planner, and any
+  // request that also names a type, badge, budget or date).
+  if (intent.occasion === 'rainy_day' && !intent.types.length && !intent.features.length && !intent.collections.length
+    && !intent.activities.length && !intent.cuisines.length && !intent.textTerms.length && !intent.budget && !intent.when) {
+    if (!intent.regions.length && countIndoorHubVenues() >= MIN_CATEGORY_VENUES) return { url: DISCOVERY_HUB_PAGES.indoor, kind: 'category', reason: 'occasion' };
+    if (intent.regions.length === 1 && getVenuesByRegionCategory(intent.regions[0], 'indoor').length >= MIN_CATEGORY_VENUES) {
+      return { url: `/${intent.regions[0]}/${CATEGORY_SLUGS.indoor}`, kind: 'region-category', reason: 'occasion' };
+    }
+  }
   if (intent.occasion) return none('heuristic_occasion');
   if (intent.budget) return none('budget_not_filterable');
   if (intent.when) return none('date_on_venue_search');
@@ -3405,7 +3432,7 @@ function resolveDiscoveryDestination(intent) {
   // when the page it points at currently has something to show.
   const hasRegionCategory = (r, t) => getVenuesByRegionCategory(r, t).length >= MIN_CATEGORY_VENUES || RETAINED_EMPTY_CATEGORY_PAGES.has(`${r}/${t}`);
   const hasRegion = (r) => Object.keys(getRegionCategoryCounts(r)).length > 0;
-  const hasHub = (t) => (t === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(t)).length >= MIN_CATEGORY_VENUES;
+  const hasHub = (t) => (t === 'indoor' ? countIndoorHubVenues() : (t === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(t)).length) >= MIN_CATEGORY_VENUES;
   const subset = (list, allowed) => list.every((x) => allowed.includes(x));
   const same = (list, expected) => list.length === expected.length && subset(list, expected);
   const isFD = (t) => !!FD_CATEGORY_KIND_BY_TYPE[t];
@@ -4332,8 +4359,16 @@ function appliedTripExclusions(plan, intent, taxonomy) {
 function tripPlannerFrModule() {
   return require('./trip-planner-fr.js');
 }
-function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null }, now = new Date()) {
+// The planner's taxonomy: Hero Search's, minus the Indoor & Rainy Day type
+// (2026-10-11). The planner has no indoor stops yet (TRIP_PLANNER_EXCLUDED_TYPES),
+// so "a museum and dinner" or "theatre" plan exactly as they did before the
+// type existed instead of asking for stops it can never fill.
+function buildTripPlannerTaxonomy() {
   const taxonomy = buildDiscoveryTaxonomy();
+  return { ...taxonomy, types: taxonomy.types.filter((t) => t !== 'indoor'), venues: taxonomy.venues.filter((v) => v.type !== 'indoor') };
+}
+function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null }, now = new Date()) {
+  const taxonomy = buildTripPlannerTaxonomy();
   const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
   const intent = discoveryIntentModule().interpretDiscoveryQuery(planText, taxonomy);
   // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
@@ -6459,8 +6494,28 @@ function bestRegionForCategoryType() {
   return bestRegionForType;
 }
 
-function renderMoodCardsHTML() {
+// Seasonal mood tiles (2026-10-11): November through March inclusive, by the
+// Okanagan calendar date (todayLocal), the homepage shows Ski & Snow in the
+// Beaches slot and Indoor & Rainy Day in the Golf slot.
+function isWinterMoodSeason(now = new Date()) {
+  const month = Number(todayLocal(now).slice(5, 7));
+  return month >= 11 || month <= 3;
+}
+
+// Test-only date override for the homepage's seasonal tiles: OKR_TODAY_OVERRIDE
+// = 'YYYY-MM-DD' makes "/" render as of noon that Okanagan day, so the
+// child-process homepage byte-identity tests can pin a summer date and pass
+// year-round. Ignored when NODE_ENV is 'production' and whenever it is not
+// a real calendar date. It must never be set in production.
+function homepageNow() {
+  const override = process.env.OKR_TODAY_OVERRIDE;
+  if (!override || process.env.NODE_ENV === 'production' || !parseLocalDate(override)) return new Date();
+  return new Date(`${override}T12:00:00-08:00`);
+}
+
+function renderMoodCardsHTML({ now = new Date() } = {}) {
   const bestRegionForType = bestRegionForCategoryType();
+  const winter = isWinterMoodSeason(now);
   // Golf-wide fix (2026-09-19): unlike every other category, Golf venues
   // are deliberately spread across several regions (Kelowna, Vernon,
   // Osoyoos, Lumby, Enderby, Kaleden) rather than concentrated in one, so
@@ -6494,6 +6549,8 @@ function renderMoodCardsHTML() {
     golf: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4l10 4-10 4"/></svg>',
     'whats-on': '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>',
     outdoors: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 8l4 6 2-3 4 9z"/></svg>',
+    'ski-snow': '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M4.5 6.5l15 11"/><path d="M19.5 6.5l-15 11"/><path d="M9.5 3.5 12 6l2.5-2.5"/><path d="M9.5 20.5 12 18l2.5 2.5"/></svg>',
+    indoor: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
   };
 
   // Beaches has no real image file yet (see PLACEHOLDER_IMAGES.md for why
@@ -6520,12 +6577,22 @@ function renderMoodCardsHTML() {
     { key: 'whats-on', href: '/whats-on', filter: null, img: '/images/mood/whats-on.webp', titleKey: 'mood.whatsOn.title', title: "What's On" },
     { key: 'outdoors', href: outdoorsHref, filter: null, img: '/images/mood/explore.webp', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
   ];
+  // Winter (Nov-Mar, see isWinterMoodSeason): same six positions, with Ski &
+  // Snow replacing Beaches and Indoor & Rainy Day replacing Golf. Summer
+  // output is byte-identical to before. ski-snow.jpg (no webp encoder on the build Mac) is cropped from
+  // /images/outdoors/winter.webp; indoor.jpg is 640x400 (the user-supplied
+  // photo), so it carries its own height. Its .mood-card-indoor rule keeps a
+  // dusk-to-amber gradient behind the image as the loading/missing fallback.
+  if (winter) {
+    cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
+    cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
+  }
 
   const cardsHtml = cards.map((c) => {
     const filterAttr = c.filter ? ` data-mood-filter="${c.filter}"` : '';
     const i18nAttr = c.titleKey ? ` data-i18n="${c.titleKey}"` : '';
     return `<a class="mood-card mood-card-${c.key}" href="${c.href}"${filterAttr}>
-      <img class="mood-card-img" src="${c.img}" width="640" height="403" alt="" loading="lazy">
+      <img class="mood-card-img" src="${c.img}" width="640" height="${c.imgHeight || 403}" alt="" loading="lazy">
       <span class="mood-card-overlay">
         <span class="mood-card-icon" aria-hidden="true">${ICONS[c.key]}</span>
         <span class="mood-card-title"${i18nAttr}>${escapeHtml(c.title)}</span>
@@ -7644,6 +7711,9 @@ function renderHomepageDiscoveryStyles() {
        broken-looking box. */
     background: var(--ref-navy);
   }
+  /* Indoor & Rainy Day winter tile (2026-10-11): a dusk-blue to warm-amber
+     fill behind its photo, shown while the image loads or if it is missing. */
+  .mood-card-indoor { background: linear-gradient(140deg, #2E3B5B 0%, #5A4A6A 52%, #C8874A 100%); }
   .mood-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
   .mood-card:hover .mood-card-img { transform: scale(1.045); }
   .mood-card-overlay {
@@ -8777,6 +8847,24 @@ function buildBeachThemeStyles() {
 function renderOutdoorThemeStyles() {
   return renderOutdoorThemeStyles.css || (renderOutdoorThemeStyles.css = buildOutdoorThemeStyles());
 }
+// Indoor & Rainy Day (2026-10-11): the fourth themed category, by the same
+// mechanism (Golf card rules re-keyed to the indoor card attribute), plus
+// the /indoor hub's simulators section and "coming soon" line. Emitted only
+// on indoor pages, so every other page's output is unchanged.
+function renderIndoorThemeStyles() {
+  return renderIndoorThemeStyles.css || (renderIndoorThemeStyles.css = buildIndoorThemeStyles());
+}
+function buildIndoorThemeStyles() {
+  const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
+  return `<style>
+  /* Indoor page theme (2026-10-11): the Golf rules above, re-keyed to the indoor card attribute. */
+  ${deriveBeachRulesFromGolfCss(SEO_PAGE_CSS, 'indoor')}
+  ${deriveBeachRulesFromGolfCss(themeCss, 'indoor')}
+  body.indoor-page .indoor-coming-soon { font-size: 1rem; line-height: 1.6; color: var(--ink); opacity: 0.8; margin: 4px 0 22px; }
+  body.indoor-page .indoor-golf-section { margin-top: 8px; }
+  body.indoor-page .indoor-golf-lead { font-size: 0.95rem; color: var(--ink); opacity: 0.8; margin: -4px 0 14px; }
+</style>`;
+}
 function buildOutdoorThemeStyles() {
   const themeCss = renderGolfThemeStyles().replace(/^<style>|<\/style>$/g, '');
   return `<style>
@@ -9725,6 +9813,8 @@ function themedCardHolderSelector(type) {
   // type -- the same set as 'lf', but its events report each card's own
   // venue_category (see golfCardEngagementScriptHtml).
   if (type === 'guide') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
+  // 'indoor': the /indoor hub also lists the indoor golf simulators (type golf).
+  if (type === 'indoor') return ':is([data-venue-category="indoor"],[data-venue-category="golf"])';
   if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
   return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
 }
@@ -9746,7 +9836,7 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
       venue_id: Number(card.dataset.venueId),
       venue_name: card.dataset.venueName,
       venue_region: card.dataset.venueRegion,
-      venue_category: ${(type === 'outdoor' || type === 'fd' || type === 'guide') ? `card.dataset.venueCategory || '${type}'` : `'${type}'`},
+      venue_category: ${(type === 'outdoor' || type === 'fd' || type === 'guide' || type === 'indoor') ? `card.dataset.venueCategory || '${type}'` : `'${type}'`},
       surface: card.dataset.surface || 'category_card',
       // Not "page_path": gtag treats page_path as its own field (sent as the
       // hit's dp), so it never reached GA4 as an event parameter (2026-10-05).
@@ -9959,7 +10049,7 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // a photo that reads as a specific business. Pages that don't pass it
   // keep the exact previous head. No twitter:image is added: X falls back
   // to og:image, and other hubs' heads are pinned to have none.
-  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null } = opts;
+  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, indoorTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null } = opts;
   const ogImage = shareImage ? `https://okanaganroam.com${shareImage}` : 'https://okanaganroam.com/og-image.png';
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9977,7 +10067,7 @@ ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.strin
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/tokens.css">
-${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${outdoorTheme ? '\n' + renderOutdoorThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}${golfDataStyles && golfData ? '\n' + golfData.GOLF_DATA_CSS : ''}${savedSidecar ? '\n' + renderSavedSidecarScriptHtml() : ''}`;
+${golfTheme ? '<link rel="stylesheet" href="/styles/app.css">\n' : ''}<style>${SEO_PAGE_CSS}</style>${golfTheme ? '\n' + renderGolfThemeStyles() : ''}${beachTheme ? '\n' + renderBeachThemeStyles() : ''}${outdoorTheme ? '\n' + renderOutdoorThemeStyles() : ''}${indoorTheme ? '\n' + renderIndoorThemeStyles() : ''}${advisoryStyles ? '\n' + renderAdvisoryStyles() : ''}${golfDataStyles && golfData ? '\n' + golfData.GOLF_DATA_CSS : ''}${savedSidecar ? '\n' + renderSavedSidecarScriptHtml() : ''}`;
 }
 
 function siteHeader(rightLinkHref, rightLinkText) {
@@ -10265,7 +10355,7 @@ ${renderGolfHeaderHtml()}
 //   Hidden Gems      -> the hidden_gem collection for the region
 const DESTINATION_CATEGORY_GROUPS = [
   { label: 'Food & Drink', keys: ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail'] },
-  { label: 'Experiences', keys: ['golf', 'beach', 'outdoor'] },
+  { label: 'Experiences', keys: ['golf', 'beach', 'outdoor', 'indoor'] },
   { label: 'Discovery', keys: ['whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems'] },
 ];
 const DESTINATION_CATEGORY_ORDER = DESTINATION_CATEGORY_GROUPS.flatMap((g) => g.keys);
@@ -10787,6 +10877,10 @@ function categoryDirectoryEntries() {
   if (has(countVenuesByCategory('golf'))) experiences.push(typeEntry('golf', `/${CATEGORY_SLUGS.golf}`));
   if (has(countVenuesByCategory('beach'))) experiences.push(typeEntry('beach', `/${CATEGORY_SLUGS.beach}`));
   if (has(countOutdoorLandingVenues())) experiences.push({ label: 'Outdoors', href: `/${CATEGORY_SLUGS.outdoor}`, tagline: 'Parks, trails, viewpoints and ski hills across the valley.' });
+  // Ski & Snow and Indoor & Rainy Day (2026-10-11): both pages always render
+  // (never a 404), so both are always listed.
+  experiences.push({ label: 'Ski & Snow', href: SKI_SNOW_PATH, tagline: 'Ski hills, Nordic trails, tube parks and après at Big White, SilverStar, Apex and Baldy.' });
+  experiences.push({ label: 'Indoor & Rainy Day', href: `/${CATEGORY_SLUGS.indoor}`, tagline: CATEGORY_TAGLINES.indoor });
 
   const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.' }];
   if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.' });
@@ -10863,7 +10957,7 @@ function renderDestinationCategoryStyles() {
 // Falls back to CATEGORY_LABELS.plural for any category without an
 // entry here, so it never breaks if a future category is added to
 // ALL_REGIONS_CATEGORIES without also adding a short label.
-const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches', outdoor: 'Outdoors', winery: 'Wineries' };
+const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches', outdoor: 'Outdoors', winery: 'Wineries', indoor: 'Indoor & Rainy Day' };
 
 // Golf's inventory deliberately includes both outdoor courses and indoor
 // golf-simulator venues under the same type='golf' (2026-09-19), so the
@@ -10875,6 +10969,16 @@ const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches', outdoor: 'Outdo
 // the distinction without inventing a new schema field.
 function isIndoorGolfVenue(venue) {
   return /simulator|indoor golf/i.test(venue.description || '');
+}
+// Indoor & Rainy Day hub (2026-10-11): the golf venues that are indoor
+// simulators, listed on /indoor in their own section (they keep type golf
+// and their /:region/golf/:slug pages).
+function getIndoorGolfVenues() {
+  return getVenuesByCategory('golf').filter(isIndoorGolfVenue);
+}
+// Everything the /indoor hub lists: indoor venues plus the simulators.
+function countIndoorHubVenues() {
+  return countVenuesByCategory('indoor') + getIndoorGolfVenues().length;
 }
 
 // Renders a category's venues as either one flat grid (every category
@@ -10997,7 +11101,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', indoorTheme: type === 'indoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type, true, 'category')}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -11792,6 +11896,7 @@ const HUB_INTRO_TEXT = {
   winery: 'Discover the Okanagan\u2019s renowned wine country, from intimate family-run wineries to celebrated estates, cellar doors and vineyard experiences across the valley.',
   beach: 'Find your perfect place to swim, relax and soak up the Okanagan sun, with beaches and lakeside spots stretching from the North Okanagan to Osoyoos.',
   golf: 'Tee off among some of the Okanagan\u2019s most scenic courses, with championship layouts, relaxed local courses and golf experiences for every level.',
+  indoor: 'Museums, galleries, theatres, escape rooms, bowling, climbing gyms and more \u2014 the Okanagan\u2019s best ideas for grey, wet or cold days.',
 };
 const HUB_INTRO_STYLE = '<style>body.golf-page .hub-intro { font-size: 1.04rem; line-height: 1.65; max-width: 68ch; color: var(--ink); opacity: 0.85; margin: -8px 0 22px; }</style>';
 
@@ -11829,13 +11934,21 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   // and the ItemList schema name all follow it -- the rename is deliberately
   // consistent across all of them. The breadcrumb still reads "Outdoor
   // Destinations" (it comes from CATEGORY_LABELS, not from here).
-  const heading = isOutdoorLanding ? 'Outdoor Adventures' : `${label.plural} in the Okanagan`;
+  // Indoor & Rainy Day hub (2026-10-11): its own venues plus the indoor golf
+  // simulators (opts.indoorGolf, type golf) in a labelled section linking to
+  // their existing golf pages. Renders with zero indoor venues: the
+  // simulators and a "coming soon" line, never a 404 (see the route).
+  const isIndoorHub = type === 'indoor';
+  const indoorGolf = isIndoorHub ? (opts.indoorGolf || []) : [];
+  const heading = isOutdoorLanding ? 'Outdoor Adventures' : isIndoorHub ? 'Indoor & Rainy Day in the Okanagan' : `${label.plural} in the Okanagan`;
   const title = `${heading} | Okanagan Roam`;
   const description = isOutdoorLanding
     ? `${venues.length} verified outdoor destinations across the Okanagan Valley — hiking, cycling, winter, nature, viewpoints and more, from Enderby to Osoyoos and the ski resorts.`
-    : `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
+    : isIndoorHub
+      ? 'Indoor things to do in the Okanagan for grey, wet or cold days: museums, galleries, theatres, escape rooms, bowling, climbing gyms and indoor golf simulators.'
+      : `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${catSlug}`;
-  const regionSelector = renderCategoryRegionSelector(catSlug, venues);
+  const regionSelector = isIndoorHub && !venues.length ? '' : renderCategoryRegionSelector(catSlug, venues);
   // Landing (2026-09-21 order): Choose Region(s) -> Explore by Activity
   // (six featured image cards + "View All Outdoor Activities" revealing
   // five more, each linking to its EXISTING /outdoors/<slug> page) -> Show
@@ -11890,7 +12003,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
     '@type': 'ItemList',
     name: title,
     description,
-    itemListElement: venues.map((v, i) => ({
+    itemListElement: [...venues, ...indoorGolf].map((v, i) => ({
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
@@ -11903,6 +12016,13 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
 
   const hiddenGemIds = getHiddenGemVenueIds();
   const advisoryNotes = getAdvisoryNotes();
+  const indoorHubHtml = isIndoorHub
+    ? `${venues.length ? '' : '<p class="indoor-coming-soon">More indoor spots are coming soon &mdash; museums, galleries, theatres, escape rooms, bowling and climbing gyms across the valley.</p>\n  '}${indoorGolf.length ? `<section class="indoor-golf-section" aria-labelledby="indoorGolfHeading">
+  <h2 class="category-subsection-heading" id="indoorGolfHeading">Indoor golf &amp; simulators</h2>
+  <p class="indoor-golf-lead">Year-round golf simulators, listed with the rest of the <a href="/${CATEGORY_SLUGS.golf}">Okanagan golf</a>.</p>
+  ${renderCategoryCardsHtml('indoor', indoorGolf, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true })}
+  </section>` : ''}`
+    : '';
   // Okanagan-wide listing: cards carry their community so same-named
   // venues in different communities can be told apart. The Outdoors
   // landing instead renders the compact region-grouped index.
@@ -11925,7 +12045,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: HIDDEN_GEM_TYPE_IMAGE[type] || null, golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: HIDDEN_GEM_TYPE_IMAGE[type] || null, golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', ...(isIndoorHub ? { indoorTheme: true, noindex: venues.length + indoorGolf.length === 0 } : {}), advisoryStyles: [...venues, ...indoorGolf].some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
 ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
@@ -11935,8 +12055,8 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: label.plural },
   ])}
   <h1>${escapeHtml(heading)}</h1>
-  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
-  ${outdoorDirectoryHeading}${cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}
+  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || (isIndoorHub && !venues.length) ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
+  ${outdoorDirectoryHeading}${isIndoorHub && !venues.length ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
@@ -13756,6 +13876,10 @@ function renderLocalFavouritesPage(venues, filter = null) {
 // tray and Favorite / Add to Trip. Only the words differ between the two
 // pages (cfg); the element ids, styles and script are the Local Favourites
 // ones, so both pages behave identically and cannot drift apart.
+// Optional cfg extras (2026-10-11, /ski-snow): extraHead (styles), leadHtml
+// (after the intro), emptyHtml (replaces the no-results line when the list
+// itself is empty) and afterResultsHtml (a further section after the
+// results). Pages that pass none of them render exactly as before.
 function renderCuratedCollectionPage(cfg, venues, filter = null) {
   const f = filter || { types: [], regions: [] };
   const types = localFavouriteTypesPresent(venues);
@@ -13799,7 +13923,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderLocalFavouritesStyles()}
-${golfEngagementHeadHtml('lf', true, 'hub')}
+${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHead : ''}
 </head>
 <body class="golf-page outdoor-page lf-page">
   ${renderGolfTripTrayHtml()}
@@ -13808,7 +13932,7 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: heading }])}
   <h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">${cfg.introHtml}</p>
+  <p class="outdoor-intro fd-intro">${cfg.introHtml}</p>${cfg.leadHtml ? '\n  ' + cfg.leadHtml : ''}
   <div class="fd-search">
     <label class="visually-hidden" for="lfSearch">${escapeHtml(cfg.searchLabel)}</label>
     <input type="search" id="lfSearch" class="fd-search-input" placeholder="Search by name, place or category..." autocomplete="off" spellcheck="false">
@@ -13822,10 +13946,10 @@ ${renderGolfHeaderHtml()}
     <p class="fd-count" id="lfResultsSummary" aria-live="polite">${escapeHtml(localFavouritesSummaryText(matching.length, venues.length, filtered, cfg.summaryLabel))}</p>
   </div>
   ${localFavouritesSelectedTagsHtml(state)}
-  <p class="fd-no-results" id="lfNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(cfg.pluralNoun)} match that combination yet. <a href="${cfg.path}" id="lfNoResultsClear">Clear the filters</a> to see everything.</p>
+  ${!venues.length && cfg.emptyHtml ? cfg.emptyHtml : `<p class="fd-no-results" id="lfNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(cfg.pluralNoun)} match that combination yet. <a href="${cfg.path}" id="lfNoResultsClear">Clear the filters</a> to see everything.</p>`}
   ${cardsHtml}
   <script type="application/json" id="lfVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
-  </section>
+  </section>${cfg.afterResultsHtml ? '\n  ' + cfg.afterResultsHtml : ''}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
@@ -13881,6 +14005,78 @@ function renderSecretSpotsPage(venues, filter = null) {
     searchLabel: 'Search secret spots',
     pluralNoun: 'secret spots',
     summaryLabel: 'tucked-away',
+  }, venues, filter);
+}
+
+// ---------- Ski & Snow (2026-10-11): the page at /ski-snow ----------
+//
+// The winter counterpart to the homepage's Beaches tile (renderMoodCardsHTML
+// swaps it in from November to March). One curated list -- every venue in
+// the live activity_winter collection (ski resorts, Nordic centres, tube
+// parks, snowshoe trails, skating, sleigh rides, dog sledding, snowmobiling,
+// ice fishing), on the shared curated-collection page with its search,
+// category chips and region selector -- then the Food & Drink venues on the
+// four ski hills as "Après & village eats", plus link cards to the ski
+// season guide and /outdoors/winter. No venue type of its own: membership
+// stays in collection_items. Renders (never 404s) with an empty collection.
+const SKI_SNOW_PATH = '/ski-snow';
+const SKI_SNOW_REGIONS = ['big-white', 'silverstar', 'apex', 'baldy'];
+const SKI_SNOW_EAT_TYPES = ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery'];
+function getSkiSnowVenues() {
+  return getOutdoorActivityVenues(OUTDOOR_ACTIVITY_BY_SLUG.winter);
+}
+function getSkiSnowEatVenues() {
+  return db.prepare(`
+    SELECT * FROM venues
+    WHERE redirect_to IS NULL
+      AND region IN (${SKI_SNOW_REGIONS.map(() => '?').join(', ')})
+      AND type IN (${SKI_SNOW_EAT_TYPES.map(() => '?').join(', ')})
+    ORDER BY name ASC
+  `).all(...SKI_SNOW_REGIONS, ...SKI_SNOW_EAT_TYPES).map(rowToVenue);
+}
+function renderSkiSnowStyles() {
+  return `<style>
+  body.lf-page .ski-snow-links { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 0 0 22px; }
+  @media (min-width: 720px) { body.lf-page .ski-snow-links { grid-template-columns: 1fr 1fr; } }
+  body.lf-page .ski-snow-link {
+    display: block; padding: 16px 18px; border-radius: 12px; text-decoration: none; color: #fff;
+    background: linear-gradient(135deg, var(--ref-navy), var(--ref-navy-deep));
+    box-shadow: 0 10px 22px -16px rgba(16,27,36,0.6);
+  }
+  body.lf-page .ski-snow-link-title { display: block; font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.08rem; }
+  body.lf-page .ski-snow-link-text { display: block; margin-top: 4px; font-size: 0.92rem; opacity: 0.88; }
+  body.lf-page .ski-snow-link:hover .ski-snow-link-title, body.lf-page .ski-snow-link:focus-visible .ski-snow-link-title { text-decoration: underline; }
+  body.lf-page .ski-snow-eats { margin-top: 28px; }
+  body.lf-page .ski-snow-eats-lead, body.lf-page .ski-snow-empty { font-size: 0.98rem; color: var(--ink); opacity: 0.8; margin: -4px 0 14px; }
+</style>`;
+}
+function renderSkiSnowPage(venues, eats, filter = null) {
+  const resortNames = SKI_SNOW_REGIONS.map((r) => REGION_LABELS[r]).filter(Boolean);
+  const leadHtml = `<div class="ski-snow-links">
+    <a class="ski-snow-link" href="${SKI_GUIDE_PATH}"><span class="ski-snow-link-title">Ski season guide &rarr;</span><span class="ski-snow-link-text">Big White and SilverStar: lifts, passes, where to stay and how to get there.</span></a>
+    <a class="ski-snow-link" href="/outdoors/winter"><span class="ski-snow-link-title">Winter outdoors &rarr;</span><span class="ski-snow-link-text">Snowshoe trails, Nordic centres and winter walks across the valley.</span></a>
+  </div>`;
+  const eatsHtml = eats.length
+    ? `<section class="ski-snow-eats" aria-labelledby="skiSnowEatsHeading">
+  <h2 class="category-subsection-heading" id="skiSnowEatsHeading">Apr&egrave;s &amp; village eats</h2>
+  <p class="ski-snow-eats-lead">Restaurants, caf&eacute;s, pubs and bars in the villages at ${escapeHtml(resortNames.join(', ').replace(/, ([^,]*)$/, ' and $1'))}.</p>
+  ${renderCategoryCardsHtml('restaurant', eats, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), getAdvisoryNotes(), getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true })}
+  </section>`
+    : '';
+  return renderCuratedCollectionPage({
+    path: SKI_SNOW_PATH,
+    filterSurface: 'ski_snow',
+    heading: 'Ski & Snow',
+    title: 'Ski & Snow in the Okanagan: Big White, SilverStar, Apex, Baldy | Okanagan Roam',
+    description: 'Ski & snow in the Okanagan: Big White, SilverStar, Apex and Baldy ski resorts, Nordic centres, tube parks, snowshoe trails, skating, sleigh rides and après-ski eats across the valley.',
+    introHtml: 'Four ski hills, Nordic trails, tube parks, skating, sleigh rides and dog sledding &mdash; everything for a snow day in the Okanagan, from Big White and SilverStar to Apex and Baldy, with where to eat when the lifts close.',
+    searchLabel: 'Search ski and snow spots',
+    pluralNoun: 'ski & snow spots',
+    summaryLabel: 'ski & snow',
+    extraHead: renderSkiSnowStyles(),
+    leadHtml,
+    emptyHtml: '<p class="ski-snow-empty">Winter listings are on their way &mdash; check the ski season guide and winter outdoors above in the meantime.</p>',
+    afterResultsHtml: eatsHtml,
   }, venues, filter);
 }
 
@@ -14987,7 +15183,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
@@ -17156,7 +17352,7 @@ function applyBrowseLoadingState(html, state) {
 //   rated, A-Z), "Use my location" (nearest region) -- carried over too.
 const BROWSE_PAGE_SIZE = 75;
 // Display order of the type chips (every venue type there is).
-const BROWSE_HUB_TYPE_ORDER = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', 'golf', 'beach', 'outdoor'];
+const BROWSE_HUB_TYPE_ORDER = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', 'golf', 'beach', 'outdoor', 'indoor'];
 const BROWSE_PRICES = [{ value: '1', label: '$' }, { value: '2', label: '$$' }, { value: '3', label: '$$$' }];
 const BROWSE_SORTS = [
   { value: '', label: 'Featured order' },
@@ -19866,7 +20062,7 @@ const server = http.createServer(async (req, res) => {
         // events now live at their own destination, /events, linked to
         // from the What's On mood card.
         const discoveryStyles = renderHomepageDiscoveryStyles();
-        const moodCards = renderMoodCardsHTML();
+        const moodCards = renderMoodCardsHTML({ now: homepageNow() });
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
         const exploreRegions = renderExploreRegionsHTML();
         const buildTripSection = renderBuildTripCTAHTML();
@@ -20196,6 +20392,9 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/outdoors</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        // Ski & Snow and Indoor & Rainy Day (2026-10-11): both always render.
+        `  <url>\n    <loc>https://okanaganroam.com${SKI_SNOW_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.indoor}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/dog-friendly</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -21868,6 +22067,13 @@ const server = http.createServer(async (req, res) => {
       return res.end(renderDestinationsPage());
     }
 
+    // GET /ski-snow -- Ski & Snow (2026-10-11), the homepage's winter tile.
+    // Always 200, even with an empty winter collection (see renderSkiSnowPage).
+    if ((pathname === SKI_SNOW_PATH || pathname === `${SKI_SNOW_PATH}/`) && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderSkiSnowPage(getSkiSnowVenues(), getSkiSnowEatVenues(), parseLocalFavouritesFilterQuery(query)));
+    }
+
     // GET /categories -- All Categories (2026-09-26), the destination for the
     // homepage's "Explore all categories" link. A fixed route before the
     // broad region pattern below, like /destinations.
@@ -22043,10 +22249,12 @@ const server = http.createServer(async (req, res) => {
       // venues plus allowlisted-type activity members); every other
       // category lists its own type.
       const venues = type === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(type);
-      if (venues.length >= MIN_CATEGORY_VENUES) {
+      // /indoor always renders (2026-10-11): with no indoor venues yet it
+      // still lists the indoor golf simulators and a "coming soon" line.
+      if (venues.length >= MIN_CATEGORY_VENUES || type === 'indoor') {
         // /outdoors?regions=..&activities=.. renders pre-filtered (see
         // parseOutdoorFilterQuery); other categories ignore the query.
-        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended' });
+        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -22613,6 +22821,17 @@ module.exports = {
   renderExploreRegionsHTML,
   renderBuildTripCTAHTML,
   renderMoodCardsHTML,
+  renderHomepageDiscoveryStyles,
+  isWinterMoodSeason,
+  homepageNow,
+  SKI_SNOW_PATH,
+  SKI_SNOW_REGIONS,
+  getSkiSnowVenues,
+  getSkiSnowEatVenues,
+  renderSkiSnowPage,
+  getIndoorGolfVenues,
+  countIndoorHubVenues,
+  buildTripPlannerTaxonomy,
   // Design Sprint 4 (Visual & Editorial Polish)
   CATEGORY_TAGLINES,
   REGION_TAGLINES,
