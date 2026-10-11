@@ -16322,3 +16322,158 @@ test('Listing removals data file: well-formed, no self-redirects, and no overlap
   for (const id of removed) assert.ok(!canonicals.has(id), `#${id} is both removed and a redirect target`);
   for (const v of websites.venues) assert.ok(!removed.has(v.id), `${v.name} is in both files`);
 });
+
+// ---- Seasonal status (2026-10-11) ----------------------------------------
+// Fixed Okanagan dates throughout: 2026-10-11 is "today" for every write.
+const SEASON_NOW = new Date('2026-10-11T19:00:00Z');
+const SEASON_SRC = 'https://example-season.ca/hours';
+const seasonInsert = db.prepare(`
+  INSERT INTO venues (name, region, type, description, hours, slug)
+  VALUES (@name, 'kelowna', @type, 'A fixture used only by the seasonal-status tests.', @hours, @slug)
+`);
+const SEASON_WEEK = JSON.stringify({ mon: [['00:00', '24:00']], tue: [['00:00', '24:00']], wed: [['00:00', '24:00']], thu: [['00:00', '24:00']], fri: [['00:00', '24:00']], sat: [['00:00', '24:00']], sun: [['00:00', '24:00']] });
+
+test('Season notes: open-until, closed, reopening and expiry are all read from the stored dates', () => {
+  const openUntil = { status: 'open_until', until_date: '2026-10-26', reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' };
+  let st = app.seasonStateOn(openUntil, '2026-10-11');
+  assert.equal(st.kind, 'open_until');
+  assert.equal(st.text, 'Open for the season until October 26.');
+  assert.equal(st.note, `Open for the season until October 26. ${SEASON_SRC}`);
+  assert.equal(app.seasonStateOn(openUntil, '2026-10-26').kind, 'open_until', 'the last open day still reads open');
+  st = app.seasonStateOn(openUntil, '2026-10-27');
+  assert.equal(st.kind, 'closed', 'the day after the last open day reads closed');
+  assert.match(st.text, /reopening date has not been announced/);
+  assert.deepEqual(app.seasonClosedRange(openUntil), { from: '2026-10-27', to: '2027-05-15' });
+  assert.equal(app.seasonStateOn(openUntil, '2027-05-15').kind, 'closed');
+  assert.equal(app.seasonStateOn(openUntil, '2027-05-16'), null, 'an undated closure expires on its own');
+
+  const closedDated = { status: 'closed', until_date: null, reopens_date: '2026-12-03', source_url: SEASON_SRC, checked_at: '2026-10-11' };
+  assert.equal(app.seasonStateOn(closedDated, '2026-10-11').text, 'Closed for the season. Reopens December 3.');
+  assert.equal(app.seasonStateOn(closedDated, '2026-12-02').kind, 'closed');
+  st = app.seasonStateOn(closedDated, '2026-12-03');
+  assert.equal(st.kind, 'reopening');
+  assert.match(st.text, /^Reopening for the season December 3\. Check current hours/);
+  assert.equal(app.seasonStateOn(closedDated, '2026-12-23').kind, 'reopening');
+  assert.equal(app.seasonStateOn(closedDated, '2026-12-24'), null, 'the reopening note expires after three weeks');
+
+  const nextYear = { status: 'closed', until_date: null, reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: '2026-10-11' };
+  assert.equal(app.seasonStateOn(nextYear, '2026-10-11').text, 'Closed for the season. Reopens May 15, 2027.', 'a reopening in another year names the year');
+
+  assert.equal(app.seasonStateOn({ ...closedDated, status: 'bogus' }, '2026-10-11'), null);
+  assert.equal(app.seasonStateOn(closedDated, 'not-a-date'), null);
+});
+
+test('Season validation: rejects bad dates, impossible combinations and non-http sources', () => {
+  const ok = { status: 'closed', reopens_date: '2026-12-03', source_url: SEASON_SRC, checked_at: '2026-10-11' };
+  assert.equal(app.validateSeason(ok, SEASON_NOW).ok, true);
+  const bad = [
+    [{ ...ok, status: 'maybe' }, /status/],
+    [{ ...ok, checked_at: '2026-10-12' }, /checked_at/],
+    [{ ...ok, checked_at: '2026-02-30' }, /checked_at/],
+    [{ ...ok, reopens_date: '2026-10-01' }, /after checked_at/],
+    [{ ...ok, until_date: '2026-10-20' }, /only used with open_until/],
+    [{ ...ok, status: 'open_until', reopens_date: null }, /needs until_date/],
+    [{ ...ok, status: 'open_until', until_date: '2026-10-01', reopens_date: null }, /before checked_at/],
+    [{ ...ok, status: 'open_until', until_date: '2026-12-10' }, /after until_date/],
+    [{ ...ok, source_url: 'ftp://example.ca/x' }, /source_url/],
+    [{ ...ok, source_url: 'example.ca' }, /source_url/],
+    [{ ...ok, note: 'x' }, /unexpected/],
+  ];
+  for (const [input, re] of bad) {
+    const r = app.validateSeason(input, SEASON_NOW);
+    assert.equal(r.ok, false, JSON.stringify(input));
+    assert.match(r.detail, re);
+  }
+});
+
+test('Season writes: set, no-op, change and clear are audited; cards, pages, Open Now and the planner read them', () => {
+  seasonInsert.run({ name: 'Season Closed Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'season-closed-fixture' });
+  seasonInsert.run({ name: 'Season Open Until Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'season-open-until-fixture' });
+  const closed = app.findVenueBySlug('kelowna', 'winery', 'season-closed-fixture');
+  const openUntil = app.findVenueBySlug('kelowna', 'winery', 'season-open-until-fixture');
+  const meta = { reason: 'test', batch_id: 'season-test' };
+  const logRows = (id) => db.prepare("SELECT * FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'season' ORDER BY id").all(id);
+
+  assert.equal(app.guardedSeasonUpdate(closed.id, { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: '2026-10-11' }, { reason: ' ', batch_id: 'x' }, SEASON_NOW).reason, 'invalid_meta');
+  assert.equal(app.guardedSeasonUpdate(999999999, null, meta, SEASON_NOW).reason, 'venue_not_found');
+  assert.equal(app.guardedSeasonUpdate(closed.id, { status: 'closed', source_url: 'nope', checked_at: '2026-10-11' }, meta, SEASON_NOW).reason, 'invalid_season');
+  assert.equal(logRows(closed.id).length, 0, 'rejected writes leave no audit row');
+
+  let r = app.guardedSeasonUpdate(closed.id, { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW);
+  assert.equal(r.ok, true); assert.equal(r.changed, true);
+  r = app.guardedSeasonUpdate(closed.id, { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW);
+  assert.equal(r.changed, false, 'writing the same season again is a no-op');
+  assert.equal(logRows(closed.id).length, 1);
+  assert.equal(logRows(closed.id)[0].old_value, null);
+  assert.equal(JSON.parse(logRows(closed.id)[0].new_value).reopens_date, '2027-05-15');
+  assert.equal(app.guardedSeasonUpdate(openUntil.id, { status: 'open_until', until_date: '2026-10-26', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).changed, true);
+
+  // Notes merge into the advisory notes every surface already renders.
+  const notes = app.getAdvisoryNotes(SEASON_NOW);
+  assert.equal(notes.get(closed.id), `Closed for the season. Reopens May 15, 2027. ${SEASON_SRC}`);
+  assert.equal(notes.get(openUntil.id), `Open for the season until October 26. ${SEASON_SRC}`);
+  const card = app.venueCardHtml(closed, { advisoryNote: notes.get(closed.id) });
+  assert.match(card, /Check before you go/);
+  assert.match(card, /Closed for the season\. Reopens May 15, 2027\./);
+  assert.match(card, /href="https:\/\/example-season\.ca\/hours"[^>]*>Official source: example-season\.ca/);
+  assert.equal(app.getAdvisoryNotes(new Date('2027-07-01T19:00:00Z')).has(closed.id), false, 'the note is gone once the season is over');
+
+  // Open Now: a closed-for-season venue gets no status; "open until" keeps it.
+  const info = app.foodDrinkOpenNowInfo([closed, openUntil], notes, SEASON_NOW, { requireVerified: false });
+  assert.equal(info.byId.get(closed.id).eligible, false);
+  assert.equal(info.byId.get(closed.id).reason, 'advisory');
+  assert.equal(info.byId.get(openUntil.id).eligible, true, 'open-until keeps its Open Now status');
+  assert.equal(info.byId.get(openUntil.id).state, 'open');
+
+  // Trip planner: the dated range is checked against the trip's own date.
+  const facts = app.buildTripPlannerFacts();
+  const fc = facts.find((f) => f.id === closed.id);
+  const fo = facts.find((f) => f.id === openUntil.id);
+  assert.deepEqual(fc.seasonClosed, { from: '2026-10-11', to: '2027-05-14' });
+  assert.deepEqual(fo.seasonClosed, { from: '2026-10-27', to: '2027-05-15' });
+  const planner = require('../trip-planner.js');
+  assert.equal(planner.seasonClosedOnTrip(fo, { date: '2026-10-20' }), false, 'still open on a trip before the last day');
+  assert.equal(planner.seasonClosedOnTrip(fo, { date: '2026-11-05' }), true, 'closed on a trip after the last day');
+  assert.equal(planner.seasonClosedOnTrip(fc, { date: '2027-06-01' }), false, 'open again on a trip after reopening');
+  assert.deepEqual(planner.advisoryFit(fo, {}, { date: '2026-11-05', month: 11 }), { skip: true });
+
+  // Clearing removes the row and the note, with its own audit row.
+  assert.equal(app.guardedSeasonUpdate(openUntil.id, null, meta, SEASON_NOW).changed, true);
+  assert.equal(app.getAdvisoryNotes(SEASON_NOW).has(openUntil.id), false);
+  assert.equal(logRows(openUntil.id).length, 2);
+  assert.equal(logRows(openUntil.id)[1].new_value, null);
+});
+
+test('POST /admin/set-season: auth, validation and a write, on a private server instance', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Season HTTP Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'season-http-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'season-http-fixture');
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const post = async (body, token = process.env.ENRICHMENT_ADMIN_TOKEN) => {
+    const res = await fetch(`${base}/admin/set-season`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  const today = app.todayLocal();
+  const good = { id: v.id, season: { status: 'closed', reopens_date: null, source_url: SEASON_SRC, checked_at: today }, reason: 'http test', batch_id: 'season-http' };
+  try {
+    assert.equal((await post(good, 'wrong')).status, 401);
+    assert.equal((await post({ ...good, extra: 1 })).status, 400);
+    assert.equal((await post({ id: v.id, reason: 'x', batch_id: 'y' })).status, 400, 'season is required');
+    assert.equal((await post({ ...good, season: { ...good.season, status: 'maybe' } })).status, 400);
+    assert.equal((await post({ ...good, id: 999999999 })).status, 404);
+    const ok = await post(good);
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.changed, true);
+    assert.equal(ok.body.showing, 'Closed for the season. The reopening date has not been announced yet.');
+    const page = await fetch(`${base}/kelowna/wineries/season-http-fixture`);
+    assert.match(await page.text(), /Closed for the season\. The reopening date has not been announced yet\./);
+    const cleared = await post({ ...good, season: null });
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.body.showing, null);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

@@ -3942,6 +3942,8 @@ function buildTripPlannerFacts() {
   for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) addMember(id, { kind: 'fdTypes', value: type });
   const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all();
   const advisories = getAdvisoryNotesWithDates();
+  const seasons = getSeasonRows();
+  const seasonToday = todayLocal();
   const dogNotes = getDogFriendlyNotes();
   const golfWindows = getGolfRateWindows();
   const facts = [];
@@ -3964,6 +3966,11 @@ function buildTripPlannerFacts() {
       // venue's current advisory note, its dog-beach access note, and a golf
       // course's published rate windows.
       advisory: advisories.get(v.id) || null,
+      // Seasonal closure (venue_seasons): the dated range the venue says it is
+      // closed, so a plan for a later date is judged on that date, plus
+      // whether that covers today for plans with no date of their own.
+      seasonClosed: seasons.has(v.id) ? seasonClosedRange(seasons.get(v.id)) : null,
+      seasonClosedToday: seasons.has(v.id) ? (seasonStateOn(seasons.get(v.id), seasonToday) || {}).kind === 'closed' : false,
       dogNote: dogNotes.get(v.id) || null,
       golfSeasons: v.type === 'golf' ? (golfWindows.get(`${v.region}/${v.slug}`) || []) : [],
     });
@@ -4565,8 +4572,183 @@ function getCollectionNotes(kind) {
   for (const r of rows) map.set(r.id, r.note || '');
   return map;
 }
-function getAdvisoryNotes() { return getCollectionNotes(ADVISORY_COLLECTION_KIND); }
+function getAdvisoryNotes(now = new Date()) { return mergeSeasonNotes(getCollectionNotes(ADVISORY_COLLECTION_KIND), getSeasonStates(now)); }
 function getDogFriendlyNotes() { return getCollectionNotes(DOG_FRIENDLY_COLLECTION_KIND); }
+
+// ---------- Seasonal status (2026-10-11) ----------
+//
+// A venue's own announcement that it is closed for the season, or open until a
+// known last day, stored in venue_seasons (db.js) and written only through
+// POST /admin/set-season. It becomes a dated note through seasonStateOn(),
+// which is the one place the dates are interpreted, and every state expires on
+// its own so a stored row can never leave a wrong label up:
+//   open_until, on or before until_date        -> "Open for the season until ..."
+//   closed (or open_until after until_date),
+//     before reopens_date                      -> "Closed for the season. Reopens ..."
+//     no reopens_date, within SEASON_CLOSED_MAX_DAYS of the closure
+//                                              -> "Closed for the season. ... not announced yet."
+//   on or after reopens_date, for SEASON_REOPENING_DAYS
+//                                              -> "Reopening for the season ..."
+//   anything later                             -> null (nothing shown)
+// The note is merged into the advisory notes every card and venue page already
+// render ("Check before you go"), with the venue's source as the "Official
+// source" link. Only the 'closed' state withholds an Open Now status; the trip
+// planner gets the dated closed range and checks it against the trip's date.
+const SEASON_STATUSES = ['closed', 'open_until'];
+const SEASON_REOPENING_DAYS = 21;
+const SEASON_CLOSED_MAX_DAYS = 200;
+
+function seasonDateText(dateStr, today) {
+  return formatLocalDateLong(dateStr, { weekday: false, year: dateStr.slice(0, 4) !== today.slice(0, 4) });
+}
+
+// The dated range (inclusive 'YYYY-MM-DD' bounds) a season row says the venue
+// is closed, or null when it says nothing about a closure.
+function seasonClosedRange(s) {
+  if (!s || !SEASON_STATUSES.includes(s.status)) return null;
+  const from = s.status === 'closed' ? s.checked_at : (s.until_date ? addLocalDays(s.until_date, 1) : null);
+  if (!from || !parseLocalDate(from)) return null;
+  const to = s.reopens_date ? addLocalDays(s.reopens_date, -1) : addLocalDays(from, SEASON_CLOSED_MAX_DAYS);
+  return to >= from ? { from, to } : null;
+}
+
+// -> null | { kind: 'open_until' | 'closed' | 'reopening', text, note }
+// `note` is `text` plus the source URL, in the advisory-note format
+// parseAdvisoryNote() reads.
+function seasonStateOn(s, today) {
+  if (!s || !SEASON_STATUSES.includes(s.status) || !parseLocalDate(today)) return null;
+  let kind = null; let text = '';
+  const closed = seasonClosedRange(s);
+  if (s.status === 'open_until' && s.until_date && today <= s.until_date) {
+    kind = 'open_until';
+    text = `Open for the season until ${seasonDateText(s.until_date, today)}.`;
+  } else if (closed && today >= closed.from && today <= closed.to) {
+    kind = 'closed';
+    text = s.reopens_date
+      ? `Closed for the season. Reopens ${seasonDateText(s.reopens_date, today)}.`
+      : 'Closed for the season. The reopening date has not been announced yet.';
+  } else if (s.reopens_date && today >= s.reopens_date && today < addLocalDays(s.reopens_date, SEASON_REOPENING_DAYS)) {
+    kind = 'reopening';
+    text = `Reopening for the season ${seasonDateText(s.reopens_date, today)}. Check current hours with the venue before you go.`;
+  }
+  if (!kind) return null;
+  return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text };
+}
+
+function getSeasonRows() {
+  const map = new Map();
+  for (const r of db.prepare(`
+    SELECT s.venue_id, s.status, s.until_date, s.reopens_date, s.source_url, s.checked_at
+    FROM venue_seasons s JOIN venues v ON v.id = s.venue_id
+    WHERE v.redirect_to IS NULL
+  `).all()) map.set(r.venue_id, r);
+  return map;
+}
+
+// venue id -> seasonStateOn() result, for venues with a season note today.
+function getSeasonStates(now = new Date()) {
+  const today = todayLocal(now);
+  const map = new Map();
+  for (const [id, s] of getSeasonRows()) {
+    const st = seasonStateOn(s, today);
+    if (st) map.set(id, st);
+  }
+  return map;
+}
+
+// The advisory collection's notes with each venue's season note in front.
+function mergeSeasonNotes(advisories, seasons) {
+  if (!seasons.size) return advisories;
+  const merged = new Map(advisories);
+  for (const [id, st] of seasons) {
+    merged.set(id, advisories.has(id) ? `${st.text} ${advisories.get(id)}`.trim() : st.note);
+  }
+  return merged;
+}
+
+// Venues whose only notice is a season note that does not say they are closed
+// right now ("open until", "reopening") -- these keep their Open Now status.
+function seasonNonBlockingIds(now = new Date()) {
+  const advisories = getCollectionNotes(ADVISORY_COLLECTION_KIND);
+  const ids = new Set();
+  for (const [id, st] of getSeasonStates(now)) if (st.kind !== 'closed' && !advisories.has(id)) ids.add(id);
+  return ids;
+}
+
+// Validates a season for POST /admin/set-season. -> { ok, season } | { ok: false, detail }
+function validateSeason(input, now = new Date()) {
+  const s = input || {};
+  const extra = Object.keys(s).filter((k) => !['status', 'until_date', 'reopens_date', 'source_url', 'checked_at'].includes(k));
+  if (extra.length) return { ok: false, detail: `unexpected field(s): ${extra.join(', ')}` };
+  if (!SEASON_STATUSES.includes(s.status)) return { ok: false, detail: `status must be one of ${SEASON_STATUSES.join(', ')}` };
+  const today = todayLocal(now);
+  if (!parseLocalDate(s.checked_at) || s.checked_at > today) return { ok: false, detail: 'checked_at must be a real YYYY-MM-DD date, not in the future' };
+  for (const k of ['until_date', 'reopens_date']) {
+    if (s[k] !== undefined && s[k] !== null && !parseLocalDate(s[k])) return { ok: false, detail: `${k} must be a real YYYY-MM-DD date or null` };
+  }
+  const until = s.until_date || null;
+  const reopens = s.reopens_date || null;
+  if (s.status === 'open_until') {
+    if (!until) return { ok: false, detail: 'open_until needs until_date (the last open day)' };
+    if (until < s.checked_at) return { ok: false, detail: 'until_date is before checked_at; use status closed' };
+    if (reopens && reopens <= until) return { ok: false, detail: 'reopens_date must be after until_date' };
+  } else {
+    if (until) return { ok: false, detail: 'until_date is only used with open_until' };
+    if (reopens && reopens <= s.checked_at) return { ok: false, detail: 'reopens_date must be after checked_at' };
+  }
+  let url;
+  try { url = new URL(String(s.source_url || '')); } catch (e) { url = null; }
+  if (!url || !/^https?:$/.test(url.protocol)) return { ok: false, detail: 'source_url must be an absolute http(s) URL' };
+  return { ok: true, season: { status: s.status, until_date: until, reopens_date: reopens, source_url: url.href, checked_at: s.checked_at } };
+}
+
+// Sets (season object) or clears (null) a venue's season, with one audit row.
+// -> { ok: false, reason } | { ok: true, changed, season }
+function guardedSeasonUpdate(id, season, meta, now = new Date()) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  let next = null;
+  if (season !== null) {
+    const v = validateSeason(season, now);
+    if (!v.ok) return { ok: false, reason: 'invalid_season', detail: v.detail };
+    next = v.season;
+  }
+  const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!venue) return { ok: false, reason: 'venue_not_found' };
+  if (venue.redirect_to) return { ok: false, reason: 'venue_redirected' };
+  const prevRow = db.prepare('SELECT status, until_date, reopens_date, source_url, checked_at FROM venue_seasons WHERE venue_id = ?').get(id);
+  const prev = prevRow ? { status: prevRow.status, until_date: prevRow.until_date, reopens_date: prevRow.reopens_date, source_url: prevRow.source_url, checked_at: prevRow.checked_at } : null;
+  if (JSON.stringify(prev) === JSON.stringify(next)) return { ok: true, changed: false, season: next };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    if (next) {
+      db.prepare(`
+        INSERT INTO venue_seasons (venue_id, status, until_date, reopens_date, source_url, checked_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(venue_id) DO UPDATE SET status = excluded.status, until_date = excluded.until_date,
+          reopens_date = excluded.reopens_date, source_url = excluded.source_url,
+          checked_at = excluded.checked_at, updated_at = CURRENT_TIMESTAMP
+      `).run(id, next.status, next.until_date, next.reopens_date, next.source_url, next.checked_at);
+    } else {
+      db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(id);
+    }
+    db.prepare(`
+      INSERT INTO venue_enrichment_log
+        (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'season', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)
+    `).run(id, prev ? JSON.stringify(prev) : null, next ? JSON.stringify(next) : null, m.reason.trim(), m.batch_id.trim());
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changed: true, season: next };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
 
 // Same .chip convention as the Hidden Gem / Local Favourite badges. The
 // official restriction (if any) rides in the title attribute so the label
@@ -11805,8 +11987,11 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
   const openIds = new Set();
   const provenance = requireVerified ? getHoursProvenanceById(venues.map((v) => v.id)) : new Map();
   const clock = okanaganClock(now);
+  // A season note that does not say the venue is closed today ("open until",
+  // "reopening") is shown on the card but leaves its Open Now status alone.
+  const seasonOk = seasonNonBlockingIds(now);
   for (const v of venues) {
-    const hasAdvisory = advisoryNotes.has(v.id);
+    const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id);
     const e = requireVerified
       ? openNowEligibility(v, provenance.get(v.id), { policy: 'food_drink', now, hasAdvisory })
       : !v.hours ? { eligible: false, reason: 'no_hours' } : hasAdvisory ? { eligible: false, reason: 'advisory' } : { eligible: true, reason: 'ok' };
@@ -20729,6 +20914,53 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // POST /admin/set-season (2026-10-11)
+    //
+    // The HTTP route for guardedSeasonUpdate(): sets a venue's seasonal status
+    // ({ status: 'closed' | 'open_until', until_date, reopens_date, source_url,
+    // checked_at }) or clears it (season: null). Same bearer-token check and
+    // strict key allowlist as every admin route; reason and batch_id are
+    // required for the audit row.
+    if (pathname === '/admin/set-season' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Set-season endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      const ALLOWED_SET_SEASON_KEYS = ['id', 'season', 'reason', 'batch_id'];
+      const unexpectedSeasonKeys = Object.keys(body).filter((k) => !ALLOWED_SET_SEASON_KEYS.includes(k));
+      if (unexpectedSeasonKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedSeasonKeys.join(', ')}` });
+      }
+      if (!Number.isInteger(body.id) || body.id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (!('season' in body) || (body.season !== null && (typeof body.season !== 'object' || Array.isArray(body.season)))) {
+        return sendJSON(res, 400, { error: 'season is required: an object, or null to clear it.' });
+      }
+      let result;
+      try {
+        result = guardedSeasonUpdate(body.id, body.season, { reason: body.reason, batch_id: body.batch_id });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Season update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { venue_not_found: 404, venue_redirected: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail });
+      }
+      const state = result.season ? seasonStateOn(result.season, todayLocal()) : null;
+      return sendJSON(res, 200, { id: body.id, changed: result.changed, season: result.season, showing: state ? state.text : null });
+    }
+
     // POST /admin/correct-amenities
     //
     // Scoped to the Phase 2.9 need: carrying verified-true amenity flags
@@ -21853,6 +22085,11 @@ module.exports = {
   normalizeWebsiteUrl,
   validateVenueWebsite,
   guardedWebsiteEnrichUpdate,
+  seasonStateOn,
+  seasonClosedRange,
+  validateSeason,
+  guardedSeasonUpdate,
+  getSeasonStates,
   breadcrumbListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,

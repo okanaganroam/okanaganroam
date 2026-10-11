@@ -489,6 +489,9 @@ function eligible(v, ctx, strict) {
   // Multi-part itineraries keep their own handling, which also names the
   // place that was left out.
   if (!ctx.itinerary && v.advisory && v.advisory.note && ADVISORY_CLOSED_RE.test(v.advisory.note)) return false;
+  // A venue closed for the season today is left out the same way (dated
+  // itineraries check the trip's own date in advisoryFit instead).
+  if (!ctx.itinerary && v.seasonClosedToday) return false;
   const occasionExcluded = OCCASION_EXCLUDED_TYPES[ctx.occasion];
   if (occasionExcluded && occasionExcluded.includes(v.type) && !ctx.types.has(v.type)) return false;
   if (ctx.rainy) {
@@ -1825,7 +1828,16 @@ function advisoryExcerpt(note) {
   const first = (clean.match(/^.*?[.!?](\s|$)/) || [clean])[0].trim();
   return first.length > 200 ? `${first.slice(0, 197).replace(/\s+\S*$/, '')}…` : first;
 }
+// Closed for the season on the trip's date (the venue's own dated range), or
+// today when the plan has no date.
+function seasonClosedOnTrip(v, season) {
+  if (!v.seasonClosed) return false;
+  const d = season && season.date;
+  if (!d) return !!v.seasonClosedToday;
+  return d >= v.seasonClosed.from && d <= v.seasonClosed.to;
+}
 function advisoryFit(v, c, season) {
+  if (seasonClosedOnTrip(v, season)) return { skip: true };
   const a = v.advisory;
   if (!a || !a.note) return null;
   if (ADVISORY_CLOSED_RE.test(a.note)) return { skip: true };
@@ -1987,7 +1999,9 @@ function planItinerary(input) {
     const bestClosed = closedByAdvisory
       .filter((x) => (pool === scored || x.v.region === community.region) && (!pick || x.score > pick.base))
       .sort((x, y) => y.score - x.score)[0];
-    const closedNote = bestClosed ? `${bestClosed.v.name} was left out: its current advisory on Okanagan Roam says it isn’t available.` : null;
+    const closedNote = !bestClosed ? null : seasonClosedOnTrip(bestClosed.v, season)
+      ? `${bestClosed.v.name} was left out: it is closed for the season on that date.`
+      : `${bestClosed.v.name} was left out: its current advisory on Okanagan Roam says it isn’t available.`;
     if (closedNote && !result.notes.includes(closedNote)) result.notes.push(closedNote);
     if (!pick) {
       result.warnings.push(`No ${c.dog && !/dog/.test(label) ? 'dog-friendly ' : ''}${label} matched ${whereText}, so the rest of the plan is shown.`);
@@ -2101,6 +2115,8 @@ module.exports = {
   OCCASION_TYPES,
   classifyPlanRequest,
   eligible,
+  advisoryFit,
+  seasonClosedOnTrip,
   scoreVenue,
   buildContext,
   chooseDayRegions,

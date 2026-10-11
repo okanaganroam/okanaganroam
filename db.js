@@ -680,4 +680,23 @@ try {
   if (e.code !== 'MODULE_NOT_FOUND') console.error('[golf-data] not loaded:', e.message);
 }
 
+// --- Seasonal status (2026-10-11, additive only) ---
+// One optional row per venue recording a seasonal closure the venue itself
+// announced: 'closed' (closed for the season now, optionally with a reopening
+// date) or 'open_until' (open now, last day of the season known). server.js
+// turns it into a dated note (seasonStateOn) that expires on its own, so a
+// row can never leave a wrong label on the site. Written only through
+// POST /admin/set-season, which audits every change.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_seasons (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  status TEXT NOT NULL CHECK (status IN ('closed', 'open_until')),
+  until_date TEXT,
+  reopens_date TEXT,
+  source_url TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 module.exports = db;
