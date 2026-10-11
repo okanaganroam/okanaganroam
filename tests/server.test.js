@@ -16807,6 +16807,35 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
   }
 });
 
+test('Indoor & Rainy Day: other-type venues tagged indoor_also get an "Also good on a rainy day" section on /indoor, linking to their own pages', async () => {
+  const arena = app.createVenue({ name: 'Also Test Arena', region: 'vernon', type: 'outdoor', description: 'Indoor ice arena (fixture).', slug: 'also-test-arena' });
+  const lanes = app.createVenue({ name: 'Also Test Lanes', region: 'kelowna', type: 'brewery', description: 'Brewery with a bowling alley (fixture).', slug: 'also-test-lanes' });
+  try {
+    assert.ok(app.NON_DISCOVERY_COLLECTION_KINDS.has(app.INDOOR_ALSO_COLLECTION_KIND), 'never offered as a trip discovery option');
+    await withWinterServer(async (base) => {
+      const before = await WINTER_GET(base, '/indoor');
+      assert.doesNotMatch(before.text, /indoorAlsoHeading/, 'no section without members');
+      for (const v of [arena, lanes]) {
+        const r = app.guardedCollectionMembershipUpdate('indoor_also', v.id, 'add', null, { reason: 'fixture', batch_id: 'test' });
+        assert.ok(r.ok, JSON.stringify(r));
+      }
+      assert.deepEqual(app.getIndoorAlsoVenues().map((v) => v.name), ['Also Test Arena', 'Also Test Lanes']);
+      const hub = await WINTER_GET(base, '/indoor');
+      assert.equal(hub.status, 200);
+      assert.match(hub.text, /<h2 class="category-subsection-heading" id="indoorAlsoHeading">Also good on a rainy day<\/h2>/);
+      assert.match(hub.text, /href="\/vernon\/outdoors\/also-test-arena"/, 'an arena links to its outdoors page');
+      assert.match(hub.text, /href="\/kelowna\/breweries\/also-test-lanes"/, 'a brewery links to its brewery page');
+      assert.doesNotMatch(hub.text, /noindex/);
+      // Their own pages and types are untouched.
+      assert.equal((await WINTER_GET(base, '/vernon/outdoors/also-test-arena')).status, 200);
+      assert.equal(app.getVenue(arena.id).type, 'outdoor');
+    });
+  } finally {
+    db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id IN (?, ?)").run(arena.id, lanes.id);
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(arena.id, lanes.id);
+  }
+});
+
 test('Indoor & Rainy Day: discovery sends museum/escape room/bowling/gallery/theatre and bare rainy-day requests to the indoor pages', () => withDiscoveryFlag('on', () => {
   const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
   const gallery = app.createVenue({ name: 'Winter Discovery Gallery', region: 'penticton', type: 'indoor', description: 'Fixture.', slug: 'winter-discovery-gallery' });

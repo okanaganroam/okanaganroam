@@ -523,6 +523,18 @@ if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(DOG_FRIENDLY_CO
     .run(DOG_FRIENDLY_COLLECTION_SLUG, 'dog_friendly', 'Dog Friendly');
 }
 
+// --- Indoor "also good" collection bootstrap (2026-10-11) -----------------
+// Venues of OTHER types (arenas, bowling at a brewery, a board-game cafe, a
+// supper-club cinema...) that are also good indoor, rainy-day options. They
+// keep their own type and pages; membership only lists them in a section of
+// the /indoor hub. Seeds NO members; membership goes through
+// POST /admin/collection-membership with kind 'indoor_also'.
+const INDOOR_ALSO_COLLECTION_SLUG = 'indoor-also';
+if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(INDOOR_ALSO_COLLECTION_SLUG)) {
+  db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(INDOOR_ALSO_COLLECTION_SLUG, 'indoor_also', 'Also good indoors');
+}
+
 // --- Outdoor activity collections bootstrap (2026-09-20, Outdoors Phase 1) --
 // Eight activity kinds that classify an `outdoor` venue (and, later, any
 // existing venue such as a beach/park) by what a visitor can do there:
