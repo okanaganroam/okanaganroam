@@ -31,6 +31,14 @@ if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 // process's environment.
 process.env.ENRICHMENT_ADMIN_TOKEN = 'test-fixture-admin-token';
 
+// Seasonal homepage tiles (2026-10-11): "/" swaps Beaches/Golf for Ski &
+// Snow/Indoor from November to March. Every existing homepage and mood-card
+// test pins a fixed summer day so the suite passes year-round: the in-process
+// "/" route and every spawned child server (which inherit this environment)
+// read OKR_TODAY_OVERRIDE; unit tests pass SUMMER_NOW explicitly.
+process.env.OKR_TODAY_OVERRIDE = '2026-07-15';
+const SUMMER_NOW = new Date('2026-07-15T19:00:00Z');
+
 const app = require('../server.js');
 const db = require('../db.js');
 
@@ -2311,29 +2319,29 @@ test('Reference redesign: Build Your Perfect Okanagan Trip has a single CTA butt
 // type, route, or schema.
 
 test('Mood cards: exactly six cards render, in the approved order', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   const keys = Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
   assert.deepEqual(keys, ['food-drink', 'wine', 'beaches', 'golf', 'whats-on', 'outdoors']);
 });
 
 test('Mood cards: no primary/secondary tiering -- all six cards share one class', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.doesNotMatch(html, /mood-card-primary/, 'tiered primary class must be gone');
   assert.doesNotMatch(html, /mood-card-secondary/, 'tiered secondary class must be gone');
 });
 
 test('Mood cards: What\'s On links to /whats-on with no filter', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.match(html, /class="mood-card mood-card-whats-on" href="\/whats-on">/);
 });
 
 test('Mood cards: no data-i18n translation key ever renders as visible card text (every titleKey resolves to real English in both languages)', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.doesNotMatch(html, />mood\.[a-zA-Z.]+</, 'a raw translation key leaked into the visible label');
 });
 
 test('Mood cards: Food & Drink filters to exactly restaurant, cafe, brewery, pub, cocktail (winery split back out to its own Wine card)', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   const cardMatch = html.match(/class="mood-card mood-card-food-drink"[^>]*data-mood-filter="([^"]*)"/);
   assert.ok(cardMatch, 'expected the Food & Drink card to have a data-mood-filter attribute');
   const types = cardMatch[1].split(',').sort();
@@ -2341,20 +2349,20 @@ test('Mood cards: Food & Drink filters to exactly restaurant, cafe, brewery, pub
 });
 
 test('Mood cards: Wine filters to winery only', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   const cardMatch = html.match(/class="mood-card mood-card-wine"[^>]*data-mood-filter="([^"]*)"/);
   assert.ok(cardMatch, 'expected the Wine card to have a data-mood-filter attribute');
   assert.equal(cardMatch[1], 'winery');
 });
 
 test('Mood cards: Outdoors links to the Okanagan-wide /outdoors listing once outdoor venues exist (2026-09-20 fix), with no filter', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.match(html, /class="mood-card mood-card-outdoors" href="\/outdoors">/);
   assert.doesNotMatch(html, /mood-card-outdoors"[^>]*data-mood-filter/, 'no filter: the card is a plain link like Golf and Beaches');
 });
 
 test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach venues exist (2026-09-20 fix), with no filter', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.match(html, /class="mood-card mood-card-beaches" href="\/beaches">/, 'the whole <a class="mood-card"> is the clickable area and must target /beaches');
   assert.doesNotMatch(html, /mood-card-beaches" href="#exploreRegions"/);
   assert.doesNotMatch(html, /mood-card-beaches"[^>]*data-mood-filter/, 'no filter: the card is a plain link like Golf');
@@ -2367,12 +2375,12 @@ test('Mood cards: Beaches links to the Okanagan-wide /beaches listing once beach
 });
 
 test('Mood cards: Hidden Gems is no longer one of the six mood cards', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.doesNotMatch(html, /mood-card-hidden-gems/, 'Hidden Gems must not render as a mood card in this pass');
 });
 
 test('Mood cards: Golf links to the Okanagan-wide /golf listing (not a single region) once any golf venue exists, else falls back to /browse', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   const golfMatch = html.match(/class="mood-card mood-card-golf" href="([^"]*)"/);
   assert.ok(golfMatch, 'expected the Golf card to have an href');
   assert.ok(
@@ -2382,7 +2390,7 @@ test('Mood cards: Golf links to the Okanagan-wide /golf listing (not a single re
 });
 
 test('Mood cards: Wine links to the dedicated valley-wide /wineries hub, not a single region', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   const wineMatch = html.match(/class="mood-card mood-card-wine" href="([^"]*)"/);
   assert.ok(wineMatch, 'expected the Wine card to have an href');
   assert.strictEqual(
@@ -2660,7 +2668,7 @@ test('Food & Drink categories are taxonomy, not Build My Trip discovery options'
 });
 
 test('Mood cards: Food & Drink links to the dedicated /food-drink hub, and keeps data-mood-filter for the /browse wizard', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   const cardMatch = html.match(/class="mood-card mood-card-food-drink" href="([^"]*)"/);
   assert.ok(cardMatch, 'expected the Food & Drink card to have an href');
   assert.equal(cardMatch[1], '/food-drink');
@@ -2670,7 +2678,7 @@ test('Mood cards: Food & Drink links to the dedicated /food-drink hub, and keeps
 });
 
 test('Mood cards: image paths are correct for all six cards, including the not-yet-supplied Beaches asset', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.match(html, /mood-card-food-drink"[^]*?src="\/images\/mood\/eat\.webp"/);
   assert.match(html, /mood-card-wine"[^]*?src="\/images\/mood\/drink\.webp"/);
   assert.match(html, /mood-card-beaches"[^]*?src="\/images\/mood\/beaches\.webp"/);
@@ -2680,7 +2688,7 @@ test('Mood cards: image paths are correct for all six cards, including the not-y
 });
 
 test('Mood cards: heading row includes the reference\'s "Explore all categories" link', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.match(html, /discover-heading-link/);
 });
 
@@ -2693,7 +2701,7 @@ test('Mood cards: heading row includes the reference\'s "Explore all categories"
 // text now carries the right data-i18n/-aria/-title/-tooltip key.
 
 test('Mood cards: all six titles are now i18n-wired (Food & Drink and Beaches previously had titleKey:null)', () => {
-  const html = app.renderMoodCardsHTML();
+  const html = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.match(html, /class="mood-card-title" data-i18n="mood\.foodDrink\.title">Food &amp; Drink</);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.beaches\.title">Beaches</);
   assert.match(html, /data-i18n="mood\.wine\.title"/);
@@ -6881,7 +6889,7 @@ test('Batch 4A: the venue-shell predicate covers exactly the themed types plus t
   assert.deepEqual([...app.THEMED_VENUE_SHELL_TYPES].sort(), [...BATCH4A_FD_TYPES, 'winery'].sort());
   for (const t of [...BATCH4A_FD_TYPES, 'winery', 'golf', 'beach', 'outdoor']) assert.equal(app.usesThemedVenueShell(t), true, t);
   // The listing / card predicate is unchanged.
-  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'outdoor']);
+  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'indoor', 'outdoor']); // + indoor (2026-10-11)
   for (const t of BATCH4A_FD_TYPES) assert.equal(app.usesThemedCategoryLayout(t), false, t);
 });
 
@@ -9984,7 +9992,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved /browse performance change F5: the sort reads each rating once (initBlock4 only), 2026-10-03.
   // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
   // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
-  assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40', 'public/scripts/app.js (V3 French interface strings, 2026-10-04)');
+  assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49', 'public/scripts/app.js (winter mood tile titles, 2026-10-11)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11121,27 +11129,27 @@ test('Hidden Gems page: Build My Trip "See everything" links follow the same rul
 // Every destination page lists the same 14 categories in one fixed order.
 // A category with results links to the page showing exactly them; an empty
 // one stays visible as a non-link, aria-disabled pill/card.
-const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
+const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
 function destTabs(html) {
   const nav = (html.match(/<nav class="category-region-selector region-category-tabs"[\s\S]*?<\/nav>/) || [''])[0];
   return [...nav.matchAll(/<(a|span)( href="([^"]+)")?([^>]*)>([^<]+)<span class="outdoor-activity-count">(\d+)<\/span><\/\1>/g)]
-    .map((m) => ({ tag: m[1], href: m[3] ? m[3].replace(/&amp;/g, '&') : null, attrs: m[4], label: m[5].replace(/&rsquo;/g, '\u2019'), count: Number(m[6]) }));
+    .map((m) => ({ tag: m[1], href: m[3] ? m[3].replace(/&amp;/g, '&') : null, attrs: m[4], label: m[5].replace(/&rsquo;/g, '\u2019').replace(/&amp;/g, '&'), count: Number(m[6]) }));
 }
 function destRegions() {
   return Object.keys(app.REGION_LABELS || {}).filter((r) => Object.keys(app.getRegionCategoryCounts(r)).length > 0);
 }
 
-test('Destination pages: every destination shows the same 14 categories in the approved order', () => {
+test('Destination pages: every destination shows the same 15 categories in the approved order (Indoor & Rainy Day added 2026-10-11)', () => {
   const regions = destRegions();
   assert.ok(regions.length > 0);
-  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
+  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
   for (const r of regions) {
     const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
     const tabs = destTabs(html);
     assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS, r);
-    // The cards list the same 14, grouped Food & Drink / Experiences / Discovery.
+    // The cards list the same 15, grouped Food & Drink / Experiences / Discovery.
     assert.match(html, /<h2 class="category-subsection-heading">Food &amp; Drink<\/h2>[\s\S]*<h2 class="category-subsection-heading">Experiences<\/h2>[\s\S]*<h2 class="category-subsection-heading">Discovery<\/h2>/, r);
-    assert.equal((html.match(/<li class="category-card/g) || []).length, 14, r);
+    assert.equal((html.match(/<li class="category-card/g) || []).length, 15, r);
   }
 });
 
@@ -11244,7 +11252,7 @@ test('/categories: 200, each visitor-facing category once, linking to its own ex
 
 test('Homepage heading links: "View all hidden gems" -> /hidden-gems, "Explore all categories" -> /categories', () => {
   const gems = app.renderHiddenGemsHomepageHTML();
-  const mood = app.renderMoodCardsHTML();
+  const mood = app.renderMoodCardsHTML({ now: SUMMER_NOW });
   assert.match(gems, /<a class="discover-heading-link" href="\/hidden-gems" data-i18n="gems\.viewAll">View all hidden gems &rarr;<\/a>/);
   assert.match(mood, /<a class="discover-heading-link" href="\/categories" data-i18n="mood\.exploreAll">Explore all categories &rarr;<\/a>/);
 });
@@ -11459,7 +11467,7 @@ test('List Your Venue: the page renders the form with the canonical types, regio
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app.css">/);
   for (const t of app.VENUE_SUBMISSION_TYPES) assert.match(html, new RegExp(`<option value="${t}">`));
   for (const r of app.VENUE_SUBMISSION_REGIONS) assert.match(html, new RegExp(`<option value="${r}">`));
-  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 10);
+  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 11); // + indoor (2026-10-11)
   assert.equal(app.VENUE_SUBMISSION_REGIONS.length, 20);
   for (const a of app.VENUE_SUBMISSION_AMENITIES) assert.match(html, new RegExp(`name="amenities" value="${a}"`));
   assert.match(html, /name="company_website" tabindex="-1"/, 'honeypot');
@@ -11795,7 +11803,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40');
+  assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16023,7 +16031,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8');
-  assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40');
+  assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16116,7 +16124,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), 'ea0e08857aa2712c3c73a773eae1bf40', 'app.js is untouched');
+    assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49', 'app.js is untouched');
   }));
 }
 
@@ -16641,5 +16649,220 @@ test('POST /admin/correct-amenities: accepts all twelve researched badges (e.g. 
     assert.equal(app.getVenue(v.id).open_late, false);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+// ==== Winter categories (2026-10-11): Indoor & Rainy Day, Ski & Snow, and the
+// seasonal homepage tiles ====================================================
+
+async function withWinterServer(fn) {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  try {
+    return await fn(`http://localhost:${srv.address().port}`);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+}
+const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); return { status: r.status, text: await r.text() }; };
+const winterMood = (iso) => app.renderMoodCardsHTML({ now: new Date(`${iso}T19:00:00Z`) });
+const moodKeys = (html) => Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
+
+test('Seasonal mood tiles: Nov-Mar swaps Beaches -> Ski & Snow and Golf -> Indoor in place; Apr-Oct is the summer set', () => {
+  for (const iso of ['2026-11-15', '2027-02-01', '2027-03-31', '2026-12-31', '2027-01-01']) {
+    assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), true, iso);
+    assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'ski-snow', 'indoor', 'whats-on', 'outdoors'], iso);
+  }
+  for (const iso of ['2027-04-01', '2026-10-31', '2026-07-15']) {
+    assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), false, iso);
+    assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'beaches', 'golf', 'whats-on', 'outdoors'], iso);
+  }
+  // The boundary is the Okanagan calendar day, not UTC: 2026-11-01 05:00 UTC
+  // is still Oct 31 in Vancouver.
+  assert.equal(app.isWinterMoodSeason(new Date('2026-11-01T05:00:00Z')), false);
+  assert.equal(app.isWinterMoodSeason(new Date('2026-11-01T08:00:00Z')), true);
+  // Every summer day renders the same bytes as the default summer call.
+  assert.equal(winterMood('2026-10-31'), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
+});
+
+test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
+  const html = winterMood('2027-02-01');
+  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
+  assert.match(html, /class="mood-card-title" data-i18n="mood\.skiSnow\.title">Ski &amp; Snow</);
+  assert.match(html, /class="mood-card-title" data-i18n="mood\.indoor\.title">Indoor &amp; Rainy Day</);
+  assert.doesNotMatch(html, /mood-card-beaches|mood-card-golf/);
+  // The other four cards are untouched.
+  const summer = app.renderMoodCardsHTML({ now: SUMMER_NOW });
+  for (const key of ['food-drink', 'wine', 'whats-on', 'outdoors']) {
+    const card = (h) => h.match(new RegExp(`<a class="mood-card mood-card-${key}"[\\s\\S]*?</a>`))[0];
+    assert.equal(card(html), card(summer), key);
+  }
+  assert.equal((html.match(/class="mood-card-title" data-i18n=/g) || []).length, 6);
+  // Both images exist on disk.
+  for (const f of ['ski-snow.jpg', 'indoor.jpg']) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'mood', f)), f);
+  // The indoor card keeps its gradient fallback rule, scoped to that card only.
+  assert.match(app.renderHomepageDiscoveryStyles(), /\.mood-card-indoor \{ background: linear-gradient\(/);
+});
+
+test('Seasonal mood tiles: app.js has English and French titles for both winter tiles', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const en = src.slice(0, src.indexOf("    'mood.beaches.title': 'Plages',"));
+  const fr = src.slice(src.indexOf("    'mood.beaches.title': 'Plages',"));
+  assert.match(en, /'mood\.skiSnow\.title': 'Ski & Snow'/);
+  assert.match(en, /'mood\.indoor\.title': 'Indoor & Rainy Day'/);
+  assert.match(fr, /'mood\.skiSnow\.title': 'Ski et neige'/);
+  assert.match(fr, /'mood\.indoor\.title': 'Int\\u00e9rieur et pluie'/);
+});
+
+test('Seasonal mood tiles: "/" honours OKR_TODAY_OVERRIDE (test-only), never in production, and ignores invalid dates', async () => {
+  const before = { o: process.env.OKR_TODAY_OVERRIDE, n: process.env.NODE_ENV };
+  try {
+    await withWinterServer(async (base) => {
+      process.env.OKR_TODAY_OVERRIDE = '2026-07-15';
+      const summer = await WINTER_GET(base, '/');
+      assert.equal(summer.status, 200);
+      assert.match(summer.text, /mood-card mood-card-beaches/);
+      assert.doesNotMatch(summer.text, /mood-card mood-card-ski-snow/);
+      process.env.OKR_TODAY_OVERRIDE = '2026-11-15';
+      const winter = await WINTER_GET(base, '/');
+      assert.match(winter.text, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">/);
+      assert.match(winter.text, /<a class="mood-card mood-card-indoor" href="\/indoor">/);
+      assert.doesNotMatch(winter.text, /mood-card mood-card-beaches|mood-card mood-card-golf/);
+      // Only the two swapped cards differ between the seasons.
+      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|ski-snow|indoor)"[\s\S]*?<\/a>/g, '');
+      assert.equal(strip(winter.text), strip(summer.text));
+    });
+    process.env.OKR_TODAY_OVERRIDE = '2027-02-30';
+    assert.ok(Math.abs(app.homepageNow() - Date.now()) < 5000, 'an impossible date is ignored');
+    process.env.OKR_TODAY_OVERRIDE = '2027-02-01';
+    assert.equal(app.isWinterMoodSeason(app.homepageNow()), true);
+    process.env.NODE_ENV = 'production';
+    assert.ok(Math.abs(app.homepageNow() - Date.now()) < 5000, 'never honoured in production');
+  } finally {
+    process.env.OKR_TODAY_OVERRIDE = before.o;
+    if (before.n === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = before.n;
+  }
+});
+
+test('Indoor & Rainy Day: registered as a themed, non-planner category with its labels, slug and schema type', () => {
+  assert.equal(app.CATEGORY_SLUGS.indoor, 'indoor');
+  assert.equal(app.SCHEMA_TYPE_MAP.indoor, 'TouristAttraction');
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('indoor'), 'not a Build My Trip interest yet');
+  assert.ok(!app.buildTripPlannerTaxonomy().types.includes('indoor'), 'the planner never parses it as a type');
+  assert.ok(app.BROWSE_HUB_TYPE_ORDER.includes('indoor'));
+  assert.ok(app.VENUE_SUBMISSION_TYPES.includes('indoor'));
+});
+
+test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + coming soon), region/venue pages, sitemap, /categories and the submission form', async () => {
+  const sim = app.createVenue({ name: 'Winter Test Sim Lounge', region: 'vernon', type: 'golf', description: 'An indoor golf simulator lounge (fixture).', slug: 'winter-test-sim-lounge' });
+  let gallery = null;
+  try {
+    await withWinterServer(async (base) => {
+      // Zero indoor venues: still 200, simulators listed, "coming soon" shown.
+      assert.equal(app.getVenuesByCategory('indoor').length, 0);
+      const empty = await WINTER_GET(base, '/indoor');
+      assert.equal(empty.status, 200);
+      assert.match(empty.text, /<h1>Indoor &amp; Rainy Day in the Okanagan<\/h1>/);
+      assert.match(empty.text, /class="indoor-coming-soon">More indoor spots are coming soon/);
+      assert.match(empty.text, /<h2 class="category-subsection-heading" id="indoorGolfHeading">Indoor golf &amp; simulators<\/h2>/);
+      assert.match(empty.text, /href="\/vernon\/golf\/winter-test-sim-lounge"/, 'the simulator links to its existing golf page');
+      assert.match(empty.text, /<body class="golf-page indoor-page">/);
+      assert.match(empty.text, /Indoor page theme \(2026-10-11\)/);
+      assert.doesNotMatch(empty.text, /noindex/);
+      assert.equal((await WINTER_GET(base, '/vernon/indoor')).status, 404, 'an empty region/indoor pair 404s like any other');
+
+      // An indoor venue: region page, venue page, hub card.
+      gallery = app.createVenue({ name: 'Winter Test Gallery', region: 'kelowna', type: 'indoor', description: 'A fixture art gallery.', slug: 'winter-test-gallery' });
+      const hub = await WINTER_GET(base, '/indoor');
+      assert.equal(hub.status, 200);
+      assert.match(hub.text, /href="\/kelowna\/indoor\/winter-test-gallery"/);
+      assert.doesNotMatch(hub.text, /class="indoor-coming-soon"/);
+      assert.match(hub.text, /Indoor golf &amp; simulators/);
+      const region = await WINTER_GET(base, '/kelowna/indoor');
+      assert.equal(region.status, 200);
+      assert.match(region.text, /Indoor &amp; Rainy Day Spots in Kelowna, BC/);
+      assert.match(region.text, /class="category-back-link" href="\/indoor">← All Indoor &amp; Rainy Day</);
+      const venue = await WINTER_GET(base, '/kelowna/indoor/winter-test-gallery');
+      assert.equal(venue.status, 200);
+      assert.match(venue.text, /<title>Winter Test Gallery — Indoor Attraction in Kelowna, BC \| Okanagan Roam<\/title>/);
+      assert.match(venue.text, /"@type":"TouristAttraction"/);
+      assert.match(venue.text, /indoor-page/);
+      const kelowna = await WINTER_GET(base, '/kelowna');
+      assert.match(kelowna.text, /<a href="\/kelowna\/indoor">Indoor &amp; Rainy Day Spots<\/a>/);
+
+      const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+      for (const loc of ['/indoor', '/ski-snow', '/kelowna/indoor', '/kelowna/indoor/winter-test-gallery']) {
+        assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), loc);
+      }
+      const cats = (await WINTER_GET(base, '/categories')).text;
+      assert.match(cats, /<a href="\/indoor">Indoor &amp; Rainy Day<\/a>/);
+      assert.match(cats, /<a href="\/ski-snow">Ski &amp; Snow<\/a>/);
+      const form = (await WINTER_GET(base, '/list-your-venue')).text;
+      assert.match(form, /<option value="indoor">Indoor Attraction<\/option>/);
+    });
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(sim.id, gallery ? gallery.id : -1);
+  }
+});
+
+test('Indoor & Rainy Day: discovery sends museum/escape room/bowling/gallery/theatre and bare rainy-day requests to the indoor pages', () => withDiscoveryFlag('on', () => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  const gallery = app.createVenue({ name: 'Winter Discovery Gallery', region: 'penticton', type: 'indoor', description: 'Fixture.', slug: 'winter-discovery-gallery' });
+  try {
+    for (const q of ['museums', 'escape room', 'bowling', 'gallery', 'theatre', 'indoor', 'indoors', 'rainy day', 'rainy']) {
+      assert.equal(route(q).url, '/indoor', q);
+    }
+    assert.equal(route('escape rooms in Penticton').url, '/penticton/indoor');
+    assert.equal(route('What can we do around Penticton if it rains?').url, '/penticton/indoor');
+    // A region with no indoor venues keeps the old heuristic answer.
+    assert.equal(route('rainy day in Vernon').reason, 'heuristic_occasion');
+    // Other occasions are unchanged.
+    assert.equal(route('date night in Kelowna').reason, 'heuristic_occasion');
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(gallery.id);
+  }
+}));
+
+test('Ski & Snow: /ski-snow lists the winter collection, après eats on the four ski hills, the guide links, and renders with an empty collection', async () => {
+  const winter = db.prepare("SELECT id FROM collections WHERE kind = 'activity_winter'").get();
+  assert.ok(winter, 'activity_winter is bootstrapped');
+  const made = [];
+  try {
+    await withWinterServer(async (base) => {
+      const before = app.getSkiSnowVenues().length;
+      const emptyHtml = app.renderSkiSnowPage([], []);
+      assert.match(emptyHtml, /<h1>Ski &amp; Snow<\/h1>/);
+      assert.match(emptyHtml, /class="ski-snow-empty">Winter listings are on their way/);
+      assert.match(emptyHtml, /<a class="ski-snow-link" href="\/guides\/ski-season-big-white-silverstar">/);
+      assert.match(emptyHtml, /<a class="ski-snow-link" href="\/outdoors\/winter">/);
+
+      const resort = app.createVenue({ name: 'Winter Test Tube Park', region: 'big-white', type: 'outdoor', description: 'Fixture tube park.', slug: 'winter-test-tube-park' });
+      const eat = app.createVenue({ name: 'Winter Test Apres Pub', region: 'big-white', type: 'pub', description: 'Fixture pub.', slug: 'winter-test-apres-pub' });
+      const town = app.createVenue({ name: 'Winter Test Town Cafe', region: 'kelowna', type: 'cafe', description: 'Fixture cafe.', slug: 'winter-test-town-cafe' });
+      made.push(resort.id, eat.id, town.id);
+      db.prepare("INSERT INTO collection_items (collection_id, content_type, content_id, position) VALUES (?, 'venue', ?, 0)").run(winter.id, resort.id);
+      assert.equal(app.getSkiSnowVenues().length, before + 1);
+
+      const page = await WINTER_GET(base, '/ski-snow');
+      assert.equal(page.status, 200);
+      assert.match(page.text, /<title>Ski &amp; Snow in the Okanagan: Big White, SilverStar, Apex, Baldy \| Okanagan Roam<\/title>/);
+      assert.match(page.text, /<meta name="description" content="Ski &amp; snow in the Okanagan: Big White, SilverStar, Apex and Baldy/);
+      assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/ski-snow">/);
+      const results = page.text.slice(page.text.indexOf('id="lfResults"'), page.text.indexOf('id="skiSnowEatsHeading"'));
+      assert.match(results, /href="\/big-white\/outdoors\/winter-test-tube-park"/, 'the winter member is in the main list');
+      const eats = page.text.slice(page.text.indexOf('id="skiSnowEatsHeading"'));
+      assert.match(eats, /Apr&egrave;s &amp; village eats/);
+      assert.match(eats, /href="\/big-white\/pubs\/winter-test-apres-pub"/);
+      assert.doesNotMatch(page.text, /winter-test-town-cafe/, 'only the four ski-hill regions');
+      assert.match(page.text, /href="\/guides\/ski-season-big-white-silverstar"/);
+      assert.equal((await fetch(`${base}/ski-snow/`)).status, 200);
+    });
+  } finally {
+    if (made.length) {
+      db.prepare(`DELETE FROM collection_items WHERE content_type = 'venue' AND content_id IN (${made.map(() => '?').join(',')})`).run(...made);
+      db.prepare(`DELETE FROM venues WHERE id IN (${made.map(() => '?').join(',')})`).run(...made);
+    }
   }
 });

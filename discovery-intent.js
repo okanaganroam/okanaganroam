@@ -108,6 +108,10 @@ const TYPE_ALIASES = {
   golf: ['golf', 'golfing', 'golf course', 'golf courses', 'tee time', 'tee times', 'driving range', 'mini golf', 'round of golf'],
   beach: ['beach', 'beaches', 'swim', 'swimming', 'swimming spot', 'swimming spots', 'swim spot', 'lake day', 'dog beach', 'dog beaches'],
   outdoor: ['outdoors', 'outdoor', 'park', 'parks', 'outside', 'outdoor activities', 'things to do outside', 'provincial park', 'regional park'],
+  // Indoor & Rainy Day (2026-10-11). "indoor", "indoors", "rainy" and "rainy
+  // day" stay rainy_day occasion words (OCCASION_ALIASES); the server routes
+  // a bare rainy-day request to the /indoor hub instead.
+  indoor: ['museum', 'museums', 'escape room', 'escape rooms', 'bowling', 'bowling alley', 'bowling alleys', 'climbing gym', 'climbing gyms', 'bouldering gym', 'bouldering gyms', 'arcade', 'arcades', 'gallery', 'galleries', 'art gallery', 'art galleries', 'theatre', 'theatres', 'theater', 'theaters', 'indoor activities', 'indoor attractions', 'rainy day activities'],
 };
 
 const FEATURE_ALIASES = {
@@ -938,7 +942,7 @@ function emptyIntent() {
 
 // Type -> the daypart it naturally belongs to, for ordered multi-part
 // requests ("a romantic winery and dinner").
-const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
+const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', indoor: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
 
 function interpretDiscoveryQuery(text, taxonomy, options) {
   const opts = options || {};
