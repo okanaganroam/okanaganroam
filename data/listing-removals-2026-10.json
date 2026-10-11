@@ -1,0 +1,27 @@
+{
+  "verifiedOn": "2026-10-11",
+  "about": "Listings to take off the site. Duplicates and replaced venues are redirected to the listing that stays (POST /admin/retire-duplicate), so old links keep working. A closed venue with nothing to redirect to is deleted. Applied with scripts/apply-listing-removals.js.",
+  "redirect": [
+    {
+      "duplicate": { "id": 769, "region": "penticton", "slug": "wings-restaurants-pubs-penticton", "name": "WINGS Restaurants & Pubs - Penticton" },
+      "canonical": { "id": 995, "region": "penticton", "slug": "wings-tap-grill", "name": "Wings Tap & Grill" },
+      "reason": "Same restaurant at 152 Riverside Dr listed twice; the kept listing has the phone number and reviews."
+    },
+    {
+      "duplicate": { "id": 229, "region": "kaleden", "slug": "frog-city-cafe", "name": "Frog City Cafe" },
+      "canonical": { "id": 368, "region": "kaleden", "slug": "linden-gardens", "name": "Linden Gardens" },
+      "reason": "Frog City Cafe is the café at Linden Gardens; frogcitycafe.ca redirects to lindengardens.ca/frog-city-cafe."
+    },
+    {
+      "duplicate": { "id": 945, "region": "vernon", "slug": "dosa-crepe-cafe", "name": "Dosa Crepe Café (Vernon)" },
+      "canonical": { "id": 217, "region": "vernon", "slug": "flamez-chicken", "name": "Flamez Chicken" },
+      "reason": "The Vernon Dosa Crepe Café closed in May 2026; Flamez Chicken now runs at the same address (3101 BC-6 #104) and phone number."
+    }
+  ],
+  "delete": [
+    {
+      "id": 215, "region": "peachland", "slug": "first-estate-winery-ltd", "name": "First Estate Winery Ltd",
+      "reason": "Closed: the property is listed for sale or lease as a former boutique winery, and there is no successor venue to redirect to."
+    }
+  ]
+}

@@ -16300,3 +16300,25 @@ test('Venue websites data file: every URL passes the enrich-website rules, one e
     assert.ok(checked.ok, `${v.name}: ${v.website} ${checked.error || ''}`);
   }
 });
+
+test('Listing removals data file: well-formed, no self-redirects, and no overlap with the websites file', () => {
+  const removals = require('../data/listing-removals-2026-10.json');
+  const websites = require('../data/venue-websites-2026-10.json');
+  const removed = new Set();
+  for (const r of removals.redirect) {
+    for (const v of [r.duplicate, r.canonical]) {
+      assert.ok(Number.isInteger(v.id) && v.id > 0 && v.region && v.slug, `${v.name}: id/region/slug`);
+    }
+    assert.notEqual(r.duplicate.id, r.canonical.id, `${r.duplicate.name}: self-redirect`);
+    assert.ok(r.reason, `${r.duplicate.name}: reason`);
+    removed.add(r.duplicate.id);
+  }
+  const canonicals = new Set(removals.redirect.map((r) => r.canonical.id));
+  for (const d of removals.delete) {
+    assert.ok(Number.isInteger(d.id) && d.id > 0 && d.region && d.slug && d.reason, `${d.name}: fields`);
+    assert.ok(!canonicals.has(d.id), `${d.name}: deleted venue is a redirect target`);
+    removed.add(d.id);
+  }
+  for (const id of removed) assert.ok(!canonicals.has(id), `#${id} is both removed and a redirect target`);
+  for (const v of websites.venues) assert.ok(!removed.has(v.id), `${v.name} is in both files`);
+});
