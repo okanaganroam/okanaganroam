@@ -8866,6 +8866,12 @@ function buildIndoorThemeStyles() {
   body.indoor-page .indoor-coming-soon { font-size: 1rem; line-height: 1.6; color: var(--ink); opacity: 0.8; margin: 4px 0 22px; }
   body.indoor-page .indoor-golf-section { margin-top: 8px; }
   body.indoor-page .indoor-golf-lead { font-size: 0.95rem; color: var(--ink); opacity: 0.8; margin: -4px 0 14px; }
+  /* Cards on /indoor clamp to 3 lines (Read more expands), like /outdoors,
+     so one long arena description doesn't stretch its whole row. */
+  body.golf-page.indoor-page .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
+  /* "Also good on a rainy day": why a non-indoor venue is listed. */
+  body.indoor-page .card-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+  body.indoor-page .card-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
 </style>`;
 }
 function buildOutdoorThemeStyles() {
@@ -9816,8 +9822,12 @@ function themedCardHolderSelector(type) {
   // type -- the same set as 'lf', but its events report each card's own
   // venue_category (see golfCardEngagementScriptHtml).
   if (type === 'guide') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
-  // 'indoor': the /indoor hub also lists the indoor golf simulators (type golf).
-  if (type === 'indoor') return ':is([data-venue-category="indoor"],[data-venue-category="golf"])';
+  // 'indoor': the /indoor hub also lists the indoor golf simulators (type golf)
+  // and, in "Also good on a rainy day", tagged venues of any other type (an
+  // arena, a brewery with bowling, a board-game cafe), so it wires every type
+  // -- otherwise those cards got no Read more clamp and dead Favorite / Trip
+  // buttons.
+  if (type === 'indoor') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   if (type !== 'outdoor') return `[data-venue-category="${type}"]`;
   return `:is(${OUTDOOR_ACTIVITY_VENUE_TYPES.map((t) => `[data-venue-category="${t}"]`).join(',')})`;
 }
@@ -10154,7 +10164,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -10218,6 +10228,13 @@ function venueCardHtml(venue, opts = {}) {
   const dogNoteHtml = (dogNoteInline && showDogFriendly && String(dogFriendlyNote || '').trim())
     ? `\n        <p class="dog-note"><span class="dog-note-label">Dogs:</span> ${escapeHtml(String(dogFriendlyNote).trim())}</p>`
     : '';
+  // cardNotes (2026-10-11): an optional Map of venue id -> a short visible
+  // line, used by the /indoor hub's "Also good on a rainy day" section to say
+  // why an arena or a brewery is there ("Indoor ice: public skating"). No map,
+  // or no entry for this venue, renders nothing, so every other card is
+  // byte-identical.
+  const cardNote = cardNotes && cardNotes.get(venue.id) ? String(cardNotes.get(venue.id)).trim() : '';
+  const cardNoteHtml = cardNote ? `\n        <p class="card-note"><span class="card-note-label">Rainy day:</span> ${escapeHtml(cardNote)}</p>` : '';
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${advisoryNoticeHtml(advisoryNote)}`
     : '';
@@ -10225,7 +10242,7 @@ function venueCardHtml(venue, opts = {}) {
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>${golfFeeHtml ? '\n        ' + golfFeeHtml : ''}
-        ${desc}${advisoryHtml}${dogNoteHtml}
+        ${desc}${advisoryHtml}${dogNoteHtml}${cardNoteHtml}
         <p class="chips">${editorialChips}${badgeChipsHtml(venue)}</p>${cardActions}
       </li>`;
 }
@@ -12030,7 +12047,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   </section>` : ''}${indoorAlso.length ? `<section class="indoor-golf-section indoor-also-section" aria-labelledby="indoorAlsoHeading">
   <h2 class="category-subsection-heading" id="indoorAlsoHeading">Also good on a rainy day</h2>
   <p class="indoor-golf-lead">Arenas, bowling, board games and more, listed with their own categories.</p>
-  ${renderCategoryCardsHtml('indoor', indoorAlso, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true })}
+  ${renderCategoryCardsHtml('indoor', indoorAlso, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true, cardNotes: getIndoorAlsoNotes() })}
   </section>` : ''}`
     : '';
   // Okanagan-wide listing: cards carry their community so same-named
@@ -13607,6 +13624,17 @@ ${renderGolfHeaderHtml()}
 // The /indoor hub's "Also good on a rainy day" section: live venues of any
 // other type in the indoor_also collection (an `indoor` venue is already in
 // the hub's main list, so it is never repeated here).
+// venue id -> the membership note ("Indoor ice: public skating sessions")
+// for the indoor_also collection.
+function getIndoorAlsoNotes() {
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, ci.note FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND ci.note IS NOT NULL AND trim(ci.note) != ''
+  `).all(INDOOR_ALSO_COLLECTION_KIND);
+  return new Map(rows.map((r) => [r.id, r.note]));
+}
+
 function getIndoorAlsoVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
