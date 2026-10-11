@@ -8890,6 +8890,23 @@ function buildIndoorThemeStyles() {
   /* Indoor page theme (2026-10-11): the Golf rules above, re-keyed to the indoor card attribute. */
   ${deriveBeachRulesFromGolfCss(SEO_PAGE_CSS, 'indoor')}
   ${deriveBeachRulesFromGolfCss(themeCss, 'indoor')}
+
+  body.indoor-page .indoor-hero { position: relative; overflow: hidden; border-radius: 16px; margin: 12px 0 22px; background: #382c22; }
+  body.indoor-page .indoor-hero img { display: block; width: 100%; height: 330px; object-fit: cover; }
+  body.indoor-page .indoor-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.7), rgba(0,0,0,.08)); }
+  body.indoor-page .indoor-hero > div { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: center; max-width: 660px; padding: 30px; }
+  body.indoor-page .indoor-hero h1, body.indoor-page .indoor-hero p { color: #fff; margin: 0; text-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  body.indoor-page .indoor-hero p { margin-top: 12px; }
+  body.indoor-page .indoor-experience-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  body.indoor-page .indoor-experience-filters a { padding: 9px 15px; border-radius: 999px; border: 1px solid rgba(27,43,58,.22); text-decoration: none; color: var(--ink); background: #fff; font-weight: 700; font-size: .88rem; }
+  body.indoor-page .indoor-experience-filters a[aria-current="page"] { background: #1b2b3a; color: #fff; }
+  body.indoor-page .indoor-experience-filters a:focus-visible { outline: 3px solid #a46b18; outline-offset: 3px; }
+  body.indoor-page .indoor-results-summary { margin: 0 0 20px; }
+  @media (max-width: 600px) {
+    body.indoor-page .indoor-hero img { height: 280px; }
+    body.indoor-page .indoor-hero > div { padding: 20px; }
+    body.indoor-page .indoor-hero h1 { font-size: 1.8rem; line-height: 1.2; }
+  }
   body.indoor-page .indoor-coming-soon { font-size: 1rem; line-height: 1.6; color: var(--ink); opacity: 0.8; margin: 4px 0 22px; }
   body.indoor-page .indoor-golf-section { margin-top: 8px; }
   body.indoor-page .indoor-golf-lead { font-size: 0.95rem; color: var(--ink); opacity: 0.8; margin: -4px 0 14px; }
@@ -11999,7 +12016,42 @@ const HUB_INTRO_STYLE = '<style>body.golf-page .hub-intro { font-size: 1.04rem; 
 // hidden non-matching cards, the summary and the selected-filter tags --
 // before any script runs (and without scripting). Ignored for every
 // other category. Omitted = nothing selected = today's landing markup.
+// Indoor discovery choices use venue names and the existing family badge;
+// they do not write inferred amenities or taxonomy to the database.
+const INDOOR_EXPERIENCES = [
+  { slug: 'arts', label: 'Museums & Galleries', pattern: /museum|gallery|galleries|art warehouse|observatory|centre for (?:excellence|contemporary art)|art(?:s)? cent(?:re|er)/i },
+  { slug: 'family', label: 'Family Fun' },
+  { slug: 'games', label: 'Games & Escape Rooms', pattern: /escape|bowling|bowl|arcade|laser tag|board game|simulator|indoor golf|energyplex/i },
+  { slug: 'spas', label: 'Spas', pattern: /spa\b|thermal|sauna|steam/i },
+  { slug: 'theatre', label: 'Theatre', pattern: /theatre|theater|cinema|actors studio|performing arts/i },
+];
+function indoorExperienceMatches(venue, slug) {
+  const choice = INDOOR_EXPERIENCES.find((c) => c.slug === slug);
+  if (!choice) return true;
+  return slug === 'family' ? !!venue.kid_friendly : choice.pattern.test(venue.name || '');
+}
+function renderIndoorDiscoveryHtml(venues, selected) {
+  const choices = [{ slug: '', label: 'All' }, ...INDOOR_EXPERIENCES];
+  const links = choices.map((c) => {
+    const count = venues.filter((v) => indoorExperienceMatches(v, c.slug)).length;
+    return `<a href="/indoor${c.slug ? '?activity=' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>(${count})</span></a>`;
+  }).join('\n');
+  const count = venues.filter((v) => indoorExperienceMatches(v, selected)).length;
+  return `<nav class="indoor-experience-filters" aria-label="Choose an indoor experience">${links}</nav>
+  <p class="indoor-results-summary" role="status">${count} matching ${count === 1 ? 'spot' : 'spots'}${selected ? ' — ' + escapeHtml(choices.find((c) => c.slug === selected).label) : ''}.</p>
+  ${count ? '' : '<p>No matching spots yet. <a href="/indoor">See all rainy-day spots</a>.</p>'}`;
+}
+
 function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
+  const indoorActivity = type === 'indoor' && INDOOR_EXPERIENCES.some((c) => c.slug === opts.indoorActivity) ? opts.indoorActivity : '';
+  const indoorUniverse = type === 'indoor' ? [...venues, ...(opts.indoorGolf || []), ...(opts.indoorAlso || []).filter((v) => !(opts.indoorGolf || []).some((g) => g.id === v.id))] : [];
+  if (type === 'indoor') {
+    venues = venues.filter((v) => indoorExperienceMatches(v, indoorActivity));
+    opts = { ...opts,
+      indoorGolf: (opts.indoorGolf || []).filter((v) => indoorExperienceMatches(v, indoorActivity)),
+      indoorAlso: (opts.indoorAlso || []).filter((v) => indoorExperienceMatches(v, indoorActivity)),
+    };
+  }
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
   // Themed presentation for this hub only (see HUB_ONLY_THEMED_TYPES).
@@ -12113,7 +12165,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   const hiddenGemIds = getHiddenGemVenueIds();
   const advisoryNotes = getAdvisoryNotes();
   const indoorHubHtml = isIndoorHub
-    ? `${venues.length ? '' : '<p class="indoor-coming-soon">More indoor spots are coming soon &mdash; museums, galleries, theatres, escape rooms, bowling and climbing gyms across the valley.</p>\n  '}${indoorGolf.length ? `<section class="indoor-golf-section" aria-labelledby="indoorGolfHeading">
+    ? `${venues.length || indoorActivity ? '' : '<p class="indoor-coming-soon">More indoor spots are coming soon &mdash; museums, galleries, theatres, escape rooms, bowling and climbing gyms across the valley.</p>\n  '}${indoorGolf.length ? `<section class="indoor-golf-section" aria-labelledby="indoorGolfHeading">
   <h2 class="category-subsection-heading" id="indoorGolfHeading">Indoor golf &amp; simulators</h2>
   <p class="indoor-golf-lead">Year-round golf simulators, listed with the rest of the <a href="/${CATEGORY_SLUGS.golf}">Okanagan golf</a>.</p>
   ${renderCategoryCardsHtml('indoor', indoorGolf, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true })}
@@ -12161,8 +12213,8 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: 'Home', href: '/' },
     { name: label.plural },
   ])}
-  <h1>${escapeHtml(heading)}</h1>
-  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}
+  ${isIndoorHub ? '<div class="indoor-hero"><img src="/images/indoor-rainy-day-banner.jpg" width="1586" height="992" alt="Illustrative rainy-day café scene with coffee, a sketchbook and a misty lake view" fetchpriority="high"><div><h1>' + escapeHtml(heading) + '</h1><p>Find your perfect rainy day.</p></div></div>' : '<h1>' + escapeHtml(heading) + '</h1>'}
+  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
@@ -22413,8 +22465,8 @@ const server = http.createServer(async (req, res) => {
       // operators and a "coming soon" line.
       if (venues.length >= MIN_CATEGORY_VENUES || type === 'indoor' || type === 'tour') {
         // /outdoors?regions=..&activities=.. renders pre-filtered (see
-        // parseOutdoorFilterQuery); other categories ignore the query.
-        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined });
+        // parseOutdoorFilterQuery); /indoor also accepts an activity choice.
+        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorActivity: type === 'indoor' ? query.activity : undefined, indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
