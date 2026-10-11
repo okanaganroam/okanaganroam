@@ -776,7 +776,11 @@ function correctionDistance(a, b, max, vowelSubstitution) {
 function correctionSourceWords(t) {
   const words = new Set();
   const addWords = (list) => { for (const p of list) { const n = normalizeDiscoveryText(p); if (n && !n.includes(' ')) words.add(n); } };
-  for (const table of [TYPE_ALIASES, FEATURE_ALIASES, COLLECTION_ALIASES, ACTIVITY_ALIASES, CUISINE_SYNONYMS, REGION_EXTRA_ALIASES]) addWords(Object.values(table).flat());
+  // The tour aliases (2026-10-11) only when the taxonomy has the type, so a
+  // taxonomy without it ("tour" is left out while /tours lists nothing, and
+  // always for the trip planner) corrects exactly as before the type existed.
+  const typeAliases = t.types.includes('tour') ? TYPE_ALIASES : Object.fromEntries(Object.entries(TYPE_ALIASES).filter(([type]) => type !== 'tour'));
+  for (const table of [typeAliases, FEATURE_ALIASES, COLLECTION_ALIASES, ACTIVITY_ALIASES, CUISINE_SYNONYMS, REGION_EXTRA_ALIASES]) addWords(Object.values(table).flat());
   addWords(VALLEY_WIDE_PHRASES);
   addWords(t.regions.map((r) => r.replace(/-/g, ' ')));
   addWords(Object.values(t.regionLabels));

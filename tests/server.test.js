@@ -9926,7 +9926,8 @@ test('Phase 1: buildDiscoveryTaxonomy only exposes existing taxonomy and active 
   const t = app.buildDiscoveryTaxonomy();
   assert.deepEqual([...t.regions].sort(), Object.keys(app.REGION_LABELS).sort());
   for (const r of t.regions) assert.equal(t.regionLabels[r], app.REGION_LABELS[r]);
-  assert.deepEqual(t.types, Object.keys(app.CATEGORY_SLUGS));
+  // Every category type, except Tours & Experiences while /tours lists nothing (2026-10-11).
+  assert.deepEqual(t.types, Object.keys(app.CATEGORY_SLUGS).filter((x) => x !== 'tour' || app.countToursHubVenues() > 0));
   assert.deepEqual(t.features, app.BOOL_FIELDS);
   assert.deepEqual(t.budgets, app.TRIP_VALID_BUDGETS);
   assert.deepEqual(t.paces, app.TRIP_VALID_PACES);
@@ -17009,8 +17010,17 @@ test('Tours & Experiences: other-type operators tagged tours_also get a "More ex
   }
 });
 
-test('Tours & Experiences: discovery sends tour, cruise, guided, experience, cooking class, sleigh ride, dog sledding and wine/food/boat tour requests to the tour pages', () => withDiscoveryFlag('on', () => {
+test('Tours & Experiences: discovery sends tour, cruise, guided, experience, cooking class, sleigh ride, dog sledding and wine/food/boat tour requests to the tour pages once /tours lists something (empty: the old answers, "wine tour" -> /wineries)', () => withDiscoveryFlag('on', () => {
   const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  // Empty hub (no tour venues, no tours_also members): the phrases read as
+  // they did before the type existed -- "wine tour" is still wineries.
+  assert.equal(app.countToursHubVenues(), 0);
+  assert.ok(!app.buildDiscoveryTaxonomy().types.includes('tour'));
+  for (const q of ['wine tour', 'wine tours']) {
+    assert.deepEqual(app.interpretDiscoveryText(q).types, ['winery'], q);
+    assert.equal(route(q).url, '/wineries', q);
+  }
+  for (const q of ['tour', 'cruise', 'guided tour', 'cooking class', 'sleigh ride']) assert.notEqual(route(q).url, '/tours', q);
   const tour = app.createVenue({ name: 'Tour Discovery Wine Shuttle', region: 'penticton', type: 'tour', description: 'Fixture.', slug: 'tour-discovery-wine-shuttle' });
   try {
     for (const q of ['tour', 'tours', 'wine tour', 'wine tours', 'boat tour', 'cruise', 'guided', 'guided tour', 'experience', 'experiences', 'cooking class', 'sleigh ride', 'dog sledding', 'food tour']) {
@@ -17018,6 +17028,7 @@ test('Tours & Experiences: discovery sends tour, cruise, guided, experience, coo
       assert.equal(route(q).url, '/tours', q);
     }
     assert.equal(route('wine tours in Penticton').url, '/penticton/tours');
+    assert.ok(app.buildDiscoveryTaxonomy().types.includes('tour'), 'listed once the hub has a venue');
     // Existing aliases are unchanged.
     assert.equal(route('wine').url, '/wineries');
     assert.equal(route('wineries').url, '/wineries');

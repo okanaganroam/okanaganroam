@@ -3302,7 +3302,11 @@ function buildDiscoveryTaxonomy() {
   return {
     regions: VALID_REGIONS.slice(),
     regionLabels: { ...REGION_LABELS },
-    types: Object.keys(CATEGORY_SLUGS),
+    // Tours & Experiences (2026-10-11): while the /tours hub lists nothing
+    // (no tour venues, no tours_also members) the type is left out, so its
+    // phrases read exactly as before it existed ("wine tour" -> wineries)
+    // instead of resolving to an empty hub.
+    types: Object.keys(CATEGORY_SLUGS).filter((t) => t !== 'tour' || countToursHubVenues() > 0),
     features: BOOL_FIELDS.slice(),
     collections: liveKinds,
     activities: OUTDOOR_ACTIVITIES.map((a) => a.slug),
