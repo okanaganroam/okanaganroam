@@ -17040,3 +17040,41 @@ test('Tours & Experiences: discovery sends tour, cruise, guided, experience, coo
     db.prepare('DELETE FROM venues WHERE id = ?').run(tour.id);
   }
 }));
+
+// Indoor discovery: a banner and server-rendered experience filters, hub only.
+test('Indoor discovery: banner and experience choices stay on the indoor hub', async () => {
+  await withWinterServer(async (base) => {
+    const hub = await WINTER_GET(base, '/indoor');
+    assert.match(hub.text, /class="indoor-hero"/);
+    assert.match(hub.text, /src="\/images\/indoor-rainy-day-banner.jpg"/);
+    assert.match(hub.text, /aria-label="Choose an indoor experience"/);
+    for (const label of ['Museums &amp; Galleries', 'Family Fun', 'Games &amp; Escape Rooms', 'Spas', 'Theatre']) assert.ok(hub.text.includes(label), label);
+    assert.doesNotMatch((await WINTER_GET(base, '/tours')).text, /class="indoor-hero"|Choose an indoor experience/);
+    assert.equal((await WINTER_GET(base, '/images/indoor-rainy-day-banner.jpg')).status, 200);
+  });
+});
+
+test('Indoor discovery: URL filters select real venues and family uses the stored badge', async () => {
+  const fixtures = [
+    { name: 'Discovery Museum', slug: 'discovery-museum' },
+    { name: 'Discovery Escape Room', slug: 'discovery-escape', kid_friendly: true },
+    { name: 'Discovery Thermal Spa', slug: 'discovery-spa' },
+    { name: 'Discovery Theatre', slug: 'discovery-theatre' },
+  ].map((v) => app.createVenue({ region: 'kelowna', type: 'indoor', description: 'Test fixture.', ...v }));
+  try {
+    await withWinterServer(async (base) => {
+      for (const [activity, selected] of [['arts', 0], ['games', 1], ['family', 1], ['spas', 2], ['theatre', 3]]) {
+        const page = await WINTER_GET(base, `/indoor?activity=${activity}`);
+        assert.equal(page.status, 200);
+        // Inspect cards, excluding JSON-LD and navigation.
+        const cards = page.text.match(/<ul class="card-grid">[\s\S]*?<\/ul>/g)?.join('') || '';
+        fixtures.forEach((v, i) => assert.equal(cards.includes(`href="/kelowna/indoor/${v.slug}"`), i === selected, `${activity}: ${v.name}`));
+        assert.match(page.text, /aria-current="page"/);
+        assert.match(page.text, /[1-9]\d* matching spots?/);
+      }
+      const unknown = await WINTER_GET(base, '/indoor?activity=unknown');
+      fixtures.forEach((v) => assert.ok(unknown.text.includes(`href="/kelowna/indoor/${v.slug}"`)));
+
+    });
+  } finally { fixtures.forEach((v) => db.prepare('DELETE FROM venues WHERE id = ?').run(v.id)); }
+});
