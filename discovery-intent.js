@@ -112,6 +112,12 @@ const TYPE_ALIASES = {
   // day" stay rainy_day occasion words (OCCASION_ALIASES); the server routes
   // a bare rainy-day request to the /indoor hub instead.
   indoor: ['museum', 'museums', 'escape room', 'escape rooms', 'bowling', 'bowling alley', 'bowling alleys', 'climbing gym', 'climbing gyms', 'bouldering gym', 'bouldering gyms', 'arcade', 'arcades', 'gallery', 'galleries', 'art gallery', 'art galleries', 'theatre', 'theatres', 'theater', 'theaters', 'indoor activities', 'indoor attractions', 'rainy day activities'],
+  // Tours & Experiences (2026-10-11). "wine tour(s)" also stays in the
+  // winery list: when the taxonomy has the tour type (Hero Search), a phrase
+  // listed here belongs to tours alone (tourClaimed, in the phrase table);
+  // the trip planner's taxonomy has no tour type, so there it still means
+  // wineries. "wine" on its own is untouched.
+  tour: ['tour', 'tours', 'wine tour', 'wine tours', 'boat tour', 'boat tours', 'cruise', 'cruises', 'lake cruise', 'lake cruises', 'guided', 'guided tour', 'guided tours', 'experience', 'experiences', 'cooking class', 'cooking classes', 'sleigh ride', 'sleigh rides', 'dog sledding', 'dog sled', 'food tour', 'food tours'],
 };
 
 const FEATURE_ALIASES = {
@@ -480,7 +486,13 @@ function buildPhraseTable(taxonomy) {
   }
   for (const p of VALLEY_WIDE_PHRASES) add(p, 'scope', 'valley');
   for (const [concept, phrases] of Object.entries(CONCEPT_ALIASES)) for (const p of phrases) add(p, 'concept', concept);
-  for (const [type, phrases] of Object.entries(TYPE_ALIASES)) if (t.types.includes(type)) for (const p of phrases) add(p, 'type', type);
+  // Tours & Experiences (2026-10-11): with the tour type present, its phrases
+  // ("wine tour") are claimed by it alone rather than shared with wineries.
+  const tourClaimed = t.types.includes('tour') ? new Set(TYPE_ALIASES.tour.map(normalizeDiscoveryText)) : new Set();
+  for (const [type, phrases] of Object.entries(TYPE_ALIASES)) if (t.types.includes(type)) for (const p of phrases) {
+    if (type !== 'tour' && tourClaimed.has(normalizeDiscoveryText(p))) continue;
+    add(p, 'type', type);
+  }
   for (const [feature, phrases] of Object.entries(FEATURE_ALIASES)) if (t.features.includes(feature)) for (const p of phrases) add(p, 'feature', feature);
   for (const [kind, phrases] of Object.entries(COLLECTION_ALIASES)) if (t.collections.includes(kind)) for (const p of phrases) add(p, 'collection', kind);
   for (const [slug, phrases] of Object.entries(ACTIVITY_ALIASES)) if (t.activities.includes(slug)) for (const p of phrases) add(p, 'activity', slug);
@@ -942,7 +954,7 @@ function emptyIntent() {
 
 // Type -> the daypart it naturally belongs to, for ordered multi-part
 // requests ("a romantic winery and dinner").
-const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', indoor: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
+const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', indoor: 'afternoon', tour: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
 
 function interpretDiscoveryQuery(text, taxonomy, options) {
   const opts = options || {};

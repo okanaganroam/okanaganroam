@@ -535,6 +535,19 @@ if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(INDOOR_ALSO_COL
     .run(INDOOR_ALSO_COLLECTION_SLUG, 'indoor_also', 'Also good indoors');
 }
 
+// --- Tours "also bookable" collection bootstrap (2026-10-11) --------------
+// Venues of OTHER types (mostly `outdoor` operators: ATV and snowmobile
+// tours, dog sledding, sleigh rides, sailing charters, ballooning, ziplines,
+// riding stables...) that are also bookable experiences. They keep their own
+// type and pages; membership only lists them in a section of the /tours hub.
+// Seeds NO members; membership goes through POST /admin/collection-membership
+// with kind 'tours_also'.
+const TOURS_ALSO_COLLECTION_SLUG = 'tours-also';
+if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(TOURS_ALSO_COLLECTION_SLUG)) {
+  db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(TOURS_ALSO_COLLECTION_SLUG, 'tours_also', 'Also bookable experiences');
+}
+
 // --- Outdoor activity collections bootstrap (2026-09-20, Outdoors Phase 1) --
 // Eight activity kinds that classify an `outdoor` venue (and, later, any
 // existing venue such as a beach/park) by what a visitor can do there:

@@ -6889,7 +6889,7 @@ test('Batch 4A: the venue-shell predicate covers exactly the themed types plus t
   assert.deepEqual([...app.THEMED_VENUE_SHELL_TYPES].sort(), [...BATCH4A_FD_TYPES, 'winery'].sort());
   for (const t of [...BATCH4A_FD_TYPES, 'winery', 'golf', 'beach', 'outdoor']) assert.equal(app.usesThemedVenueShell(t), true, t);
   // The listing / card predicate is unchanged.
-  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'indoor', 'outdoor']); // + indoor (2026-10-11)
+  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'indoor', 'outdoor', 'tour']); // + indoor, tour (2026-10-11)
   for (const t of BATCH4A_FD_TYPES) assert.equal(app.usesThemedCategoryLayout(t), false, t);
 });
 
@@ -9992,7 +9992,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved /browse performance change F5: the sort reads each rating once (initBlock4 only), 2026-10-03.
   // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
   // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
-  assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49', 'public/scripts/app.js (winter mood tile titles, 2026-10-11)');
+  // Approved Tours & Experiences change (2026-10-11): tripv3.type.tour added to TRANSLATIONS (en and fr) only.
+  assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2', 'public/scripts/app.js (tripv3.type.tour, 2026-10-11)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11129,7 +11130,7 @@ test('Hidden Gems page: Build My Trip "See everything" links follow the same rul
 // Every destination page lists the same 14 categories in one fixed order.
 // A category with results links to the page showing exactly them; an empty
 // one stays visible as a non-link, aria-disabled pill/card.
-const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
+const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'Tours & Experiences', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
 function destTabs(html) {
   const nav = (html.match(/<nav class="category-region-selector region-category-tabs"[\s\S]*?<\/nav>/) || [''])[0];
   return [...nav.matchAll(/<(a|span)( href="([^"]+)")?([^>]*)>([^<]+)<span class="outdoor-activity-count">(\d+)<\/span><\/\1>/g)]
@@ -11139,17 +11140,17 @@ function destRegions() {
   return Object.keys(app.REGION_LABELS || {}).filter((r) => Object.keys(app.getRegionCategoryCounts(r)).length > 0);
 }
 
-test('Destination pages: every destination shows the same 15 categories in the approved order (Indoor & Rainy Day added 2026-10-11)', () => {
+test('Destination pages: every destination shows the same 16 categories in the approved order (Indoor & Rainy Day, Tours & Experiences added 2026-10-11)', () => {
   const regions = destRegions();
   assert.ok(regions.length > 0);
-  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
+  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'tour', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
   for (const r of regions) {
     const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
     const tabs = destTabs(html);
     assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS, r);
-    // The cards list the same 15, grouped Food & Drink / Experiences / Discovery.
+    // The cards list the same 16, grouped Food & Drink / Experiences / Discovery.
     assert.match(html, /<h2 class="category-subsection-heading">Food &amp; Drink<\/h2>[\s\S]*<h2 class="category-subsection-heading">Experiences<\/h2>[\s\S]*<h2 class="category-subsection-heading">Discovery<\/h2>/, r);
-    assert.equal((html.match(/<li class="category-card/g) || []).length, 15, r);
+    assert.equal((html.match(/<li class="category-card/g) || []).length, 16, r);
   }
 });
 
@@ -11467,7 +11468,7 @@ test('List Your Venue: the page renders the form with the canonical types, regio
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app.css">/);
   for (const t of app.VENUE_SUBMISSION_TYPES) assert.match(html, new RegExp(`<option value="${t}">`));
   for (const r of app.VENUE_SUBMISSION_REGIONS) assert.match(html, new RegExp(`<option value="${r}">`));
-  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 11); // + indoor (2026-10-11)
+  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 12); // + indoor, tour (2026-10-11)
   assert.equal(app.VENUE_SUBMISSION_REGIONS.length, 20);
   for (const a of app.VENUE_SUBMISSION_AMENITIES) assert.match(html, new RegExp(`name="amenities" value="${a}"`));
   assert.match(html, /name="company_website" tabindex="-1"/, 'honeypot');
@@ -11803,7 +11804,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49');
+  assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16031,7 +16032,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8');
-  assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49');
+  assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16124,7 +16125,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '65ebcbac52105fadbfd06435399ddc49', 'app.js is untouched');
+    assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2', 'app.js is untouched');
   }));
 }
 
@@ -16901,3 +16902,130 @@ test('Ski & Snow: /ski-snow lists the winter collection, après eats on the four
     }
   }
 });
+
+// ==== Tours & Experiences (2026-10-11): the `tour` type, /tours, and the
+// tours_also "More experiences to book" section ==============================
+
+test('Tours & Experiences: registered as a themed, non-planner category with its labels, slug and schema type', () => {
+  assert.equal(app.CATEGORY_SLUGS.tour, 'tours');
+  assert.deepEqual(app.CATEGORY_LABELS.tour, { singular: 'Tour & Experience', plural: 'Tours & Experiences' });
+  assert.equal(app.SCHEMA_TYPE_MAP.tour, 'TouristAttraction');
+  assert.ok(app.usesThemedCategoryLayout('tour'));
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('tour'), 'not a Build My Trip interest yet');
+  assert.ok(!app.buildTripPlannerTaxonomy().types.includes('tour'), 'the planner never parses it as a type');
+  assert.ok(app.BROWSE_HUB_TYPE_ORDER.includes('tour'));
+  assert.ok(app.VENUE_SUBMISSION_TYPES.includes('tour'));
+  assert.ok(app.NON_DISCOVERY_COLLECTION_KINDS.has(app.TOURS_ALSO_COLLECTION_KIND), 'never offered as a trip discovery option');
+  const col = db.prepare("SELECT slug, title FROM collections WHERE kind = 'tours_also'").get();
+  assert.deepEqual({ ...col }, { slug: 'tours-also', title: 'Also bookable experiences' });
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(src, /'tripv3\.type\.tour': 'Tours & Experiences'/);
+  assert.match(src, /'tripv3\.type\.tour': 'Visites et exp\\u00e9riences'/);
+});
+
+test('Tours & Experiences: /tours renders with zero tour venues (coming soon), region/venue pages, sitemap, /categories and the submission form', async () => {
+  let cruise = null;
+  try {
+    await withWinterServer(async (base) => {
+      assert.equal(app.getVenuesByCategory('tour').length, 0);
+      const empty = await WINTER_GET(base, '/tours');
+      assert.equal(empty.status, 200);
+      assert.match(empty.text, /<h1>Tours &amp; Experiences in the Okanagan<\/h1>/);
+      assert.match(empty.text, /class="tour-coming-soon">More tours and experiences are coming soon/);
+      assert.match(empty.text, /<p class="hub-intro">Wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more/);
+      assert.match(empty.text, /<body class="golf-page tour-page">/);
+      assert.match(empty.text, /Tour page theme \(2026-10-11\)/);
+      assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
+      assert.doesNotMatch(empty.text, /toursAlsoHeading/, 'no also-section without members');
+      assert.equal((await WINTER_GET(base, '/vernon/tours')).status, 404, 'an empty region/tours pair 404s like any other');
+
+      cruise = app.createVenue({ name: 'Tour Test Lake Cruise', region: 'kelowna', type: 'tour', description: 'A fixture sunset cruise on Okanagan Lake.', slug: 'tour-test-lake-cruise' });
+      const hub = await WINTER_GET(base, '/tours');
+      assert.equal(hub.status, 200);
+      assert.match(hub.text, /href="\/kelowna\/tours\/tour-test-lake-cruise"/);
+      assert.doesNotMatch(hub.text, /class="tour-coming-soon"/);
+      assert.doesNotMatch(hub.text, /noindex/);
+      const region = await WINTER_GET(base, '/kelowna/tours');
+      assert.equal(region.status, 200);
+      assert.match(region.text, /Tours &amp; Experiences in Kelowna, BC/);
+      assert.match(region.text, /class="category-back-link" href="\/tours">← All Tours &amp; Experiences</);
+      assert.match(region.text, /<body class="golf-page tour-page">/);
+      const venue = await WINTER_GET(base, '/kelowna/tours/tour-test-lake-cruise');
+      assert.equal(venue.status, 200);
+      assert.match(venue.text, /<title>Tour Test Lake Cruise — Tour &amp; Experience in Kelowna, BC \| Okanagan Roam<\/title>/);
+      assert.match(venue.text, /"@type":"TouristAttraction"/);
+      assert.match(venue.text, /tour-page/);
+      const kelowna = await WINTER_GET(base, '/kelowna');
+      assert.match(kelowna.text, /<a href="\/kelowna\/tours">Tours &amp; Experiences<\/a>/);
+
+      const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+      for (const loc of ['/tours', '/kelowna/tours', '/kelowna/tours/tour-test-lake-cruise']) {
+        assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), loc);
+      }
+      const cats = (await WINTER_GET(base, '/categories')).text;
+      assert.match(cats, /<a href="\/tours">Tours &amp; Experiences<\/a>/);
+      const form = (await WINTER_GET(base, '/list-your-venue')).text;
+      assert.match(form, /<option value="tour">Tour &amp; Experience<\/option>/);
+    });
+  } finally {
+    if (cruise) db.prepare('DELETE FROM venues WHERE id = ?').run(cruise.id);
+  }
+});
+
+test('Tours & Experiences: other-type operators tagged tours_also get a "More experiences to book" section on /tours, with notes, linking to their own pages', async () => {
+  const atv = app.createVenue({ name: 'Tours Also ATV Outfitter', region: 'vernon', type: 'outdoor', description: 'Guided ATV tours through the hills above the lake, with long trail descriptions that run on and on (fixture).', slug: 'tours-also-atv-outfitter' });
+  const sleigh = app.createVenue({ name: 'Tours Also Sleigh Farm', region: 'kelowna', type: 'winery', description: 'A winery with winter sleigh rides (fixture).', slug: 'tours-also-sleigh-farm' });
+  try {
+    await withWinterServer(async (base) => {
+      for (const v of [atv, sleigh]) {
+        const r = app.guardedCollectionMembershipUpdate('tours_also', v.id, 'add', v === atv ? 'Guided ATV tours, May to October' : null, { reason: 'fixture', batch_id: 'test' });
+        assert.ok(r.ok, JSON.stringify(r));
+      }
+      assert.deepEqual(app.getToursAlsoVenues().map((v) => v.name), ['Tours Also ATV Outfitter', 'Tours Also Sleigh Farm']);
+      assert.equal(app.countToursHubVenues(), 2);
+      const hub = await WINTER_GET(base, '/tours');
+      assert.equal(hub.status, 200);
+      assert.match(hub.text, /<h2 class="category-subsection-heading" id="toursAlsoHeading">More experiences to book<\/h2>/);
+      assert.match(hub.text, /class="tour-coming-soon"/, 'still no tour venues of its own');
+      assert.match(hub.text, /href="\/vernon\/outdoors\/tours-also-atv-outfitter"/, 'an outdoor operator links to its outdoors page');
+      assert.match(hub.text, /href="\/kelowna\/wineries\/tours-also-sleigh-farm"/, 'a winery links to its winery page');
+      assert.doesNotMatch(hub.text, /noindex/);
+      // The membership note is shown on that card only, labelled "Experience:".
+      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Experience:<\/span> Guided ATV tours, May to October<\/p>/);
+      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
+      assert.doesNotMatch(hub.text, /Rainy day:/);
+      // The card script wires every type on /tours (Read more clamp, Favorite / Trip), and descriptions clamp to 3 lines.
+      assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="winery"\][^)]*\[data-venue-category="outdoor"\]/);
+      assert.match(hub.text, /body\.golf-page\.tour-page \.golf-desc\.is-clamped p \{ -webkit-line-clamp: 3;/);
+      // Their own pages and types are untouched.
+      assert.equal((await WINTER_GET(base, '/vernon/outdoors/tours-also-atv-outfitter')).status, 200);
+      assert.equal(app.getVenue(atv.id).type, 'outdoor');
+      // /indoor's note label is unchanged.
+      assert.doesNotMatch((await WINTER_GET(base, '/indoor')).text, /Experience:<\/span>/);
+    });
+  } finally {
+    db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id IN (?, ?)").run(atv.id, sleigh.id);
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(atv.id, sleigh.id);
+  }
+});
+
+test('Tours & Experiences: discovery sends tour, cruise, guided, experience, cooking class, sleigh ride, dog sledding and wine/food/boat tour requests to the tour pages', () => withDiscoveryFlag('on', () => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  const tour = app.createVenue({ name: 'Tour Discovery Wine Shuttle', region: 'penticton', type: 'tour', description: 'Fixture.', slug: 'tour-discovery-wine-shuttle' });
+  try {
+    for (const q of ['tour', 'tours', 'wine tour', 'wine tours', 'boat tour', 'cruise', 'guided', 'guided tour', 'experience', 'experiences', 'cooking class', 'sleigh ride', 'dog sledding', 'food tour']) {
+      assert.deepEqual(app.interpretDiscoveryText(q).types, ['tour'], q);
+      assert.equal(route(q).url, '/tours', q);
+    }
+    assert.equal(route('wine tours in Penticton').url, '/penticton/tours');
+    // Existing aliases are unchanged.
+    assert.equal(route('wine').url, '/wineries');
+    assert.equal(route('wineries').url, '/wineries');
+    assert.deepEqual(app.interpretDiscoveryText('restaurants').types, ['restaurant']);
+    // The trip planner has no tour type: "wine tour" still means wineries there.
+    const planner = require('../discovery-intent.js').interpretDiscoveryQuery('wine tour', app.buildTripPlannerTaxonomy());
+    assert.deepEqual(planner.types, ['winery']);
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(tour.id);
+  }
+}));
