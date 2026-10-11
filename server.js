@@ -1353,16 +1353,195 @@ const REGION_INTROS = Object.freeze({
       ['When to go.', `Summer is for the lakes. In fall, Vernon gets its Halloween events, including <a href="/vernon/events/field-of-screams-xiii-the-unlucky">Field of Screams</a>. In winter, <a href="/silverstar">SilverStar</a> is about 30 minutes up the hill. The Vernon Winter Carnival runs every February.`],
     ],
   },
+  'west-kelowna': {
+    titleTail: 'Wineries, Beaches & Hikes',
+    describe: (n) => `Things to do in West Kelowna, BC: Westside wineries, lakeside parks and beaches, Mount Boucherie hikes and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `West Kelowna sits across the bridge from Kelowna on the west shore of Okanagan Lake. It's quieter than the city, with a cluster of wineries on the slopes of Mount Boucherie and plenty of lakeside parks.`],
+      ['Wine country.', `Most of the tasting rooms are within a few minutes of each other, many with lake views. <a href="/west-kelowna/wineries/mission-hill-family-estate-winery">Mission Hill</a>, <a href="/west-kelowna/wineries/quails-gate-winery">Quails' Gate</a>, <a href="/west-kelowna/wineries/mt-boucherie-estate-winery">Mt. Boucherie</a> and <a href="/west-kelowna/wineries/indigenous-world-winery">Indigenous World Winery</a> are all close together. See all <a href="/west-kelowna/wineries">West Kelowna wineries</a>.`],
+      ['Beaches and parks.', `<a href="/west-kelowna/beaches/gellatly-nut-farm-regional-park">Gellatly Nut Farm Regional Park</a> and <a href="/west-kelowna/beaches/kalamoir-regional-park">Kalamoir Regional Park</a> have quiet swims and shoreline trails, and <a href="/west-kelowna/beaches/gellatly-dog-beach">Gellatly Dog Beach</a> is made for dogs. North along the lake, <a href="/west-kelowna/beaches/bear-creek-provincial-park">Bear Creek Provincial Park</a> and <a href="/west-kelowna/beaches/fintry-provincial-park">Fintry Provincial Park</a> have sandy beaches and campgrounds.`],
+      ['Hikes.', `For big views over the lake, climb <a href="/west-kelowna/outdoors/mount-boucherie-boucherie-rush-trail">Mount Boucherie</a> or <a href="/west-kelowna/outdoors/goats-peak-regional-park">Goats Peak</a>, or walk the trails in <a href="/west-kelowna/outdoors/rose-valley-regional-park">Rose Valley Regional Park</a>.`],
+      ['When to go.', `Summer is for the lake and patios, and fall brings harvest to the wineries. In winter, <a href="/big-white">Big White</a> is a little over an hour's drive.`],
+    ],
+  },
+  peachland: {
+    titleTail: 'Beaches, Waterfalls & Lakeside Dining',
+    describe: (n) => `Things to do in Peachland, BC: a walkable Okanagan Lake waterfront, Hardy Falls, Pincushion Mountain and ${n} verified places to eat, drink and play.`,
+    paragraphs: [
+      [null, `Peachland is a small, friendly town on Okanagan Lake between West Kelowna and Summerland, built along a long, walkable waterfront. It's an easy stop on a road trip and a relaxed base for a lake weekend.`],
+      ['On the water.', `Swim at <a href="/peachland/beaches/swim-bay">Swim Bay</a> or <a href="/peachland/beaches/antlers-beach-regional-park">Antlers Beach</a>, or rent a paddleboard from <a href="/peachland/outdoors/peachland-beach-rentals">Peachland Beach Rentals</a>. Lakeside patios like <a href="/peachland/restaurants/gasthaus-on-the-lake">Gasthaus on the Lake</a>, <a href="/peachland/restaurants/the-edgewater-bar-and-grill">The Edgewater Bar and Grill</a> and <a href="/peachland/restaurants/jac-s-on-the-beach">JAC's On The Beach</a> are steps from the sand.`],
+      ['Outdoors.', `<a href="/peachland/outdoors/hardy-falls-regional-park">Hardy Falls</a> is a short, shady creekside walk to a waterfall. <a href="/peachland/outdoors/pincushion-mountain-trail">Pincushion Mountain</a> is a quick climb with a big view over the lake. For more of a thrill, try <a href="/peachland/outdoors/zipzone-peachland">ZipZone Peachland</a> or <a href="/peachland/outdoors/okanagan-atv-tours">Okanagan ATV Tours</a>.`],
+      ['Wine.', `<a href="/peachland/wineries/fitzpatrick-family-vineyards-at-greata-ranch">Fitzpatrick Family Vineyards</a> and <a href="/peachland/wineries/hainle-vineyards-estate-winery">Hainle Vineyards</a> are both just outside town.`],
+    ],
+  },
+  'lake-country': {
+    titleTail: 'Wineries, Lakes & the Rail Trail',
+    describe: (n) => `Things to do in Lake Country, BC: Wood and Kalamalka lake beaches, the Okanagan Rail Trail, wineries and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Lake Country sits between Kelowna and Vernon, surrounded by Okanagan, Wood and Kalamalka lakes. It's minutes from Kelowna's airport and feels like a quiet, lake-and-orchard escape.`],
+      ['Wineries.', `<a href="/lake-country/wineries/gray-monk-estate-winery">Gray Monk</a>, <a href="/lake-country/wineries/50th-parallel-estate-winery-tasting-room">50th Parallel</a>, <a href="/lake-country/wineries/ex-nihilo-vineyards-tasting-room">Ex Nihilo</a> and <a href="/lake-country/wineries/arrowleaf-cellars">Arrowleaf Cellars</a> are close together, and <a href="/lake-country/breweries/rose-hill-orchard-cidery">Rose Hill Orchard &amp; Cidery</a> pours cider from its own orchard.`],
+      ['Lakes and trails.', `The <a href="/lake-country/outdoors/okanagan-rail-trail">Okanagan Rail Trail</a> runs flat along the shores of Wood and Kalamalka lakes, perfect for an easy bike ride. Swim at <a href="/lake-country/beaches/kaloya-regional-park">Kaloya Regional Park</a> or <a href="/lake-country/beaches/coral-beach-park">Coral Beach</a>, or try the <a href="/lake-country/outdoors/oyama-zipline-adventure-park">Oyama Zipline</a>.`],
+      ['Eat and drink.', `Grab a coffee at <a href="/lake-country/cafes/the-daily-grind-lake-country">The Daily Grind</a> or a pint at <a href="/lake-country/breweries/britannia-brewing-co">Britannia Brewing</a>.`],
+    ],
+  },
+  summerland: {
+    titleTail: 'Wineries, Cideries & Beaches',
+    describe: (n) => `Things to do in Summerland, BC: Bottleneck Drive wineries, cideries, Giant's Head Mountain, lakeside beaches and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Summerland sits on Okanagan Lake between Peachland and Penticton, with a small-town downtown, orchards on every hillside and a cluster of wineries and cideries close by.`],
+      ['Wine and cider.', `Wineries like <a href="/summerland/wineries/dirty-laundry-winery">Dirty Laundry</a>, <a href="/summerland/wineries/haywire-winery">Haywire</a>, <a href="/summerland/wineries/8th-generation-vineyard">8th Generation Vineyard</a> and <a href="/summerland/wineries/lunessence-winery-vineyards">Lunessence</a> are all a short drive apart. Summerland is also big on cider: try <a href="/summerland/breweries/dominion-cider-co">Dominion Cider</a>, <a href="/summerland/breweries/millionaires-row-cider-co">Millionaires' Row</a> or <a href="/summerland/breweries/summerland-heritage-cider-company">Summerland Heritage Cider</a>. See all <a href="/summerland/wineries">Summerland wineries</a>.`],
+      ['Views and gardens.', `<a href="/summerland/outdoors/giants-head-mountain-park">Giant's Head Mountain</a> has a short trail to the top and views over the whole lake. The <a href="/summerland/outdoors/summerland-ornamental-gardens">Summerland Ornamental Gardens</a> are a peaceful stop.`],
+      ['Beaches.', `<a href="/summerland/beaches/sun-oka-beach-provincial-park">Sun-Oka Beach</a> is a big, sandy family beach, and <a href="/summerland/beaches/peach-orchard-beach-park">Peach Orchard Beach</a> is right below town. For dinner on the water, there's <a href="/summerland/restaurants/shaughnessy-s-cove">Shaughnessy's Cove</a>.`],
+    ],
+  },
+  naramata: {
+    titleTail: 'Wineries, Beaches & the KVR Trail',
+    describe: (n) => `Things to do in Naramata, BC: 33 Naramata Bench wineries, quiet beaches, the KVR Trail tunnels and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Naramata is a quiet village on the east shore of Okanagan Lake, just north of Penticton. The road there winds along the Naramata Bench, one of the Okanagan's best-known wine routes.`],
+      ['The Bench.', `Dozens of tasting rooms sit above the lake, many family-run. <a href="/naramata/wineries/elephant-island-winery">Elephant Island</a>, <a href="/naramata/wineries/hillside-winery">Hillside</a>, <a href="/naramata/wineries/bench-1775-winery">Bench 1775</a> and <a href="/naramata/wineries/howling-bluff-estate-winery">Howling Bluff</a> make an easy afternoon. See all <a href="/naramata/wineries">33 Naramata Bench wineries</a>.`],
+      ['Village and lake.', `Swim at <a href="/naramata/beaches/manitou-park">Manitou Park</a> or <a href="/naramata/beaches/naramata-wharf-park">the Naramata wharf</a>, then eat at <a href="/naramata/restaurants/the-patio-at-lake-breeze">The Patio At Lake Breeze</a>, <a href="/naramata/restaurants/terroir-kitchen">Terroir Kitchen</a> or the <a href="/naramata/pubs/naramata-pub-grill">Naramata Pub &amp; Grill</a>.`],
+      ['On foot or by bike.', `The <a href="/naramata/outdoors/kvr-trail-naramata-bench-little-tunnel-adra-tunnel">KVR Trail</a> above the village is a gentle ride or walk past vineyards to Little Tunnel, with views down the lake.`],
+      ['When to go.', `Summer for the lake, and September and October for harvest on the Bench.`],
+    ],
+  },
+  'okanagan-falls': {
+    titleTail: 'Wineries, Beaches & Birding',
+    describe: (n) => `Things to do in Okanagan Falls, BC: Skaha Lake beaches, respected wineries, Vaseux Lake birding and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Okanagan Falls is a small town at the south end of Skaha Lake, between Penticton and Oliver. It's surrounded by some of the valley's most respected wineries.`],
+      ['Wineries.', `<a href="/okanagan-falls/wineries/blue-mountain-vineyard-and-cellars">Blue Mountain</a>, <a href="/okanagan-falls/wineries/blasted-church-vineyards">Blasted Church</a>, <a href="/okanagan-falls/wineries/meyer-family-vineyards">Meyer Family</a> and <a href="/okanagan-falls/wineries/liquidity-wines">Liquidity</a> are all nearby, and <a href="/okanagan-falls/restaurants/the-restaurant-at-liquidity-wines">The Restaurant at Liquidity Wines</a> is a lovely lunch stop. See all <a href="/okanagan-falls/wineries">Okanagan Falls wineries</a>.`],
+      ['Lake and nature.', `<a href="/okanagan-falls/beaches/christie-memorial-park">Christie Memorial Park</a> has a sandy beach on Skaha Lake. Just south of town, <a href="/okanagan-falls/outdoors/vaseux-lake-wildlife-centre-migratory-bird-sanctuary">Vaseux Lake</a> is a top spot for birding, and the <a href="/okanagan-falls/outdoors/white-lake-grasslands-protected-area">White Lake Grasslands</a> have wide-open hiking.`],
+    ],
+  },
+  kaleden: {
+    titleTail: 'Wineries, Golf & Skaha Lake',
+    describe: (n) => `Things to do in Kaleden, BC: a quiet Skaha Lake beach, small wineries, two golf courses and ${n} verified places to eat, drink and play.`,
+    paragraphs: [
+      [null, `Kaleden is a small, quiet community on the west shore of Skaha Lake, between Penticton and Okanagan Falls. It's a peaceful place to slow down, swim and sip.`],
+      ['Things to do.', `Swim at <a href="/kaleden/beaches/pioneer-park">Pioneer Park</a>, tee off at <a href="/kaleden/golf/st-andrews-by-the-lake-golf-resort">St. Andrews by the Lake</a> or <a href="/kaleden/golf/twin-lakes-golf-course">Twin Lakes</a>, and visit small wineries like <a href="/kaleden/wineries/anthony-buchanan-wines">Anthony Buchanan Wines</a> and <a href="/kaleden/wineries/kraze-legz-vineyard-and-winery">Kraze Legz</a>. For a bite, try <a href="/kaleden/cafes/frog-city-cafe">Frog City Cafe</a> or <a href="/kaleden/cafes/linden-gardens">Linden Gardens</a>.`],
+    ],
+  },
+  oliver: {
+    titleTail: 'Wineries, Golf & Desert Trails',
+    describe: (n) => `Things to do in Oliver, BC: Golden Mile and Black Sage wineries, desert golf, the International Hike and Bike Trail and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Oliver calls itself the Wine Capital of Canada, and with 49 wineries listed here, it's easy to see why. It's hot, dry and sunny, with vineyards stretching across both sides of the valley.`],
+      ['Wine routes.', `On the Golden Mile Bench, visit <a href="/oliver/wineries/church-state-wines">Church &amp; State</a> and <a href="/oliver/wineries/culmina-family-estate-winery">Culmina</a>. Across the valley on Black Sage Road, <a href="/oliver/wineries/burrowing-owl-estate-winery">Burrowing Owl</a> and <a href="/oliver/wineries/black-hills-estate-winery">Black Hills</a> are local favourites. See all <a href="/oliver/wineries">Oliver wineries</a>.`],
+      ['Eat and drink.', `Book <a href="/oliver/restaurants/miradoro-restaurant-1029">Miradoro</a> for a view over the vines, or try <a href="/oliver/restaurants/backyard-farm-chef-s-table">Backyard Farm Chef's Table</a> and <a href="/oliver/breweries/firehall-brewery">Firehall Brewery</a>.`],
+      ['Outdoors.', `The flat <a href="/oliver/outdoors/international-hike-and-bike-trail">International Hike and Bike Trail</a> follows the Okanagan River through town, and the <a href="/oliver/outdoors/golden-mile-trail">Golden Mile Trail</a> climbs above the vineyards. Golfers can play <a href="/oliver/golf/fairview-mountain-golf-club">Fairview Mountain</a> or <a href="/oliver/golf/nkmip-canyon-desert-golf-course">Nk'Mip Canyon Desert</a>.`],
+      ['When to go.', `Summer is hot, and fall harvest is the best time for wine.`],
+    ],
+  },
+  osoyoos: {
+    titleTail: 'Beaches, Wineries & Desert',
+    describe: (n) => `Things to do in Osoyoos, BC: warm Osoyoos Lake beaches, desert trails, Nk'Mip, wineries and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Osoyoos sits at the southern tip of the Okanagan, near the US border. Osoyoos Lake is one of the warmest lakes in Canada, and the surrounding desert landscape is unlike anywhere else in the valley.`],
+      ['Beaches.', `<a href="/osoyoos/beaches/gyro-beach">Gyro Beach</a>, <a href="/osoyoos/beaches/cottonwood-park">Cottonwood Beach</a> and <a href="/osoyoos/beaches/osoyoos-lake-regional-park">Osoyoos Lake Regional Park</a> all have warm, shallow water, great for families.`],
+      ['Desert and culture.', `Learn about the land and the Osoyoos Indian Band at the <a href="/osoyoos/outdoors/nkmip-desert-cultural-centre">Nk'Mip Desert Cultural Centre</a>, walk the boardwalk at the <a href="/osoyoos/outdoors/osoyoos-desert-centre">Osoyoos Desert Centre</a>, and stop at the <a href="/osoyoos/outdoors/spotted-lake-klilxw-viewpoint">Spotted Lake viewpoint</a>. For the big view, drive up to the <a href="/osoyoos/outdoors/anarchist-mountain-lookout">Anarchist Mountain Lookout</a>.`],
+      ['Wine.', `<a href="/osoyoos/wineries/nk-mip-cellars">Nk'Mip Cellars</a>, <a href="/osoyoos/wineries/moon-curser-vineyards">Moon Curser</a>, <a href="/osoyoos/wineries/adega-on-45th-estate-winery">Adega on 45th</a> and <a href="/osoyoos/wineries/lariana-cellars">Lariana Cellars</a> are all close by. See all <a href="/osoyoos/wineries">Osoyoos wineries</a>.`],
+      ['When to go.', `July and August are hot and busy. Spring and fall are quieter and great for wine touring.`],
+    ],
+  },
+  coldstream: {
+    titleTail: 'Kalamalka Lake Beaches & Trails',
+    describe: (n) => `Things to do in Coldstream, BC: Kalamalka Lake beaches, Cosens Bay, the Okanagan Rail Trail and ${n} verified places to eat, drink and play.`,
+    paragraphs: [
+      [null, `Coldstream wraps around the north end of Kalamalka Lake, right next to Vernon. It's home to some of the most beautiful beaches in the Okanagan, with clear turquoise water.`],
+      ['Beaches.', `<a href="/coldstream/beaches/kal-beach">Kal Beach</a> is the easy, in-town favourite. For something quieter, hike into <a href="/coldstream/beaches/kalamalka-lake-provincial-park-cosens-bay">Cosens Bay</a> or <a href="/coldstream/beaches/kalamalka-lake-provincial-park-jade-bay">Jade and Juniper Bays</a>. Stop at the <a href="/coldstream/outdoors/kalamalka-lake-lookout-highway-97-rest-area">Kalamalka Lake Lookout</a> for the classic view.`],
+      ['Trails and rentals.', `The Okanagan Rail Trail runs along the lake, with coffee at the <a href="/coldstream/cafes/rail-trail-cafe-market">Rail Trail Café &amp; Market</a>. Rent a board from <a href="/coldstream/outdoors/kalavida-surf-shop">Kalavida Surf Shop</a>, or hike the <a href="/coldstream/outdoors/coldstream-ranchlands-trail">Coldstream Ranchlands Trail</a>. After a beach day, <a href="/coldstream/pubs/alexander-s-beach-pub-liquor-store">Alexander's Beach Pub</a> is right by the water.`],
+    ],
+  },
+  armstrong: {
+    titleTail: 'Farm Food, Cider & Small-Town Charm',
+    describe: (n) => `Things to do in Armstrong, BC: farm-fresh food, cider, golf, local trails and ${n} verified places to eat and drink.`,
+    paragraphs: [
+      [null, `Armstrong is a friendly farming town in the North Okanagan, between Vernon and Enderby. It's known for its farmland, local food and small-town main street.`],
+      ['Eat and drink.', `Stop at <a href="/armstrong/cafes/village-dairy-table">Village Dairy + Table</a> and the <a href="/armstrong/cafes/armstrong-bakery">Armstrong Bakery</a>, sip cider at <a href="/armstrong/breweries/farmstrong-cider-company">Farmstrong Cider</a>, or have dinner at <a href="/armstrong/restaurants/1862-social-house">1862 Social House</a> or <a href="/armstrong/restaurants/the-clove-restaurant">The Clove</a>.`],
+      ['Things to do.', `Play a round at <a href="/armstrong/golf/overlander-golf-event-centre">The Overlander</a>, walk the <a href="/armstrong/outdoors/thomas-hayes-ecological-reserve-trails">Thomas Hayes Ecological Reserve Trails</a>, or visit <a href="/armstrong/wineries/edge-of-the-earth-vineyards">Edge of the Earth Vineyards</a>.`],
+    ],
+  },
+  lumby: {
+    titleTail: 'Lakes, Trails & Mountain Adventures',
+    describe: (n) => `Things to do in Lumby, BC: Mabel Lake, Camel's Hump, Monashee trails, paragliding and ${n} verified places to eat, drink and play.`,
+    paragraphs: [
+      [null, `Lumby is a small village east of Vernon, on the way to the Monashee Mountains. It's the gateway to Mabel Lake, Sugar Lake and some of the North Okanagan's best backcountry.`],
+      ['Outdoors.', `Spend a beach day at <a href="/lumby/beaches/mabel-lake-provincial-park">Mabel Lake Provincial Park</a>, hike <a href="/lumby/outdoors/camels-hump">Camel's Hump</a> or the <a href="/lumby/outdoors/spectrum-lake-trail-monashee-provincial-park">Spectrum Lake Trail</a>, or walk the <a href="/lumby/outdoors/lumby-salmon-trail">Lumby Salmon Trail</a>. For something different, try a paragliding flight at <a href="/lumby/outdoors/freedom-flight-park-and-school">Freedom Flight Park</a>.`],
+      ['Eat and drink.', `Pick up treats at <a href="/lumby/cafes/ida-s-bakery-deli">Ida's Bakery</a> or <a href="/lumby/cafes/jitter-beans-coffee-house">Jitter Beans</a>, and end the day at the <a href="/lumby/pubs/blue-ox-pub">Blue Ox Pub</a>.`],
+    ],
+  },
+  enderby: {
+    titleTail: 'River Floats, Trails & Small-Town Charm',
+    describe: (n) => `Things to do in Enderby, BC: Shuswap River floats, the Enderby Cliffs, Mabel Lake and ${n} verified places to eat, drink and play.`,
+    paragraphs: [
+      [null, `Enderby is a small town on the Shuswap River at the north end of the Okanagan. It's a laid-back base for river floats, cliff-top hikes and lake days.`],
+      ['On the river.', `In summer, the <a href="/enderby/outdoors/shuswap-river-float">Shuswap River Float</a> is a local tradition. The <a href="/enderby/outdoors/shuswap-north-okanagan-rail-trail-enderby-section">Shuswap North Okanagan Rail Trail</a> follows the river, and the <a href="/enderby/outdoors/kingfisher-interpretive-centre">Kingfisher Interpretive Centre</a> is a great stop to learn about salmon.`],
+      ['Hikes and lakes.', `Climb <a href="/enderby/outdoors/tplaqin-enderby-cliffs-provincial-park">the Enderby Cliffs</a> for big views, or head east to <a href="/enderby/outdoors/mabel-lake-resort-marina">Mabel Lake</a>.`],
+      ['Eat and drink.', `Try <a href="/enderby/cafes/sutherland-s-bakery-deli">Sutherland's Bakery</a>, <a href="/enderby/pubs/the-small-axe-road-house">The Small Axe Road House</a> or <a href="/enderby/wineries/baccata-ridge-winery">Baccata Ridge Winery</a>.`],
+    ],
+  },
+  'big-white': {
+    paragraphs: [
+      [null, `Big White is the Okanagan's biggest ski resort, about an hour from Kelowna. It has a ski-in, ski-out village, so you can park the car for the whole trip.`],
+      ['Off the slopes.', `Go tubing at <a href="/big-white/outdoors/big-white-tube-park">the tube park</a>, skate at <a href="/big-white/outdoors/happy-valley-ice-skating-rink">Happy Valley</a>, take a <a href="/big-white/outdoors/candle-creek-kennels-dog-sled-tours">dog sled tour</a>, or ride a <a href="/big-white/outdoors/big-white-horse-drawn-sleigh-rides">horse-drawn sleigh</a>.`],
+      ['Eat and drink.', `Après at <a href="/big-white/pubs/snowshoe-sam-s">Snowshoe Sam's</a> or the <a href="/big-white/restaurants/black-diamond-bar-grill">Black Diamond</a>, and book dinner at <a href="/big-white/restaurants/kettle-valley-steakhouse">Kettle Valley Steakhouse</a> or <a href="/big-white/restaurants/the-woods-restaurant">The Woods</a>. Read our <a href="/guides/ski-season-big-white-silverstar#big-white">Big White ski season guide</a> for more.`],
+    ],
+  },
+  silverstar: {
+    paragraphs: [
+      [null, `SilverStar is a colourful, village-style ski resort about 30 minutes above Vernon. It's known for its family-friendly feel and some of the best cross-country trails in Canada.`],
+      ['Off the slopes.', `Explore the <a href="/silverstar/outdoors/silverstar-cross-country-ski-trails">cross-country trails</a> and <a href="/silverstar/outdoors/sovereign-lake-nordic-centre">Sovereign Lake Nordic Centre</a>, ride the <a href="/silverstar/outdoors/silverstar-fat-bike-trails">fat bike trails</a>, skate on <a href="/silverstar/outdoors/brewers-pond-skating-silverstar">Brewer's Pond</a>, or go tubing at <a href="/silverstar/outdoors/tube-town-silverstar-tube-park">Tube Town</a>.`],
+      ['Eat and drink.', `Après at <a href="/silverstar/pubs/long-john-s-pub">Long John's Pub</a>, and book dinner at <a href="/silverstar/restaurants/the-red-antler">The Red Antler</a> or <a href="/silverstar/restaurants/black-pine">Black Pine</a>. Read our <a href="/guides/ski-season-big-white-silverstar#silverstar">SilverStar ski season guide</a> for more.`],
+    ],
+  },
+  apex: {
+    paragraphs: [
+      [null, `Apex Mountain Resort is a friendly, smaller ski hill about 40 minutes west of Penticton. It's known for a relaxed, local feel and a cozy village.`],
+      ['On the mountain.', `Ski or ride at <a href="/apex/outdoors/apex-mountain-resort">Apex Mountain Resort</a>, go tubing at the <a href="/apex/outdoors/tim-hortons-tube-park-apex">Apex tube park</a>, or skate the <a href="/apex/outdoors/adventure-skating-loop-apex">Adventure Skating Loop</a>. Cross-country skiers head to the nearby <a href="/apex/outdoors/nickel-plate-nordic-centre">Nickel Plate Nordic Centre</a>.`],
+      ['Eat and drink.', `Après at <a href="/apex/pubs/the-gunbarrel-saloon">The Gunbarrel Saloon</a>, dinner at <a href="/apex/restaurants/longshots-steak-house">Longshots Steak House</a>, and coffee at <a href="/apex/cafes/the-edge-bistro">The Edge Bistro</a>. In summer, the <a href="/apex/outdoors/brent-mountain-trail">Brent Mountain Trail</a> is a great alpine hike.`],
+    ],
+  },
+  baldy: {
+    paragraphs: [
+      [null, `Baldy Mountain Resort is a small, uncrowded ski hill in the South Okanagan, east of Oliver and Osoyoos. It's a laid-back, local favourite.`],
+      ['Things to do.', `Ski or ride at <a href="/baldy/outdoors/baldy-mountain-resort">Baldy Mountain Resort</a>, explore the <a href="/baldy/outdoors/baldy-snowshoe-trails">snowshoe trails</a> or the <a href="/baldy/outdoors/mckinney-nordic-ski-club-trails">McKinney Nordic trails</a>, and warm up at the <a href="/baldy/restaurants/corduroy-cafe">Corduroy Cafe</a>.`],
+    ],
+  },
 });
 
 function regionIntroHtml(region) {
   const intro = REGION_INTROS[region];
   if (!intro) return '';
+  const para = ([lead, html]) => `<p>${lead ? `<strong>${escapeHtml(lead)}</strong> ` : ''}${html}</p>`;
+  const [first, ...rest] = intro.paragraphs;
+  if (!rest.length) return `<div class="region-intro">\n    ${para(first)}\n  </div>`;
+  // Phones show the first paragraph plus a "Read more" toggle (a visually
+  // hidden, keyboard-focusable checkbox, so no script is needed); desktop
+  // always shows the whole intro and hides the toggle. The full text stays
+  // in the HTML either way, so search engines see all of it.
   return `<div class="region-intro">
-${intro.paragraphs.map(([lead, html]) => `    <p>${lead ? `<strong>${escapeHtml(lead)}</strong> ` : ''}${html}</p>`).join('\n')}
+    ${para(first)}
+    <input type="checkbox" id="region-intro-toggle" class="region-intro-toggle">
+    <div class="region-intro-more">
+${rest.map((p) => `      ${para(p)}`).join('\n')}
+    </div>
+    <label for="region-intro-toggle" class="region-intro-readmore">Read more about ${escapeHtml(REGION_LABELS[region])}</label>
   </div>`;
 }
-const REGION_INTRO_STYLE = '<style>body.region-page .region-intro { max-width: 68ch; margin: 0 0 26px; }\nbody.region-page .region-intro p { font-size: 1.02rem; line-height: 1.65; margin: 0 0 12px; }</style>';
+const REGION_INTRO_STYLE = `<style>
+body.region-page .region-intro { max-width: 68ch; margin: 0 0 26px; }
+body.region-page .region-intro p { font-size: 1.02rem; line-height: 1.65; margin: 0 0 12px; }
+body.region-page .region-intro-toggle { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+body.region-page .region-intro-readmore { display: none; font-weight: 700; color: var(--teal-deep); cursor: pointer; }
+body.region-page .region-intro-toggle:focus-visible + .region-intro-more + .region-intro-readmore { outline: 2px solid var(--teal-deep); outline-offset: 2px; }
+@media (max-width: 640px) {
+  body.region-page .region-intro-more { display: none; }
+  body.region-page .region-intro-readmore { display: inline-block; }
+  body.region-page .region-intro-toggle:checked + .region-intro-more { display: block; }
+  body.region-page .region-intro-toggle:checked + .region-intro-more + .region-intro-readmore { display: none; }
+}
+</style>`;
 
 // One JS source of truth for the compact-band accent colors used by
 // Design Sprint 4's new compact visual band (Hidden Gems homepage cards,
@@ -9573,12 +9752,12 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
   // courses" wording doesn't match what people search for on a ski hill.
   const isSkiResort = SKI_RESORT_REGIONS.has(region);
   const intro = REGION_INTROS[region];
-  const title = intro
+  const title = intro && intro.titleTail
     ? `Things to Do in ${regionLabel}: ${intro.titleTail} | Okanagan Roam`
     : isSkiResort
       ? `${regionLabel} Restaurants, Bars & Après-Ski, BC | Okanagan Roam`
       : `${regionLabel} Restaurants, Wineries & More, BC | Okanagan Roam`;
-  const description = intro
+  const description = intro && intro.describe
     ? intro.describe(totalVenues)
     : isSkiResort
       ? `${totalVenues} verified spots at ${regionLabel}, BC: restaurants, bars, cafés and après-ski, all reviewed and badge-checked by Okanagan Roam.`
@@ -21481,6 +21660,9 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  REGION_INTROS,
+  REGION_INTRO_STYLE,
+  SKI_RESORT_REGIONS,
   startServer,
   importEventBatches,
   // List an Event, Phase 1
