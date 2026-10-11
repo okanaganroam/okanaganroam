@@ -5589,7 +5589,7 @@ const TRIP_PARSER_AMENITY_ALIASES = {
   live_music: ['live music'],
   great_groups: ['great for groups', 'good for groups', 'large groups'],
   happy_hour: ['happy hour'],
-  open_early: ['breakfast', 'brunch', 'early', 'open early'],
+  open_early: ['breakfast', 'brunch', 'open early'],
   open_late: ['late night', 'open late'],
 };
 
