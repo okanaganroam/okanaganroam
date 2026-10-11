@@ -16816,7 +16816,7 @@ test('Indoor & Rainy Day: other-type venues tagged indoor_also get an "Also good
       const before = await WINTER_GET(base, '/indoor');
       assert.doesNotMatch(before.text, /indoorAlsoHeading/, 'no section without members');
       for (const v of [arena, lanes]) {
-        const r = app.guardedCollectionMembershipUpdate('indoor_also', v.id, 'add', null, { reason: 'fixture', batch_id: 'test' });
+        const r = app.guardedCollectionMembershipUpdate('indoor_also', v.id, 'add', v === arena ? 'Indoor ice: public skating sessions' : null, { reason: 'fixture', batch_id: 'test' });
         assert.ok(r.ok, JSON.stringify(r));
       }
       assert.deepEqual(app.getIndoorAlsoVenues().map((v) => v.name), ['Also Test Arena', 'Also Test Lanes']);
@@ -16826,6 +16826,12 @@ test('Indoor & Rainy Day: other-type venues tagged indoor_also get an "Also good
       assert.match(hub.text, /href="\/vernon\/outdoors\/also-test-arena"/, 'an arena links to its outdoors page');
       assert.match(hub.text, /href="\/kelowna\/breweries\/also-test-lanes"/, 'a brewery links to its brewery page');
       assert.doesNotMatch(hub.text, /noindex/);
+      // The membership note is shown on that card only; a member without a note shows none.
+      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Rainy day:<\/span> Indoor ice: public skating sessions<\/p>/);
+      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
+      // The card script wires every type on /indoor (Read more clamp, Favorite / Trip), not just indoor + golf.
+      assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="brewery"\][^)]*\[data-venue-category="outdoor"\]/);
+      assert.match(hub.text, /body\.golf-page\.indoor-page \.golf-desc\.is-clamped p \{ -webkit-line-clamp: 3;/);
       // Their own pages and types are untouched.
       assert.equal((await WINTER_GET(base, '/vernon/outdoors/also-test-arena')).status, 200);
       assert.equal(app.getVenue(arena.id).type, 'outdoor');
