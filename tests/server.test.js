@@ -17435,3 +17435,25 @@ test('Venue descriptions ship in English and French: the EN / FR toggle (<html l
     db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(fr.id, en.id);
   }
 });
+
+test('Browse hub: venues tagged into an "also" collection count and filter under that category chip (sports_also -> Sports & Recreation), and their note is searchable', async () => {
+  const park = app.createVenue({ name: 'Browse Also Test Park', region: 'vernon', type: 'outdoor', description: 'A fixture park by the lake.', slug: 'browse-also-test-park' });
+  try {
+    const r = app.guardedCollectionMembershipUpdate('sports_also', park.id, 'add', 'Skate park and a paved pumptrackfixture loop', { reason: 'fixture', batch_id: 'test' });
+    assert.ok(r.ok, JSON.stringify(r));
+    await withWinterServer(async (base) => {
+      const html = await WINTER_GET(base, '/browse?types=sport');
+      assert.equal(html.status, 200);
+      assert.ok(browseCardIds(html.text).includes(park.id), 'listed under Sports & Recreation');
+      assert.match(html.text, new RegExp(`"${park.id}":\\{"c":\\["outdoor","sport"\\][^}]*"n":"Skate park and a paved pumptrackfixture loop"`), 'page data carries the extra category and the note');
+      const outdoor = await WINTER_GET(base, '/browse?types=outdoor');
+      assert.ok(browseCardIds(outdoor.text).includes(park.id), 'still listed under its own type');
+      const search = await WINTER_GET(base, '/browse?q=pumptrackfixture');
+      assert.deepEqual(browseCardIds(search.text), [park.id], 'the note is searchable');
+      assert.match(html.text, /'d\.cu \|\| '', meta \? meta\.textContent : '', desc \? desc\.textContent : '', d\.n \|\| ''\]|d\.n \|\| ''/, 'the page script searches the note too');
+    });
+  } finally {
+    db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id = ?").run(park.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(park.id);
+  }
+});
