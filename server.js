@@ -9274,6 +9274,10 @@ function renderGolfThemeStyles() {
      shadow, hover lift), two-up on wide screens like the discovery rows. */
   body.golf-page .card-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 0 0 26px; }
   @media (min-width: 900px) { body.golf-page .card-grid { grid-template-columns: repeat(2, 1fr); } }
+  /* Cards keep their own height (2026-10-11): stretching a short card to its
+     taller neighbour (a long advisory, a note) left a large empty gap above
+     its buttons. */
+  body.golf-page .card-grid { align-items: start; }
   body.golf-page .venue-card {
     margin: 0; background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
     padding: 18px 20px; box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
@@ -10197,8 +10201,12 @@ function breadcrumbNavHtml(items) {
 // The `<span class="chip">` badge row used on venue/category/guide pages —
 // one chip per true boolean amenity flag on the venue. Identical output to
 // what all three call sites built inline before this extraction.
-function badgeChipsHtml(venue) {
-  return BOOL_FIELDS.filter((f) => venue[f])
+// skipDogFriendly (2026-10-11): a venue on the official dog-beach list already
+// shows the richer "🐾 Dog Friendly" collection badge (with its leash-rule
+// tooltip), so the plain Dog-Friendly amenity chip is dropped beside it
+// rather than showing the same fact twice.
+function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
     .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
     .join(' ');
 }
@@ -10315,7 +10323,7 @@ function venueCardHtml(venue, opts = {}) {
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>${golfFeeHtml ? '\n        ' + golfFeeHtml : ''}
         ${desc}${advisoryHtml}${dogNoteHtml}${cardNoteHtml}
-        <p class="chips">${editorialChips}${badgeChipsHtml(venue)}</p>${cardActions}
+        <p class="chips">${editorialChips}${badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly })}</p>${cardActions}
       </li>`;
 }
 
@@ -15236,10 +15244,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     openingHoursSpecification: buildOpeningHoursSpecification(pageHours),
   };
 
-  const attributeChips = badgeChipsHtml(venue);
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
   const dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
+  const attributeChips = badgeChipsHtml(venue, { skipDogFriendly: dogFriendlyNote !== undefined });
   const hiddenGemChip = (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
 
   // Stage 2 (2026-09-29): read through hours.js like Open Now and the
