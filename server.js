@@ -4100,7 +4100,7 @@ function tripPlannerModule() {
 // secondary Food & Drink categories, the stored coordinates, rating, review
 // count, price level and cuisine, and normalized name/cuisine/description
 // text for whole-word matching. The planner can use nothing else.
-function buildTripPlannerFacts() {
+function buildTripPlannerFacts(preparePlannerKinds = true) {
   const normalize = discoveryIntentModule().normalizeDiscoveryText;
   const memberships = new Map();
   const addMember = (id, key) => { if (!memberships.has(id)) memberships.set(id, { collections: [], activities: [], fdTypes: [] }); memberships.get(id)[key.kind].push(key.value); };
@@ -4114,6 +4114,8 @@ function buildTripPlannerFacts() {
   const dogNotes = getDogFriendlyNotes();
   const golfWindows = getGolfRateWindows();
   const facts = [];
+  const indoorIds = new Set(getCollectionVenueIds('indoor_also'));
+  const requirementModule = require('./trip-requirements');
   for (const v of rows) {
     if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
     const features = {};
@@ -4126,8 +4128,11 @@ function buildTripPlannerFacts() {
       lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
       cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisineLabel: v.cuisine || null,
       textName: normalize(v.name || ''), textCuisine: normalize(v.cuisine || ''), textDesc: normalize(v.description || ''),
-      features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
+      features, collections: m.collections, activities: preparePlannerKinds ? [...new Set([...m.activities, ...requirementModule.inferPlannerActivities(v)])] : m.activities, fdTypes: m.fdTypes,
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
+      plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds(v) : [],
+      plannerDescription: preparePlannerKinds ? v.description || '' : null,
+      indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       hours: v.hours || null, // the stored JSON; parsed (never modified) by the planner
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
@@ -4378,35 +4383,39 @@ function appliedTripExclusions(plan, intent, taxonomy) {
 function tripPlannerFrModule() {
   return require('./trip-planner-fr.js');
 }
-// The planner's taxonomy: Hero Search's, minus the Indoor & Rainy Day type
-// (2026-10-11). The planner has no indoor stops yet (TRIP_PLANNER_EXCLUDED_TYPES),
-// so "a museum and dinner" or "theatre" plan exactly as they did before the
-// type existed instead of asking for stops it can never fill. Tours &
-// Experiences (2026-10-11) is dropped the same way, so "plan a wine tour"
-// still reads as wineries (discovery-intent.js gives "wine tour" to the tour
-// type only when the taxonomy has it).
-const TRIP_PLANNER_DROPPED_TYPES = new Set(['indoor', 'tour']);
+// V3 uses every registered venue category, including categories with no current
+// matches so unmet requests are explained instead of reinterpreted as wineries.
 function buildTripPlannerTaxonomy() {
   const taxonomy = buildDiscoveryTaxonomy();
-  return { ...taxonomy, types: taxonomy.types.filter((t) => !TRIP_PLANNER_DROPPED_TYPES.has(t)), venues: taxonomy.venues.filter((v) => !TRIP_PLANNER_DROPPED_TYPES.has(v.type)) };
+  return { ...taxonomy, types: [...new Set([...taxonomy.types, ...Object.keys(CATEGORY_SLUGS)])] };
 }
 function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
-  const intent = discoveryIntentModule().interpretDiscoveryQuery(planText, taxonomy);
+  // Calendar dates are handled by requirements, not mistaken for a day count.
+  const interpretationText = planText.replace(/\b20\d{2}-\d{2}-\d{2}\b/g, '');
+  const intent = discoveryIntentModule().interpretDiscoveryQuery(interpretationText, taxonomy);
   // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
-  const trip = discoveryIntentModule().interpretTripComponents(planText, taxonomy, intent);
+  let trip = discoveryIntentModule().interpretTripComponents(interpretationText, taxonomy, intent);
+  const requirementModule = require('./trip-requirements');
+  const extracted = requirementModule.extractTripRequirements({ text: planText, intent, trip, taxonomy });
+  const requirements = extracted.startDate || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
+  if (requirements) {
+    trip = requirementModule.expandTripComponents(trip, requirements);
+    if (requirements.items.some(i=>i.kind==='rainy'&&i.activityOnly)) intent.occasion=null;
+  }
   // Build My Trip V3 (Step 2): chips the visitor edited. Without overrides
   // (every existing caller) nothing below changes.
   if (overrides) {
-    if (overrides.days !== undefined && intent.mode === 'plan') intent.days = overrides.days;
+    if (overrides.days !== undefined) { if (intent.mode === 'plan') intent.days = overrides.days; if (requirements) requirements.items = requirements.items.filter(i => i.kind !== 'days').concat({ id: 'override-days', kind: 'days', value: overrides.days, strength: 'must', dayIndex: null, sourceText: 'Updated trip length' }); }
     if (overrides.pace !== undefined) intent.pace = overrides.pace;
     if (overrides.baseRegion !== undefined) {
       const regions = overrides.baseRegion === 'valley' ? [] : [overrides.baseRegion];
       intent.regions = regions;
       if (trip.multi && !trip.route) trip.regions = regions;
+      if (requirements) requirements.items = requirements.items.filter(i => i.kind !== 'base');
     }
   }
   const understood = (plan) => {
@@ -4416,6 +4425,35 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
     return tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).map((d) => d.region) });
   };
+  if (requirements && !trip.multi && !requirements.items.some(i=>['days','venue_kind','venue','type'].includes(i.kind)) && requirements.items.some(i=>i.kind==='event')) {
+    intent.mode = 'events';
+    intent.eventCategories = [...new Set(requirements.items.filter(i=>i.kind==='event'&&i.value!=='any').map(i=>i.value))];
+    intent.features = (intent.features || []).filter(f=>f!=='live_music');
+  }
+  let itineraryEvents = null;
+  if (requirements && requirements.items.some(i => i.kind === 'event') && requirements.items.some(i => i.kind === 'days')) {
+    const venueText = interpretationText.replace(/\b(?:concerts?|live music|hockey|events?|festivals?|markets?)\b/gi, '');
+    Object.assign(intent, discoveryIntentModule().interpretDiscoveryQuery(venueText, taxonomy));
+    intent.mode = 'plan';
+    if (overrides?.baseRegion !== undefined) intent.regions = overrides.baseRegion === 'valley' ? [] : [overrides.baseRegion];
+    if (overrides?.pace !== undefined) intent.pace = overrides.pace;
+    intent.days = overrides && overrides.days !== undefined ? overrides.days : requirements.items.find(i => i.kind === 'days').value;
+    trip.multi = false;
+    const from = requirements.startDate || tripPlanDate(intent.when, now);
+    const to = addLocalDays(from, Math.max(1, Math.min(7, intent.days)) - 1);
+    const window = resolveWhatsOnWindow({ from, to }, now);
+    const categories = requirements.items.filter(i => i.kind === 'event' && i.value !== 'any').map(i => i.value);
+    itineraryEvents = eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), intent.regions, categories), intent.excluded).map(e => ({
+      id: e.id, name: e.name, description: e.description || '', region: e.region, regionLabel: REGION_LABELS[e.region], url: discoveryEventUrl(e),
+      categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '', startDate: e.startDate || null, endDate: e.endDate || null,
+      startTime: e.firstOccurrence?.start_time || null, endTime: e.firstOccurrence?.end_time || null, endsNextDay: e.firstOccurrence?.ends_next_day || 0,
+    }));
+  }
+  if (requirements) {
+    const consumed = requirementModule.consumedTerms(requirements);
+    intent.foodTerms = (intent.foodTerms || []).filter(f => f.cuisine || !consumed.has(f.term));
+    intent.textTerms = (intent.textTerms || []).filter(t => !consumed.has(t));
+  }
   if (trip.multi) {
     const planner = tripPlannerModule();
     const eventRegions = trip.route ? planner.routeRegions(trip.route.from, trip.route.to) : trip.regions;
@@ -4427,8 +4465,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       return sel.items;
     });
     const plan = planner.planTrip({
-      intent, trip, tripEvents,
-      facts: buildTripPlannerFacts(),
+      intent, trip, tripEvents, requirements,
+      facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity')),
       labels: tripPlannerLabels(),
       seed,
       excludeIds: excludeVenueIds,
@@ -4454,15 +4492,16 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now) : null;
   const plan = tripPlannerModule().planTrip({
-    intent,
-    facts: buildTripPlannerFacts(),
+    intent, requirements,
+    facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity')),
     labels: tripPlannerLabels(),
     seed,
     excludeIds: excludeVenueIds,
     avoidIds: avoidVenueIds,
     pinned,
-    events: events ? events.items : null,
-    startWeekday: tripStartWeekday(intent.when, now),
+    events: itineraryEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
+    tripDate: requirements?.startDate || tripPlanDate(intent.when, now),
+    startWeekday: requirements?.startDate ? ['sun','mon','tue','wed','thu','fri','sat'][new Date(`${requirements.startDate}T12:00:00Z`).getUTCDay()] : tripStartWeekday(intent.when, now),
     clock: okanaganClock(now),
   });
   if (intent.mode === 'navigate' && intent.exactVenue) {
@@ -22176,7 +22215,7 @@ const server = http.createServer(async (req, res) => {
       }
       const parsed = parseTripPlanBody(body);
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
-      return sendJSON(res, 200, runTripPlan(parsed.value));
+      try { return sendJSON(res, 200, runTripPlan(parsed.value)); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered

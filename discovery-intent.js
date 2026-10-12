@@ -1287,6 +1287,11 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // that stand for the thing refused never remain as positive search terms.
   intent.textTerms = withoutConceptStrays(intent.textTerms, intent.excluded);
   intent.foodTerms = withoutConceptStrays(intent.foodTerms, intent.excluded);
+  // Planner-only subtype intent. Search keeps its existing category behavior.
+  if (planning && intent.types.some(type => type === 'indoor' || type === 'tour')) {
+    const req = require('./trip-requirements').extractTripRequirements({ text, intent, taxonomy });
+    intent.plannerKinds = req.items.filter(i => i.kind === 'venue_kind').map(i => i.value);
+  }
   return finalizeIntent(intent, t);
 }
 

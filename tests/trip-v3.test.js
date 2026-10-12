@@ -390,3 +390,13 @@ test('Stage 5G map: no locations, bad locations, events, empty slots, shared loc
   // Nothing to read: no days.
   assert.deepEqual(v3.t3MapPoints(undefined, undefined), { days: [], count: 0, skipped: 0 });
 });
+test('Complex V3 edits: settings send existing locks to the server so conflicts are visible',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'..','trip-planner-v3-page.js'),'utf8');
+ const handler=source.slice(source.indexOf("  resultEl.addEventListener('change'"),source.indexOf('  var exampleSubmit'));
+ for(const complex of [true,false]) {
+  const state={overrides:{},locks:{'2-morning':41},removed:{},last:complex?{requirementResults:[{kind:'venue_kind'}]}:{}};let sent,change;
+  require('node:vm').runInNewContext(handler,{state,resultEl:{addEventListener:(name,fn)=>{change=fn;}},request:body=>{sent=body;}});
+  change({target:{closest:()=>({value:'1',getAttribute:()=> 'days'})}});
+  assert.equal(sent.pinned?.['2-morning'],complex?41:undefined);
+ }
+});

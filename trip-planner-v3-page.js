@@ -1216,9 +1216,10 @@ function renderScript(d) {
     if (k === 'days') state.overrides.days = Number(v);
     else if (k === 'pace') state.overrides.pace = v;
     else if (k === 'baseRegion') { if (v) state.overrides.baseRegion = v; else delete state.overrides.baseRegion; }
-    // Edited settings start a fresh plan from the same words; kept stops only
-    // survive when the days they sit on still exist and the base is unchanged.
-    if (k !== 'pace') state.locks = {};
+    // Complex plans keep locks through settings edits. The server reports
+    // incompatible locks instead of silently replacing the visitor's choices.
+    // Preserve the existing fresh-plan behavior for ordinary requests.
+    if (k !== 'pace' && !(state.last && state.last.requirementResults)) state.locks = {};
     state.removed = {};
     request(Object.keys(state.locks).length ? { pinned: state.locks } : {}, { requestType: 'refine', trigger: sel, focus: false });
   });
