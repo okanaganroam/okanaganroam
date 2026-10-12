@@ -9781,6 +9781,20 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
 // /secret-spots lists the live 'hidden_gem' collection narrowed to places
 // (outdoor + beach). A Hidden Gem cafe stays a Hidden Gem but is not a
 // Secret Spot. Fixture memberships are removed again at the end.
+test('Cards: themed listing cards cap the badge row at 5 chips (+N more) and the grid uses uniform, bottom-aligned cards', () => {
+  const v = { id: 990003, name: 'Chip Cap Fixture', region: 'kelowna', type: 'brewery', slug: 'chip-cap-fixture', description: 'Fixture.', vegan: true, vegetarian: true, patio: true, live_music: true, happy_hour: true, great_groups: true, gluten_free: true };
+  const card = app.venueCardHtml(v, { themed: true });
+  const chips = card.match(/<p class="chips">(.*?)<\/p>/)[1];
+  assert.equal((chips.match(/class="chip/g) || []).length, 5);
+  assert.match(chips, /<span class="chip chip-more" title="Live Music, Great for Groups, Happy Hour">\+3 more<\/span>/);
+  assert.equal(app.capChips('<span class="chip">A</span>', 5), '<span class="chip">A</span>', 'short rows untouched');
+  const plain = app.venueCardHtml(v, { themed: false });
+  assert.doesNotMatch(plain, /chip-more/, 'unthemed cards keep every chip');
+  const css = app.renderGolfThemeStyles();
+  assert.match(css, /body\.golf-page \.card-grid \{ align-items: stretch; \}/);
+  assert.match(css, /\.card-grid > \.venue-card > \.chips:not\(:empty\) \{ margin-top: auto; \}/);
+});
+
 test('Cards: a season-only notice is a one-line tag on list cards; written advisories keep the full box', () => {
   const v = { id: 990002, name: 'Season Tag Fixture', region: 'apex', type: 'restaurant', slug: 'season-tag-fixture', description: 'Fixture.' };
   const st = { kind: 'closed', text: 'Closed for the season. The reopening date has not been announced yet.', note: 'Closed for the season. The reopening date has not been announced yet. https://example.com' };
@@ -9794,7 +9808,7 @@ test('Cards: a season-only notice is a one-line tag on list cards; written advis
   assert.doesNotMatch(box, /class="season-tag/);
 });
 
-test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badge, not the plain Dog-Friendly chip too; themed card grids do not stretch cards', () => {
+test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badge, not the plain Dog-Friendly chip too', () => {
   const v = { id: 990001, name: 'Dog Chip Fixture Beach', region: 'kelowna', type: 'beach', slug: 'dog-chip-fixture-beach', description: 'Fixture.', dog_friendly: true, lake_view: true };
   const both = app.venueCardHtml(v, { dogFriendlyNote: 'On-leash in the park; off-leash at the dog beach.' });
   assert.equal((both.match(/Dog Friendly<\/span>/g) || []).length, 1, 'the collection badge');

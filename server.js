@@ -4998,6 +4998,10 @@ function advisoryNoticeHtml(note) {
 // tokens.css; the kicker mirrors the homepage's .eyebrow treatment.
 function renderAdvisoryStyles() {
   return `<style>
+  /* On listing cards a written notice is capped at 3 lines (the venue page shows it in full). */
+  body.golf-page .card-grid > .venue-card .venue-advisory-text {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
   /* One-line season tag on list cards (closed / open until / reopening). */
   .season-tag {
     margin: 0 0 12px; padding: 6px 12px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center;
@@ -9295,10 +9299,28 @@ function renderGolfThemeStyles() {
      shadow, hover lift), two-up on wide screens like the discovery rows. */
   body.golf-page .card-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 0 0 26px; }
   @media (min-width: 900px) { body.golf-page .card-grid { grid-template-columns: repeat(2, 1fr); } }
-  /* Cards keep their own height (2026-10-11): stretching a short card to its
-     taller neighbour (a long advisory, a note) left a large empty gap above
-     its buttons. */
-  body.golf-page .card-grid { align-items: start; }
+  /* Uniform listing cards (2026-10-12): every card in a row is the same
+     height and built the same way, top to bottom -- name (max 2 lines),
+     one-line meta, description (3 lines, Read more always reserves its line),
+     notices and notes (max 3 lines), then the badge row and buttons pinned to
+     the bottom, so the chips and buttons line up across the row. The badge
+     row itself is capped server-side (venueCardHtml maxChips). */
+  body.golf-page .card-grid { align-items: stretch; }
+  body.golf-page .card-grid > .venue-card h2 a.venue-card-link .venue-card-name {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  body.golf-page .card-grid > .venue-card > .venue-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.golf-page .card-grid > .venue-card .golf-desc { min-height: calc(3 * 1.45em); }
+  body.golf-page .card-grid > .venue-card .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
+  body.golf-page .card-grid > .venue-card > .desc-toggle[hidden] { display: block; visibility: hidden; }
+  body.golf-page .card-grid > .venue-card > .card-note,
+  body.golf-page .card-grid > .venue-card > .dog-note {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  body.golf-page .card-grid > .venue-card > .chips:not(:empty) { margin-top: auto; }
+  body.golf-page .card-grid > .venue-card > .chips:empty { display: none; }
+  body.golf-page .card-grid > .venue-card > .chips:not(:empty) + .card-actions { margin-top: 8px; }
+  body.golf-page .card-grid > .venue-card > .chips:empty + .card-actions { margin-top: auto; }
   body.golf-page .venue-card {
     margin: 0; background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
     padding: 18px 20px; box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
@@ -10226,6 +10248,17 @@ function breadcrumbNavHtml(items) {
 // shows the richer "🐾 Dog Friendly" collection badge (with its leash-rule
 // tooltip), so the plain Dog-Friendly amenity chip is dropped beside it
 // rather than showing the same fact twice.
+// Keeps at most `max` chips on a listing card and folds the rest into one
+// "+N more" chip (its title lists them); the venue page shows every badge.
+// max 0 = no cap (unthemed cards keep their markup unchanged).
+function capChips(html, max) {
+  const chips = html.match(/<span class="chip[^"]*"[^>]*>.*?<\/span>/g) || [];
+  if (!max || chips.length <= max) return html;
+  const kept = chips.slice(0, max - 1);
+  const rest = chips.slice(max - 1).map((c) => c.replace(/<[^>]+>/g, '').trim());
+  return `${kept.join(' ')} <span class="chip chip-more" title="${escapeHtml(rest.join(', '))}">+${rest.length} more</span>`;
+}
+
 function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
   return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
     .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
@@ -10264,7 +10297,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 5 } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -10344,7 +10377,7 @@ function venueCardHtml(venue, opts = {}) {
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>${golfFeeHtml ? '\n        ' + golfFeeHtml : ''}
         ${desc}${advisoryHtml}${dogNoteHtml}${cardNoteHtml}
-        <p class="chips">${editorialChips}${badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly })}</p>${cardActions}
+        <p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly }), themed ? maxChips : 0)}</p>${cardActions}
       </li>`;
 }
 
@@ -22726,6 +22759,7 @@ module.exports = {
   breadcrumbListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,
+  capChips,
   breadcrumbNavHtml,
   venueCardHtml,
   listVenues,
