@@ -1477,8 +1477,9 @@ const ALL_REGIONS_CATEGORIES = ['golf', 'beach', 'outdoor', 'winery', 'indoor', 
 // Human-readable label per category, singular and plural, for titles/H1s
 // The noun in "N verified ... in <region>" counts (2026-10-12): the plural
 // label, except where it isn't a countable noun ("Sports & Recreation").
-function categoryCountNoun(type, label) {
-  return type === 'sport' ? 'sports & recreation spots' : label.plural.toLowerCase();
+function categoryCountNoun(type, label, n) {
+  if (type === 'sport') return n === 1 ? 'sports & recreation spot' : 'sports & recreation spots';
+  return label.plural.toLowerCase();
 }
 const CATEGORY_LABELS = {
   restaurant: { singular: 'Restaurant', plural: 'Restaurants' },
@@ -11359,9 +11360,15 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
   const title = `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
-  const description = venues.length === 0
+  // Sports & Recreation (2026-10-12): the region's other-type venues tagged
+  // sports_also (a park with a skate park, a resort's bike park), listed
+  // under "More places to play" as on /sports. Empty for every other type.
+  const sportsAlso = type === 'sport' ? (opts.sportsAlso || []) : [];
+  const description = venues.length === 0 && sportsAlso.length
+    ? `Places to play in ${regionLabel}, BC: skate parks, bike parks and trails, disc golf and courts, listed by Okanagan Roam.`
+    : venues.length === 0
     ? `No ${label.plural.toLowerCase()} are currently listed in ${regionLabel}, BC. Browse everything else Okanagan Roam covers in ${regionLabel}.`
-    : `${venues.length} verified ${categoryCountNoun(type, label)} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
+    : `${venues.length} verified ${categoryCountNoun(type, label, venues.length)} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}/${catSlug}`;
 
   const breadcrumb = breadcrumbListSchema([
@@ -11375,10 +11382,10 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
     '@type': 'ItemList',
     name: title,
     description,
-    itemListElement: venues.map((v, i) => ({
+    itemListElement: [...venues, ...sportsAlso].map((v, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      url: `https://okanaganroam.com/${region}/${catSlug}/${v.slug}`,
+      url: `https://okanaganroam.com/${region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
       item: {
         '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
         name: v.name,
@@ -11404,6 +11411,13 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
     ? `<a class="category-back-link" href="/${catSlug}">\u2190 All ${escapeHtml(ALL_REGIONS_BACK_LABEL[type] || label.plural)}</a>`
     : '';
 
+  const sportsAlsoHtml = sportsAlso.length
+    ? `<section class="sport-also-section" aria-labelledby="sportsAlsoHeading">
+  <h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play</h2>
+  ${renderCategoryCardsHtml('sport', sportsAlso, hiddenGemIds, regionLabel, getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { themed: true, appLabels: true, cardNotes: getSportsAlsoNotes(), cardNoteLabel: 'Play:' })}
+  </section>`
+    : '';
+
   const guideLinks = categoryGuidePages.length
     ? `<div class="related-section">
         <h2>Filter ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</h2>
@@ -11416,7 +11430,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', indoorTheme: type === 'indoor', tourTheme: type === 'tour', sportTheme: type === 'sport', advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', indoorTheme: type === 'indoor', tourTheme: type === 'tour', sportTheme: type === 'sport', advisoryStyles: [...venues, ...sportsAlso].some((v) => advisoryNotes.has(v.id)), noindex: venues.length + sportsAlso.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type, true, 'category')}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -11429,9 +11443,9 @@ ${golfEngagementHeadHtml(type, true, 'category')}
   ${backLink}
   <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
   ${venues.length === 0
-    ? `<p class="subtitle">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`
-    : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label))} in ${escapeHtml(regionLabel)}.</p>
-  ${cardsHtml}`}
+    ? (sportsAlso.length ? '' : `<p class="subtitle">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`)
+    : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} in ${escapeHtml(regionLabel)}.</p>
+  ${cardsHtml}`}${sportsAlsoHtml ? '\n  ' + sportsAlsoHtml : ''}
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
@@ -12317,9 +12331,9 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
         ? 'Tours and experiences in the Okanagan: wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more, booked with local operators.'
         : isSportsHub
           ? 'Sports and recreation in the Okanagan: skate parks, pump tracks, BMX tracks, bike parks, disc golf courses, and pickleball, tennis and beach volleyball courts.'
-          : `${venues.length} verified ${categoryCountNoun(type, label)} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
+          : `${venues.length} verified ${categoryCountNoun(type, label, venues.length)} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${catSlug}`;
-  const regionSelector = emptyMainList ? '' : renderCategoryRegionSelector(catSlug, venues);
+  const regionSelector = emptyMainList ? '' : renderCategoryRegionSelector(catSlug, isSportsHub ? [...venues, ...sportsAlso] : venues);
   // Landing (2026-09-21 order): Choose Region(s) -> Explore by Activity
   // (six featured image cards + "View All Outdoor Activities" revealing
   // five more, each linking to its EXISTING /outdoors/<slug> page) -> Show
@@ -12444,7 +12458,7 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: label.plural },
   ])}
   ${isIndoorHub ? '<div class="indoor-hero"><img src="/images/indoor-rainy-day-banner.jpg" width="1586" height="992" alt="Illustrative rainy-day café scene with coffee, a sketchbook and a misty lake view" fetchpriority="high"><div><h1>' + escapeHtml(heading) + '</h1><p>Find your perfect rainy day.</p></div></div>' : '<h1>' + escapeHtml(heading) + '</h1>'}
-  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
+  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
@@ -20871,6 +20885,14 @@ const server = http.createServer(async (req, res) => {
         .prepare('SELECT region, type, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region, type')
         .all()
         .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && r.n > 0);
+      // /:region/sports also renders for regions whose places to play are
+      // only tagged sports_also venues (2026-10-12), so list those too.
+      for (const v of getSportsAlsoVenues()) {
+        if (!REGION_LABELS[v.region]) continue;
+        const combo = categoryCombos.find((r) => r.region === v.region && r.type === 'sport');
+        if (!combo) categoryCombos.push({ region: v.region, type: 'sport', n: 1, lastmod: v.updated_at });
+        else if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
+      }
 
       // Venue pages: every venue that has a real, non-null slug (should be
       // all of them after the startup backfill, but this guards against any
@@ -22707,7 +22729,10 @@ const server = http.createServer(async (req, res) => {
       const type = SLUG_TO_TYPE[categorySlug];
       if (REGION_LABELS[region] && type) {
         const venues = getVenuesByRegionCategory(region, type);
-        if (venues.length >= MIN_CATEGORY_VENUES || RETAINED_EMPTY_CATEGORY_PAGES.has(`${region}/${type}`)) {
+        // /:region/sports also renders for a region whose only places to play
+        // are tagged sports_also venues (2026-10-12).
+        const sportsAlso = type === 'sport' ? getSportsAlsoVenues().filter((v) => v.region === region) : [];
+        if (venues.length >= MIN_CATEGORY_VENUES || sportsAlso.length > 0 || RETAINED_EMPTY_CATEGORY_PAGES.has(`${region}/${type}`)) {
           const categoryGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter(
             (c) => c.region === region && venues.some((v) => v[c.badge])
           );
@@ -22716,7 +22741,7 @@ const server = http.createServer(async (req, res) => {
           // beaches and outdoors keep their existing page unchanged.
           const html = FD_CATEGORY_KIND_BY_TYPE[type]
             ? renderFoodDrinkHubPage(venues, parseFoodDrinkFilterQuery(query), { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
-            : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended' });
+            : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', sportsAlso });
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }

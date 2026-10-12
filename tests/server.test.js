@@ -17159,10 +17159,10 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(hub.text, /href="\/penticton\/sports\/sport-test-skate-park"/);
       assert.doesNotMatch(hub.text, /class="sport-coming-soon"/);
       assert.doesNotMatch(hub.text, /noindex/);
-      assert.match(hub.text, /verified sports &amp; recreation spots across the Okanagan Valley\./, 'a countable noun, not "verified sports & recreation"');
+      assert.match(hub.text, /1 verified sports &amp; recreation spot across the Okanagan Valley\./, 'a countable noun, singular for one');
       const region = await WINTER_GET(base, '/penticton/sports');
       assert.equal(region.status, 200);
-      assert.match(region.text, /verified sports &amp; recreation spots in Penticton\./);
+      assert.match(region.text, /1 verified sports &amp; recreation spot in Penticton\./);
       assert.match(region.text, /Sports &amp; Recreation in Penticton, BC/);
       assert.match(region.text, /class="category-back-link" href="\/sports">← All Sports &amp; Recreation</);
       assert.match(region.text, /<body class="golf-page sport-page">/);
@@ -17227,6 +17227,33 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       assert.equal((await WINTER_GET(base, '/kelowna/outdoors/sports-also-city-park')).status, 200);
       assert.equal(app.getVenue(park.id).type, 'outdoor');
       assert.doesNotMatch((await WINTER_GET(base, '/tours')).text, /Play:<\/span>|sports-also-city-park/);
+      // Region pages (2026-10-12): a region whose only places to play are
+      // tagged venues still gets /:region/sports, with the same section and
+      // notes, and the sitemap lists it; the hub's region selector offers it.
+      const kel = await WINTER_GET(base, '/kelowna/sports');
+      assert.equal(kel.status, 200);
+      assert.match(kel.text, /<h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play<\/h2>/);
+      assert.match(kel.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/);
+      assert.match(kel.text, /<span class="card-note-label">Play:<\/span> Skate park and four tennis courts/);
+      assert.doesNotMatch(kel.text, /noindex|No sports &amp; recreation are listed/);
+      assert.doesNotMatch(kel.text, /sports-also-disc-golf-club/, 'only this region\'s tagged venues');
+      const sitemap = await WINTER_GET(base, '/sitemap.xml');
+      assert.match(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/kelowna\/sports<\/loc>/);
+      assert.match(sitemap.text, /<loc>https:\/\/okanaganroam\.com\/vernon\/sports<\/loc>/);
+      // A region with nothing to play is still a 404.
+      assert.equal((await WINTER_GET(base, '/osoyoos/sports')).status, 404);
+      // With one sport venue of its own, the count reads in the singular.
+      const own = app.createVenue({ name: 'Sports Also Test Skate Park', region: 'kelowna', type: 'sport', description: 'A fixture skate park.', slug: 'sports-also-test-skate-park' });
+      try {
+        const kel2 = await WINTER_GET(base, '/kelowna/sports');
+        assert.match(kel2.text, /<p class="subtitle">1 verified sports &amp; recreation spot in Kelowna\.<\/p>/);
+        assert.match(kel2.text, /href="\/kelowna\/sports\/sports-also-test-skate-park"[\s\S]*id="sportsAlsoHeading"/, 'its own venues first, then More places to play');
+        const hub2 = await WINTER_GET(base, '/sports');
+        assert.match(hub2.text, /<p class="subtitle">1 verified sports &amp; recreation spot across the Okanagan Valley\.<\/p>/);
+        assert.match(hub2.text, /<a href="\/vernon\/sports">Vernon<\/a>/, 'the region selector offers a region that only has tagged venues');
+      } finally {
+        db.prepare('DELETE FROM venues WHERE id = ?').run(own.id);
+      }
     });
     // The admin endpoint accepts the kind.
     await withWinterServer(async (base) => {
