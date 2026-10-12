@@ -17476,3 +17476,27 @@ test('Navigation (2026-10-12): the header\'s Things to Do menu and the footer\'s
     }
   });
 });
+
+test('Venue photos (2026-10-12): an openly licensed photo shows its credit line (author, licence, source) under the photo; no credit stored, no line', async () => {
+  const v = app.createVenue({ name: 'Photo Credit Test Beach', region: 'penticton', type: 'beach', description: 'A fixture beach.', slug: 'photo-credit-test-beach' });
+  try {
+    app.updateVenue(v.id, { image_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Test.jpg/1280px-Test.jpg', image_credit: 'Jane <Doe>', image_license: 'CC BY-SA 4.0', image_license_url: 'https://creativecommons.org/licenses/by-sa/4.0', image_source_url: 'https://commons.wikimedia.org/wiki/File:Test.jpg' });
+    const live = app.getVenue(v.id);
+    assert.equal(live.image_credit, 'Jane <Doe>');
+    assert.equal(live.image_source_url, 'https://commons.wikimedia.org/wiki/File:Test.jpg');
+    await withWinterServer(async (base) => {
+      const page = (await WINTER_GET(base, '/penticton/beaches/photo-credit-test-beach')).text;
+      assert.match(page, /<div class="venue-hero venue-hero-photo"><img src="https:\/\/upload\.wikimedia\.org\/[^"]+" alt="Photo Credit Test Beach"/);
+      assert.match(page, /<p class="venue-photo-credit">Photo: <a href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Test\.jpg" rel="noopener" target="_blank">Jane &lt;Doe&gt;<\/a>, <a href="https:\/\/creativecommons\.org\/licenses\/by-sa\/4\.0" rel="license noopener" target="_blank">CC BY-SA 4\.0<\/a>, via Wikimedia Commons<\/p>/);
+      assert.match(page, /<h1>Photo Credit Test Beach<\/h1>/, 'with a photo the name moves into the header');
+      app.updateVenue(v.id, { image_credit: null, image_source_url: 'javascript:alert(1)' });
+      const bare = (await WINTER_GET(base, '/penticton/beaches/photo-credit-test-beach')).text;
+      assert.doesNotMatch(bare, /venue-photo-credit">/);
+      app.updateVenue(v.id, { image_credit: 'Someone', image_license: 'CC0', image_license_url: null });
+      const unsafe = (await WINTER_GET(base, '/penticton/beaches/photo-credit-test-beach')).text;
+      assert.match(unsafe, /<p class="venue-photo-credit">Photo: Someone, CC0<\/p>/, 'a non-https source is never linked');
+    });
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});

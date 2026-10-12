@@ -49,6 +49,12 @@ const newColumns = [
   ['address', 'TEXT'],
   ['website', 'TEXT'],
   ['image_url', 'TEXT'],
+  // Photo credit (2026-10-12): openly licensed photos (Wikimedia Commons)
+  // must show their author and licence. Shown under the venue page photo.
+  ['image_credit', 'TEXT'],
+  ['image_license', 'TEXT'],
+  ['image_license_url', 'TEXT'],
+  ['image_source_url', 'TEXT'],
   ['slug', 'TEXT'],
   ['latitude', 'REAL'],
   ['longitude', 'REAL'],

@@ -110,6 +110,7 @@ const BOOL_FIELDS = [...RESEARCHED_BOOL_FIELDS, ...DERIVED_BOOL_FIELDS];
 const ALL_FIELDS = [
   'name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating',
   'description', 'description_fr', 'hours', 'address', 'website', 'image_url',
+  'image_credit', 'image_license', 'image_license_url', 'image_source_url',
   'latitude', 'longitude', ...RESEARCHED_BOOL_FIELDS,
 ];
 
@@ -188,9 +189,23 @@ function recomputeAllDerivedHoursBadges() {
   return { checked: rows.length, changed };
 }
 
+// The credit line under a venue photo (2026-10-12): openly licensed photos
+// (e.g. Wikimedia Commons, CC BY / CC BY-SA) must name the author, the licence
+// and the source. Nothing renders unless a credit is stored.
+function venuePhotoCreditHtml(venue) {
+  if (!venue.image_url || !venue.image_credit) return '';
+  const safe = (u) => (typeof u === 'string' && /^https:\/\//.test(u) ? u : null);
+  const src = safe(venue.image_source_url);
+  const licUrl = safe(venue.image_license_url);
+  const who = src ? `<a href="${escapeHtml(src)}" rel="noopener" target="_blank">${escapeHtml(venue.image_credit)}</a>` : escapeHtml(venue.image_credit);
+  const lic = venue.image_license ? (licUrl ? `, <a href="${escapeHtml(licUrl)}" rel="license noopener" target="_blank">${escapeHtml(venue.image_license)}</a>` : `, ${escapeHtml(venue.image_license)}`) : '';
+  const via = src && /wikimedia\.org|wikipedia\.org/.test(src) ? ', via Wikimedia Commons' : '';
+  return `\n  <p class="venue-photo-credit">Photo: ${who}${lic}${via}</p>`;
+}
+
 function rowToVenue(row) {
   const v = { id: row.id, created_at: row.created_at, updated_at: row.updated_at };
-  for (const f of ['name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description', 'description_fr', 'hours', 'address', 'website', 'image_url', 'slug', 'latitude', 'longitude', 'redirect_to']) {
+  for (const f of ['name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description', 'description_fr', 'hours', 'address', 'website', 'image_url', 'image_credit', 'image_license', 'image_license_url', 'image_source_url', 'slug', 'latitude', 'longitude', 'redirect_to']) {
     v[f] = row[f];
   }
   for (const f of BOOL_FIELDS) {
@@ -8251,6 +8266,8 @@ const SEO_PAGE_CSS = `
     box-shadow: 0 10px 24px -16px rgba(74,52,40,0.35);
   }
   .venue-hero-photo img { width: 100%; max-height: 420px; object-fit: cover; display: block; }
+  .venue-photo-credit { margin: 6px 2px 14px; font-size: 0.78rem; line-height: 1.4; color: var(--ink); opacity: 0.7; }
+  .venue-photo-credit a { color: inherit; text-decoration: underline; }
   .venue-hero-fallback {
     display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
     min-height: 220px; padding: 28px 30px; color: var(--paper);
@@ -15564,7 +15581,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const themedShell = usesThemedVenueShell(venue.type);
   const themedHeroTitle = themedShell && !venue.image_url;
   const imageHtml = venue.image_url
-    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>`
+    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>${venuePhotoCreditHtml(venue)}`
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}">
         <span class="venue-hero-type">${escapeHtml(golfKindLabel)}</span>
