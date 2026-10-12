@@ -118,6 +118,14 @@ const TYPE_ALIASES = {
   // the trip planner's taxonomy has no tour type, so there it still means
   // wineries. "wine" on its own is untouched.
   tour: ['tour', 'tours', 'wine tour', 'wine tours', 'boat tour', 'boat tours', 'cruise', 'cruises', 'lake cruise', 'lake cruises', 'guided', 'guided tour', 'guided tours', 'experience', 'experiences', 'cooking class', 'cooking classes', 'sleigh ride', 'sleigh rides', 'dog sledding', 'dog sled', 'food tour', 'food tours'],
+  // Sports & Recreation (2026-10-12). Only phrases no other list uses, so
+  // nothing existing is hijacked: "golf" stays golf ("disc golf" is the
+  // longer phrase), "mountain biking", "bike trails" and "biking" stay the
+  // outdoor cycling activity, "skating" stays winter, and "park" stays
+  // outdoor. Claimed by the sport type alone when the taxonomy has it
+  // (claimedPhrases, in the phrase table); while /sports lists nothing the
+  // taxonomy leaves the type out, so these phrases read as before it existed.
+  sport: ['sport', 'sports', 'recreation', 'sports and recreation', 'sports and rec', 'skate park', 'skate parks', 'skatepark', 'skateparks', 'skateboarding', 'pump track', 'pump tracks', 'bmx', 'bmx track', 'bmx tracks', 'bike park', 'bike parks', 'disc golf', 'disc golf course', 'disc golf courses', 'frisbee golf', 'pickleball', 'pickleball court', 'pickleball courts', 'tennis', 'tennis court', 'tennis courts', 'beach volleyball', 'volleyball', 'volleyball court', 'volleyball courts', 'basketball court', 'basketball courts'],
 };
 
 const FEATURE_ALIASES = {
@@ -468,6 +476,8 @@ function uniq(list) { return Array.from(new Set(list)); }
 
 // [{ phrase, assign: [{ field, value }] }] -- every value checked against the
 // taxonomy, every phrase normalized the same way as the input.
+// Types whose aliases, when the taxonomy has the type, belong to it alone.
+const CLAIMING_TYPES = ['tour', 'sport'];
 function buildPhraseTable(taxonomy) {
   const t = normalizeTaxonomy(taxonomy);
   const entries = new Map();
@@ -488,9 +498,12 @@ function buildPhraseTable(taxonomy) {
   for (const [concept, phrases] of Object.entries(CONCEPT_ALIASES)) for (const p of phrases) add(p, 'concept', concept);
   // Tours & Experiences (2026-10-11): with the tour type present, its phrases
   // ("wine tour") are claimed by it alone rather than shared with wineries.
-  const tourClaimed = t.types.includes('tour') ? new Set(TYPE_ALIASES.tour.map(normalizeDiscoveryText)) : new Set();
+  // Sports & Recreation (2026-10-12) claims its phrases the same way.
+  const claimedPhrases = new Map();
+  for (const owner of CLAIMING_TYPES) if (t.types.includes(owner)) for (const p of TYPE_ALIASES[owner]) claimedPhrases.set(normalizeDiscoveryText(p), owner);
   for (const [type, phrases] of Object.entries(TYPE_ALIASES)) if (t.types.includes(type)) for (const p of phrases) {
-    if (type !== 'tour' && tourClaimed.has(normalizeDiscoveryText(p))) continue;
+    const owner = claimedPhrases.get(normalizeDiscoveryText(p));
+    if (owner && owner !== type) continue;
     add(p, 'type', type);
   }
   for (const [feature, phrases] of Object.entries(FEATURE_ALIASES)) if (t.features.includes(feature)) for (const p of phrases) add(p, 'feature', feature);
@@ -779,7 +792,8 @@ function correctionSourceWords(t) {
   // The tour aliases (2026-10-11) only when the taxonomy has the type, so a
   // taxonomy without it ("tour" is left out while /tours lists nothing, and
   // always for the trip planner) corrects exactly as before the type existed.
-  const typeAliases = t.types.includes('tour') ? TYPE_ALIASES : Object.fromEntries(Object.entries(TYPE_ALIASES).filter(([type]) => type !== 'tour'));
+  // Sports & Recreation (2026-10-12): the same for the sport aliases.
+  const typeAliases = Object.fromEntries(Object.entries(TYPE_ALIASES).filter(([type]) => !CLAIMING_TYPES.includes(type) || t.types.includes(type)));
   for (const table of [typeAliases, FEATURE_ALIASES, COLLECTION_ALIASES, ACTIVITY_ALIASES, CUISINE_SYNONYMS, REGION_EXTRA_ALIASES]) addWords(Object.values(table).flat());
   addWords(VALLEY_WIDE_PHRASES);
   addWords(t.regions.map((r) => r.replace(/-/g, ' ')));
@@ -958,7 +972,7 @@ function emptyIntent() {
 
 // Type -> the daypart it naturally belongs to, for ordered multi-part
 // requests ("a romantic winery and dinner").
-const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', indoor: 'afternoon', tour: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
+const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', indoor: 'afternoon', tour: 'afternoon', sport: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
 
 function interpretDiscoveryQuery(text, taxonomy, options) {
   const opts = options || {};
