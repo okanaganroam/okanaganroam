@@ -6889,7 +6889,7 @@ test('Batch 4A: the venue-shell predicate covers exactly the themed types plus t
   assert.deepEqual([...app.THEMED_VENUE_SHELL_TYPES].sort(), [...BATCH4A_FD_TYPES, 'winery'].sort());
   for (const t of [...BATCH4A_FD_TYPES, 'winery', 'golf', 'beach', 'outdoor']) assert.equal(app.usesThemedVenueShell(t), true, t);
   // The listing / card predicate is unchanged.
-  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'indoor', 'outdoor', 'tour']); // + indoor, tour (2026-10-11)
+  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'indoor', 'outdoor', 'sport', 'tour']); // + indoor, tour (2026-10-11), sport (2026-10-12)
   for (const t of BATCH4A_FD_TYPES) assert.equal(app.usesThemedCategoryLayout(t), false, t);
 });
 
@@ -9995,7 +9995,8 @@ test('Phase 1: buildDiscoveryTaxonomy only exposes existing taxonomy and active 
   assert.deepEqual([...t.regions].sort(), Object.keys(app.REGION_LABELS).sort());
   for (const r of t.regions) assert.equal(t.regionLabels[r], app.REGION_LABELS[r]);
   // Every category type, except Tours & Experiences while /tours lists nothing (2026-10-11).
-  assert.deepEqual(t.types, Object.keys(app.CATEGORY_SLUGS).filter((x) => x !== 'tour' || app.countToursHubVenues() > 0));
+  // Sports & Recreation too, while /sports lists nothing (2026-10-12).
+  assert.deepEqual(t.types, Object.keys(app.CATEGORY_SLUGS).filter((x) => (x !== 'tour' || app.countToursHubVenues() > 0) && (x !== 'sport' || app.countSportsHubVenues() > 0)));
   assert.deepEqual(t.features, app.BOOL_FIELDS);
   assert.deepEqual(t.budgets, app.TRIP_VALID_BUDGETS);
   assert.deepEqual(t.paces, app.TRIP_VALID_PACES);
@@ -10062,7 +10063,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved /browse performance change F6: Favorite buttons rewritten only when they change (Favorites module only), 2026-10-03.
   // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
   // Approved Tours & Experiences change (2026-10-11): tripv3.type.tour added to TRANSLATIONS (en and fr) only.
-  assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2', 'public/scripts/app.js (tripv3.type.tour, 2026-10-11)');
+  // Approved Sports & Recreation change (2026-10-12): tripv3.type.sport added to TRANSLATIONS (en and fr) only.
+  assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5', 'public/scripts/app.js (tripv3.type.sport, 2026-10-12)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11199,7 +11201,7 @@ test('Hidden Gems page: Build My Trip "See everything" links follow the same rul
 // Every destination page lists the same 14 categories in one fixed order.
 // A category with results links to the page showing exactly them; an empty
 // one stays visible as a non-link, aria-disabled pill/card.
-const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'Tours & Experiences', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
+const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'Tours & Experiences', 'Sports & Recreation', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
 function destTabs(html) {
   const nav = (html.match(/<nav class="category-region-selector region-category-tabs"[\s\S]*?<\/nav>/) || [''])[0];
   return [...nav.matchAll(/<(a|span)( href="([^"]+)")?([^>]*)>([^<]+)<span class="outdoor-activity-count">(\d+)<\/span><\/\1>/g)]
@@ -11209,17 +11211,17 @@ function destRegions() {
   return Object.keys(app.REGION_LABELS || {}).filter((r) => Object.keys(app.getRegionCategoryCounts(r)).length > 0);
 }
 
-test('Destination pages: every destination shows the same 16 categories in the approved order (Indoor & Rainy Day, Tours & Experiences added 2026-10-11)', () => {
+test('Destination pages: every destination shows the same 17 categories in the approved order (Indoor & Rainy Day, Tours & Experiences added 2026-10-11; Sports & Recreation 2026-10-12)', () => {
   const regions = destRegions();
   assert.ok(regions.length > 0);
-  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'tour', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
+  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'tour', 'sport', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
   for (const r of regions) {
     const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
     const tabs = destTabs(html);
     assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS, r);
-    // The cards list the same 16, grouped Food & Drink / Experiences / Discovery.
+    // The cards list the same 17, grouped Food & Drink / Experiences / Discovery.
     assert.match(html, /<h2 class="category-subsection-heading">Food &amp; Drink<\/h2>[\s\S]*<h2 class="category-subsection-heading">Experiences<\/h2>[\s\S]*<h2 class="category-subsection-heading">Discovery<\/h2>/, r);
-    assert.equal((html.match(/<li class="category-card/g) || []).length, 16, r);
+    assert.equal((html.match(/<li class="category-card/g) || []).length, 17, r);
   }
 });
 
@@ -11537,7 +11539,7 @@ test('List Your Venue: the page renders the form with the canonical types, regio
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app.css">/);
   for (const t of app.VENUE_SUBMISSION_TYPES) assert.match(html, new RegExp(`<option value="${t}">`));
   for (const r of app.VENUE_SUBMISSION_REGIONS) assert.match(html, new RegExp(`<option value="${r}">`));
-  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 12); // + indoor, tour (2026-10-11)
+  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 13); // + indoor, tour (2026-10-11), sport (2026-10-12)
   assert.equal(app.VENUE_SUBMISSION_REGIONS.length, 20);
   for (const a of app.VENUE_SUBMISSION_AMENITIES) assert.match(html, new RegExp(`name="amenities" value="${a}"`));
   assert.match(html, /name="company_website" tabindex="-1"/, 'honeypot');
@@ -11873,7 +11875,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2');
+  assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16101,7 +16103,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8');
-  assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2');
+  assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16194,7 +16196,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '7a54736e96537657c32790fb160796a2', 'app.js is untouched');
+    assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5', 'app.js is untouched');
   }));
 }
 
@@ -17106,6 +17108,185 @@ test('Tours & Experiences: discovery sends tour, cruise, guided, experience, coo
     assert.deepEqual(planner.types, ['tour']);
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(tour.id);
+  }
+}));
+
+// ==== Sports & Recreation (2026-10-12): the `sport` type, /sports, and the
+// sports_also "More places to play" section ==================================
+
+test('Sports & Recreation: registered as a themed, non-planner category with its labels, slug, gradient and schema type', () => {
+  assert.equal(app.CATEGORY_SLUGS.sport, 'sports');
+  assert.deepEqual(app.CATEGORY_LABELS.sport, { singular: 'Sports & Recreation Spot', plural: 'Sports & Recreation' });
+  assert.equal(app.SCHEMA_TYPE_MAP.sport, 'SportsActivityLocation');
+  assert.deepEqual(app.TYPE_ACCENT_GRADIENTS.sport, ['#2B5C8A', '#B5552F']);
+  assert.ok(app.usesThemedCategoryLayout('sport'));
+  assert.ok(app.ALL_REGIONS_CATEGORIES.includes('sport'));
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('sport'), 'not a Build My Trip interest');
+  assert.ok(!app.buildTripPlannerTaxonomy().types.includes('sport'), 'the planner never parses it as a type');
+  assert.deepEqual(app.BROWSE_HUB_TYPE_ORDER.slice(-2), ['tour', 'sport'], 'browse chip right after tour');
+  assert.ok(app.VENUE_SUBMISSION_TYPES.includes('sport'));
+  assert.ok(app.NON_DISCOVERY_COLLECTION_KINDS.has(app.SPORTS_ALSO_COLLECTION_KIND), 'never offered as a trip discovery option');
+  const col = db.prepare("SELECT slug, title FROM collections WHERE kind = 'sports_also'").get();
+  assert.deepEqual({ ...col }, { slug: 'sports-also', title: 'Also good for sport' });
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(src, /'tripv3\.type\.sport': 'Sports & Recreation'/);
+  assert.match(src, /'tripv3\.type\.sport': 'Sports et loisirs'/);
+});
+
+test('Sports & Recreation: /sports renders with zero sport venues (coming soon, noindex), region/venue pages, sitemap, /categories and the submission form', async () => {
+  let skate = null;
+  try {
+    await withWinterServer(async (base) => {
+      assert.equal(app.getVenuesByCategory('sport').length, 0);
+      assert.equal(app.countSportsHubVenues(), 0);
+      const empty = await WINTER_GET(base, '/sports');
+      assert.equal(empty.status, 200);
+      assert.match(empty.text, /<h1>Sports &amp; Recreation in the Okanagan<\/h1>/);
+      assert.match(empty.text, /class="sport-coming-soon">More sports and recreation spots are coming soon/);
+      assert.match(empty.text, /<p class="hub-intro">Skate parks, pump tracks, BMX tracks, bike parks and mountain bike trail networks, disc golf courses, and pickleball, tennis and beach volleyball courts/);
+      assert.match(empty.text, /<body class="golf-page sport-page">/);
+      assert.match(empty.text, /Sport page theme \(2026-10-12\)/);
+      assert.match(empty.text, /<meta name="robots" content="noindex/, 'nothing listed yet: noindex');
+      assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/mood\/explore\.webp"/);
+      assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
+      assert.doesNotMatch(empty.text, /sportsAlsoHeading/, 'no also-section without members');
+      assert.doesNotMatch(empty.text, /Tour page theme/, 'the tour theme is not emitted on /sports');
+      assert.equal((await WINTER_GET(base, '/vernon/sports')).status, 404, 'an empty region/sports pair 404s like any other');
+
+      skate = app.createVenue({ name: 'Sport Test Skate Park', region: 'penticton', type: 'sport', description: 'A fixture skate park and pump track by the channel.', slug: 'sport-test-skate-park' });
+      const hub = await WINTER_GET(base, '/sports');
+      assert.equal(hub.status, 200);
+      assert.match(hub.text, /href="\/penticton\/sports\/sport-test-skate-park"/);
+      assert.doesNotMatch(hub.text, /class="sport-coming-soon"/);
+      assert.doesNotMatch(hub.text, /noindex/);
+      assert.match(hub.text, /verified sports &amp; recreation spots across the Okanagan Valley\./, 'a countable noun, not "verified sports & recreation"');
+      const region = await WINTER_GET(base, '/penticton/sports');
+      assert.equal(region.status, 200);
+      assert.match(region.text, /verified sports &amp; recreation spots in Penticton\./);
+      assert.match(region.text, /Sports &amp; Recreation in Penticton, BC/);
+      assert.match(region.text, /class="category-back-link" href="\/sports">← All Sports &amp; Recreation</);
+      assert.match(region.text, /<body class="golf-page sport-page">/);
+      const venue = await WINTER_GET(base, '/penticton/sports/sport-test-skate-park');
+      assert.equal(venue.status, 200);
+      assert.match(venue.text, /<title>Sport Test Skate Park — Sports &amp; Recreation Spot in Penticton, BC \| Okanagan Roam<\/title>/);
+      assert.match(venue.text, /"@type":"SportsActivityLocation"/);
+      assert.match(venue.text, /sport-page/);
+      const penticton = await WINTER_GET(base, '/penticton');
+      assert.match(penticton.text, /<a href="\/penticton\/sports">Sports &amp; Recreation<\/a>/);
+
+      const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+      for (const loc of ['/sports', '/penticton/sports', '/penticton/sports/sport-test-skate-park']) {
+        assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${loc}</loc>`), loc);
+      }
+      const cats = (await WINTER_GET(base, '/categories')).text;
+      assert.match(cats, /<a href="\/sports">Sports &amp; Recreation<\/a>/);
+      const form = (await WINTER_GET(base, '/list-your-venue')).text;
+      assert.match(form, /<option value="sport">Sports &amp; Recreation Spot<\/option>/);
+    });
+  } finally {
+    if (skate) db.prepare('DELETE FROM venues WHERE id = ?').run(skate.id);
+  }
+});
+
+test('Sports & Recreation: /sports and /categories render with nothing listed; the sitemap always lists /sports', async () => {
+  await withWinterServer(async (base) => {
+    const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/sports</loc>'));
+    const cats = (await WINTER_GET(base, '/categories')).text;
+    assert.match(cats, /<a href="\/sports">Sports &amp; Recreation<\/a>/);
+  });
+});
+
+test('Sports & Recreation: other-type venues tagged sports_also get a "More places to play" section on /sports, with "Play:" notes, linking to their own pages', async () => {
+  const park = app.createVenue({ name: 'Sports Also City Park', region: 'kelowna', type: 'outdoor', description: 'A lakeside city park with a skate park, tennis courts and long descriptions that run on and on (fixture).', slug: 'sports-also-city-park' });
+  const course = app.createVenue({ name: 'Sports Also Disc Golf Club', region: 'vernon', type: 'golf', description: 'A golf course with a disc golf loop (fixture).', slug: 'sports-also-disc-golf-club' });
+  try {
+    await withWinterServer(async (base) => {
+      for (const v of [park, course]) {
+        const r = app.guardedCollectionMembershipUpdate('sports_also', v.id, 'add', v === park ? 'Skate park and four tennis courts' : null, { reason: 'fixture', batch_id: 'test' });
+        assert.ok(r.ok, JSON.stringify(r));
+      }
+      assert.deepEqual(app.getSportsAlsoVenues().map((v) => v.name), ['Sports Also City Park', 'Sports Also Disc Golf Club']);
+      assert.equal(app.countSportsHubVenues(), 2);
+      const hub = await WINTER_GET(base, '/sports');
+      assert.equal(hub.status, 200);
+      assert.match(hub.text, /<h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play<\/h2>/);
+      assert.match(hub.text, /<p class="sport-also-lead">Parks with skate parks, courts and bike trails/);
+      assert.match(hub.text, /class="sport-coming-soon"/, 'still no sport venues of its own');
+      assert.match(hub.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/, 'a park links to its outdoors page');
+      assert.match(hub.text, /href="\/vernon\/golf\/sports-also-disc-golf-club"/, 'a golf course links to its golf page');
+      assert.doesNotMatch(hub.text, /noindex/);
+      // The membership note is shown on that card only, labelled "Play:".
+      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Play:<\/span> Skate park and four tennis courts<\/p>/);
+      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
+      assert.doesNotMatch(hub.text, /Rainy day:|Experience:<\/span>/);
+      // The card script wires every type on /sports, and descriptions clamp to 3 lines.
+      assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="golf"\][^)]*\[data-venue-category="outdoor"\]/);
+      assert.match(hub.text, /body\.golf-page\.sport-page \.golf-desc\.is-clamped p \{ -webkit-line-clamp: 3;/);
+      // Their own pages and types are untouched; /tours does not list them.
+      assert.equal((await WINTER_GET(base, '/kelowna/outdoors/sports-also-city-park')).status, 200);
+      assert.equal(app.getVenue(park.id).type, 'outdoor');
+      assert.doesNotMatch((await WINTER_GET(base, '/tours')).text, /Play:<\/span>|sports-also-city-park/);
+    });
+    // The admin endpoint accepts the kind.
+    await withWinterServer(async (base) => {
+      const res = await fetch(`${base}/admin/collection-membership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` },
+        body: JSON.stringify({ kind: 'sports_also', venue_id: course.id, action: 'remove', reason: 'fixture', batch_id: 'test' }),
+      });
+      assert.equal(res.status, 200, await res.text());
+      assert.deepEqual(app.getSportsAlsoVenues().map((v) => v.name), ['Sports Also City Park']);
+    });
+  } finally {
+    db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id IN (?, ?)").run(park.id, course.id);
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(park.id, course.id);
+  }
+});
+
+test('Sports & Recreation: discovery sends skate park, pickleball, tennis, disc golf, bike park and similar requests to the sport pages once /sports lists something (empty: the old answers)', () => withDiscoveryFlag('on', () => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  const SPORT_QUERIES = ['skate park', 'skateparks', 'pump track', 'bmx', 'bike park', 'disc golf', 'frisbee golf', 'pickleball', 'tennis', 'tennis courts', 'beach volleyball', 'volleyball', 'basketball court', 'sports', 'recreation', 'sports and recreation'];
+  // Empty hub (no sport venues, no sports_also members): the phrases read as
+  // they did before the type existed.
+  assert.equal(app.countSportsHubVenues(), 0);
+  assert.ok(!app.buildDiscoveryTaxonomy().types.includes('sport'));
+  for (const q of SPORT_QUERIES) {
+    assert.ok(!app.interpretDiscoveryText(q).types.includes('sport'), q);
+    assert.notEqual(route(q).url, '/sports', q);
+  }
+  assert.deepEqual(app.interpretDiscoveryText('disc golf').types, ['golf'], 'as before');
+  assert.deepEqual(app.interpretDiscoveryText('bike park').activities, ['cycling'], 'as before');
+  assert.equal(route('pickleball in Penticton').url, '/browse?regions=penticton&q=pickleball', 'as before');
+  const skate = app.createVenue({ name: 'Sport Discovery Skate Park', region: 'penticton', type: 'sport', description: 'Fixture.', slug: 'sport-discovery-skate-park' });
+  try {
+    assert.ok(app.buildDiscoveryTaxonomy().types.includes('sport'), 'listed once the hub has a venue');
+    for (const q of SPORT_QUERIES) {
+      assert.deepEqual(app.interpretDiscoveryText(q).types, ['sport'], q);
+      assert.equal(route(q).url, '/sports', q);
+    }
+    assert.equal(route('pickleball in Penticton').url, '/penticton/sports');
+    assert.equal(route('skate park in Penticton').url, '/penticton/sports');
+    // Existing aliases are unchanged: golf is golf, mountain biking is cycling, a sports bar is a feature.
+    for (const q of ['golf', 'mini golf', 'golf courses']) assert.deepEqual(app.interpretDiscoveryText(q).types, ['golf'], q);
+    for (const q of ['mountain biking', 'biking', 'bike trails']) {
+      assert.ok(!app.interpretDiscoveryText(q).types.includes('sport'), q);
+      assert.deepEqual(app.interpretDiscoveryText(q).activities, ['cycling'], q);
+    }
+    assert.deepEqual(app.interpretDiscoveryText('sports bar').features, ['sports_tv']);
+    assert.ok(!app.interpretDiscoveryText('sports bar').types.includes('sport'));
+    assert.deepEqual(app.interpretDiscoveryText('ice skating').activities, ['winter']);
+    assert.deepEqual(app.interpretDiscoveryText('beaches').types, ['beach']);
+    assert.deepEqual(app.interpretDiscoveryText('parks').types, ['outdoor']);
+    // The trip planner has no sport type: its reading is unchanged.
+    const di = require('../discovery-intent.js');
+    assert.deepEqual(di.interpretDiscoveryQuery('disc golf', app.buildTripPlannerTaxonomy()).types, ['golf']);
+    assert.deepEqual(di.interpretDiscoveryQuery('tennis', app.buildTripPlannerTaxonomy()).types, []);
+    assert.ok(!app.buildTripPlannerTaxonomy().venues.some((v) => v.type === 'sport'));
+    const plan = app.runTripPlan({ text: 'Plan a day in Penticton' }, new Date('2026-07-15T17:00:00Z'));
+    assert.ok(!JSON.stringify(plan).includes('sport-discovery-skate-park'), 'sport venues never become planner stops');
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(skate.id);
   }
 }));
 

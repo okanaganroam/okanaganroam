@@ -548,6 +548,19 @@ if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(TOURS_ALSO_COLL
     .run(TOURS_ALSO_COLLECTION_SLUG, 'tours_also', 'Also bookable experiences');
 }
 
+// --- Sports "also good for sport" collection bootstrap (2026-10-12) -------
+// Venues of OTHER types (a city park with a skate park or courts, a ski
+// hill's summer bike park, a golf course with disc golf) that are also good
+// places to play. They keep their own type and pages; membership only lists
+// them in the "More places to play" section of the /sports hub. Seeds NO
+// members; membership goes through POST /admin/collection-membership with
+// kind 'sports_also'.
+const SPORTS_ALSO_COLLECTION_SLUG = 'sports-also';
+if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(SPORTS_ALSO_COLLECTION_SLUG)) {
+  db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(SPORTS_ALSO_COLLECTION_SLUG, 'sports_also', 'Also good for sport');
+}
+
 // --- Outdoor activity collections bootstrap (2026-09-20, Outdoors Phase 1) --
 // Eight activity kinds that classify an `outdoor` venue (and, later, any
 // existing venue such as a beach/park) by what a visitor can do there:
