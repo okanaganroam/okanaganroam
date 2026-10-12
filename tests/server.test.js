@@ -9781,6 +9781,17 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
 // /secret-spots lists the live 'hidden_gem' collection narrowed to places
 // (outdoor + beach). A Hidden Gem cafe stays a Hidden Gem but is not a
 // Secret Spot. Fixture memberships are removed again at the end.
+test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badge, not the plain Dog-Friendly chip too; themed card grids do not stretch cards', () => {
+  const v = { id: 990001, name: 'Dog Chip Fixture Beach', region: 'kelowna', type: 'beach', slug: 'dog-chip-fixture-beach', description: 'Fixture.', dog_friendly: true, lake_view: true };
+  const both = app.venueCardHtml(v, { dogFriendlyNote: 'On-leash in the park; off-leash at the dog beach.' });
+  assert.equal((both.match(/Dog Friendly<\/span>/g) || []).length, 1, 'the collection badge');
+  assert.doesNotMatch(both, /<span class="chip">Dog-Friendly<\/span>/, 'no duplicate amenity chip');
+  assert.match(both, /<span class="chip">Lake View<\/span>/, 'other badges unchanged');
+  const plain = app.venueCardHtml(v, {});
+  assert.match(plain, /<span class="chip">Dog-Friendly<\/span>/, 'without the collection badge the amenity chip still shows');
+  assert.equal(app.badgeChipsHtml(v), app.badgeChipsHtml(v, {}), 'default output unchanged');
+});
+
 test('Curated lists: visitor-facing notes from public batches show on Local Favourites / Hidden Gems / Secret Spots cards; internal notes stay hidden', () => {
   const add = (row) => {
     db.prepare('INSERT INTO venues (name, region, type, slug, description, rating) VALUES (?, ?, ?, ?, ?, ?)')
