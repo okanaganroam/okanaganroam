@@ -13645,7 +13645,7 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -13696,7 +13696,7 @@ test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in
 // with the module's own error instead of quietly planning in English only.
 test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails clearly without it (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
   const run = async (port, files, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripfr-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -13992,7 +13992,7 @@ test('Stage 2: POST /admin/verify-hours is the guarded, audited hours write (aut
   childEnv.PORT = ISOLATED_PORT;
   childEnv.ENRICHMENT_ADMIN_TOKEN = 'verify-hours-test-token';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-verify-hours-'));
-  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
+  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
     if (fs.existsSync(path.join(__dirname, '..', f))) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
   }
   try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
@@ -16816,11 +16816,11 @@ test('Seasonal mood tiles: "/" honours OKR_TODAY_OVERRIDE (test-only), never in 
   }
 });
 
-test('Indoor & Rainy Day: registered as a themed, non-planner category with its labels, slug and schema type', () => {
+test('Indoor & Rainy Day: registered as a themed category with V3 planner support with its labels, slug and schema type', () => {
   assert.equal(app.CATEGORY_SLUGS.indoor, 'indoor');
   assert.equal(app.SCHEMA_TYPE_MAP.indoor, 'TouristAttraction');
   assert.ok(!app.TRIP_INTEREST_TYPES.includes('indoor'), 'not a Build My Trip interest yet');
-  assert.ok(!app.buildTripPlannerTaxonomy().types.includes('indoor'), 'the planner never parses it as a type');
+  assert.ok(app.buildTripPlannerTaxonomy().types.includes('indoor'), 'V3 understands the category');
   assert.ok(app.BROWSE_HUB_TYPE_ORDER.includes('indoor'));
   assert.ok(app.VENUE_SUBMISSION_TYPES.includes('indoor'));
 });
@@ -16975,13 +16975,13 @@ test('Ski & Snow: /ski-snow lists the winter collection, après eats on the four
 // ==== Tours & Experiences (2026-10-11): the `tour` type, /tours, and the
 // tours_also "More experiences to book" section ==============================
 
-test('Tours & Experiences: registered as a themed, non-planner category with its labels, slug and schema type', () => {
+test('Tours & Experiences: registered as a themed category with V3 planner support with its labels, slug and schema type', () => {
   assert.equal(app.CATEGORY_SLUGS.tour, 'tours');
   assert.deepEqual(app.CATEGORY_LABELS.tour, { singular: 'Tour & Experience', plural: 'Tours & Experiences' });
   assert.equal(app.SCHEMA_TYPE_MAP.tour, 'TouristAttraction');
   assert.ok(app.usesThemedCategoryLayout('tour'));
   assert.ok(!app.TRIP_INTEREST_TYPES.includes('tour'), 'not a Build My Trip interest yet');
-  assert.ok(!app.buildTripPlannerTaxonomy().types.includes('tour'), 'the planner never parses it as a type');
+  assert.ok(app.buildTripPlannerTaxonomy().types.includes('tour'), 'V3 understands the category');
   assert.ok(app.BROWSE_HUB_TYPE_ORDER.includes('tour'));
   assert.ok(app.VENUE_SUBMISSION_TYPES.includes('tour'));
   assert.ok(app.NON_DISCOVERY_COLLECTION_KINDS.has(app.TOURS_ALSO_COLLECTION_KIND), 'never offered as a trip discovery option');
@@ -17101,9 +17101,9 @@ test('Tours & Experiences: discovery sends tour, cruise, guided, experience, coo
     assert.equal(route('wine').url, '/wineries');
     assert.equal(route('wineries').url, '/wineries');
     assert.deepEqual(app.interpretDiscoveryText('restaurants').types, ['restaurant']);
-    // The trip planner has no tour type: "wine tour" still means wineries there.
+    // V3 now treats an explicitly requested wine tour as a bookable experience.
     const planner = require('../discovery-intent.js').interpretDiscoveryQuery('wine tour', app.buildTripPlannerTaxonomy());
-    assert.deepEqual(planner.types, ['winery']);
+    assert.deepEqual(planner.types, ['tour']);
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(tour.id);
   }
@@ -17145,4 +17145,63 @@ test('Indoor discovery: URL filters select real venues and family uses the store
 
     });
   } finally { fixtures.forEach((v) => db.prepare('DELETE FROM venues WHERE id = ?').run(v.id)); }
+});
+
+test('Planner upgrade: V3 taxonomy includes indoor and tour while legacy wizard remains unchanged', () => {
+  assert.ok(app.buildTripPlannerTaxonomy().types.includes('indoor'));
+  assert.ok(app.buildTripPlannerTaxonomy().types.includes('tour'));
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('indoor'));
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('tour'));
+});
+test('Planner upgrade: live facts ground museum selection, requirements and French equivalence', () => {
+  const museum = app.createVenue({ name:'Planner Upgrade History Museum',slug:'planner-upgrade-history-museum',region:'kelowna',type:'indoor',description:'An indoor history museum.',latitude:49.89,longitude:-119.49,kid_friendly:true });
+  try {
+    const english=app.runTripPlan({text:'Plan a day in Kelowna with a museum'},new Date('2026-10-17T17:00:00Z'));
+    const french=app.runTripPlan({text:'Planifie une journée à Kelowna avec un musée'},new Date('2026-10-17T17:00:00Z'));
+    assert.ok(english.days.flatMap(d=>d.stops).some(s=>s.venue?.id===museum.id));
+    assert.ok(english.requirementResults.some(r=>r.value==='museum'&&r.status==='satisfied'));
+    assert.deepEqual(french.days.flatMap(d=>d.stops).map(s=>s.venue?.id),english.days.flatMap(d=>d.stops).map(s=>s.venue?.id));
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(museum.id); }
+});
+test('Planner upgrade: a dated concert can anchor a multi-day plan through the real API pipeline',()=>{
+ const r=app.createEvent({name:'Planner Upgrade Autumn Concert',region:'kelowna',description:'Fixture concert.',source_type:'official_venue',source_name:'Fixture Hall',source_url:'https://example.com/planner-upgrade-concert',venue_name_text:'Fixture Hall',categories:['live-music'],occurrences:[{start_date:'2030-10-05',start_time:'19:00',end_time:'21:00'}]},{reason:'planner upgrade fixture',batch_id:'test-planner-upgrade'});
+ assert.equal(r.ok,true,JSON.stringify(r));
+ try {const p=app.runTripPlan({text:'Plan 3 days in Kelowna from 2030-10-04. Include a concert and dinner.'},new Date('2030-10-02T19:00:00Z'));assert.equal(p.days.length,3);assert.ok(p.days[1].stops.some(s=>s.event?.id===r.event.id));}
+ finally {for (const table of ['event_enrichment_log','event_categories','event_occurrences']) db.prepare(`DELETE FROM ${table} WHERE event_id = ?`).run(r.event.id); db.prepare('DELETE FROM events WHERE id = ?').run(r.event.id);}
+});
+test('Review: multi-day event planning preserves edited base and pace',()=>{const p=app.runTripPlan({text:'Plan 3 days in Kelowna from 2030-10-04 with a museum and a concert',overrides:{baseRegion:'vernon',pace:'packed'}},new Date('2030-10-02T19:00:00Z'));assert.deepEqual(p.intent.regions,['vernon']);assert.equal(p.understood.pace,'packed');});
+test('Planner upgrade: explicit dates preserve length and day-scoped museum requests',()=>{
+ const p=app.runTripPlan({text:'Plan 3 days in Kelowna starting 2030-10-04. Day 2 museum. Keep driving limited.'},new Date('2030-10-02T19:00:00Z'));
+ assert.equal(p.days.length,3);assert.ok(!p.warnings.some(w=>/matching “(?:starting|keep|driving|limited)”/.test(w)));
+});
+test('Planner upgrade: a duration edit overrides the original event-plan duration',()=>{
+ const p=app.runTripPlan({text:'Plan 3 days in Kelowna from 2030-10-04 with a museum and a concert',overrides:{days:4}},new Date('2030-10-02T19:00:00Z'));
+ assert.equal(p.days.length,4);assert.equal(p.requirementResults.find(r=>r.kind==='days').value,4);
+});
+test('Planner upgrade: incompatible locks return a visible conflict through the HTTP API',async()=>{
+ const before=process.env.TRIP_PLANNER_V3; process.env.TRIP_PLANNER_V3='on';
+ const srv=require('node:http').createServer(app.server.listeners('request')[0]);await new Promise(resolve=>srv.listen(0,'127.0.0.1',resolve));
+ try {const response=await fetch(`http://127.0.0.1:${srv.address().port}/api/trip/plan`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'Plan a day in Kelowna with a museum',pinned:{'1-afternoon':9999999}})});assert.equal(response.status,409);assert.match((await response.json()).error,/locked/i);}
+ finally {await new Promise(resolve=>srv.close(resolve));if(before===undefined)delete process.env.TRIP_PLANNER_V3;else process.env.TRIP_PLANNER_V3=before;}
+});
+test('Planner upgrade: ordinary requests skip activity classification while complex requests prepare it',()=>{
+ const req=require('../trip-requirements'),original=req.inferPlannerKinds;let calls=0;req.inferPlannerKinds=v=>{calls++;return original(v);};
+ try {app.runTripPlan({text:'Plan a day in Kelowna with coffee and wineries'});assert.equal(calls,0);app.runTripPlan({text:'Plan a day in Kelowna with a museum'});assert.ok(calls>0);}
+ finally {req.inferPlannerKinds=original;}
+});
+test('Planner search fixes: untagged stored hiking evidence is available to English and French requests',()=>{
+ const v=app.createVenue({name:'Planner Search Fix Trail Park',slug:'planner-search-fix-trail-park',region:'kelowna',type:'outdoor',description:'Hiking trails with a lookout and sunset stop.',dog_friendly:true});
+ try {for(const text of ['Dog friendly hiking in Kelowna','Randonnée avec un chien à Kelowna','Sunset viewpoints in Kelowna']){const p=app.runTripPlan({text},new Date('2030-10-02T19:00:00Z'));assert.ok(p.recommendations.some(s=>s.venue.id===v.id),text);assert.ok(!p.requirementResults.some(i=>i.status==='unmet'),text);}}
+ finally {db.prepare('DELETE FROM venues WHERE id=?').run(v.id);}
+});
+test('Planner search fixes: live music without the word event returns dated events, not venue badges',()=>{
+ const r=app.createEvent({name:'Planner Search Fix Live Music',region:'kelowna',description:'Live music fixture.',source_type:'official_venue',source_name:'Fixture Hall',source_url:'https://example.com/planner-search-fix',venue_name_text:'Fixture Hall',categories:['live-music'],occurrences:[{start_date:'2030-10-05',start_time:'19:00',end_time:'21:00'}]},{reason:'planner search fixture',batch_id:'test-planner-search'});
+ assert.equal(r.ok,true,JSON.stringify(r));
+ try {for(const text of ['Live music in Kelowna this weekend','Live music events in Kelowna this weekend']){const p=app.runTripPlan({text},new Date('2030-10-02T19:00:00Z'));assert.equal(p.kind,'events');assert.ok(p.events.some(e=>e.id===r.event.id));assert.ok(p.requirementResults.filter(i=>i.kind==='event').every(i=>i.status==='satisfied'));}}
+ finally {for(const table of ['event_enrichment_log','event_categories','event_occurrences'])db.prepare(`DELETE FROM ${table} WHERE event_id=?`).run(r.event.id);db.prepare('DELETE FROM events WHERE id=?').run(r.event.id);}
+});
+test('Planner search fixes: operating periods beyond the search excerpt remain available to availability checks',()=>{
+ const v=app.createVenue({name:'Planner Search Seasonal Adventure Park',slug:'planner-search-seasonal-adventure-park',region:'kelowna',type:'outdoor',description:'Family attractions. '.repeat(40)+' Opens daily from May into early September.',kid_friendly:true});
+ try {const p=app.runTripPlan({text:'Parks in Kelowna'},new Date('2030-10-02T19:00:00Z'));assert.ok(!p.recommendations.some(s=>s.venue.id===v.id));}
+ finally {db.prepare('DELETE FROM venues WHERE id=?').run(v.id);}
 });

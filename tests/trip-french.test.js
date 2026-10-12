@@ -274,7 +274,7 @@ test('English: runTripPlan() reads the French layer’s text; the request shown 
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const fn = src.slice(src.indexOf('function runTripPlan('), src.indexOf('// ---------- Temporary-condition advisories'));
   assert.ok(fn.includes('const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);'));
-  assert.ok(fn.includes('interpretDiscoveryQuery(planText, taxonomy)') && fn.includes('interpretTripComponents(planText, taxonomy, intent)'));
+  assert.ok(fn.includes('interpretDiscoveryQuery(interpretationText, taxonomy)') && fn.includes('interpretTripComponents(interpretationText, taxonomy, intent)'));
   assert.equal((fn.match(/plan\.query = text;/g) || []).length, 2, 'plan.query is the visitor’s own text');
   // Site search does not use it.
   for (const f of ['discovery-search.js', 'discovery-intent.js']) assert.ok(!fs.readFileSync(path.join(__dirname, '..', f), 'utf8').includes('trip-planner-fr'), f);
@@ -311,4 +311,20 @@ test('V3 interface: in English the static text is the page’s original text', (
   for (const m of tagged) assert.equal(T.en[m[1]], decode(m[2]), m[1]);
   const ph = /placeholder="([^"]+)" data-i18n-placeholder="([^"]+)"/.exec(html);
   assert.equal(T.en[ph[2]], ph[1]);
+});
+
+test('French upgrade: museums, escape rooms and guided tours normalize to the new English intents',()=>{
+  const t={...TAXONOMY,types:[...TAXONOMY.types,'indoor','tour']};
+  assert.ok(fr.tripPlannerText('Un musée et une salle d’évasion',t).includes('museum'));
+  assert.ok(fr.tripPlannerText('Un musée et une salle d’évasion',t).includes('escape room'));
+  assert.ok(fr.tripPlannerText('Une visite guidée et un cours de cuisine',t).includes('guided tour'));
+  assert.ok(fr.tripPlannerText('Une visite guidée et un cours de cuisine',t).includes('cooking class'));
+});
+test('French upgrade: separate day clauses and exact dates survive normalization',()=>{
+ const r=require('../trip-requirements');
+ const text=fr.tripPlannerText('Planifie 2 jours à Kelowna le 2030-10-04. Jour 1 musée. Jour 2 salle d’évasion.',TAXONOMY);
+ const requirements=r.extractTripRequirements({text,taxonomy:TAXONOMY});
+ assert.equal(requirements.startDate,'2030-10-04');
+ assert.equal(requirements.items.find(i=>i.value==='museum').dayIndex,1);
+ assert.equal(requirements.items.find(i=>i.value==='escape').dayIndex,2);
 });

@@ -19,7 +19,7 @@ const di = require('./discovery-intent.js');
 
 // Unmistakably French words: one is enough. (Words English visitors also
 // type -- pour, propose, organise, distilleries, belvedere -- are left out.)
-const STRONG = new Set(('avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
+const STRONG = new Set(('musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
   + 'randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
   + 'aimerais aimerions cherche cherchons sejour itineraire activites demain aujourdhui lundi mardi mercredi jeudi '
   + 'vendredi samedi dimanche janvier fevrier avril juin juillet aout septembre octobre novembre decembre hiver printemps '
@@ -39,6 +39,17 @@ const STRONG_ENGLISH_TOO = new Set(['cave', 'caves', 'plein', 'peche']);
 // interpreter's own English phrases (discovery-intent.js), so nothing here
 // can introduce a meaning the planner does not already have. '' drops a word.
 const PHRASES = [
+  ['salle d evasion', 'escape room'], ['salles d evasion', 'escape rooms'],
+  ['jeu d evasion', 'escape room'], ['jeux d evasion', 'escape rooms'],
+  ['visite guidee', 'guided tour'], ['visites guidees', 'guided tours'],
+  ['cours de cuisine', 'cooking class'], ['cours de cuisines', 'cooking classes'],
+  ['galerie d art', 'art gallery'], ['galeries d art', 'art galleries'],
+  ['musee', 'museum'], ['musees', 'museums'], ['galerie', 'gallery'], ['galeries', 'galleries'],
+  ['salle d escalade', 'climbing gym'], ['quilles', 'bowling'], ['cinema', 'cinema'],
+  ['obligatoirement', 'must'], ['obligatoire', 'must'], ['seulement', 'only'], ['idealement', 'ideally'],
+  ['repas vegetariens', 'vegetarian meals'], ['repas vegetariens seulement', 'only vegetarian meals'],
+  ['jour 1', 'day 1'], ['jour 2', 'day 2'], ['jour 3', 'day 3'], ['jour 4', 'day 4'],
+
   // length
   ['longue fin de semaine', 'long weekend'], ['fin de semaine prolongee', 'long weekend'], ['long week end', 'long weekend'],
   ['cette fin de semaine', 'this weekend'], ['ce week end', 'this weekend'], ['ce weekend', 'this weekend'],
@@ -232,7 +243,7 @@ const MAX_PHRASE_WORDS = Math.max(...PHRASES.map(([fr]) => fr.split(' ').length)
 const REGION_FRENCH = { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' };
 
 // Lowercase, accents removed, French elisions split ("l'eau" -> "l eau",
-// "s'il" -> "si il"), commas and semicolons kept (they separate trip parts).
+// "s'il" -> "si il"), clause boundaries and ISO dates kept for day instructions.
 function tokenize(text) {
   return String(text)
     .slice(0, di.DISCOVERY_MAX_TEXT_LENGTH)
@@ -244,12 +255,10 @@ function tokenize(text) {
     .replace(/\bs'(ils?)\b/g, 'si $1')
     .replace(/\b(l|d|j|qu|n|m|t|c|s|jusqu|lorsqu|puisqu)'/g, '$1 ')
     .replace(/'s\b/g, 's')
-    .replace(/[-–—_/]/g, ' ')
+    .replace(/20\d{2}-\d{2}-\d{2}|[-–—_/]/g, m => /^20\d/.test(m) ? m : ' ')
     .replace(/&/g, ' and ')
-    .replace(/\s*[,;]\s*/g, ' , ')
-    .replace(/[^a-z0-9\s,]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
+    .replace(/\n/g, ' ; ')
+    .match(/20\d{2}-\d{2}-\d{2}|[a-z0-9]+|[,.;]/g) || [];
 }
 
 // Venue names and region names, as word lists, for a taxonomy. The server
@@ -333,7 +342,7 @@ function tripPlannerText(text, taxonomy) {
   let fromOpen = false;
   for (let i = 0; i < tokens.length;) {
     const w = tokens[i];
-    if (keep.has(i) || w === ',') { out.push(w); i += 1; continue; }
+    if (keep.has(i) || /^[,.;]$/.test(w)) { out.push(w); i += 1; continue; }
     // Routes and places: "de Kelowna à Penticton" -> "from kelowna to
     // penticton"; "à / en / au Kelowna" -> "in kelowna".
     const fr = Object.keys(REGION_FRENCH).find((p) => tokens.slice(i, i + p.split(' ').length).join(' ') === p);
@@ -353,7 +362,7 @@ function tripPlannerText(text, taxonomy) {
     let matched = 0;
     for (let len = Math.min(MAX_PHRASE_WORDS, tokens.length - i); len >= 1; len--) {
       let clash = false;
-      for (let k = 0; k < len; k++) if (keep.has(i + k) || tokens[i + k] === ',') clash = true;
+      for (let k = 0; k < len; k++) if (keep.has(i + k) || /^[,.;]$/.test(tokens[i + k])) clash = true;
       if (clash) continue;
       const p = tokens.slice(i, i + len).join(' ');
       if (PHRASE_MAP.has(p)) { const en = PHRASE_MAP.get(p); if (en) out.push(en); matched = len; break; }

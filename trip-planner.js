@@ -19,6 +19,7 @@
 'use strict';
 
 const hoursModule = require('./hours.js');
+const tripRequirements = require('./trip-requirements');
 
 const PLAN_DAYPARTS = {
   relaxed: ['morning', 'afternoon', 'evening'],
@@ -37,10 +38,10 @@ const RECOMMENDATION_PER_TYPE = 3;
 
 // How well a venue type suits each part of the day (0 = never placed there).
 const SLOT_AFFINITY = {
-  morning: { cafe: 3, outdoor: 3, golf: 3, beach: 1 },
-  midday: { restaurant: 3, cafe: 2, winery: 2, beach: 2, brewery: 1, outdoor: 1 },
-  afternoon: { winery: 3, beach: 3, outdoor: 2, brewery: 2, golf: 2, distillery: 2, cafe: 1, restaurant: 1 },
-  evening: { restaurant: 3, cocktail: 3, pub: 3, brewery: 2, winery: 1 },
+  morning: { cafe: 3, outdoor: 3, golf: 3, beach: 1, indoor: 2, tour: 2 },
+  midday: { restaurant: 3, cafe: 2, winery: 2, beach: 2, brewery: 1, outdoor: 1, indoor: 2, tour: 2 },
+  afternoon: { winery: 3, beach: 3, outdoor: 2, brewery: 2, golf: 2, distillery: 2, cafe: 1, restaurant: 1, indoor: 3, tour: 3 },
+  evening: { restaurant: 3, cocktail: 3, pub: 3, brewery: 2, winery: 1, indoor: 2, tour: 1 },
 };
 // Types on which the Food & Drink badge columns are meaningful.
 const BADGE_TYPES = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery'];
@@ -161,7 +162,7 @@ const SLOT_WINDOWS = {
 // Types that are expected to list hours (the Food & Drink / winery badge
 // types). Beaches, parks and golf courses rarely do, so a missing value
 // there is not flagged as a caveat.
-const HOURS_EXPECTED_TYPES = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery'];
+const HOURS_EXPECTED_TYPES = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', 'indoor', 'tour'];
 
 // -> { known, days: { mon: { status: 'open', ranges: [[from, to]] } | { status: 'closed' } | { status: 'unknown' } } }
 // Stage 2 (2026-09-29): the site's one hours reading (hours.js) -- the same
@@ -334,6 +335,10 @@ function buildContext(intent, labels, options) {
     seasonInfo: requestSeason(intent),
     dayThemes: Array.isArray(intent.dayThemes) ? intent.dayThemes : [],
     lake: intent.lake === true,
+    plannerKinds: opts.requirements ? opts.requirements.items.filter(i => i.kind === 'venue_kind' && i.strength === 'must').map(i => i.value) : intent.plannerKinds || [],
+    requirements: opts.requirements || null,
+    tripDate: opts.tripDate || null,
+    events: opts.events || [],
   };
 }
 
@@ -491,7 +496,7 @@ function eligible(v, ctx, strict) {
   if (!ctx.itinerary && v.advisory && v.advisory.note && ADVISORY_CLOSED_RE.test(v.advisory.note)) return false;
   // A venue closed for the season today is left out the same way (dated
   // itineraries check the trip's own date in advisoryFit instead).
-  if (!ctx.itinerary && v.seasonClosedToday) return false;
+  if (!ctx.itinerary && !ctx.requirements && v.seasonClosedToday) return false;
   const occasionExcluded = OCCASION_EXCLUDED_TYPES[ctx.occasion];
   if (occasionExcluded && occasionExcluded.includes(v.type) && !ctx.types.has(v.type)) return false;
   if (ctx.rainy) {
@@ -504,6 +509,7 @@ function eligible(v, ctx, strict) {
   }
   if (ctx.dog && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) return false;
   for (const f of ctx.features) {
+    if (ctx.requirements?.items.some(i => i.kind === 'feature' && i.value === f) && !DINING_TYPES.includes(v.type) && ['vegetarian','vegan','gluten_free'].includes(f)) continue;
     if (f === 'dog_friendly') continue; // handled above
     if (f === 'kid_friendly') {
       if (BADGE_TYPES.includes(v.type) && !v.features.kid_friendly) return false;
@@ -511,9 +517,13 @@ function eligible(v, ctx, strict) {
     }
     if (BADGE_TYPES.includes(v.type)) { if (!v.features[f]) return false; } else if (strict) return false;
   }
+  if (ctx.plannerKinds.length && ['indoor', 'tour'].includes(v.type) && !ctx.plannerKinds.some(k => (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(k))) return false;
   if (strict) {
-    if (ctx.types.size && !ctx.types.has(v.type) && !(v.fdTypes || []).some((t) => ctx.types.has(t))) return false;
+    const kindMatch = ctx.plannerKinds.some(k => (v.plannerKinds || []).includes(k));
+    if (ctx.plannerKinds.length && (!ctx.types.size || ['indoor','tour','outdoor'].some(t=>ctx.types.has(t))) && !kindMatch) return false;
+    if (ctx.types.size && !ctx.types.has(v.type) && !(v.fdTypes || []).some((t) => ctx.types.has(t)) && !(ctx.requirements && kindMatch && [...ctx.types].every(t=>['tour','indoor','outdoor'].includes(t)))) return false;
     if (ctx.activities.size && !v.activities.some((a) => ctx.activities.has(a))) return false;
+    if (!ctx.itinerary && ctx.requirements?.items.some(i=>i.kind==='activity'&&i.strength==='must'&&!tripRequirements.requirementDay(i,ctx.tripDate)&&!tripRequirements.matches(v,i))) return false;
     for (const c of ctx.collections) if (!v.collections.includes(c)) return false;
     for (const ft of ctx.foodTerms) if (!foodMatch(v, ft)) return false;
   }
@@ -783,7 +793,7 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
   const strict = true;
   const scored = [];
   for (const v of facts) {
-    if (!regionOk(v, ctx) || !eligible(v, ctx, strict)) continue;
+    if (!regionOk(v, ctx) || !eligible(v, ctx, strict) || !tripRequirements.venueAllowed(v, ctx.requirements, 1, ctx.tripDate) || ctx.requirements && seasonClosedOnTrip(v, { date:ctx.tripDate })) continue;
     const s = scoreVenue(v, ctx);
     const t = requestedTimeFit(v, ctx);
     if (t && t.skip) continue; // listed hours prove it is closed at the time asked for
@@ -844,7 +854,7 @@ function distanceTerm(prev, v, kmCost, maxHop) {
 
 function buildOuting(facts, ctx) {
   const steps = outingSteps(ctx);
-  const base = facts.filter((v) => regionOk(v, ctx) && eligible(v, ctx, false));
+  const base = facts.filter((v) => regionOk(v, ctx) && eligible(v, ctx, false) && tripRequirements.venueAllowed(v, ctx.requirements, 1, ctx.tripDate) && (!ctx.requirements || !seasonClosedOnTrip(v, { date:ctx.tripDate })));
   // One evening, so distance matters more than on a day plan: 2 points a km.
   const kmCost = OUTING_KM_PENALTY, maxHop = PLAN_MAX_HOP_KM.relaxed;
   const candidatesFor = (step, prev, used) => {
@@ -926,6 +936,7 @@ function regionCentroids(facts) {
 // named activity, each named collection and each food word.
 function focusList(ctx) {
   const f = [];
+  for (const k of ctx.plannerKinds) f.push({ key: `kind:${k}`, test: v => (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(k) });
   for (const t of ctx.types) f.push({ key: `type:${t}`, test: (v) => v.type === t || (v.fdTypes || []).includes(t) });
   for (const a of ctx.activities) f.push({ key: `activity:${a}`, test: (v) => v.activities.includes(a) });
   for (const c of ctx.collections) f.push({ key: `collection:${c}`, test: (v) => v.collections.includes(c) });
@@ -1021,6 +1032,7 @@ function buildDays(facts, ctx, days, pinned) {
   const byId = new Map(facts.map((v) => [v.id, v]));
   const base = new Map(pool.map((v) => [v.id, scoreVenue(v, ctx)]));
   const used = new Set();
+  const covered = new Set();
   // Pinned stops are reserved up front, so refilling one removed slot can
   // never take a venue that another kept slot is holding.
   const reserved = new Set(pinned ? Object.values(pinned) : []);
@@ -1038,9 +1050,20 @@ function buildDays(facts, ctx, days, pinned) {
 
   for (let d = 1; d <= days; d++) {
     const region = dayRegions[d - 1] || null;
-    const dayPool = pool.filter((v) => !region || v.region === region);
+    const actualDate = ctx.tripDate ? new Date(new Date(`${ctx.tripDate}T12:00:00Z`).getTime() + (d - 1) * 86400000).toISOString().slice(0, 10) : null;
+    const dayPool = pool.filter((v) => {
+      if (ctx.requirements && seasonClosedOnTrip(v, { date: actualDate })) return false;
+      if(region && v.region!==region)return false;
+      const activities=(ctx.requirements?.items||[]).filter(i=>i.kind==='activity'&&i.strength==='must'&&(!tripRequirements.requirementDay(i,ctx.tripDate)||tripRequirements.requirementDay(i,ctx.tripDate)===d));
+      const specificWinter=activities.some(i=>['skiing','snowshoeing'].includes(i.value));
+      const outdoorNeeds=[...activities.filter(i=>i.value!=='winter'||!specificWinter),...(ctx.requirements?.items||[]).filter(i=>i.kind==='venue_kind'&&['park','sunset','horseback'].includes(i.value)&&i.strength==='must'&&(!tripRequirements.requirementDay(i,ctx.tripDate)||tripRequirements.requirementDay(i,ctx.tripDate)===d))];
+      if(v.type==='outdoor'&&outdoorNeeds.length&&!outdoorNeeds.some(i=>tripRequirements.matches(v,i)))return false;
+      const scoped=(ctx.requirements?.items||[]).filter(i=>['venue_kind','venue'].includes(i.kind)&&tripRequirements.matches(v,i));
+      return !scoped.length||scoped.some(i=>!tripRequirements.requirementDay(i,ctx.tripDate)||tripRequirements.requirementDay(i,ctx.tripDate)===d);
+    });
     const met = new Set();
     const dayTypes = {};
+    const capped = v => (ctx.requirements?.items || []).some(i => i.kind === 'type_count' && i.strength === 'must' && i.value === v.type && (!tripRequirements.requirementDay(i, ctx.tripDate) || tripRequirements.requirementDay(i, ctx.tripDate) === d) && (tripRequirements.requirementDay(i, ctx.tripDate) ? dayTypes[v.type] || 0 : tripTypeCount[v.type] || 0) >= i.count);
     const stops = [];
     let prev = null;
     const theme = themeByDay[d] || null;
@@ -1051,27 +1074,57 @@ function buildDays(facts, ctx, days, pinned) {
     const thTest = themeTest(theme);
     const thLabel = theme ? themeLabel(ctx, theme) : null;
     let themeMet = false;
+    const distanceLimit = (ctx.requirements?.items || []).filter(i => i.kind === 'distance' && i.strength === 'must' && (!tripRequirements.requirementDay(i, ctx.tripDate) || tripRequirements.requirementDay(i, ctx.tripDate) === d)).reduce((n,i) => Math.min(n,i.value), Infinity);
+    const anchors = ctx.requirements ? (ctx.events || []).filter(e => {
+      const visit=eventAttendanceDate(e,actualDate);return visit===actualDate&&(!region||e.region===region);
+    }) : [];
+    const requestedEvents = (ctx.requirements?.items || []).filter(i => i.kind === 'event' && !covered.has(i.id) && (!tripRequirements.requirementDay(i, ctx.tripDate) || tripRequirements.requirementDay(i, ctx.tripDate) === d));
+    const anchor = anchors.find(e => requestedEvents.some(i => tripRequirements.eventMatches(e,i) && eventSuitsKind(e,i.eventKind)) && !used.has(`event:${e.id}`));
+    const start = anchor ? parseEventStart(anchor.time) : null;
+    const end = anchor ? eventEndMinutes(anchor, start) : null;
+    const eventPart = anchor ? (start == null ? 'evening' : start < 12 * 60 ? 'morning' : start < 17 * 60 ? 'afternoon' : 'evening') : null;
     for (const daypart of dayDayparts) {
       const pin = pinned && pinned[`${d}-${daypart}`];
+      const occupied=anchor && (daypart===eventPart || start!=null && end!=null && start<SLOT_WINDOWS[daypart].to && end>SLOT_WINDOWS[daypart].from);
+      if(occupied && pin) { const error=new Error(`The event conflicts with a locked stop on day ${d}. Unlock it or choose another event.`); error.code='TRIP_CONFLICT'; throw error; }
+      if(anchor && daypart === eventPart) {
+        stops.push({ kind:'event', daypart, label: PLAN_DAYPART_LABELS[daypart], event:anchor, timeKnown:start!=null, caveats:[start==null?'Event start time is not listed; confirm before visiting.':'Confirm the event duration and allow time around its listed start.'] });
+        used.add(`event:${anchor.id}`);
+        for (const i of requestedEvents) if (tripRequirements.eventMatches(anchor,i)) covered.add(i.id);
+        continue;
+      }
+      if(occupied) { stops.push({daypart,label:PLAN_DAYPART_LABELS[daypart],venue:null,why:[],reasons:[],caveats:['Reserved for the listed event time.']}); warnings.push(`${PLAN_DAYPART_LABELS[daypart]} on day ${d} is kept free for the event’s listed duration.`); continue; }
       let chosen = null;
-      if (pin && byId.has(pin) && !ctx.exclude.has(pin) && !used.has(pin) && eligible(byId.get(pin), ctx, false)) {
+      if (pin && byId.has(pin) && !capped(byId.get(pin)) && !ctx.exclude.has(pin) && !used.has(pin) && eligible(byId.get(pin), ctx, false) && tripRequirements.venueAllowed(byId.get(pin), ctx.requirements, d, ctx.tripDate) && (!ctx.requirements || !seasonClosedOnTrip(byId.get(pin), { date: actualDate }))) {
         const v = byId.get(pin);
         const fit = slotFit(v, ctx, daypart, d - 1, daypart);
         const dist = distanceTerm(prev, v, dayKmCost, dayMaxHop);
-        chosen = { v, score: 0, reasons: (base.get(v.id) || scoreVenue(v, ctx)).reasons.concat(fit.ok ? fit.reasons : [], dist.reasons), caveats: (fit.ok ? fit.caveats : []).concat(dist.caveats) };
-      } else {
+        if ((fit.ok || !ctx.requirements) && (kmBetween(prev, v) == null || kmBetween(prev, v) <= distanceLimit)) chosen = { v, score: 0, reasons: (base.get(v.id) || scoreVenue(v, ctx)).reasons.concat(fit.ok ? fit.reasons : [], dist.reasons), caveats: (fit.ok ? fit.caveats : []).concat(dist.caveats) };
+      }
+      if (!chosen) {
         const cands = [];
         for (const v of dayPool) {
-          if (used.has(v.id) || reserved.has(v.id)) continue;
+          if (used.has(v.id) || reserved.has(v.id) || capped(v) || !tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate)) continue;
+          // Preserve scarce activities for later explicit day requests once
+          // today's matching requirement has already been fulfilled.
+          const futureKinds = (ctx.requirements?.items || []).filter(i => i.strength === 'must' && i.kind === 'venue_kind' && tripRequirements.matches(v, i) && tripRequirements.requirementDay(i, ctx.tripDate) > d);
+          if (futureKinds.some(i => {
+            const currentMet = ctx.requirements.items.some(j => j.kind === i.kind && j.value === i.value && covered.has(j.id) && tripRequirements.requirementDay(j, ctx.tripDate) === d);
+            const needed = new Set(futureKinds.filter(j => j.value === i.value).map(j => tripRequirements.requirementDay(j, ctx.tripDate))).size;
+            const remaining = pool.filter(o => !used.has(o.id) && !reserved.has(o.id) && tripRequirements.matches(o, i)).length;
+            return currentMet && remaining <= needed;
+          })) continue;
+          if (kmBetween(prev, v) != null && kmBetween(prev, v) > distanceLimit) continue;
           const aff = (SLOT_AFFINITY[daypart] || {})[v.type] || 0;
           if (!aff) continue;
+          if (ctx.requirements && Number((ctx.tripDate || '').slice(5,7)) === 10 && ['beach','golf'].includes(v.type) && !v.indoorGolf && !ctx.types.has(v.type)) continue;
           // One stop of each kind per day (one round of golf, one winery...);
           // only restaurants may appear twice, as lunch and dinner.
-          if (dayTypes[v.type] && v.type !== 'restaurant') continue;
+          if (dayTypes[v.type] && !['restaurant', 'indoor', 'tour'].includes(v.type)) continue;
           const fit = slotFit(v, ctx, daypart, d - 1, daypart);
           if (!fit.ok) continue; // listed hours prove it is closed then
           const s = base.get(v.id);
-          let score = s.score + aff * 6 + fit.score;
+          let score = s.score + aff * 6 + fit.score + tripRequirements.requirementScore(v, ctx.requirements, d, ctx.tripDate, covered);
           const extra = fit.reasons.slice();
           const vFocus = focuses.filter((f) => f.test(v));
           if (vFocus.length) score += vFocus.some((f) => !met.has(f.key)) ? 20 : 6;
@@ -1118,6 +1171,7 @@ function buildDays(facts, ctx, days, pinned) {
       }
       const v = chosen.v;
       used.add(v.id);
+      for (const i of ctx.requirements?.items || []) if (tripRequirements.matches(v, i) && (!tripRequirements.requirementDay(i, ctx.tripDate) || tripRequirements.requirementDay(i, ctx.tripDate) === d)) covered.add(i.id);
       dayTypes[v.type] = (dayTypes[v.type] || 0) + 1;
       tripTypeCount[v.type] = (tripTypeCount[v.type] || 0) + 1;
       for (const f of focuses) if (f.test(v)) met.add(f.key);
@@ -1143,6 +1197,7 @@ function buildDays(facts, ctx, days, pinned) {
 }
 
 function focusText(ctx, key) {
+  if (key.startsWith('kind:')) return tripRequirements.LABELS[key.slice(5)] || key.slice(5);
   const [kind, value] = key.split(':');
   if (kind === 'type') return typeLabel(ctx, value).toLowerCase();
   if (kind === 'activity') return activityLabel(ctx, value);
@@ -1316,6 +1371,59 @@ function buildPlanOverview(kind, result, ctx, facts) {
 //   pinned: { "<day>-<daypart>": venueId } -- stops to keep when one stop is
 //           removed and replaced
 function planTrip(input) {
+  if (!input?.requirements?.items?.length && !input?.requirements?.conflicts?.length) return planTripCore(input);
+  const requirements = input.requirements;
+  const intent = { ...(input.intent || {}) };
+  const consumed = tripRequirements.consumedTerms(requirements);
+  intent.foodTerms = (intent.foodTerms || []).filter(f => f.cuisine || !consumed.has(f.term));
+  const length = requirements.items.find(i => i.kind === 'days');
+  if (length) { intent.days = length.value; if (intent.mode !== 'events') intent.mode = 'plan'; }
+
+  input = { ...input, tripDate: requirements.startDate || input.tripDate };
+  if (intent.mode === 'events' && requirements.items.some(i => i.kind === 'days')) {
+    intent.mode = 'plan'; intent.days = requirements.items.find(i => i.kind === 'days').value;
+    intent.types = requirements.items.filter(i => i.kind === 'type').map(i => i.value);
+    if(requirements.items.some(i=>i.kind==='venue_kind'&&!i.value.includes('tour'))) intent.types.push('indoor');
+    intent.plannerKinds = requirements.items.filter(i=>i.kind==='venue_kind').map(i=>i.value);
+    input.trip = null;
+  }
+  if (!input.trip?.multi && !length && requirements.items.some(i=>i.kind==='event') && !requirements.items.some(i=>['venue_kind','venue','type'].includes(i.kind))) intent.mode='events';
+  if (intent.mode==='find') intent.activities = [...new Set([...(intent.activities||[]),...requirements.items.filter(i=>i.kind==='activity'&&i.strength==='must').map(i=>i.value)])];
+  if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex&&!i.weekday)) intent.types=['indoor'];
+  const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>['horseback','sunset','park'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(i.value)?'tour':'indoor'))];
+  if (input.trip?.multi) {
+    const trip = tripRequirements.expandTripComponents(input.trip, requirements);
+    const tripEvents = (input.tripEvents || []).slice();
+    while (tripEvents.length < trip.components.length) tripEvents.push(null);
+    input = {...input,trip,tripEvents};
+  }
+  if (requirements.items.some(i=>i.kind==='rainy'&&i.activityOnly)) intent.occasion=null;
+  const scopedRain = requirements.items.some(i => i.kind === 'rainy' && (i.dayIndex || i.weekday));
+  if (scopedRain && intent.occasion === 'rainy_day') intent.occasion = null;
+  const base = requirements.items.find(i => i.kind === 'base');
+  if (base && !input.trip?.route) intent.regions = [base.value];
+  const named = requirements.items.filter(i => i.kind === 'venue').map(i => (input.facts || []).find(v => v.id === i.value)).filter(Boolean);
+  intent.types = [...new Set([...(intent.types || []), ...named.map(v => v.type)])];
+  intent.features = (intent.features || []).filter(f => !requirements.items.some(i => i.kind === 'feature' && i.value === f));
+  if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
+  if(requirements.items.some(i=>i.kind==='excluded_kind')) {
+    const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor'));
+    intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
+  }
+  const result = planTripCore({ ...input, intent });
+  if (requirements.startDate && result.days.length) { result.notes.push(`Trip starts on ${requirements.startDate} (Okanagan calendar date).`); result.days.forEach(day => { day.date = new Date(new Date(`${requirements.startDate}T12:00:00Z`).getTime() + (day.day - 1) * 86400000).toISOString().slice(0,10); }); }
+  result.requirementResults = tripRequirements.evaluateTripRequirements({ requirements, plan: result, facts: input.facts || [], tripDate: input.tripDate });
+  result.warnings = [...new Set([...(result.warnings || []), ...requirements.conflicts, ...result.requirementResults.filter(i => i.status !== 'satisfied').map(i => `${i.status === 'unmet' ? 'Not met' : 'Not verified'}: ${i.sourceText} — ${i.reason}`)])];
+  for (const [key, id] of Object.entries(input.pinned || {})) {
+    const [day,part]=key.split('-');
+    if (!result.days.find(d=>d.day===Number(day))?.stops.some(s=>s.daypart===part&&s.venue?.id===id)) { const error=new Error(`A locked stop cannot be kept (${key}). Unlock it or adjust the conflicting requirement.`); error.code='TRIP_CONFLICT'; throw error; }
+  }
+  return result;
+}
+
+function planTripCore(input) {
   // Multi-part requests (input.trip from interpretTripComponents) get the
   // itinerary path; every other request is planned exactly as before.
   if (input && input.trip && input.trip.multi) return planItinerary(input);
@@ -1439,7 +1547,7 @@ function routeDirection(from, to) {
   return a < b ? 'south' : 'north';
 }
 // When a part happens, if the request did not say.
-const ITIN_TYPE_DAYPART = { cafe: 'morning', golf: 'morning', outdoor: 'morning', beach: 'afternoon', winery: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
+const ITIN_TYPE_DAYPART = { cafe: 'morning', golf: 'morning', outdoor: 'morning', beach: 'afternoon', winery: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening', indoor: 'afternoon', tour: 'afternoon' };
 const ITIN_DAYPART_RANK = { morning: 0, midday: 1, afternoon: 2, evening: 3 };
 // "Live music" with no listed event falls back to places whose verified
 // Live Music badge is set -- only venue types that carry that badge.
@@ -1467,6 +1575,14 @@ function parseEventStart(timeLabel) {
   const h = Number(m[1]) % 12 + (m[3].toLowerCase() === 'pm' ? 12 : 0);
   return h * 60 + Number(m[2] || 0);
 }
+function eventEndMinutes(e,start) {
+  if(start==null)return null;
+  let end=null;
+  if(/^\d{2}:\d{2}$/.test(e.endTime||'')) {const [h,m]=e.endTime.split(':').map(Number);end=h*60+m;}
+  else {const range=String(e.time||'').split(/\s*[–—-]\s*/);if(range.length>1)end=parseEventStart(range[range.length-1]);}
+  if(end!=null&&(e.endsNextDay||end<start))end+=1440;
+  return end;
+}
 function weekdayOfDate(dateStr) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || ''));
   if (!m) return null;
@@ -1475,6 +1591,7 @@ function weekdayOfDate(dateStr) {
 function componentLabel(c, ctx) {
   if (c.kind === 'event') return c.event.noun;
   if (c.liveMusicFallback) return 'live music';
+  if (c.rainyOption) return 'indoor activity';
   if (c.meal) return c.meal;
   if (c.generic) return c.kids ? 'family activities' : 'activities';
   if (c.cuisines && c.cuisines.length) return `${c.cuisines[0]} restaurants`;
@@ -1830,11 +1947,29 @@ function advisoryExcerpt(note) {
 }
 // Closed for the season on the trip's date (the venue's own dated range), or
 // today when the plan has no date.
+const OPERATING_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+const OPERATING_PERIOD_RE = new RegExp(`\\b(?:opens?|operates?|runs?)\\s+(?:daily\\s+)?(?:from\\s+)?(${OPERATING_MONTHS.join('|')})\\s+(?:to|through|until|into)\\s+(?:(?:early|mid|late)\\s+)?(${OPERATING_MONTHS.join('|')})\\b`);
 function seasonClosedOnTrip(v, season) {
-  if (!v.seasonClosed) return false;
   const d = season && season.date;
-  if (!d) return !!v.seasonClosedToday;
-  return d >= v.seasonClosed.from && d <= v.seasonClosed.to;
+  if (v.seasonClosed) {
+    if (!d) return !!v.seasonClosedToday;
+    return d >= v.seasonClosed.from && d <= v.seasonClosed.to;
+  }
+  // Only explicit operating ranges in the stored description establish a
+  // closure. Generic seasonal mentions never establish dates or availability.
+  if (!d || !['outdoor','tour'].includes(v.type)) return false;
+  const clauses=String(v.plannerDescription || v.textDesc || '').split(/[.!?;]/).map(normalizeText);
+  const period=clauses.map(clause=>{
+    const match=OPERATING_PERIOD_RE.exec(clause);
+    if (!match) return null;
+    const subject=clause.slice(0,match.index).trim();
+    const venueSubject=/^(?:(?:the|this) )?(?:park|venue|attraction|resort|centre|center|operator|business|it)$/.test(subject)||subject===normalizeText(v.name||'');
+    const tourSubject=v.type==='tour'&&/^(?:the )?tours?$/.test(subject);
+    return !subject||venueSubject||tourSubject?match:null;
+  }).find(Boolean);
+  if (!period) return false;
+  const month = Number(d.slice(5,7))-1, from = OPERATING_MONTHS.indexOf(period[1]), to = OPERATING_MONTHS.indexOf(period[2]);
+  return from<=to ? month<from || month>to : month<from && month>to;
 }
 function advisoryFit(v, c, season) {
   if (seasonClosedOnTrip(v, season)) return { skip: true };
@@ -1913,10 +2048,11 @@ function planItinerary(input) {
         event: { ...e, regionLabel: regionLabel(baseCtx, e.region) }, timeKnown: start != null, start,
         caveats: start != null ? [] : [wantPart ? `Its start time isn’t listed, so it may not be in the ${wantPart === 'evening' ? 'evening' : 'daytime'} — check the event page` : 'Start times vary — check the event page before you plan around it'],
       };
+      if (input.requirements && start != null && eventEndMinutes(e,start)==null) stop.caveats.push('The event’s end time is not listed; check that any later stop fits before making plans.');
       stops.push(stop);
       if (!anchor) {
         const date = eventAttendanceDate(e, input.tripDate);
-        anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(date), daypart, date };
+        anchor = { region: e.valleyWide ? null : e.region, weekday: weekdayOfDate(date), daypart, date, start };
       }
     } else if (p.c.event.venueFeature) {
       // No listed event: the verified venue badge stands in, when places have it.
@@ -1943,7 +2079,7 @@ function planItinerary(input) {
     const c = p.c;
     if (c.kind !== 'venue') continue;
     const pairWithEvent = anchor && (c.meal === 'dinner' || c.meal === 'supper' || (!c.daypart && c.types.includes('restaurant')) || c.daypart === 'evening');
-    const daypart = pairWithEvent ? 'evening' : (c.daypart || null);
+    const daypart = pairWithEvent ? 'evening' : (c.daypart || (input.requirements && anchor ? ITIN_TYPE_DAYPART[c.types[0]] || 'afternoon' : null));
     const when = pairWithEvent ? { daypart: 'evening' } : trip.when ? { ...trip.when, ...(daypart ? { daypart } : {}) } : daypart ? { daypart } : null;
     const ci = {
       regions, types: c.types, activities: c.activities || [], collections: c.collections || [], features: c.features || [],
@@ -1956,15 +2092,20 @@ function planItinerary(input) {
       // down, a place without a price is never excluded).
       budget: intent.budget || null,
     };
-    const ctx = buildContext(ci, labels, { ...input, startWeekday: pairWithEvent && anchor.weekday ? anchor.weekday : input.startWeekday });
+    const ctx = buildContext(ci, labels, { ...input, tripDate: input.requirements && anchor ? anchor.date : input.tripDate, startWeekday: (pairWithEvent || input.requirements) && anchor?.weekday ? anchor.weekday : input.startWeekday });
+    if (c.plannerKinds) ctx.plannerKinds = c.plannerKinds;
     const scored = [];
     const closedByAdvisory = [];
     for (const v of facts) {
-      if (used.has(v.id) || !regionOk(v, ctx) || !eligible(v, ctx, true)) continue;
+      if (used.has(v.id) || !regionOk(v, ctx) || !eligible(v, ctx, true) || !tripRequirements.venueAllowed(v, input.requirements, 1, input.tripDate)) continue;
       if (c.generic && !c.types.includes(v.type)) continue;
       const s = scoreVenue(v, ctx);
       const t = requestedTimeFit(v, ctx);
       if (t && t.skip) continue;
+      if (input.requirements && anchor?.start != null && daypart && SLOT_WINDOWS[daypart]?.from < anchor.start) {
+        const parsed = v._hours || (v._hours = parseVenueHours(v.hours));
+        if (parsed.known && anchor.weekday && provenClosed(parsed.days[anchor.weekday], {from:SLOT_WINDOWS[daypart].from,to:Math.min(SLOT_WINDOWS[daypart].to,anchor.start)})) continue;
+      }
       const adv = advisoryFit(v, c, season);
       if (adv && adv.skip) { closedByAdvisory.push({ v, score: s.score }); continue; }
       const sf = seasonFit(v, c, season, ctx);
