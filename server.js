@@ -8680,11 +8680,23 @@ function renderGolfHeaderHtml() {
 //    destination } through the page's existing window.trackEvent (GA4 config,
 //    internal-traffic flag and page_type are the existing ones). Placements, read
 //    from the link itself: header, menu, homepage_section.
+// A venue description in English, plus its French translation when there is
+// one: both are in the HTML and the CSS in BMT_HEADER_STYLE shows the one that
+// matches <html lang>. Without a translation it is the escaped English text,
+// exactly as before.
+function bilingualDescHtml(en, fr) {
+  if (!fr) return escapeHtml(en || '');
+  return `<span class="desc-en" lang="en">${escapeHtml(en || '')}</span><span class="desc-fr" lang="fr">${escapeHtml(fr)}</span>`;
+}
 const BMT_HEADER_STYLE = `<style id="bmt-header">
 .nav #navTripBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; position: relative; flex-shrink: 0; min-height: 40px; padding: 0 18px; white-space: nowrap; text-decoration: none; }
 .nav #navTripBtn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 .nav #navTripBtn::after { content: ""; position: absolute; inset: -2px; }
 .nav .logo-wordmark, .nav .lang-toggle { white-space: nowrap; }
+/* Venue descriptions ship in both languages (2026-10-12); app.js sets <html lang> from the EN / FR toggle, so CSS shows the chosen one. */
+.desc-fr { display: none; }
+html[lang="fr"] .desc-fr { display: inline; }
+html[lang="fr"] .desc-en { display: none; }
 .nav .lang-toggle, .nav .nav-search-btn { flex-shrink: 0; }
 /* 941-1100px: the links, search, EN / FR and the button have to share one line, so the logo and links tighten a little. */
 @media (min-width: 941px) and (max-width: 1100px) {
@@ -10384,9 +10396,9 @@ function venueCardHtml(venue, opts = {}) {
   const isGolf = themed;
   const descId = `golf-desc-${venue.id}`;
   const desc = !venue.description ? '' : isGolf
-    ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(venue.description)}</p></div>
+    ? `<div class="golf-desc" id="${descId}"><p>${bilingualDescHtml(venue.description, venue.description_fr)}</p></div>
         <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`
-    : `<p>${escapeHtml(venue.description)}</p>`;
+    : `<p>${bilingualDescHtml(venue.description, venue.description_fr)}</p>`;
   // Emitted for themed cards and for ENGAGEMENT_ONLY_TYPES cards alike: the
   // shared engagement script locates a card by data-venue-category, so an
   // unthemed card carrying the controls needs these attributes too. They are
@@ -15584,7 +15596,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
-  <p class="venue-description">${escapeHtml(editorial ? editorial.intro : (venue.description || ''))}</p>${venueAdvisoryHtml}${editorialHtml}
+  <p class="venue-description">${editorial ? escapeHtml(editorial.intro) : bilingualDescHtml(venue.description, venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}
   <div class="venue-section venue-key-info">
     <h2>Good to Know</h2>

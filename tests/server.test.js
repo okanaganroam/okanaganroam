@@ -17205,3 +17205,25 @@ test('Planner search fixes: operating periods beyond the search excerpt remain a
  try {const p=app.runTripPlan({text:'Parks in Kelowna'},new Date('2030-10-02T19:00:00Z'));assert.ok(!p.recommendations.some(s=>s.venue.id===v.id));}
  finally {db.prepare('DELETE FROM venues WHERE id=?').run(v.id);}
 });
+
+test('Venue descriptions ship in English and French: the EN / FR toggle (<html lang>) picks one by CSS; venues without French are unchanged', async () => {
+  const fr = app.createVenue({ name: 'Bilingual Test Bistro', region: 'kelowna', type: 'restaurant', description: 'A cosy test bistro (fixture).', slug: 'bilingual-test-bistro' });
+  db.prepare('UPDATE venues SET description_fr = ? WHERE id = ?').run("Un bistro d'essai chaleureux (fixture).", fr.id);
+  const en = app.createVenue({ name: 'English Only Test Beach', region: 'kelowna', type: 'beach', description: 'A test beach & cove (fixture).', slug: 'english-only-test-beach' });
+  try {
+    await withWinterServer(async (base) => {
+      const page = await WINTER_GET(base, '/kelowna/restaurants/bilingual-test-bistro');
+      assert.equal(page.status, 200);
+      assert.match(page.text, /<p class="venue-description"><span class="desc-en" lang="en">A cosy test bistro \(fixture\)\.<\/span><span class="desc-fr" lang="fr">Un bistro d&#39;essai chaleureux \(fixture\)\.<\/span><\/p>/);
+      assert.match(page.text, /\.desc-fr \{ display: none; \}\nhtml\[lang="fr"\] \.desc-fr \{ display: inline; \}\nhtml\[lang="fr"\] \.desc-en \{ display: none; \}/);
+      const list = await WINTER_GET(base, '/kelowna/restaurants');
+      assert.match(list.text, /<span class="desc-en" lang="en">A cosy test bistro \(fixture\)\.<\/span><span class="desc-fr" lang="fr">Un bistro d&#39;essai chaleureux/);
+      // No translation: plain escaped English, exactly as before.
+      const beach = await WINTER_GET(base, '/kelowna/beaches/english-only-test-beach');
+      assert.match(beach.text, /<p class="venue-description">A test beach &amp; cove \(fixture\)\.<\/p>/);
+      assert.doesNotMatch(beach.text, /class="desc-fr"/);
+    });
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(fr.id, en.id);
+  }
+});
