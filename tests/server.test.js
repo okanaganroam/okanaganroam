@@ -9781,6 +9781,36 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
 // /secret-spots lists the live 'hidden_gem' collection narrowed to places
 // (outdoor + beach). A Hidden Gem cafe stays a Hidden Gem but is not a
 // Secret Spot. Fixture memberships are removed again at the end.
+test('Curated lists: visitor-facing notes from public batches show on Local Favourites / Hidden Gems / Secret Spots cards; internal notes stay hidden', () => {
+  const add = (row) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(row.name, row.region, row.type, row.slug, row.description, 4.5);
+    return db.prepare('SELECT * FROM venues WHERE slug = ?').get(row.slug);
+  };
+  const lfPub = add({ name: 'CN Fixture Diner', region: 'penticton', type: 'restaurant', slug: 'cn-fixture-diner', description: 'Fixture.' });
+  const lfInt = add({ name: 'CN Fixture Pub', region: 'vernon', type: 'pub', slug: 'cn-fixture-pub', description: 'Fixture.' });
+  const gemPub = add({ name: 'CN Fixture Cove', region: 'summerland', type: 'beach', slug: 'cn-fixture-cove', description: 'Fixture.' });
+  const pub = { reason: 'test', batch_id: app.PUBLIC_NOTE_BATCHES[0] };
+  const internal = { reason: 'test', batch_id: 'test-internal-notes' };
+  try {
+    assert.ok(app.guardedCollectionMembershipUpdate('local_favorite', lfPub.id, 'add', 'Voted Best Breakfast in Penticton (fixture)', pub).ok);
+    assert.ok(app.guardedCollectionMembershipUpdate('local_favorite', lfInt.id, 'add', 'internal rationale must not render', internal).ok);
+    assert.ok(app.guardedCollectionMembershipUpdate('hidden_gem', gemPub.id, 'add', 'Three tiny coves most drivers miss (fixture)', pub).ok);
+    const lf = app.renderLocalFavouritesPage(app.getLocalFavouriteVenues());
+    assert.match(lf, /<p class="card-note"><span class="card-note-label">Local pick:<\/span> Voted Best Breakfast in Penticton \(fixture\)<\/p>/);
+    assert.doesNotMatch(lf, /internal rationale must not render/);
+    assert.match(lf, /body\.lf-page \.card-note \{/, 'the note line is styled on the curated pages');
+    const gems = app.renderHiddenGemsPage(app.getHiddenGemCollectionVenues());
+    const ss = app.renderSecretSpotsPage(app.getSecretSpotVenues());
+    for (const html of [gems, ss]) assert.match(html, /<span class="card-note-label">Why it\u2019s a gem:<\/span> Three tiny coves most drivers miss \(fixture\)/);
+  } finally {
+    const ids = [lfPub.id, lfInt.id, gemPub.id];
+    db.prepare(`DELETE FROM collection_items WHERE content_type = 'venue' AND content_id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+    db.prepare(`DELETE FROM venue_enrichment_log WHERE venue_id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+    db.prepare(`DELETE FROM venues WHERE id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+  }
+});
+
 test('Secret Spots: /secret-spots renders only the Hidden Gem places, with filters, SEO and the homepage card repointed', () => {
   const add = (row) => {
     db.prepare('INSERT INTO venues (name, region, type, slug, description, rating) VALUES (?, ?, ?, ?, ?, ?)')

@@ -13802,6 +13802,29 @@ function getIndoorAlsoVenues() {
   `).all(INDOOR_ALSO_COLLECTION_KIND).map(rowToVenue);
 }
 
+// Curated-list card notes (2026-10-11). Most editorial membership notes are
+// internal rationale and stay off the page (see the Local Favourites / Secret
+// Spots tests), so only notes known to be written for visitors are shown:
+// members added in a batch listed in PUBLIC_NOTE_BATCHES (each add's batch_id
+// is in venue_enrichment_log as field 'collection:<kind>'), plus the original
+// Hidden Gems seeded by db.js (HIDDEN_GEMS_MEMBERS), which have no add row.
+const PUBLIC_NOTE_BATCHES = ['gems-favourites-2026-10', 'public-notes-2026-10'];
+function getPublicCollectionNotes(kind) {
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, ci.note,
+      (SELECT l.batch_id FROM venue_enrichment_log l
+        WHERE l.venue_id = ci.content_id AND l.field_name = ? AND l.new_value = 'member'
+        ORDER BY l.id DESC LIMIT 1) AS batch_id
+    FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND ci.note IS NOT NULL AND trim(ci.note) != ''
+  `).all(`collection:${kind}`, kind);
+  const seeded = kind === 'hidden_gem';
+  return new Map(rows
+    .filter((r) => (r.batch_id ? PUBLIC_NOTE_BATCHES.includes(r.batch_id) : seeded))
+    .map((r) => [r.id, r.note]));
+}
+
 function getLocalFavouriteVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
@@ -13884,7 +13907,12 @@ function renderLocalFavouritesStyles() {
     .filter((line) => !/dog-note|dog-guides|The dog-beach restriction|rather than the advisory|not a temporary warning/.test(line))
     .join('\n')
     .replace(/body\.dog-page/g, 'body.lf-page')
-    .replace(/#dogResults/g, '#lfResults');
+    .replace(/#dogResults/g, '#lfResults')
+    // Collection notes on the curated pages' cards ("Local pick: …",
+    // "Why it's a gem: …"), styled like the /indoor and /tours note line.
+    .replace(/<\/style>\s*$/, `  body.lf-page .card-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+  body.lf-page .card-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
+</style>`);
 }
 function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite', filterSurface = 'local_favourites') {
   const labels = {
@@ -14077,6 +14105,8 @@ function renderLocalFavouritesPage(venues, filter = null) {
     searchLabel: 'Search local favourites',
     pluralNoun: 'local favourites',
     summaryLabel: 'local favourite',
+    cardNotes: getPublicCollectionNotes('local_favorite'),
+    cardNoteLabel: 'Local pick:',
   }, venues, filter);
 }
 // The shared page body behind /local-favorites and /secret-spots: one curated
@@ -14088,6 +14118,8 @@ function renderLocalFavouritesPage(venues, filter = null) {
 // (after the intro), emptyHtml (replaces the no-results line when the list
 // itself is empty) and afterResultsHtml (a further section after the
 // results). Pages that pass none of them render exactly as before.
+// cardNotes / cardNoteLabel (2026-10-11): each member's collection note shown
+// on its card ("Local pick: Voted Best Breakfast…", "Why it's a gem: …").
 function renderCuratedCollectionPage(cfg, venues, filter = null) {
   const f = filter || { types: [], regions: [] };
   const types = localFavouriteTypesPresent(venues);
@@ -14121,7 +14153,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
   for (const v of venues) payload[String(v.id)] = { t: v.type, r: v.region };
 
   const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true })
+  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, ...(cfg.cardNotes ? { cardNotes: cfg.cardNotes, cardNoteLabel: cfg.cardNoteLabel } : {}) })
     .replace('<ul class="card-grid">', `<ul class="card-grid" id="lfResults"${matching.length === 0 ? ' hidden' : ''}>`)
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card"${matchIds.has(Number(id)) ? '' : ' hidden'} data-venue-id="${id}"`);
 
@@ -14213,6 +14245,8 @@ function renderSecretSpotsPage(venues, filter = null) {
     searchLabel: 'Search secret spots',
     pluralNoun: 'secret spots',
     summaryLabel: 'tucked-away',
+    cardNotes: getPublicCollectionNotes('hidden_gem'),
+    cardNoteLabel: 'Why it\u2019s a gem:',
   }, venues, filter);
 }
 
@@ -14354,6 +14388,8 @@ function renderHiddenGemsPage(venues, filter = null, feature = null) {
     searchLabel: 'Search hidden gems',
     pluralNoun: 'hidden gems',
     summaryLabel: 'hidden gem',
+    cardNotes: getPublicCollectionNotes('hidden_gem'),
+    cardNoteLabel: 'Why it\u2019s a gem:',
   }, venues, filter);
 }
 
@@ -22808,6 +22844,8 @@ module.exports = {
   getAdvisoryNotes,
   DOG_FRIENDLY_COLLECTION_KIND,
   getCollectionNotes,
+  getPublicCollectionNotes,
+  PUBLIC_NOTE_BATCHES,
   getDogFriendlyNotes,
   DOG_HUB_TYPES,
   DOG_HUB_FEATURES,
