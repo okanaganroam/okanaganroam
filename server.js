@@ -9351,15 +9351,34 @@ function renderGolfThemeStyles() {
   body.golf-page .card-grid > .venue-card > .venue-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   body.golf-page .card-grid > .venue-card .golf-desc { min-height: calc(3 * 1.45em); }
   body.golf-page .card-grid > .venue-card .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
-  body.golf-page .card-grid > .venue-card > .desc-toggle[hidden] { display: block; visibility: hidden; }
-  body.golf-page .card-grid > .venue-card > .card-note,
-  body.golf-page .card-grid > .venue-card > .dog-note {
+  body.golf-page .card-grid > .venue-card .desc-toggle[hidden] { display: block; visibility: hidden; }
+  body.golf-page .card-grid > .venue-card .card-note,
+  body.golf-page .card-grid > .venue-card .dog-note {
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
   }
   body.golf-page .card-grid > .venue-card > .chips:not(:empty) { margin-top: auto; }
   body.golf-page .card-grid > .venue-card > .chips:empty { display: none; }
   body.golf-page .card-grid > .venue-card > .chips:not(:empty) + .card-actions { margin-top: 8px; }
   body.golf-page .card-grid > .venue-card > .chips:empty + .card-actions { margin-top: auto; }
+  body.golf-page .card-slot:empty { display: none; }
+  body.golf-page .card-slot-desc { display: flex; flex-direction: column; }
+  /* Two-up rows (2026-10-12): each card spans eight rows of the list's grid
+     and shares them (subgrid), so the name, description, notice, note, badge
+     and button rows line up across the row; an empty slot becomes a blank
+     row only when its neighbour fills that row. */
+  @supports (grid-template-rows: subgrid) {
+    @media (min-width: 900px) {
+      body.golf-page .card-grid { row-gap: 0; }
+      /* content-visibility: auto (the long-list paint saver) implies layout
+         containment, which switches subgrid off, so two-up cards opt out. */
+      body.golf-page .card-grid > .venue-card { display: grid; grid-template-rows: subgrid; grid-row: span 8; row-gap: 0; margin-bottom: 16px; align-content: start; content-visibility: visible; contain-intrinsic-size: none; }
+      body.golf-page .card-grid > .venue-card > .card-slot:empty { display: block; }
+      body.golf-page .card-grid > .venue-card > .chips:empty { display: block; margin: 0; padding: 0; border: 0; }
+      /* One spacing for every card type, so the badge and button rows match. */
+      body.golf-page .card-grid > .venue-card > .chips:not(:empty) { margin: 10px 0 0 !important; padding: 0 !important; border: 0 !important; align-self: start !important; }
+      body.golf-page .card-grid > .venue-card > .card-actions { margin: 10px 0 0 !important; padding: 10px 0 0 !important; border: 0 !important; border-top: 1px solid rgba(74,52,40,0.10) !important; align-self: end !important; }
+    }
+  }
   body.golf-page .venue-card {
     margin: 0; background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
     padding: 18px 20px; box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
@@ -10411,12 +10430,30 @@ function venueCardHtml(venue, opts = {}) {
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${seasonTag ? seasonTagHtml(seasonTag) : advisoryNoticeHtml(advisoryNote)}`
     : '';
+  const chipsHtml = `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly }), themed ? maxChips : 0)}</p>`;
+  // Themed listing cards (2026-10-12) always have the same eight parts in the
+  // same order -- name, meta, fee slot, description slot, notice slot, notes
+  // slot, badges, buttons -- with empty slots rendered as empty elements, so
+  // the grid can line each part up across a row (CSS subgrid). A slot only
+  // takes space when a card in that row fills it.
+  if (themed) {
+    return `
+      <li class="venue-card"${liAttrs}>
+        <h2>${nameHtml}</h2>
+        <p class="venue-meta">${meta}</p>
+        <div class="card-slot card-slot-fee">${golfFeeHtml ? '\n        ' + golfFeeHtml + '\n        ' : ''}</div>
+        <div class="card-slot card-slot-desc">${desc ? '\n        ' + desc + '\n        ' : ''}</div>
+        <div class="card-slot card-slot-notice">${advisoryHtml ? advisoryHtml + '\n        ' : ''}</div>
+        <div class="card-slot card-slot-notes">${dogNoteHtml || cardNoteHtml ? dogNoteHtml + cardNoteHtml + '\n        ' : ''}</div>
+        ${chipsHtml}${cardActions || '\n        <div class="card-actions card-actions-empty"></div>'}
+      </li>`;
+  }
   return `
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>${golfFeeHtml ? '\n        ' + golfFeeHtml : ''}
         ${desc}${advisoryHtml}${dogNoteHtml}${cardNoteHtml}
-        <p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly }), themed ? maxChips : 0)}</p>${cardActions}
+        ${chipsHtml}${cardActions}
       </li>`;
 }
 
