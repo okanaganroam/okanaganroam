@@ -4861,6 +4861,21 @@ function seasonNonBlockingIds(now = new Date()) {
   return ids;
 }
 
+// venue id -> season state, for venues whose ONLY notice is a season note (no
+// written advisory). List cards show these as a one-line tag instead of the full
+// "Check before you go" box; the venue page keeps the full box.
+function seasonOnlyStates(now = new Date()) {
+  const advisories = getCollectionNotes(ADVISORY_COLLECTION_KIND);
+  const map = new Map();
+  for (const [id, st] of getSeasonStates(now)) if (!advisories.has(id)) map.set(id, st);
+  return map;
+}
+const SEASON_TAG_ICON = { closed: '\u{1F342}', open_until: '\u23F3', reopening: '\u{1F331}' };
+function seasonTagHtml(st) {
+  const short = st.text.replace(' The reopening date has not been announced yet.', '').replace(/ Check current hours.*$/, '');
+  return `<p class="season-tag season-tag-${st.kind}"><span aria-hidden="true">${SEASON_TAG_ICON[st.kind] || ''}</span> ${escapeHtml(short)}</p>`;
+}
+
 // Validates a season for POST /admin/set-season. -> { ok, season } | { ok: false, detail }
 function validateSeason(input, now = new Date()) {
   const s = input || {};
@@ -4983,6 +4998,12 @@ function advisoryNoticeHtml(note) {
 // tokens.css; the kicker mirrors the homepage's .eyebrow treatment.
 function renderAdvisoryStyles() {
   return `<style>
+  /* One-line season tag on list cards (closed / open until / reopening). */
+  .season-tag {
+    margin: 0 0 12px; padding: 6px 12px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center;
+    align-self: flex-start; font-size: 0.86rem; line-height: 1.35; font-weight: 600;
+    background: var(--ref-cream-deep, #EAE6D9); color: var(--ref-navy, #1B2B3A);
+  }
   .venue-advisory {
     margin: 0 0 14px; padding: 12px 16px; border-radius: 10px;
     background: var(--ref-cream-deep, #EAE6D9); border-left: 3px solid var(--ref-navy, #1B2B3A);
@@ -10243,7 +10264,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:' } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -10316,7 +10337,7 @@ function venueCardHtml(venue, opts = {}) {
   const cardNote = cardNotes && cardNotes.get(venue.id) ? String(cardNotes.get(venue.id)).trim() : '';
   const cardNoteHtml = cardNote ? `\n        <p class="card-note"><span class="card-note-label">${escapeHtml(cardNoteLabel)}</span> ${escapeHtml(cardNote)}</p>` : '';
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
-    ? `\n        ${advisoryNoticeHtml(advisoryNote)}`
+    ? `\n        ${seasonTag ? seasonTagHtml(seasonTag) : advisoryNoticeHtml(advisoryNote)}`
     : '';
   return `
       <li class="venue-card"${liAttrs}>
@@ -11105,7 +11126,9 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     const d = golfDetails.get(`${v.region}/${v.slug}`);
     return [golfData.golfCardFeeHtml(d, golfOpts.today), golfData.golfCardValueHtml(d, golfOpts.today)].filter(Boolean).join('\n        ');
   };
-  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
+  // Season-only notices render as a compact tag on list cards (2026-10-11).
+  const seasonTags = seasonOnlyStates();
+  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
 
   if (type !== 'golf') {
     return `<ul class="card-grid">
@@ -22887,6 +22910,8 @@ module.exports = {
   renderDogHubScriptHtml,
   dogFriendlyBadgeHtml,
   advisoryNoticeHtml,
+  seasonTagHtml,
+  seasonOnlyStates,
   parseAdvisoryNote,
   renderAdvisoryStyles,
   renderBeachThemeStyles,
