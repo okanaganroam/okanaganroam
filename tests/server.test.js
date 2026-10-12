@@ -9781,6 +9781,19 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
 // /secret-spots lists the live 'hidden_gem' collection narrowed to places
 // (outdoor + beach). A Hidden Gem cafe stays a Hidden Gem but is not a
 // Secret Spot. Fixture memberships are removed again at the end.
+test('Cards: a season-only notice is a one-line tag on list cards; written advisories keep the full box', () => {
+  const v = { id: 990002, name: 'Season Tag Fixture', region: 'apex', type: 'restaurant', slug: 'season-tag-fixture', description: 'Fixture.' };
+  const st = { kind: 'closed', text: 'Closed for the season. The reopening date has not been announced yet.', note: 'Closed for the season. The reopening date has not been announced yet. https://example.com' };
+  const tag = app.venueCardHtml(v, { advisoryNote: st.note, seasonTag: st });
+  assert.match(tag, /<p class="season-tag season-tag-closed"><span aria-hidden="true">\u{1F342}<\/span> Closed for the season\.<\/p>/u);
+  assert.doesNotMatch(tag, /Check before you go/);
+  const reopen = app.seasonTagHtml({ kind: 'closed', text: 'Closed for the season. Reopens December 16.' });
+  assert.match(reopen, /Closed for the season\. Reopens December 16\./);
+  const box = app.venueCardHtml(v, { advisoryNote: 'Partial closure after the wildfire. https://example.com' });
+  assert.match(box, /Check before you go/i, 'a written advisory keeps the full box');
+  assert.doesNotMatch(box, /class="season-tag/);
+});
+
 test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badge, not the plain Dog-Friendly chip too; themed card grids do not stretch cards', () => {
   const v = { id: 990001, name: 'Dog Chip Fixture Beach', region: 'kelowna', type: 'beach', slug: 'dog-chip-fixture-beach', description: 'Fixture.', dog_friendly: true, lake_view: true };
   const both = app.venueCardHtml(v, { dogFriendlyNote: 'On-leash in the park; off-leash at the dog beach.' });
