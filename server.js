@@ -17893,9 +17893,35 @@ function getBrowseHubVenues() {
   const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL ORDER BY name ASC').all().map(rowToVenue);
   return attachFoodDrinkCategories(rows);
 }
-function browseCategoriesByVenue(venues) {
+// Other-type venues tagged into a category's "also" collection (2026-10-12):
+// a park with a skate park (sports_also), an ATV outfitter (tours_also), an
+// arena (indoor_also). /browse counts and filters them under that category's
+// chip too, exactly as its hub lists them, and searches their membership note.
+const BROWSE_ALSO_TYPE_BY_KIND = { indoor_also: 'indoor', tours_also: 'tour', sports_also: 'sport' };
+function browseAlsoByVenue() {
+  const kinds = Object.keys(BROWSE_ALSO_TYPE_BY_KIND);
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, c.kind AS kind, ci.note AS note FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue' AND c.kind IN (${kinds.map(() => '?').join(',')})
+    ORDER BY ci.content_id, c.kind
+  `).all(...kinds);
   const map = new Map();
-  for (const v of venues) map.set(v.id, (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type]);
+  for (const r of rows) {
+    const e = map.get(r.id) || { types: [], notes: [] };
+    e.types.push(BROWSE_ALSO_TYPE_BY_KIND[r.kind]);
+    if (r.note && String(r.note).trim()) e.notes.push(String(r.note).trim());
+    map.set(r.id, e);
+  }
+  return map;
+}
+function browseCategoriesByVenue(venues, also = new Map()) {
+  const map = new Map();
+  for (const v of venues) {
+    const own = (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [v.type];
+    const extra = also.has(v.id) ? also.get(v.id).types.filter((t) => !own.includes(t)) : [];
+    map.set(v.id, extra.length ? [...own, ...extra] : own);
+  }
   return map;
 }
 function browseFeaturesByVenue(venues) {
@@ -17910,9 +17936,9 @@ function browseCuisines(venues) {
 }
 // Everything the text search looks at, lower-cased, for one venue (the client
 // builds the same words from the card, so server and browser agree).
-function browseSearchText(v, cats, feats) {
+function browseSearchText(v, cats, feats, note = '') {
   return [v.name, REGION_LABELS[v.region] || '', cats.map(browseTypeLabel).join(' '),
-    feats.map((k) => FD_HUB_LABEL_BY_FEATURE[k] || k).join(' '), v.cuisine || '', v.description || ''].join(' ').toLowerCase();
+    feats.map((k) => FD_HUB_LABEL_BY_FEATURE[k] || k).join(' '), v.cuisine || '', v.description || '', note].join(' ').toLowerCase();
 }
 
 // Shared verbatim by the server render and the inline client script
@@ -18268,7 +18294,7 @@ function renderBrowseHubScriptHtml() {
     var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
                  d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
                  d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
-                 d.cu || '', meta ? meta.textContent : '', desc ? desc.textContent : ''];
+                 d.cu || '', meta ? meta.textContent : '', desc ? desc.textContent : '', d.n || ''];
     card.__bh = parts.join(' ').toLowerCase();
   });
   function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
@@ -18558,15 +18584,17 @@ function renderBrowseHubScriptHtml() {
 function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   const cuisines = browseCuisines(venues);
   const f = filter || parseBrowseHubQuery({}, cuisines);
-  const catsById = browseCategoriesByVenue(venues);
+  const also = browseAlsoByVenue();
+  const catsById = browseCategoriesByVenue(venues, also);
   const featsById = browseFeaturesByVenue(venues);
+  const noteOf = (v) => (also.has(v.id) ? also.get(v.id).notes.join(' ') : '');
   const dataById = new Map(venues.map((v) => [v.id, {
     c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, cu: v.cuisine || '', p: Number(v.price) || 0, rt: Number(v.rating) || 0,
   }]));
   const advisoryNotes = getAdvisoryNotes();
   const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
   const q = f.q.toLowerCase();
-  const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || []).includes(q);
+  const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || [], noteOf(v)).includes(q);
   const pool = f.openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
   // Favourites live in the visitor's browser: the server cannot apply them, the
   // page script does on load.
@@ -18590,6 +18618,8 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   for (const v of venues) {
     const d = dataById.get(v.id);
     payload[String(v.id)] = { c: d.c, f: d.f, r: d.r, cu: d.cu, p: d.p, rt: d.rt };
+    const note = noteOf(v);
+    if (note) payload[String(v.id)].n = note;
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = st.hours;
   }
