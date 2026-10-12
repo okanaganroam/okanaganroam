@@ -6853,6 +6853,10 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
           <li><a href="/whats-on" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
           <li><a href="${outdoorsHref}" data-i18n="mood.outdoors.title">Outdoors</a></li>
+          <li><a href="/sports" data-i18n="tripv3.type.sport">Sports &amp; Recreation</a></li>
+          <li><a href="/tours" data-i18n="tripv3.type.tour">Tours &amp; Experiences</a></li>
+          <li><a href="/indoor" data-i18n="mood.indoor.title">Indoor &amp; Rainy Day</a></li>
+          <li><a href="${SKI_SNOW_PATH}" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a></li>
           <li><a href="/hidden-gems" data-i18n="gems.heading">Hidden Gems</a></li>
         </ul>
       </div>
