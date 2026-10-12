@@ -2763,13 +2763,13 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
 // Columbia"). The old global footer{padding} leak is also fixed here
 // (.home-footer now explicitly overrides it to padding:0).
 
-test('Home footer: Explore column has exactly the 7 approved items, in order, each with a real href (no invented routes)', () => {
+test('Home footer: Explore column has exactly the 11 approved items, in order, each with a real href (no invented routes)', () => {
   const html = app.renderHomeFooterHTML();
   const exploreMatch = html.match(/<h4 data-i18n="homeFooter\.explore">Explore<\/h4>\s*<ul>([\s\S]*?)<\/ul>/);
   assert.ok(exploreMatch, 'expected to find the Explore column');
   const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
     .map((m) => ({ href: m[1], text: m[2] }));
-  assert.equal(items.length, 7, 'expected exactly 7 Explore links');
+  assert.equal(items.length, 11, 'expected exactly 11 Explore links (the four 2026-10 categories added before Hidden Gems)');
   assert.equal(items[0].text, 'Food &amp; Drinks');
   assert.equal(items[0].href, '/food-drink', 'Food & Drinks points at the dedicated hub, matching the mood card and the Wine link below it');
   assert.ok(items[1].href === '/wineries', `Wine href unexpected: ${items[1].href}`);
@@ -2777,7 +2777,8 @@ test('Home footer: Explore column has exactly the 7 approved items, in order, ea
   assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
   assert.equal(items[4].href, '/whats-on');
   assert.equal(items[5].href, '/outdoors', 'footer Outdoors link matches the Outdoors mood card once outdoor venues exist (2026-09-20)');
-  assert.equal(items[6].href, '/hidden-gems', 'footer Hidden Gems goes to the full /hidden-gems page, matching the header (2026-09-25)');
+  assert.deepEqual(items.slice(6, 10).map((i) => i.href), ['/sports', '/tours', '/indoor', '/ski-snow'], 'the 2026-10 categories, matching the header (2026-10-12)');
+  assert.equal(items[10].href, '/hidden-gems', 'footer Hidden Gems goes to the full /hidden-gems page, matching the header (2026-09-25)');
 });
 
 test('Home footer: Regions column lists ALL 20 real regions (none omitted), each a real /:region link', () => {
@@ -10045,7 +10046,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
+  assert.equal(md5('okanagan.html'), '318e3ad004834be0981610e78882752c', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
   assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
@@ -11368,6 +11369,10 @@ const HEADER_SPEC = [
     ['/outdoors/water', 'nav.outdoor.water', 'Water Activities'],
     ['/beaches', 'mood.beaches.title', 'Beaches'],
     ['/golf', 'mood.golf.title', 'Golf'],
+    ['/sports', 'tripv3.type.sport', 'Sports &amp; Recreation'],
+    ['/tours', 'tripv3.type.tour', 'Tours &amp; Experiences'],
+    ['/indoor', 'mood.indoor.title', 'Indoor &amp; Rainy Day'],
+    ['/ski-snow', 'mood.skiSnow.title', 'Ski &amp; Snow'],
   ] },
   { label: 'Food &amp; Drink', key: 'mood.foodDrink.title', items: [
     ['/food-drink', 'mood.foodDrink.title', 'Food &amp; Drink'],
@@ -11871,7 +11876,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8'); // SEO-2 (2026-10-02) descriptions
+  assert.equal(md5('okanagan.html'), '318e3ad004834be0981610e78882752c'); // SEO-2 (2026-10-02) descriptions
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
@@ -16102,7 +16107,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   // Frozen files are byte-identical.
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '31368a6993852a5eacb89bdbcaa18eb8');
+  assert.equal(md5('okanagan.html'), '318e3ad004834be0981610e78882752c');
   assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
@@ -17456,4 +17461,18 @@ test('Browse hub: venues tagged into an "also" collection count and filter under
     db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id = ?").run(park.id);
     db.prepare('DELETE FROM venues WHERE id = ?').run(park.id);
   }
+});
+
+test('Navigation (2026-10-12): the header\'s Things to Do menu and the footer\'s Explore column link to Sports & Recreation, Tours & Experiences, Indoor & Rainy Day and Ski & Snow, in English and French', async () => {
+  await withWinterServer(async (base) => {
+    for (const p of ['/', '/sports', '/browse']) {
+      const html = (await WINTER_GET(base, p)).text;
+      const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
+      const footer = html.slice(html.lastIndexOf('<footer'), html.lastIndexOf('</footer>'));
+      for (const [href, key, label] of [['/sports', 'tripv3.type.sport', 'Sports &amp; Recreation'], ['/tours', 'tripv3.type.tour', 'Tours &amp; Experiences'], ['/indoor', 'mood.indoor.title', 'Indoor &amp; Rainy Day'], ['/ski-snow', 'mood.skiSnow.title', 'Ski &amp; Snow']]) {
+        assert.ok(header.includes(`<a href="${href}" data-i18n="${key}">${label}</a>`), `${p}: header links ${href}`);
+        assert.ok(footer.includes(`<li><a href="${href}" data-i18n="${key}">${label}</a></li>`), `${p}: footer links ${href}`);
+      }
+    }
+  });
 });
