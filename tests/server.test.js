@@ -17159,8 +17159,10 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(hub.text, /href="\/penticton\/sports\/sport-test-skate-park"/);
       assert.doesNotMatch(hub.text, /class="sport-coming-soon"/);
       assert.doesNotMatch(hub.text, /noindex/);
+      assert.match(hub.text, /verified sports &amp; recreation spots across the Okanagan Valley\./, 'a countable noun, not "verified sports & recreation"');
       const region = await WINTER_GET(base, '/penticton/sports');
       assert.equal(region.status, 200);
+      assert.match(region.text, /verified sports &amp; recreation spots in Penticton\./);
       assert.match(region.text, /Sports &amp; Recreation in Penticton, BC/);
       assert.match(region.text, /class="category-back-link" href="\/sports">← All Sports &amp; Recreation</);
       assert.match(region.text, /<body class="golf-page sport-page">/);

@@ -1475,6 +1475,11 @@ function isTripPlannerType(type) {
 const ALL_REGIONS_CATEGORIES = ['golf', 'beach', 'outdoor', 'winery', 'indoor', 'tour', 'sport'];
 
 // Human-readable label per category, singular and plural, for titles/H1s
+// The noun in "N verified ... in <region>" counts (2026-10-12): the plural
+// label, except where it isn't a countable noun ("Sports & Recreation").
+function categoryCountNoun(type, label) {
+  return type === 'sport' ? 'sports & recreation spots' : label.plural.toLowerCase();
+}
 const CATEGORY_LABELS = {
   restaurant: { singular: 'Restaurant', plural: 'Restaurants' },
   winery: { singular: 'Winery', plural: 'Wineries' },
@@ -11356,7 +11361,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   const title = `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
   const description = venues.length === 0
     ? `No ${label.plural.toLowerCase()} are currently listed in ${regionLabel}, BC. Browse everything else Okanagan Roam covers in ${regionLabel}.`
-    : `${venues.length} verified ${label.plural.toLowerCase()} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
+    : `${venues.length} verified ${categoryCountNoun(type, label)} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}/${catSlug}`;
 
   const breadcrumb = breadcrumbListSchema([
@@ -11425,7 +11430,7 @@ ${golfEngagementHeadHtml(type, true, 'category')}
   <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
   ${venues.length === 0
     ? `<p class="subtitle">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`
-    : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}.</p>
+    : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label))} in ${escapeHtml(regionLabel)}.</p>
   ${cardsHtml}`}
   ${guideLinks}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
@@ -12312,7 +12317,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
         ? 'Tours and experiences in the Okanagan: wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more, booked with local operators.'
         : isSportsHub
           ? 'Sports and recreation in the Okanagan: skate parks, pump tracks, BMX tracks, bike parks, disc golf courses, and pickleball, tennis and beach volleyball courts.'
-          : `${venues.length} verified ${label.plural.toLowerCase()} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
+          : `${venues.length} verified ${categoryCountNoun(type, label)} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${catSlug}`;
   const regionSelector = emptyMainList ? '' : renderCategoryRegionSelector(catSlug, venues);
   // Landing (2026-09-21 order): Choose Region(s) -> Explore by Activity
@@ -12439,7 +12444,7 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: label.plural },
   ])}
   ${isIndoorHub ? '<div class="indoor-hero"><img src="/images/indoor-rainy-day-banner.jpg" width="1586" height="992" alt="Illustrative rainy-day café scene with coffee, a sketchbook and a misty lake view" fetchpriority="high"><div><h1>' + escapeHtml(heading) + '</h1><p>Find your perfect rainy day.</p></div></div>' : '<h1>' + escapeHtml(heading) + '</h1>'}
-  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(label.plural.toLowerCase())} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
+  ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
