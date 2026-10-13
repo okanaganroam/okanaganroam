@@ -13183,21 +13183,22 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
 // Category banners (2026-10-12): a licensed Adobe Stock photo across the top
 // of a Food & Drink category page.
 const CATEGORY_BANNER_IMAGES = Object.freeze({
-  restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table', pos: 10 },
-  cafe: { src: '/images/food-drink/cafes.jpg', alt: 'Coffee and fresh croissants on a café table', pos: 75 },
+  restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table', pos: 5 },
+  cafe: { src: '/images/food-drink/cafes.jpg', alt: 'Coffee and fresh croissants on a café table', pos: 60 },
   pub: { src: '/images/food-drink/pubs.jpg', alt: 'A bartender pouring a craft beer from the tap', pos: 65 },
   cocktail: { src: '/images/food-drink/cocktail-lounges.jpg', alt: 'A bartender pouring a cocktail at night', pos: 75 },
   brewery: { src: '/images/food-drink/breweries.jpg', alt: 'A flight of craft beers', pos: 57 },
-  distillery: { src: '/images/food-drink/distilleries.jpg', alt: 'A copper still at a craft distillery', pos: 57 },
-  winery: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata', pos: 72 },
+  distillery: { src: '/images/food-drink/distilleries.jpg', alt: 'A copper still at a craft distillery', pos: 50 },
+  winery: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata', pos: 40 },
 });
 const CATEGORY_BANNER_STYLE = `<style id="category-banner">
   /* The photo runs full width above the heading: 2:1 on phones, 2.4:1 on
-     desktop. Each photo's pos (CATEGORY_BANNER_IMAGES) keeps its subject --
+     desktop, never taller than ~44% of the window so the heading stays in
+     view. Each photo's pos (CATEGORY_BANNER_IMAGES) keeps its subject --
      faces, the glass -- inside the crop. */
   .category-hero { margin: 4px 0 18px; }
   .category-hero-text > :last-child { margin-bottom: 0; }
-  .category-banner { margin: 0 0 16px; border-radius: 16px; overflow: hidden; aspect-ratio: 2 / 1; background: #2A6B67; }
+  .category-banner { margin: 0 0 16px; border-radius: 16px; overflow: hidden; aspect-ratio: 2 / 1; max-height: min(44vh, 440px); width: 100%; background: #2A6B67; }
   .category-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .category-banner[hidden] { display: none; }
   @media (max-width: 700px) { .category-banner { border-radius: 12px; } }
