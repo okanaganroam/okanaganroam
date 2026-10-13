@@ -8337,7 +8337,7 @@ const SEO_PAGE_CSS = `
     padding-top: 112px !important;
     background-image:
       linear-gradient(100deg, rgba(25,53,57,0.76), rgba(25,53,57,0.18)),
-      url('/images/venue-hero-okanagan.a01552e12e24.jpg') !important;
+      url('/images/venue-hero-okanagan.a01552e12e24.jpg?v=a01552e12e24') !important;
     background-position: center top !important;
     background-size: 100% 92px !important;
     background-repeat: no-repeat !important;
@@ -8555,7 +8555,7 @@ const SEO_PAGE_CSS = `
   .venue-hero-fallback {
     background-image:
       linear-gradient(100deg, var(--hero-shade) 0%, var(--hero-wash) 58%, rgba(16,32,38,0.12) 100%),
-      url('/images/venue-hero-okanagan.a01552e12e24.jpg');
+      url('/images/venue-hero-okanagan.a01552e12e24.jpg?v=a01552e12e24');
     background-size: cover;
     background-position: center 48%;
   }
