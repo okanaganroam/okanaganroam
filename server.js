@@ -6174,6 +6174,23 @@ async function parseTripRequest(text, options) {
   };
 }
 
+// schema.org ItemList of the places a guide names, in page order, so search
+// engines read the guide as a list of those places. Only places that
+// rendered (live listings) are included; repeats keep their first position.
+function guideItemListSchema(name, url, entries) {
+  const seen = new Set();
+  const items = entries.filter((e) => !seen.has(e.url) && seen.add(e.url));
+  if (!items.length) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name,
+    url,
+    numberOfItems: items.length,
+    itemListElement: items.map((e, i) => ({ '@type': 'ListItem', position: i + 1, name: e.name, url: e.url })),
+  };
+}
+
 function breadcrumbListSchema(items) {
   // items: [{ name, url }, ...] in order from Home to the current page
   return {
@@ -20121,10 +20138,12 @@ function renderSkiGuidePage() {
     mainEntityOfPage: canonical,
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
   };
+  const listed = [];
   const itemHtml = (region, item) => {
     const v = skiGuideVenue(region, item.slug);
     if (!v) return '';
     const href = `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+    listed.push({ name: item.name || v.name, url: `https://okanaganroam.com${href}` });
     const rating = item.rating && v.rating ? ` (${Number(v.rating).toFixed(1)}★)` : '';
     const where = item.where ? ` (${escapeHtml(item.where)})` : '';
     return `\n          <li><strong><a href="${escapeHtml(href)}">${escapeHtml(item.name || v.name)}</a></strong>${where}${rating}: ${escapeHtml(item.text)}</li>`;
@@ -20140,7 +20159,7 @@ function renderSkiGuidePage() {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: g.shareImage })}
+${pageHead(g.title, g.description, canonical, [breadcrumb, article, guideItemListSchema(g.heading, canonical, listed)].filter(Boolean), { golfTheme: true, shareImage: g.shareImage })}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
   body.ski-guide-page .ski-guide h1 { margin-bottom: 16px; }
@@ -20264,9 +20283,11 @@ function renderPatioGuidePage() {
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
   };
   const href = (v) => `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+  const listed = [];
   const itemHtml = (item) => {
     const v = skiGuideVenue('kelowna', item.slug);
     if (!v) return '';
+    listed.push({ name: item.name || v.name, url: `https://okanaganroam.com${href(v)}` });
     return `\n          <li><strong><a href="${escapeHtml(href(v))}">${escapeHtml(item.name || v.name)}</a></strong>: ${escapeHtml(item.text)}</li>`;
   };
   const sectionsHtml = g.sections.map((sec) => {
@@ -20280,7 +20301,7 @@ function renderPatioGuidePage() {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: banner.src })}
+${pageHead(g.title, g.description, canonical, [breadcrumb, article, guideItemListSchema(g.heading, canonical, listed)].filter(Boolean), { golfTheme: true, shareImage: banner.src })}
 ${CATEGORY_BANNER_STYLE}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
@@ -20447,10 +20468,12 @@ function renderEditorialGuidePage(g, path) {
     mainEntityOfPage: canonical,
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
   };
+  const listed = [];
   const itemHtml = (item) => {
     if (item.tip) return `\n          <li><strong>${escapeHtml(item.lead)}</strong> ${guideTipHtml(item.tip)}</li>`;
     const v = guideRefVenue(item.ref);
     if (!v) return '';
+    listed.push({ name: item.name || v.name, url: `https://okanaganroam.com${guideVenueHref(v)}` });
     const place = item.where || (item.noPlace || g.noPlace ? '' : REGION_LABELS[v.region] || '');
     return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${guideTipHtml(item.text)}</li>`;
   };
@@ -20470,7 +20493,7 @@ function renderEditorialGuidePage(g, path) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: banner.src, noindex: thin })}
+${pageHead(g.title, g.description, canonical, [breadcrumb, article, guideItemListSchema(g.heading, canonical, listed)].filter(Boolean), { golfTheme: true, shareImage: banner.src, noindex: thin })}
 ${CATEGORY_BANNER_STYLE}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
@@ -24998,6 +25021,7 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  guideItemListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,
   capChips,
