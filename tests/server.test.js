@@ -15494,6 +15494,7 @@ test('Mobile polish: the phone header button has no arrow (desktop keeps it); th
   assert.match(home, /\.mood-swipe-cue \{ display: none; \}/);
   assert.match(home, /\.mood-card-indoor \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day title is a step smaller');
   assert.match(home, /\.mood-card-title \{[^}]*line-height: 1\.15; text-wrap: balance; \}/, 'tile titles wrap as even, tight lines');
+  assert.match(home, /@media \(max-width: 640px\) \{[^@]*\.mood-season-link \{ display: none; \}/, 'the seasonal guide link is hidden on phones so the heading stays two rows');
 }))));
 
 // ---- Build My Trip in the header (2026-10-06) ----------------------------------
@@ -16791,7 +16792,7 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Ski & Snow and Golf -> Indoo
 
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   const html = winterMood('2027-02-01');
-  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow-powder\.jpg" width="640" height="403" alt="" loading="lazy">/);
   assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.skiSnow\.title">Ski &amp; Snow</);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.indoor\.title">Indoor &amp; Rainy Day</);
