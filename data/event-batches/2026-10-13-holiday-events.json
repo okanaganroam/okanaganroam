@@ -1,0 +1,641 @@
+{
+ "batch_id": "2026-10-13-holiday-events",
+ "reason": "Holiday-season events (Nov 2026 – Jan 2027) missing from What’s On, each re-checked on 2026-10-13 against the organizer, venue, municipality or official ticketing page for its 2026 dates. Also corrects two existing listings: the TELUS Kelowna Cup placeholder description (from Big White’s event page) and Ballet Jörgen: Swan Lake, which was tagged as a holiday event.",
+ "reviewed_by": "owner-approved 2026-10-13",
+ "events": [
+  {
+   "name": "Christmas Express",
+   "region": "summerland",
+   "venue_name_text": "Kettle Valley Steam Railway, Prairie Valley Station",
+   "description": "A one-hour holiday ride on the Kettle Valley Steam Railway, with Christmas lights aboard the 3716 locomotive, music, carols, a hot drink and Santa. Departures at 4:30 and 6:30 pm on select December dates. Tickets are non-refundable; book ahead.",
+   "categories": [
+    "holiday-seasonal",
+    "family-kids"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-03",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-04",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-05",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-06",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-10",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-11",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-12",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-13",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-17",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-18",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-19",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-20",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-21",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    },
+    {
+     "start_date": "2026-12-22",
+     "start_time": "16:30",
+     "label": "Departures at 4:30 and 6:30 pm"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Kettle Valley Steam Railway",
+   "source_url": "https://www.kettlevalleyrail.org/experiences/christmas-express/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Freya & Friends: Okanagan Symphony Holiday Concert",
+   "region": "kelowna",
+   "venue_name_text": "Kelowna Community Theatre",
+   "description": "The Okanagan Symphony Orchestra’s holiday concert with the folk duo Freya, Okanagan composer, pianist and vocalist Leila Naderi, and the Okanagan Symphony Chorus, mixing new songs with reimagined favourites. About two hours, with a pre-concert chat one hour before. Tickets $18–$75.",
+   "categories": [
+    "holiday-seasonal",
+    "live-music",
+    "arts-culture"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-18",
+     "start_time": "19:30"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Okanagan Symphony Orchestra",
+   "source_url": "https://okanagansymphony.com/26-27-season/freya-and-friends/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Freya & Friends: Okanagan Symphony Holiday Concert",
+   "region": "penticton",
+   "venue_name_text": "Cleland Theatre",
+   "description": "The Okanagan Symphony Orchestra’s holiday concert with the folk duo Freya, Okanagan composer, pianist and vocalist Leila Naderi, and the Okanagan Symphony Chorus, mixing new songs with reimagined favourites. About two hours, with a pre-concert chat one hour before. Tickets $18–$75.",
+   "categories": [
+    "holiday-seasonal",
+    "live-music",
+    "arts-culture"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-19",
+     "start_time": "14:00"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Okanagan Symphony Orchestra",
+   "source_url": "https://okanagansymphony.com/26-27-season/freya-and-friends/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Freya & Friends: Okanagan Symphony Holiday Concert",
+   "region": "vernon",
+   "venue_name_text": "Vernon & District Performing Arts Centre",
+   "description": "The Okanagan Symphony Orchestra’s holiday concert with the folk duo Freya, Okanagan composer, pianist and vocalist Leila Naderi, and the Okanagan Symphony Chorus, mixing new songs with reimagined favourites. About two hours, with a pre-concert chat one hour before. Tickets $18–$75.",
+   "categories": [
+    "holiday-seasonal",
+    "live-music",
+    "arts-culture"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-20",
+     "start_time": "14:00"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Okanagan Symphony Orchestra",
+   "source_url": "https://okanagansymphony.com/26-27-season/freya-and-friends/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "The Nutcracker: Mission Dance Company",
+   "region": "vernon",
+   "venue_name_text": "Vernon & District Performing Arts Centre",
+   "description": "Mission Dance Company, with guest dancers from Okanagan Ballet Theatre, performs a family-friendly, two-hour Nutcracker with live narration. There’s also a silent auction and a post-show reception with the cast. Shows at 2 pm and 7 pm; tickets $20–$54.",
+   "categories": [
+    "holiday-seasonal",
+    "arts-culture",
+    "family-kids"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-13",
+     "start_time": "14:00",
+     "label": "Shows at 2 pm and 7 pm"
+    }
+   ],
+   "source_type": "official_venue",
+   "source_name": "Ticket Seller",
+   "source_url": "https://www.ticketseller.ca/tickets/event/the-nutcracker-5",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Festival of Trees at Mission Hill",
+   "region": "west-kelowna",
+   "venue_name_text": "Mission Hill Family Estate Winery",
+   "description": "Holiday trees decorated by sponsors are on display at Mission Hill for the season. The Festival of Trees Tasting Experience ($65) walks past the trees and finishes with a seated wine flight, with part of each ticket going to BC Children’s Hospital Foundation. Estate access is by reservation.",
+   "categories": [
+    "holiday-seasonal",
+    "wineries-wine-events"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-20",
+     "end_date": "2027-01-03",
+     "label": "Trees on display Nov 20 – Jan 3; tasting experience Nov 21 – Dec 31"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Mission Hill Family Estate",
+   "source_url": "https://www.missionhillwinery.com/festival-of-trees-sponsorship",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "medium"
+  },
+  {
+   "name": "Magic on Main Street: Santa Claus Parade & Light Up",
+   "region": "penticton",
+   "venue_name_text": "Main Street and Gyro Park",
+   "description": "Penticton’s Santa Claus Parade travels down Main Street to Gyro Park for the official downtown light-up, with Santa, a 180-foot light tunnel and a giant “light brite”. Free, with a free Park, Shop ’n’ Ride shuttle from Cherry Lane.",
+   "categories": [
+    "holiday-seasonal",
+    "community-events",
+    "family-kids"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-29",
+     "start_time": "16:30",
+     "label": "Parade 4:30 pm; light-up 6 pm in Gyro Park"
+    }
+   ],
+   "source_type": "municipal",
+   "source_name": "City of Penticton",
+   "source_url": "https://www.penticton.ca/our-community/events/major-events/magic-main-street",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "West Kelowna Winterfest",
+   "region": "west-kelowna",
+   "venue_name_text": "Mount Boucherie Community Centre",
+   "description": "A free family winter weekend at the Mount Boucherie Community Centre arena and courtyard, including storytime with Santa and skating with Santa. The city posts the full schedule on November 20.",
+   "categories": [
+    "holiday-seasonal",
+    "community-events",
+    "family-kids"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-05",
+     "end_date": "2026-12-06"
+    }
+   ],
+   "source_type": "municipal",
+   "source_name": "City of West Kelowna",
+   "source_url": "https://www.westkelownacity.ca/parks-recreation-facilities/city-events/winterfest/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Christmas Sleigh Rides at Ottercrest Farms",
+   "region": "armstrong",
+   "venue_name_text": "Ottercrest Farms, 4387 MacDonald Rd",
+   "description": "Horse-drawn Christmas sleigh rides at Ottercrest Farms on select December afternoons, with rides every half hour. Tickets $31 adults, $20 children 4–12; children 3 and under ride free.",
+   "categories": [
+    "holiday-seasonal",
+    "family-kids"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-11",
+     "start_time": "16:00",
+     "label": "Rides at 4:00, 4:30, 5:00 and 5:30 pm"
+    },
+    {
+     "start_date": "2026-12-12",
+     "start_time": "16:00",
+     "label": "Rides at 4:00, 4:30, 5:00 and 5:30 pm"
+    },
+    {
+     "start_date": "2026-12-13",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-14",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-17",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-18",
+     "start_time": "16:00",
+     "label": "Rides at 4:00, 4:30, 5:00 and 5:30 pm"
+    },
+    {
+     "start_date": "2026-12-19",
+     "start_time": "16:00",
+     "label": "Rides at 4:00, 4:30, 5:00 and 5:30 pm"
+    },
+    {
+     "start_date": "2026-12-20",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-21",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-23",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-24",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-26",
+     "start_time": "16:00",
+     "label": "Rides at 4:00, 4:30, 5:00 and 5:30 pm"
+    },
+    {
+     "start_date": "2026-12-27",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-28",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-29",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    },
+    {
+     "start_date": "2026-12-30",
+     "start_time": "15:30",
+     "label": "Rides at 3:30, 4:00, 4:30 and 5:00 pm"
+    }
+   ],
+   "source_type": "official_venue",
+   "source_name": "Ticket Seller",
+   "source_url": "https://www.ticketseller.ca/tickets/event/christmas-sleigh-rides",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Stars on Ice Holiday Tour",
+   "region": "vernon",
+   "venue_name_text": "Kal Tire Place",
+   "description": "A holiday edition of Stars on Ice, with Olympic, World and National champion figure skaters performing holiday-themed programs. Tickets $35–$110.",
+   "categories": [
+    "holiday-seasonal",
+    "events-festivals",
+    "family-kids"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-18",
+     "start_time": "19:00"
+    }
+   ],
+   "source_type": "official_venue",
+   "source_name": "Ticket Seller",
+   "source_url": "https://www.ticketseller.ca/tickets/event/stars-on-ice",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "A 1940s Radio Christmas Carol",
+   "region": "vernon",
+   "venue_name_text": "Powerhouse Theatre",
+   "description": "A comedy in which a WWII-era troupe performs a live radio broadcast of A Christmas Carol, complete with vintage carols, mock commercials and backstage mishaps. Tickets $41.25 adults, $20.75 students.",
+   "categories": [
+    "holiday-seasonal",
+    "arts-culture"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-19",
+     "start_time": "19:30"
+    },
+    {
+     "start_date": "2026-11-20",
+     "start_time": "19:30"
+    },
+    {
+     "start_date": "2026-11-21",
+     "start_time": "19:30"
+    },
+    {
+     "start_date": "2026-11-22",
+     "start_time": "14:00"
+    },
+    {
+     "start_date": "2026-11-25",
+     "start_time": "19:30"
+    },
+    {
+     "start_date": "2026-11-26",
+     "start_time": "19:30"
+    },
+    {
+     "start_date": "2026-11-27",
+     "start_time": "19:30"
+    },
+    {
+     "start_date": "2026-11-28",
+     "start_time": "19:30"
+    },
+    {
+     "start_date": "2026-11-29",
+     "start_time": "14:00"
+    }
+   ],
+   "source_type": "official_venue",
+   "source_name": "Ticket Seller",
+   "source_url": "https://www.ticketseller.ca/tickets/event/a-1940s-radio-christmas-carol",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Oh Come All Ye Soulful",
+   "region": "lake-country",
+   "venue_name_text": "Creekside Theatre",
+   "description": "A holiday concert by vocalist Dawn Pemberton and bassist Jodi Proznick with an all-star band, playing soul and jazz holiday classics in the spirit of Ray Charles, Stevie Wonder and Ella Fitzgerald. All seats $49.",
+   "categories": [
+    "holiday-seasonal",
+    "live-music"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-17",
+     "start_time": "19:00"
+    }
+   ],
+   "source_type": "official_venue",
+   "source_name": "Ticket Seller",
+   "source_url": "https://www.ticketseller.ca/tickets/event/oh-come-all-ye-soulful",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Disney's Frozen at Kelowna Actors Studio",
+   "region": "kelowna",
+   "venue_name_text": "Kelowna Actors Studio",
+   "description": "Kelowna Actors Studio’s family musical for the holiday season: a stage version of Disney’s Frozen, the story of sisters Anna and Elsa. It runs from November 25 to December 20; see the studio’s site for show times and tickets.",
+   "categories": [
+    "arts-culture",
+    "family-kids"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-25",
+     "end_date": "2026-12-20",
+     "label": "Runs Nov 25 – Dec 20; see the studio for show times"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Kelowna Actors Studio",
+   "source_url": "https://kelownaactorsstudio.com/event/disneys-frozen",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "New Year's Eve with the Justin Glibbery Quintet",
+   "region": "vernon",
+   "venue_name_text": "Vernon Jazz Club",
+   "description": "A 19+ New Year’s Eve party at the Vernon Jazz Club with pianist Justin Glibbery’s quintet, featuring vocals, trumpet and sax. Doors 8:30 pm; tickets $75.",
+   "categories": [
+    "holiday-seasonal",
+    "live-music",
+    "nightlife"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-31",
+     "start_time": "21:00",
+     "label": "Doors 8:30 pm; 19+"
+    }
+   ],
+   "source_type": "official_venue",
+   "source_name": "Ticket Seller",
+   "source_url": "https://www.ticketseller.ca/tickets/event/new-years-eve-with-the-justin-glibbery-quintet",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Yuletide @ the PTCC",
+   "region": "penticton",
+   "venue_name_text": "Penticton Trade & Convention Centre",
+   "description": "A three-day holiday market with local artisans, gift vendors and specialty food sellers, plus the kids-only Little Elf Shop. Admission $3 a day.",
+   "categories": [
+    "holiday-seasonal",
+    "markets-fairs"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-06",
+     "end_date": "2026-11-08"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Artisans Showcase",
+   "source_url": "https://artisansshowcase.com/event/yuletide-the-ptcc/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Christmas at the Laurel",
+   "region": "kelowna",
+   "venue_name_text": "Laurel Packinghouse",
+   "description": "A three-day, European-style holiday market in the historic Laurel Packinghouse, with handmade gifts from local artisans and festive treats. Admission by donation to the Food Bank.",
+   "categories": [
+    "holiday-seasonal",
+    "markets-fairs"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-13",
+     "start_time": "15:00",
+     "end_time": "19:00"
+    },
+    {
+     "start_date": "2026-11-14",
+     "start_time": "10:00",
+     "end_time": "17:00"
+    },
+    {
+     "start_date": "2026-11-15",
+     "start_time": "10:00",
+     "end_time": "15:00"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Artisans Showcase",
+   "source_url": "https://artisansshowcase.com/event/christmas-at-the-laurel/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "It's Christmas @ the Red Barn",
+   "region": "kelowna",
+   "venue_name_text": "The Red Barn, 4409 Lakeshore Rd",
+   "description": "A two-day holiday market with more than 50 local makers selling clothing, gourmet foods, body products, jewelry and home decor. Free admission; Food Bank donations welcome.",
+   "categories": [
+    "holiday-seasonal",
+    "markets-fairs"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-21",
+     "start_time": "09:00",
+     "end_time": "17:00"
+    },
+    {
+     "start_date": "2026-11-22",
+     "start_time": "10:00",
+     "end_time": "15:00"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Artisans Showcase",
+   "source_url": "https://artisansshowcase.com/event/its-christmas-the-red-barn/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Christkindl Holiday Market",
+   "region": "kelowna",
+   "venue_name_text": "Laurel Packinghouse",
+   "description": "A traditional European-style Christmas market in the Laurel Packinghouse, with handmade local gifts, festive treats and hot cider. Admission by donation to the Food Bank.",
+   "categories": [
+    "holiday-seasonal",
+    "markets-fairs"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-04",
+     "start_time": "14:00",
+     "end_time": "19:00"
+    },
+    {
+     "start_date": "2026-12-05",
+     "start_time": "10:00",
+     "end_time": "17:00"
+    },
+    {
+     "start_date": "2026-12-06",
+     "start_time": "10:00",
+     "end_time": "15:00"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Artisans Showcase",
+   "source_url": "https://artisansshowcase.com/event/christkindl-holiday-market/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  },
+  {
+   "name": "The Last Chance Holiday Market",
+   "region": "penticton",
+   "venue_name_text": "Penticton Trade & Convention Centre",
+   "description": "A two-day market of handmade gifts from local artisans, specialty foods and festive treats, billed as the last local shopping stop before Christmas. Admission $3 at the door.",
+   "categories": [
+    "holiday-seasonal",
+    "markets-fairs"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-12-12",
+     "end_date": "2026-12-13"
+    }
+   ],
+   "source_type": "official_organizer",
+   "source_name": "Artisans Showcase",
+   "source_url": "https://artisansshowcase.com/event/the-last-chance-holiday-market/",
+   "source_checked_at": "2026-10-13",
+   "event_confidence": "high"
+  }
+ ],
+ "updates": [
+  {
+   "region": "big-white",
+   "name": "TELUS Kelowna Cup at Big White",
+   "fields": {
+    "description": "A family-friendly snowcross race on the Snow Cross Track at Big White's TELUS Park, open to skiers and snowboarders of all skill levels. Racers try to match their first-run time on a second run, and the closest match wins the grand prize; there's a Best Dressed prize too. The event supports the Powderhounds, the adaptive snowsports program of People in Motion. Big White says full details are coming soon, so check before you go.",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/kelowna-cup-big-white",
+    "source_checked_at": "2026-10-13"
+   }
+  },
+  {
+   "region": "vernon",
+   "name": "Ballet Jörgen: Swan Lake",
+   "categories": [
+    "arts-culture",
+    "events-festivals",
+    "family-kids"
+   ]
+  }
+ ]
+}
