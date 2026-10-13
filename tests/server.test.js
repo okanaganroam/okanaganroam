@@ -17558,8 +17558,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const ski = (await WINTER_GET(base, '/ski-snow')).text;
       assert.match(ski, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Ski &amp; Snow<\/h1>/, '/ski-snow opens with its photo above the heading');
-      const gems = (await WINTER_GET(base, '/hidden-gems')).text;
-      assert.doesNotMatch(gems, /class="category-banner"/, 'other curated pages are unchanged');
+      const gems = app.renderHiddenGemsPage([{ id: 990008, name: 'Banner Gem', slug: 'banner-gem', region: 'kelowna', type: 'cafe', description: 'Fixture.' }]);
+      assert.match(gems, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Hidden Gems<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
       const whatsOn = (await WINTER_GET(base, '/whats-on')).text;
       assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), "What's On thumbnail exists");
