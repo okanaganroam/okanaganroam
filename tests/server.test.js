@@ -4886,7 +4886,8 @@ test('Batch 4B Guides + Stage 5B: every guide card is the compact card -- View d
   }
   assert.doesNotMatch(html, /&#9825; Favorite|&#65291; Add to Trip/, 'no standalone labels');
   // The full description stays in the page for every card (the clamp is visual only).
-  for (const v of venues.filter((x) => x.description)) assert.ok(markup.includes(`<p>${app.escapeHtml(v.description)}</p>`), `full description of ${v.name}`);
+  // Card excerpts (2026-10-13): guide cards carry the short blurb; the full text is on the venue page.
+  for (const v of venues.filter((x) => x.description)) assert.ok(markup.includes(`<p>${app.escapeHtml(app.descExcerpt(v.description))}</p>`), `description excerpt of ${v.name}`);
   // Scripts: app.js exactly once, then the card script (guide holder: every venue type).
   assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1);
   const appAt = html.indexOf(`<script src="${app.APP_JS_SRC}"></script>`);
@@ -17799,4 +17800,20 @@ test('Event images (SEO, 2026-10-13): event pages share a picture and their Even
   assert.deepEqual(ld.image, ['https://okanaganroam.com/images/whats-on/markets-fairs.jpg']);
   assert.equal(ld.description, 'Image Test Fest in Kelowna, BC.', 'a description is always present');
   assert.match(app.pageHead('t', 'd', 'https://okanaganroam.com/x', [], { shareImage: 'https://cdn.example.com/p.jpg' }), /<meta property="og:image" content="https:\/\/cdn\.example\.com\/p\.jpg">/);
+});
+
+test('Guide, Dog Friendly and Outdoors excerpts (2026-10-13): cards show the short blurb, search keeps the full words, and badge guides share a fitting real photo', async () => {
+  const long = 'A quiet lakeside park with shady lawns and a short loop trail that suits an easy evening walk. Look for the old orchard ladders, the osprey platform and a hidden swimming cove at the far end.';
+  const v = app.createVenue({ name: 'Excerpt Guide Park', slug: 'excerpt-guide-park', region: 'kelowna', type: 'outdoor', description: long });
+  try {
+    const card = app.venueCardHtml(app.getVenueById ? app.getVenueById(v.id) || v : v, { themed: true, excerpt: true });
+    assert.match(card, /easy evening walk\./);
+    assert.doesNotMatch(card, /osprey/);
+    await withWinterServer(async (base) => {
+      const outdoors = (await WINTER_GET(base, '/outdoors')).text;
+      assert.match(outdoors, /<script type="application\/json" id="outdoorSearchWords">[^<]*osprey/);
+      const guide = await WINTER_GET(base, '/guide/kelowna/dog_friendly');
+      if (guide.status === 200) assert.match(guide.text, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/dog-friendly\/dog-friendly\.jpg">/);
+    });
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
 });

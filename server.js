@@ -6199,6 +6199,17 @@ function listGuideCombos(minCount) {
   return combos;
 }
 
+// Guide share photos (SEO, 2026-10-13): badges with a fitting real photo
+// share it; the rest keep the region's photo. Lazy, as the banner constants
+// are defined further down.
+const GUIDE_BADGE_SHARE_IMAGES = {
+  dog_friendly: () => DOG_FRIENDLY_BANNER.src,
+  live_music: () => WHATS_ON_BANNER.src,
+  kid_friendly: () => WHATSON_CATEGORY_BANNERS['family-kids'].src,
+  great_groups: () => FOOD_DRINK_HUB_BANNER.src,
+  happy_hour: () => FOOD_DRINK_HUB_BANNER.src,
+  sports_tv: () => CATEGORY_BANNER_IMAGES.pub.src,
+};
 function renderGuidePage(region, badge, venues) {
   const regionLabel = REGION_LABELS[region];
   const badgeInfo = BADGE_LABELS[badge];
@@ -6238,7 +6249,7 @@ function renderGuidePage(region, badge, venues) {
   // details", the description clamped behind Read more / Read less, and
   // Favorite / Add to Trip with app.js's canonical labels. Golf cards are
   // unchanged (they already had it).
-  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true, savedId: true, themed: true })).join('\n');
+  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true, savedId: true, themed: true, excerpt: true })).join('\n');
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -6261,7 +6272,7 @@ function renderGuidePage(region, badge, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: badge === 'dog_friendly' ? '/images/hidden-gems/dog-friendly.webp' : badge === 'live_music' ? '/images/whats-on/live-music.webp' : (REGION_SHARE_IMAGES[region] || null), golfTheme: true, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: (GUIDE_BADGE_SHARE_IMAGES[badge] && GUIDE_BADGE_SHARE_IMAGES[badge]()) || REGION_SHARE_IMAGES[region] || null, golfTheme: true, savedSidecar: true })}
 ${renderAnalyticsHeadHtml('guide')}
 </head>
 <body class="golf-page guide-page">
@@ -11871,6 +11882,8 @@ function renderOutdoorFilterScriptHtml() {
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
   var mapEl = document.getElementById('outdoorActivityMap');
   var activityMap = mapEl ? JSON.parse(mapEl.textContent || '{}') : {};
+  var kwEl = document.getElementById('outdoorSearchWords');
+  var searchWords = kwEl ? JSON.parse(kwEl.textContent || '{}') : {};
   // Region pills and the activity cards share one toggle contract
   // (data-region / data-activity + aria-pressed).
   var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle')).filter(function(c){ return !c.hasAttribute('data-activity-all'); });
@@ -11916,7 +11929,7 @@ function renderOutdoorFilterScriptHtml() {
     var meta = card.querySelector('.venue-meta'), desc = card.querySelector('.golf-desc');
     var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.region] || '',
                  d.acts.map(function(a){ return LABELS.activities[a] || a; }).join(' '),
-                 meta ? meta.textContent : '', desc ? desc.textContent : ''];
+                 meta ? meta.textContent : '', desc ? desc.textContent : '', searchWords[card.getAttribute('data-venue-id')] || ''];
     card.__od = parts.join(' ').toLowerCase();
   });
   function cardMatchesSearch(card){ return !searchTerm || (card.__od || '').indexOf(searchTerm) !== -1; }
@@ -12643,6 +12656,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   <h2 class="visually-hidden" id="outdoorResultsTop">Results</h2>
   ${outdoorsResultBarHtml(outdoorSummary, selectedRegions, selectedActivities)}
   <p class="outdoor-no-results" id="outdoorNoResults"${outdoorMatching.length === 0 ? '' : ' hidden'}>No outdoor destinations match that combination yet. <a href="/outdoors" id="outdoorNoResultsClear">Clear the filters</a> to see everything.</p>
+  <script type="application/json" id="outdoorSearchWords">${JSON.stringify(Object.fromEntries(venues.map((v) => [String(v.id), descSearchWords(v.description)]))).replace(/</g, '\\u003c')}</script>
   <script type="application/json" id="outdoorActivityMap">${JSON.stringify(Object.fromEntries([...outdoorActivityMap].map(([id, slugs]) => [String(id), slugs]))).replace(/</g, '\\u003c')}</script>`
     : '';
   const outdoorDirectoryHeading = '';
@@ -12710,7 +12724,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   // all agree; every card is still in the markup for the script to toggle.
   const golfDetails = type === 'golf' ? golfDetailsFor(venues) : new Map();
   const cardsHtml = isOutdoorLanding
-    ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed, appLabels: hubThemed })
+    ? renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed, excerpt: true, appLabels: hubThemed })
         .replace('<ul class="card-grid">', `<ul class="card-grid" id="outdoorResults"${outdoorMatching.length === 0 ? ' hidden' : ''}>`)
         .replace(/<li class="venue-card" data-venue-id="(\d+)"([^>]*)>/g, (m, id, rest) => (outdoorMatchIds.has(Number(id)) ? m : `<li class="venue-card" data-venue-id="${id}"${rest} hidden>`))
     : renderCategoryCardsHtml(type, venues, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: hubThemed, appLabels: hubThemed },
@@ -14118,7 +14132,7 @@ function renderDogHubScriptHtml() {
     var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
                  d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
                  d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
-                 meta ? meta.textContent : '', desc ? desc.textContent : '', note ? note.textContent : ''];
+                 meta ? meta.textContent : '', desc ? desc.textContent : '', note ? note.textContent : '', d.k || ''];
     card.__dog = parts.join(' ').toLowerCase();
   });
   function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
@@ -14314,7 +14328,7 @@ function renderDogHubPage(venues, filter = null) {
   };
   // id -> { c: types, f: features, r: region } for the client script.
   const payload = {};
-  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
+  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description) };
 
   const advisoryNotes = getAdvisoryNotes();
   // Every card is rendered into the list server-side and simply hidden when
@@ -14323,7 +14337,7 @@ function renderDogHubPage(venues, filter = null) {
   // style+layout; this one is an order of magnitude smaller, closer to
   // /outdoors (196 cards, fast), so batching would add moving parts and cost
   // the page its "everything is in the HTML" simplicity for no measured win.
-  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, dogNotes, { showRegion: true, themed: true, dogNoteInline: true, appLabels: true })
+  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, dogNotes, { showRegion: true, themed: true, excerpt: true, dogNoteInline: true, appLabels: true })
     .replace('<ul class="card-grid">', `<ul class="card-grid" id="dogResults"${matching.length === 0 ? ' hidden' : ''}>`)
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card"${matchIds.has(Number(id)) ? '' : ' hidden'} data-venue-id="${id}"`);
 
