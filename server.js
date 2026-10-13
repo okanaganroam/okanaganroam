@@ -6287,7 +6287,7 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>${escapeHtml(badgeInfo.title)} Venues in ${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(badgeInfo.noun)} in ${escapeHtml(regionLabel)} — badge-checked from real listings, not guessed.</p>
-  ${categoryLinksHtml}
+  ${categoryLinksHtml}${region === 'kelowna' && badge === 'patio' ? `\n  <p class="subtitle"><a href="${PATIO_GUIDE_PATH}">Our picks: the best patios in Kelowna &rarr;</a></p>` : ''}
   <ul class="card-grid">
     ${cards}
   </ul>
@@ -13754,6 +13754,7 @@ ${renderGolfHeaderHtml()}
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Food & Drink' }])}
   ${categoryHeroHtml(foodDrinkHubBannerHtml(f.types), `<h1 id="fdHeading">${escapeHtml(hubText.heading)}</h1>
   <p class="outdoor-intro fd-intro" id="fdIntro">${escapeHtml(hubText.intro)}</p>
+  <p class="fd-type-page-link"><a href="${PATIO_GUIDE_PATH}">Guide: the best patios in Kelowna &rarr;</a></p>
   <p class="fd-type-page-link" id="fdTypePageLink"${f.types.length === 1 ? '' : ' hidden'}><a href="${f.types.length === 1 ? `/${CATEGORY_SLUGS[f.types[0]]}` : '#'}">See the ${escapeHtml(f.types.length === 1 ? CATEGORY_LABELS[f.types[0]].plural.toLowerCase() : '')} page &rarr;</a></p>`)}
   ${foodDrinkSearchHtml()}
   ${foodDrinkTypeChipsHtml(state)}
@@ -20085,6 +20086,151 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// ---------- Best patios in Kelowna (2026-10-13): /guides/best-patios-kelowna ----------
+// The second editorial guide, same approach as the ski guide: approved copy
+// fixed here, every venue looked up live (Kelowna + slug) so links follow the
+// venue's current page and a removed venue simply drops out. Every detail
+// comes from the venue's own verified listing.
+const PATIO_GUIDE_PATH = '/guides/best-patios-kelowna';
+const PATIO_GUIDE = {
+  heading: 'Best Patios in Kelowna',
+  title: 'Best Patios in Kelowna: Lake Views, Rooftops & More | Okanagan Roam',
+  description: 'Rooftop sunsets, lakeside decks, winery terraces and dog-friendly brewery patios: the best places to eat and drink outside in Kelowna, BC.',
+  banner: () => FOOD_DRINK_HUB_BANNER,
+  intro: [
+    'When the weather turns warm, Kelowna moves outside. The city has rooftop bars that face the sunset, decks right on Okanagan Lake, winery terraces above the water and brewery lawns where the dog is as welcome as you are.',
+    'Okanagan Roam lists more than 160 Kelowna places with a patio. These are the standouts, grouped by the kind of afternoon or evening you’re after.',
+  ],
+  sections: [
+    { id: 'rooftops', jump: 'Rooftops', heading: 'Rooftops with a lake and sunset view', items: [
+      { slug: 'earls-kitchen-bar', text: 'a rooftop patio with sweeping lake and sunset views. They hand out blankets when it cools off, so you can stay after the sun goes down.' },
+      { slug: 'craft-beer-market-kelowna', name: 'CRAFT Beer Market', text: 'a downtown rooftop that’s widely called one of the best in Kelowna for watching the sunset with a drink in hand.' },
+      { slug: 'perch-sky-lounge', text: 'regulars call its rooftop the best patio view in Kelowna. It serves a full dinner menu, so it’s more than a drinks stop.' },
+    ] },
+    { id: 'on-the-water', jump: 'On the water', heading: 'Right on the water', items: [
+      { slug: 'king-taps', text: 'a lakeside patio with a well-reviewed happy hour and a big cocktail list. Time your visit for happy hour.' },
+      { slug: 'the-galley-lakeside-cafe', text: 'a walk-up waterfront café by the Kelowna Yacht Club, with outdoor fireplaces for cooler days and real vegan options.' },
+      { slug: 'shore-line-brewing-co', text: 'a bright, beachy taproom on Lakeshore Road, right across the street from Gyro Beach. It has outdoor patios and a full kitchen, so it’s an easy stop after a swim.' },
+      { slug: 'maestro-s-mediterranean-restaurant-and-terrace', text: 'a lake-view Mediterranean terrace, best known for weekend brunch.' },
+    ] },
+    { id: 'wineries', jump: 'Winery terraces', heading: 'Winery terraces', items: [
+      { slug: 'summerhill-pyramid-winery', text: 'a certified-organic estate with an actual pyramid, a heated lake-view terrace and its own restaurant.' },
+      { slug: 'cedarcreek-estate-winery', text: 'cozy outdoor booths with a lake view. Regulars recommend the schnitzel with a glass of CedarCreek’s own Pinot Gris.' },
+      { slug: 'spearhead-winery', text: 'an East Kelowna patio praised as one of the prettiest tasting spots in the valley.' },
+      { slug: 'st-hubertus-oak-bay-estate-winery', text: 'a small, unpretentious winery right on the lake. The walk-around tasting fee is waived when you buy a bottle.' },
+      { slug: 'sperling-vineyards', text: 'picnic tables with mountain views over the vines, and leashed dogs are welcome.' },
+    ] },
+    { id: 'breweries', jump: 'Breweries & cideries', heading: 'Brewery and cidery patios', items: [
+      { slug: 'barn-owl-brewing', text: 'a grassy neighbourhood patio with occasional live music and food from rotating local vendors.' },
+      { slug: 'railside-brewing-ltd', name: 'Railside Brewing', text: 'a rail-trail stop with a fantastic patio and a gluten-free drink menu alongside the craft beer.' },
+      { slug: 'kettle-river-brewing-co', text: 'a spacious patio brewpub with a full kitchen, worth visiting for a proper meal.' },
+      { slug: 'upside-cidery', text: 'a big, lively cidery with lawn and upstairs patio seating, wood-fired pizza and real non-alcoholic options.' },
+    ] },
+    { id: 'dogs', jump: 'Dog-friendly', heading: 'Patios that welcome your dog', items: [
+      { slug: 'unleashed-brewing-company', text: 'a dog-inspired brewery in the Brewery District. Pups are welcome inside or out on the patio.' },
+      { slug: 'train-station-pub', text: 'a historic-character pub on Ellis Street with a dog-friendly menu and a summer patio. Regulars call its burger and fries the best in Kelowna.' },
+      { slug: 'milk-shed-coffeehouse', text: 'a coffeehouse in a heritage barn. Dogs are welcome on half the patio, and the cinnamon buns are famous.' },
+      { slug: 'post-haus-pub', text: 'a hole-in-the-wall neighbourhood pub where pups are welcome on the patio. Order the schnitzel.' },
+    ] },
+    { id: 'downtown', jump: 'Downtown & Pandosy', heading: 'Downtown, Bernard Avenue and Pandosy', items: [
+      { slug: 'la-vela-pizzeria', text: 'wood-fired Neapolitan pizza on a patio in the heart of downtown. Reviewers recommend the La Vela and Deliza pies.' },
+      { slug: 'casa-de-frida', text: 'Mexican food regulars call the best in Kelowna, with a cozy patio and second-floor live music.' },
+      { slug: 'perogies-bar-by-ready-to-cook', text: 'a cozy Bernard Avenue counter with a lovely terrace, live Ukrainian jazz, and made-to-order pierogi boiled, fried or both.' },
+      { slug: 'room-272-bar-bites', text: 'comfortable outdoor seating on the Bernard strip and inventive cocktails.' },
+      { slug: 'black-rabbit-coffee-house', text: 'a small but great Pandosy patio, close enough to the beach for a croissant-and-coffee beach walk.' },
+      { slug: 'hector-s-casa', text: 'a shaded back patio in the Lower Mission that regulars treat as a summer hangout.' },
+    ] },
+  ],
+  quickPicks: [
+    ['A sunset with a drink', ['craft-beer-market-kelowna|CRAFT Beer Market', 'earls-kitchen-bar|Earls', 'perch-sky-lounge|Perch Sky Lounge']],
+    ['To eat with your feet nearly in the lake', ['king-taps|King Taps', 'shore-line-brewing-co|Shore Line Brewing']],
+    ['Wine with a view', ['summerhill-pyramid-winery|Summerhill', 'cedarcreek-estate-winery|CedarCreek', 'spearhead-winery|SpearHead']],
+    ['To bring the dog', ['unleashed-brewing-company|Unleashed Brewing', 'train-station-pub|Train Station Pub']],
+    ['A patio on a cool evening', ['the-galley-lakeside-cafe|The Galley (outdoor fireplaces)', 'summerhill-pyramid-winery|Summerhill (heated terrace)', 'earls-kitchen-bar|Earls (blankets)', 'masa-s-grill-at-the-harvest-golf-club|Masa’s Grill at The Harvest Golf Club (patio heaters)']],
+  ],
+};
+
+function renderPatioGuidePage() {
+  const g = PATIO_GUIDE;
+  const banner = g.banner();
+  const canonical = `https://okanaganroam.com${PATIO_GUIDE_PATH}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Food & Drink', url: 'https://okanaganroam.com/food-drink' },
+    { name: g.heading, url: canonical },
+  ]);
+  const article = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: g.heading,
+    description: g.description,
+    image: `https://okanaganroam.com${banner.src}`,
+    mainEntityOfPage: canonical,
+    publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
+  };
+  const href = (v) => `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+  const itemHtml = (item) => {
+    const v = skiGuideVenue('kelowna', item.slug);
+    if (!v) return '';
+    return `\n          <li><strong><a href="${escapeHtml(href(v))}">${escapeHtml(item.name || v.name)}</a></strong>: ${escapeHtml(item.text)}</li>`;
+  };
+  const sectionsHtml = g.sections.map((sec) => {
+    const items = sec.items.map(itemHtml).join('');
+    return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
+  }).join('');
+  const pickHtml = g.quickPicks.map(([want, list]) => {
+    const links = list.map((x) => { const [slug, label] = x.split('|'); const v = skiGuideVenue('kelowna', slug); return v ? `<a href="${escapeHtml(href(v))}">${escapeHtml(label)}</a>` : ''; }).filter(Boolean);
+    return links.length ? `\n          <tr><th scope="row">${escapeHtml(want)}</th><td>${links.join(', ')}</td></tr>` : '';
+  }).join('');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: banner.src })}
+${CATEGORY_BANNER_STYLE}
+<style>
+  body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
+  body.ski-guide-page .ski-guide-intro p { font-size: 1.05rem; line-height: 1.6; }
+  body.ski-guide-page .ski-guide-jump { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+  body.ski-guide-page .ski-guide-jump a { background: var(--paper); border-radius: 999px; padding: 8px 16px; font-weight: 700; text-decoration: none; }
+  body.ski-guide-page .ski-guide-resort { margin-top: 32px; }
+  body.ski-guide-page .ski-guide-list { padding-left: 1.2em; margin: 0; }
+  body.ski-guide-page .ski-guide-list li { margin: 0 0 10px; line-height: 1.55; }
+  body.ski-guide-page .patio-picks { width: 100%; border-collapse: collapse; margin: 8px 0 18px; }
+  body.ski-guide-page .patio-picks th, body.ski-guide-page .patio-picks td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgba(27,43,58,.12); line-height: 1.5; }
+  body.ski-guide-page .patio-picks th { width: 38%; font-weight: 700; }
+</style>
+</head>
+<body class="golf-page ski-guide-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Food & Drink', href: '/food-drink' },
+    { name: g.heading },
+  ])}
+    <article class="ski-guide">
+      ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
+      <div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
+      </div>
+      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}<a href="#quick-picks">Quick picks</a></nav>${sectionsHtml}
+      <section class="ski-guide-resort" id="quick-picks">
+        <h2>Quick picks</h2>
+        <table class="patio-picks">
+          <tbody>${pickHtml}
+          </tbody>
+        </table>
+        <p><strong>See every Kelowna patio:</strong> <a href="/guide/kelowna/patio">Patio venues in Kelowna</a>, with filters.</p>
+      </section>
+    </article>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
   const description = 'Own a restaurant, winery, cafe, brewery or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
@@ -21573,6 +21719,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
+        `  <url>\n    <loc>https://okanaganroam.com${PATIO_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${SKI_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Hidden Gems and the category directory (SEO, 2026-10-13): both live
         // but were missing from the sitemap.
@@ -23185,6 +23332,10 @@ const server = http.createServer(async (req, res) => {
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
     // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if ((pathname === PATIO_GUIDE_PATH || pathname === `${PATIO_GUIDE_PATH}/`) && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderPatioGuidePage());
+    }
     if ((pathname === SKI_GUIDE_PATH || pathname === `${SKI_GUIDE_PATH}/`) && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderSkiGuidePage());
@@ -23653,6 +23804,9 @@ module.exports = {
   renderSkiGuidePage,
   SKI_GUIDE,
   SKI_GUIDE_PATH,
+  PATIO_GUIDE,
+  PATIO_GUIDE_PATH,
+  renderPatioGuidePage,
   renderListYourVenuePage,
   validateVenueSubmission,
   buildVenueSubmissionEmail,

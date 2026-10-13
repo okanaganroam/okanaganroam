@@ -17817,3 +17817,22 @@ test('Guide, Dog Friendly and Outdoors excerpts (2026-10-13): cards show the sho
     });
   } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
 });
+
+test('Patio guide (2026-10-13): /guides/best-patios-kelowna renders the approved copy with live venue links, Article schema, a banner, and is linked and in the sitemap', async () => {
+  const html = app.renderPatioGuidePage();
+  assert.match(html, /<title>Best Patios in Kelowna: Lake Views, Rooftops &amp; More \| Okanagan Roam<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/best-patios-kelowna">/);
+  assert.match(html, /"@type":"Article","headline":"Best Patios in Kelowna"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
+  assert.match(html, /<h1>Best Patios in Kelowna<\/h1>/);
+  for (const sec of app.PATIO_GUIDE.sections) for (const it of sec.items) {
+    const v = db.prepare("SELECT * FROM venues WHERE region = 'kelowna' AND slug = ? AND redirect_to IS NULL").get(it.slug);
+    if (v) assert.ok(html.includes(`href="/kelowna/`) && html.includes(`/${it.slug}"`), `${it.slug} is linked`);
+    else assert.ok(!html.includes(`/${it.slug}"`), `${it.slug} is missing locally and simply left out`);
+  }
+  await withWinterServer(async (base) => {
+    assert.equal((await WINTER_GET(base, '/guides/best-patios-kelowna')).status, 200);
+    assert.ok((await WINTER_GET(base, '/sitemap.xml')).text.includes('<loc>https://okanaganroam.com/guides/best-patios-kelowna</loc>'));
+    assert.match((await WINTER_GET(base, '/food-drink')).text, /href="\/guides\/best-patios-kelowna"/);
+  });
+});
