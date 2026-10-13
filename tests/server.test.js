@@ -17476,3 +17476,13 @@ test('Navigation (2026-10-12): the header\'s Things to Do menu and the footer\'s
     }
   });
 });
+
+test('Card rows (2026-10-12): two-up cards give every part its own subgrid row, so the open-now line on Food & Drink and browse cards never pushes the badges into the buttons\' row', () => {
+  const css = app.renderGolfThemeStyles();
+  assert.match(css, /body\.golf-page \.card-grid > \.venue-card \{ display: grid; grid-template-rows: subgrid; grid-row: span 10;/);
+  const order = ['h2', '.venue-meta', '.fd-open-status', '.card-slot-fee', '.card-slot-desc', '.card-slot-notice', '.card-slot-notes', '.chips', '.card-actions', '.card-links'];
+  order.forEach((sel, i) => {
+    const re = new RegExp(`body\\.golf-page \\.card-grid > \\.venue-card > ${sel.replace(/\./g, '\\.')} \\{ grid-row: ${i + 1}; \\}`);
+    assert.match(css, re, `${sel} sits in row ${i + 1}`);
+  });
+});

@@ -9434,7 +9434,7 @@ function renderGolfThemeStyles() {
   body.golf-page .card-grid > .venue-card > .chips:empty + .card-actions { margin-top: auto; }
   body.golf-page .card-slot:empty { display: none; }
   body.golf-page .card-slot-desc { display: flex; flex-direction: column; }
-  /* Two-up rows (2026-10-12): each card spans eight rows of the list's grid
+  /* Two-up rows (2026-10-12): each card spans ten rows of the list's grid
      and shares them (subgrid), so the name, description, notice, note, badge
      and button rows line up across the row; an empty slot becomes a blank
      row only when its neighbour fills that row. */
@@ -9443,7 +9443,21 @@ function renderGolfThemeStyles() {
       body.golf-page .card-grid { row-gap: 0; }
       /* content-visibility: auto (the long-list paint saver) implies layout
          containment, which switches subgrid off, so two-up cards opt out. */
-      body.golf-page .card-grid > .venue-card { display: grid; grid-template-rows: subgrid; grid-row: span 8; row-gap: 0; margin-bottom: 16px; align-content: start; content-visibility: visible; contain-intrinsic-size: none; }
+      body.golf-page .card-grid > .venue-card { display: grid; grid-template-rows: subgrid; grid-row: span 10; row-gap: 0; margin-bottom: 16px; align-content: start; content-visibility: visible; contain-intrinsic-size: none; }
+      /* Every card part has its own row (2026-10-12): Food & Drink and browse
+         cards add an open-now line under the meta, which pushed the badges and
+         buttons into one shared row when the rows were auto-placed. A card
+         without a part leaves that row empty, so rows still line up. */
+      body.golf-page .card-grid > .venue-card > h2 { grid-row: 1; }
+      body.golf-page .card-grid > .venue-card > .venue-meta { grid-row: 2; }
+      body.golf-page .card-grid > .venue-card > .fd-open-status { grid-row: 3; }
+      body.golf-page .card-grid > .venue-card > .card-slot-fee { grid-row: 4; }
+      body.golf-page .card-grid > .venue-card > .card-slot-desc { grid-row: 5; }
+      body.golf-page .card-grid > .venue-card > .card-slot-notice { grid-row: 6; }
+      body.golf-page .card-grid > .venue-card > .card-slot-notes { grid-row: 7; }
+      body.golf-page .card-grid > .venue-card > .chips { grid-row: 8; }
+      body.golf-page .card-grid > .venue-card > .card-actions { grid-row: 9; }
+      body.golf-page .card-grid > .venue-card > .card-links { grid-row: 10; }
       body.golf-page .card-grid > .venue-card > .card-slot:empty { display: block; }
       body.golf-page .card-grid > .venue-card > .chips:empty { display: block; margin: 0; padding: 0; border: 0; }
       /* One spacing for every card type, so the badge and button rows match. */
