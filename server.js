@@ -11213,7 +11213,7 @@ function categoryDirectoryEntries() {
 
   const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', image: categoryCardImage(WHATS_ON_BANNER) }];
   if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.', image: categoryCardImage(DOG_FRIENDLY_BANNER) });
-  if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.' });
+  if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.', image: categoryCardImage(LOCAL_FAVOURITES_BANNER) });
   if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.' });
   if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.' });
 
@@ -14519,6 +14519,10 @@ function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite', filte
 })();
 </script>`;
 }
+// Banner (2026-10-12): licensed free Adobe Stock 322165760 -- friends on a
+// deck under string lights at sunset -- with an 800px thumbs/ copy for the
+// /categories card.
+const LOCAL_FAVOURITES_BANNER = Object.freeze({ src: '/images/local-favourites/local-favourites.jpg', alt: 'Friends sharing drinks on a deck under string lights at sunset', pos: 55 });
 function renderLocalFavouritesPage(venues, filter = null) {
   return renderCuratedCollectionPage({
     path: '/local-favorites',
@@ -14532,6 +14536,7 @@ function renderLocalFavouritesPage(venues, filter = null) {
     summaryLabel: 'local favourite',
     cardNotes: getPublicCollectionNotes('local_favorite'),
     cardNoteLabel: 'Local pick:',
+    banner: LOCAL_FAVOURITES_BANNER,
   }, venues, filter);
 }
 // The shared page body behind /local-favorites and /secret-spots: one curated
@@ -23320,6 +23325,7 @@ module.exports = {
   SKI_SNOW_BANNER,
   WHATS_ON_BANNER,
   DOG_FRIENDLY_BANNER,
+  LOCAL_FAVOURITES_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
