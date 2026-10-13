@@ -18394,6 +18394,35 @@ test('Event schema (2026-10-13): organizer only when the source is the organizer
   }
 });
 
+test('Event batches: `updates` retime moves a stored start (and end) time, logged, once; a missing date or a clash is reported', () => {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'okr-batch-retime-'));
+  const name = 'Retime Fixture Festival';
+  const cleanup = () => {
+    for (const { id } of db.prepare('SELECT id FROM events WHERE name = ?').all(name)) {
+      for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  };
+  cleanup();
+  try {
+    const made = app.createEvent({ name, region: 'big-white', venue_name_text: 'Village Centre', categories: ['events-festivals'], source_type: 'official_venue', source_name: 'Test Resort', source_url: 'https://example.com/retime', occurrences: [{ start_date: '2032-12-24', start_time: '17:30', end_time: '20:05' }, { start_date: '2032-12-25', start_time: '11:30' }] }, { reason: 'fixture', batch_id: 'retime-test' });
+    assert.equal(made.ok, true, JSON.stringify(made));
+    const write = (retime) => fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ batch_id: 'retime-test', reason: 'test', reviewed_by: 'test', updates: [{ region: 'big-white', name, retime }] }));
+    write([{ start_date: '2032-12-24', from: '17:30', to: '16:30', end_to: '19:05' }, { start_date: '2032-12-25', from: '11:30', to: '10:30' }]);
+    const first = app.importEventBatches(dir);
+    assert.deepEqual([first.created, first.failed], [[`${name} (updated)`], []]);
+    const occ = db.prepare('SELECT start_date, start_time, end_time FROM event_occurrences WHERE event_id = ? ORDER BY start_date').all(made.event.id);
+    assert.deepEqual(occ.map((o) => [o.start_date, o.start_time, o.end_time]), [['2032-12-24', '16:30', '19:05'], ['2032-12-25', '10:30', null]]);
+    assert.ok(db.prepare("SELECT 1 FROM event_enrichment_log WHERE event_id = ? AND field_name = 'start_time' AND old_value = '17:30' AND new_value = '16:30'").get(made.event.id), 'logged');
+    assert.deepEqual(app.importEventBatches(dir).created, [], 'a re-run changes nothing');
+    write([{ start_date: '2032-12-26', from: '10:00', to: '09:00' }]);
+    assert.equal(app.importEventBatches(dir).failed[0].reason, 'occurrence_not_found');
+    assert.equal(app.retimeEventOccurrence(made.event.id, '2032-12-24', '16:30', '20:30', { reason: 'r', batch_id: 'b' }).reason, 'occurrence_end_time_before_start');
+  } finally {
+    cleanup();
+  }
+});
+
 test('Event batches: an entry\'s reviewed_duplicates clears the fuzzy duplicate gate for those ids only', () => {
   const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'okr-batch-dup-'));
   const names = ['Fixture Craftworks Holiday Market', 'Fixture Christkindl Holiday Market'];
