@@ -1,0 +1,313 @@
+{
+ "heading": "Things to Do in the Okanagan in January 2027",
+ "title": "Things to Do in the Okanagan in January | Okanagan Roam",
+ "description": "Tubing, sleigh rides, a winter carnival, floating saunas, ramen and soup: things to do in the Okanagan in January 2027, from the valley to the hills.",
+ "banner": "winter",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "January is the quiet month in the Okanagan. The holidays are over, the summer crowds are a long way off, and the snow sits high in the hills while the valley towns stay calm. It's a good month to get out on the snow, warm up somewhere cozy and see the places you'd usually share with everyone else.",
+  "This guide mixes a few January events with snow days, indoor warm-ups and good food for cold weather. For the full winter calendar, see our {page:/guides/okanagan-winter-events|winter festivals & events guide}, and if you're heading up the mountain, our {page:/guides/ski-season-big-white-silverstar|ski season guide to Big White and SilverStar}."
+ ],
+ "sections": [
+  {
+   "id": "on-the-calendar-in-january",
+   "jump": "Events",
+   "heading": "On the calendar in January",
+   "lead": "A handful of dated events, from New Year's Day to the end of the month. More winter dates are in our {page:/guides/okanagan-winter-events|winter events guide}.",
+   "items": [
+    {
+     "ref": "event:kelowna/polar-bear-dip",
+     "name": "Polar Bear Dip",
+     "text": "start the year with a cold plunge at Tugboat Beach in Waterfront Park, 1 to 2:30 pm. Admission is $15.",
+     "where": "Kelowna, Jan 1"
+    },
+    {
+     "ref": "event:armstrong/le-hockey-sweater",
+     "name": "Le Hockey Sweater",
+     "text": "the final dates of its run at Caravan Farm Theatre, at 3 pm. Admission is $57.75 to $73.50.",
+     "where": "Armstrong, Jan 1 – 3"
+    },
+    {
+     "ref": "event:big-white/jr-chef-challenge",
+     "name": "Jr. Chef Challenge",
+     "text": "a cooking contest for kids aged 5 to 13 on the top floor of the Happy Valley Day Lodge. Young cooks gather at 3:15 pm.",
+     "where": "Big White, Jan 13"
+    },
+    {
+     "ref": "event:big-white/the-loose-moose-challenge-january",
+     "name": "The Loose Moose Challenge – January",
+     "text": "a scavenger hunt around the village. Pick up a card at the Events Tent in the Village Centre from 9 am and bring it back the next afternoon, between 2 and 4 pm.",
+     "where": "Big White, Jan 16 – 17"
+    },
+    {
+     "ref": "event:penticton/frost-fest-winter-carnival",
+     "name": "Frost Fest Winter Carnival",
+     "text": "a winter carnival weekend at Gyro Park.",
+     "where": "Penticton, Jan 22 – 24"
+    },
+    {
+     "ref": "event:penticton/penticton-vees-home-games-2026-27",
+     "name": "Penticton Vees Home Games 2026–27",
+     "text": "WHL regular-season hockey on a cold night. The team publishes tickets and any schedule changes.",
+     "where": "Penticton, home games through Mar 26"
+    }
+   ]
+  },
+  {
+   "id": "snow-days",
+   "jump": "Snow days",
+   "heading": "Snow days",
+   "lead": "January is deep winter up the hill. For lift-and-run days, see our {page:/guides/ski-season-big-white-silverstar|ski season guide}; for more rinks, see our {page:/guides/okanagan-skating|skating guide}.",
+   "items": [
+    {
+     "ref": "armstrong/caravan-farm-theatre-winter-sleigh-ride-show",
+     "name": "Caravan Farm Theatre – Winter Sleigh Ride Show",
+     "text": "a horse-drawn sleigh carries you through a story staged in the snowy fields and woods of the farm. Shows run about an hour, with live music, a fire and hot cider, and the season runs from December into January.",
+     "where": "Armstrong"
+    },
+    {
+     "ref": "big-white/big-white-tube-park",
+     "name": "Big White Tube Park (Happy Valley)",
+     "text": "five groomed lanes down the hillside, and you don't need any skill or gear. Tickets are for timed two-hour sessions, so book online ahead.",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/twinkling-trail-big-white",
+     "name": "Twinkling Trail – Big White",
+     "text": "an evening walk on a lit-up path through the snowy forest of the Happy Valley Adventure Park. No equipment needed, and it's included with a Big White lift ticket, season pass or POWder Card.",
+     "where": "Big White"
+    },
+    {
+     "ref": "silverstar/tube-town-silverstar-tube-park",
+     "name": "Tube Town – SilverStar Tube Park",
+     "text": "a tube lift takes you back to the top after every run. Kids need to be at least three to ride, and the café next door has hot chocolate or mulled wine.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "a free rink on the downtown waterfront, with the lake and the Bennett Bridge behind it. The rental hut runs 11 am to 8 pm, but it closes below −10°C, so bring your own skates on the coldest days.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/telemark-nordic-club",
+     "name": "Telemark Nordic Club",
+     "text": "about 25 minutes from downtown Kelowna, with more than 50 km of groomed cross-country trails (some lit for night skiing) and 60 km of snowshoe trails. The lodge has a fire to warm up by.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "warm-up-indoors",
+   "jump": "Warm up indoors",
+   "heading": "Warm up indoors",
+   "lead": "When it's grey or bitterly cold, head inside. Our {page:/guides/okanagan-saunas-spas|saunas & spas guide} and {page:/guides/rainy-day-okanagan|rainy-day guide} have more ideas.",
+   "items": [
+    {
+     "ref": "kelowna/loyly-floating-sauna",
+     "name": "Löyly Floating Sauna",
+     "text": "a Finnish-style cedar sauna floating at the Downtown Marina, with a cold plunge in the lake and a warm solarium lounge. Book a shared 80-minute session.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "event:kelowna/new-year-reset-salt-cave-yin-sound-healing-intention-setting",
+     "name": "New Year Reset: Salt Cave Yin, Sound Healing & Intention Setting",
+     "text": "an evening class at Room and Pillar Spa, 6:30 to 7:30 pm. Admission is $55.",
+     "where": "Kelowna, Jan 5"
+    },
+    {
+     "ref": "penticton/penticton-community-centre-pool-lazy-river",
+     "name": "Penticton Community Centre (Pool & Lazy River)",
+     "text": "a leisure pool with a lazy river and a waterslide, plus a big whirlpool, sauna and steam room for warming up on a cold day.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "kelowna/okanagan-heritage-museum",
+     "name": "Okanagan Heritage Museum",
+     "text": "the natural and human history of the valley, from syilx culture to settler life, with exhibits such as Dinosaurs of BC.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/vernon-public-art-gallery",
+     "name": "Vernon Public Art Gallery",
+     "text": "the largest public art gallery in the North Okanagan, with changing contemporary exhibitions and hands-on art activities for all ages.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/beyond-the-crux-climbing-gym",
+     "name": "Beyond the Crux Climbing Gym",
+     "text": "over 5,000 sq ft of bouldering plus top rope and lead walls. Drop-in passes and rentals make it easy to try for the first time.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "osoyoos/kobau-lanes",
+     "name": "Kobau Lanes",
+     "text": "an eight-lane 5-pin bowling centre with cosmic lighting and a licensed lounge, and you can order pizza in.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "cozy-food-for-cold-days",
+   "jump": "Cozy food",
+   "heading": "Cozy food for cold days",
+   "lead": "Soup, ramen and a seat by the fire. Our {page:/guides/cozy-spots-okanagan|cozy spots guide} has more.",
+   "items": [
+    {
+     "ref": "kelowna/little-hobo-soup-sandwich-shop",
+     "name": "Little Hobo Soup & Sandwich Shop",
+     "text": "a downtown soup and sandwich shop that's been a local staple since the 1970s. Try the three-soup flight with a grilled cheese.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "peachland/bliss-bakery-and-bistro",
+     "name": "Bliss Bakery and Bistro",
+     "text": "fresh pastries, real quiche and hearty soups on Beach Avenue.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "enderby/kaze-japanese-restaurant",
+     "name": "Kaze Japanese Restaurant",
+     "text": "a family-run spot in a converted old home downtown, with a fireplace dining room and miso ramen that reviewers call spectacular.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "vernon/sugoi-ramen-express",
+     "name": "Sugoi Ramen Express",
+     "text": "noodles made in-house and a broth that takes four full days to make.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "big-white/fat-marmot",
+     "name": "Fat Marmot",
+     "text": "a ramen bar at the Inn at Big White with a fire-table patio for sunset après-ski. The ramen is served inside only.",
+     "where": "Big White"
+    },
+    {
+     "ref": "silverstar/the-bulldog-grand-cafe-silver-star",
+     "name": "The Bulldog Grand Cafe Silver Star",
+     "text": "a village pub with four gas fireplaces, a good warm-up stop between runs.",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "the-quiet-season",
+   "jump": "Quiet season",
+   "heading": "The quiet season",
+   "lead": "January is a calm time to see the wine country side of the valley, with a guide doing the driving.",
+   "items": [
+    {
+     "ref": "event:west-kelowna/festival-of-trees-at-mission-hill",
+     "name": "Festival of Trees at Mission Hill",
+     "text": "the last days of a display of community-decorated holiday trees, with a guided experience and seasonal wine tasting supporting BC Children's Hospital.",
+     "where": "West Kelowna, until Jan 3"
+    },
+    {
+     "ref": "kelowna/toast-the-okanagan-wine-tours",
+     "name": "Toast the Okanagan Wine Tours",
+     "text": "a small tour company with over 10 years of guided tasting tours, including winter wine tours that leave from Big White.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cheers-okanagan-tours-and-transportation",
+     "name": "Cheers! Okanagan Tours and Transportation",
+     "text": "guided wine tours, including wheelchair-accessible tours, plus winter wine tours from Big White and SilverStar.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A New Year's Day plunge",
+    [
+     "event:kelowna/polar-bear-dip|Polar Bear Dip"
+    ]
+   ],
+   [
+    "A winter carnival",
+    [
+     "event:penticton/frost-fest-winter-carnival|Frost Fest Winter Carnival"
+    ]
+   ],
+   [
+    "Snow fun for the whole family",
+    [
+     "big-white/big-white-tube-park|Big White Tube Park (Happy Valley)",
+     "silverstar/tube-town-silverstar-tube-park|Tube Town – SilverStar Tube Park"
+    ]
+   ],
+   [
+    "A sleigh ride",
+    [
+     "armstrong/caravan-farm-theatre-winter-sleigh-ride-show|Caravan Farm Theatre – Winter Sleigh Ride Show"
+    ]
+   ],
+   [
+    "A free skate by the lake",
+    [
+     "kelowna/stuart-park-outdoor-rink|Stuart Park Outdoor Rink"
+    ]
+   ],
+   [
+    "Cross-country skiing or snowshoeing",
+    [
+     "west-kelowna/telemark-nordic-club|Telemark Nordic Club"
+    ]
+   ],
+   [
+    "A hot sauna and a cold plunge",
+    [
+     "kelowna/loyly-floating-sauna|Löyly Floating Sauna"
+    ]
+   ],
+   [
+    "A cold afternoon with kids",
+    [
+     "penticton/penticton-community-centre-pool-lazy-river|Penticton Community Centre (Pool & Lazy River)",
+     "osoyoos/kobau-lanes|Kobau Lanes"
+    ]
+   ],
+   [
+    "A bowl of ramen",
+    [
+     "vernon/sugoi-ramen-express|Sugoi Ramen Express",
+     "enderby/kaze-japanese-restaurant|Kaze Japanese Restaurant"
+    ]
+   ],
+   [
+    "Soup and a sandwich",
+    [
+     "kelowna/little-hobo-soup-sandwich-shop|Little Hobo Soup & Sandwich Shop"
+    ]
+   ],
+   [
+    "A fireside drink after skiing",
+    [
+     "silverstar/the-bulldog-grand-cafe-silver-star|The Bulldog Grand Cafe Silver Star"
+    ]
+   ],
+   [
+    "A winter wine tour from the ski hill",
+    [
+     "kelowna/toast-the-okanagan-wine-tours|Toast the Okanagan Wine Tours",
+     "kelowna/cheers-okanagan-tours-and-transportation|Cheers! Okanagan Tours and Transportation"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guides/okanagan-winter-events\">Winter festivals &amp; events</a>, <a href=\"/guides/okanagan-saunas-spas\">Saunas &amp; spas</a>, <a href=\"/guides/rainy-day-okanagan\">Rainy-day ideas</a>, <a href=\"/whats-on\">What's On</a>"
+}
