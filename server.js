@@ -8767,6 +8767,38 @@ function bilingualDescHtml(en, fr) {
   if (!fr) return escapeHtml(en || '');
   return `<span class="desc-en" lang="en">${escapeHtml(en || '')}</span><span class="desc-fr" lang="fr">${escapeHtml(fr)}</span>`;
 }
+// Card excerpts (2026-10-13): Food & Drink list cards show a short blurb --
+// the first sentence (or two short ones), cut at a word near 170 characters
+// -- instead of the full paragraph, which stays on the venue's own page.
+// This keeps the long list pages light and avoids repeating every full
+// description on every list it appears in.
+function descExcerpt(text, max = 170) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const sentences = t.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [];
+  let out = '';
+  for (const sen of sentences) {
+    const next = (out + ' ' + sen.trim()).trim();
+    if (next.length > max) break;
+    out = next;
+    if (out.length >= 60) break;
+  }
+  if (out) return out;
+  const cut = t.slice(0, max);
+  return cut.slice(0, cut.lastIndexOf(' ') > 80 ? cut.lastIndexOf(' ') : max).replace(/[,;:\s\u2014-]+$/, '') + '\u2026';
+}
+// The description words a list page's search still needs once cards carry
+// only an excerpt: the distinct lower-case words of 4+ letters from the
+// full English description, minus common filler, as one string.
+const DESC_SEARCH_STOPWORDS = new Set('that this with from have your their there they them then than what when where which while into onto over under about after before also just only very more most much many some such each every other others been being were will would could should here into also well like make made makes its it\'s you\'re you\'ll it\'s isn\'t don\'t can\'t'.split(' '));
+function descSearchWords(text) {
+  const seen = new Set();
+  for (const w of String(text || '').toLowerCase().normalize('NFC').match(/[a-z\u00e0-\u00ff][a-z\u00e0-\u00ff'-]{3,}/g) || []) {
+    const word = w.replace(/^'+|'+$/g, '');
+    if (word.length >= 4 && !DESC_SEARCH_STOPWORDS.has(word)) seen.add(word);
+  }
+  return [...seen].join(' ');
+}
 const BMT_HEADER_STYLE = `<style id="bmt-header">
 .nav #navTripBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; position: relative; flex-shrink: 0; min-height: 40px; padding: 0 18px; white-space: nowrap; text-decoration: none; }
 .nav #navTripBtn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
@@ -10513,10 +10545,12 @@ function venueCardHtml(venue, opts = {}) {
   // 2026-09-19, Beaches (THEMED_CATEGORY_TYPES). Golf output is unchanged.
   const isGolf = themed;
   const descId = `golf-desc-${venue.id}`;
+  const descEn = opts.excerpt ? descExcerpt(venue.description) : venue.description;
+  const descFr = opts.excerpt && venue.description_fr ? descExcerpt(venue.description_fr) : venue.description_fr;
   const desc = !venue.description ? '' : isGolf
-    ? `<div class="golf-desc" id="${descId}"><p>${bilingualDescHtml(venue.description, venue.description_fr)}</p></div>
+    ? `<div class="golf-desc" id="${descId}"><p>${bilingualDescHtml(descEn, descFr)}</p></div>
         <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`
-    : `<p>${bilingualDescHtml(venue.description, venue.description_fr)}</p>`;
+    : `<p>${bilingualDescHtml(descEn, descFr)}</p>`;
   // Emitted for themed cards and for ENGAGEMENT_ONLY_TYPES cards alike: the
   // shared engagement script locates a card by data-venue-category, so an
   // unthemed card carrying the controls needs these attributes too. They are
@@ -13174,7 +13208,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
                  d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
                  d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
-                 meta ? meta.textContent : '', desc ? desc.textContent : ''];
+                 meta ? meta.textContent : '', desc ? desc.textContent : '', d.k || ''];
     card.__fd = parts.join(' ').toLowerCase();
   });
   function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
@@ -13366,7 +13400,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
 // category pages so "Show more" works identically on both.
 function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion, openStatusById = null) {
   const orderById = new Map(venues.map((v, i) => [v.id, i]));
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
   let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
   // Open Now (hub only): one status line directly under each card's meta line.
@@ -13549,7 +13583,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
     })),
   };
   const payload = {};
-  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
+  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description) };
 
   const advisoryNotes = getAdvisoryNotes();
   const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false) : '';
@@ -13665,7 +13699,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   // plus h: the verified weekly hours of Open Now-eligible venues only.
   const payload = {};
   for (const v of venues) {
-    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region };
+    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description) };
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = st.hours;
   }
@@ -23852,6 +23886,8 @@ module.exports = {
   OUTDOOR_ACTIVITY_CARDS,
   outdoorActivityImagePath,
   OUTDOOR_ACTIVITY_BANNERS,
+  descExcerpt,
+  descSearchWords,
   renderOutdoorActivityShowcaseHtml,
   outdoorsSearchHtml,
   outdoorsActivityChipsHtml,
