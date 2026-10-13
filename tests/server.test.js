@@ -17560,6 +17560,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(ski, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Ski &amp; Snow<\/h1>/, '/ski-snow opens with its photo above the heading');
       const gems = (await WINTER_GET(base, '/hidden-gems')).text;
       assert.doesNotMatch(gems, /class="category-banner"/, 'other curated pages are unchanged');
+      const whatsOn = (await WINTER_GET(base, '/whats-on')).text;
+      assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), "What's On thumbnail exists");
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
