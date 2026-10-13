@@ -10748,6 +10748,30 @@ function venueCardHtml(venue, opts = {}) {
 }
 
 // GET /:region — region hub page
+// Town page structured data (2026-10-13): the town as a TouristDestination in the Okanagan Valley, and an ItemList of the
+// category pages it links to that have listings (a summary-page list: each item is its own page). Filtered views (query-string
+// links such as Dog Friendly or What's On) are left out, since their canonical is another page.
+function regionPageSchemas(region, regionLabel, description, canonical, categories) {
+  const items = categories.filter((c) => c.href && c.count > 0 && !c.href.includes('?'));
+  const destination = {
+    '@context': 'https://schema.org',
+    '@type': 'TouristDestination',
+    name: `${regionLabel}, BC`,
+    description,
+    url: canonical,
+    containedInPlace: { '@type': 'Place', name: 'Okanagan Valley, British Columbia' },
+  };
+  const list = items.length ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `Things to do in ${regionLabel}`,
+    url: canonical,
+    numberOfItems: items.length,
+    itemListElement: items.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: `${c.label} in ${regionLabel}`, url: `https://okanaganroam.com${c.href}` })),
+  } : null;
+  return [destination, list].filter(Boolean);
+}
+
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
   const totalVenues = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
@@ -10832,7 +10856,7 @@ ${upcomingEvents.map((e) => {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, shareImage })}
+${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
 ${renderDestinationCategoryStyles()}
 ${intro ? REGION_INTRO_STYLE : ''}
@@ -25252,6 +25276,7 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  regionPageSchemas,
   whatsOnScopeFromPath,
   whatsOnWeekendWindow,
   whatsOnRelatedGuides,
