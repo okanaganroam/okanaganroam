@@ -14596,7 +14596,9 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
   const heading = cfg.heading;
   // Category content (2026-10-12, Local Favourites): one type chosen shows
   // that category's photo, heading and intro, like /food-drink.
-  const heroOne = cfg.categoryContent && f.types.length === 1 ? cfg.categoryContent[f.types[0]] || null : null;
+  const heroOne = (cfg.categoryContent && f.types.length === 1 ? cfg.categoryContent[f.types[0]] || null : null)
+    || (cfg.regionContent && f.regions.length === 1 ? cfg.regionContent[f.regions[0]] || null : null);
+  const swapContent = cfg.categoryContent || cfg.regionContent;
   const heroBanner = heroOne ? heroOne.banner : cfg.banner;
   const title = cfg.title;
   const description = cfg.description;
@@ -14639,15 +14641,16 @@ ${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHe
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: heading }])}
-  ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${cfg.categoryContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high"></div>${cfg.categoryContent ? `
+  ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${swapContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high"></div>${swapContent ? `
   <script>
   (function(){
-    var c = ${JSON.stringify(cfg.categoryContent).replace(/</g, '\\u003c')}, all = ${JSON.stringify({ banner: cfg.banner, heading, introHtml: cfg.introHtml }).replace(/</g, '\\u003c')};
+    var c = ${JSON.stringify(cfg.categoryContent || {}).replace(/</g, '\\u003c')}, rc = ${JSON.stringify(cfg.regionContent || {}).replace(/</g, '\\u003c')}, all = ${JSON.stringify({ banner: cfg.banner, heading, introHtml: cfg.introHtml }).replace(/</g, '\\u003c')};
     var box = document.getElementById('lfBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-lf-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-lf-type'); });
-      var one = on.length === 1 && c[on[0]], b = one ? one.banner : all.banner;
+      var rs = Array.prototype.slice.call(document.querySelectorAll('button.outdoor-filter-chip[data-region][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-region'); });
+      var one = (on.length === 1 && c[on[0]]) || (rs.length === 1 && rc[rs[0]]), b = one ? one.banner : all.banner;
       if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       var ht = one ? one.heading : all.heading;
@@ -14793,6 +14796,16 @@ function renderSkiSnowStyles() {
   body.lf-page .ski-snow-eats-lead, body.lf-page .ski-snow-empty { font-size: 0.98rem; color: var(--ink); opacity: 0.8; margin: -4px 0 14px; }
 </style>`;
 }
+// Per-resort banner, heading and intro on /ski-snow (2026-10-12): choosing a
+// single ski-resort region swaps them in. Big White has a real photo
+// (licensed free Adobe Stock 567585920, "Sunset at Big White"); no free photo
+// of SilverStar, Apex or Baldy exists yet, so they keep the general skier.
+const SKI_SNOW_REGION_CONTENT = Object.freeze({
+  'big-white': { banner: { src: '/images/ski-snow/big-white-sunset.jpg', alt: 'Sunset over snow-covered firs and mountain ridges at Big White', pos: 55 }, heading: 'Big White Ski Resort', intro: 'The Okanagan\u2019s biggest ski hill, up the mountain from Kelowna \u2014 famous for light, dry powder and snow-frosted trees, with a ski-in, ski-out village, night skiing and plenty to do off the slopes.' },
+  silverstar: { banner: SKI_SNOW_BANNER, heading: 'SilverStar Mountain Resort', intro: 'Above Vernon in the North Okanagan \u2014 a colourful, car-free village, terrain on several faces of the mountain and one of the region\u2019s best-known Nordic trail networks next door.' },
+  apex: { banner: SKI_SNOW_BANNER, heading: 'Apex Mountain Resort', intro: 'A short drive from Penticton \u2014 a smaller, friendly hill known for steep runs, short lift lines and a relaxed village feel.' },
+  baldy: { banner: SKI_SNOW_BANNER, heading: 'Baldy Mountain Resort', intro: 'The South Okanagan\u2019s family-friendly ski hill near Oliver and Osoyoos \u2014 quiet glades, sunny days and an easygoing, local feel.' },
+});
 function renderSkiSnowPage(venues, eats, filter = null) {
   const resortNames = SKI_SNOW_REGIONS.map((r) => REGION_LABELS[r]).filter(Boolean);
   const leadHtml = `<div class="ski-snow-links">
@@ -14818,6 +14831,7 @@ function renderSkiSnowPage(venues, eats, filter = null) {
     summaryLabel: 'ski & snow',
     extraHead: renderSkiSnowStyles(),
     banner: SKI_SNOW_BANNER,
+    regionContent: SKI_SNOW_REGION_CONTENT,
     leadHtml,
     emptyHtml: '<p class="ski-snow-empty">Winter listings are on their way &mdash; check the ski season guide and winter outdoors above in the meantime.</p>',
     afterResultsHtml: eatsHtml,
@@ -23485,6 +23499,7 @@ module.exports = {
   FD_HUB_HEADINGS,
   FOOD_DRINK_HUB_BANNER,
   SKI_SNOW_BANNER,
+  SKI_SNOW_REGION_CONTENT,
   WHATS_ON_BANNER,
   WHATSON_CATEGORY_BANNERS,
   WHATSON_CATEGORY_TEXT,
