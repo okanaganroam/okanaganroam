@@ -17,6 +17,7 @@ function golfDetailsFor(venues) {
 // their own hours logic. Guarded like golf-data.js so a copy of the app
 // without hours.js (e.g. the isolated homepage tests) starts exactly as before.
 const hoursModule = (() => { try { return require('./hours.js'); } catch (e) { return null; } })();
+const { renderShareCard } = require('./share-card.js');
 
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
@@ -16348,6 +16349,30 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// Place share cards (2026-10-13): a place page's share image is its own generated card (share-card.js) -- the brand mark, a
+// gold "WINERY · KELOWNA, BC" line and the place's name -- instead of the site logo. It is only the og:image preview, never
+// the place's schema image. The URL carries a short hash of the card's text, so a renamed place gets a fresh card in caches.
+function venueShareCardLabel(venue) {
+  const type = CATEGORY_LABELS[venue.type] ? CATEGORY_LABELS[venue.type].singular : '';
+  const town = REGION_LABELS[venue.region] ? `${REGION_LABELS[venue.region]}, BC` : '';
+  return [type, town].filter(Boolean).join(' \u00b7 ').toUpperCase();
+}
+function venueShareCardUrl(venue) {
+  if (!CATEGORY_SLUGS[venue.type] || !venue.slug) return null;
+  const v = require('crypto').createHash('sha1').update(`${venue.name}|${venueShareCardLabel(venue)}`).digest('hex').slice(0, 8);
+  return `https://okanaganroam.com/share/${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}.png?v=${v}`;
+}
+const shareCardCache = new Map(); // key -> PNG buffer; oldest dropped past 300 entries
+function venueShareCardPng(venue) {
+  const label = venueShareCardLabel(venue);
+  const key = `${venue.id}|${venue.name}|${label}`;
+  if (shareCardCache.has(key)) return shareCardCache.get(key);
+  const png = renderShareCard({ name: venue.name, label });
+  shareCardCache.set(key, png);
+  if (shareCardCache.size > 300) shareCardCache.delete(shareCardCache.keys().next().value);
+  return png;
+}
+
 // GET /:region/:category/:slug — individual venue page
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // Page-only editorial copy: no database changes or effects on other venues.
@@ -16600,7 +16625,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { shareImage: venueShareCardUrl(venue), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
@@ -23154,6 +23179,20 @@ const server = http.createServer(async (req, res) => {
       '/badges/featured-on-okanagan-roam.svg': { file: 'public/badges/featured-on-okanagan-roam.svg', type: 'image/svg+xml' },
       '/badges/featured-on-okanagan-roam.png': { file: 'public/badges/featured-on-okanagan-roam.png', type: 'image/png' },
     };
+    // GET /share/<region>/<category>/<slug>.png -- a place's share card (2026-10-13). Only live places with a public page get one.
+    const shareCardMatch = method === 'GET' ? pathname.match(/^\/share\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\.png$/) : null;
+    if (shareCardMatch) {
+      const [, scRegion, scCategory, scSlug] = shareCardMatch;
+      const scType = Object.keys(CATEGORY_SLUGS).find((t) => CATEGORY_SLUGS[t] === scCategory);
+      const scVenue = scType && REGION_LABELS[scRegion] ? db.prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND slug = ? AND redirect_to IS NULL').get(scRegion, scType, scSlug) : null;
+      if (!scVenue) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('Not found');
+      }
+      const png = venueShareCardPng(scVenue);
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': png.length, 'Cache-Control': 'public, max-age=604800' });
+      return res.end(png);
+    }
     if (BADGE_ASSETS[pathname] && method === 'GET') {
       const badgePath = path.join(__dirname, BADGE_ASSETS[pathname].file);
       if (fs.existsSync(badgePath)) {
@@ -25276,6 +25315,8 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  venueShareCardUrl,
+  venueShareCardLabel,
   regionPageSchemas,
   whatsOnScopeFromPath,
   whatsOnWeekendWindow,
