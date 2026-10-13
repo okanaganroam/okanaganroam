@@ -6852,6 +6852,12 @@ function homepageNow() {
 // Fall hero text (2026-10-13): September through November (Okanagan calendar date), the homepage hero's headline and its
 // two lead lines switch to their fall versions -- the hero.*Fall keys in app.js, in English and French, so the EN/FR
 // switch keeps working. The photo is unchanged, and every other month the hero is byte-identical to before.
+const FALL_MOOD_IMAGES = Object.freeze({
+  'food-drink': '/images/mood/food-drink-fall.jpg', // Adobe Stock 523052575: friends toasting red wine at a sunset dinner
+  wine: '/images/mood/wine-fall.jpg', // Adobe Stock 408049776: a vineyard row in red and gold fall colour
+  'whats-on': '/images/mood/whats-on-fall.jpg', // Adobe Stock 905676733: a scarecrow on hay bales at a pumpkin patch
+  outdoors: '/images/mood/outdoors-fall.jpg', // Adobe Stock 277081912: a hiker on a road through golden fall forest
+});
 function isFallHeroSeason(now = new Date()) {
   const month = Number(todayLocal(now).slice(5, 7));
   return month >= 9 && month <= 11;
@@ -6935,6 +6941,9 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
   // Mac) is the free Adobe Stock photo 499088168, a skier in powder through frosted trees; indoor.jpg is 640x400 (the user-supplied
   // photo), so it carries its own height. Its .mood-card-indoor rule keeps a
   // dusk-to-amber gradient behind the image as the loading/missing fallback.
+  // Fall photos (2026-10-13): September through November (isFallHeroSeason), a card with a fall photo in
+  // FALL_MOOD_IMAGES shows it instead (free Adobe Stock, each under its own file name). Other months are unchanged.
+  if (isFallHeroSeason(now)) cards.forEach((c) => { if (FALL_MOOD_IMAGES[c.key]) c.img = FALL_MOOD_IMAGES[c.key]; });
   if (winter) {
     cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
@@ -25595,6 +25604,7 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  FALL_MOOD_IMAGES,
   seasonalHeroText,
   isFallHeroSeason,
   retimeEventOccurrence,
