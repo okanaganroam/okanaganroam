@@ -9345,7 +9345,7 @@ test("What's On shell: twelve categories in the approved order, tiles are multi-
   assert.equal(app.whatsOnInventoryExists(), true);
   assert.doesNotMatch(html, /<meta name="robots" content="noindex">/, 'inventory exists -> indexable');
   assert.match(html, /<body class="golf-page outdoor-page whatson-page">/);
-  assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1); assert.match(markup, /<h1>What&#39;s On in the Okanagan<\/h1>/);
+  assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1); assert.match(markup, /<h1 id="whatsOnHeading">What&#39;s On in the Okanagan<\/h1>/);
   // Hierarchy: intro -> Choose Region(s) -> Choose Category(s) -> actions -> Results.
   const order = ['<p class="outdoor-intro whatson-intro">', 'id="whatsOnSearch"', 'class="whatson-cat-row"', 'data-filter="category"', 'class="whatson-controls"', 'id="whatsOnRegionsBtn"', 'data-filter="region"', 'id="whatsOnResultsSummary"', 'id="whatsOnEmptyInventory"'];
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
@@ -17580,8 +17580,11 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       for (const [k, b] of Object.entries(app.WHATSON_CATEGORY_BANNERS)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${k} photo exists`);
       const woNight = (await WINTER_GET(base, '/whats-on?categories=nightlife')).text;
       assert.match(woNight, /id="whatsOnBanner"><img src="\/images\/whats-on\/nightlife\.jpg"/);
+      assert.match(woNight, /<h1 id="whatsOnHeading">Nightlife in the Okanagan<\/h1>\s*<p class="outdoor-intro whatson-intro" id="whatsOnIntro">DJ nights/, 'one category: its own heading and intro');
+      assert.deepEqual(Object.keys(app.WHATSON_CATEGORY_TEXT).filter((k) => k !== 'all').sort(), Object.keys(app.WHATSON_CATEGORY_BANNERS).sort(), 'every category has text');
       const woTwo = (await WINTER_GET(base, '/whats-on?categories=nightlife,arts-culture')).text;
       assert.match(woTwo, /id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"/);
+      assert.match(woTwo, /<h1 id="whatsOnHeading">What&#39;s On in the Okanagan<\/h1>|<h1 id="whatsOnHeading">What's On in the Okanagan<\/h1>/);
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
