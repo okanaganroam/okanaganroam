@@ -6805,8 +6805,8 @@ test('Wine, Beaches and Golf hubs render their intro directly under the H1; othe
   for (const [type, text] of Object.entries(intros)) {
     const html = app.renderCategoryAllRegionsPage(type, app.getVenuesByCategory(type));
     const esc = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Wineries (2026-10-12): the H1 and intro share the hero block with the banner photo, then the count.
-    const between = type === 'winery' ? '</div>\\s*<div class="category-banner">[\\s\\S]*?</div>\\s*</div>\\s*' : '\\s*';
+    // Wineries (2026-10-12): the banner photo then the H1 and intro share the hero block, then the count.
+    const between = type === 'winery' ? '</div>\\s*</div>\\s*' : '\\s*';
     assert.match(html, new RegExp(`</h1>\\s*<p class="hub-intro">${esc}</p>${between}<p class="subtitle">`), `${type}: intro sits between the H1 and the count subtitle`);
     assert.match(html, /<style>body\.golf-page \.hub-intro \{/, `${type}: intro style loaded`);
     assert.equal((html.match(/class="hub-intro"/g) || []).length, 1, `${type}: exactly one intro`);
@@ -8834,7 +8834,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
 
   // Page identity, canonical and schema.
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
-  assert.match(html, /<h1>Food &amp; Drink in the Okanagan<\/h1>/);
+  assert.match(html, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
   assert.match(html, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink"/);
   assert.match(html, /"@type":"ItemList"/);
@@ -8988,7 +8988,7 @@ test('Food & Drink hub: the /food-drink route serves it, and /browse, the Wine h
     assert.ok(ready, 'child server started');
     const hub = await get('/food-drink');
     assert.equal(hub.status, 200);
-    assert.match(hub.text, /<h1>Food &amp; Drink in the Okanagan<\/h1>/);
+    assert.match(hub.text, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
     // Pre-filtered from the URL, server-side.
     const pre = await get('/food-drink?types=cafe&features=patio&regions=kelowna');
     assert.equal(pre.status, 200);
