@@ -1606,7 +1606,7 @@ const REGION_INTROS = Object.freeze({
     describe: (n) => `Things to do in West Kelowna, BC: Westside wineries, lakeside parks and beaches, Mount Boucherie hikes and ${n} verified places to eat and drink.`,
     paragraphs: [
       [null, `West Kelowna sits across the bridge from Kelowna on the west shore of Okanagan Lake. It's quieter than the city, with a cluster of wineries on the slopes of Mount Boucherie and plenty of lakeside parks.`],
-      ['Wine country.', `Most of the tasting rooms are within a few minutes of each other, many with lake views. <a href="/west-kelowna/wineries/mission-hill-family-estate-winery">Mission Hill</a>, <a href="/west-kelowna/wineries/quails-gate-winery">Quails' Gate</a>, <a href="/west-kelowna/wineries/mt-boucherie-estate-winery">Mt. Boucherie</a> and <a href="/west-kelowna/wineries/indigenous-world-winery">Indigenous World Winery</a> are all close together. See all <a href="/west-kelowna/wineries">West Kelowna wineries</a>.`],
+      ['Wine country.', `Most of the tasting rooms are within a few minutes of each other, many with lake views. <a href="/west-kelowna/wineries/mission-hill-family-estate-winery">Mission Hill</a>, <a href="/west-kelowna/wineries/quails-gate-winery">Quails' Gate</a>, <a href="/west-kelowna/wineries/mt-boucherie-estate-winery">Mt. Boucherie</a> and Indigenous World Winery are all close together. See all <a href="/west-kelowna/wineries">West Kelowna wineries</a>.`],
       ['Beaches and parks.', `<a href="/west-kelowna/beaches/gellatly-nut-farm-regional-park">Gellatly Nut Farm Regional Park</a> and <a href="/west-kelowna/beaches/kalamoir-regional-park">Kalamoir Regional Park</a> have quiet swims and shoreline trails, and <a href="/west-kelowna/beaches/gellatly-dog-beach">Gellatly Dog Beach</a> is made for dogs. North along the lake, <a href="/west-kelowna/beaches/bear-creek-provincial-park">Bear Creek Provincial Park</a> and <a href="/west-kelowna/beaches/fintry-provincial-park">Fintry Provincial Park</a> have sandy beaches and campgrounds.`],
       ['Hikes.', `For big views over the lake, climb <a href="/west-kelowna/outdoors/mount-boucherie-boucherie-rush-trail">Mount Boucherie</a> or <a href="/west-kelowna/outdoors/goats-peak-regional-park">Goats Peak</a>, or walk the trails in <a href="/west-kelowna/outdoors/rose-valley-regional-park">Rose Valley Regional Park</a>.`],
       ['When to go.', `Summer is for the lake and patios, and fall brings harvest to the wineries. In winter, <a href="/big-white">Big White</a> is a little over an hour's drive.`],
@@ -1667,7 +1667,7 @@ const REGION_INTROS = Object.freeze({
     describe: (n) => `Things to do in Kaleden, BC: a quiet Skaha Lake beach, small wineries, two golf courses and ${n} verified places to eat, drink and play.`,
     paragraphs: [
       [null, `Kaleden is a small, quiet community on the west shore of Skaha Lake, between Penticton and Okanagan Falls. It's a peaceful place to slow down, swim and sip.`],
-      ['Things to do.', `Swim at <a href="/kaleden/beaches/pioneer-park">Pioneer Park</a>, tee off at <a href="/kaleden/golf/st-andrews-by-the-lake-golf-resort">St. Andrews by the Lake</a> or <a href="/kaleden/golf/twin-lakes-golf-course">Twin Lakes</a>, and visit small wineries like <a href="/kaleden/wineries/anthony-buchanan-wines">Anthony Buchanan Wines</a> and <a href="/kaleden/wineries/kraze-legz-vineyard-and-winery">Kraze Legz</a>. For a bite, try <a href="/kaleden/cafes/frog-city-cafe">Frog City Cafe</a> or <a href="/kaleden/cafes/linden-gardens">Linden Gardens</a>.`],
+      ['Things to do.', `Swim at <a href="/kaleden/beaches/pioneer-park">Pioneer Park</a>, tee off at <a href="/kaleden/golf/st-andrews-by-the-lake-golf-resort">St. Andrews by the Lake</a> or <a href="/kaleden/golf/twin-lakes-golf-course">Twin Lakes</a>, and visit small wineries like <a href="/kaleden/wineries/anthony-buchanan-wines">Anthony Buchanan Wines</a> and <a href="/kaleden/wineries/kraze-legz-vineyard-and-winery">Kraze Legz</a>. For a bite, try <a href="/kaleden/cafes/linden-gardens">Frog City Cafe</a> or <a href="/kaleden/cafes/linden-gardens">Linden Gardens</a>.`],
     ],
   },
   oliver: {
@@ -12718,7 +12718,8 @@ function whatsOnScopeText(scope, window = null) {
     const label = WHATSON_CATEGORY_BY_KEY[scope.category].label;
     return {
       heading: t.heading, intro: t.intro, crumb: label,
-      title: `${t.heading} | Okanagan Roam`,
+      // /sports already uses "Sports & Recreation in the Okanagan" (health crawl, 2026-10-13).
+      title: `${scope.category === 'sports-recreation' ? 'Sports & Recreation Events in the Okanagan' : t.heading} | Okanagan Roam`,
       description: `${label} in the Okanagan: what\u2019s on over the next three months, with dates, places and details for each event, from Vernon to Osoyoos.`,
     };
   }
@@ -16544,7 +16545,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const catSlug = CATEGORY_SLUGS[venue.type];
   const label = (fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[venue.type];
   const canonical = `https://okanaganroam.com${venuePagePath(venue, fr ? 'fr' : 'en')}`;
-  const title = editorial ? editorial.title : fr ? `${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam` : `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`;
+  const title = editorial ? editorial.title : fr
+    ? fitTitle([`${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam`, `${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B.`, `${venue.name} \u2014 ${regionLabel}, C.-B.`, `${venue.name} \u2014 ${regionLabel}`, venue.name])
+    : fitTitle([`${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`, `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC`, `${venue.name} \u2014 ${regionLabel}, BC`, `${venue.name} \u2014 ${regionLabel}`, venue.name]);
   const rawDesc = fr && venue.description_fr ? venue.description_fr : (venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`);
   const description = editorial ? editorial.metaDescription
     : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
@@ -16975,13 +16978,21 @@ function eventOffersSchema(event) {
 // same region, both pages would carry an identical <title>; such pages add
 // their own date (the next upcoming occurrence, else the first; legacy rows
 // use the stored start date). Every other event title is unchanged.
+// Title length (health crawl, 2026-10-13): Google cuts titles at roughly 60-65 characters, and over half of the place and
+// event titles ran longer. The first candidate that fits wins; the brand suffix goes first (Google shows the site name
+// anyway), then the descriptive tail; a very long name stands alone.
+const TITLE_MAX = 65;
+function fitTitle(candidates) {
+  return candidates.find((t) => t.length <= TITLE_MAX) || candidates[candidates.length - 1];
+}
 function eventPageTitle(full, regionLabel, mainOccurrence) {
-  const plain = `${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`;
+  const plain = fitTitle([`${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — Event in ${regionLabel}, BC`, `${full.name} — ${regionLabel}`, full.name]);
   const twin = db.prepare('SELECT 1 FROM events WHERE region = ? AND name = ? AND id <> ? LIMIT 1').get(full.region, full.name, full.id);
   if (!twin) return plain;
   const dateStr = mainOccurrence ? mainOccurrence.start_date : String(full.start_datetime || '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return plain;
-  return `${full.name} — ${formatLocalDateLong(dateStr, { weekday: false })} — Event in ${regionLabel}, BC | Okanagan Roam`;
+  const date = formatLocalDateLong(dateStr, { weekday: false });
+  return fitTitle([`${full.name} — ${date} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — ${date} — Event in ${regionLabel}, BC`, `${full.name} — ${date}`]);
 }
 function renderEventPage(event, hostVenue, opts = {}) {
   const now = opts.now || new Date();
@@ -25509,6 +25520,7 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  fitTitle,
   localizeHtml,
   localizeStaticFr,
   frHoursText,
