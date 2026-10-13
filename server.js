@@ -12743,7 +12743,7 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     ...(activityContent ? [{ name: label.plural, href: `/${catSlug}` }, { name: activityContent.label }] : [{ name: label.plural }]),
   ])}
   ${activityContent ? CATEGORY_BANNER_STYLE + categoryHeroHtml(`<div class="category-banner"><img src="${activityContent.banner.src}" alt="${escapeHtml(activityContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${activityContent.banner.pos}%" fetchpriority="high"></div>`, '<h1>' + escapeHtml(activityContent.heading) + '</h1>\n  <p class="hub-intro">' + escapeHtml(activityContent.intro) + '</p>') : CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
-  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}${type === 'sport' ? renderSportActivityHtml(sportUniverse, sportActivity, sportNotes) : ''}
+  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${type === 'winery' || (type === 'tour' && tourActivity === 'wine') ? `<p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a></p>\n  ` : ''}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}${type === 'sport' ? renderSportActivityHtml(sportUniverse, sportActivity, sportNotes) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
@@ -20231,6 +20231,175 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// ---------- Okanagan wineries for first-timers (2026-10-13): /guides/okanagan-wineries-first-timers ----------
+// Valley-wide editorial guide, same approach as the patio guide: approved
+// copy here, every place looked up live by 'region/slug'. Tip lines carry
+// inline links written {region/slug|Label}; a place that's gone keeps its
+// label as plain text, and a list item for it simply drops out.
+const WINE_GUIDE_PATH = '/guides/okanagan-wineries-first-timers';
+const WINE_GUIDE = {
+  heading: 'Okanagan Wineries for First-Timers',
+  title: 'Okanagan Wineries for First-Timers: Where to Start | Okanagan Roam',
+  description: 'New to Okanagan wine country? How tastings work, welcoming wineries to start with, landmark estates and wine tours that do the driving.',
+  banner: () => CATEGORY_BANNER_IMAGES.winery,
+  parent: { name: 'Wineries', href: '/wineries' },
+  intro: [
+    'Okanagan Roam lists more than 200 wineries, from Lake Country to Osoyoos. That’s a lot to choose from on your first trip. This guide picks easy, welcoming places to start: wineries where you’ll learn something, eat well, feel relaxed even if you don’t know much about wine, and bring the family or the dog.',
+  ],
+  sections: [
+    { id: 'tastings', jump: 'How tastings work', heading: 'How tastings usually work', items: [
+      { lead: 'Tasting fees are often waived when you buy.', tip: 'At {kelowna/st-hubertus-oak-bay-estate-winery|St Hubertus & Oak Bay}, {west-kelowna/the-hatch|The Hatch}, {summerland/back-door-winery|Back Door Winery} and {west-kelowna/crown-thieves|Crown & Thieves}, buying a bottle waives the fee. At {penticton/black-market-wine-co|Black Market Wine Co.}, it’s two bottles.' },
+      { lead: 'A few tastings are free:', tip: '{oliver/gehringer-brothers-estate-winery|Gehringer Brothers}, {oliver/hidden-chapel-winery|Hidden Chapel} and {oliver/silver-sage-winery|Silver Sage}, whose free tasting reviewers call genuinely hilarious.' },
+      { lead: 'Some small wineries work by appointment or reservation,', tip: 'such as {kelowna/scorched-earth-winery|Scorched Earth} and {naramata/daydreamer-wines|Daydreamer Wines}. Book ahead and your visit is never rushed.' },
+      { lead: 'Plan who’s driving.', tip: 'The easiest way to taste is a wine tour with pickup (see below).' },
+    ] },
+    { id: 'learn', jump: 'Learn as you sip', heading: 'Learn as you sip', items: [
+      { ref: 'kelowna/martin-s-lane-winery', text: 'a striking, gravity-fed winery known for Riesling and Pinot Noir. Its guided tour is considered top-tier among Kelowna wineries.' },
+      { ref: 'west-kelowna/mission-hill-family-estate-winery', text: 'one of the Okanagan’s most iconic estates, with architectural tours and a fine-dining terrace over the valley. Worth building a whole day around.' },
+      { ref: 'osoyoos/night-bird-estate-winery', text: 'a relaxed, storytelling tasting that weaves the history of Osoyoos settlement into every pour.' },
+      { ref: 'naramata/chain-reaction-winery', text: 'the owner shares winemaking knowledge over wood-fired pizza and wide views of the Naramata Bench.' },
+      { ref: 'kelowna/meadow-vista-honey-wines', text: 'a bee farm and honey winery. Tours include a full charcuterie lunch, and there are games for kids near the picnic area.' },
+    ] },
+    { id: 'landmarks', jump: 'Landmarks', heading: 'Landmarks to see once', items: [
+      { ref: 'kelowna/tantalus-vineyards', text: 'one of BC’s oldest continuously producing vineyards, planted in 1927. On-leash dogs can join the tasting room and vineyard walks.' },
+      { ref: 'west-kelowna/quails-gate-winery', text: 'family-farmed since 1956, with a dog-friendly patio overlooking Okanagan Lake.' },
+      { ref: 'kelowna/summerhill-pyramid-winery', text: 'a certified-organic estate built around an actual pyramid, with a heated lake-view terrace and its own restaurant.' },
+      { ref: 'osoyoos/nk-mip-cellars', text: 'North America’s first Indigenous-owned winery, with a restaurant terrace overlooking the desert and the lake.' },
+    ] },
+    { id: 'food', jump: 'Good food', heading: 'Relaxed stops with good food', items: [
+      { ref: 'summerland/back-door-winery', text: 'laid-back and low-key, with thin-crust wood-fired pizza and sweeping valley views.' },
+      { ref: 'naramata/wesbert-winery', text: 'a dog-friendly patio with wood-fired pizza, low-intervention wines and panoramic lake views.' },
+      { ref: 'penticton/painted-rock-estate-winery', text: 'a family-friendly estate with a deck over Skaha Lake that’s built for a charcuterie board, not a quick stop.' },
+      { ref: 'oliver/hester-creek-estate-winery', text: 'a gorgeous patio restaurant. The gnocchi and the Golden Mile reds both get raves.' },
+      { ref: 'oliver/culmina-family-estate-winery', text: 'fresh bread, tea-cup charcuterie and patio views all the way to Osoyoos Lake.' },
+      { ref: 'lake-country/gray-monk-estate-winery', text: 'a wine-trail staple with picnic tables, lake views and an on-site restaurant.' },
+    ] },
+    { id: 'family', jump: 'Kids & dogs', heading: 'Bring the kids (and the dog)', items: [
+      { ref: 'naramata/origin-wines', text: 'a tadpole pond, lawn games like cornhole and Jenga, and one of the best views on the bench.' },
+      { ref: 'west-kelowna/ciao-bella-winery', text: 'proper Italian pizza with your tasting, and kids and pets are genuinely welcome.' },
+      { ref: 'summerland/summergate-winery', text: 'a family- and pet-friendly patio and picnic area, with poutine and big burgers on summer weekends.' },
+      { ref: 'summerland/sage-hills-wine', text: 'an organic winery with a lake-view patio, snacks and non-alcoholic drinks, and an explicit kid- and pet-friendly welcome.' },
+      { ref: 'summerland/ve-oh-lay-acres-winery-farm', text: 'a farm winery with tacos, non-alcoholic options and dogs welcome throughout.' },
+    ] },
+    { id: 'tours', jump: 'Wine tours', heading: 'Let someone else drive', lead: 'A guided tour is the easiest way to visit several wineries in a day. These companies include pickup:', items: [
+      { ref: 'kelowna/a-grape-experience-wine-tours', noPlace: true, text: 'half-day and full-day tours with tasting fees included, covering Kelowna, West Kelowna, Lake Country, Summerland, Naramata and Oliver/Osoyoos.' },
+      { ref: 'kelowna/just-grapes-wine-tours', noPlace: true, text: 'a separate itinerary for each wine area, so you can pick the one you want to explore.' },
+      { ref: 'kelowna/vivid-tours', noPlace: true, text: 'half-day and full-day tours with a dedicated guide, for groups of 2 to 28.' },
+      { ref: 'kelowna/cheers-okanagan-tours-and-transportation', name: 'Cheers! Okanagan Tours', noPlace: true, text: 'all-inclusive tours to farm-gate and estate wineries, including wheelchair-accessible tours.' },
+      { ref: 'kelowna/wicked-wine-tours', noPlace: true, text: 'an Indigenous-owned company running half-day and full-day tours of West Kelowna, East Kelowna and Lake Country.' },
+      { ref: 'oliver/devino-wine-tours', where: 'South Okanagan', text: 'door-to-door pickup in Oliver, Osoyoos and OK Falls, with full-day tours that include a lunch stop.' },
+    ] },
+  ],
+  table: { id: 'by-area', jump: 'By area', heading: 'Where to start, by area', head: ['Area', 'Start with'], rows: [
+    ['Kelowna & Lake Country', ['kelowna/martin-s-lane-winery|Martin’s Lane', 'kelowna/tantalus-vineyards|Tantalus', 'lake-country/gray-monk-estate-winery|Gray Monk']],
+    ['West Kelowna', ['west-kelowna/mission-hill-family-estate-winery|Mission Hill', 'west-kelowna/quails-gate-winery|Quails’ Gate', 'west-kelowna/ciao-bella-winery|Ciao Bella']],
+    ['Naramata Bench', ['naramata/chain-reaction-winery|Chain Reaction', 'naramata/origin-wines|Origin', 'naramata/wesbert-winery|Wesbert']],
+    ['Summerland', ['summerland/back-door-winery|Back Door', 'summerland/summergate-winery|SummerGate', 'summerland/sage-hills-wine|Sage Hills']],
+    ['Penticton', ['penticton/painted-rock-estate-winery|Painted Rock', 'penticton/black-market-wine-co|Black Market']],
+    ['Oliver & Osoyoos', ['oliver/hester-creek-estate-winery|Hester Creek', 'oliver/gehringer-brothers-estate-winery|Gehringer Brothers', 'osoyoos/nk-mip-cellars|Nk’Mip Cellars']],
+  ] },
+  footerHtml: '<strong>Browse every winery:</strong> <a href="/wineries">All Okanagan wineries</a>, or <a href="/tours/wine">wine &amp; drink tours</a>.',
+};
+
+// A guide place by 'region/slug' (live), and its public URL.
+function guideRefVenue(ref) {
+  const [region, slug] = String(ref).split('/');
+  return skiGuideVenue(region, slug);
+}
+const guideVenueHref = (v) => `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+// Tip text with {region/slug|Label} links resolved live; everything else escaped.
+function guideTipHtml(text) {
+  return String(text).split(/(\{[a-z-]+\/[a-z0-9-]+\|[^}]+\})/).map((part) => {
+    const m = part.match(/^\{([a-z-]+\/[a-z0-9-]+)\|([^}]+)\}$/);
+    if (!m) return escapeHtml(part);
+    const v = guideRefVenue(m[1]);
+    return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(m[2])}</a>` : escapeHtml(m[2]);
+  }).join('');
+}
+function renderWineGuidePage() {
+  const g = WINE_GUIDE;
+  const banner = g.banner();
+  const canonical = `https://okanaganroam.com${WINE_GUIDE_PATH}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: g.parent.name, url: `https://okanaganroam.com${g.parent.href}` },
+    { name: g.heading, url: canonical },
+  ]);
+  const article = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: g.heading,
+    description: g.description,
+    image: `https://okanaganroam.com${banner.src}`,
+    mainEntityOfPage: canonical,
+    publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
+  };
+  const itemHtml = (item) => {
+    if (item.tip) return `\n          <li><strong>${escapeHtml(item.lead)}</strong> ${guideTipHtml(item.tip)}</li>`;
+    const v = guideRefVenue(item.ref);
+    if (!v) return '';
+    const place = item.where || (item.noPlace ? '' : REGION_LABELS[v.region] || '');
+    return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${escapeHtml(item.text)}</li>`;
+  };
+  const sectionsHtml = g.sections.map((sec) => {
+    const items = sec.items.map(itemHtml).join('');
+    return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${escapeHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
+  }).join('');
+  const rowsHtml = g.table.rows.map(([area, refs]) => {
+    const links = refs.map((x) => { const [ref, label] = x.split('|'); const v = guideRefVenue(ref); return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(label)}</a>` : ''; }).filter(Boolean);
+    return links.length ? `\n          <tr><th scope="row">${escapeHtml(area)}</th><td>${links.join(', ')}</td></tr>` : '';
+  }).join('');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: banner.src })}
+${CATEGORY_BANNER_STYLE}
+<style>
+  body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
+  body.ski-guide-page .ski-guide-intro p { font-size: 1.05rem; line-height: 1.6; }
+  body.ski-guide-page .ski-guide-jump { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+  body.ski-guide-page .ski-guide-jump a { background: var(--paper); border-radius: 999px; padding: 8px 16px; font-weight: 700; text-decoration: none; }
+  body.ski-guide-page .ski-guide-resort { margin-top: 32px; }
+  body.ski-guide-page .ski-guide-list { padding-left: 1.2em; margin: 0; }
+  body.ski-guide-page .ski-guide-list li { margin: 0 0 10px; line-height: 1.55; }
+  body.ski-guide-page .patio-picks { width: 100%; border-collapse: collapse; margin: 8px 0 18px; }
+  body.ski-guide-page .patio-picks th, body.ski-guide-page .patio-picks td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgba(27,43,58,.12); line-height: 1.5; }
+  body.ski-guide-page .patio-picks thead th { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+  body.ski-guide-page .patio-picks tbody th { width: 38%; font-weight: 700; }
+</style>
+</head>
+<body class="golf-page ski-guide-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: g.parent.name, href: g.parent.href },
+    { name: g.heading },
+  ])}
+    <article class="ski-guide">
+      ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
+      <div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
+      </div>
+      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a></nav>${sectionsHtml}
+      <section class="ski-guide-resort" id="${g.table.id}">
+        <h2>${escapeHtml(g.table.heading)}</h2>
+        <table class="patio-picks">
+          <thead><tr><th scope="col">${escapeHtml(g.table.head[0])}</th><th scope="col">${escapeHtml(g.table.head[1])}</th></tr></thead>
+          <tbody>${rowsHtml}
+          </tbody>
+        </table>
+        <p>${g.footerHtml}</p>
+      </section>
+    </article>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
   const description = 'Own a restaurant, winery, cafe, brewery or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
@@ -21719,6 +21888,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
+        `  <url>\n    <loc>https://okanaganroam.com${WINE_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${PATIO_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${SKI_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Hidden Gems and the category directory (SEO, 2026-10-13): both live
@@ -23332,6 +23502,10 @@ const server = http.createServer(async (req, res) => {
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
     // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if ((pathname === WINE_GUIDE_PATH || pathname === `${WINE_GUIDE_PATH}/`) && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderWineGuidePage());
+    }
     if ((pathname === PATIO_GUIDE_PATH || pathname === `${PATIO_GUIDE_PATH}/`) && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderPatioGuidePage());
@@ -23807,6 +23981,10 @@ module.exports = {
   PATIO_GUIDE,
   PATIO_GUIDE_PATH,
   renderPatioGuidePage,
+  WINE_GUIDE,
+  WINE_GUIDE_PATH,
+  renderWineGuidePage,
+  guideTipHtml,
   renderListYourVenuePage,
   validateVenueSubmission,
   buildVenueSubmissionEmail,
