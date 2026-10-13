@@ -1,6 +1,6 @@
 {
  "batch_id": "2026-10-13-holiday-events",
- "reason": "Holiday-season events (Nov 2026 – Jan 2027) missing from What’s On, each re-checked on 2026-10-13 against the organizer, venue, municipality or official ticketing page for its 2026 dates. Also corrects two existing listings: the TELUS Kelowna Cup placeholder description (from Big White’s event page) and Ballet Jörgen: Swan Lake, which was tagged as a holiday event.",
+ "reason": "Holiday-season events (Nov 2026 – Jan 2027) missing from What’s On, each re-checked on 2026-10-13 against the organizer, venue, municipality or official ticketing page for its 2026 dates. Also corrects two existing listings: the TELUS Kelowna Cup placeholder description (from Big White’s event page) and Ballet Jörgen: Swan Lake, which was tagged as a holiday event. Three entries were removed after the first import because they were already listed (Freya & Friends Live in Kelowna, Disney’s Frozen the Musical, and NYE!! The Justin Glibbery Sextet); Christkindl was checked against Craft Culture Holiday Market (event 548, a different market at Prospera Place on the same weekend) and kept, and the existing Kelowna Freya listing gets its venue.",
  "reviewed_by": "owner-approved 2026-10-13",
  "events": [
   {
@@ -87,28 +87,6 @@
    "source_type": "official_organizer",
    "source_name": "Kettle Valley Steam Railway",
    "source_url": "https://www.kettlevalleyrail.org/experiences/christmas-express/",
-   "source_checked_at": "2026-10-13",
-   "event_confidence": "high"
-  },
-  {
-   "name": "Freya & Friends: Okanagan Symphony Holiday Concert",
-   "region": "kelowna",
-   "venue_name_text": "Kelowna Community Theatre",
-   "description": "The Okanagan Symphony Orchestra’s holiday concert with the folk duo Freya, Okanagan composer, pianist and vocalist Leila Naderi, and the Okanagan Symphony Chorus, mixing new songs with reimagined favourites. About two hours, with a pre-concert chat one hour before. Tickets $18–$75.",
-   "categories": [
-    "holiday-seasonal",
-    "live-music",
-    "arts-culture"
-   ],
-   "occurrences": [
-    {
-     "start_date": "2026-12-18",
-     "start_time": "19:30"
-    }
-   ],
-   "source_type": "official_organizer",
-   "source_name": "Okanagan Symphony Orchestra",
-   "source_url": "https://okanagansymphony.com/26-27-season/freya-and-friends/",
    "source_checked_at": "2026-10-13",
    "event_confidence": "high"
   },
@@ -440,51 +418,6 @@
    "event_confidence": "high"
   },
   {
-   "name": "Disney's Frozen at Kelowna Actors Studio",
-   "region": "kelowna",
-   "venue_name_text": "Kelowna Actors Studio",
-   "description": "Kelowna Actors Studio’s family musical for the holiday season: a stage version of Disney’s Frozen, the story of sisters Anna and Elsa. It runs from November 25 to December 20; see the studio’s site for show times and tickets.",
-   "categories": [
-    "arts-culture",
-    "family-kids"
-   ],
-   "occurrences": [
-    {
-     "start_date": "2026-11-25",
-     "end_date": "2026-12-20",
-     "label": "Runs Nov 25 – Dec 20; see the studio for show times"
-    }
-   ],
-   "source_type": "official_organizer",
-   "source_name": "Kelowna Actors Studio",
-   "source_url": "https://kelownaactorsstudio.com/event/disneys-frozen",
-   "source_checked_at": "2026-10-13",
-   "event_confidence": "high"
-  },
-  {
-   "name": "New Year's Eve with the Justin Glibbery Quintet",
-   "region": "vernon",
-   "venue_name_text": "Vernon Jazz Club",
-   "description": "A 19+ New Year’s Eve party at the Vernon Jazz Club with pianist Justin Glibbery’s quintet, featuring vocals, trumpet and sax. Doors 8:30 pm; tickets $75.",
-   "categories": [
-    "holiday-seasonal",
-    "live-music",
-    "nightlife"
-   ],
-   "occurrences": [
-    {
-     "start_date": "2026-12-31",
-     "start_time": "21:00",
-     "label": "Doors 8:30 pm; 19+"
-    }
-   ],
-   "source_type": "official_venue",
-   "source_name": "Ticket Seller",
-   "source_url": "https://www.ticketseller.ca/tickets/event/new-years-eve-with-the-justin-glibbery-quintet",
-   "source_checked_at": "2026-10-13",
-   "event_confidence": "high"
-  },
-  {
    "name": "Yuletide @ the PTCC",
    "region": "penticton",
    "venue_name_text": "Penticton Trade & Convention Centre",
@@ -594,7 +527,10 @@
    "source_name": "Artisans Showcase",
    "source_url": "https://artisansshowcase.com/event/christkindl-holiday-market/",
    "source_checked_at": "2026-10-13",
-   "event_confidence": "high"
+   "event_confidence": "high",
+   "reviewed_duplicates": [
+    548
+   ]
   },
   {
    "name": "The Last Chance Holiday Market",
@@ -636,6 +572,13 @@
     "events-festivals",
     "family-kids"
    ]
+  },
+  {
+   "region": "kelowna",
+   "name": "Freya & Friends Live",
+   "fields": {
+    "venue_name_text": "Kelowna Community Theatre"
+   }
   }
  ]
 }
