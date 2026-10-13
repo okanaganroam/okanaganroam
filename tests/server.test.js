@@ -16369,7 +16369,7 @@ test('Ski guide: renders the article head, links only venues that exist, and dro
   assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/ski-season-big-white-silverstar">/);
   assert.match(head, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/ski-snow\/ski-snow\.jpg">/);
   const ld = [...head.matchAll(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/g)].map((m) => JSON.parse(m[1]));
-  assert.deepEqual(ld.map((j) => j['@type']).sort(), ['Article', 'BreadcrumbList']);
+  assert.deepEqual(ld.map((j) => j['@type']).filter((t) => t !== 'ItemList').sort(), ['Article', 'BreadcrumbList'], 'Article and breadcrumb schema, plus the guide ItemList when places show');
   assert.equal((html.match(/<h1>/g) || []).length, 1);
   // The seeded venue is linked, with its live name; unseeded ones are left out, and empty sections vanish.
   assert.match(html, /<a href="\/big-white\/restaurants\/fat-marmot">Fat Marmot<\/a><\/strong> \(Inn at Big White\): ramen/);
@@ -17921,6 +17921,35 @@ test('Editorial guides (2026-10-13): a section whose places are all gone drops o
   assert.doesNotMatch(html, /href="#gone"|Gone section/);
   assert.doesNotMatch(html, /href="#quick-picks"|<h2>Quick picks<\/h2>/);
   assert.match(html, /See everything:/, 'the footer links stay');
+});
+
+test('Guide ItemList schema (2026-10-13): each guide lists the places it shows, in page order, with absolute URLs; a guide with no live places has none', () => {
+  const lists = (html) => [...html.matchAll(/<script type="application\/ld\+json">\n(.*?)\n<\/script>/gs)].map((m) => JSON.parse(m[1])).filter((b) => b['@type'] === 'ItemList');
+  const pages = [
+    ...Object.keys(app.FILE_GUIDES).map((p) => [p, app.renderFileGuidePage(p)]),
+    ['/guides/rainy-day-okanagan', app.renderEditorialGuidePage(app.RAINY_GUIDE, '/guides/rainy-day-okanagan')],
+    [app.SKI_GUIDE_PATH, app.renderSkiGuidePage()],
+    [app.PATIO_GUIDE_PATH, app.renderPatioGuidePage()],
+  ];
+  let checked = 0;
+  for (const [p, html] of pages) {
+    const article = html.slice(html.indexOf('<article'), html.indexOf('</article>'));
+    const shown = [...new Set([...article.matchAll(/<li><strong><a href="([^"]+)">/g)].map((m) => `https://okanaganroam.com${m[1]}`))];
+    const found = lists(html);
+    if (!shown.length) { assert.equal(found.length, 0, `${p} has no ItemList when no places show`); continue; }
+    assert.equal(found.length, 1, `${p} has one ItemList`);
+    const list = found[0];
+    assert.equal(list.url, `https://okanaganroam.com${p}`);
+    assert.equal(list.numberOfItems, shown.length, `${p} lists every place it shows`);
+    assert.deepEqual(list.itemListElement.map((e) => e.url), shown, `${p} lists them in page order`);
+    assert.deepEqual(list.itemListElement.map((e) => e.position), shown.map((_, i) => i + 1));
+    assert.ok(list.itemListElement.every((e) => e.name), `${p} names every place`);
+    checked++;
+  }
+  assert.ok(checked > 0, 'at least one guide shows places in the test database');
+  const gone = { ...app.RAINY_GUIDE, sections: [{ id: 'gone', jump: 'Gone', heading: 'Gone', items: [{ ref: 'nowhere/not-a-place', name: 'Ghost', text: 'gone' }] }] };
+  assert.equal(lists(app.renderEditorialGuidePage(gone, '/guides/test')).length, 0);
+  assert.equal(app.guideItemListSchema('X', 'u', [{ name: 'A', url: 'a' }, { name: 'A again', url: 'a' }]).numberOfItems, 1, 'a place named twice is listed once');
 });
 
 test('Fall guides (2026-10-13): data/guides files load, render on the shared guide page, are in the sitemap; event refs link upcoming events and drop past ones', async () => {
