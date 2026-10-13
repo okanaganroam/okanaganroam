@@ -298,11 +298,11 @@ function t3MapPoints(days, removed) {
 const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
-  'Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake',
-  '2 days in Penticton with the kids — beaches, parks and easy food',
-  'A romantic weekend in Naramata with wineries and a great dinner',
-  'A dog-friendly weekend in Vernon',
-  'Coffee, a hike, a winery and dinner in Kelowna',
+  'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
+  '2 days in Penticton with the kids — museums, parks and easy food',
+  'A romantic autumn weekend in Naramata with wineries and a great dinner',
+  'A dog-friendly autumn weekend in Vernon',
+  'Coffee, an autumn hike, a winery and dinner in Kelowna',
   'What can we do around Penticton if it rains?',
 ];
 
@@ -556,7 +556,7 @@ function renderBody(d) {
       <p class="t3-lead" data-i18n="tripv3.lead">Describe your Okanagan trip in your own words &mdash; how long, who&rsquo;s coming, what you love. We&rsquo;ll plan it day by day from real places on Okanagan Roam, and tell you why each one fits.</p>
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
-        <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake." data-i18n-placeholder="tripv3.placeholder"></textarea>
+        <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food." data-i18n-placeholder="tripv3.placeholder"></textarea>
         <div class="t3-composer-foot">
           <span class="t3-hint" data-i18n="tripv3.hint">Real Okanagan Roam places only &mdash; no invented details.</span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
@@ -572,7 +572,7 @@ function renderBody(d) {
   <section class="t3-wrap t3-how" id="t3How" aria-labelledby="t3HowTitle">
     <h2 id="t3HowTitle" data-i18n="tripv3.howTitle">How it works</h2>
     <ol class="t3-how-grid">
-      <li><span class="t3-how-num">1</span><strong data-i18n="tripv3.how1Title">Say it your way</strong><span data-i18n="tripv3.how1Text">&ldquo;Three days, wine and golf, one slow day by the lake.&rdquo; Days, dates, kids, dogs and occasions all count.</span></li>
+      <li><span class="t3-how-num">1</span><strong data-i18n="tripv3.how1Title">Say it your way</strong><span data-i18n="tripv3.how1Text">&ldquo;Three days, wineries and a cozy dinner, plus an autumn walk.&rdquo; Days, dates, kids, dogs and occasions all count.</span></li>
       <li><span class="t3-how-num">2</span><strong data-i18n="tripv3.how2Title">Real places, real reasons</strong><span data-i18n="tripv3.how2Text">Every stop is a place listed on Okanagan Roam, chosen from what we actually know about it &mdash; and we tell you why.</span></li>
       <li><span class="t3-how-num">3</span><strong data-i18n="tripv3.how3Title">Make it yours</strong><span data-i18n="tripv3.how3Text">Keep the stops you love, swap or remove the rest, regenerate a day and add it all to My Trip.</span></li>
     </ol>
