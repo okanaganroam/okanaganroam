@@ -18150,3 +18150,33 @@ test('Event schema (2026-10-13): organizer only when the source is the organizer
     db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
   }
 });
+
+test('Event batches: an entry\'s reviewed_duplicates clears the fuzzy duplicate gate for those ids only', () => {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'okr-batch-dup-'));
+  const names = ['Fixture Craftworks Holiday Market', 'Fixture Christkindl Holiday Market'];
+  const cleanup = () => {
+    for (const { id } of db.prepare(`SELECT id FROM events WHERE name IN (?, ?)`).all(...names)) {
+      for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  };
+  cleanup();
+  try {
+    const base = { region: 'kelowna', categories: ['markets-fairs'], source_type: 'official_organizer', source_name: 'Fixture Org', occurrences: [{ start_date: '2032-12-04' }] };
+    const existing = app.createEvent({ ...base, name: names[0], venue_name_text: 'Arena', source_url: 'https://example.com/dup/a' }, { reason: 'fixture', batch_id: 'dup-test' });
+    assert.equal(existing.ok, true, JSON.stringify(existing));
+    const entry = { ...base, name: names[1], venue_name_text: 'Packinghouse', source_url: 'https://example.com/dup/b' };
+    const write = (e) => fs.writeFileSync(path.join(dir, 'b.json'), JSON.stringify({ batch_id: 'dup-test', reason: 'test', reviewed_by: 'test', events: [e] }));
+    write(entry);
+    const blocked = app.importEventBatches(dir);
+    assert.equal(blocked.failed.length, 1);
+    assert.equal(blocked.failed[0].reason, 'possible_duplicate', 'same-day near match is held back');
+    write({ ...entry, reviewed_duplicates: [existing.event.id + 9999] });
+    assert.equal(app.importEventBatches(dir).failed[0].reason, 'possible_duplicate', 'acknowledging a different id does not clear it');
+    write({ ...entry, reviewed_duplicates: [existing.event.id] });
+    const ok = app.importEventBatches(dir);
+    assert.deepEqual([ok.created, ok.failed], [[names[1]], []]);
+  } finally {
+    cleanup();
+  }
+});

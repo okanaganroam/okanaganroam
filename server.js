@@ -24988,7 +24988,10 @@ function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches'))
     for (const ev of Array.isArray(batch.events) ? batch.events : []) {
       try {
         if (db.prepare('SELECT id FROM events WHERE region = ? AND name = ?').get(ev.region, ev.name)) { out.skipped.push(ev.name); continue; }
-        const r = createEvent(ev, meta);
+        // An entry may list existing event ids a person has checked are NOT the same event (reviewed_duplicates), which
+        // clears the fuzzy duplicate gate for those ids only.
+        const { reviewed_duplicates: reviewedDuplicates, ...data } = ev;
+        const r = createEvent(data, Array.isArray(reviewedDuplicates) ? { ...meta, reviewed_duplicates: reviewedDuplicates } : meta);
         if (r.ok) out.created.push(ev.name);
         else if (r.reason === 'duplicate_event') out.skipped.push(ev.name);
         else out.failed.push({ name: ev.name, reason: r.reason, detail: r.detail });
