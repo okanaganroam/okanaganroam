@@ -17563,6 +17563,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const whatsOn = (await WINTER_GET(base, '/whats-on')).text;
       assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), "What's On thumbnail exists");
+      const dogs = (await WINTER_GET(base, '/dog-friendly')).text;
+      if (dogs.includes('<h1')) assert.match(dogs, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.DOG_FRIENDLY_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'dog-friendly thumbnail exists');
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
