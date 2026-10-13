@@ -15492,6 +15492,9 @@ test('Mobile polish: the phone header button has no arrow (desktop keeps it); th
   assert.ok(home.includes('<span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>'));
   assert.ok(home.includes('html[lang="fr"] .mood-swipe-fr { display: inline; }') && home.includes('html[lang="fr"] .mood-swipe-en { display: none; }'), 'French by page language, no change to the frozen app.js');
   assert.match(home, /\.mood-swipe-cue \{ display: none; \}/);
+  assert.match(home, /\.mood-card-indoor \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day title is a step smaller');
+  assert.match(home, /\.mood-card-title \{[^}]*line-height: 1\.15; text-wrap: balance; \}/, 'tile titles wrap as even, tight lines');
+  assert.match(home, /@media \(max-width: 640px\) \{[^@]*\.mood-season-link \{ display: none; \}/, 'the seasonal guide link is hidden on phones so the heading stays two rows');
 }))));
 
 // ---- Build My Trip in the header (2026-10-06) ----------------------------------
@@ -16227,8 +16230,10 @@ test('Contact: a successful send leaves the venue and event submission paths, an
 
 // ---- Reviewed event batches (2026-10-09) ---------------------------------------
 test('Event batches: the reviewed batch goes in through createEvent, adds a missing date to an existing event, and is idempotent', () => {
-  const batchDir = path.join(__dirname, '..', 'data', 'event-batches');
-  const batch = JSON.parse(fs.readFileSync(path.join(batchDir, '2026-10-09-tourism-kelowna-harvest-bites-sips.json'), 'utf8'));
+  // Only this batch, so later batch files in data/event-batches don't change the counts.
+  const batchDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'okr-batch-'));
+  fs.copyFileSync(path.join(__dirname, '..', 'data', 'event-batches', '2026-10-09-tourism-kelowna-harvest-bites-sips.json'), path.join(batchDir, 'harvest.json'));
+  const batch = JSON.parse(fs.readFileSync(path.join(batchDir, 'harvest.json'), 'utf8'));
   const names = [...batch.events.map((e) => e.name), 'Oktoberfest at The Hatching Post'];
   const cleanup = () => {
     const ids = db.prepare(`SELECT id FROM events WHERE name IN (${names.map(() => '?').join(',')})`).all(...names).map((r) => r.id);
@@ -16267,6 +16272,45 @@ test('Event batches: the reviewed batch goes in through createEvent, adds a miss
     cleanup();
   }
   assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM events WHERE name IN (${names.map(() => '?').join(',')})`).get(...names).n, 0);
+});
+
+test('Event batches: `updates` correct an existing event\'s description and categories through the logged update path, only once, and report a missing event', () => {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'okr-batch-upd-'));
+  const name = 'Batch Update Fixture Ballet';
+  const cleanup = () => {
+    for (const { id } of db.prepare('SELECT id FROM events WHERE name = ?').all(name)) {
+      for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  };
+  cleanup();
+  try {
+    const made = app.createEvent({
+      name, region: 'vernon', venue_name_text: 'Test Hall', description: 'Placeholder.', categories: ['events-festivals', 'holiday-seasonal'],
+      source_type: 'tourism_org', source_name: 'Test Tourism', source_url: 'https://example.com/batch-update/ballet', occurrences: [{ start_date: '2032-02-04' }],
+    }, { reason: 'batch update fixture', batch_id: 'batch-update-test' });
+    assert.equal(made.ok, true, JSON.stringify(made));
+    fs.writeFileSync(path.join(dir, 'fix.json'), JSON.stringify({
+      batch_id: 'batch-update-test', reason: 'test corrections', reviewed_by: 'test',
+      updates: [
+        { region: 'vernon', name, fields: { description: 'A full-length ballet.' }, categories: ['arts-culture', 'events-festivals'] },
+        { region: 'vernon', name: 'No Such Event Anywhere', categories: ['arts-culture'] },
+      ],
+    }));
+    const first = app.importEventBatches(dir);
+    assert.deepEqual(first.created, [`${name} (updated)`]);
+    assert.deepEqual(first.failed, [{ name: 'No Such Event Anywhere', reason: 'event_not_found' }]);
+    const row = db.prepare('SELECT id, description FROM events WHERE name = ?').get(name);
+    assert.equal(row.description, 'A full-length ballet.');
+    assert.deepEqual(db.prepare('SELECT category_key FROM event_categories WHERE event_id = ? ORDER BY position').all(row.id).map((r) => r.category_key), ['arts-culture', 'events-festivals']);
+    const logged = db.prepare('SELECT field_name FROM event_enrichment_log WHERE event_id = ?').all(row.id).map((r) => r.field_name);
+    assert.ok(logged.includes('description') && logged.includes('categories'), 'both changes are in the change log');
+    const second = app.importEventBatches(dir);
+    assert.deepEqual(second.created, [], 'a re-run changes nothing');
+    assert.ok(second.skipped.includes(name));
+  } finally {
+    cleanup();
+  }
 });
 
 // ---- Page weight (2026-10-10): listing ItemLists don't repeat descriptions ----
@@ -16789,7 +16833,7 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Ski & Snow and Golf -> Indoo
 
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   const html = winterMood('2027-02-01');
-  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow-powder\.jpg" width="640" height="403" alt="" loading="lazy">/);
   assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.skiSnow\.title">Ski &amp; Snow</);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.indoor\.title">Indoor &amp; Rainy Day</);

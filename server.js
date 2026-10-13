@@ -6867,12 +6867,12 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
   ];
   // Winter (Oct-Mar, see isWinterMoodSeason): same six positions, with Ski &
   // Snow replacing Beaches and Indoor & Rainy Day replacing Golf. Summer
-  // output is byte-identical to before. ski-snow.jpg (no webp encoder on the build Mac) is cropped from
-  // /images/outdoors/winter.webp; indoor.jpg is 640x400 (the user-supplied
+  // output is byte-identical to before. ski-snow-powder.jpg (2026-10-13; no webp encoder on the build
+  // Mac) is the free Adobe Stock photo 499088168, a skier in powder through frosted trees; indoor.jpg is 640x400 (the user-supplied
   // photo), so it carries its own height. Its .mood-card-indoor rule keeps a
   // dusk-to-amber gradient behind the image as the loading/missing fallback.
   if (winter) {
-    cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
+    cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
   }
 
@@ -8016,7 +8016,10 @@ function renderHomepageDiscoveryStyles() {
   }
   .mood-card-icon { color: #fff; opacity: 0.95; margin-bottom: 4px; }
   .mood-card-icon svg { display: block; width: 18px; height: 18px; }
-  .mood-card-title { font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 700; display: block; }
+  .mood-card-title { font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 700; display: block; line-height: 1.15; text-wrap: balance; }
+  /* The longest tile title (Indoor & Rainy Day / Intérieur et pluie, 2026-10-13) is a step smaller and wraps as two even lines,
+     so it covers less of the photo. */
+  .mood-card-indoor .mood-card-title { font-size: 0.84rem; }
 
   @media (min-width: 720px) {
     .mood-card-grid { grid-template-columns: repeat(6, 1fr); }
@@ -8041,6 +8044,8 @@ function renderHomepageDiscoveryStyles() {
     .mood-card-grid::-webkit-scrollbar { display: none; }
     .mood-card { flex: 0 0 calc((100% + var(--mood-pad) - 2 * var(--mood-gap)) / 2.25); scroll-snap-align: start; aspect-ratio: 1.59 / 1; }
     .mood-swipe-cue { display: inline-block; margin-left: auto; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.02em; color: rgba(42,32,25,0.62); white-space: nowrap; }
+    /* The seasonal guide link (2026-10-13) stacked the heading into three rows on phones; it shows from 641px up only. */
+    .mood-season-link { display: none; }
   }
 
   /* Reference redesign, forensic-comparison rebuild (supersedes the
@@ -24969,7 +24974,8 @@ const server = http.createServer(async (req, res) => {
 
 // Reviewed event batches (2026-10-09). A batch is a JSON file in data/event-batches/ holding events that have been checked by a person; it is
 // applied through createEvent() / upsertEventOccurrences(), so every rule (provenance, categories, duplicates, change log) still applies. It is
-// idempotent (an event that already exists by region + name, or an occurrence that already exists, is skipped) and never throws: a failing
+// idempotent (an event that already exists by region + name, or an occurrence that already exists, is skipped; `updates` correct an
+// existing event's fields or categories) and never throws: a failing
 // entry is logged and the rest carry on. It runs once the server is listening, on Railway (or with EVENT_BATCH_IMPORT=on), never in tests.
 function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches')) {
   const out = { created: [], skipped: [], failed: [] };
@@ -24997,6 +25003,28 @@ function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches'))
         else if (r.ok) out.skipped.push(add.name);
         else out.failed.push({ name: add.name, reason: r.reason, detail: r.detail });
       } catch (e) { out.failed.push({ name: add && add.name, reason: 'error', detail: String(e && e.message) }); }
+    }
+    // Corrections to events already listed: scalar fields go through updateEvent(), categories through
+    // replaceEventCategories(), so each change is validated and lands in the change log. Only fields that
+    // differ are written, so re-running a batch changes nothing.
+    for (const upd of Array.isArray(batch.updates) ? batch.updates : []) {
+      try {
+        const row = db.prepare('SELECT * FROM events WHERE region = ? AND name = ?').get(upd.region, upd.name);
+        if (!row) { out.failed.push({ name: upd.name, reason: 'event_not_found' }); continue; }
+        const fields = Object.fromEntries(Object.entries(upd.fields || {}).filter(([k, v]) => row[k] !== v));
+        let changed = false;
+        if (Object.keys(fields).length) {
+          const r = updateEvent(row.id, fields, meta);
+          if (!r.ok) { out.failed.push({ name: upd.name, reason: r.reason, detail: r.detail }); continue; }
+          changed = true;
+        }
+        if (Array.isArray(upd.categories)) {
+          const r = replaceEventCategories(row.id, upd.categories, meta);
+          if (!r.ok) { out.failed.push({ name: upd.name, reason: r.reason, detail: r.detail }); continue; }
+          changed = changed || r.changed;
+        }
+        (changed ? out.created : out.skipped).push(changed ? `${upd.name} (updated)` : upd.name);
+      } catch (e) { out.failed.push({ name: upd && upd.name, reason: 'error', detail: String(e && e.message) }); }
     }
   }
   return out;
