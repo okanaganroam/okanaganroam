@@ -11212,7 +11212,7 @@ function categoryDirectoryEntries() {
   experiences.push({ label: CATEGORY_LABELS.sport.plural, href: `/${CATEGORY_SLUGS.sport}`, tagline: CATEGORY_TAGLINES.sport, image: categoryCardImage(CATEGORY_BANNER_IMAGES.sport) });
 
   const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', image: categoryCardImage(WHATS_ON_BANNER) }];
-  if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.' });
+  if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.', image: categoryCardImage(DOG_FRIENDLY_BANNER) });
   if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.' });
   if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.' });
   if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.' });
@@ -14106,6 +14106,7 @@ function renderDogHubPage(venues, filter = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: '/images/hidden-gems/dog-friendly.webp', golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderDogHubStyles()}
+${CATEGORY_BANNER_STYLE}
 ${golfEngagementHeadHtml('dog', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page dog-page">
@@ -14114,8 +14115,8 @@ ${golfEngagementHeadHtml('dog', true, 'hub')}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Dog Friendly Finds' }])}
-  <h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">Patios, caf&eacute;s, taprooms and tasting rooms across the Okanagan that welcome your dog &mdash; plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.</p>
+  ${categoryHeroHtml(`<div class="category-banner"><img src="${DOG_FRIENDLY_BANNER.src}" alt="${escapeHtml(DOG_FRIENDLY_BANNER.alt)}" width="1600" height="716" style="object-position: 50% ${DOG_FRIENDLY_BANNER.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">Patios, caf&eacute;s, taprooms and tasting rooms across the Okanagan that welcome your dog &mdash; plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.</p>`)}
   ${dogSearchHtml()}
   ${dogTypeChipsHtml(state)}
   ${dogFilterBarHtml(venues, state)}
@@ -15526,6 +15527,9 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
 // Banner (2026-10-12): licensed free Adobe Stock 330262001 -- a festival
 // crowd with hands raised under stage lights -- with an 800px thumbs/ copy
 // for the /categories card.
+// Dog Friendly Finds banner (2026-10-12): licensed free Adobe Stock 68376380
+// -- three Labradors splashing through a lake (1600x716, a wide original).
+const DOG_FRIENDLY_BANNER = Object.freeze({ src: '/images/dog-friendly/dog-friendly.jpg', alt: 'Three Labradors splashing through the shallows of a lake', pos: 40 });
 const WHATS_ON_BANNER = Object.freeze({ src: '/images/whats-on/whats-on.jpg', alt: 'A festival crowd with hands raised under bright stage lights', pos: 40 });
 function renderWhatsOnPage(filter = null) {
   const selectedRegions = filter ? filter.regions : [];
@@ -23315,6 +23319,7 @@ module.exports = {
   FOOD_DRINK_HUB_BANNER,
   SKI_SNOW_BANNER,
   WHATS_ON_BANNER,
+  DOG_FRIENDLY_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
