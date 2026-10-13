@@ -17853,3 +17853,24 @@ test('Wine guide (2026-10-13): /guides/okanagan-wineries-first-timers renders li
     if (wineries.status === 200) assert.match(wineries.text, /href="\/guides\/okanagan-wineries-first-timers"/);
   });
 });
+
+test('Dog guide (2026-10-13): /guides/dog-friendly-kelowna uses the shared guide page with the dog banner, Article schema and Dog Friendly breadcrumb, and is linked from /dog-friendly and in the sitemap', async () => {
+  const existing = db.prepare("SELECT id FROM venues WHERE region = 'kelowna' AND slug = 'cedar-creek-park'").get();
+  const fixture = existing ? null : app.createVenue({ name: 'Cedar Creek Park', slug: 'cedar-creek-park', region: 'kelowna', type: 'beach', description: 'Fixture.' });
+  let html;
+  try { html = app.renderDogGuidePage(); } finally { if (fixture) db.prepare('DELETE FROM venues WHERE id = ?').run(fixture.id); }
+  assert.match(html, /<title>Dog-Friendly Kelowna: Beaches, Trails &amp; Patios \| Okanagan Roam<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/dog-friendly-kelowna">/);
+  assert.match(html, /"@type":"Article","headline":"Dog-Friendly Kelowna"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"/);
+  assert.match(html, /"name":"Dog Friendly Finds","item":"https:\/\/okanaganroam\.com\/dog-friendly"/);
+  assert.match(html, /<h2>Off-leash dog beaches<\/h2>\s*<p>The City of Kelowna has four official off-leash dog beaches:<\/p>/);
+  assert.doesNotMatch(html, /\(Kelowna\):/, 'a Kelowna-only guide does not repeat the town after every name');
+  assert.equal(app.DOG_GUIDE.sections.reduce((n, s) => n + s.items.length, 0), 25);
+  await withWinterServer(async (base) => {
+    assert.equal((await WINTER_GET(base, '/guides/dog-friendly-kelowna')).status, 200);
+    assert.ok((await WINTER_GET(base, '/sitemap.xml')).text.includes('<loc>https://okanaganroam.com/guides/dog-friendly-kelowna</loc>'));
+    const hub = await WINTER_GET(base, '/dog-friendly');
+    if (hub.status === 200) assert.match(hub.text, /href="\/guides\/dog-friendly-kelowna"/);
+  });
+});
