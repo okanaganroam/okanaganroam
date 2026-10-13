@@ -4698,7 +4698,7 @@ const OUTDOOR_ACTIVITIES = [
 // it, and the /outdoors landing swaps to it when exactly one activity card is
 // pressed. Free Unsplash sa3EBC3S0ug, OZQEwoy5V_Y, gKN-QsCLdaQ, MePjPb_5FvE and
 // b53j6cPfnww, plus EzU9XMMsN-I for camping (2026-10-13); licensed free Adobe
-// Stock 206095390 and 273871791. Water has none yet and keeps the Outdoors photo.
+// Stock 206095390, 273871791 and 357261632 (water).
 const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
   hiking: { src: '/images/outdoors/activity-hiking.jpg', alt: 'The Myra Canyon trail winding along a forested canyon above Kelowna', pos: 50 },
   viewpoints: { src: '/images/outdoors/activity-viewpoints.jpg', alt: 'Kelowna and Okanagan Lake seen from the Knox Mountain lookout', pos: 55 },
@@ -4708,6 +4708,7 @@ const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
   adventure: { src: '/images/outdoors/activity-adventure.jpg', alt: 'Climbers on a rocky bluff above Penticton', pos: 20 },
   fishing: { src: '/images/outdoors/activity-fishing.jpg', alt: 'Two men fishing from a boat on a calm lake at dawn', pos: 50 },
   camping: { src: '/images/outdoors/activity-camping.jpg', alt: 'A tent pitched beside the lake near Kelowna', pos: 55 },
+  water: { src: '/images/outdoors/activity-water.jpg', alt: 'Friends leaping off a wooden dock into the lake on a summer day', pos: 25 },
 });
 // /outdoors landing: when exactly one activity is pressed (card or chip),
 // swap the banner, H1 and intro to that activity's; otherwise restore the
