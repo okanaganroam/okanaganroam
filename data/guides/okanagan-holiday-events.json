@@ -1,7 +1,7 @@
 {
  "heading": "Holiday Markets, Lights & Christmas Events in the Okanagan, 2026",
  "title": "Okanagan Christmas & Holiday Events 2026 | Okanagan Roam",
- "description": "Holiday markets, tree lightings, Christmas concerts, Santa at Big White and New Year's Eve in the Okanagan, from mid-November 2026 into January.",
+ "description": "Christmas markets, light-ups, The Nutcracker, holiday concerts, the Christmas Express steam train, sleigh rides and New Year's Eve in the Okanagan, 2026.",
  "banner": "whats-on-holiday-seasonal",
  "parent": {
   "name": "What's On",
@@ -18,6 +18,24 @@
    "jump": "Markets",
    "heading": "Christmas markets & craft fairs",
    "items": [
+    {
+     "ref": "event:penticton/yuletide-the-ptcc",
+     "name": "Yuletide @ the PTCC",
+     "text": "a three-day holiday market with local artisans, gift vendors and specialty food sellers, plus the kids-only Little Elf Shop. Admission is $3 a day.",
+     "where": "Penticton, Nov 6 – 8"
+    },
+    {
+     "ref": "event:kelowna/christmas-at-the-laurel",
+     "name": "Christmas at the Laurel",
+     "text": "a European-style holiday market in the historic Laurel Packinghouse, with handmade gifts from local artisans and festive treats. Admission is by donation to the Food Bank.",
+     "where": "Kelowna, Nov 13 – 15"
+    },
+    {
+     "ref": "event:kelowna/it-s-christmas-the-red-barn",
+     "name": "It's Christmas @ the Red Barn",
+     "text": "more than 50 local makers selling clothing, gourmet foods, body products, jewelry and home decor. Free admission; Food Bank donations welcome.",
+     "where": "Kelowna, Nov 21 – 22"
+    },
     {
      "ref": "event:kelowna/delta-grand-holiday-market",
      "name": "Delta Grand Holiday Market",
@@ -41,6 +59,18 @@
      "name": "Craft Culture Holiday Market",
      "text": "at Prospera Place, 1 to 7 pm on Dec 4. Admission is $7.",
      "where": "Kelowna, from Dec 4, several dates"
+    },
+    {
+     "ref": "event:kelowna/christkindl-holiday-market",
+     "name": "Christkindl Holiday Market",
+     "text": "a traditional European-style Christmas market back at the Laurel Packinghouse, with handmade local gifts, festive treats and hot cider. Admission is by donation to the Food Bank.",
+     "where": "Kelowna, Dec 4 – 6"
+    },
+    {
+     "ref": "event:penticton/the-last-chance-holiday-market",
+     "name": "The Last Chance Holiday Market",
+     "text": "handmade gifts from local artisans, specialty foods and festive treats, billed as the last local shopping stop before Christmas. Admission is $3 at the door.",
+     "where": "Penticton, Dec 12 – 13"
     }
    ]
   },
@@ -60,6 +90,12 @@
      "name": "Tree of Hope Festival",
      "text": "the annual tree-lighting tradition in the Landmark District, with festive entertainment, seasonal treats and family-friendly activities. The organizer will announce the detailed schedule closer to the date.",
      "where": "Kelowna, Nov 21"
+    },
+    {
+     "ref": "event:penticton/magic-on-main-street-santa-claus-parade-light-up",
+     "name": "Magic on Main Street: Santa Claus Parade & Light Up",
+     "text": "the Santa Claus Parade travels down Main Street to Gyro Park for the official downtown light-up, with Santa, a 180-foot light tunnel and a giant “light brite”. Parade at 4:30 pm, light-up at 6 pm; free.",
+     "where": "Penticton, Nov 29"
     },
     {
      "ref": "event:west-kelowna/west-kelowna-light-up-2026",
@@ -93,10 +129,22 @@
      "where": "Lake Country, Nov 18"
     },
     {
+     "ref": "event:vernon/a-1940s-radio-christmas-carol",
+     "name": "A 1940s Radio Christmas Carol",
+     "text": "a comedy in which a WWII-era troupe performs a live radio broadcast of A Christmas Carol, complete with vintage carols, mock commercials and backstage mishaps, at the Powerhouse Theatre.",
+     "where": "Vernon, Nov 19 – 29"
+    },
+    {
      "ref": "event:kelowna/a-celtic-family-christmas-party",
      "name": "A Celtic Family Christmas Party",
      "text": "at Kelowna Community Theatre, 7:30 pm. Admission is $70.21.",
      "where": "Kelowna, Nov 23"
+    },
+    {
+     "ref": "event:kelowna/disney-s-frozen-the-musical",
+     "name": "Disney's Frozen the Musical",
+     "text": "a family musical at the Actors Studio and Dinner Theatre, 7 pm. Admission: $72-$99.",
+     "where": "Kelowna, from Nov 25"
     },
     {
      "ref": "event:vernon/the-celtic-tenors-a-celtic-christmas",
@@ -117,10 +165,28 @@
      "where": "Summerland, Dec 12"
     },
     {
+     "ref": "event:vernon/the-nutcracker-mission-dance-company",
+     "name": "The Nutcracker: Mission Dance Company",
+     "text": "Mission Dance Company, with guest dancers from Okanagan Ballet Theatre, performs a family-friendly, two-hour Nutcracker with live narration, at the Vernon & District Performing Arts Centre. Shows at 2 pm and 7 pm.",
+     "where": "Vernon, Dec 13"
+    },
+    {
      "ref": "event:lake-country/oh-come-all-ye-soulful",
      "name": "Oh Come All Ye Soulful",
      "text": "at Creekside Theatre, ticketed through the theatre's box office.",
      "where": "Lake Country, Dec 17"
+    },
+    {
+     "ref": "event:penticton/freya-friends-okanagan-symphony-holiday-concert",
+     "name": "Freya & Friends: Okanagan Symphony Holiday Concert",
+     "text": "the Okanagan Symphony Orchestra’s holiday concert with the folk duo Freya, Okanagan composer, pianist and vocalist Leila Naderi, and the Okanagan Symphony Chorus. It plays {event:kelowna/freya-friends-live|Kelowna} on Dec 18, Penticton’s Cleland Theatre on Dec 19 and {event:vernon/freya-friends-okanagan-symphony-holiday-concert|Vernon} on Dec 20.",
+     "where": "Kelowna, Penticton & Vernon, Dec 18 – 20"
+    },
+    {
+     "ref": "event:vernon/stars-on-ice-holiday-tour",
+     "name": "Stars on Ice Holiday Tour",
+     "text": "a holiday edition of Stars on Ice, with Olympic, World and National champion figure skaters performing holiday-themed programs, at Kal Tire Place.",
+     "where": "Vernon, Dec 18"
     },
     {
      "ref": "event:summerland/south-okanagan-big-band-jazzy-christmas",
@@ -195,6 +261,24 @@
      "name": "Welcome to Winter at Big White",
      "text": "the resort's season-opening celebration in the village, with family activities and festivities, 5 to 7:05 pm.",
      "where": "Big White, Nov 28"
+    },
+    {
+     "ref": "event:summerland/christmas-express",
+     "name": "Christmas Express",
+     "text": "a one-hour holiday ride on the Kettle Valley Steam Railway, with Christmas lights aboard the 3716 locomotive, music, carols, a hot drink and Santa. Departures at 4:30 and 6:30 pm; book ahead.",
+     "where": "Summerland, select dates Dec 3 – 22"
+    },
+    {
+     "ref": "event:west-kelowna/west-kelowna-winterfest",
+     "name": "West Kelowna Winterfest",
+     "text": "a free family winter weekend at the Mount Boucherie Community Centre, including storytime with Santa and skating with Santa.",
+     "where": "West Kelowna, Dec 5 – 6"
+    },
+    {
+     "ref": "event:armstrong/christmas-sleigh-rides-at-ottercrest-farms",
+     "name": "Christmas Sleigh Rides at Ottercrest Farms",
+     "text": "horse-drawn Christmas sleigh rides on select December afternoons, with rides every half hour.",
+     "where": "Armstrong, select dates Dec 11 – 30"
     },
     {
      "ref": "event:osoyoos/christmas-dinner-and-dance",
@@ -278,8 +362,8 @@
    [
     "Holiday shopping at a market",
     [
-     "event:kelowna/delta-grand-holiday-market|Delta Grand Holiday Market",
-     "event:kelowna/holiday-magic-market|Holiday Magic Market",
+     "event:kelowna/christmas-at-the-laurel|Christmas at the Laurel",
+     "event:kelowna/christkindl-holiday-market|Christkindl Holiday Market",
      "event:kelowna/craft-culture-holiday-market|Craft Culture Holiday Market"
     ]
    ],
@@ -294,8 +378,16 @@
    [
     "A Christmas concert",
     [
-     "event:oliver/the-celtic-tenors-a-celtic-christmas|The Celtic Tenors: A Celtic Christmas",
-     "event:vernon/a-coast-to-coast-cowboy-christmas-with-george-canyon-aaron-pritchett|A Coast-to-Coast Cowboy Christmas with George Canyon & Aaron Pritchett"
+     "event:penticton/freya-friends-okanagan-symphony-holiday-concert|Freya & Friends: Okanagan Symphony Holiday Concert",
+     "event:oliver/the-celtic-tenors-a-celtic-christmas|The Celtic Tenors: A Celtic Christmas"
+    ]
+   ],
+   [
+    "The Nutcracker or a holiday show",
+    [
+     "event:vernon/the-nutcracker-mission-dance-company|The Nutcracker: Mission Dance Company",
+     "event:vernon/a-1940s-radio-christmas-carol|A 1940s Radio Christmas Carol",
+     "event:vernon/stars-on-ice-holiday-tour|Stars on Ice Holiday Tour"
     ]
    ],
    [
@@ -307,8 +399,15 @@
    [
     "Santa time for the kids",
     [
-     "event:big-white/santa-s-workshop|Santa's Workshop",
-     "event:big-white/ski-with-santa|Ski with Santa"
+     "event:summerland/christmas-express|Christmas Express",
+     "event:penticton/magic-on-main-street-santa-claus-parade-light-up|Magic on Main Street: Santa Claus Parade & Light Up",
+     "event:big-white/santa-s-workshop|Santa's Workshop"
+    ]
+   ],
+   [
+    "A sleigh ride",
+    [
+     "event:armstrong/christmas-sleigh-rides-at-ottercrest-farms|Christmas Sleigh Rides at Ottercrest Farms"
     ]
    ],
    [
@@ -341,5 +440,5 @@
    ]
   ]
  },
- "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>"
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on/holiday-seasonal\">All holiday &amp; seasonal events</a>, <a href=\"/whats-on\">What's On</a>"
 }

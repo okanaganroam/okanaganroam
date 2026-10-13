@@ -12688,6 +12688,25 @@ function liveWhatsOnScopes(now = new Date()) {
     .map((scope) => ({ scope, path: whatsOnScopePath(scope), count: whatsOnScopeEvents(scope, events).length }))
     .filter((x) => x.count >= WHATSON_SCOPE_MIN_EVENTS);
 }
+// Guides that feature this page's events (2026-10-13): the live (not thin) guides sharing the most event refs with the
+// scoped list, at most four, so a type or town page links to the guide that covers it in depth.
+function whatsOnRelatedGuides(events, limit = 4) {
+  const refs = new Set(events.map((e) => `event:${e.region}/${e.slug}`));
+  if (!refs.size) return [];
+  return liveGuides()
+    .map((g) => ({ g, n: g.refs.filter((r) => refs.has(r)).length }))
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, limit)
+    .map((x) => x.g);
+}
+function whatsOnRelatedGuidesHtml(guides) {
+  if (!guides.length) return '';
+  return `<section class="whatson-guides" aria-labelledby="whatsOnGuidesHeading">
+    <h2 class="category-subsection-heading" id="whatsOnGuidesHeading">From our guides</h2>
+    <ul class="whatson-browse-list">${guides.map((g) => `<li><a href="${g.path}">${escapeHtml(g.heading)}</a></li>`).join('')}</ul>
+  </section>`;
+}
 // Crawlable links to the live scoped pages, shown under the results on every What's On page.
 function whatsOnBrowseLinksHtml(live, current = null) {
   if (!live.length) return '';
@@ -15777,6 +15796,8 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.whatson-page .whatson-pop-apply:hover { background: var(--ref-navy-deep); }
   body.whatson-page .whatson-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.whatson-page .whatson-guides { margin: 40px 0 0; }
+  body.whatson-page .whatson-guides + .whatson-browse { margin-top: 12px; }
   body.whatson-page .whatson-browse { margin: 40px 0 8px; }
   body.whatson-page .whatson-browse-list { list-style: none; padding: 0; margin: 8px 0 20px; display: flex; flex-wrap: wrap; gap: 8px 10px; }
   body.whatson-page .whatson-browse-list a, body.whatson-page .whatson-browse-list span { display: inline-block; background: var(--paper); border-radius: 999px; padding: 7px 14px; font-weight: 700; text-decoration: none; }
@@ -16250,6 +16271,7 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 ? '' : ' hidden'}>No events match that combination yet. <a href="/whats-on" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
+  ${scope ? whatsOnRelatedGuidesHtml(whatsOnRelatedGuides(scopeList)) : ''}
   ${whatsOnBrowseLinksHtml(live, scope ? basePath : null)}
   </main>
   ${renderHomeFooterHTML(true)}
@@ -25135,6 +25157,7 @@ module.exports = {
   renderPatioGuidePage,
   renderGuidesIndexPage,
   allGuides,
+  liveGuides,
   guidesFeaturing,
   guideIsThin,
   resetGuideCache,
@@ -25186,6 +25209,7 @@ module.exports = {
   getSeasonStates,
   breadcrumbListSchema,
   whatsOnScopeFromPath,
+  whatsOnRelatedGuides,
   liveWhatsOnScopes,
   WHATSON_SCOPE_MIN_EVENTS,
   eventOrganizerSchema,
