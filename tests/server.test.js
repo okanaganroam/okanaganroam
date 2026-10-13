@@ -17766,3 +17766,25 @@ test('Food & Drink type pages (SEO, 2026-10-13): /breweries etc. are valley-wide
     });
   } finally { fixtures.forEach((v) => db.prepare('DELETE FROM venues WHERE id = ?').run(v.id)); }
 });
+
+test('Card excerpts (2026-10-13): Food & Drink list cards show a short blurb, the full text stays on the venue page, and search still finds words from the full description', async () => {
+  const long = 'A cozy neighbourhood bistro with a sunny patio and a short seasonal menu that changes weekly. Regulars come back for the wood-fired flatbreads, the house-cured gravlax and a surprisingly good lemon tart.';
+  assert.equal(app.descExcerpt(long), 'A cozy neighbourhood bistro with a sunny patio and a short seasonal menu that changes weekly.');
+  assert.equal(app.descExcerpt('Great coffee.'), 'Great coffee.', 'short text is left whole');
+  const noStop = 'word '.repeat(60).trim();
+  assert.ok(app.descExcerpt(noStop).length <= 171 && app.descExcerpt(noStop).endsWith('…'), 'no sentence break: cut at a word with an ellipsis');
+  assert.match(app.descSearchWords(long), /\bgravlax\b/);
+  assert.doesNotMatch(app.descSearchWords(long), /\b(that|with|the)\b/, 'filler words are dropped');
+  const v = app.createVenue({ name: 'Excerpt Card Bistro', slug: 'excerpt-card-bistro', region: 'kelowna', type: 'restaurant', description: long });
+  try {
+    await withWinterServer(async (base) => {
+      const list = (await WINTER_GET(base, '/restaurants')).text;
+      const card = list.slice(list.indexOf('data-venue-name="Excerpt Card Bistro"'), list.indexOf('</li>', list.indexOf('data-venue-name="Excerpt Card Bistro"')));
+      assert.match(card, /changes weekly\./);
+      assert.doesNotMatch(card, /gravlax/, 'the card carries only the excerpt');
+      assert.match(list, new RegExp(`"${v.id}":\\{[^}]*"k":"[^"]*gravlax`), 'the search data keeps the word');
+      const own = (await WINTER_GET(base, '/kelowna/restaurants/excerpt-card-bistro')).text;
+      assert.match(own, /house-cured gravlax/, 'the venue page keeps the full description');
+    });
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+});
