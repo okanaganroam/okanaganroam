@@ -9450,7 +9450,6 @@ function renderGolfThemeStyles() {
          without a part leaves that row empty, so rows still line up. */
       body.golf-page .card-grid > .venue-card > h2 { grid-row: 1; }
       body.golf-page .card-grid > .venue-card > .venue-meta { grid-row: 2; }
-      body.golf-page .card-grid > .venue-card > .fd-open-status { grid-row: 3; }
       body.golf-page .card-grid > .venue-card > .card-slot-fee { grid-row: 4; }
       body.golf-page .card-grid > .venue-card > .card-slot-desc { grid-row: 5; }
       body.golf-page .card-grid > .venue-card > .card-slot-notice { grid-row: 6; }
@@ -12694,6 +12693,8 @@ function renderFoodDrinkOpenNowStyles() {
      the meta line's own 10px before the description. The .venue-card
      selector outranks the golf theme's ".venue-card p" sizing. Filled dot =
      open, hollow dot = closed, no dot when today's hours are not listed. */
+  /* Two-up card rows (2026-10-12): the open-now line has its own row under the meta (see the golf theme's card rows). */
+  @supports (grid-template-rows: subgrid) { @media (min-width: 900px) { body.golf-page .card-grid > .venue-card > .fd-open-status { grid-row: 3; } } }
   body.fd-page .venue-card .fd-open-status { display: flex; align-items: center; gap: 7px; margin: -6px 0 10px; font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; line-height: 1.3; color: var(--ink); opacity: 1; }
   body.fd-page .venue-card .fd-open-status::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
@@ -23160,6 +23161,7 @@ module.exports = {
   SCHEMA_TYPE_MAP,
   ALL_REGIONS_CATEGORIES,
   renderGolfThemeStyles,
+  renderFoodDrinkOpenNowStyles,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,

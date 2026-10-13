@@ -17480,9 +17480,13 @@ test('Navigation (2026-10-12): the header\'s Things to Do menu and the footer\'s
 test('Card rows (2026-10-12): two-up cards give every part its own subgrid row, so the open-now line on Food & Drink and browse cards never pushes the badges into the buttons\' row', () => {
   const css = app.renderGolfThemeStyles();
   assert.match(css, /body\.golf-page \.card-grid > \.venue-card \{ display: grid; grid-template-rows: subgrid; grid-row: span 10;/);
-  const order = ['h2', '.venue-meta', '.fd-open-status', '.card-slot-fee', '.card-slot-desc', '.card-slot-notice', '.card-slot-notes', '.chips', '.card-actions', '.card-links'];
+  const order = ['h2', '.venue-meta', null, '.card-slot-fee', '.card-slot-desc', '.card-slot-notice', '.card-slot-notes', '.chips', '.card-actions', '.card-links'];
   order.forEach((sel, i) => {
+    if (!sel) return;
     const re = new RegExp(`body\\.golf-page \\.card-grid > \\.venue-card > ${sel.replace(/\./g, '\\.')} \\{ grid-row: ${i + 1}; \\}`);
     assert.match(css, re, `${sel} sits in row ${i + 1}`);
   });
+  // The open-now line's row lives with the open-now styles, so pages without Open Now carry none of it.
+  assert.doesNotMatch(css, /fd-open-status/);
+  assert.match(app.renderFoodDrinkOpenNowStyles(), /body\.golf-page \.card-grid > \.venue-card > \.fd-open-status \{ grid-row: 3; \}/);
 });
