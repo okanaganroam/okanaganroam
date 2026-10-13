@@ -16834,7 +16834,10 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Ski & Snow and Golf -> Indoo
   // Every summer-tile day renders the same tiles as the default summer call;
   // Sep-Mar also adds the seasonal guide link (2026-10-13), never in summer.
   const noSeasonLink = (h) => h.replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
-  assert.equal(noSeasonLink(winterMood('2026-09-30')), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
+  // Sep-Nov also swaps in the fall tile photos (2026-10-13); put the summer ones back to compare the rest.
+  const summerSrc = { 'food-drink': 'eat.webp', wine: 'drink.webp', 'whats-on': 'whats-on.webp', outdoors: 'explore.webp' };
+  const unFall = (h) => Object.entries(app.FALL_MOOD_IMAGES).reduce((acc, [k, src]) => acc.split(`src="${src}"`).join(`src="/images/mood/${summerSrc[k]}"`), h);
+  assert.equal(noSeasonLink(unFall(winterMood('2026-09-30'))), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
   assert.match(winterMood('2026-09-30'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/);
   assert.match(winterMood('2026-10-31'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/, 'October shows the winter tiles with the fall guide link');
   assert.doesNotMatch(app.renderMoodCardsHTML({ now: SUMMER_NOW }), /mood-season-link/);
@@ -18395,6 +18398,25 @@ test('Fall hero text (2026-10-13): Sep-Nov the homepage hero headline and leads 
   for (const key of ['hero.headlineFall', 'hero.leadFall', 'hero.leadMobileFall']) {
     assert.ok(app.APP_TRANSLATIONS.en[key] && app.APP_TRANSLATIONS.fr[key], `${key} in English and French`);
   }
+});
+
+test('Fall tile photos (2026-10-13): Sep-Nov the Food & Drink, Wine, What\'s On and Outdoors tiles show their fall photos; other months are unchanged', () => {
+  const srcOf = (html, key) => (html.match(new RegExp(`mood-card-${key}" href="[^"]*"[^>]*>\\s*<img class="mood-card-img" src="([^"]+)"`)) || [])[1];
+  assert.deepEqual(Object.keys(app.FALL_MOOD_IMAGES).sort(), ['food-drink', 'outdoors', 'whats-on', 'wine']);
+  for (const iso of ['2026-09-01', '2026-10-13', '2026-11-30']) {
+    const html = winterMood(iso);
+    for (const [key, src] of Object.entries(app.FALL_MOOD_IMAGES)) {
+      assert.equal(srcOf(html, key), src, `${iso} ${key}`);
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), `${src} exists`);
+    }
+  }
+  // October and November keep the winter swaps (Ski & Snow, Indoor) alongside the fall photos.
+  assert.deepEqual(moodKeys(winterMood('2026-10-13')), ['food-drink', 'wine', 'ski-snow', 'indoor', 'whats-on', 'outdoors']);
+  const summer = { 'food-drink': '/images/mood/eat.webp', wine: '/images/mood/drink.webp', 'whats-on': '/images/mood/whats-on.webp', outdoors: '/images/mood/explore.webp' };
+  for (const iso of ['2026-07-15', '2026-08-31', '2026-12-01', '2027-03-01']) {
+    for (const [key, src] of Object.entries(summer)) assert.equal(srcOf(winterMood(iso), key), src, `${iso} ${key}`);
+  }
+  assert.doesNotMatch(app.renderMoodCardsHTML({ now: SUMMER_NOW }), /-fall\.jpg/);
 });
 
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
