@@ -17509,7 +17509,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${type} image exists`);
     assert.ok(b.alt && b.alt.length > 10, `${type} has alt text`);
   }
-  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'pub', 'restaurant', 'winery']);
+  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'outdoor', 'pub', 'restaurant', 'winery']);
   for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), `${type} has a card thumbnail`);
   const golfFixture = [{ id: 990001, name: 'Banner Golf', slug: 'banner-golf', region: 'kelowna', type: 'golf', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'golf', golfFixture, []), /<div class="category-banner"><img src="\/images\/golf\/golf-courses\.jpg"/, 'golf region pages open with the golf photo');
@@ -17517,6 +17517,8 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
   const beachFixture = [{ id: 990003, name: 'Banner Beach', slug: 'banner-beach', region: 'kelowna', type: 'beach', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'beach', beachFixture, []), /<div class="category-banner"><img src="\/images\/beaches\/beaches\.jpg"/, 'beach region pages open with the beach photo');
   assert.match(app.renderCategoryAllRegionsPage('beach', beachFixture), /<div class="category-banner"><img src="\/images\/beaches\/beaches\.jpg"/, 'the /beaches hub too');
+  const outdoorFixture = [{ id: 990004, name: 'Banner Trail', slug: 'banner-trail', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
+  assert.match(app.renderCategoryPage('kelowna', 'outdoor', outdoorFixture, []), /<div class="category-banner"><img src="\/images\/outdoors\/outdoors\.jpg"/, 'outdoor region pages open with the outdoors photo');
   const pub = app.createVenue({ name: 'Banner Test Pub', region: 'kelowna', type: 'pub', description: 'A fixture pub.', slug: 'banner-test-pub' });
   const pub2 = app.createVenue({ name: 'Banner Test Pub Two', region: 'kelowna', type: 'pub', description: 'Another fixture pub.', slug: 'banner-test-pub-two' });
   try {
