@@ -10606,7 +10606,9 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
       ? `${totalVenues} verified spots at ${regionLabel}, BC: restaurants, bars, cafés and après-ski, all reviewed and badge-checked by Okanagan Roam.`
       : `${totalVenues} verified venues in ${regionLabel}, BC — restaurants, wineries, breweries, golf courses, and more, all reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}`;
-  const shareImage = isSkiResort ? '/images/outdoors/winter.webp' : (REGION_SHARE_IMAGES[region] || null);
+  // Ski resorts share the real ski photos (SEO, 2026-10-13): Big White its
+  // sunset, the others the Ski & Snow skier.
+  const shareImage = isSkiResort ? (region === 'big-white' ? '/images/ski-snow/big-white-sunset.jpg' : SKI_SNOW_BANNER.src) : (REGION_SHARE_IMAGES[region] || null);
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -11534,7 +11536,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', indoorTheme: type === 'indoor', tourTheme: type === 'tour', sportTheme: type === 'sport', advisoryStyles: [...venues, ...sportsAlso].some((v) => advisoryNotes.has(v.id)), noindex: venues.length + sportsAlso.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_IMAGES[type].src : null, golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', indoorTheme: type === 'indoor', tourTheme: type === 'tour', sportTheme: type === 'sport', advisoryStyles: [...venues, ...sportsAlso].some((v) => advisoryNotes.has(v.id)), noindex: venues.length + sportsAlso.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type, true, 'category')}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -12266,7 +12268,10 @@ function renderOutdoorRegionIndexHtml(venues) {
 function renderOutdoorActivityPage(activity, venues) {
   const label = CATEGORY_LABELS.outdoor;
   const title = `${activity.label} in the Okanagan | Okanagan Roam`;
-  const description = `${venues.length} outdoor destinations for ${activity.label.toLowerCase()} across the Okanagan Valley \u2014 ${activity.blurb}`;
+  // Kept under ~158 characters (SEO, 2026-10-13): the blurb plus the count when
+  // both fit, otherwise the blurb alone.
+  const fullDescription = `${activity.blurb} ${venues.length} spots across the Okanagan Valley.`;
+  const description = fullDescription.length <= 158 ? fullDescription : activity.blurb;
   const canonical = `https://okanaganroam.com/outdoors/${activity.slug}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -12291,7 +12296,7 @@ function renderOutdoorActivityPage(activity, venues) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, outdoorTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: OUTDOOR_ACTIVITY_BANNERS[activity.slug] ? OUTDOOR_ACTIVITY_BANNERS[activity.slug].src : CATEGORY_BANNER_IMAGES.outdoor.src, golfTheme: true, outdoorTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${golfEngagementHeadHtml('outdoor', true, 'category')}
 </head>
 <body${themedBodyClassAttr('outdoor')}>
@@ -12659,7 +12664,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: HIDDEN_GEM_TYPE_IMAGE[type] || null, golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', ...(isIndoorHub ? { indoorTheme: true, noindex: venues.length + indoorGolf.length + indoorAlso.length === 0 } : {}), ...(isToursHub ? { tourTheme: true, noindex: venues.length + toursAlso.length === 0 } : {}), ...(isSportsHub ? { sportTheme: true, noindex: venues.length + sportsAlso.length === 0 } : {}), advisoryStyles: [...venues, ...indoorGolf, ...indoorAlso, ...toursAlso, ...sportsAlso].some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: (activityContent && activityContent.banner.src) || (CATEGORY_BANNER_IMAGES[type] && CATEGORY_BANNER_IMAGES[type].src) || HIDDEN_GEM_TYPE_IMAGE[type] || null, golfTheme: hubThemed, beachTheme: type === 'beach' || (isOutdoorLanding && venues.some((v) => v.type === 'beach')), outdoorTheme: type === 'outdoor', ...(isIndoorHub ? { indoorTheme: true, noindex: venues.length + indoorGolf.length + indoorAlso.length === 0 } : {}), ...(isToursHub ? { tourTheme: true, noindex: venues.length + toursAlso.length === 0 } : {}), ...(isSportsHub ? { sportTheme: true, noindex: venues.length + sportsAlso.length === 0 } : {}), advisoryStyles: [...venues, ...indoorGolf, ...indoorAlso, ...toursAlso, ...sportsAlso].some((v) => advisoryNotes.has(v.id)), golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${isOutdoorLanding ? '\n' + renderOutdoorsSimplifiedStyles() : ''}
 ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
@@ -13650,7 +13655,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: '/images/mood/eat.webp', golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: FOOD_DRINK_HUB_BANNER.src, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
@@ -14254,7 +14259,7 @@ function renderDogHubPage(venues, filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: '/images/hidden-gems/dog-friendly.webp', golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: dogContent.banner.src, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderDogHubStyles()}
 ${CATEGORY_BANNER_STYLE}
@@ -14711,8 +14716,9 @@ function renderLocalFavouritesPage(venues, filter = null) {
     path: '/local-favorites',
     filterSurface: 'local_favourites',
     heading: 'Local Favourites',
+    h1: 'Local Favourites in the Okanagan',
     title: 'Local Favourites in the Okanagan | Okanagan Roam',
-    description: `${venues.length} places across the Okanagan Valley with genuine local roots and credible evidence that locals value, recommend or have worked to preserve them \u2014 from independent restaurants, caf\u00e9s and pubs to community-protected parks, trails and beaches. Not a ranking.`,
+    description: `${venues.length} places across the Okanagan with real local roots \u2014 independent restaurants, caf\u00e9s and pubs, plus parks, trails and beaches locals love.`,
     introHtml: 'Places with genuine local roots &mdash; the caf&eacute;s, pubs, restaurants, parks, trails and beaches that people who live here value, recommend, support or have worked to protect. Each one is here because of specific evidence of that local connection, not because it is popular with visitors or highly rated. They are listed alphabetically, not ranked.',
     searchLabel: 'Search local favourites',
     pluralNoun: 'local favourites',
@@ -14744,6 +14750,9 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
   const state = { types: f.types, regions: f.regions, counts };
 
   const heading = cfg.heading;
+  // cfg.h1 (SEO, 2026-10-13): a fuller H1 ("... in the Okanagan") while the
+  // breadcrumb keeps the short name.
+  const h1Text = cfg.h1 || heading;
   // Category content (2026-10-12, Local Favourites): one type chosen shows
   // that category's photo, heading and intro, like /food-drink.
   const heroOne = (cfg.categoryContent && f.types.length === 1 ? cfg.categoryContent[f.types[0]] || null : null)
@@ -14780,7 +14789,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: cfg.banner ? cfg.banner.src : null, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderLocalFavouritesStyles()}
 ${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHead : ''}${cfg.banner ? '\n' + CATEGORY_BANNER_STYLE : ''}
@@ -14794,7 +14803,7 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${swapContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high"></div>${swapContent ? `
   <script>
   (function(){
-    var c = ${JSON.stringify(cfg.categoryContent || {}).replace(/</g, '\\u003c')}, rc = ${JSON.stringify(cfg.regionContent || {}).replace(/</g, '\\u003c')}, all = ${JSON.stringify({ banner: cfg.banner, heading, introHtml: cfg.introHtml }).replace(/</g, '\\u003c')};
+    var c = ${JSON.stringify(cfg.categoryContent || {}).replace(/</g, '\\u003c')}, rc = ${JSON.stringify(cfg.regionContent || {}).replace(/</g, '\\u003c')}, all = ${JSON.stringify({ banner: cfg.banner, heading: h1Text, introHtml: cfg.introHtml }).replace(/</g, '\\u003c')};
     var box = document.getElementById('lfBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
@@ -14809,7 +14818,7 @@ ${renderGolfHeaderHtml()}
     };
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
-  </script>` : ''}` : '', `<h1>${escapeHtml(heroOne ? heroOne.heading : heading)}</h1>
+  </script>` : ''}` : '', `<h1>${escapeHtml(heroOne ? heroOne.heading : h1Text)}</h1>
   <p class="outdoor-intro fd-intro">${heroOne ? escapeHtml(heroOne.intro) : cfg.introHtml}</p>`)}${cfg.leadHtml ? '\n  ' + cfg.leadHtml : ''}
   <div class="fd-search">
     <label class="visually-hidden" for="lfSearch">${escapeHtml(cfg.searchLabel)}</label>
@@ -14887,8 +14896,9 @@ function renderSecretSpotsPage(venues, filter = null) {
     path: '/secret-spots',
     filterSurface: 'secret_spots',
     heading: 'Secret Spots',
+    h1: 'Secret Spots in the Okanagan',
     title: 'Secret Spots in the Okanagan | Okanagan Roam',
-    description: `${venues.length} tucked-away parks, gardens, waterfalls and quieter beaches across the Okanagan Valley that are easy to miss and worth seeking out — each one chosen on specific evidence, not popularity. Not a ranking.`,
+    description: `${venues.length} tucked-away parks, gardens, waterfalls and quieter beaches across the Okanagan Valley \u2014 easy to miss and worth seeking out.`,
     introHtml: 'Looking for the places that are a little easier to miss? Secret Spots brings together tucked-away parks, gardens, waterfalls and quieter beaches across the Okanagan &mdash; the finds worth seeking out once you have seen the famous ones. Each is here because a local tourism, parks or community source points to it as a quieter or lesser-known find, not because it is popular or highly rated. They are listed alphabetically, not ranked.',
     searchLabel: 'Search secret spots',
     pluralNoun: 'secret spots',
@@ -14973,8 +14983,9 @@ function renderSkiSnowPage(venues, eats, filter = null) {
     path: SKI_SNOW_PATH,
     filterSurface: 'ski_snow',
     heading: 'Ski & Snow',
-    title: 'Ski & Snow in the Okanagan: Big White, SilverStar, Apex, Baldy | Okanagan Roam',
-    description: 'Ski & snow in the Okanagan: Big White, SilverStar, Apex and Baldy ski resorts, Nordic centres, tube parks, snowshoe trails, skating, sleigh rides and après-ski eats across the valley.',
+    h1: 'Ski & Snow in the Okanagan',
+    title: 'Ski & Snow in the Okanagan | Okanagan Roam',
+    description: 'Big White, SilverStar, Apex and Baldy ski resorts, plus Nordic trails, tube parks, snowshoeing, skating, sleigh rides and apr\u00e8s-ski eats in the Okanagan.',
     introHtml: 'Four ski hills, Nordic trails, tube parks, skating, sleigh rides and dog sledding &mdash; everything for a snow day in the Okanagan, from Big White and SilverStar to Apex and Baldy, with where to eat when the lifts close.',
     searchLabel: 'Search ski and snow spots',
     pluralNoun: 'ski & snow spots',
@@ -15070,7 +15081,8 @@ function renderHiddenGemsPage(venues, filter = null, feature = null) {
     filterSurface: 'hidden_gems',
     heading,
     title: `${heading} in the Okanagan | Okanagan Roam`,
-    description: `${venues.length} ${badge ? `${badge.adj} ` : ''}places on Okanagan Roam's Hidden Gems list across the Okanagan Valley. Not a ranking.`,
+    h1: `${heading} in the Okanagan`,
+    description: `${venues.length} ${badge ? `${badge.adj} ` : ''}lesser-known restaurants, wineries, trails and beaches on Okanagan Roam's Hidden Gems list, across the Okanagan Valley.`,
     introHtml: `Every place on Okanagan Roam&rsquo;s Hidden Gems list &mdash; caf&eacute;s, wineries, breweries, pubs, golf courses, parks and quieter beaches that are easy to miss. They are listed alphabetically, not ranked.${which}`,
     searchLabel: 'Search hidden gems',
     pluralNoun: 'hidden gems',
@@ -15797,7 +15809,7 @@ const DOG_FRIENDLY_BANNER = Object.freeze({ src: '/images/dog-friendly/dog-frien
 // B1kiHKg-v-Y, gDcCFG0keeg; Unsplash License). Wider scenes, so the dog
 // still shows in the short desktop banner.
 const DOG_CATEGORY_CONTENT = Object.freeze({
-  all: { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Friendly Finds', intro: 'Patios, caf\u00e9s, taprooms and tasting rooms across the Okanagan that welcome your dog \u2014 plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.' },
+  all: { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Friendly Finds in the Okanagan', intro: 'Patios, caf\u00e9s, taprooms and tasting rooms across the Okanagan that welcome your dog \u2014 plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.' },
   restaurant: { banner: { src: '/images/dog-friendly/dog-restaurant.jpg', alt: 'A dachshund sitting beside its owner at an outdoor restaurant table', pos: 35 }, heading: 'Dog-Friendly Restaurants in the Okanagan', intro: 'Restaurants with patios and spaces where your dog is welcome to join you \u2014 so nobody gets left at home when it\u2019s time to eat out.' },
   cafe: { banner: { src: '/images/dog-friendly/dog-cafe-jack-russell.jpg', alt: 'A Jack Russell sitting by a caf\u00e9 table set with food', pos: 50 }, heading: 'Dog-Friendly Caf\u00e9s in the Okanagan', intro: 'Coffee shops and caf\u00e9s that welcome dogs \u2014 grab a latte, a pastry and maybe a treat for your four-legged friend.' },
   pub: { banner: { src: '/images/dog-friendly/dog-pub.jpg', alt: 'A black Labrador lying by the fireplace in a cosy pub', pos: 60 }, heading: 'Dog-Friendly Pubs & Bars in the Okanagan', intro: 'Pubs and bars where dogs are welcome \u2014 settle in for a pint and a bite with your best friend at your feet.' },
@@ -15889,7 +15901,7 @@ function renderWhatsOnPage(filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { shareImage: '/images/mood/whats-on.webp', golfTheme: true, outdoorTheme: true, noindex: !hasInventory, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb], { shareImage: WHATS_ON_BANNER.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory, savedSidecar: true })}
 ${renderWhatsOnStyles()}
 ${CATEGORY_BANNER_STYLE}
 ${renderAnalyticsHeadHtml('hub')}
@@ -19812,7 +19824,7 @@ const SKI_GUIDE = {
   heading: 'Where to eat, drink and play at Big White and SilverStar this winter',
   title: 'Big White & SilverStar Ski Guide 2026/27: Après, Food & Fun | Okanagan Roam',
   description: 'Where to eat, drink and play at Big White and SilverStar this winter: après-ski, on-mountain lunch, dinner and things to do off the slopes.',
-  shareImage: '/images/outdoors/winter.webp',
+  shareImage: SKI_SNOW_BANNER.src,
   intro: [
     'The Okanagan’s two big mountains sit just up the road from Kelowna and Vernon, and the skiing is only half the trip. This guide covers the other half: where to warm up for lunch, the best après-ski, dinner worth booking, and what to do when the lifts stop.',
     'Every place here is listed and badge-checked on Okanagan Roam. Hours change through the season, so check before you go.',
@@ -21459,6 +21471,12 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
         `  <url>\n    <loc>https://okanaganroam.com${SKI_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        // Hidden Gems and the category directory (SEO, 2026-10-13): both live
+        // but were missing from the sitemap.
+        ...(getHiddenGemCollectionVenues(null).length >= MIN_CATEGORY_VENUES
+          ? [`  <url>\n    <loc>https://okanaganroam.com/hidden-gems</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
+          : []),
+        `  <url>\n    <loc>https://okanaganroam.com/categories</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`,
         ...(getSecretSpotVenues().length >= MIN_CATEGORY_VENUES
           ? [`  <url>\n    <loc>https://okanaganroam.com/secret-spots</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
           : []),

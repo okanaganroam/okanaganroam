@@ -7979,7 +7979,7 @@ test('Activity page + landing sections render once an activity reaches the thres
     assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors\/hiking"/);
     assert.equal((html.match(/rel="canonical"/g) || []).length, 1, 'exactly one canonical');
     assert.match(html, /<meta property="og:title" content="Hiking &amp; Trails in the Okanagan \| Okanagan Roam">/);
-    assert.match(html, /<meta name="description" content="4 outdoor destinations for hiking &amp; trails across the Okanagan Valley/);
+    assert.match(html, /<meta name="description" content="Creek-side greenways[^"]* 4 spots across the Okanagan Valley\.">/);
     assert.match(html, /"@type":"ItemList"/); assert.match(html, /"@type":"BreadcrumbList"/); assert.match(html, /"@type":"TouristAttraction"/);
     assert.match(html, /<body class="golf-page outdoor-page">/);
     assert.match(html, /<a class="category-back-link" href="\/outdoors">← All Outdoors<\/a>/);
@@ -9472,7 +9472,7 @@ test('Dog Friendly Finds: /dog-friendly renders every dog venue with the canonic
   const markup = s6markup(html);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/dog-friendly">/);
   assert.match(markup, /<title>Dog Friendly Finds in the Okanagan \| Okanagan Roam<\/title>/);
-  assert.match(markup, /<h1>Dog Friendly Finds<\/h1>/);
+  assert.match(markup, /<h1>Dog Friendly Finds in the Okanagan<\/h1>/);
   assert.match(markup, /<meta name="description" content="[^"]*dog-friendly places across the Okanagan Valley[^"]*designated dog beaches[^"]*"/);
   // Breadcrumb: Home > Dog Friendly Finds, in the nav and in schema.
   assert.match(markup, /<a href="\/">Home<\/a>/);
@@ -9502,7 +9502,7 @@ test('Dog Friendly Finds: the live route answers 200, the sitemap lists it once,
   seedDogFixture();
   const hub = await s5get('/dog-friendly');
   assert.equal(hub.status, 200, '/dog-friendly returns 200');
-  assert.match(hub.text, /<h1>Dog Friendly Finds<\/h1>/);
+  assert.match(hub.text, /<h1>Dog Friendly Finds in the Okanagan<\/h1>/);
   assert.match(hub.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/dog-friendly">/);
   const baseline = app.getDogFriendlyHubVenues().length;
   assert.equal((s6markup(hub.text).match(/<li class="venue-card"/g) || []).length, baseline, 'the route renders the full baseline set');
@@ -9745,7 +9745,7 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
     const markup = s6markup(html);
     assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/local-favorites">/);
     assert.match(markup, /<title>Local Favourites in the Okanagan \| Okanagan Roam<\/title>/);
-    assert.match(markup, /<h1>Local Favourites<\/h1>/);
+    assert.match(markup, /<h1>Local Favourites in the Okanagan<\/h1>/);
     assert.doesNotMatch(markup, /name="robots" content="noindex"/, 'the page is indexable');
     assert.match(html, /"@type":"ItemList"/);
     const cards = markup.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
@@ -9879,7 +9879,7 @@ test('Secret Spots: /secret-spots renders only the Hidden Gem places, with filte
     const markup = s6markup(html);
     assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/secret-spots">/);
     assert.match(markup, /<title>Secret Spots in the Okanagan \| Okanagan Roam<\/title>/);
-    assert.match(markup, /<h1>Secret Spots<\/h1>/);
+    assert.match(markup, /<h1>Secret Spots in the Okanagan<\/h1>/);
     assert.match(markup, /<nav class="breadcrumb"><a href="\/">Home<\/a> &rsaquo; Secret Spots<\/nav>/);
     assert.doesNotMatch(markup, /name="robots" content="noindex"/, 'the page is indexable');
     assert.match(html, /"@type":"BreadcrumbList"/);
@@ -11148,7 +11148,7 @@ test('Hidden Gems page: every Hidden Gems request lands on a page showing exactl
     assert.equal(r.headers.get('location'), '/hidden-gems?regions=kelowna');
     // The badge view names its rule; unknown badges and paths are 404s.
     const dog = await (await fetch(`${base}/hidden-gems/dog-friendly`)).text();
-    assert.match(dog, /<h1>Dog-Friendly Hidden Gems<\/h1>/);
+    assert.match(dog, /<h1>Dog-Friendly Hidden Gems in the Okanagan<\/h1>/);
     assert.match(dog, /Dog-Friendly badge or on the official dog-friendly beaches list/);
     assert.equal((await fetch(`${base}/hidden-gems/not-a-badge`)).status, 404);
     assert.equal((await fetch(`${base}/hidden-gems/dog-friendly/extra`)).status, 404);
@@ -16286,7 +16286,7 @@ test('SEO audit: region pages get their own share image; ski resorts get après-
   const bigWhite = app.renderRegionPage('big-white', app.getRegionCategoryCounts('big-white') || {}, []);
   assert.match(bigWhite, /<title>Big White Restaurants, Bars &amp; Après-Ski, BC \| Okanagan Roam<\/title>/);
   assert.doesNotMatch(bigWhite.match(/<meta name="description" content="([^"]*)">/)[1], /golf|winer/i);
-  assert.equal(ogImage(bigWhite), 'https://okanaganroam.com/images/outdoors/winter.webp');
+  assert.equal(ogImage(bigWhite), 'https://okanaganroam.com/images/ski-snow/big-white-sunset.jpg');
 });
 
 test('Region intros: every destination carries local copy; towns get a "Things to Do" title, ski resorts keep theirs', () => {
@@ -16362,7 +16362,7 @@ test('Ski guide: renders the article head, links only venues that exist, and dro
   const head = html.split('</head>')[0];
   assert.match(head, /<title>Big White &amp; SilverStar Ski Guide 2026\/27/);
   assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/ski-season-big-white-silverstar">/);
-  assert.match(head, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/outdoors\/winter\.webp">/);
+  assert.match(head, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/ski-snow\/ski-snow\.jpg">/);
   const ld = [...head.matchAll(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/g)].map((m) => JSON.parse(m[1]));
   assert.deepEqual(ld.map((j) => j['@type']).sort(), ['Article', 'BreadcrumbList']);
   assert.equal((html.match(/<h1>/g) || []).length, 1);
@@ -16959,7 +16959,7 @@ test('Ski & Snow: /ski-snow lists the winter collection, après eats on the four
     await withWinterServer(async (base) => {
       const before = app.getSkiSnowVenues().length;
       const emptyHtml = app.renderSkiSnowPage([], []);
-      assert.match(emptyHtml, /<h1>Ski &amp; Snow<\/h1>/);
+      assert.match(emptyHtml, /<h1>Ski &amp; Snow in the Okanagan<\/h1>/);
       assert.match(emptyHtml, /class="ski-snow-empty">Winter listings are on their way/);
       assert.match(emptyHtml, /<a class="ski-snow-link" href="\/guides\/ski-season-big-white-silverstar">/);
       assert.match(emptyHtml, /<a class="ski-snow-link" href="\/outdoors\/winter">/);
@@ -16973,8 +16973,8 @@ test('Ski & Snow: /ski-snow lists the winter collection, après eats on the four
 
       const page = await WINTER_GET(base, '/ski-snow');
       assert.equal(page.status, 200);
-      assert.match(page.text, /<title>Ski &amp; Snow in the Okanagan: Big White, SilverStar, Apex, Baldy \| Okanagan Roam<\/title>/);
-      assert.match(page.text, /<meta name="description" content="Ski &amp; snow in the Okanagan: Big White, SilverStar, Apex and Baldy/);
+      assert.match(page.text, /<title>Ski &amp; Snow in the Okanagan \| Okanagan Roam<\/title>/);
+      assert.match(page.text, /<meta name="description" content="Big White, SilverStar, Apex and Baldy ski resorts/);
       assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/ski-snow">/);
       const results = page.text.slice(page.text.indexOf('id="lfResults"'), page.text.indexOf('id="skiSnowEatsHeading"'));
       assert.match(results, /href="\/big-white\/outdoors\/winter-test-tube-park"/, 'the winter member is in the main list');
@@ -17166,7 +17166,7 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(empty.text, /<body class="golf-page sport-page">/);
       assert.match(empty.text, /Sport page theme \(2026-10-12\)/);
       assert.match(empty.text, /<meta name="robots" content="noindex/, 'nothing listed yet: noindex');
-      assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/mood\/explore\.webp"/);
+      assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/sports\/sports\.jpg"/);
       assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
       assert.doesNotMatch(empty.text, /sportsAlsoHeading/, 'no also-section without members');
       assert.doesNotMatch(empty.text, /Tour page theme/, 'the tour theme is not emitted on /sports');
@@ -17557,9 +17557,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(hubTwo, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
       assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const ski = (await WINTER_GET(base, '/ski-snow')).text;
-      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Ski &amp; Snow<\/h1>/, '/ski-snow opens with its photo above the heading');
+      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Ski &amp; Snow in the Okanagan<\/h1>/, '/ski-snow opens with its photo above the heading');
       const gems = app.renderHiddenGemsPage([{ id: 990008, name: 'Banner Gem', slug: 'banner-gem', region: 'kelowna', type: 'cafe', description: 'Fixture.' }]);
-      assert.match(gems, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Hidden Gems<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
+      assert.match(gems, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Hidden Gems in the Okanagan<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
       const whatsOn = (await WINTER_GET(base, '/whats-on')).text;
       assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner" id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
@@ -17568,10 +17568,10 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       if (dogsRes.status === 200) assert.match(dogsRes.text, /<div class="category-hero">\s*<div class="category-banner" id="dogBanner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.DOG_FRIENDLY_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'dog-friendly thumbnail exists');
       const favs = app.renderLocalFavouritesPage([{ id: 990007, name: 'Banner Diner', slug: 'banner-diner', region: 'kelowna', type: 'restaurant', description: 'Fixture.' }]);
-      assert.match(favs, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Local Favourites<\/h1>/, '/local-favorites opens with its photo above the heading');
+      assert.match(favs, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Local Favourites in the Okanagan<\/h1>/, '/local-favorites opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.LOCAL_FAVOURITES_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'local favourites thumbnail exists');
       const secret = app.renderSecretSpotsPage([{ id: 990009, name: 'Banner Cove', slug: 'banner-cove', region: 'kelowna', type: 'beach', description: 'Fixture.' }]);
-      assert.match(secret, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/secret-spots\/secret-spots\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Secret Spots<\/h1>/, '/secret-spots opens with its photo above the heading');
+      assert.match(secret, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/secret-spots\/secret-spots\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Secret Spots in the Okanagan<\/h1>/, '/secret-spots opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.SECRET_SPOTS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'secret spots thumbnail exists');
       // Every Discovery entry now has a photo, so /categories shows it as a photo grid too.
       assert.ok(app.categoryDirectoryEntries().filter((g) => g.label === 'Discovery').every((g) => g.categories.every((c) => c.image)), 'every Discovery card has a photo');
@@ -17598,7 +17598,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const lfGolf = app.renderLocalFavouritesPage(lfV, { types: ['golf'], regions: [] });
       assert.match(lfGolf, /id="lfBanner"><img src="\/images\/golf\/golf-courses\.jpg"/);
       assert.match(lfGolf, /<h1>Local Favourite Golf Courses in the Okanagan<\/h1>/);
-      assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites<\/h1>/);
+      assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites in the Okanagan<\/h1>/);
       for (const [k, c] of Object.entries(app.LOCAL_FAVOURITES_CATEGORY_CONTENT)) assert.ok(c.banner && c.heading && c.intro, `${k} has content`);
       assert.doesNotMatch(app.renderHiddenGemsPage(lfV, null, 'dog_friendly'), /lfBanner/, 'badge views unchanged');
       const ssV = [{ id: 990014, name: 'SS Cove', slug: 'ss-cove', region: 'kelowna', type: 'beach', description: 'Fixture.' }, { id: 990015, name: 'SS Falls', slug: 'ss-falls', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
@@ -17616,7 +17616,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(skiBW, /id="lfBanner"><img src="\/images\/ski-snow\/big-white-sunset\.jpg"/);
       assert.match(skiBW, /<h1>Big White Ski Resort<\/h1>/);
       assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['apex'] }), /<h1>Apex Mountain Resort<\/h1>/);
-      assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['big-white', 'apex'] }), /<h1>Ski &amp; Snow<\/h1>/, 'two resorts: general text');
+      assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['big-white', 'apex'] }), /<h1>Ski &amp; Snow in the Okanagan<\/h1>/, 'two resorts: general text');
       assert.deepEqual(Object.keys(app.SKI_SNOW_REGION_CONTENT).sort(), ['apex', 'baldy', 'big-white', 'silverstar']);
       // Tours: activity chips sort tours by keyword rules (+ overrides) and swap the banner, heading and intro.
       const tv = (name, description) => ({ name, description });
