@@ -16230,8 +16230,10 @@ test('Contact: a successful send leaves the venue and event submission paths, an
 
 // ---- Reviewed event batches (2026-10-09) ---------------------------------------
 test('Event batches: the reviewed batch goes in through createEvent, adds a missing date to an existing event, and is idempotent', () => {
-  const batchDir = path.join(__dirname, '..', 'data', 'event-batches');
-  const batch = JSON.parse(fs.readFileSync(path.join(batchDir, '2026-10-09-tourism-kelowna-harvest-bites-sips.json'), 'utf8'));
+  // Only this batch, so later batch files in data/event-batches don't change the counts.
+  const batchDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'okr-batch-'));
+  fs.copyFileSync(path.join(__dirname, '..', 'data', 'event-batches', '2026-10-09-tourism-kelowna-harvest-bites-sips.json'), path.join(batchDir, 'harvest.json'));
+  const batch = JSON.parse(fs.readFileSync(path.join(batchDir, 'harvest.json'), 'utf8'));
   const names = [...batch.events.map((e) => e.name), 'Oktoberfest at The Hatching Post'];
   const cleanup = () => {
     const ids = db.prepare(`SELECT id FROM events WHERE name IN (${names.map(() => '?').join(',')})`).all(...names).map((r) => r.id);
@@ -16270,6 +16272,45 @@ test('Event batches: the reviewed batch goes in through createEvent, adds a miss
     cleanup();
   }
   assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM events WHERE name IN (${names.map(() => '?').join(',')})`).get(...names).n, 0);
+});
+
+test('Event batches: `updates` correct an existing event\'s description and categories through the logged update path, only once, and report a missing event', () => {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'okr-batch-upd-'));
+  const name = 'Batch Update Fixture Ballet';
+  const cleanup = () => {
+    for (const { id } of db.prepare('SELECT id FROM events WHERE name = ?').all(name)) {
+      for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  };
+  cleanup();
+  try {
+    const made = app.createEvent({
+      name, region: 'vernon', venue_name_text: 'Test Hall', description: 'Placeholder.', categories: ['events-festivals', 'holiday-seasonal'],
+      source_type: 'tourism_org', source_name: 'Test Tourism', source_url: 'https://example.com/batch-update/ballet', occurrences: [{ start_date: '2032-02-04' }],
+    }, { reason: 'batch update fixture', batch_id: 'batch-update-test' });
+    assert.equal(made.ok, true, JSON.stringify(made));
+    fs.writeFileSync(path.join(dir, 'fix.json'), JSON.stringify({
+      batch_id: 'batch-update-test', reason: 'test corrections', reviewed_by: 'test',
+      updates: [
+        { region: 'vernon', name, fields: { description: 'A full-length ballet.' }, categories: ['arts-culture', 'events-festivals'] },
+        { region: 'vernon', name: 'No Such Event Anywhere', categories: ['arts-culture'] },
+      ],
+    }));
+    const first = app.importEventBatches(dir);
+    assert.deepEqual(first.created, [`${name} (updated)`]);
+    assert.deepEqual(first.failed, [{ name: 'No Such Event Anywhere', reason: 'event_not_found' }]);
+    const row = db.prepare('SELECT id, description FROM events WHERE name = ?').get(name);
+    assert.equal(row.description, 'A full-length ballet.');
+    assert.deepEqual(db.prepare('SELECT category_key FROM event_categories WHERE event_id = ? ORDER BY position').all(row.id).map((r) => r.category_key), ['arts-culture', 'events-festivals']);
+    const logged = db.prepare('SELECT field_name FROM event_enrichment_log WHERE event_id = ?').all(row.id).map((r) => r.field_name);
+    assert.ok(logged.includes('description') && logged.includes('categories'), 'both changes are in the change log');
+    const second = app.importEventBatches(dir);
+    assert.deepEqual(second.created, [], 'a re-run changes nothing');
+    assert.ok(second.skipped.includes(name));
+  } finally {
+    cleanup();
+  }
 });
 
 // ---- Page weight (2026-10-10): listing ItemLists don't repeat descriptions ----

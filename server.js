@@ -24842,7 +24842,8 @@ const server = http.createServer(async (req, res) => {
 
 // Reviewed event batches (2026-10-09). A batch is a JSON file in data/event-batches/ holding events that have been checked by a person; it is
 // applied through createEvent() / upsertEventOccurrences(), so every rule (provenance, categories, duplicates, change log) still applies. It is
-// idempotent (an event that already exists by region + name, or an occurrence that already exists, is skipped) and never throws: a failing
+// idempotent (an event that already exists by region + name, or an occurrence that already exists, is skipped; `updates` correct an
+// existing event's fields or categories) and never throws: a failing
 // entry is logged and the rest carry on. It runs once the server is listening, on Railway (or with EVENT_BATCH_IMPORT=on), never in tests.
 function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches')) {
   const out = { created: [], skipped: [], failed: [] };
@@ -24870,6 +24871,28 @@ function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches'))
         else if (r.ok) out.skipped.push(add.name);
         else out.failed.push({ name: add.name, reason: r.reason, detail: r.detail });
       } catch (e) { out.failed.push({ name: add && add.name, reason: 'error', detail: String(e && e.message) }); }
+    }
+    // Corrections to events already listed: scalar fields go through updateEvent(), categories through
+    // replaceEventCategories(), so each change is validated and lands in the change log. Only fields that
+    // differ are written, so re-running a batch changes nothing.
+    for (const upd of Array.isArray(batch.updates) ? batch.updates : []) {
+      try {
+        const row = db.prepare('SELECT * FROM events WHERE region = ? AND name = ?').get(upd.region, upd.name);
+        if (!row) { out.failed.push({ name: upd.name, reason: 'event_not_found' }); continue; }
+        const fields = Object.fromEntries(Object.entries(upd.fields || {}).filter(([k, v]) => row[k] !== v));
+        let changed = false;
+        if (Object.keys(fields).length) {
+          const r = updateEvent(row.id, fields, meta);
+          if (!r.ok) { out.failed.push({ name: upd.name, reason: r.reason, detail: r.detail }); continue; }
+          changed = true;
+        }
+        if (Array.isArray(upd.categories)) {
+          const r = replaceEventCategories(row.id, upd.categories, meta);
+          if (!r.ok) { out.failed.push({ name: upd.name, reason: r.reason, detail: r.detail }); continue; }
+          changed = changed || r.changed;
+        }
+        (changed ? out.created : out.skipped).push(changed ? `${upd.name} (updated)` : upd.name);
+      } catch (e) { out.failed.push({ name: upd && upd.name, reason: 'error', detail: String(e && e.message) }); }
     }
   }
   return out;
