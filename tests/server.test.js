@@ -17492,22 +17492,22 @@ test('Card rows (2026-10-12): two-up cards give every part its own subgrid row, 
   assert.match(app.renderFoodDrinkOpenNowStyles(), /body\.golf-page \.card-grid > \.venue-card > \.fd-open-status \{ grid-row: 3; \}/);
 });
 
-test('Category banners (2026-10-12): pub, cocktail, brewery, distillery and winery pages open with their photo; restaurants and cafés have none; /food-drink shows one only for a single chosen type', async () => {
+test('Category banners (2026-10-12): pub, cocktail, brewery, distillery and winery pages open with their photo; cafés have none; /food-drink shows one only for a single chosen type', async () => {
   const fs = require('node:fs');
   const path = require('node:path');
   for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) {
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${type} image exists`);
     assert.ok(b.alt && b.alt.length > 10, `${type} has alt text`);
   }
-  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['brewery', 'cocktail', 'distillery', 'pub', 'winery']);
+  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['brewery', 'cocktail', 'distillery', 'pub', 'restaurant', 'winery']);
   const pub = app.createVenue({ name: 'Banner Test Pub', region: 'kelowna', type: 'pub', description: 'A fixture pub.', slug: 'banner-test-pub' });
   const pub2 = app.createVenue({ name: 'Banner Test Pub Two', region: 'kelowna', type: 'pub', description: 'Another fixture pub.', slug: 'banner-test-pub-two' });
   try {
     await withWinterServer(async (base) => {
       const scoped = (await WINTER_GET(base, '/kelowna/pubs')).text;
       assert.match(scoped, /<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" fetchpriority="high"><\/div>\s*<h1>Pubs in Kelowna, BC<\/h1>/);
-      const rest = (await WINTER_GET(base, '/kelowna/restaurants')).text;
-      assert.doesNotMatch(rest, /class="category-banner"/);
+      const cafes = (await WINTER_GET(base, '/kelowna/cafes')).text;
+      assert.doesNotMatch(cafes, /class="category-banner"/);
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
       assert.match(hubAll, /<div class="category-banner" id="fdBanner" hidden><img src=""/);
       const hubPub = (await WINTER_GET(base, '/food-drink?types=pub')).text;
