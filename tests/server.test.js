@@ -11322,14 +11322,17 @@ test('/categories: 200, each visitor-facing category once, linking to its own ex
     assert.equal((await fetch(`${base}${href}`)).status, 200, href);
   }
   assert.doesNotMatch(html, /id="searchInput"|class="venue-card"|type="search"/, 'no search box, filters or venue listing');
-  // Photos (2026-10-12): every Food & Drink card carries its page's banner photo as a lazy thumbnail; other sections stay text-only.
+  // Photos (2026-10-12): every Food & Drink card carries its page's banner photo as a lazy thumbnail.
   const fd = html.slice(html.indexOf('<ul class="card-grid category-photo-grid">'));
   assert.ok(html.includes('<ul class="card-grid category-photo-grid">'), 'Food & Drink is a photo grid');
   const fdList = fd.slice(0, fd.indexOf('</ul>'));
   const fdCount = app.categoryDirectoryEntries().find((g) => g.label === 'Food & Drink').categories.length;
   assert.equal((fdList.match(/<div class="category-card-photo"><img src="\/images\/food-drink\/thumbs\/[a-z-]+\.jpg" alt="" width="800" height="533" loading="lazy"/g) || []).length, fdCount);
   for (const m of fdList.matchAll(/src="(\/images\/food-drink\/thumbs\/[a-z-]+\.jpg)"/g)) assert.ok(require('node:fs').existsSync(require('node:path').join(__dirname, '..', 'public', m[1])), m[1]);
-  assert.equal((html.match(/category-card-photo"/g) || []).length, fdCount, 'no photos outside Food & Drink');
+  // Experiences (2026-10-12) became a photo grid once every card in it had a photo; Discovery stays text-only.
+  const photoCount = app.categoryDirectoryEntries().filter((g) => g.categories.every((c) => c.image)).reduce((n, g) => n + g.categories.length, 0);
+  assert.equal((html.match(/category-card-photo"/g) || []).length, photoCount, 'photos only in sections where every card has one');
+  assert.ok(app.categoryDirectoryEntries().find((g) => g.label === 'Experiences').categories.every((c) => c.image), 'every Experiences card has a photo');
   assert.match(html, /<footer/, 'shared footer present');
   assert.equal((await fetch(`${base}/categories/`)).status, 200);
 }));
@@ -17337,12 +17340,12 @@ test('Sports & Recreation: discovery sends skate park, pickleball, tennis, disc 
 test('Indoor discovery: banner and experience choices stay on the indoor hub', async () => {
   await withWinterServer(async (base) => {
     const hub = await WINTER_GET(base, '/indoor');
-    assert.match(hub.text, /class="indoor-hero"/);
-    assert.match(hub.text, /src="\/images\/indoor-rainy-day-banner.jpg"/);
+    // Photo banner (2026-10-12): the shared category hero replaced the illustrated indoor-hero.
+    assert.match(hub.text, /<div class="category-banner"><img src="\/images\/indoor\/indoor\.jpg"/);
+    assert.doesNotMatch(hub.text, /class="indoor-hero"/);
     assert.match(hub.text, /aria-label="Choose an indoor experience"/);
     for (const label of ['Museums &amp; Galleries', 'Family Fun', 'Games &amp; Escape Rooms', 'Spas', 'Theatre']) assert.ok(hub.text.includes(label), label);
     assert.doesNotMatch((await WINTER_GET(base, '/tours')).text, /class="indoor-hero"|Choose an indoor experience/);
-    assert.equal((await WINTER_GET(base, '/images/indoor-rainy-day-banner.jpg')).status, 200);
   });
 });
 
@@ -17509,7 +17512,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${type} image exists`);
     assert.ok(b.alt && b.alt.length > 10, `${type} has alt text`);
   }
-  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'outdoor', 'pub', 'restaurant', 'sport', 'tour', 'winery']);
+  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'indoor', 'outdoor', 'pub', 'restaurant', 'sport', 'tour', 'winery']);
   for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), `${type} has a card thumbnail`);
   const golfFixture = [{ id: 990001, name: 'Banner Golf', slug: 'banner-golf', region: 'kelowna', type: 'golf', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'golf', golfFixture, []), /<div class="category-banner"><img src="\/images\/golf\/golf-courses\.jpg"/, 'golf region pages open with the golf photo');
@@ -17536,7 +17539,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(scoped, /@media \(min-width: 900px\) \{[\s\S]*?\.category-banner \{ aspect-ratio: 12 \/ 5;/, 'desktop banner is a 2.4:1 strip');
       assert.doesNotMatch(scoped, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\)/, 'no side-by-side layout');
       assert.match(scoped, /\.category-banner \{[^}]*max-height: min\(44vh, 440px\);/, 'the banner never fills the window, so the heading stays in view');
-      assert.doesNotMatch(app.renderCategoryPage('kelowna', 'indoor', [{ id: 990002, name: 'Banner Museum', slug: 'banner-museum', region: 'kelowna', type: 'indoor', description: 'Fixture.' }], []), /class="category-banner"/, 'categories without a photo carry no banner');
+      assert.deepEqual(Object.keys(app.CATEGORY_LABELS).filter((t) => !app.CATEGORY_BANNER_IMAGES[t]), [], 'every category has a banner photo');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
       // No type or several: the hub's own photo with the general heading.
       assert.match(hubAll, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg" alt="Friends toasting drinks over a table of shared dishes"/);
