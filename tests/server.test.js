@@ -6805,7 +6805,9 @@ test('Wine, Beaches and Golf hubs render their intro directly under the H1; othe
   for (const [type, text] of Object.entries(intros)) {
     const html = app.renderCategoryAllRegionsPage(type, app.getVenuesByCategory(type));
     const esc = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    assert.match(html, new RegExp(`</h1>\\s*<p class="hub-intro">${esc}</p>\\s*<p class="subtitle">`), `${type}: intro sits between the H1 and the count subtitle`);
+    // Wineries (2026-10-12): the H1 and intro share the hero block with the banner photo, then the count.
+    const between = type === 'winery' ? '</div>\\s*<div class="category-banner">[\\s\\S]*?</div>\\s*</div>\\s*' : '\\s*';
+    assert.match(html, new RegExp(`</h1>\\s*<p class="hub-intro">${esc}</p>${between}<p class="subtitle">`), `${type}: intro sits between the H1 and the count subtitle`);
     assert.match(html, /<style>body\.golf-page \.hub-intro \{/, `${type}: intro style loaded`);
     assert.equal((html.match(/class="hub-intro"/g) || []).length, 1, `${type}: exactly one intro`);
   }
@@ -17505,7 +17507,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
   try {
     await withWinterServer(async (base) => {
       const scoped = (await WINTER_GET(base, '/kelowna/pubs')).text;
-      assert.match(scoped, /<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" fetchpriority="high"><\/div>\s*<h1>Pubs in Kelowna, BC<\/h1>/);
+      // Heading then photo in one hero block (side by side on desktop, photo first on phones).
+      assert.match(scoped, /<div class="category-hero">\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>\s*<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" fetchpriority="high"><\/div>/);
+      assert.match(scoped, /@media \(min-width: 900px\) \{\s*\.category-hero \{ display: grid; grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\);[\s\S]*?\.category-hero \.category-banner \{ order: 0; margin: 0; aspect-ratio: 3 \/ 2; \}/, 'desktop shows the whole 3:2 photo beside the heading');
       const golf = (await WINTER_GET(base, '/kelowna/golf')).text;
       assert.doesNotMatch(golf, /class="category-banner"/, 'non-food pages carry no banner');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
