@@ -4697,8 +4697,8 @@ const OUTDOOR_ACTIVITIES = [
 // Banner photo per outdoor activity (2026-10-13): /outdoors/<slug> opens with
 // it, and the /outdoors landing swaps to it when exactly one activity card is
 // pressed. Free Unsplash sa3EBC3S0ug, OZQEwoy5V_Y, gKN-QsCLdaQ, MePjPb_5FvE and
-// b53j6cPfnww; licensed free Adobe Stock 206095390 and 273871791. Camping and
-// Water have none yet and keep the Outdoors photo.
+// b53j6cPfnww, plus EzU9XMMsN-I for camping (2026-10-13); licensed free Adobe
+// Stock 206095390 and 273871791. Water has none yet and keeps the Outdoors photo.
 const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
   hiking: { src: '/images/outdoors/activity-hiking.jpg', alt: 'The Myra Canyon trail winding along a forested canyon above Kelowna', pos: 50 },
   viewpoints: { src: '/images/outdoors/activity-viewpoints.jpg', alt: 'Kelowna and Okanagan Lake seen from the Knox Mountain lookout', pos: 55 },
@@ -4707,6 +4707,7 @@ const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
   winter: { src: '/images/outdoors/activity-winter.jpg', alt: 'Snow-covered trees in a winter forest at Big White', pos: 50 },
   adventure: { src: '/images/outdoors/activity-adventure.jpg', alt: 'Climbers on a rocky bluff above Penticton', pos: 20 },
   fishing: { src: '/images/outdoors/activity-fishing.jpg', alt: 'Two men fishing from a boat on a calm lake at dawn', pos: 50 },
+  camping: { src: '/images/outdoors/activity-camping.jpg', alt: 'A tent pitched beside the lake near Kelowna', pos: 55 },
 });
 // /outdoors landing: when exactly one activity is pressed (card or chip),
 // swap the banner, H1 and intro to that activity's; otherwise restore the
