@@ -18434,6 +18434,25 @@ test('Fall Hidden Gems photos (2026-10-13): Sep-Nov a card with a fall photo sho
   assert.doesNotMatch(app.renderHiddenGemsHomepageHTML({ now: SUMMER_NOW }), /-fall\.jpg/);
 });
 
+test('Guide photos of their own (2026-10-13): each guide-<name> banner has its 1600px photo, an 800px phone copy and a card thumb, and the nine guides use them', () => {
+  const pub = (p) => path.join(__dirname, '..', 'public', p);
+  for (const [name, b] of Object.entries(app.GUIDE_PHOTOS)) {
+    const banner = app.GUIDE_BANNERS[`guide-${name}`]();
+    assert.equal(banner.src, `/images/guides/${name}.jpg`);
+    assert.ok(b.alt && banner.alt === b.alt, `${name} has alt text`);
+    for (const f of [`/images/guides/${name}.jpg`, `/images/guides/${name}-800.jpg`, `/images/guides/thumbs/${name}.jpg`]) assert.ok(fs.existsSync(pub(f)), `${f} exists`);
+  }
+  const uses = {
+    'kokanee-salmon-okanagan': 'kokanee-run', 'okanagan-waterfall-walks': 'forest-walk', 'halloween-okanagan': 'halloween-pumpkins',
+    'fall-events-okanagan': 'fall-fair', 'soup-ramen-pho-okanagan': 'noodle-soup', 'indoor-golf-okanagan': 'indoor-golf-sim',
+    'okanagan-winter-events': 'winter-fireside', 'valentines-day-okanagan': 'valentines-candlelight', 'okanagan-winter-wine': 'icewine-grapes',
+  };
+  for (const [slug, name] of Object.entries(uses)) {
+    const html = app.renderFileGuidePage(`/guides/${slug}`);
+    assert.match(html, new RegExp(`<img src="/images/guides/${name}\\.jpg" srcset="/images/guides/${name}-800\\.jpg 800w`), `${slug} banner`);
+  }
+});
+
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });

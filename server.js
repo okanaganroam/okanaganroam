@@ -21698,6 +21698,20 @@ const GUIDE_BANNERS = {
   'spas': () => INDOOR_EXPERIENCES.find((c) => c.slug === 'spas').banner,
 };
 for (const [key, b] of Object.entries(WHATSON_CATEGORY_BANNERS)) GUIDE_BANNERS[`whats-on-${key}`] = () => b;
+// Guide photos of their own (2026-10-13): a guide whose banner is `guide-<name>` uses /images/guides/<name>.jpg (free
+// Adobe Stock, 1600x778, with a -800 copy for phones and an 800x533 card thumb), instead of sharing a category photo.
+const GUIDE_PHOTOS = {
+  'kokanee-run': { alt: 'Two bright red kokanee salmon over the pebbles of a clear spawning creek', pos: 45 }, // Adobe Stock 343147349
+  'forest-walk': { alt: 'A hiker walking a forest road through fall colours', pos: 55 }, // Adobe Stock 289594517
+  'halloween-pumpkins': { alt: 'A row of carved jack-o-lanterns glowing outdoors at night', pos: 45 }, // Adobe Stock 466342992
+  'fall-fair': { alt: 'Hay bales, pumpkins and mums set out at a fall fair', pos: 50 }, // Adobe Stock 296311780
+  'noodle-soup': { alt: 'A steaming bowl of beef noodle soup on a wooden table', pos: 50 }, // Adobe Stock 632611028
+  'indoor-golf-sim': { alt: 'A golfer mid-swing in an indoor golf simulator bay', pos: 45 }, // Adobe Stock 597545624
+  'winter-fireside': { alt: 'Friends in winter coats gathered around an outdoor fire at night, one playing guitar', pos: 50 }, // Adobe Stock 487200379
+  'valentines-candlelight': { alt: 'A couple toasting red wine across a candlelit table with a red rose', pos: 50 }, // Adobe Stock 314863953
+  'icewine-grapes': { alt: 'Frozen icewine grapes hanging on the vine in a snowy vineyard', pos: 50 }, // Adobe Stock 243238436
+};
+for (const [name, b] of Object.entries(GUIDE_PHOTOS)) GUIDE_BANNERS[`guide-${name}`] = () => ({ src: `/images/guides/${name}.jpg`, alt: b.alt, pos: b.pos });
 const FILE_GUIDES_DIR = path.join(__dirname, 'data', 'guides');
 const FILE_GUIDES = (() => {
   const out = {};
@@ -25586,6 +25600,7 @@ module.exports = {
   renderRainyGuidePage,
   FILE_GUIDES,
   GUIDE_BANNERS,
+  GUIDE_PHOTOS,
   renderFileGuidePage,
   guideRefVenue,
   renderEditorialGuidePage,
