@@ -6287,7 +6287,7 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>${escapeHtml(badgeInfo.title)} Venues in ${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(badgeInfo.noun)} in ${escapeHtml(regionLabel)} — badge-checked from real listings, not guessed.</p>
-  ${categoryLinksHtml}${region === 'kelowna' && badge === 'patio' ? `\n  <p class="subtitle"><a href="${PATIO_GUIDE_PATH}">Our picks: the best patios in Kelowna &rarr;</a></p>` : ''}
+  ${categoryLinksHtml}${region === 'kelowna' && badge === 'patio' ? `\n  <p class="subtitle"><a href="${PATIO_GUIDE_PATH}">Our picks: the best patios in Kelowna &rarr;</a></p>` : ''}${region === 'kelowna' && badge === 'dog_friendly' ? `\n  <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Our guide: dog beaches, trails and patios in Kelowna &rarr;</a></p>` : ''}
   <ul class="card-grid">
     ${cards}
   </ul>
@@ -14374,7 +14374,8 @@ ${renderGolfHeaderHtml()}
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
   </script>`, `<h1>${escapeHtml(dogContent.heading)}</h1>
-  <p class="outdoor-intro fd-intro">${escapeHtml(dogContent.intro)}</p>`)}
+  <p class="outdoor-intro fd-intro">${escapeHtml(dogContent.intro)}</p>
+  <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Guide: dog-friendly Kelowna, with the dog rules for each place &rarr;</a></p>`)}
   ${dogSearchHtml()}
   ${dogTypeChipsHtml(state)}
   ${dogFilterBarHtml(venues, state)}
@@ -20316,10 +20317,11 @@ function guideTipHtml(text) {
     return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(m[2])}</a>` : escapeHtml(m[2]);
   }).join('');
 }
-function renderWineGuidePage() {
-  const g = WINE_GUIDE;
+function renderWineGuidePage() { return renderEditorialGuidePage(WINE_GUIDE, WINE_GUIDE_PATH); }
+// Shared page for the region/slug-based editorial guides (wine, dog-friendly).
+function renderEditorialGuidePage(g, path) {
   const banner = g.banner();
-  const canonical = `https://okanaganroam.com${WINE_GUIDE_PATH}`;
+  const canonical = `https://okanaganroam.com${path}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
     { name: g.parent.name, url: `https://okanaganroam.com${g.parent.href}` },
@@ -20338,7 +20340,7 @@ function renderWineGuidePage() {
     if (item.tip) return `\n          <li><strong>${escapeHtml(item.lead)}</strong> ${guideTipHtml(item.tip)}</li>`;
     const v = guideRefVenue(item.ref);
     if (!v) return '';
-    const place = item.where || (item.noPlace ? '' : REGION_LABELS[v.region] || '');
+    const place = item.where || (item.noPlace || g.noPlace ? '' : REGION_LABELS[v.region] || '');
     return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${escapeHtml(item.text)}</li>`;
   };
   const sectionsHtml = g.sections.map((sec) => {
@@ -20386,7 +20388,7 @@ ${renderGolfHeaderHtml()}
       <section class="ski-guide-resort" id="${g.table.id}">
         <h2>${escapeHtml(g.table.heading)}</h2>
         <table class="patio-picks">
-          <thead><tr><th scope="col">${escapeHtml(g.table.head[0])}</th><th scope="col">${escapeHtml(g.table.head[1])}</th></tr></thead>
+          ${g.table.head ? `<thead><tr><th scope="col">${escapeHtml(g.table.head[0])}</th><th scope="col">${escapeHtml(g.table.head[1])}</th></tr></thead>` : ''}
           <tbody>${rowsHtml}
           </tbody>
         </table>
@@ -20399,6 +20401,195 @@ ${renderGolfHeaderHtml()}
 </body>
 </html>`;
 }
+
+// ---------- Dog-friendly Kelowna (2026-10-13): /guides/dog-friendly-kelowna ----------
+// Approved copy (drafts/dog-friendly-kelowna.md); only places whose listing
+// states the dog rule. Every place is looked up live, as in the wine guide.
+const DOG_GUIDE_PATH = '/guides/dog-friendly-kelowna';
+const DOG_GUIDE = {
+  heading: 'Dog-Friendly Kelowna',
+  title: 'Dog-Friendly Kelowna: Beaches, Trails & Patios | Okanagan Roam',
+  description: 'Off-leash dog beaches, on-leash trails, and breweries, caf\u00e9s and wineries that welcome dogs in Kelowna, BC, with the dog rules for each.',
+  banner: () => DOG_FRIENDLY_BANNER,
+  parent: { name: 'Dog Friendly Finds', href: '/dog-friendly' },
+  noPlace: true,
+  intro: [
+    "Kelowna is an easy city to explore with a dog. There are off-leash beaches on Okanagan Lake, long creek-side trails, and plenty of breweries, cafés and wineries where your dog is welcome to come along.",
+    "This guide covers the best of them, with the dog rules for each place. Rules can change, and parks post their own signs, so always check what's posted when you arrive."
+  ],
+  sections: [
+    {
+      "id": "beaches",
+      "jump": "Dog beaches",
+      "heading": "Off-leash dog beaches",
+      "lead": "The City of Kelowna has four official off-leash dog beaches:",
+      "items": [
+        {
+          "ref": "kelowna/cedar-creek-park",
+          "name": "Cedar Creek Park",
+          "text": "the biggest off-leash dog beach in Kelowna. There's a beach and swimming area where you can take a dip with your dog, mountain views across the lake, and a large off-leash field for socializing afterwards. Pick up after your dog."
+        },
+        {
+          "ref": "kelowna/poplar-point-dog-beach",
+          "name": "Poplar Point Dog Beach",
+          "text": "just north of Sutherland Bay Park on Ellis Street. Treat it as a dog outing rather than a swimming beach for people. Dogs must be on leash elsewhere in Sutherland Bay Park."
+        },
+        {
+          "ref": "kelowna/lake-avenue-beach-access",
+          "name": "Lake Avenue Beach Access",
+          "text": "a small pocket of shoreline for a quick lake dip with the dog, rather than a full beach day."
+        },
+        {
+          "ref": "kelowna/downtown-sails-dog-beach",
+          "name": "Downtown Sails Dog Beach",
+          "text": "downtown's cooling-off beach for dogs, at the end of Bernard Avenue beside Kerry Park. It's off-leash only during seasonal designated hours, which the City doesn't publish online, so check the posted hours before unclipping. Outside those hours, Kerry Park is on-leash."
+        }
+      ]
+    },
+    {
+      "id": "walks",
+      "jump": "Walks & hikes",
+      "heading": "Walks and hikes (on leash)",
+      "items": [
+        {
+          "ref": "kelowna/mission-creek-greenway-regional-park",
+          "name": "Mission Creek Greenway",
+          "text": "16.5 km of trail following Mission Creek from Okanagan Lake into the hills. It's flat and wide from the lake and gets steeper through Scenic Canyon. There are washrooms on the route. Dogs on leash."
+        },
+        {
+          "ref": "kelowna/mill-creek-regional-park",
+          "name": "Mill Creek Regional Park",
+          "text": "a flat, shaded trail under cedars to a set of cascading waterfalls, about 800 metres one way. It's a cool escape on a hot afternoon. Washrooms on site; dogs on leash."
+        },
+        {
+          "ref": "kelowna/knox-mountain-park",
+          "name": "Knox Mountain Park",
+          "text": "Kelowna's largest natural park, with the classic view of the city. Dogs must be on leash, except in the designated off-leash dog park at 450 Knox Mountain Drive."
+        },
+        {
+          "ref": "kelowna/scenic-canyon-regional-park",
+          "name": "Scenic Canyon Regional Park",
+          "text": "trails along Mission Creek and KLO Creek, with washrooms, picnic tables and viewpoints. Dogs on leash."
+        },
+        {
+          "ref": "kelowna/canyon-falls-park-crawford-falls",
+          "name": "Canyon Falls Park (Crawford Falls)",
+          "text": "Bellevue Creek drops through a rocky canyon over two waterfalls. There are no washrooms. Dogs on leash."
+        },
+        {
+          "ref": "kelowna/johns-family-nature-conservancy-regional-park",
+          "name": "Johns Family Nature Conservancy",
+          "text": "more than 400 hectares with panoramic valley views and trails to The Crags. Washroom on site; dogs on leash."
+        },
+        {
+          "ref": "kelowna/chichester-wetland-park",
+          "name": "Chichester Wetland Park",
+          "text": "Rutland's neighbourhood wetland, and the one Kelowna wetland park on the trail that allows dogs. Keep them on leash and close around the water."
+        },
+        {
+          "ref": "kelowna/myra-canyon-myra-bellevue-provincial-park",
+          "name": "Myra Canyon",
+          "text": "the famous trestles of the Kettle Valley Railway. Dogs must be kept under control, and BC Parks notes the backcountry beyond the trail isn't suitable for pets."
+        },
+        {
+          "lead": "In winter:",
+          "tip": "the {kelowna/kelowna-nordic-ski-snowshoe-club|Kelowna Nordic Ski and Snowshoe Club} has designated K-9 trails where dogs are welcome."
+        }
+      ]
+    },
+    {
+      "id": "breweries",
+      "jump": "Breweries & pubs",
+      "heading": "Breweries and pubs",
+      "items": [
+        {
+          "ref": "kelowna/unleashed-brewing-company",
+          "name": "Unleashed Brewing Company",
+          "text": "a dog-inspired brewery in the Brewery District. Pups are welcome inside or out on the patio."
+        },
+        {
+          "ref": "kelowna/train-station-pub",
+          "name": "Train Station Pub",
+          "text": "a historic-character pub on Ellis Street with a dog-friendly menu and a summer patio. Regulars call its burger and fries the best in Kelowna."
+        },
+        {
+          "ref": "kelowna/post-haus-pub",
+          "name": "Post Haus Pub",
+          "text": "a hole-in-the-wall neighbourhood pub where pups are welcome on the patio. Order the schnitzel."
+        },
+        {
+          "ref": "kelowna/michaelbrook-golf-course",
+          "name": "Brookside Grill at Michaelbrook Golf Course",
+          "text": "a dog-friendly patio just off the Rail Trail. Golfers and non-golfers alike drop by."
+        }
+      ]
+    },
+    {
+      "id": "cafes",
+      "jump": "Cafés & treats",
+      "heading": "Cafés and treats",
+      "items": [
+        {
+          "ref": "kelowna/so-fetch-canine-social-club",
+          "name": "So Fetch Canine Social Club",
+          "text": "a downtown café by day and a 19+ dog-friendly lounge by night, with a separate all-ages treat bar serving gourmet meals and treats for dogs. There's no membership or entry fee, and it hosts regular events and breed meet-ups."
+        },
+        {
+          "ref": "kelowna/sweet-cloud-ice-cream-rolls",
+          "name": "Sweet Cloud Ice Cream Rolls",
+          "text": "rolled ice cream on Water Street, with a pup cup for your dog. Regulars rave about the banana s'more."
+        },
+        {
+          "ref": "kelowna/chaibaba",
+          "name": "Chaibaba",
+          "text": "a cozy downtown tea shop where the owner recommends teas by mood, and dogs get a treat at the door."
+        },
+        {
+          "ref": "kelowna/milk-shed-coffeehouse",
+          "name": "Milk Shed Coffeehouse",
+          "text": "a coffeehouse in a heritage barn. Dogs are welcome on half the patio, and the cinnamon buns are famous."
+        },
+        {
+          "ref": "kelowna/the-energy-den",
+          "name": "The Energy Den",
+          "text": "a smoothie and shake shop with dog-friendly owners who remember regulars' orders."
+        }
+      ]
+    },
+    {
+      "id": "wineries",
+      "jump": "Wineries",
+      "heading": "Wineries",
+      "items": [
+        {
+          "ref": "kelowna/sperling-vineyards",
+          "name": "Sperling Vineyards",
+          "text": "leashed dogs are welcome for a glass of wine at the picnic tables, with mountain views over the vines."
+        },
+        {
+          "ref": "kelowna/tantalus-vineyards",
+          "name": "Tantalus Vineyards",
+          "text": "one of BC's oldest vineyards, planted in 1927. On-leash dogs can join you in the tasting room and on vineyard walks."
+        },
+        {
+          "ref": "kelowna/priest-creek-family-estate-winery",
+          "name": "Priest Creek Family Estate Winery",
+          "text": "a dog-friendly patio among the vines, with a food truck on site."
+        }
+      ]
+    }
+  ],
+  table: { id: 'quick-picks', jump: 'Quick picks', heading: 'Quick picks', head: ['If you want\u2026', 'Go to'], rows: [
+    ['A swim with your dog', ['kelowna/cedar-creek-park|Cedar Creek Park']],
+    ['A shady walk on a hot day', ['kelowna/mill-creek-regional-park|Mill Creek Regional Park']],
+    ['A long walk from the lake', ['kelowna/mission-creek-greenway-regional-park|Mission Creek Greenway']],
+    ['A pint with the dog inside', ['kelowna/unleashed-brewing-company|Unleashed Brewing']],
+    ['A treat for the dog', ['kelowna/so-fetch-canine-social-club|So Fetch', 'kelowna/sweet-cloud-ice-cream-rolls|Sweet Cloud (pup cup)', 'kelowna/chaibaba|Chaibaba']],
+    ['Wine with the dog', ['kelowna/sperling-vineyards|Sperling Vineyards', 'kelowna/tantalus-vineyards|Tantalus']],
+  ] },
+  footerHtml: '<strong>See every dog-friendly place in Kelowna:</strong> <a href="/guide/kelowna/dog_friendly">Dog-friendly venues in Kelowna</a>, or <a href="/dog-friendly">Dog Friendly Finds</a> across the whole valley.',
+};
+function renderDogGuidePage() { return renderEditorialGuidePage(DOG_GUIDE, DOG_GUIDE_PATH); }
 
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
@@ -21888,6 +22079,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
+        `  <url>\n    <loc>https://okanaganroam.com${DOG_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${WINE_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${PATIO_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${SKI_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -23502,6 +23694,10 @@ const server = http.createServer(async (req, res) => {
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
     // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if ((pathname === DOG_GUIDE_PATH || pathname === `${DOG_GUIDE_PATH}/`) && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderDogGuidePage());
+    }
     if ((pathname === WINE_GUIDE_PATH || pathname === `${WINE_GUIDE_PATH}/`) && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderWineGuidePage());
@@ -23985,6 +24181,9 @@ module.exports = {
   WINE_GUIDE_PATH,
   renderWineGuidePage,
   guideTipHtml,
+  DOG_GUIDE,
+  DOG_GUIDE_PATH,
+  renderDogGuidePage,
   renderListYourVenuePage,
   validateVenueSubmission,
   buildVenueSubmissionEmail,
