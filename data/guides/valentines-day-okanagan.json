@@ -1,0 +1,273 @@
+{
+ "heading": "Valentine's Day in the Okanagan, 2027",
+ "title": "Valentine's Day in the Okanagan 2027 | Okanagan Roam",
+ "description": "Valentine's week 2027 in the Okanagan: a salt-cave chocolate night, ballet, romantic dinners, floating saunas, chocolate shops and a snowcat dinner.",
+ "banner": "restaurant",
+ "parent": {
+  "name": "Food & Drink",
+  "href": "/food-drink"
+ },
+ "noPlace": true,
+ "intro": [
+  "February in the Okanagan suits a slow evening out. This guide gathers date ideas for the week around February 14, 2027: a few events, dinners built for lingering, saunas on the lake, cocktails and chocolate, and a couple of snowy nights up the mountain. For everything else on that month, see our {page:/guides/okanagan-winter-events|winter events guide}.",
+  "The picks are spread across the valley, from Enderby and Vernon down to Naramata and Okanagan Falls. Many of these take bookings, so plan ahead and check each listing before you go."
+ ],
+ "sections": [
+  {
+   "id": "valentine-s-week-events",
+   "jump": "Events",
+   "heading": "Valentine's week events",
+   "lead": "These are the dated events that fit a night out for two.",
+   "items": [
+    {
+     "ref": "event:kelowna/valentine-s-day-bliss-yoga-sound-local-chocolate-in-the-salt-cave",
+     "name": "Valentine’s Day Bliss: Yoga, Sound & Local Chocolate in the Salt Cave",
+     "text": "yoga, sound and local chocolate in the salt cave at Room and Pillar Spa, 6:30 to 7:30 pm. Admission is $55.",
+     "where": "Kelowna, Feb 15"
+    },
+    {
+     "ref": "event:kelowna/ballet-kelowna-a-streetcar-named-desire",
+     "name": "Ballet Kelowna: A Streetcar Named Desire",
+     "text": "at Kelowna Community Theatre, 7:30 pm. Admission is $41.94 to $105.61.",
+     "where": "Kelowna, Feb 12 – 13"
+    },
+    {
+     "ref": "event:kelowna/come-from-away",
+     "name": "Come From Away",
+     "text": "dinner and a show at the Actors Studio & Dinner Theatre, running through Valentine's week. Admission is $93 to $100.",
+     "where": "Kelowna, Feb 3 – 21"
+    }
+   ]
+  },
+  {
+   "id": "romantic-dinners",
+   "jump": "Dinners",
+   "heading": "Romantic dinners",
+   "lead": "Small rooms, fireplaces and set menus. For more warm rooms to settle into, see our {page:/guides/cozy-spots-okanagan|cozy spots guide}, and for winery visits this time of year, our {page:/guides/okanagan-winter-wine|winter wine guide}.",
+   "items": [
+    {
+     "ref": "naramata/bistro-lapin-perdu",
+     "name": "Bistro Lapin Perdu",
+     "text": "a quiet, romantic French bistro inside the historic Naramata Inn, with a garden view. It's a place to linger, course by course.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "kelowna/humo-kelowna",
+     "name": "HUMO Kelowna",
+     "text": "an intimate tasting menu, and a good pick for a first date or a special occasion. Book ahead and mention any dietary needs when you do.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bouchons-bistro",
+     "name": "Bouchons Bistro",
+     "text": "the owner greets guests in French, and reviewers single out the escargot and duck confit. Book ahead and let the evening unfold slowly.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/intermezzo-restaurant-and-wine-cellar",
+     "name": "Intermezzo Restaurant and Wine Cellar",
+     "text": "elegant Italian fine dining with a wine cellar, and live Spanish guitar on select nights.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/gerni-s-farmhouse",
+     "name": "Gerni's Farmhouse",
+     "text": "an adults-only (16+) German-Austrian dining room inside Sparkling Hill Resort, popular with couples.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "enderby/kaze-japanese-restaurant",
+     "name": "Kaze Japanese Restaurant",
+     "text": "a cozy, family-run spot in a converted old home, with a fireplace dining room and a miso ramen reviewers call spectacular.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "okanagan-falls/the-barn-bistro-at-see-ya-later-ranch",
+     "name": "The Barn Bistro at See Ya Later Ranch",
+     "text": "the hilltop winery's kitchen runs ticketed Friday chef's dinners through the cooler months, with a surprise menu and a glass of wine. Check the winery's booking page first.",
+     "where": "Okanagan Falls"
+    }
+   ]
+  },
+  {
+   "id": "saunas-warm-soaks",
+   "jump": "Saunas",
+   "heading": "Saunas & warm soaks",
+   "lead": "A sauna session makes an easy afternoon date before dinner. Our {page:/guides/okanagan-saunas-spas|saunas and spas guide} has more.",
+   "items": [
+    {
+     "ref": "kelowna/cleopatra-s-rituals-thermal-spa-and-steam",
+     "name": "Cleopatra's Rituals Thermal Spa and Steam",
+     "text": "a hot-cold circuit of sauna, steam, thermal showers and a falling-snow room. Book a Thermal Ritual session or reserve the space privately.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/loyly-floating-sauna",
+     "name": "Löyly Floating Sauna",
+     "text": "a Finnish-style cedar sauna at the Downtown Marina, with a lake cold plunge and a warm solarium lounge overlooking Okanagan Lake.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/shelter-floating-sauna",
+     "name": "Shelter Floating Sauna",
+     "text": "a cedar sauna floating at the Lakeside Resort marina. Join a shared session or book the whole sauna privately.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "cocktails-chocolate-dessert",
+   "jump": "Cocktails & dessert",
+   "heading": "Cocktails, chocolate & dessert",
+   "lead": "For a drink after dinner, or a box of chocolates to bring home.",
+   "items": [
+    {
+     "ref": "kelowna/bernie-s-supper-club-cinema",
+     "name": "Bernie's Supper Club & Cinema",
+     "text": "a speakeasy-style supper club with an oyster bar and an upstairs theatre for a show after the meal. Book ahead for the theatre.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/micro-bar-bites",
+     "name": "Micro Bar + Bites",
+     "text": "a short cocktail list and seasonal small plates in a small, intimate room.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/wildflower-distilling-co",
+     "name": "Wildflower Distilling Co.",
+     "text": "a downtown craft distillery that doubles as an intimate cocktail lounge. Start with a tasting flight.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/chulo-tapas-bar",
+     "name": "Chulo Tapas & Bar",
+     "text": "a micro tapas bar for Spanish and Mediterranean small plates; reviewers single out the roasted duck and the craft cocktails.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "kelowna/karat-chocolate",
+     "name": "Karat Chocolate",
+     "text": "a downtown pastry boutique that sources its chocolate directly from a Brazilian partner farm, known for showstopping cakes.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/kin-pod-chocolate-ice-cream-and-coffee",
+     "name": "Kin+Pod Chocolate, Ice Cream, and Coffee",
+     "text": "chocolate, ice cream and coffee all made in house, and the owner is happy to let you sample before you choose.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "penticton/accent-chocolate-factory",
+     "name": "Accent Chocolate Factory",
+     "text": "handmade chocolates on Main Street since 2000, made with Belgian couverture, plus espresso drinks and tea.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "snowy-dates-on-the-mountain",
+   "jump": "Snowy dates",
+   "heading": "Snowy dates on the mountain",
+   "lead": "If you'd rather spend the evening in the snow, the ski hills have a few good options. For more winter outings, see our {page:/guides/okanagan-sleigh-rides-dog-sledding|sleigh rides and dog sledding guide}.",
+   "items": [
+    {
+     "ref": "silverstar/paradise-camp-snowcat-dinner-tours-silverstar",
+     "name": "Paradise Camp Snowcat Dinner Tours – SilverStar",
+     "text": "an evening snowcat ride about 8 km through the snowy forest to Paradise Camp, then a candlelit multi-course dinner. Runs select evenings, December to April.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/la-plata",
+     "name": "La Plata",
+     "text": "tapas and cocktails in SilverStar Village, with spruce syrup cocktails, a prickly pear mocktail and a tasting menu.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "big-white/6-bistro",
+     "name": "6° Bistro",
+     "text": "an intimate set-menu bistro with a warm outdoor fireplace, fur seating and a tasting menu with vegetarian options.",
+     "where": "Big White"
+    },
+    {
+     "ref": "event:big-white/the-loose-moose-challenge-february",
+     "name": "The Loose Moose Challenge – February",
+     "text": "a village scavenger hunt. Pick up a card at the Events Tent in the Village Centre from 9 am and return it the next afternoon.",
+     "where": "Big White, Feb 13 – 14"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A Valentine's event",
+    [
+     "event:kelowna/valentine-s-day-bliss-yoga-sound-local-chocolate-in-the-salt-cave|Valentine’s Day Bliss: Yoga, Sound & Local Chocolate in the Salt Cave"
+    ]
+   ],
+   [
+    "A quiet, romantic dinner",
+    [
+     "naramata/bistro-lapin-perdu|Bistro Lapin Perdu",
+     "kelowna/humo-kelowna|HUMO Kelowna"
+    ]
+   ],
+   [
+    "Dinner and a show",
+    [
+     "kelowna/bernie-s-supper-club-cinema|Bernie's Supper Club & Cinema",
+     "event:kelowna/come-from-away|Come From Away"
+    ]
+   ],
+   [
+    "A night at the ballet",
+    [
+     "event:kelowna/ballet-kelowna-a-streetcar-named-desire|Ballet Kelowna: A Streetcar Named Desire"
+    ]
+   ],
+   [
+    "A dinner by the fire",
+    [
+     "enderby/kaze-japanese-restaurant|Kaze Japanese Restaurant",
+     "big-white/6-bistro|6° Bistro"
+    ]
+   ],
+   [
+    "A sauna for two",
+    [
+     "kelowna/loyly-floating-sauna|Löyly Floating Sauna",
+     "penticton/shelter-floating-sauna|Shelter Floating Sauna"
+    ]
+   ],
+   [
+    "Chocolate to bring home",
+    [
+     "kelowna/karat-chocolate|Karat Chocolate",
+     "penticton/accent-chocolate-factory|Accent Chocolate Factory"
+    ]
+   ],
+   [
+    "Cocktails after dinner",
+    [
+     "penticton/wildflower-distilling-co|Wildflower Distilling Co.",
+     "kelowna/micro-bar-bites|Micro Bar + Bites"
+    ]
+   ],
+   [
+    "A snowy night out",
+    [
+     "silverstar/paradise-camp-snowcat-dinner-tours-silverstar|Paradise Camp Snowcat Dinner Tours – SilverStar"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on/events-festivals\">Events &amp; festivals</a>, <a href=\"/guides/cozy-spots-okanagan\">Cozy spots</a>, <a href=\"/whats-on\">What's On</a>"
+}
