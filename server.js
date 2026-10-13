@@ -12334,9 +12334,69 @@ function renderIndoorDiscoveryHtml(venues, selected) {
   ${count ? '' : '<p>No matching spots yet. <a href="/indoor">See all rainy-day spots</a>.</p>'}`;
 }
 
+// Tour activity chips (2026-10-12): /tours?activity=<slug> narrows Tours &
+// Experiences to one activity and swaps the banner, heading and intro. Tours
+// are sorted by keyword rules on the name first, then the description, with
+// TOUR_ACTIVITY_OVERRIDES for the few the rules get wrong -- so new tours land
+// in a chip without anyone tagging them. Photos: licensed free Adobe Stock
+// (290507958, 216375352, 1882450066, 239470335, 533796164, 357835833) and
+// free Unsplash 2xsY_jkXAYM (the Kettle Valley Steam Railway).
+const TOUR_ACTIVITIES = [
+  { slug: 'wine', label: 'Wine & Drink Tours', pattern: /wine tour|wine|cider|brewer|tasting tour|trolley|craft beverage|bubbl/i, banner: { src: '/images/tours/activity-wine.jpg', alt: 'Friends tasting wine in a vineyard on a sunny morning', pos: 35 }, heading: 'Wine & Drink Tours in the Okanagan', intro: 'Guided wine, cider and craft-beer tours with pickup and tasting stops across the valley — leave the driving to someone else.' },
+  { slug: 'lake', label: 'Lake & Boats', pattern: /boat|cruise|pontoon|marina|kayak|paddle|sea-doo|jet ski|waverunner|watercraft|wake|charter|fishing|water bike|parasail|channel float|sail|yacht/i, banner: { src: '/images/tours/activity-lake.jpg', alt: 'Friends canoeing on a lake on a summer day', pos: 50 }, heading: 'Lake & Boat Experiences in the Okanagan', intro: 'Cruises, boat and pontoon rentals, paddleboards, kayaks, fishing charters and more — the best ways to get out on the water.' },
+  { slug: 'bike', label: 'Bike & E-Bike', pattern: /e-bike|ebike|bike|bicycle|cycl/i, banner: { src: '/images/tours/activity-bike.jpg', alt: 'A couple cycling together along a paved trail', pos: 50 }, heading: 'Bike & E-Bike Tours in the Okanagan', intro: 'Bike rentals and guided e-bike rides on rail trails, lakeshore paths and through wine country.' },
+  { slug: 'farm', label: 'Farms & Food', pattern: /farm|u-pick|orchard|food tour|petting|goat|fruit|mushroom|flower/i, banner: { src: '/images/tours/activity-farm.jpg', alt: 'A woman and a girl picking apples in an orchard', pos: 35 }, heading: 'Farms & Food Experiences in the Okanagan', intro: 'U-pick orchards, farm visits, food tours and foraging — a taste of the valley straight from where it grows.' },
+  { slug: 'adventure', label: 'Adventure', pattern: /canyon|helicopter|heli|zipline|zip tour|atv|utv|4x4|skydiv|paraglid|balloon|climb|kart|riding|stables|horse|adventure park/i, banner: { src: '/images/tours/activity-adventure.jpg', alt: 'A woman flying along a zipline through the forest', pos: 40 }, heading: 'Adventure Experiences in the Okanagan', intro: 'Ziplines, heli flights, canyoning, paragliding, ATV tours, horseback rides and more — for when you want your heart racing.' },
+  { slug: 'winter', label: 'Winter', pattern: /snowshoe|sleigh|catski|snowcat|snowmobile|dog sled|ice[- ]fishing|winter ebike|winter e-bike/i, banner: { src: '/images/tours/activity-winter.jpg', alt: 'A team of huskies racing through the snow', pos: 45 }, heading: 'Winter Experiences in the Okanagan', intro: 'Dog sledding, sleigh rides, snowmobile and snowcat tours, snowshoeing and ice fishing — the best of the valley’s snowy season.' },
+  { slug: 'culture', label: 'History & Culture', pattern: /walking|ghost|railway|theatre|folk school|workshop|history|storytelling/i, banner: { src: '/images/tours/activity-culture.jpg', alt: 'The Kettle Valley Steam Railway rounding a bend through golden grass', pos: 50 }, heading: 'History & Culture Experiences in the Okanagan', intro: 'Steam train rides, ghost and walking tours and hands-on workshops — the stories and crafts of the Okanagan.' },
+];
+// Rule order matters: winter first (a winter e-bike tour is a winter tour).
+const TOUR_ACTIVITY_ORDER = ['winter', 'wine', 'lake', 'bike', 'farm', 'adventure', 'culture'];
+const TOUR_ACTIVITY_OVERRIDES = Object.freeze({
+  'Elements Adventure Company': 'farm',
+  'Full Cyrcle Adventures': 'adventure',
+  'Lakeside Eco-Sports': 'bike',
+  'Tiki Time Tours': 'lake',
+  'Luxury Lake Tours': 'lake',
+});
+function tourActivityOf(venue) {
+  if (TOUR_ACTIVITY_OVERRIDES[venue.name]) return TOUR_ACTIVITY_OVERRIDES[venue.name];
+  const rules = TOUR_ACTIVITY_ORDER.map((slug) => TOUR_ACTIVITIES.find((a) => a.slug === slug));
+  for (const a of rules) if (a.pattern.test(venue.name || '')) return a.slug;
+  const text = `${venue.name || ''} ${venue.description || ''}`;
+  for (const a of rules) if (a.pattern.test(text)) return a.slug;
+  return '';
+}
+const TOUR_ACTIVITY_STYLE = `<style>
+  .tour-activity-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .tour-activity-filters a { padding: 9px 15px; border-radius: 999px; border: 1px solid rgba(27,43,58,.22); text-decoration: none; color: var(--ink); background: #fff; font-weight: 700; font-size: .88rem; }
+  .tour-activity-filters a span { opacity: .6; font-weight: 600; }
+  .tour-activity-filters a[aria-current="page"] { background: #1b2b3a; color: #fff; }
+  .tour-activity-filters a[aria-current="page"] span { opacity: .8; }
+  .tour-activity-filters a:focus-visible { outline: 3px solid #a46b18; outline-offset: 3px; }
+</style>`;
+function renderTourActivityHtml(venues, selected) {
+  const choices = [{ slug: '', label: 'All' }, ...TOUR_ACTIVITIES];
+  const links = choices.map((c) => {
+    const count = c.slug ? venues.filter((v) => tourActivityOf(v) === c.slug).length : venues.length;
+    return `<a href="/tours${c.slug ? '?activity=' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>${count}</span></a>`;
+  }).join('\n    ');
+  return `${TOUR_ACTIVITY_STYLE}
+  <nav class="tour-activity-filters" aria-label="Choose a tour activity">
+    ${links}
+  </nav>`;
+}
+
 function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   const indoorActivity = type === 'indoor' && INDOOR_EXPERIENCES.some((c) => c.slug === opts.indoorActivity) ? opts.indoorActivity : '';
   const indoorUniverse = type === 'indoor' ? [...venues, ...(opts.indoorGolf || []), ...(opts.indoorAlso || []).filter((v) => !(opts.indoorGolf || []).some((g) => g.id === v.id))] : [];
+  const tourActivity = type === 'tour' && TOUR_ACTIVITIES.some((a) => a.slug === opts.tourActivity) ? opts.tourActivity : '';
+  const tourUniverse = type === 'tour' ? [...venues, ...(opts.toursAlso || [])] : [];
+  const tourContent = tourActivity ? TOUR_ACTIVITIES.find((a) => a.slug === tourActivity) : null;
+  if (tourActivity) {
+    venues = venues.filter((v) => tourActivityOf(v) === tourActivity);
+    opts = { ...opts, toursAlso: (opts.toursAlso || []).filter((v) => tourActivityOf(v) === tourActivity) };
+  }
   if (type === 'indoor') {
     venues = venues.filter((v) => indoorExperienceMatches(v, indoorActivity));
     opts = { ...opts,
@@ -12518,8 +12578,8 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: 'Home', href: '/' },
     { name: label.plural },
   ])}
-  ${CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
-  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
+  ${tourContent ? CATEGORY_BANNER_STYLE + categoryHeroHtml(`<div class="category-banner"><img src="${tourContent.banner.src}" alt="${escapeHtml(tourContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${tourContent.banner.pos}%" fetchpriority="high"></div>`, '<h1>' + escapeHtml(tourContent.heading) + '</h1>\n  <p class="hub-intro">' + escapeHtml(tourContent.intro) + '</p>') : CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
+  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
@@ -23165,7 +23225,7 @@ const server = http.createServer(async (req, res) => {
       if (venues.length >= MIN_CATEGORY_VENUES || type === 'indoor' || type === 'tour' || type === 'sport') {
         // /outdoors?regions=..&activities=.. renders pre-filtered (see
         // parseOutdoorFilterQuery); /indoor also accepts an activity choice.
-        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorActivity: type === 'indoor' ? query.activity : undefined, indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined, sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined });
+        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorActivity: type === 'indoor' ? query.activity : undefined, indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined, tourActivity: type === 'tour' ? query.activity : undefined, sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -23500,6 +23560,8 @@ module.exports = {
   FOOD_DRINK_HUB_BANNER,
   SKI_SNOW_BANNER,
   SKI_SNOW_REGION_CONTENT,
+  TOUR_ACTIVITIES,
+  tourActivityOf,
   WHATS_ON_BANNER,
   WHATSON_CATEGORY_BANNERS,
   WHATSON_CATEGORY_TEXT,
