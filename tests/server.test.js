@@ -10070,7 +10070,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
   // Approved Tours & Experiences change (2026-10-11): tripv3.type.tour added to TRANSLATIONS (en and fr) only.
   // Approved Sports & Recreation change (2026-10-12): tripv3.type.sport added to TRANSLATIONS (en and fr) only.
-  assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5', 'public/scripts/app.js (tripv3.type.sport, 2026-10-12)');
+  assert.equal(md5('public/scripts/app.js'), '963bc21c03c1b595b1d4c462e7b49178', 'public/scripts/app.js (French page twins, 2026-10-13)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11896,7 +11896,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5');
+  assert.equal(md5('public/scripts/app.js'), '963bc21c03c1b595b1d4c462e7b49178');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16130,7 +16130,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5');
+  assert.equal(md5('public/scripts/app.js'), '963bc21c03c1b595b1d4c462e7b49178');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16223,7 +16223,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5', 'app.js is untouched');
+    assert.equal(md5('public/scripts/app.js'), '963bc21c03c1b595b1d4c462e7b49178', 'app.js is untouched');
   }));
 }
 
@@ -18240,6 +18240,101 @@ test('Place share cards (2026-10-13): /share/<region>/<category>/<slug>.png is a
     const png = renderShareCard({ name, label: 'WINERY \u00b7 OKANAGAN FALLS, BC' });
     assert.equal(png.readUInt32BE(16), 1200);
   }
+});
+
+// ---- French place pages, Phase 1 (2026-10-13) --------------------------------------
+// English interface phrases that must never show on a French page (text outside <script>/<style>).
+const FR_PAGE_ENGLISH_PHRASES = ['Good to Know', 'Get Directions', 'Visit Website', 'View on map', 'Back to ', 'Explore all of', 'More to explore', 'Other ', 'Hours not listed', 'Favorites', 'List an Event', 'Get in touch', 'Send message', 'Coming soon', 'Your message', 'Thank you!', 'Featured in our guides', 'Also see', 'Hidden Gem', 'Local Favourite', 'Dog Friendly', 'Monday', 'Sunday', 'Closed', 'Address', 'Website', 'Phone', 'Region', 'Rating', 'Location', 'Events at', 'Indoor Golf', 'Add to trip', 'Add to Trip', 'Build My Trip', 'Things to Do', 'Explore '];
+// Visible text minus place and event names, which stay as they are on French pages (a fixture named "Test Website ..."
+// is a name, not interface text).
+function frVisibleText(html) {
+  let text = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+  const names = [...db.prepare('SELECT name FROM venues').all(), ...db.prepare('SELECT name FROM events').all()].map((r) => r.name).filter(Boolean).sort((a, b) => b.length - a.length);
+  for (const n of names) text = text.split(n).join(' ');
+  return text;
+}
+function withFrenchDescriptions(fn) {
+  const rows = db.prepare('SELECT id, description_fr FROM venues').all();
+  db.prepare("UPDATE venues SET description_fr = 'Une adresse de l’Okanagan, décrite en français.' WHERE description_fr IS NULL OR description_fr = ''").run();
+  return Promise.resolve().then(fn).finally(() => {
+    const restore = db.prepare('UPDATE venues SET description_fr = ? WHERE id = ?');
+    for (const r of rows) restore.run(r.description_fr, r.id);
+  });
+}
+
+test('French place pages (2026-10-13): /fr/... renders the place in French, paired with its English page by hreflang, in the sitemap, with a French share card', () => withFrenchDescriptions(async () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const page = await s5get('/fr/kelowna/restaurants/test-trattoria');
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<html lang="fr" data-page-lang="fr">/);
+  assert.match(page.text, /<title>Test Trattoria — Restaurant à Kelowna, C\.-B\. \| Okanagan Roam<\/title>/);
+  assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria">/);
+  for (const [lang, href] of [['en-CA', '/kelowna/restaurants/test-trattoria'], ['fr-CA', '/fr/kelowna/restaurants/test-trattoria'], ['x-default', '/kelowna/restaurants/test-trattoria']]) {
+    assert.ok(page.text.includes(`<link rel="alternate" hreflang="${lang}" href="https://okanaganroam.com${href}">`), lang);
+  }
+  assert.match(page.text, /<meta property="og:locale" content="fr_CA">/);
+  assert.match(page.text, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/share\/fr\/kelowna\/restaurants\/test-trattoria\.png\?v=/);
+  assert.match(page.text, /<a href="\/kelowna\/restaurants\/test-trattoria" hreflang="en" lang="en">English<\/a>/);
+  assert.doesNotMatch(page.text, /class="desc-en"/, 'only the French description');
+  assert.match(page.text, /Bon à savoir/);
+  const ld = s5jsonLd(page.text);
+  assert.deepEqual(ld.find((b) => b['@type'] === 'BreadcrumbList').itemListElement[0].name, 'Accueil');
+  assert.equal(ld.find((b) => b['@type'] !== 'BreadcrumbList').description, app.getVenue(venue.id).description_fr);
+  const text = frVisibleText(page.text);
+  for (const phrase of FR_PAGE_ENGLISH_PHRASES) assert.ok(!text.includes(phrase), `no English "${phrase}" on the French page: …${text.slice(Math.max(0, text.indexOf(phrase) - 80), text.indexOf(phrase) + 60)}…`);
+  // The English page names its twin and offers the switch.
+  const en = await s5get('/kelowna/restaurants/test-trattoria');
+  assert.match(en.text, /<html lang="en" data-page-lang="en">/);
+  assert.match(en.text, /<link rel="alternate" hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria">/);
+  assert.match(en.text, /<a href="\/fr\/kelowna\/restaurants\/test-trattoria" hreflang="fr" lang="fr">Français<\/a>/);
+  assert.doesNotMatch(en.text, /og:locale/, 'the English page head is otherwise unchanged');
+  // Unknown places 404; a place without French goes to its English page.
+  assert.equal((await s5get('/fr/kelowna/restaurants/no-such-place')).status, 404);
+  assert.equal((await s5get('/fr/nowhere/restaurants/test-trattoria')).status, 404);
+  db.prepare("UPDATE venues SET description_fr = NULL WHERE id = ?").run(venue.id);
+  const noFr = await new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try { const r = await fetch(`http://127.0.0.1:${tmp.address().port}/fr/kelowna/restaurants/test-trattoria`, { redirect: 'manual' }); resolve({ status: r.status, location: r.headers.get('location') }); }
+      catch (e) { reject(e); } finally { tmp.close(); }
+    });
+  });
+  assert.deepEqual(noFr, { status: 302, location: '/kelowna/restaurants/test-trattoria' });
+  assert.doesNotMatch((await s5get('/kelowna/restaurants/test-trattoria')).text, /hreflang/, 'no French, no pairing');
+  db.prepare("UPDATE venues SET description_fr = 'Une trattoria.' WHERE id = ?").run(venue.id);
+  // Sitemap: both URLs, each with the pair as alternates.
+  const sitemap = (await s5get('/sitemap.xml')).text;
+  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9" xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml">/);
+  assert.match(sitemap, /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna\/restaurants\/test-trattoria<\/loc>[\s\S]*?<xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna\/restaurants\/test-trattoria"\/>/);
+  // The French share card.
+  const card = await s5get('/share/fr/kelowna/restaurants/test-trattoria.png');
+  assert.equal(card.status, 200);
+}));
+
+test('French place pages (2026-10-13): every place type in the data renders without English interface text', () => withFrenchDescriptions(() => {
+  const types = db.prepare("SELECT type, MIN(id) AS id FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL GROUP BY type").all();
+  assert.ok(types.length >= 3);
+  for (const { type, id } of types) {
+    const venue = app.getVenue(id);
+    if (!app.venueHasFrench(venue)) continue;
+    const html = app.renderVenuePage(venue, [], [], [], { lang: 'fr' });
+    const text = frVisibleText(html);
+    for (const phrase of FR_PAGE_ENGLISH_PHRASES) assert.ok(!text.includes(phrase), `${type}: no English "${phrase}": …${text.slice(Math.max(0, text.indexOf(phrase) - 80), text.indexOf(phrase) + 60)}…`);
+    assert.match(html, /<html lang="fr" data-page-lang="fr">/, type);
+  }
+}));
+
+test('French helpers (2026-10-13): app.js dictionary is shared; header text, hours and town names are put into French', () => {
+  assert.equal(app.APP_TRANSLATIONS.fr['badge.patio'], 'Terrasse', 'the server reads app.js TRANSLATIONS');
+  assert.equal(app.localizeHtml('<a href="/x" data-i18n="badge.patio">Patio</a>', 'fr'), '<a href="/x" data-i18n="badge.patio">Terrasse</a>');
+  assert.equal(app.localizeHtml('<a data-i18n="badge.patio">Patio</a>', 'en'), '<a data-i18n="badge.patio">Patio</a>');
+  assert.match(app.localizeHtml('<a aria-label="Home" data-i18n-aria="nav.homeAriaLabel" href="/">x</a>', 'fr'), /aria-label="Accueil Okanagan Roam"/);
+  assert.equal(app.localizeStaticFr('<li><a href="/favorites">Favorites</a></li><script>var x = ">Favorites<";</script>'), '<li><a href="/favorites">Favoris</a></li><script>var x = ">Favorites<";</script>');
+  assert.equal(app.frHoursText('11:00–22:30'), '11 h–22 h 30');
+  assert.equal(app.frHoursText('Closed'), 'Fermé');
+  assert.equal(app.frHoursText('Hours not listed'), 'Heures non indiquées');
+  assert.equal(app.frDe('Osoyoos'), 'd’Osoyoos');
+  assert.equal(app.frDe('Kelowna'), 'de Kelowna');
 });
 
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {

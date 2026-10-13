@@ -943,6 +943,10 @@ var TRANSLATIONS = {
 };
 
 function getCurrentLang(){
+  // A page with a French twin (/fr/...) has its own fixed language (2026-10-13): its text is
+  // server-rendered in that language, so the saved preference must not translate it over.
+  var pageLang = document.documentElement.getAttribute('data-page-lang');
+  if (pageLang) return pageLang;
   try { return window.localStorage.getItem('okanaganLang') || 'en'; } catch (e) { return 'en'; }
 }
 
@@ -1013,6 +1017,12 @@ function applyTranslations(){
 function setLanguage(lang){
   try { window.localStorage.setItem('okanaganLang', lang); } catch (e) {}
   if (window.trackEvent) window.trackEvent('language_change', { language: lang });
+  // On a page with a twin in the other language, switching opens that page instead of translating in place.
+  var twin = document.querySelector('link[rel="alternate"][hreflang="' + lang + '-CA"]');
+  if (twin && document.documentElement.getAttribute('data-page-lang') && document.documentElement.getAttribute('data-page-lang') !== lang) {
+    window.location.assign(twin.getAttribute('href').replace(/^https:\/\/okanaganroam\.com/, ''));
+    return;
+  }
   applyTranslations();
   // Update existing venue cards in place rather than rebuilding them.
   // renderVenueCards() would destroy and recreate every .venue-card, but
