@@ -17559,7 +17559,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const ski = (await WINTER_GET(base, '/ski-snow')).text;
       assert.match(ski, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Ski &amp; Snow<\/h1>/, '/ski-snow opens with its photo above the heading');
       const gems = app.renderHiddenGemsPage([{ id: 990008, name: 'Banner Gem', slug: 'banner-gem', region: 'kelowna', type: 'cafe', description: 'Fixture.' }]);
-      assert.match(gems, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Hidden Gems<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
+      assert.match(gems, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Hidden Gems<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
       const whatsOn = (await WINTER_GET(base, '/whats-on')).text;
       assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner" id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
@@ -17601,6 +17601,12 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites<\/h1>/);
       for (const [k, c] of Object.entries(app.LOCAL_FAVOURITES_CATEGORY_CONTENT)) assert.ok(c.banner && c.heading && c.intro, `${k} has content`);
       assert.doesNotMatch(app.renderSecretSpotsPage(lfV), /lfBanner/, 'other curated pages unchanged');
+      // Hidden Gems: one type chosen shows that category's photo, heading and intro (main page only).
+      const hgV = [{ id: 990012, name: 'HG Cafe', slug: 'hg-cafe', region: 'kelowna', type: 'cafe', description: 'Fixture.' }, { id: 990013, name: 'HG Beach', slug: 'hg-beach', region: 'kelowna', type: 'beach', description: 'Fixture.' }];
+      const hgBeach = app.renderHiddenGemsPage(hgV, { types: ['beach'], regions: [] });
+      assert.match(hgBeach, /id="lfBanner"><img src="\/images\/beaches\/beaches\.jpg"/);
+      assert.match(hgBeach, /<h1>Hidden Gem Beaches in the Okanagan<\/h1>/);
+      assert.doesNotMatch(app.renderHiddenGemsPage(hgV, { types: ['beach'], regions: [] }, 'dog_friendly'), /Hidden Gem Beaches in the Okanagan/, 'badge views keep their own heading');
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
