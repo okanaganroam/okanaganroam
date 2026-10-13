@@ -10401,7 +10401,7 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // keep the exact previous head. No twitter:image is added: X falls back
   // to og:image, and other hubs' heads are pinned to have none.
   const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, indoorTheme = false, tourTheme = false, sportTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null } = opts;
-  const ogImage = shareImage ? `https://okanaganroam.com${shareImage}` : 'https://okanaganroam.com/og-image.png';
+  const ogImage = shareImage ? (/^https?:\/\//.test(shareImage) ? shareImage : `https://okanaganroam.com${shareImage}`) : 'https://okanaganroam.com/og-image.png';
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
@@ -16398,6 +16398,19 @@ function eventLocationAddress(event, hostVenue) {
   const locality = !hostVenue && event.valley_wide === 1 ? 'Okanagan Valley' : (REGION_LABELS[region] || 'Okanagan Valley');
   return { '@type': 'PostalAddress', addressLocality: locality, addressRegion: 'BC', addressCountry: 'CA' };
 }
+// An event's picture (SEO, 2026-10-13): its own image_url when it has an
+// http(s) one, otherwise the What's On photo for its first category with
+// one, otherwise the What's On banner. Used for og:image and the Event
+// schema's image, which Google's event results strongly recommend.
+function eventImagePath(event, categories) {
+  if (event.image_url && /^https?:\/\//.test(event.image_url)) return event.image_url;
+  const key = (categories || []).find((c) => WHATSON_CATEGORY_BANNERS[c]);
+  return (key ? WHATSON_CATEGORY_BANNERS[key] : WHATS_ON_BANNER).src;
+}
+function eventImageUrl(event, categories) {
+  const p = eventImagePath(event, categories);
+  return /^https?:\/\//.test(p) ? p : `https://okanaganroam.com${p}`;
+}
 function eventJsonLd(event, occurrences, categories, hostVenue, canonical, todayStr) {
   if (event.status !== 'scheduled' || !occurrences.length) return null;
   const upcoming = occurrences.filter((o) => o.end_date >= todayStr);
@@ -16418,13 +16431,13 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     '@context': 'https://schema.org',
     '@type': schemaType,
     name: main.label ? `${event.name} – ${main.label}` : event.name,
-    description: event.description || undefined,
+    description: event.description || `${event.name} in ${REGION_LABELS[event.region] || 'the Okanagan'}, BC.`,
     startDate: occurrenceIsoStart(main),
     endDate: occurrenceIsoEnd(main),
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     eventStatus: 'https://schema.org/EventScheduled',
     url: canonical,
-    image: event.image_url || undefined,
+    image: [eventImageUrl(event, categories)],
     location,
     subEvent: others.length ? others.map(sub) : undefined,
   };
@@ -16568,7 +16581,7 @@ ${related.map((r) => {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { noindex: expired, golfTheme: true, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { shareImage: eventImagePath(full, categories), noindex: expired, golfTheme: true, savedSidecar: true })}
 ${renderAnalyticsHeadHtml('event')}
 <style>
   /* Batch 4B (2026-09-27): the event page uses the themed shell, whose
@@ -23886,6 +23899,7 @@ module.exports = {
   OUTDOOR_ACTIVITY_CARDS,
   outdoorActivityImagePath,
   OUTDOOR_ACTIVITY_BANNERS,
+  eventImagePath,
   descExcerpt,
   descSearchWords,
   renderOutdoorActivityShowcaseHtml,
