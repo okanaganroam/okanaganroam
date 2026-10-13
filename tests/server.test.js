@@ -16765,24 +16765,25 @@ const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); re
 const winterMood = (iso) => app.renderMoodCardsHTML({ now: new Date(`${iso}T19:00:00Z`) });
 const moodKeys = (html) => Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
 
-test('Seasonal mood tiles: Nov-Mar swaps Beaches -> Ski & Snow and Golf -> Indoor in place; Apr-Oct is the summer set', () => {
-  for (const iso of ['2026-11-15', '2027-02-01', '2027-03-31', '2026-12-31', '2027-01-01']) {
+test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Ski & Snow and Golf -> Indoor in place; Apr-Sep is the summer set', () => {
+  for (const iso of ['2026-10-01', '2026-10-31', '2026-11-15', '2027-02-01', '2027-03-31', '2026-12-31', '2027-01-01']) {
     assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), true, iso);
     assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'ski-snow', 'indoor', 'whats-on', 'outdoors'], iso);
   }
-  for (const iso of ['2027-04-01', '2026-10-31', '2026-07-15']) {
+  for (const iso of ['2027-04-01', '2026-09-30', '2026-07-15']) {
     assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), false, iso);
     assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'beaches', 'golf', 'whats-on', 'outdoors'], iso);
   }
-  // The boundary is the Okanagan calendar day, not UTC: 2026-11-01 05:00 UTC
-  // is still Oct 31 in Vancouver.
-  assert.equal(app.isWinterMoodSeason(new Date('2026-11-01T05:00:00Z')), false);
-  assert.equal(app.isWinterMoodSeason(new Date('2026-11-01T08:00:00Z')), true);
+  // The boundary is the Okanagan calendar day, not UTC: 2026-10-01 05:00 UTC
+  // is still Sep 30 in Vancouver.
+  assert.equal(app.isWinterMoodSeason(new Date('2026-10-01T05:00:00Z')), false);
+  assert.equal(app.isWinterMoodSeason(new Date('2026-10-01T08:00:00Z')), true);
   // Every summer-tile day renders the same tiles as the default summer call;
   // Sep-Mar also adds the seasonal guide link (2026-10-13), never in summer.
   const noSeasonLink = (h) => h.replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
-  assert.equal(noSeasonLink(winterMood('2026-10-31')), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
-  assert.match(winterMood('2026-10-31'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/);
+  assert.equal(noSeasonLink(winterMood('2026-09-30')), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
+  assert.match(winterMood('2026-09-30'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/);
+  assert.match(winterMood('2026-10-31'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/, 'October shows the winter tiles with the fall guide link');
   assert.doesNotMatch(app.renderMoodCardsHTML({ now: SUMMER_NOW }), /mood-season-link/);
 });
 
