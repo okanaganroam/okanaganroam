@@ -84,7 +84,8 @@ function t3PlanNextSteps(p) {
     if(i.status!=='unmet'||['type','type_count','venue_kind','venue','activity','event','rainy','feature'].indexOf(i.kind)===-1)return;
     var key=i.kind+':'+i.value;if(seen[key])return;seen[key]=true;
     var eventLabels={hockey:'hockey game','live-music':'live music',festival:'festival',market:'market'};
-    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):String(i.value).replace(/_/g,' '),url:browseUrl(i)});
+    var requestLabels={pottery:'pottery class'};
+    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' '),labelFr:i.value==='pottery'?'atelier de poterie':null,url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode};}):[]});
   });
   var stops=p.days&&p.days.length?p.days.reduce(function(a,d){return a.concat(d.stops||[]);},[]):((p.itinerary&&p.itinerary.stops)||(p.outing&&p.outing.stops)||[]);
   (p.schedule||[]).forEach(function(i){
@@ -115,6 +116,14 @@ function t3PlanNextSteps(p) {
     steps.push({kind:'event_timing',name:stop.event.name,checks:checks,url:typeof url==='string'&&/^\/(?!\/)/.test(url)?url:null});
   });
   return steps;
+}
+
+function t3OptionalAlternativesHtml(step,fr,esc){
+ const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
+ if(!alternatives.length)return '';
+ const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing'};
+ const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing};
+ return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a href="'+esc(a.url)+'">'+esc(a.name)+'</a>'+(reason[a.reasonCode]?' — '+esc(reason[a.reasonCode]):'')+'</li>';}).join('')+'</ul></div>';
 }
 
 function t3TimingChecklist(step,fr){
@@ -286,7 +295,7 @@ function t3MapPoints(days, removed) {
   });
   return out;
 }
-const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   'Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake',
@@ -1140,7 +1149,7 @@ function renderScript(d) {
     if (!checks.length) return '';
     var fr = lang() === 'fr';
     var titles = fr ? ['Demandes vérifiées', 'Correspondances', 'Manquant', 'À confirmer'] : ['Requests checked', 'Matched', 'Missing', 'Needs confirmation'];
-    var names = fr ? {museum:'musée', gallery:'galerie', spa:'spa', easy_walk:'promenade facile', walk:'promenade', sunset:'point de vue au coucher du soleil', cafe:'café', restaurant:'restaurant', winery:'vignoble', rainy:'activité intérieure', duration:'durée', price_limit:'coût total', 'exact budget':'budget exact', 'party size':'taille du groupe', 'age suitability':'âge des enfants', accessibility:'accessibilité'} : {easy_walk:'easy walk', sunset:'sunset viewpoint', cafe:'coffee', rainy:'indoor suitability', duration:'visit duration', price_limit:'total cost'};
+    var names = fr ? {museum:'musée', gallery:'galerie', pottery:'atelier de poterie', spa:'spa', easy_walk:'promenade facile', walk:'promenade', sunset:'point de vue au coucher du soleil', cafe:'café', restaurant:'restaurant', winery:'vignoble', rainy:'activité intérieure', duration:'durée', price_limit:'coût total', 'exact budget':'budget exact', 'party size':'taille du groupe', 'age suitability':'âge des enfants', accessibility:'accessibilité'} : {pottery:'pottery class', easy_walk:'easy walk', sunset:'sunset viewpoint', cafe:'coffee', rainy:'indoor suitability', duration:'visit duration', price_limit:'total cost'};
     var statuses = ['satisfied', 'unmet', 'unverified'];
     return '<section class="t3-warnings" aria-label="' + esc(titles[0]) + '"><h3>' + esc(titles[0]) + '</h3><p>' + esc(fr ? 'Les correspondances concernent les fiches du site. Les disponibilités, les réservations et le temps de trajet restent à confirmer.' : 'Matches refer to listing information. Availability, reservations and travel timing still need confirmation.') + '</p>' + statuses.map(function(status, n){
       var items = checks.filter(function(i){ return i.status === status; });
@@ -1246,7 +1255,7 @@ function renderScript(d) {
         if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
-        return '<li>'+esc(nextFr?t3FrenchText(step.label):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+'</li>';
+        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
       }).join('')+'</ul></section>';
     }
     html += requirementSummaryHtml(p);
@@ -1634,4 +1643,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
