@@ -11214,7 +11214,7 @@ function categoryDirectoryEntries() {
   const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', image: categoryCardImage(WHATS_ON_BANNER) }];
   if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.', image: categoryCardImage(DOG_FRIENDLY_BANNER) });
   if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.', image: categoryCardImage(LOCAL_FAVOURITES_BANNER) });
-  if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.' });
+  if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.', image: categoryCardImage(HIDDEN_GEMS_BANNER) });
   if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.' });
 
   return [
@@ -14806,6 +14806,10 @@ function hiddenGemsPageDestination(intent) {
   const path = feature ? `/hidden-gems/${feature.replace(/_/g, '-')}` : '/hidden-gems';
   return { url: `${path}${discoveryQueryString({ types: T, regions: R })}`, kind: 'hidden-gems', reason: 'collection' };
 }
+// Banner (2026-10-12): Hardy Falls, Peachland -- free Unsplash photo
+// fyna7wKsHRk by Rodney Saigeon (Unsplash License) -- with an 800px thumbs/
+// copy for the /categories card. Shown on /hidden-gems and its badge views.
+const HIDDEN_GEMS_BANNER = Object.freeze({ src: '/images/hidden-gems-banner/hidden-gems.jpg', alt: 'Hardy Falls tumbling into Deep Creek in a rocky canyon near Peachland', pos: 45 });
 function renderHiddenGemsPage(venues, filter = null, feature = null) {
   const badge = feature ? BADGE_LABELS[feature] : null;
   const heading = badge ? `${badge.title} Hidden Gems` : 'Hidden Gems';
@@ -14825,6 +14829,7 @@ function renderHiddenGemsPage(venues, filter = null, feature = null) {
     summaryLabel: 'hidden gem',
     cardNotes: getPublicCollectionNotes('hidden_gem'),
     cardNoteLabel: 'Why it\u2019s a gem:',
+    banner: HIDDEN_GEMS_BANNER,
   }, venues, filter);
 }
 
@@ -23326,6 +23331,7 @@ module.exports = {
   WHATS_ON_BANNER,
   DOG_FRIENDLY_BANNER,
   LOCAL_FAVOURITES_BANNER,
+  HIDDEN_GEMS_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
