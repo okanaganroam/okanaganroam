@@ -3998,7 +3998,7 @@ test('SEO-1: Event location always has an address; same-name same-region events 
     const hostedLd = s5jsonLd((await s5get(`/kelowna/events/${hosted.slug}`)).text).find((b) => b['@type'] !== 'BreadcrumbList');
     assert.deepEqual(hostedLd.location.address, s5venue.address || locality('Kelowna'));
     // Nothing else in the Event JSON-LD changed shape.
-    assert.deepEqual(Object.keys(ld).sort(), ['@context', '@type', 'description', 'endDate', 'eventAttendanceMode', 'eventStatus', 'location', 'name', 'startDate', 'subEvent', 'url'].sort());
+    assert.deepEqual(Object.keys(ld).sort(), ['@context', '@type', 'description', 'endDate', 'eventAttendanceMode', 'eventStatus', 'image', 'location', 'name', 'startDate', 'subEvent', 'url'].sort());
 
     // E -- a unique name keeps the plain title.
     const titleOf = (html) => (/<title>([^<]*)<\/title>/.exec(html) || [])[1];
@@ -17787,4 +17787,16 @@ test('Card excerpts (2026-10-13): Food & Drink list cards show a short blurb, th
       assert.match(own, /house-cured gravlax/, 'the venue page keeps the full description');
     });
   } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+});
+
+test('Event images (SEO, 2026-10-13): event pages share a picture and their Event schema carries one -- the event\'s own image_url, else its What\'s On category photo, else the What\'s On banner', () => {
+  assert.equal(app.eventImagePath({ image_url: 'https://cdn.example.com/poster.jpg' }, ['live-music']), 'https://cdn.example.com/poster.jpg');
+  assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'live-music']), '/images/whats-on/nightlife.jpg');
+  assert.equal(app.eventImagePath({ image_url: null }, ['unknown-cat', 'markets-fairs']), '/images/whats-on/markets-fairs.jpg');
+  assert.equal(app.eventImagePath({}, []), '/images/whats-on/whats-on.jpg');
+  const fake = { id: 1, name: 'Image Test Fest', region: 'kelowna', status: 'scheduled', description: '', image_url: null };
+  const ld = app.eventJsonLd(fake, [{ id: 1, start_date: '2099-07-01', end_date: '2099-07-01', all_day: 1 }], ['markets-fairs'], null, 'https://okanaganroam.com/kelowna/events/x', '2099-01-01');
+  assert.deepEqual(ld.image, ['https://okanaganroam.com/images/whats-on/markets-fairs.jpg']);
+  assert.equal(ld.description, 'Image Test Fest in Kelowna, BC.', 'a description is always present');
+  assert.match(app.pageHead('t', 'd', 'https://okanaganroam.com/x', [], { shareImage: 'https://cdn.example.com/p.jpg' }), /<meta property="og:image" content="https:\/\/cdn\.example\.com\/p\.jpg">/);
 });
