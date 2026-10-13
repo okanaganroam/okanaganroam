@@ -1993,7 +1993,7 @@ test('renderVenuePage produces a page with the venue name as H1 and a canonical 
 test('venue hero fallbacks use the Okanagan illustration while supplied photos remain untouched', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const fallback = app.renderVenuePage(venue, [], [], []);
-  assert.match(fallback, /url\(['"]?\/images\/venue-hero-okanagan\.a01552e12e24\.jpg['"]?\)/);
+  assert.match(fallback, /url\(['"]?\/images\/venue-hero-okanagan\.a01552e12e24\.jpg\?v=a01552e12e24['"]?\)/);
   assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'venue-hero-okanagan.a01552e12e24.jpg')));
   assert.match(fallback, /venue-hero-fallback/);
 
@@ -2006,7 +2006,7 @@ test('shared venue listing cards get an illustrated header while event cards are
   const page = app.renderCategoryPage('kelowna', 'restaurant', [app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria')], []);
   assert.match(page, /li\.venue-card:not\(\.whatson-event-card\)\s*\{[\s\S]*?padding-top:\s*112px\s*!important/);
   assert.match(page, /linear-gradient\(100deg, rgba\(25,53,57,0\.76\), rgba\(25,53,57,0\.18\)\)/);
-  assert.match(page, /url\(['"]?\/images\/venue-hero-okanagan\.a01552e12e24\.jpg['"]?\)/);
+  assert.match(page, /url\(['"]?\/images\/venue-hero-okanagan\.a01552e12e24\.jpg\?v=a01552e12e24['"]?\)/);
   assert.match(page, /background-size:\s*100% 92px\s*!important/);
 });
 
