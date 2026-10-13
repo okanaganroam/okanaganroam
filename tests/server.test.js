@@ -16374,10 +16374,11 @@ test('Region intros: every destination carries local copy; towns get a "Things t
   assert.match(app.REGION_INTRO_STYLE, /@media \(max-width: 640px\)[\s\S]*\.region-intro-more \{ display: none; \}/);
 });
 
-test('SEO audit: single-venue pages keep the brand share image (decision #8)', () => {
+test('SEO audit: single-venue pages share their own generated card, not the brand image (decision #8 revised 2026-10-13)', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);
-  assert.deepEqual([...html.matchAll(/<meta property="og:image" content="([^"]*)">/g)].map((m) => m[1]), ['https://okanaganroam.com/og-image.png']);
+  assert.deepEqual([...html.matchAll(/<meta property="og:image" content="([^"]*)">/g)].map((m) => m[1]), [app.venueShareCardUrl(venue)]);
+  assert.match(app.venueShareCardUrl(venue), /^https:\/\/okanaganroam\.com\/share\/kelowna\/restaurants\/test-trattoria\.png\?v=[0-9a-f]{8}$/);
   assert.doesNotMatch(html, /<meta name="twitter:image"/);
 });
 
@@ -18208,6 +18209,37 @@ test('Town pages (2026-10-13): a TouristDestination plus an ItemList of the cate
     assert.ok(page.text.includes(`href="${x.url.replace('https://okanaganroam.com', '')}"`), `${x.url} is linked from the page`);
   }
   assert.equal(app.regionPageSchemas('kelowna', 'Kelowna', 'd', 'https://x', [{ key: 'a', label: 'Dog Friendly', count: 3, href: '/dog-friendly?regions=kelowna' }, { key: 'b', label: 'Golf', count: 0, href: null }]).length, 1, 'no list when nothing qualifies');
+});
+
+test('Place share cards (2026-10-13): /share/<region>/<category>/<slug>.png is a 1200x630 PNG for live places only, cached, and never the place\'s schema image', async () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  assert.equal(app.venueShareCardLabel(venue), 'RESTAURANT \u00b7 KELOWNA, BC');
+  const card = await new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try { const r = await fetch(`http://127.0.0.1:${tmp.address().port}/share/kelowna/restaurants/test-trattoria.png`); resolve({ status: r.status, type: r.headers.get('content-type'), cache: r.headers.get('cache-control'), body: Buffer.from(await r.arrayBuffer()) }); }
+      catch (e) { reject(e); } finally { tmp.close(); }
+    });
+  });
+  assert.equal(card.status, 200);
+  assert.equal(card.type, 'image/png');
+  assert.match(card.cache, /max-age=604800/);
+  assert.deepEqual([...card.body.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 'a PNG signature');
+  assert.deepEqual([card.body.readUInt32BE(16), card.body.readUInt32BE(20)], [1200, 630]);
+  for (const bad of ['/share/kelowna/restaurants/no-such-place.png', '/share/nowhere/restaurants/test-trattoria.png', '/share/kelowna/not-a-category/test-trattoria.png']) {
+    assert.equal((await s5get(bad)).status, 404, bad);
+  }
+  // The card is the share preview only: the place's own structured data claims no image.
+  const page = await s5get('/kelowna/restaurants/test-trattoria');
+  assert.equal(s5jsonLd(page.text).find((b) => b['@type'] !== 'BreadcrumbList').image, undefined);
+  // A renamed place gets a new URL, so caches fetch a fresh card.
+  assert.notEqual(app.venueShareCardUrl({ ...venue, name: 'Renamed Trattoria' }), app.venueShareCardUrl(venue));
+  // Long names, accents and characters outside the font still render.
+  const { renderShareCard } = require('../share-card.js');
+  for (const name of ['Café Ünïcödé & Co. \u2013 \u201cQuoted\u201d \u4e2d\u6587', 'A'.repeat(300), 'Word '.repeat(80)]) {
+    const png = renderShareCard({ name, label: 'WINERY \u00b7 OKANAGAN FALLS, BC' });
+    assert.equal(png.readUInt32BE(16), 1200);
+  }
 });
 
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
