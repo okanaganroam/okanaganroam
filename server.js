@@ -6694,6 +6694,8 @@ function homepageNow() {
 }
 
 function renderMoodCardsHTML({ now = new Date() } = {}) {
+  // Seasonal guide link (2026-10-13): Sep-Mar only, so summer output is unchanged.
+  const seasonalLink = seasonalGuideLink(now);
   const bestRegionForType = bestRegionForCategoryType();
   const winter = isWinterMoodSeason(now);
   // Golf-wide fix (2026-09-19): unlike every other category, Golf venues
@@ -6785,7 +6787,8 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
       <h2 data-i18n="mood.heading">What are you in the mood for?</h2>
-      <a class="discover-heading-link" href="/categories" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>
+      <a class="discover-heading-link" href="/categories" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>${seasonalLink ? `
+      <a class="discover-heading-link mood-season-link" href="${seasonalLink.href}">${escapeHtml(seasonalLink.label)} &rarr;</a>` : ''}
       <span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>
     </div>
     <div class="mood-card-grid">${cardsHtml}</div>
@@ -6912,6 +6915,7 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="/indoor" data-i18n="mood.indoor.title">Indoor &amp; Rainy Day</a></li>
           <li><a href="${SKI_SNOW_PATH}" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a></li>
           <li><a href="/hidden-gems" data-i18n="gems.heading">Hidden Gems</a></li>
+          <li><a href="/guides">Guides</a></li>
         </ul>
       </div>
       <div class="home-footer-col">
@@ -16278,9 +16282,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
       </div>`
     : '';
 
-  const guideLinks = venueGuidePages.length
+  const guideLinks = featuredInGuidesHtml(`${venue.region}/${venue.slug}`) + (venueGuidePages.length
     ? `<p class="venue-meta">Also see: ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}">${escapeHtml(BADGE_LABELS[c.badge].title)} in ${escapeHtml(regionLabel)}</a>`).join(', ')}</p>`
-    : '';
+    : '');
 
   // Back-link to the venue's regional category page (2026-09-19), only
   // for categories in ALL_REGIONS_CATEGORIES (currently golf) -- those
@@ -16641,6 +16645,7 @@ ${renderGolfHeaderHtml()}
   ${detailRows}
   ${datesListHtml}
   ${attribution}${editorialHtml}
+  ${expired ? '' : featuredInGuidesHtml(`event:${full.region}/${full.slug}`)}
   ${relatedHtml}
   <a class="cta" href="/${full.region}">Explore all of ${escapeHtml(regionLabel)}</a>
   </main>
@@ -20078,6 +20083,7 @@ ${renderGolfHeaderHtml()}
         <h2>Plan your ski trip</h2>
         <ul class="ski-guide-list">${tipsHtml}
         </ul>
+        <p><a href="/guides">More Okanagan guides &rarr;</a></p>
       </section>
     </article>
   </main>
@@ -20223,6 +20229,7 @@ ${renderGolfHeaderHtml()}
           </tbody>
         </table>
         <p><strong>See every Kelowna patio:</strong> <a href="/guide/kelowna/patio">Patio venues in Kelowna</a>, with filters.</p>
+        <p><a href="/guides">More Okanagan guides &rarr;</a></p>
       </section>
     </article>
   </main>
@@ -20336,6 +20343,7 @@ function renderWineGuidePage() { return renderEditorialGuidePage(WINE_GUIDE, WIN
 // Shared page for the region/slug-based editorial guides (wine, dog-friendly).
 function renderEditorialGuidePage(g, path) {
   const banner = g.banner();
+  const thin = guideIsThin(g);
   const canonical = `https://okanaganroam.com${path}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -20374,7 +20382,7 @@ function renderEditorialGuidePage(g, path) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: banner.src })}
+${pageHead(g.title, g.description, canonical, [breadcrumb, article], { golfTheme: true, shareImage: banner.src, noindex: thin })}
 ${CATEGORY_BANNER_STYLE}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
@@ -20402,7 +20410,7 @@ ${renderGolfHeaderHtml()}
   ])}
     <article class="ski-guide">
       ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
-      <div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${guideTipHtml(p)}</p>`).join('')}
+      ${thin ? `<p class="guide-thin-note"><strong>This guide is between seasons.</strong> Most of what it covered has finished for now. See our <a href="/guides">current guides</a>.</p>\n      ` : ''}<div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${guideTipHtml(p)}</p>`).join('')}
       </div>
       <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}
       <section class="ski-guide-resort" id="${g.table.id}">${rowsHtml ? `
@@ -20413,6 +20421,7 @@ ${renderGolfHeaderHtml()}
           </tbody>
         </table>` : ''}
         <p>${g.footerHtml}</p>
+        <p><a href="/guides">More Okanagan guides &rarr;</a></p>
       </section>
     </article>
   </main>
@@ -21089,6 +21098,153 @@ const FILE_GUIDES = (() => {
 function renderFileGuidePage(pathname) {
   const g = FILE_GUIDES[pathname];
   return g ? renderEditorialGuidePage(g, pathname) : null;
+}
+
+// ---------- Guide registry, /guides index, thin guides, "Featured in" (2026-10-13) ----------
+// Every editorial guide in one list, so the /guides page, the sitemap, the
+// homepage's seasonal link and venue/event "Featured in" links all agree.
+const GUIDE_GROUPS = [
+  { key: 'fall', heading: 'Fall in the Okanagan', paths: ['/guides/fall-okanagan', '/guides/fall-farms-u-pick-okanagan', '/guides/okanagan-cideries', '/guides/okanagan-winery-restaurants', '/guides/kokanee-salmon-okanagan', '/guides/okanagan-waterfall-walks', '/guides/halloween-okanagan', '/guides/fall-events-okanagan', '/guides/okanagan-hockey-season'] },
+  { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan'] },
+  { key: 'winter', heading: 'Winter', paths: ['/guides/ski-season-big-white-silverstar'] },
+  { key: 'year', heading: 'Food, drink and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna'] },
+];
+// Season order for /guides (Okanagan local month): the current season leads.
+function guideGroupOrder(now = new Date()) {
+  const m = Number(todayLocal(now).slice(5, 7));
+  if (m >= 9 && m <= 11) return ['fall', 'cozy', 'winter', 'year'];
+  if (m === 12 || m <= 3) return ['winter', 'cozy', 'year', 'fall'];
+  return ['year', 'fall', 'cozy', 'winter'];
+}
+// Each guide's refs ('region/slug' or 'event:region/slug'), from list items,
+// inline {ref|Label} links and quick-pick rows.
+function guideRefsOf(g) {
+  const refs = new Set();
+  const fromText = (t) => { for (const m of String(t || '').matchAll(/\{((?:event:)?[a-z-]+\/[a-z0-9-]+)\|/g)) refs.add(m[1]); };
+  for (const sec of g.sections || []) {
+    fromText(sec.lead);
+    for (const it of sec.items || []) { if (it.ref) refs.add(it.ref); fromText(it.text); fromText(it.tip); }
+  }
+  for (const p of g.intro || []) fromText(p);
+  for (const [, list] of (g.table && g.table.rows) || []) for (const x of list) refs.add(x.split('|')[0]);
+  return [...refs];
+}
+function allGuides() {
+  const list = [
+    { path: SKI_GUIDE_PATH, heading: SKI_GUIDE.heading, description: SKI_GUIDE.description, banner: SKI_SNOW_BANNER, refs: SKI_GUIDE.resorts.flatMap((r) => r.sections.flatMap((sec) => sec.items.map((it) => `${r.region}/${it.slug}`))), editorial: null },
+    { path: PATIO_GUIDE_PATH, heading: PATIO_GUIDE.heading, description: PATIO_GUIDE.description, banner: PATIO_GUIDE.banner(), refs: PATIO_GUIDE.sections.flatMap((sec) => sec.items.map((it) => `kelowna/${it.slug}`)), editorial: null },
+  ];
+  for (const [p, g] of [[WINE_GUIDE_PATH, WINE_GUIDE], [DOG_GUIDE_PATH, DOG_GUIDE], [BRUNCH_GUIDE_PATH, BRUNCH_GUIDE], [RAINY_GUIDE_PATH, RAINY_GUIDE], ...Object.entries(FILE_GUIDES)]) {
+    list.push({ path: p, heading: g.heading, description: g.description, banner: g.banner(), refs: guideRefsOf(g), editorial: g });
+  }
+  return list;
+}
+// A guide is "thin" when fewer than GUIDE_MIN_LIVE_ITEMS of its list items
+// still resolve to a live place or upcoming event (seasonal event guides
+// empty out once the season ends). Thin guides stay reachable but are
+// noindex, out of the sitemap and the /guides page, and say so.
+const GUIDE_MIN_LIVE_ITEMS = 5;
+function guideLiveItemCount(g) {
+  let n = 0;
+  for (const sec of g.sections || []) for (const it of sec.items || []) {
+    if (it.tip) { n += 1; continue; }
+    if (guideRefVenue(it.ref)) n += 1;
+  }
+  return n;
+}
+const guideIsThin = (g) => !!g && guideLiveItemCount(g) < GUIDE_MIN_LIVE_ITEMS;
+// Cached for 10 minutes: every venue and event page asks for this, and
+// working it out means looking up each guide's places.
+let liveGuidesCache = null;
+function liveGuides() {
+  if (liveGuidesCache && Date.now() - liveGuidesCache.at < 10 * 60 * 1000) return liveGuidesCache.list;
+  const list = allGuides().filter((x) => !x.editorial || !guideIsThin(x.editorial));
+  liveGuidesCache = { at: Date.now(), list };
+  return list;
+}
+function resetGuideCache() { liveGuidesCache = null; }
+// "Featured in our guides" for a venue or event page: the guides (not thin)
+// whose list mentions it.
+function guidesFeaturing(ref) {
+  return liveGuides().filter((x) => x.refs.includes(ref));
+}
+function featuredInGuidesHtml(ref) {
+  const gs = guidesFeaturing(ref);
+  if (!gs.length) return '';
+  return `<p class="venue-meta guide-featured-in">Featured in our guides: ${gs.map((x) => `<a href="${x.path}">${escapeHtml(x.heading)}</a>`).join(', ')}</p>`;
+}
+const guideCardImage = (b) => {
+  const thumb = b.src.replace(/\/([^/]+)$/, '/thumbs/$1');
+  return fs.existsSync(path.join(__dirname, 'public', thumb)) ? thumb : b.src;
+};
+// The homepage's seasonal guide link (Sep-Mar only; nothing in summer).
+function seasonalGuideLink(now = new Date()) {
+  const m = Number(todayLocal(now).slice(5, 7));
+  if (m >= 9 && m <= 11 && FILE_GUIDES['/guides/fall-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/fall-okanagan'])) return { href: '/guides/fall-okanagan', label: 'Fall in the Okanagan: our seasonal guides' };
+  if (m === 12 || m <= 3) return { href: SKI_GUIDE_PATH, label: 'Winter in the Okanagan: the ski season guide' };
+  return null;
+}
+function renderGuidesIndexPage(now = new Date()) {
+  const title = 'Okanagan Guides: Things to Do by Season | Okanagan Roam';
+  const description = 'Okanagan Roam’s guides to the Okanagan: fall harvest and events, cozy and rainy days, ski season, brunch, patios, wineries and dog-friendly spots.';
+  const canonical = 'https://okanaganroam.com/guides';
+  const byPath = Object.fromEntries(liveGuides().map((x) => [x.path, x]));
+  const groups = guideGroupOrder(now).map((k) => GUIDE_GROUPS.find((g) => g.key === k)).map((g) => ({ ...g, guides: g.paths.map((p) => byPath[p]).filter(Boolean) })).filter((g) => g.guides.length);
+  const listed = groups.flatMap((g) => g.guides);
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Guides', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Okanagan Roam guides',
+    itemListElement: listed.map((x, i) => ({ '@type': 'ListItem', position: i + 1, url: `https://okanaganroam.com${x.path}`, name: x.heading })),
+  };
+  const card = (x) => `
+        <li class="guide-card"><a href="${x.path}">
+          <span class="guide-card-img"><img src="${guideCardImage(x.banner)}" alt="" width="800" height="533" loading="lazy" decoding="async" style="object-position: 50% ${x.banner.pos || 50}%"></span>
+          <span class="guide-card-body"><span class="guide-card-title">${escapeHtml(x.heading)}</span><span class="guide-card-desc">${escapeHtml(x.description)}</span></span>
+        </a></li>`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, shareImage: OUTDOOR_ACTIVITY_BANNERS.hiking.src })}
+<style>
+  body.guides-index-page .guides-index { max-width: 1100px; margin: 0 auto; padding: 8px 0 48px; }
+  body.guides-index-page .guides-index-intro { font-size: 1.05rem; line-height: 1.6; max-width: 70ch; }
+  body.guides-index-page .guides-group { margin-top: 32px; }
+  body.guides-index-page .guide-grid { list-style: none; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  body.guides-index-page .guide-card a { display: flex; flex-direction: column; height: 100%; border-radius: 14px; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgba(27,43,58,.12); text-decoration: none; color: var(--ink); }
+  body.guides-index-page .guide-card a:hover .guide-card-title { text-decoration: underline; }
+  body.guides-index-page .guide-card a:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+  body.guides-index-page .guide-card-img { display: block; aspect-ratio: 3 / 2; background: #2A6B67; }
+  body.guides-index-page .guide-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  body.guides-index-page .guide-card-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 16px; }
+  body.guides-index-page .guide-card-title { font-weight: 800; font-size: 1.02rem; line-height: 1.3; }
+  body.guides-index-page .guide-card-desc { font-size: .9rem; line-height: 1.45; opacity: .8; }
+</style>
+</head>
+<body class="golf-page guides-index-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Guides' }])}
+    <div class="guides-index">
+      <h1>Okanagan Guides</h1>
+      <p class="guides-index-intro">Seasonal guides to the Okanagan, built from places and events Okanagan Roam has verified. Each one links straight to the listings.</p>${groups.map((g) => `
+      <section class="guides-group" id="${g.key}">
+        <h2>${escapeHtml(g.heading)}</h2>
+        <ul class="guide-grid">${g.guides.map(card).join('')}
+        </ul>
+      </section>`).join('')}
+    </div>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
 }
 
 function renderListYourVenuePage() {
@@ -22579,7 +22735,8 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
-        ...Object.keys(FILE_GUIDES).map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
+        `  <url>\n    <loc>https://okanaganroam.com/guides</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        ...Object.keys(FILE_GUIDES).filter((p) => !guideIsThin(FILE_GUIDES[p])).map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com${RAINY_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${BRUNCH_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${DOG_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -24197,6 +24354,10 @@ const server = http.createServer(async (req, res) => {
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
     // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if ((pathname === '/guides' || pathname === '/guides/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderGuidesIndexPage());
+    }
     if (method === 'GET' && FILE_GUIDES[pathname.replace(/\/$/, '')]) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderFileGuidePage(pathname.replace(/\/$/, '')));
@@ -24692,6 +24853,14 @@ module.exports = {
   PATIO_GUIDE,
   PATIO_GUIDE_PATH,
   renderPatioGuidePage,
+  renderGuidesIndexPage,
+  allGuides,
+  guidesFeaturing,
+  guideIsThin,
+  resetGuideCache,
+  seasonalGuideLink,
+  GUIDE_GROUPS,
+  guideGroupOrder,
   WINE_GUIDE,
   WINE_GUIDE_PATH,
   renderWineGuidePage,

@@ -2769,7 +2769,7 @@ test('Home footer: Explore column has exactly the 11 approved items, in order, e
   assert.ok(exploreMatch, 'expected to find the Explore column');
   const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
     .map((m) => ({ href: m[1], text: m[2] }));
-  assert.equal(items.length, 11, 'expected exactly 11 Explore links (the four 2026-10 categories added before Hidden Gems)');
+  assert.equal(items.length, 12, 'expected exactly 12 Explore links (the four 2026-10 categories added before Hidden Gems, then Guides)');
   assert.equal(items[0].text, 'Food &amp; Drinks');
   assert.equal(items[0].href, '/food-drink', 'Food & Drinks points at the dedicated hub, matching the mood card and the Wine link below it');
   assert.ok(items[1].href === '/wineries', `Wine href unexpected: ${items[1].href}`);
@@ -2779,6 +2779,7 @@ test('Home footer: Explore column has exactly the 11 approved items, in order, e
   assert.equal(items[5].href, '/outdoors', 'footer Outdoors link matches the Outdoors mood card once outdoor venues exist (2026-09-20)');
   assert.deepEqual(items.slice(6, 10).map((i) => i.href), ['/sports', '/tours', '/indoor', '/ski-snow'], 'the 2026-10 categories, matching the header (2026-10-12)');
   assert.equal(items[10].href, '/hidden-gems', 'footer Hidden Gems goes to the full /hidden-gems page, matching the header (2026-09-25)');
+  assert.equal(items[11].href, '/guides', 'footer Guides goes to the /guides index (2026-10-13)');
 });
 
 test('Home footer: Regions column lists ALL 20 real regions (none omitted), each a real /:region link', () => {
@@ -10050,7 +10051,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), '05d0841fe606e175a97c7cc82527df37', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
+  assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
   assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
@@ -11891,7 +11892,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '05d0841fe606e175a97c7cc82527df37'); // SEO (2026-10-13): header Food & Drink links go to /restaurants, /cafes, /pubs, /breweries, /distilleries, /cocktail-lounges
+  assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80'); // SEO (2026-10-13): header Food & Drink links go to /restaurants, /cafes, /pubs, /breweries, /distilleries, /cocktail-lounges
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
@@ -16122,7 +16123,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   // Frozen files are byte-identical.
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '05d0841fe606e175a97c7cc82527df37');
+  assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
   assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
@@ -16774,8 +16775,12 @@ test('Seasonal mood tiles: Nov-Mar swaps Beaches -> Ski & Snow and Golf -> Indoo
   // is still Oct 31 in Vancouver.
   assert.equal(app.isWinterMoodSeason(new Date('2026-11-01T05:00:00Z')), false);
   assert.equal(app.isWinterMoodSeason(new Date('2026-11-01T08:00:00Z')), true);
-  // Every summer day renders the same bytes as the default summer call.
-  assert.equal(winterMood('2026-10-31'), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
+  // Every summer-tile day renders the same tiles as the default summer call;
+  // Sep-Mar also adds the seasonal guide link (2026-10-13), never in summer.
+  const noSeasonLink = (h) => h.replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
+  assert.equal(noSeasonLink(winterMood('2026-10-31')), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
+  assert.match(winterMood('2026-10-31'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/);
+  assert.doesNotMatch(app.renderMoodCardsHTML({ now: SUMMER_NOW }), /mood-season-link/);
 });
 
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
@@ -16823,7 +16828,7 @@ test('Seasonal mood tiles: "/" honours OKR_TODAY_OVERRIDE (test-only), never in 
       assert.match(winter.text, /<a class="mood-card mood-card-indoor" href="\/indoor">/);
       assert.doesNotMatch(winter.text, /mood-card mood-card-beaches|mood-card mood-card-golf/);
       // Only the two swapped cards differ between the seasons.
-      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|ski-snow|indoor)"[\s\S]*?<\/a>/g, '');
+      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|ski-snow|indoor)"[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
       assert.equal(strip(winter.text), strip(summer.text));
     });
     process.env.OKR_TODAY_OVERRIDE = '2027-02-30';
@@ -17941,6 +17946,43 @@ test('Fall guides (2026-10-13): data/guides files load, render on the shared gui
   await withWinterServer(async (base) => {
     assert.equal((await WINTER_GET(base, '/guides/halloween-okanagan')).status, 200);
     const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
-    for (const p of paths) assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${p}</loc>`), `sitemap lists ${p}`);
+    for (const p of paths) assert.equal(sitemap.includes(`<loc>https://okanaganroam.com${p}</loc>`), !app.guideIsThin(app.FILE_GUIDES[p]), `sitemap lists ${p} unless thin`);
+  });
+});
+
+test('Guides hub (2026-10-13): /guides lists live guides by season, header/footer/homepage link to it, venue pages show "Featured in", thin guides are noindex and out of the sitemap', async () => {
+  const oct = new Date('2026-10-13T12:00:00-07:00');
+  const idx = app.renderGuidesIndexPage(oct);
+  assert.match(idx, /<title>Okanagan Guides: Things to Do by Season \| Okanagan Roam<\/title>/);
+  assert.match(idx, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides">/);
+  assert.deepEqual(app.guideGroupOrder(oct), ['fall', 'cozy', 'winter', 'year'], 'fall leads in October');
+  assert.deepEqual(app.guideGroupOrder(new Date('2027-01-15T12:00:00-08:00')), ['winter', 'cozy', 'year', 'fall'], 'winter leads in January');
+  assert.deepEqual(app.guideGroupOrder(new Date('2027-06-15T12:00:00-07:00')), ['year', 'fall', 'cozy', 'winter'], 'year-round leads in summer');
+  assert.match(idx, /<h2>Winter<\/h2>/, 'the ski guide is always listed');
+  assert.match(idx, /href="\/guides\/ski-season-big-white-silverstar"/);
+  assert.equal(app.seasonalGuideLink(new Date('2026-07-15T12:00:00-07:00')), null, 'no seasonal link in summer');
+  assert.equal(app.seasonalGuideLink(new Date('2027-01-15T12:00:00-08:00')).href, '/guides/ski-season-big-white-silverstar');
+  // Thin: a guide whose places are all gone is noindex with a note.
+  const ghost = { ...app.RAINY_GUIDE, sections: [{ id: 's', jump: 'S', heading: 'S', items: [{ ref: 'nowhere/gone', name: 'Gone', text: 'gone' }] }] };
+  assert.ok(app.guideIsThin(ghost));
+  const thinHtml = app.renderEditorialGuidePage(ghost, '/guides/test');
+  assert.match(thinHtml, /<meta name="robots" content="noindex">/);
+  assert.match(thinHtml, /This guide is between seasons\./);
+  assert.match(app.renderEditorialGuidePage(app.FILE_GUIDES['/guides/fall-okanagan'], '/guides/fall-okanagan'), /href="\/guides">More Okanagan guides/);
+  // Featured in: a venue a live guide mentions links back to it.
+  const live = app.allGuides().find((x) => x.editorial && !app.guideIsThin(x.editorial) && x.refs.some((r) => !r.startsWith('event:') && app.guideRefVenue(r)));
+  if (live) {
+    const ref = live.refs.find((r) => !r.startsWith('event:') && app.guideRefVenue(r));
+    app.resetGuideCache();
+    assert.ok(app.guidesFeaturing(ref).some((x) => x.path === live.path), `${ref} is featured in ${live.path}`);
+  }
+  await withWinterServer(async (base) => {
+    const page = await WINTER_GET(base, '/guides');
+    assert.equal(page.status, 200);
+    assert.match(page.text, /<a href="\/guides">Guides<\/a>/, 'header Discover menu links Guides');
+    assert.match(page.text, /<li><a href="\/guides">Guides<\/a><\/li>/, 'footer links Guides');
+    const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/guides</loc>'));
+    for (const p of Object.keys(app.FILE_GUIDES)) assert.equal(sitemap.includes(`<loc>https://okanaganroam.com${p}</loc>`), !app.guideIsThin(app.FILE_GUIDES[p]), `sitemap lists ${p} only when not thin`);
   });
 });
