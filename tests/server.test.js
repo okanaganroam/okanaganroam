@@ -3999,7 +3999,7 @@ test('SEO-1: Event location always has an address; same-name same-region events 
     const hostedLd = s5jsonLd((await s5get(`/kelowna/events/${hosted.slug}`)).text).find((b) => b['@type'] !== 'BreadcrumbList');
     assert.deepEqual(hostedLd.location.address, s5venue.address || locality('Kelowna'));
     // Nothing else in the Event JSON-LD changed shape.
-    assert.deepEqual(Object.keys(ld).sort(), ['@context', '@type', 'description', 'endDate', 'eventAttendanceMode', 'eventStatus', 'image', 'location', 'name', 'startDate', 'subEvent', 'url'].sort());
+    assert.deepEqual(Object.keys(ld).sort(), ['@context', '@type', 'description', 'endDate', 'eventAttendanceMode', 'eventStatus', 'image', 'location', 'name', 'offers', 'startDate', 'subEvent', 'url'].sort(), 'the official ticketing source adds an offers link (2026-10-13); no organizer, since a venue source is not the organizer');
 
     // E -- a unique name keeps the plain title.
     const titleOf = (html) => (/<title>([^<]*)<\/title>/.exec(html) || [])[1];
