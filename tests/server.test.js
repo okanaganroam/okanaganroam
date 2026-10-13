@@ -4009,17 +4009,17 @@ test('SEO-1: Event location always has an address; same-name same-region events 
     const b = s5create({ name: 'SEO1 Long Table Dinner', occurrences: [{ start_date: '2032-10-28', start_time: '18:00' }] });
     assert.notEqual(a.slug, b.slug);
     const pa = (await s5get(`/kelowna/events/${a.slug}`)).text;
-    assert.equal(titleOf(pa), 'SEO1 Long Table Dinner — October 21, 2032 — Event in Kelowna, BC | Okanagan Roam');
-    assert.equal(titleOf((await s5get(`/kelowna/events/${b.slug}`)).text), 'SEO1 Long Table Dinner — October 28, 2032 — Event in Kelowna, BC | Okanagan Roam');
+    assert.equal(titleOf(pa), 'SEO1 Long Table Dinner — October 21, 2032 — Event in Kelowna, BC');
+    assert.equal(titleOf((await s5get(`/kelowna/events/${b.slug}`)).text), 'SEO1 Long Table Dinner — October 28, 2032 — Event in Kelowna, BC');
     // The same name in a DIFFERENT region is not a twin: plain title.
     const other = s5create({ name: 'SEO1 Long Table Dinner', region: 'penticton', venue_id: null, venue_name_text: 'Penticton Hall', occurrences: [{ start_date: '2032-11-04' }] });
     assert.equal(titleOf((await s5get(`/penticton/events/${other.slug}`)).text), 'SEO1 Long Table Dinner — Event in Penticton, BC | Okanagan Roam');
     // og:title / twitter:title follow <title> (pageHead); the H1 stays the plain name.
-    assert.ok(pa.includes('<meta property="og:title" content="SEO1 Long Table Dinner — October 21, 2032 — Event in Kelowna, BC | Okanagan Roam">'));
+    assert.ok(pa.includes('<meta property="og:title" content="SEO1 Long Table Dinner — October 21, 2032 — Event in Kelowna, BC">'));
     assert.match(pa, /<h1[^>]*>SEO1 Long Table Dinner<\/h1>/);
     // The helper: legacy rows (no occurrence) use the stored start date; no twin -> plain.
     assert.equal(app.eventPageTitle({ id: -1, region: 'kelowna', name: 'SEO1 No Twin Here', start_datetime: '2032-01-01' }, 'Kelowna', null), 'SEO1 No Twin Here — Event in Kelowna, BC | Okanagan Roam');
-    assert.equal(app.eventPageTitle({ id: -1, region: 'kelowna', name: 'SEO1 Long Table Dinner', start_datetime: '2032-12-01T19:00' }, 'Kelowna', null), 'SEO1 Long Table Dinner — December 1, 2032 — Event in Kelowna, BC | Okanagan Roam');
+    assert.equal(app.eventPageTitle({ id: -1, region: 'kelowna', name: 'SEO1 Long Table Dinner', start_datetime: '2032-12-01T19:00' }, 'Kelowna', null), 'SEO1 Long Table Dinner — December 1, 2032 — Event in Kelowna, BC');
   } finally {
     // Remove this test's own fixtures so later sitemap/cleanup tests see exactly their own.
     for (const { id } of db.prepare("SELECT id FROM events WHERE name LIKE 'SEO1 %'").all()) {
@@ -16932,7 +16932,7 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       assert.match(region.text, /class="category-back-link" href="\/indoor">← All Indoor &amp; Rainy Day</);
       const venue = await WINTER_GET(base, '/kelowna/indoor/winter-test-gallery');
       assert.equal(venue.status, 200);
-      assert.match(venue.text, /<title>Winter Test Gallery — Indoor Attraction in Kelowna, BC \| Okanagan Roam<\/title>/);
+      assert.match(venue.text, /<title>Winter Test Gallery — Indoor Attraction in Kelowna, BC<\/title>/);
       assert.match(venue.text, /"@type":"TouristAttraction"/);
       assert.match(venue.text, /indoor-page/);
       const kelowna = await WINTER_GET(base, '/kelowna');
@@ -17097,7 +17097,7 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
       assert.match(region.text, /<body class="golf-page tour-page">/);
       const venue = await WINTER_GET(base, '/kelowna/tours/tour-test-lake-cruise');
       assert.equal(venue.status, 200);
-      assert.match(venue.text, /<title>Tour Test Lake Cruise — Tour &amp; Experience in Kelowna, BC \| Okanagan Roam<\/title>/);
+      assert.match(venue.text, /<title>Tour Test Lake Cruise — Tour &amp; Experience in Kelowna, BC<\/title>/);
       assert.match(venue.text, /"@type":"TouristAttraction"/);
       assert.match(venue.text, /tour-page/);
       const kelowna = await WINTER_GET(base, '/kelowna');
@@ -17242,7 +17242,7 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(region.text, /<body class="golf-page sport-page">/);
       const venue = await WINTER_GET(base, '/penticton/sports/sport-test-skate-park');
       assert.equal(venue.status, 200);
-      assert.match(venue.text, /<title>Sport Test Skate Park — Sports &amp; Recreation Spot in Penticton, BC \| Okanagan Roam<\/title>/);
+      assert.match(venue.text, /<title>Sport Test Skate Park — Sports &amp; Recreation Spot in Penticton, BC<\/title>/);
       assert.match(venue.text, /"@type":"SportsActivityLocation"/);
       assert.match(venue.text, /sport-page/);
       const penticton = await WINTER_GET(base, '/penticton');
@@ -18346,6 +18346,28 @@ test('Place schema (2026-10-13): no AggregateRating from third-party reviews, wh
     assert.match(html, /\u2605/, `${lang}: the rating is still on the page`);
   }
 }));
+
+test('Titles (health crawl, 2026-10-13): place and event titles fit ~65 characters, dropping the brand first; What\'s On sports is not /sports', () => {
+  assert.equal(app.fitTitle(['short | Okanagan Roam', 'short']), 'short | Okanagan Roam', 'a title that fits keeps its brand');
+  assert.equal(app.fitTitle(['x'.repeat(70), 'y'.repeat(60)]), 'y'.repeat(60));
+  assert.equal(app.fitTitle(['x'.repeat(80), 'y'.repeat(70)]), 'y'.repeat(70), 'nothing fits: the last, shortest candidate');
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  assert.match(app.renderVenuePage(venue, [], [], []), /<title>Test Trattoria \u2014 Restaurant in Kelowna, BC \| Okanagan Roam<\/title>/, 'short titles are unchanged');
+  const long = { ...venue, name: '50th Parallel Estate Winery - Tasting Room And Patio', type: 'winery', region: 'lake-country', slug: 'long-name-fixture' };
+  const title = app.renderVenuePage(long, [], [], []).match(/<title>([^<]*)<\/title>/)[1];
+  assert.ok(title.length <= 65, title);
+  assert.ok(title.startsWith(long.name), 'the name always leads');
+  const ev = s5create({ name: 'An Extremely Long Event Name That Goes On And On Past The Limit' });
+  try {
+    const page = app.renderEventPage(app.getEventById(ev.id), null);
+    const et = page.match(/<title>([^<]*)<\/title>/)[1];
+    assert.ok(et.length <= 65 || et === ev.name, et);
+    assert.ok(et.startsWith(ev.name));
+  } finally {
+    for (const tbl of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${tbl} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+});
 
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
