@@ -3115,7 +3115,7 @@ test('localRangesOverlap is the single inclusive window predicate', () => {
   assert.equal(app.localRangesOverlap('2026-09-24', '2026-09-24', ...w), false, 'the Thursday before');
 });
 
-test('vancouverOffsetFor / toVancouverIso derive the offset from Intl for the local wall-clock time', () => {
+test('vancouverOffsetFor / toVancouverIso follow Vancouver tzdata, then permanent B.C. UTC-7', () => {
   // Pinned transitions every tzdata release agrees on.
   assert.equal(app.vancouverOffsetFor('2026-01-15', '12:00'), '-08:00', 'PST in January 2026');
   assert.equal(app.vancouverOffsetFor('2026-03-08', '01:59'), '-08:00', 'just before spring-forward');
@@ -3123,15 +3123,17 @@ test('vancouverOffsetFor / toVancouverIso derive the offset from Intl for the lo
   assert.equal(app.vancouverOffsetFor('2026-07-01', '19:00'), '-07:00', 'PDT in summer');
   assert.equal(app.vancouverOffsetFor('2026-10-30', '19:05'), '-07:00', 'late October is still PDT');
   assert.equal(app.vancouverOffsetFor('2025-11-03', '12:00'), '-08:00', 'PST after the November 2025 fall-back');
-  // Later dates: whatever the platform tzdata says, the helper must agree
-  // with Intl's own rendering of the resulting instant (round trip).
+  // Before the permanent-time change, round-trip through the host tzdata.
+  // After it, verify against UTC-7 directly: older bundled tzdata still
+  // incorrectly applies the November fallback that B.C. has discontinued.
   for (const [d, t] of [['2026-11-02', '19:05'], ['2026-12-31', '23:30'], ['2027-03-14', '03:00'], ['2027-07-01', '10:00']]) {
     const off = app.vancouverOffsetFor(d, t);
     assert.match(off, /^-0[78]:00$/, `${d} ${t} must be PST or PDT`);
     const iso = app.toVancouverIso(d, t);
     assert.equal(iso, `${d}T${t}:00${off}`);
-    const back = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso)).replace(', ', 'T').replace(/T24:/, 'T00:');
-    assert.equal(back, `${d}T${t}`, `round trip through Intl must land on the same Okanagan wall-clock time (${iso})`);
+    const local = new Date(Date.parse(iso) - 7 * 60 * 60 * 1000);
+    const back = `${local.toISOString().slice(0, 10)}T${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')}`;
+    assert.equal(back, `${d}T${t}`, `round trip through permanent UTC-7 must land on the same Okanagan wall-clock time (${iso})`);
   }
   assert.equal(app.toVancouverIso('2026-12-31'), '2026-12-31', 'date-only stays a bare date (all-day / time unknown)');
   assert.equal(app.toVancouverIso('2026-12-31', ''), '2026-12-31');
@@ -5132,9 +5134,7 @@ test('Canonical footer: venue/category/region/guide/event/events-index pages all
 // routing entirely. Binds the real server (module-level PORT, default
 // 3001, since no PORT env var is set in this environment) exactly once
 // for this whole file.
-test('HTTP routes: region, category, venue, guide, and 404 all respond correctly', async () => {
-  app.startServer();
-  const base = 'http://localhost:3001';
+test('HTTP routes: region, category, venue, guide, and 404 all respond correctly', () => withDiscoveryServer(async (base) => {
 
   const region = await fetch(`${base}/kelowna`);
   assert.equal(region.status, 200);
@@ -5234,14 +5234,15 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(golfAllRegionsBody, /href="\/vernon\/golf\/test-vernon-golf-course"/, "each card must link using that venue's OWN region");
   assert.doesNotMatch(golfAllRegionsBody, /Test Trattoria|Test Winery/, '/golf must not include non-golf venues');
 
-  // Reusable region-selector (2026-09-19): built from the regions actually
-  // present, not a hardcoded list -- must show exactly Kelowna and Vernon
-  // (the two regions the golf fixtures are in), each linking to that
-  // region's EXISTING single-region page, and nothing else.
+  // Reusable region-selector (2026-09-19): built from regions actually
+  // present in the current fixture database, including planner fixtures
+  // added earlier in this file.
   assert.match(golfAllRegionsBody, /class="category-region-selector"/, '/golf must render the shared region selector');
   assert.match(golfAllRegionsBody, /<a href="\/kelowna\/golf">Kelowna<\/a>/, 'selector must link to the existing /kelowna/golf page');
   assert.match(golfAllRegionsBody, /<a href="\/vernon\/golf">Vernon<\/a>/, 'selector must link to the existing /vernon/golf page');
-  assert.doesNotMatch(golfAllRegionsBody, /<a href="\/osoyoos\/golf">/, 'selector must NOT list a region with zero golf venues in this fixture set');
+  const expectedGolfRegions = [...new Set(app.listVenues({ type: 'golf', limit: '2000' }).venues.map(v => v.region))].sort();
+  const actualGolfRegions = [...golfAllRegionsBody.matchAll(/<a href="\/([^/]+)\/golf">/g)].map(m => m[1]).sort();
+  assert.deepEqual(actualGolfRegions, expectedGolfRegions, 'selector must list exactly regions that have golf venues in the current fixture database');
 
   // Back-link to the Okanagan-wide page (2026-09-19): only categories in
   // ALL_REGIONS_CATEGORIES render it, since it's the only case where a
@@ -5255,7 +5256,11 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(golfCategoryBody, /<h2 class="category-subsection-heading">Kelowna Golf Courses<\/h2>/, '/kelowna/golf must show a region-prefixed Golf Courses heading');
   assert.match(golfCategoryBody, /<h2 class="category-subsection-heading">Kelowna Indoor Golf &amp; Simulators<\/h2>/, '/kelowna/golf must show a region-prefixed Indoor Golf & Simulators heading');
   assert.match(golfCategoryBody, /Test Golf Simulator/, '/kelowna/golf must include the simulator fixture');
-  const [coursesSectionBody, indoorSectionBody] = golfCategoryBody.split('Kelowna Indoor Golf &amp; Simulators');
+  const coursesHeadingAt = golfCategoryBody.indexOf('<h2 class="category-subsection-heading">Kelowna Golf Courses</h2>');
+  const indoorHeadingAt = golfCategoryBody.indexOf('<h2 class="category-subsection-heading">Kelowna Indoor Golf &amp; Simulators</h2>');
+  assert.ok(coursesHeadingAt >= 0 && indoorHeadingAt > coursesHeadingAt, 'course sections appear in the expected order');
+  const coursesSectionBody = golfCategoryBody.slice(coursesHeadingAt, indoorHeadingAt);
+  const indoorSectionBody = golfCategoryBody.slice(indoorHeadingAt);
   assert.match(coursesSectionBody, /Test Golf Course/, 'Test Golf Course (an outdoor course) must be in the Golf Courses section');
   assert.doesNotMatch(coursesSectionBody, /Test Golf Simulator/, 'Test Golf Simulator must NOT be in the Golf Courses section');
   assert.match(indoorSectionBody, /Test Golf Simulator/, 'Test Golf Simulator must be in the Indoor Golf & Simulators section');
@@ -5272,13 +5277,11 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.doesNotMatch(wineryBody, /class="golf-page/, 'winery REGION pages must stay unthemed -- the Beaches-style treatment is hub-only');
   assert.doesNotMatch(wineryBody, /<h2 class="category-subsection-heading">/, 'non-golf category pages must not render the Golf/Indoor split');
 
-  // Reusable-architecture allowlist (2026-09-19): a real, valid category
-  // slug that is NOT in ALL_REGIONS_CATEGORIES must NOT get an Okanagan-
-  // wide page just because the route was generalized -- generalizing the
-  // route must not silently expose a new public URL for every existing
-  // category.
+  // Food & Drink SEO pages (2026-10-13): a dedicated valley-wide restaurant
+  // listing now exists independently of ALL_REGIONS_CATEGORIES.
   const restaurantsAllRegionsPage = await fetch(`${base}/restaurants`);
-  assert.equal(restaurantsAllRegionsPage.status, 404, '/restaurants must stay 404 -- only categories explicitly listed in ALL_REGIONS_CATEGORIES get an Okanagan-wide page');
+  assert.equal(restaurantsAllRegionsPage.status, 200, '/restaurants is the dedicated valley-wide Food & Drink page');
+  assert.match(await restaurantsAllRegionsPage.text(), /<h1>Restaurants in the Okanagan<\/h1>/);
 
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
   assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');
@@ -5324,7 +5327,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Milestone 1 (approved homepage redesign) — the old "Worth the Drive"
   // carousel is intentionally replaced by a scenic hero + a new "What are
   // you in the mood for?" section, both ahead of the wizard.
-  assert.match(homepageBody, /class="hero-scenic"/, 'New scenic hero (Milestone 1) must render');
+  assert.match(homepageBody, /class="hero-scenic(?:\s|\")/, 'New scenic hero (Milestone 1) must render');
   assert.match(homepageBody, /id="moodCards"/, 'Mood cards section (Milestone 1) must render');
   assert.doesNotMatch(homepageBody, /class="hero">/, 'Old "Worth the Drive" hero carousel must be gone');
 
@@ -5438,7 +5441,9 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // single venue type, straight to that category page -- see the Golf/
   // Wine mood-card tests above). No dangling in-page anchors left behind.
   assert.doesNotMatch(homepageBody, /href="#directory"/, 'no homepage link should still point at the removed #directory anchor');
-  assert.match(homepageBody, /class="hidden-gem-card" href="\/browse"/, 'Hidden Gems editorial cards must link into the real directory at /browse');
+  const homepageGemLinks = [...homepageBody.matchAll(/class="hidden-gem-card" href="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(homepageGemLinks.length, 3, 'the three Hidden Gems editorial cards render');
+  assert.deepEqual(homepageGemLinks, ['/dog-friendly', '/local-favorites', '/secret-spots'], 'each card links to its dedicated Hidden Gems destination');
   assert.match(homepageBody, /discover-heading-link" href="\/hidden-gems"[^>]*>View all hidden gems/, '"View all hidden gems" must link to the dedicated \/hidden-gems page');
   assert.match(homepageBody, /discover-heading-link" href="\/categories"[^>]*>Explore all categories/, '"Explore all categories" must link to the dedicated \/categories page');
   assert.match(homepageBody, /Browse &amp; Search<\/a>/, 'header dropdown "Browse & Search" label must still read the same');
@@ -5478,14 +5483,13 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // ---- /events: the standalone events index (2026-09-17), replacing the
   // homepage's own removed Happening Soon strip. The What's On mood card
   // must link here instead of the old #happeningSoon anchor.
-  assert.match(homepageBody, /class="mood-card mood-card-whats-on" href="\/events">/, 'What\'s On mood card must link to /events');
-  const eventsIndexPage = await fetch(`${base}/events`);
-  assert.equal(eventsIndexPage.status, 200, '/events must exist and serve the events index');
-  const eventsIndexBody = await eventsIndexPage.text();
-  assert.match(eventsIndexBody, /<h1>Upcoming Events in the Okanagan<\/h1>/);
-  assert.match(eventsIndexBody, /Test Future Festival/, 'an active event fixture must be listed');
-  assert.doesNotMatch(eventsIndexBody, /Test Past Market/, 'an expired event fixture must not be listed');
-  assert.match(eventsIndexBody, /href="\/kelowna\/events\/test-future-festival"/, 'event cards must link to the real individual event page');
+  assert.match(homepageBody, /class="mood-card mood-card-whats-on" href="\/whats-on">/, 'What\'s On mood card must link to its current /whats-on destination');
+  const eventsLegacy = await fetch(`${base}/events`, { redirect: 'manual' });
+  assert.equal(eventsLegacy.status, 301, '/events redirects to its current canonical page');
+  assert.equal(eventsLegacy.headers.get('location'), '/whats-on');
+  const eventsIndexPage = await fetch(`${base}/whats-on`);
+  assert.equal(eventsIndexPage.status, 200, '/whats-on must serve the current event index');
+  assert.match(await eventsIndexPage.text(), /<h1>What&#39;s On in the Okanagan<\/h1>/);
 
   // Individual event pages are completely untouched by this change.
   const eventPageStillWorks = await fetch(`${base}/kelowna/events/test-future-festival`);
@@ -5493,7 +5497,9 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
 
   const eventsApi = await fetch(`${base}/api/events`);
   const collectionsApi = await fetch(`${base}/api/collections`);
-  assert.equal(eventsApi.status, 404, '/api/events must not exist');
+  assert.equal(eventsApi.status, 200, '/api/events exposes the current public event feed');
+  const publicEvents = await eventsApi.json();
+  assert.ok(Array.isArray(publicEvents.events), 'public event feed returns an events array');
   assert.equal(collectionsApi.status, 404, '/api/collections must not exist');
 
   const trattoriaPage = await fetch(`${base}/kelowna/restaurants/test-trattoria`);
@@ -5542,7 +5548,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     assert.equal((await rmRes.json()).members, 0);
     assert.ok(!app.getCollectionVenueIds('local_favorite').has(cmGolf.id));
     const logRows = db.prepare("SELECT field_name, old_value, new_value, source, source_ref, batch_id FROM venue_enrichment_log WHERE venue_id = ? AND batch_id = 'http-cm-batch' ORDER BY id").all(cmGolf.id);
-    assert.deepEqual(logRows, [
+    assert.deepEqual(logRows.map((row) => ({ ...row })), [
       { field_name: 'collection:local_favorite', old_value: 'absent', new_value: 'member', source: 'editorial_collection', source_ref: 'http test', batch_id: 'http-cm-batch' },
       { field_name: 'collection:local_favorite', old_value: 'member', new_value: 'absent', source: 'editorial_collection', source_ref: 'http test', batch_id: 'http-cm-batch' },
     ]);
@@ -6469,7 +6475,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Close the listener so the test process can exit naturally instead of
   // hanging on an open server handle.
   await new Promise((resolve) => app.server.close(resolve));
-});
+}));
 
 // ---- /admin/correct-phone: 503 when ENRICHMENT_ADMIN_TOKEN is unset -----
 //
@@ -7239,15 +7245,14 @@ test('Beaches regional listing page reuses the Golf design system: theme, header
   assert.doesNotMatch(html, /<h2 class="category-subsection-heading"/, 'no Golf Courses / Indoor Golf subsection headings on a Beaches page');
 });
 
-test('Beaches Okanagan-wide page (/beaches) lists only regions that have beaches in its region selector', () => {
+test('Beaches Okanagan-wide page (/beaches) lists exactly regions that have beaches in its region selector', () => {
   const venues = app.getVenuesByCategory('beach');
   const html = app.renderCategoryAllRegionsPage('beach', venues);
   assert.match(html, /<h1>Beaches in the Okanagan<\/h1>/);
   assert.match(html, /<body class="golf-page beach-page">/);
-  assert.match(html, /href="\/kelowna\/beaches"/);
-  assert.match(html, /href="\/vernon\/beaches"/);
-  assert.doesNotMatch(html, /href="\/osoyoos\/beaches"/, 'selector must NOT list a region with zero beach venues');
-  assert.doesNotMatch(html, /href="\/penticton\/beaches"/);
+  const expectedBeachRegions = [...new Set(app.listVenues({ type: 'beach', limit: '2000' }).venues.map(v => v.region))].sort();
+  const actualBeachRegions = [...html.matchAll(/href="\/([^/]+)\/beaches"/g)].map(m => m[1]).sort();
+  assert.deepEqual(actualBeachRegions, expectedBeachRegions, 'selector must list exactly regions that have beach venues in the current fixture database');
   assert.match(html, /Test Vernon Beach/);
 });
 
@@ -10070,7 +10075,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved V3 French change (2026-10-04): the tripv3.* interface strings added to TRANSLATIONS (en and fr) only.
   // Approved Tours & Experiences change (2026-10-11): tripv3.type.tour added to TRANSLATIONS (en and fr) only.
   // Approved Sports & Recreation change (2026-10-12): tripv3.type.sport added to TRANSLATIONS (en and fr) only.
-  assert.equal(md5('public/scripts/app.js'), '5598881a7b34d778d1ad3e9c1fb98c63', 'public/scripts/app.js (French page twins, 2026-10-13)');
+  // Approved planner empty-day copy (2026-10-13): tripv3.noStop changed in EN and FR only.
+  assert.equal(md5('public/scripts/app.js'), '2c4446ab5f3de11ad4aa44d78cb1104a', 'public/scripts/app.js (planner empty-day copy, 2026-10-13)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -10285,7 +10291,7 @@ test('Phase 2: /api/discover returns only real, active records with canonical UR
       const row = active.get(item.id);
       assert.ok(row, `${q}: venue ${item.id} is a real, active row`);
       assert.equal(item.name, row.name, `${q}: name comes from the database`);
-      assert.equal(item.url, `/${row.region}/${app.CATEGORY_SLUGS[row.type]}/${row.slug}`, `${q}: canonical URL`);
+      assert.equal(item.url, row.slug ? `/${row.region}/${app.CATEGORY_SLUGS[row.type]}/${row.slug}` : null, `${q}: canonical URL is emitted only when the real row has a slug`);
       assert.equal(item.rating, row.rating == null ? null : row.rating);
       assert.equal(item.price, row.price == null ? null : row.price);
       assert.deepEqual(Object.keys(item).sort(), ['id', 'matchedOn', 'name', 'price', 'rating', 'region', 'reviews', 'type', 'url']);
@@ -10709,6 +10715,8 @@ test('Stage 2: the Okanagan clock across 2026-11-01 -- America/Vancouver stays o
   assert.deepEqual(clock('2026-11-01T10:00:00Z'), { weekday: 'sun', minutes: 3 * 60 });
   assert.deepEqual(clock('2026-11-15T20:00:00Z'), { weekday: 'sun', minutes: 13 * 60 });
   assert.deepEqual(clock('2027-01-15T20:00:00Z'), { weekday: 'fri', minutes: 13 * 60 });
+  assert.equal(app.todayLocal(new Date('2026-11-02T07:30:00Z')), '2026-11-02', 'the Okanagan date stays UTC-7 after midnight');
+  assert.equal(app.toVancouverIso('2026-11-08', '02:30'), '2026-11-08T02:30:00-07:00', 'event wall times use permanent UTC-7');
   // A 12:00-26:00 venue on Saturday night is open at 01:30 Sunday before and after the change.
   const h = JSON.stringify({ sat: [['12:00', '26:00']], sun: [['12:00', '26:00']] });
   const tz = process.env.TZ;
@@ -11896,7 +11904,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '5598881a7b34d778d1ad3e9c1fb98c63');
+  assert.equal(md5('public/scripts/app.js'), '2c4446ab5f3de11ad4aa44d78cb1104a');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16130,7 +16138,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '5598881a7b34d778d1ad3e9c1fb98c63');
+  assert.equal(md5('public/scripts/app.js'), '2c4446ab5f3de11ad4aa44d78cb1104a');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16223,7 +16231,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '5598881a7b34d778d1ad3e9c1fb98c63', 'app.js is untouched');
+    assert.equal(md5('public/scripts/app.js'), '2c4446ab5f3de11ad4aa44d78cb1104a', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 

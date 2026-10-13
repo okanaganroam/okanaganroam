@@ -108,6 +108,27 @@ test('Customer: a winery-and-dinner trip does not add an unrequested brewery as 
  assert.ok(stops(p).some(v=>v.type==='restaurant'));
  assert.ok(!stops(p).some(v=>v.id===43));
 });
+test('Customer: a multi-day wine-and-food itinerary does not pad mornings with unrequested coffee stops',()=>{
+ const p=plan('Plan 3 days in Kelowna with wineries and great food, including one relaxed day by the lake.');
+ assert.equal(p.days.length,3);
+ assert.ok(p.days.flatMap(d=>d.stops).every(s=>s.venue?.type!=='cafe'),JSON.stringify(p.days.map(d=>d.stops.map(s=>s.venue?.name))));
+});
+test('Customer activity: pottery-class wording selects a real listed studio and reports the request as met',()=>{
+ const pottery={...facts[0],id:50,name:'Work of Art Pottery Studio',type:'indoor',description:'Paint-your-own-pottery studio offering bookable classes and workshops.',plannerDescription:'Paint-your-own-pottery studio offering bookable classes and workshops.',textName:'work of art pottery studio',textDesc:'paint your own pottery studio offering bookable classes and workshops',url:'/kelowna/indoor/work-of-art-pottery-studio'};
+ pottery.plannerKinds=r.inferPlannerKinds(pottery);
+ const x=interpret('Plan a rainy day in Kelowna with a pottery class and dinner.');
+ const p=tp.planTrip({...x,trip:x.trip.multi?x.trip:null,facts:[...facts,pottery],labels,tripDate:'2026-10-17'});
+ assert.ok(x.requirements.items.some(i=>i.kind==='venue_kind'&&i.value==='pottery'));
+ assert.ok(stops(p).some(v=>v.id===50));
+ assert.ok(p.requirementResults.some(i=>i.kind==='venue_kind'&&i.value==='pottery'&&i.status==='satisfied'));
+});
+test('Customer activity: French pottery-workshop wording reaches the same real studio requirement',()=>{
+ const fr=require('../trip-planner-fr');
+ const text=fr.tripPlannerText('Planifie une journée pluvieuse à Kelowna avec un cours de poterie et un souper.',taxonomy);
+ const x=interpret(text);
+ assert.ok(text.includes('pottery class'));
+ assert.ok(x.requirements.items.some(i=>i.kind==='venue_kind'&&i.value==='pottery'));
+});
 test('Customer: rainy-day option and sunset remain separate requirements and stops',()=>{const p=plan('We want an event this weekend, a winery, a rainy day option and sunset, all in Kelowna.');assert.ok(stops(p).some(v=>v.type==='indoor'));assert.ok(stops(p).some(v=>v.id===8));assert.ok(stops(p).some(v=>v.type==='winery'));assert.ok(p.events.length);assert.ok(!p.requirementResults.some(i=>['rainy','venue_kind'].includes(i.kind)&&i.status==='unmet'));});
 test('Customer: easy walks need stored ease evidence, not just an outdoor hiking mention',()=>{assert.ok(r.inferPlannerKinds({type:'outdoor',name:'Flat Walk',description:'An easy flat walking path.'}).includes('easy_walk'));assert.ok(!r.inferPlannerKinds({type:'outdoor',name:'Mountain Trail',description:'A steep challenging hiking trail.'}).includes('easy_walk'));assert.ok(!r.inferPlannerKinds({type:'cafe',name:'Walk In Cafe',description:'An easy walk from downtown.'}).includes('easy_walk'));});
 

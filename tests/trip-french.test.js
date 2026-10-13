@@ -110,6 +110,14 @@ test('French: randonnée is hiking, plage is a beach, pluie is a rainy day', () 
   for (const q of ['Que faire à Penticton s’il pleut ?', 'Une journée de pluie à Kelowna', 'Kelowna sous la pluie']) assert.equal(plan(q).intent.occasion, 'rainy_day', q);
 });
 
+test('French: randonnée facile is understood as an easy hike without a stray facile requirement', () => {
+  const r = plan('Planifie un week-end à Kelowna avec une randonnée facile et un souper.');
+  assert.match(r.text, /easy hike/i);
+  assert.doesNotMatch(r.text, /facile/i);
+  assert.ok(r.intent.activities.includes('hiking'));
+  assert.ok(!r.p.requirementResults?.some((x) => /facile/i.test(x.label || x.value || '')));
+});
+
 test('French: a long French request leaves no French words behind', () => {
   const r = plan('Planifie-moi un voyage de 3 jours en septembre avec du vin, de la bonne bouffe et du golf, avec une journée relaxe au bord du lac');
   assert.deepEqual(r.intent.foodTerms, []);

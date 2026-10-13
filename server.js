@@ -2162,6 +2162,13 @@ function findEventBySlug(region, slug) {
 // Deliberately minimal: no date library, no RRULE, no occurrence expansion
 // -- exactly the helpers the expiry fix (below) and later steps need.
 const OKANAGAN_TIME_ZONE = 'America/Vancouver';
+// B.C. stays on UTC-7 after the clocks advance on November 1, 2026. Keep
+// planner dates and event times correct on runtimes whose bundled tzdata still
+// applies the old November fallback rule.
+const BC_PERMANENT_UTC7_FROM = Date.UTC(2026, 10, 1, 9, 0);
+function isAfterBCPermanentTimeChange(instant) {
+  return instant instanceof Date && instant.getTime() >= BC_PERMANENT_UTC7_FROM;
+}
 const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_CUSTOM_WINDOW_DAYS = 366; // frozen design: Choose Dates spans at most a year
@@ -2175,6 +2182,7 @@ const okanaganDateFormatter = new Intl.DateTimeFormat('en-CA', {
 // The Okanagan calendar date ('YYYY-MM-DD') of an instant. `now` is
 // injectable for tests; production callers pass nothing.
 function todayLocal(now = new Date()) {
+  if (isAfterBCPermanentTimeChange(now)) return new Date(now.getTime() - 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
   return okanaganDateFormatter.format(now);
 }
 
@@ -2275,6 +2283,7 @@ const okanaganOffsetFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: OKANAGAN_TIME_ZONE, timeZoneName: 'longOffset',
 });
 function offsetAtInstant(instantMs) {
+  if (instantMs >= BC_PERMANENT_UTC7_FROM) return { sign: -1, hours: 7, minutes: 0 };
   const part = okanaganOffsetFormatter.formatToParts(new Date(instantMs)).find((p) => p.type === 'timeZoneName');
   const m = /GMT([+-])(\d{2}):?(\d{2})?/.exec(part ? part.value : '');
   if (!m) return null;
@@ -4363,6 +4372,12 @@ function tripPlanDate(when, now = new Date()) {
 const OKANAGAN_CLOCK_FORMAT = { timeZone: OKANAGAN_TIME_ZONE, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
 const okanaganClockFormatter = new Intl.DateTimeFormat('en-US', OKANAGAN_CLOCK_FORMAT);
 function okanaganClock(now = new Date()) {
+  // This function is serialized into browser scripts with toString(), so keep
+  // the cutoff self-contained instead of depending on a server-only helper.
+  if (now instanceof Date && now.getTime() >= Date.UTC(2026, 10, 1, 9, 0)) {
+    const local = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+    return { weekday: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][local.getUTCDay()], minutes: local.getUTCHours() * 60 + local.getUTCMinutes() };
+  }
   const parts = Object.fromEntries(okanaganClockFormatter.formatToParts(now).map((x) => [x.type, x.value]));
   return { weekday: parts.weekday.slice(0, 3).toLowerCase(), minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute) };
 }
