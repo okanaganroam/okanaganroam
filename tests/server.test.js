@@ -17593,6 +17593,14 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
         assert.match(dogPub.text, /id="dogBanner"><img src="\/images\/dog-friendly\/dog-pub\.jpg"/);
         assert.match(dogPub.text, /<h1>Dog-Friendly Pubs &amp; Bars in the Okanagan<\/h1>/);
       }
+      // Local Favourites: one type chosen shows that category's photo, heading and intro.
+      const lfV = [{ id: 990010, name: 'LF Cafe', slug: 'lf-cafe', region: 'kelowna', type: 'cafe', description: 'Fixture.' }, { id: 990011, name: 'LF Golf', slug: 'lf-golf', region: 'kelowna', type: 'golf', description: 'Fixture.' }];
+      const lfGolf = app.renderLocalFavouritesPage(lfV, { types: ['golf'], regions: [] });
+      assert.match(lfGolf, /id="lfBanner"><img src="\/images\/golf\/golf-courses\.jpg"/);
+      assert.match(lfGolf, /<h1>Local Favourite Golf Courses in the Okanagan<\/h1>/);
+      assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites<\/h1>/);
+      for (const [k, c] of Object.entries(app.LOCAL_FAVOURITES_CATEGORY_CONTENT)) assert.ok(c.banner && c.heading && c.intro, `${k} has content`);
+      assert.doesNotMatch(app.renderSecretSpotsPage(lfV), /lfBanner/, 'other curated pages unchanged');
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });

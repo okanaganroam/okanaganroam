@@ -14540,6 +14540,22 @@ function renderLocalFavouritesScriptHtml(summaryLabel = 'local favourite', filte
 // deck under string lights at sunset -- with an 800px thumbs/ copy for the
 // /categories card.
 const LOCAL_FAVOURITES_BANNER = Object.freeze({ src: '/images/local-favourites/local-favourites.jpg', alt: 'Friends sharing drinks on a deck under string lights at sunset', pos: 55 });
+// Local Favourites per-category heading and intro (2026-10-12); photos reuse
+// each category's own banner.
+const LOCAL_FAVOURITES_CATEGORY_CONTENT = Object.freeze({
+  restaurant: { banner: CATEGORY_BANNER_IMAGES.restaurant, heading: "Local Favourite Restaurants in the Okanagan", intro: "Independent restaurants with real local roots \u2014 the dining rooms and patios people who live here keep going back to." },
+  cafe: { banner: CATEGORY_BANNER_IMAGES.cafe, heading: "Local Favourite Caf\u00e9s in the Okanagan", intro: "The neighbourhood coffee shops and bakeries locals start their mornings at, and recommend to everyone who visits." },
+  pub: { banner: CATEGORY_BANNER_IMAGES.pub, heading: "Local Favourite Pubs in the Okanagan", intro: "Community pubs with a loyal local crowd \u2014 the places for a pint, a game on TV and a familiar face." },
+  cocktail: { banner: CATEGORY_BANNER_IMAGES.cocktail, heading: "Local Favourite Cocktail Lounges in the Okanagan", intro: "The cocktail bars and lounges locals pick for a night out, from date nights to catching up with friends." },
+  brewery: { banner: CATEGORY_BANNER_IMAGES.brewery, heading: "Local Favourite Breweries in the Okanagan", intro: "Homegrown breweries and taprooms that locals support \u2014 small-batch beer brewed right here in the valley." },
+  distillery: { banner: CATEGORY_BANNER_IMAGES.distillery, heading: "Local Favourite Distilleries in the Okanagan", intro: "Small Okanagan distilleries with local roots, making craft spirits that locals are proud to pour." },
+  winery: { banner: CATEGORY_BANNER_IMAGES.winery, heading: "Local Favourite Wineries in the Okanagan", intro: "Family-run and long-standing wineries that locals recommend \u2014 the tasting rooms people who live here bring their visitors to." },
+  golf: { banner: CATEGORY_BANNER_IMAGES.golf, heading: "Local Favourite Golf Courses in the Okanagan", intro: "The courses locals actually play \u2014 friendly, community-loved clubs and layouts worth a round." },
+  beach: { banner: CATEGORY_BANNER_IMAGES.beach, heading: "Local Favourite Beaches in the Okanagan", intro: "The beaches locals head to on a hot afternoon \u2014 community spots with a neighbourhood feel." },
+  outdoor: { banner: CATEGORY_BANNER_IMAGES.outdoor, heading: "Local Favourite Outdoor Spots in the Okanagan", intro: "Parks, trails and viewpoints that locals love, use every week and have worked to protect." },
+  indoor: { banner: CATEGORY_BANNER_IMAGES.indoor, heading: "Local Favourite Indoor Spots in the Okanagan", intro: "Museums, galleries and rainy-day places with deep community roots \u2014 local favourites for any weather." },
+  tour: { banner: CATEGORY_BANNER_IMAGES.tour, heading: "Local Favourite Tours & Experiences in the Okanagan", intro: "Locally owned tours and experiences run by people who know the valley inside out." },
+});
 function renderLocalFavouritesPage(venues, filter = null) {
   return renderCuratedCollectionPage({
     path: '/local-favorites',
@@ -14554,6 +14570,7 @@ function renderLocalFavouritesPage(venues, filter = null) {
     cardNotes: getPublicCollectionNotes('local_favorite'),
     cardNoteLabel: 'Local pick:',
     banner: LOCAL_FAVOURITES_BANNER,
+    categoryContent: LOCAL_FAVOURITES_CATEGORY_CONTENT,
   }, venues, filter);
 }
 // The shared page body behind /local-favorites and /secret-spots: one curated
@@ -14577,6 +14594,10 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
   const state = { types: f.types, regions: f.regions, counts };
 
   const heading = cfg.heading;
+  // Category content (2026-10-12, Local Favourites): one type chosen shows
+  // that category's photo, heading and intro, like /food-drink.
+  const heroOne = cfg.categoryContent && f.types.length === 1 ? cfg.categoryContent[f.types[0]] || null : null;
+  const heroBanner = heroOne ? heroOne.banner : cfg.banner;
   const title = cfg.title;
   const description = cfg.description;
   const canonical = `https://okanaganroam.com${cfg.path}`;
@@ -14618,8 +14639,25 @@ ${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHe
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: heading }])}
-  ${categoryHeroHtml(cfg.banner ? `<div class="category-banner"><img src="${cfg.banner.src}" alt="${escapeHtml(cfg.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${cfg.banner.pos}%" fetchpriority="high"></div>` : '', `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">${cfg.introHtml}</p>`)}${cfg.leadHtml ? '\n  ' + cfg.leadHtml : ''}
+  ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${cfg.categoryContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high"></div>${cfg.categoryContent ? `
+  <script>
+  (function(){
+    var c = ${JSON.stringify(cfg.categoryContent).replace(/</g, '\\u003c')}, all = ${JSON.stringify({ banner: cfg.banner, heading, introHtml: cfg.introHtml }).replace(/</g, '\\u003c')};
+    var box = document.getElementById('lfBanner'); if (!box) return;
+    var img = box.querySelector('img');
+    var sync = function(){
+      var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-lf-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-lf-type'); });
+      var one = on.length === 1 && c[on[0]], b = one ? one.banner : all.banner;
+      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
+      var ht = one ? one.heading : all.heading;
+      if (h && h.textContent !== ht) h.textContent = ht;
+      if (p) { if (one) { if (p.textContent !== one.intro) p.textContent = one.intro; } else if (p.innerHTML !== all.introHtml) p.innerHTML = all.introHtml; }
+    };
+    try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
+  })();
+  </script>` : ''}` : '', `<h1>${escapeHtml(heroOne ? heroOne.heading : heading)}</h1>
+  <p class="outdoor-intro fd-intro">${heroOne ? escapeHtml(heroOne.intro) : cfg.introHtml}</p>`)}${cfg.leadHtml ? '\n  ' + cfg.leadHtml : ''}
   <div class="fd-search">
     <label class="visually-hidden" for="lfSearch">${escapeHtml(cfg.searchLabel)}</label>
     <input type="search" id="lfSearch" class="fd-search-input" placeholder="Search by name, place or category..." autocomplete="off" spellcheck="false">
@@ -23428,6 +23466,7 @@ module.exports = {
   DOG_FRIENDLY_BANNER,
   DOG_CATEGORY_CONTENT,
   LOCAL_FAVOURITES_BANNER,
+  LOCAL_FAVOURITES_CATEGORY_CONTENT,
   HIDDEN_GEMS_BANNER,
   SECRET_SPOTS_BANNER,
   THEMED_CATEGORY_TYPES,
