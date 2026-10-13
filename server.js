@@ -6834,6 +6834,20 @@ function homepageNow() {
   return new Date(`${override}T12:00:00-08:00`);
 }
 
+// Fall hero text (2026-10-13): September through November (Okanagan calendar date), the homepage hero's headline and its
+// two lead lines switch to their fall versions -- the hero.*Fall keys in app.js, in English and French, so the EN/FR
+// switch keeps working. The photo is unchanged, and every other month the hero is byte-identical to before.
+function isFallHeroSeason(now = new Date()) {
+  const month = Number(todayLocal(now).slice(5, 7));
+  return month >= 9 && month <= 11;
+}
+function seasonalHeroText(html, now = new Date()) {
+  if (!isFallHeroSeason(now)) return html;
+  const en = APP_TRANSLATIONS.en || {};
+  const swap = (key) => (h) => h.replace(new RegExp(`(<[a-z0-9]+ [^>]*data-i18n=")${key.replace('.', '\\.')}(">)[^<]*(<)`), (m, a, b, c) => (en[`${key}Fall`] ? `${a}${key}Fall${b}${escapeHtml(en[`${key}Fall`])}${c}` : m));
+  return ['hero.headline', 'hero.lead', 'hero.leadMobile'].reduce((h, key) => swap(key)(h), html);
+}
+
 function renderMoodCardsHTML({ now = new Date() } = {}) {
   // Seasonal guide link (2026-10-13): Sep-Mar only, so summer output is unchanged.
   const seasonalLink = seasonalGuideLink(now);
@@ -22944,6 +22958,7 @@ const server = http.createServer(async (req, res) => {
         // from the What's On mood card.
         const discoveryStyles = renderHomepageDiscoveryStyles();
         const moodCards = renderMoodCardsHTML({ now: homepageNow() });
+        html = seasonalHeroText(html, homepageNow());
         const hiddenGemsSection = renderHiddenGemsHomepageHTML();
         const exploreRegions = renderExploreRegionsHTML();
         const buildTripSection = renderBuildTripCTAHTML();
@@ -25565,6 +25580,8 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  seasonalHeroText,
+  isFallHeroSeason,
   retimeEventOccurrence,
   fitTitle,
   localizeHtml,
