@@ -11215,7 +11215,7 @@ function categoryDirectoryEntries() {
   if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.', image: categoryCardImage(DOG_FRIENDLY_BANNER) });
   if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.', image: categoryCardImage(LOCAL_FAVOURITES_BANNER) });
   if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.', image: categoryCardImage(HIDDEN_GEMS_BANNER) });
-  if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.' });
+  if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.', image: categoryCardImage(SECRET_SPOTS_BANNER) });
 
   return [
     { label: 'Food & Drink', categories: foodDrink },
@@ -14664,6 +14664,10 @@ function countHiddenGemsOutsideSecretSpots(regions = []) {
   `).get(...SECRET_SPOT_TYPES, ...regions);
   return row ? row.n : 0;
 }
+// Banner (2026-10-12): a lone hilltop bench looking over Kelowna and the lake
+// at golden hour -- free Unsplash photo z5jXAMKlHso by Kolby Milton
+// (Unsplash License), cropped to 3:2 -- with an 800px thumbs/ copy.
+const SECRET_SPOTS_BANNER = Object.freeze({ src: '/images/secret-spots/secret-spots.jpg', alt: 'A lone bench under a pine on a hilltop overlooking Kelowna and Okanagan Lake at golden hour', pos: 55 });
 function renderSecretSpotsPage(venues, filter = null) {
   return renderCuratedCollectionPage({
     path: '/secret-spots',
@@ -14677,6 +14681,7 @@ function renderSecretSpotsPage(venues, filter = null) {
     summaryLabel: 'tucked-away',
     cardNotes: getPublicCollectionNotes('hidden_gem'),
     cardNoteLabel: 'Why it\u2019s a gem:',
+    banner: SECRET_SPOTS_BANNER,
   }, venues, filter);
 }
 
@@ -23332,6 +23337,7 @@ module.exports = {
   DOG_FRIENDLY_BANNER,
   LOCAL_FAVOURITES_BANNER,
   HIDDEN_GEMS_BANNER,
+  SECRET_SPOTS_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
