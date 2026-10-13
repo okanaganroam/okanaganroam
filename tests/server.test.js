@@ -15492,6 +15492,8 @@ test('Mobile polish: the phone header button has no arrow (desktop keeps it); th
   assert.ok(home.includes('<span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>'));
   assert.ok(home.includes('html[lang="fr"] .mood-swipe-fr { display: inline; }') && home.includes('html[lang="fr"] .mood-swipe-en { display: none; }'), 'French by page language, no change to the frozen app.js');
   assert.match(home, /\.mood-swipe-cue \{ display: none; \}/);
+  assert.match(home, /\.mood-card-indoor \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day title is a step smaller');
+  assert.match(home, /\.mood-card-title \{[^}]*line-height: 1\.15; text-wrap: balance; \}/, 'tile titles wrap as even, tight lines');
   assert.match(home, /@media \(max-width: 640px\) \{[^@]*\.mood-season-link \{ display: none; \}/, 'the seasonal guide link is hidden on phones so the heading stays two rows');
 }))));
 
