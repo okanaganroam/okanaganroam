@@ -4694,6 +4694,47 @@ const OUTDOOR_ACTIVITIES = [
   { slug: 'adventure', kind: 'activity_adventure', label: 'Adventure', blurb: 'Rock climbing, bike parks, tubing and skating loops \u2014 the bigger, louder days out.' },
   { slug: 'fishing', kind: 'activity_fishing', label: 'Fishing', blurb: 'Trout-fishing lodges, public fishing docks and guided charters on the valley\u2019s lakes \u2014 licence required.' },
 ];
+// Banner photo per outdoor activity (2026-10-13): /outdoors/<slug> opens with
+// it, and the /outdoors landing swaps to it when exactly one activity card is
+// pressed. Free Unsplash sa3EBC3S0ug, OZQEwoy5V_Y, gKN-QsCLdaQ, MePjPb_5FvE and
+// b53j6cPfnww; licensed free Adobe Stock 206095390 and 273871791. Camping and
+// Water have none yet and keep the Outdoors photo.
+const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
+  hiking: { src: '/images/outdoors/activity-hiking.jpg', alt: 'The Myra Canyon trail winding along a forested canyon above Kelowna', pos: 50 },
+  viewpoints: { src: '/images/outdoors/activity-viewpoints.jpg', alt: 'Kelowna and Okanagan Lake seen from the Knox Mountain lookout', pos: 55 },
+  nature: { src: '/images/outdoors/activity-nature.jpg', alt: 'Spotted Lake’s mineral pools in the dry hills near Osoyoos', pos: 55 },
+  cycling: { src: '/images/outdoors/activity-cycling.jpg', alt: 'A cyclist crossing a wooden trestle on the Myra Canyon trail', pos: 55 },
+  winter: { src: '/images/outdoors/activity-winter.jpg', alt: 'Snow-covered trees in a winter forest at Big White', pos: 50 },
+  adventure: { src: '/images/outdoors/activity-adventure.jpg', alt: 'Climbers on a rocky bluff above Penticton', pos: 20 },
+  fishing: { src: '/images/outdoors/activity-fishing.jpg', alt: 'Two men fishing from a boat on a calm lake at dawn', pos: 50 },
+});
+// /outdoors landing: when exactly one activity is pressed (card or chip),
+// swap the banner, H1 and intro to that activity's; otherwise restore the
+// Outdoors ones. Runs on load too, so ?activity=hiking paints correctly.
+function renderOutdoorBannerSwapScript() {
+  const all = { banner: CATEGORY_BANNER_IMAGES.outdoor, heading: 'Outdoor Adventures', intro: 'Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs \u2014 the Okanagan\u2019s outdoors run the length of the valley.' };
+  const c = { all };
+  for (const a of OUTDOOR_ACTIVITIES) if (OUTDOOR_ACTIVITY_BANNERS[a.slug]) c[a.slug] = { banner: OUTDOOR_ACTIVITY_BANNERS[a.slug], heading: `${a.label} in the Okanagan`, intro: a.blurb };
+  return `<script>
+  (function(){
+    var c = ${JSON.stringify(c).replace(/</g, '\\u003c')};
+    var sync = function(){
+      var img = document.querySelector('.category-banner img'); if (!img) return;
+      var on = {}; Array.prototype.forEach.call(document.querySelectorAll('[data-activity][aria-pressed="true"]'), function(x){ on[x.getAttribute('data-activity')] = 1; });
+      var keys = Object.keys(on), t = (keys.length === 1 && c[keys[0]]) || c.all, b = t.banner;
+      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.outdoors-intro');
+      if (h && h.textContent !== t.heading) h.textContent = t.heading;
+      if (p && p.textContent !== t.intro) p.textContent = t.intro;
+    };
+    try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync); else sync();
+  })();
+  </script>`;
+}
+function outdoorActivityBannerHtml(b, id) {
+  return `<div class="category-banner"${id ? ` id="${id}"` : ''}><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" style="object-position: 50% ${b.pos}%" fetchpriority="high"></div>`;
+}
 const OUTDOOR_ACTIVITY_BY_SLUG = Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a]));
 // Finalized visitor-facing display order (I.3, 2026-09-20) for every
 // Outdoor activity selector/chip row: most-common summer intents first,
@@ -12262,7 +12303,7 @@ ${renderGolfHeaderHtml()}
     { name: activity.label },
   ])}
   <a class="category-back-link" href="/outdoors">\u2190 All Outdoors</a>
-  <h1>${escapeHtml(activity.label)} in the Okanagan</h1>
+  ${OUTDOOR_ACTIVITY_BANNERS[activity.slug] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(outdoorActivityBannerHtml(OUTDOOR_ACTIVITY_BANNERS[activity.slug]), `<h1>${escapeHtml(activity.label)} in the Okanagan</h1>`) : `<h1>${escapeHtml(activity.label)} in the Okanagan</h1>`}
   <p class="subtitle">${venues.length} ${escapeHtml(label.plural.toLowerCase())} for ${escapeHtml(activity.label.toLowerCase())} across the Okanagan Valley.</p>
   <p class="outdoor-intro">${escapeHtml(activity.blurb)}</p>
   ${renderOutdoorActivitySelector(activity.slug)}
@@ -12531,6 +12572,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   // being updated by the same updateStepStatus() calls. No date control.
   const outdoorIntroHtml = isOutdoorLanding
     ? `<p class="outdoor-intro outdoors-intro">Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs \u2014 the Okanagan\u2019s outdoors run the length of the valley.</p>
+  ${renderOutdoorBannerSwapScript()}
   ${outdoorsSearchHtml()}
   ${outdoorsActivityChipsHtml({ selectedActivities, counts: outdoorCounts })}
   ${outdoorsFilterBarHtml(venues, { selectedRegions, counts: outdoorCounts })}
@@ -23694,6 +23736,7 @@ module.exports = {
   renderOutdoorFeaturedHtml,
   OUTDOOR_ACTIVITY_CARDS,
   outdoorActivityImagePath,
+  OUTDOOR_ACTIVITY_BANNERS,
   renderOutdoorActivityShowcaseHtml,
   outdoorsSearchHtml,
   outdoorsActivityChipsHtml,
