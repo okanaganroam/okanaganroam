@@ -18131,6 +18131,22 @@ test('What\'s On pages (2026-10-13): /whats-on/<category> and /<region>/events r
   }
 });
 
+test('What\'s On pages (2026-10-13): a type or town page links to the guides that feature its events; guides link back', () => {
+  assert.deepEqual(app.whatsOnRelatedGuides([]), []);
+  // Fixture events stand in for a page's list: refs taken from a real guide, so that guide must come back first.
+  const withEvents = app.allGuides().find((g) => g.refs.filter((r) => r.startsWith('event:')).length >= 2 && app.liveGuides().some((x) => x.path === g.path));
+  if (withEvents) {
+    const evs = withEvents.refs.filter((r) => r.startsWith('event:')).map((r) => { const [region, slug] = r.slice(6).split('/'); return { region, slug }; });
+    const got = app.whatsOnRelatedGuides(evs);
+    assert.equal(got[0].path, withEvents.path);
+    assert.ok(got.length <= 4);
+  }
+  assert.equal(app.whatsOnRelatedGuides([{ region: 'kelowna', slug: 'not-in-any-guide' }]).length, 0);
+  const holiday = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'guides', 'okanagan-holiday-events.json'), 'utf8'));
+  assert.match(holiday.footerHtml, /href="\/whats-on\/holiday-seasonal"/, 'the holiday guide links to its What\'s On page');
+  assert.match(JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'guides', 'okanagan-hockey-season.json'), 'utf8')).footerHtml, /href="\/whats-on\/sports-recreation"/);
+});
+
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });
