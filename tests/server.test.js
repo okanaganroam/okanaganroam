@@ -17359,7 +17359,7 @@ test('Indoor discovery: URL filters select real venues and family uses the store
   try {
     await withWinterServer(async (base) => {
       for (const [activity, selected] of [['arts', 0], ['games', 1], ['family', 1], ['spas', 2], ['theatre', 3]]) {
-        const page = await WINTER_GET(base, `/indoor?activity=${activity}`);
+        const page = await WINTER_GET(base, `/indoor/${activity}`);
         assert.equal(page.status, 200);
         // Inspect cards, excluding JSON-LD and navigation.
         const cards = page.text.match(/<ul class="card-grid">[\s\S]*?<\/ul>/g)?.join('') || '';
@@ -17629,7 +17629,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const toursLake = app.renderCategoryAllRegionsPage('tour', toursV, null, { tourActivity: 'lake', toursAlso: [] });
       assert.match(toursLake, /<img src="\/images\/tours\/activity-lake\.jpg"/);
       assert.match(toursLake, /<h1>Lake &amp; Boat Experiences in the Okanagan<\/h1>/);
-      assert.match(toursLake, /<a href="\/tours\?activity=lake" aria-current="page">Lake &amp; Boats <span>1<\/span><\/a>/);
+      assert.match(toursLake, /<a href="\/tours\/lake" aria-current="page">Lake &amp; Boats <span>1<\/span><\/a>/);
       assert.ok(toursLake.includes('Fixture Boat Rentals') && !toursLake.includes('Fixture Wine Tours'), 'only the chosen activity is listed');
       assert.match(app.renderCategoryAllRegionsPage('tour', toursV, null, { toursAlso: [] }), /<a href="\/tours" aria-current="page">All <span>2<\/span><\/a>/);
       for (const a of app.TOUR_ACTIVITIES) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', a.banner.src)), `${a.slug} photo exists`);
@@ -17662,12 +17662,12 @@ test('Sports activity chips (2026-10-13): /sports?activity= narrows to skate, bi
   const all = app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [] });
   assert.match(all, /<nav class="tour-activity-filters" aria-label="Choose a sport or activity">/);
   assert.match(all, /<a href="\/sports" aria-current="page">All <span>2<\/span><\/a>/);
-  assert.match(all, /<a href="\/sports\?activity=disc">Disc Golf <span>1<\/span><\/a>/);
+  assert.match(all, /<a href="\/sports\/disc">Disc Golf <span>1<\/span><\/a>/);
   assert.match(all, /<img src="\/images\/sports\/sports\.jpg"/, 'All keeps the Sports banner');
   const disc = app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [], sportActivity: 'disc' });
   assert.match(disc, /<img src="\/images\/sports\/activity-disc\.jpg"/);
   assert.match(disc, /<h1>Disc Golf in the Okanagan<\/h1>/);
-  assert.match(disc, /<a href="\/sports\?activity=disc" aria-current="page">/);
+  assert.match(disc, /<a href="\/sports\/disc" aria-current="page">/);
   assert.match(disc, /Lakeview Disc Golf/); assert.doesNotMatch(disc, /Glenmore Skate Park/);
   const courts = app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [], sportActivity: 'courts' });
   assert.doesNotMatch(courts, /sport-coming-soon"/, 'an empty chip never shows the general coming-soon line');
@@ -17705,4 +17705,39 @@ test('Outdoor activity banners (2026-10-13): each live activity page opens with 
   const landing = app.renderCategoryAllRegionsPage('outdoor', venues, null, {});
   assert.match(landing, /"fishing":\{"banner":\{"src":"\/images\/outdoors\/activity-fishing\.jpg"/, 'the landing carries each activity\'s swap content');
   assert.match(landing, /querySelectorAll\('\[data-activity\]\[aria-pressed="true"\]'\)/);
+});
+
+test('Activity pages (SEO, 2026-10-13): /tours/<slug>, /sports/<slug> and /indoor/<slug> are their own indexable pages; ?activity= links 301 there', async () => {
+  const fixtures = [
+    { name: 'Activity Page Wine Tours', slug: 'activity-page-wine-tours', type: 'tour', description: 'Guided wine tours.' },
+    { name: 'Activity Page Disc Golf', slug: 'activity-page-disc-golf', type: 'sport', description: 'Fixture.' },
+    { name: 'Activity Page Thermal Spa', slug: 'activity-page-spa', type: 'indoor', description: 'Fixture.' },
+  ].map((v) => app.createVenue({ region: 'kelowna', ...v }));
+  try {
+    const wine = app.renderCategoryAllRegionsPage('tour', [fixtures[0]], null, { toursAlso: [], tourActivity: 'wine' });
+    assert.match(wine, /<title>Wine &amp; Drink Tours in the Okanagan \| Okanagan Roam<\/title>/);
+    assert.match(wine, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/tours\/wine">/);
+    assert.match(wine, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/tours\/activity-wine\.jpg">/);
+    assert.match(wine, /"name":"Tours & Experiences","item":"https:\/\/okanaganroam\.com\/tours"\},\{"@type":"ListItem","position":3,"name":"Wine & Drink Tours","item":"https:\/\/okanaganroam\.com\/tours\/wine"/);
+    assert.match(wine, /<a href="\/tours">Tours &amp; Experiences<\/a>/, 'visible breadcrumb links back to the hub');
+    const hub = app.renderCategoryAllRegionsPage('tour', [fixtures[0]], null, { toursAlso: [] });
+    assert.match(hub, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/tours">/);
+    assert.match(hub, /<a href="\/tours\/wine">Wine &amp; Drink Tours <span>1<\/span><\/a>/);
+    const paths = app.liveActivityPagePaths();
+    for (const p of ['/tours/wine', '/sports/disc', '/indoor/spas']) assert.ok(paths.includes(p), `${p} is listed`);
+    assert.ok(!paths.includes('/tours/winter') || app.getVenuesByCategory('tour').some((v) => app.tourActivityOf(v) === 'winter') || app.getToursAlsoVenues().some((v) => app.tourActivityOf(v) === 'winter'), 'empty activities are not listed');
+    await withWinterServer(async (base) => {
+      for (const p of ['/tours/wine', '/sports/disc', '/indoor/spas']) {
+        const page = await WINTER_GET(base, p);
+        assert.equal(page.status, 200, p);
+        assert.match(page.text, new RegExp(`<link rel="canonical" href="https://okanaganroam\\.com${p}">`), p);
+      }
+      assert.equal((await WINTER_GET(base, '/tours/not-an-activity')).status, 404);
+      const sitemap = await WINTER_GET(base, '/sitemap.xml');
+      for (const p of ['/tours/wine', '/sports/disc', '/indoor/spas']) assert.ok(sitemap.text.includes(`<loc>https://okanaganroam.com${p}</loc>`), `sitemap lists ${p}`);
+      const res = await fetch(`${base}/tours?activity=wine`, { redirect: 'manual' });
+      assert.equal(res.status, 301);
+      assert.equal(res.headers.get('location'), '/tours/wine');
+    });
+  } finally { fixtures.forEach((v) => db.prepare('DELETE FROM venues WHERE id = ?').run(v.id)); }
 });

@@ -12377,7 +12377,7 @@ function renderIndoorDiscoveryHtml(venues, selected) {
   const choices = [{ slug: '', label: 'All' }, ...INDOOR_EXPERIENCES];
   const links = choices.map((c) => {
     const count = venues.filter((v) => indoorExperienceMatches(v, c.slug)).length;
-    return `<a href="/indoor${c.slug ? '?activity=' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>(${count})</span></a>`;
+    return `<a href="/indoor${c.slug ? '/' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>(${count})</span></a>`;
   }).join('\n');
   const count = venues.filter((v) => indoorExperienceMatches(v, selected)).length;
   return `<nav class="indoor-experience-filters" aria-label="Choose an indoor experience">${links}</nav>
@@ -12385,7 +12385,7 @@ function renderIndoorDiscoveryHtml(venues, selected) {
   ${count ? '' : '<p>No matching spots yet. <a href="/indoor">See all rainy-day spots</a>.</p>'}`;
 }
 
-// Tour activity chips (2026-10-12): /tours?activity=<slug> narrows Tours &
+// Tour activity chips (2026-10-12): /tours/<slug> (was ?activity=) narrows Tours &
 // Experiences to one activity and swaps the banner, heading and intro. Tours
 // are sorted by keyword rules on the name first, then the description, with
 // TOUR_ACTIVITY_OVERRIDES for the few the rules get wrong -- so new tours land
@@ -12430,7 +12430,7 @@ function renderTourActivityHtml(venues, selected) {
   const choices = [{ slug: '', label: 'All' }, ...TOUR_ACTIVITIES];
   const links = choices.map((c) => {
     const count = c.slug ? venues.filter((v) => tourActivityOf(v) === c.slug).length : venues.length;
-    return `<a href="/tours${c.slug ? '?activity=' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>${count}</span></a>`;
+    return `<a href="/tours${c.slug ? '/' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>${count}</span></a>`;
   }).join('\n    ');
   return `${TOUR_ACTIVITY_STYLE}
   <nav class="tour-activity-filters" aria-label="Choose a tour activity">
@@ -12438,7 +12438,7 @@ function renderTourActivityHtml(venues, selected) {
   </nav>`;
 }
 
-// Sports activity chips (2026-10-13): /sports?activity=<slug> narrows Sports
+// Sports activity chips (2026-10-13): /sports/<slug> (was ?activity=) narrows Sports
 // & Recreation to one activity and swaps the banner, heading and intro, like
 // the tour chips. A spot can sit under several chips (a park with a skate
 // bowl and tennis courts). Sport venues match on their name (falling back to
@@ -12463,12 +12463,27 @@ function renderSportActivityHtml(venues, selected, notes) {
   const choices = [{ slug: '', label: 'All' }, ...SPORT_ACTIVITIES];
   const links = choices.map((c) => {
     const count = c.slug ? venues.filter((v) => sportActivitiesOf(v, notes).includes(c.slug)).length : venues.length;
-    return `<a href="/sports${c.slug ? '?activity=' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>${count}</span></a>`;
+    return `<a href="/sports${c.slug ? '/' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>${count}</span></a>`;
   }).join('\n    ');
   return `${TOUR_ACTIVITY_STYLE}
   <nav class="tour-activity-filters" aria-label="Choose a sport or activity">
     ${links}
   </nav>`;
+}
+
+// The /tours/<slug>, /sports/<slug> and /indoor/<slug> pages that list at
+// least one place right now (for the sitemap), matched exactly as the pages
+// filter them.
+function liveActivityPagePaths() {
+  const paths = [];
+  const tours = [...getVenuesByCategory('tour'), ...getToursAlsoVenues()];
+  for (const a of TOUR_ACTIVITIES) if (tours.some((v) => tourActivityOf(v) === a.slug)) paths.push(`/${CATEGORY_SLUGS.tour}/${a.slug}`);
+  const notes = getSportsAlsoNotes();
+  const sports = [...getVenuesByCategory('sport'), ...getSportsAlsoVenues()];
+  for (const a of SPORT_ACTIVITIES) if (sports.some((v) => sportActivitiesOf(v, notes).includes(a.slug))) paths.push(`/${CATEGORY_SLUGS.sport}/${a.slug}`);
+  const indoor = [...getVenuesByCategory('indoor'), ...getIndoorGolfVenues(), ...getIndoorAlsoVenues()];
+  for (const c of INDOOR_EXPERIENCES) if (indoor.some((v) => indoorExperienceMatches(v, c.slug))) paths.push(`/${CATEGORY_SLUGS.indoor}/${c.slug}`);
+  return paths;
 }
 
 function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
@@ -12491,6 +12506,10 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
     opts = { ...opts, sportsAlso: (opts.sportsAlso || []).filter(inActivity) };
   }
   const activityContent = tourContent || sportContent || (indoorActivity ? INDOOR_EXPERIENCES.find((c) => c.slug === indoorActivity) : null);
+  // Activity pages (SEO, 2026-10-13): /tours/<slug>, /sports/<slug> and
+  // /indoor/<slug> are real pages with their own title, description,
+  // canonical and breadcrumb (the old ?activity= URLs 301 here).
+  const activitySlug = activityContent ? activityContent.slug : '';
   if (type === 'indoor') {
     venues = venues.filter((v) => indoorExperienceMatches(v, indoorActivity));
     opts = { ...opts,
@@ -12537,8 +12556,8 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   // The hubs that render with an empty main list.
   const emptyMainList = (isIndoorHub || isToursHub || isSportsHub) && !venues.length;
   const heading = isOutdoorLanding ? 'Outdoor Adventures' : isIndoorHub ? 'Indoor & Rainy Day in the Okanagan' : `${label.plural} in the Okanagan`;
-  const title = `${heading} | Okanagan Roam`;
-  const description = isOutdoorLanding
+  const title = activityContent ? `${activityContent.heading} | Okanagan Roam` : `${heading} | Okanagan Roam`;
+  const description = activityContent ? activityContent.intro : isOutdoorLanding
     ? `${venues.length} verified outdoor destinations across the Okanagan Valley — hiking, cycling, winter, nature, viewpoints and more, from Enderby to Osoyoos and the ski resorts.`
     : isIndoorHub
       ? 'Indoor things to do in the Okanagan for grey, wet or cold days: museums, galleries, theatres, escape rooms, bowling, climbing gyms and indoor golf simulators.'
@@ -12547,7 +12566,8 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
         : isSportsHub
           ? 'Sports and recreation in the Okanagan: skate parks, pump tracks, BMX tracks, bike parks, disc golf courses, and pickleball, tennis and beach volleyball courts.'
           : `${venues.length} verified ${categoryCountNoun(type, label, venues.length)} across the Okanagan Valley — real listings reviewed and badge-checked by Okanagan Roam.`;
-  const canonical = `https://okanaganroam.com/${catSlug}`;
+  const hubUrl = `https://okanaganroam.com/${catSlug}`;
+  const canonical = activitySlug ? `${hubUrl}/${activitySlug}` : hubUrl;
   const regionSelector = emptyMainList ? '' : renderCategoryRegionSelector(catSlug, isSportsHub ? [...venues, ...sportsAlso] : venues);
   // Landing (2026-09-21 order): Choose Region(s) -> Explore by Activity
   // (six featured image cards + "View All Outdoor Activities" revealing
@@ -12596,7 +12616,8 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
-    { name: label.plural, url: canonical },
+    { name: label.plural, url: hubUrl },
+    ...(activityContent ? [{ name: activityContent.label, url: canonical }] : []),
   ]);
 
   const itemList = {
@@ -12671,7 +12692,7 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
   ${hubThemed ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
-    { name: label.plural },
+    ...(activityContent ? [{ name: label.plural, href: `/${catSlug}` }, { name: activityContent.label }] : [{ name: label.plural }]),
   ])}
   ${activityContent ? CATEGORY_BANNER_STYLE + categoryHeroHtml(`<div class="category-banner"><img src="${activityContent.banner.src}" alt="${escapeHtml(activityContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${activityContent.banner.pos}%" fetchpriority="high"></div>`, '<h1>' + escapeHtml(activityContent.heading) + '</h1>\n  <p class="hub-intro">' + escapeHtml(activityContent.intro) + '</p>') : CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
   ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}${type === 'sport' ? renderSportActivityHtml(sportUniverse, sportActivity, sportNotes) : ''}
@@ -21462,6 +21483,9 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.tour}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Sports & Recreation (2026-10-12): always renders.
         `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.sport}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        // Activity pages (SEO, 2026-10-13): one per tour, sport and indoor
+        // activity that currently lists at least one place.
+        ...liveActivityPagePaths().map((path) => `  <url>\n    <loc>https://okanaganroam.com${path}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/dog-friendly</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -23272,6 +23296,40 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // Activity pages (SEO, 2026-10-13): /tours/<slug>, /sports/<slug> and
+    // /indoor/<slug> render the hub narrowed to one activity, as their own
+    // indexable page. The old ?activity= links 301 to them.
+    const ACTIVITY_HUBS = { tour: TOUR_ACTIVITIES, sport: SPORT_ACTIVITIES, indoor: INDOOR_EXPERIENCES };
+    const activityHubMatch = pathname.match(/^\/([a-z-]+)(?:\/([a-z-]+))?\/?$/);
+    const activityHubType = activityHubMatch ? SLUG_TO_TYPE[activityHubMatch[1]] : null;
+    if (activityHubType && ACTIVITY_HUBS[activityHubType] && method === 'GET') {
+      const list = ACTIVITY_HUBS[activityHubType];
+      const hubSlug = activityHubMatch[1];
+      if (!activityHubMatch[2] && query.activity && list.some((a) => a.slug === query.activity)) {
+        res.writeHead(301, { Location: `/${hubSlug}/${query.activity}` });
+        return res.end();
+      }
+      if (activityHubMatch[2]) {
+        const slug = activityHubMatch[2];
+        if (!list.some((a) => a.slug === slug)) {
+          res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(render404Page(pathname));
+        }
+        const type = activityHubType;
+        const html = renderCategoryAllRegionsPage(type, getVenuesByCategory(type), null, {
+          indoorActivity: type === 'indoor' ? slug : undefined,
+          indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined,
+          indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined,
+          toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined,
+          tourActivity: type === 'tour' ? slug : undefined,
+          sportActivity: type === 'sport' ? slug : undefined,
+          sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined,
+        });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+    }
+
     // GET /:region/:category — category page within a region
     const categoryPageMatch = pathname.match(/^\/([a-z-]+)\/([a-z-]+)\/?$/);
     if (categoryPageMatch && method === 'GET') {
@@ -23672,6 +23730,7 @@ module.exports = {
   tourActivityOf,
   SPORT_ACTIVITIES,
   INDOOR_EXPERIENCES,
+  liveActivityPagePaths,
   sportActivitiesOf,
   WHATS_ON_BANNER,
   WHATSON_CATEGORY_BANNERS,
