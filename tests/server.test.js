@@ -17562,7 +17562,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(gems, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Hidden Gems<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
       const whatsOn = (await WINTER_GET(base, '/whats-on')).text;
-      assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
+      assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner" id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), "What's On thumbnail exists");
       const dogsRes = await WINTER_GET(base, '/dog-friendly');
       if (dogsRes.status === 200) assert.match(dogsRes.text, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
@@ -17575,6 +17575,13 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.SECRET_SPOTS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'secret spots thumbnail exists');
       // Every Discovery entry now has a photo, so /categories shows it as a photo grid too.
       assert.ok(app.categoryDirectoryEntries().filter((g) => g.label === 'Discovery').every((g) => g.categories.every((c) => c.image)), 'every Discovery card has a photo');
+      // One What's On category chosen: its own photo; none or several: the general one.
+      assert.deepEqual(Object.keys(app.WHATSON_CATEGORY_BANNERS).sort(), ['arts-culture', 'community-events', 'events-festivals', 'family-kids', 'food-drink-events', 'holiday-seasonal', 'live-music', 'markets-fairs', 'nightlife', 'sports-recreation', 'wineries-wine-events', 'workshops-classes']);
+      for (const [k, b] of Object.entries(app.WHATSON_CATEGORY_BANNERS)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${k} photo exists`);
+      const woNight = (await WINTER_GET(base, '/whats-on?categories=nightlife')).text;
+      assert.match(woNight, /id="whatsOnBanner"><img src="\/images\/whats-on\/nightlife\.jpg"/);
+      const woTwo = (await WINTER_GET(base, '/whats-on?categories=nightlife,arts-culture')).text;
+      assert.match(woTwo, /id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"/);
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });

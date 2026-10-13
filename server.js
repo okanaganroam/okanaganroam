@@ -15546,9 +15546,28 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
 // -- three Labradors splashing through a lake (1600x716, a wide original).
 const DOG_FRIENDLY_BANNER = Object.freeze({ src: '/images/dog-friendly/dog-friendly.jpg', alt: 'Three Labradors splashing through the shallows of a lake', pos: 40 });
 const WHATS_ON_BANNER = Object.freeze({ src: '/images/whats-on/whats-on.jpg', alt: 'A festival crowd with hands raised under bright stage lights', pos: 40 });
+// Category banners (2026-10-12): one licensed free Adobe Stock photo per
+// What's On category. Choosing exactly one category shows its photo (server-
+// side for ?categories=, live as the chips change); anything else shows
+// WHATS_ON_BANNER. Live Music keeps the concert crowd.
+const WHATSON_CATEGORY_BANNERS = Object.freeze({
+  'events-festivals': { src: '/images/whats-on/events-festivals.jpg', alt: 'Friends dancing at an outdoor summer festival', pos: 55 },
+  'live-music': WHATS_ON_BANNER,
+  'sports-recreation': { src: '/images/whats-on/sports-recreation.jpg', alt: 'A fan cheering at a hockey game from the stands', pos: 50 },
+  'arts-culture': { src: '/images/whats-on/arts-culture.jpg', alt: 'A theatre cast taking a bow on stage', pos: 40 },
+  'food-drink-events': { src: '/images/whats-on/food-drink-events.jpg', alt: 'A long candlelit table of food set out in a forest at golden hour', pos: 55 },
+  'markets-fairs': { src: '/images/whats-on/markets-fairs.jpg', alt: 'A woman smelling an apple at a farmers market stall', pos: 40 },
+  'family-kids': { src: '/images/whats-on/family-kids.jpg', alt: 'Kids and parents in a tug of war at a summer fair', pos: 45 },
+  'nightlife': { src: '/images/whats-on/nightlife.jpg', alt: 'Friends dancing on a nightclub dance floor', pos: 25 },
+  'wineries-wine-events': { src: '/images/whats-on/wineries-wine-events.jpg', alt: 'Friends toasting with wine in a vineyard at harvest', pos: 40 },
+  'holiday-seasonal': { src: '/images/whats-on/holiday-seasonal.jpg', alt: 'Two friends with warm drinks under holiday lights', pos: 35 },
+  'workshops-classes': { src: '/images/whats-on/workshops-classes.jpg', alt: 'A group enjoying a pottery class in a cozy studio', pos: 30 },
+  'community-events': { src: '/images/whats-on/community-events.jpg', alt: 'Neighbours chatting at a community gathering in a park', pos: 40 },
+});
 function renderWhatsOnPage(filter = null) {
   const selectedRegions = filter ? filter.regions : [];
   const selectedCategories = filter ? filter.categories : [];
+  const whatsOnBanner = (selectedCategories.length === 1 && WHATSON_CATEGORY_BANNERS[selectedCategories[0]]) || WHATS_ON_BANNER;
   // Step 6: the date window is resolved server-side from ?when= / ?from=&to=
   // (default: the rolling next 30 days) and selects the events rendered;
   // region/category chips then filter that set exactly as before.
@@ -15604,7 +15623,20 @@ ${renderGolfHeaderHtml()}
     { name: 'Home', href: '/' },
     { name: "What's On" },
   ])}
-  ${categoryHeroHtml(`<div class="category-banner"><img src="${WHATS_ON_BANNER.src}" alt="${escapeHtml(WHATS_ON_BANNER.alt)}" width="1600" height="1067" style="object-position: 50% ${WHATS_ON_BANNER.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(heading)}</h1>
+  ${categoryHeroHtml(`<div class="category-banner" id="whatsOnBanner"><img src="${whatsOnBanner.src}" alt="${escapeHtml(whatsOnBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${whatsOnBanner.pos}%" fetchpriority="high"></div>
+  <script>
+  (function(){
+    var map = ${JSON.stringify(WHATSON_CATEGORY_BANNERS).replace(/</g, '\\u003c')}, general = ${JSON.stringify(WHATS_ON_BANNER).replace(/</g, '\\u003c')};
+    var box = document.getElementById('whatsOnBanner'); if (!box) return;
+    var img = box.querySelector('img');
+    var sync = function(){
+      var on = Array.prototype.slice.call(document.querySelectorAll('.whatson-cat-chip[data-category][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-category'); });
+      var b = (on.length === 1 && map[on[0]]) || general;
+      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+    };
+    try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
+  })();
+  </script>`, `<h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro whatson-intro">Festivals on the lakeshore, live music in the vineyards, farmers’ markets, hockey nights and holiday lights — there is always something happening somewhere in the valley.</p>`)}
   ${whatsOnSearchHtml()}
   ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
@@ -23334,6 +23366,7 @@ module.exports = {
   FOOD_DRINK_HUB_BANNER,
   SKI_SNOW_BANNER,
   WHATS_ON_BANNER,
+  WHATSON_CATEGORY_BANNERS,
   DOG_FRIENDLY_BANNER,
   LOCAL_FAVOURITES_BANNER,
   HIDDEN_GEMS_BANNER,
