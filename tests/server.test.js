@@ -17565,7 +17565,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner" id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), "What's On thumbnail exists");
       const dogsRes = await WINTER_GET(base, '/dog-friendly');
-      if (dogsRes.status === 200) assert.match(dogsRes.text, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
+      if (dogsRes.status === 200) assert.match(dogsRes.text, /<div class="category-hero">\s*<div class="category-banner" id="dogBanner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.DOG_FRIENDLY_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'dog-friendly thumbnail exists');
       const favs = app.renderLocalFavouritesPage([{ id: 990007, name: 'Banner Diner', slug: 'banner-diner', region: 'kelowna', type: 'restaurant', description: 'Fixture.' }]);
       assert.match(favs, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Local Favourites<\/h1>/, '/local-favorites opens with its photo above the heading');
@@ -17585,6 +17585,14 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const woTwo = (await WINTER_GET(base, '/whats-on?categories=nightlife,arts-culture')).text;
       assert.match(woTwo, /id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"/);
       assert.match(woTwo, /<h1>What&#39;s On in the Okanagan<\/h1>/);
+      // Dog Friendly Finds: one type chosen shows its own photo, heading and intro.
+      assert.deepEqual(Object.keys(app.DOG_CATEGORY_CONTENT).filter((k) => k !== 'all').sort(), ['brewery', 'cafe', 'cocktail', 'distillery', 'dog-beach', 'pub', 'restaurant', 'winery']);
+      for (const [k, c] of Object.entries(app.DOG_CATEGORY_CONTENT)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', c.banner.src)), `${k} dog photo exists`);
+      const dogPub = await WINTER_GET(base, '/dog-friendly?types=pub');
+      if (dogPub.status === 200) {
+        assert.match(dogPub.text, /id="dogBanner"><img src="\/images\/dog-friendly\/dog-pub\.jpg"/);
+        assert.match(dogPub.text, /<h1>Dog-Friendly Pubs &amp; Bars in the Okanagan<\/h1>/);
+      }
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
