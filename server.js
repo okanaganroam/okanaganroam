@@ -10528,13 +10528,13 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // a photo that reads as a specific business. Pages that don't pass it
   // keep the exact previous head. No twitter:image is added: X falls back
   // to og:image, and other hubs' heads are pinned to have none.
-  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, indoorTheme = false, tourTheme = false, sportTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null } = opts;
+  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, indoorTheme = false, tourTheme = false, sportTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null, alternates = null, locale = null } = opts;
   const ogImage = shareImage ? (/^https?:\/\//.test(shareImage) ? shareImage : `https://okanaganroam.com${shareImage}`) : 'https://okanaganroam.com/og-image.png';
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
-${canonical === null ? '' : `<link rel="canonical" href="${canonical}">\n`}${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">
+${canonical === null ? '' : `<link rel="canonical" href="${canonical}">\n`}${alternates ? alternates.map((a) => `<link rel="alternate" hreflang="${a.hreflang}" href="${a.href}">\n`).join('') : ''}${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">${locale ? `\n<meta property="og:locale" content="${locale}">` : ''}
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:image" content="${ogImage}">
@@ -16350,22 +16350,154 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// ---------- French pages (Phase 1, 2026-10-13): /fr/<region>/<category>/<slug> ----------
+// Each place page has a French twin at /fr/..., rendered in French on the server (title, description, headings, buttons,
+// hours, badges) so Google can index it; the two point at each other with hreflang. Interface words come from the same
+// TRANSLATIONS.fr that app.js uses for the in-browser EN/FR switch (read from public/scripts/app.js), plus the place-page
+// words below. Place and town names stay as they are.
+const APP_TRANSLATIONS = (() => {
+  try {
+    const src = fs.readFileSync(path.join(__dirname, 'public', 'scripts', 'app.js'), 'utf8');
+    const start = src.indexOf('var TRANSLATIONS = {');
+    const end = src.indexOf('\n};', start);
+    if (start < 0 || end < 0) return { en: {}, fr: {} };
+    return require('vm').runInNewContext(`(${src.slice(start + 'var TRANSLATIONS = '.length, end + 2)})`, {}, { timeout: 1000 });
+  } catch (e) {
+    return { en: {}, fr: {} };
+  }
+})();
+const CATEGORY_LABELS_FR = {
+  restaurant: { singular: 'Restaurant', plural: 'Restaurants' },
+  winery: { singular: 'Vignoble', plural: 'Vignobles' },
+  cafe: { singular: 'Café', plural: 'Cafés' },
+  brewery: { singular: 'Brasserie', plural: 'Brasseries' },
+  pub: { singular: 'Pub', plural: 'Pubs' },
+  cocktail: { singular: 'Bar à cocktails', plural: 'Bars à cocktails' },
+  distillery: { singular: 'Distillerie', plural: 'Distilleries' },
+  golf: { singular: 'Terrain de golf', plural: 'Terrains de golf' },
+  beach: { singular: 'Plage', plural: 'Plages' },
+  outdoor: { singular: 'Site de plein air', plural: 'Sites de plein air' },
+  indoor: { singular: 'Activité intérieure', plural: 'Activités intérieures et jours de pluie' },
+  tour: { singular: 'Visite et expérience', plural: 'Visites et expériences' },
+  sport: { singular: 'Sports et loisirs', plural: 'Sports et loisirs' },
+};
+const FR_DAY_NAMES = { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' };
+const FR_WEEKDAY_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const FR_MONTH_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+function frDateShort(dateStr) {
+  const [, m, d] = dateStr.split('-').map(Number);
+  return `${FR_WEEKDAY_SHORT[localWeekday(dateStr)]} ${d} ${FR_MONTH_SHORT[m - 1]}`;
+}
+// "11:00–22:30" -> "11 h–22 h 30"; "Closed" / "Hours not listed" in French.
+function frHoursText(text) {
+  if (text === 'Closed') return 'Fermé';
+  if (text === 'Hours not listed') return 'Heures non indiquées';
+  return text.replace(/\b(\d{1,2}):(\d{2})\b/g, (m, h, mm) => `${Number(h)} h${mm === '00' ? '' : ` ${mm}`}`);
+}
+// A badge field (dog_friendly) -> app.js key (badge.dogFriendly) -> French.
+function frBadgeLabel(field) {
+  const key = `badge.${field.replace(/_([a-z])/g, (m, c) => c.toUpperCase())}`;
+  return APP_TRANSLATIONS.fr[key] || (BADGE_LABELS[field] ? BADGE_LABELS[field].title : field);
+}
+// A stored cuisine ("Italian") -> its French name through app.js's cuisine.* keys; unknown values stay as stored.
+function frCuisine(cuisine) {
+  const key = Object.keys(APP_TRANSLATIONS.en).find((k) => k.startsWith('cuisine.') && APP_TRANSLATIONS.en[k] === cuisine);
+  return (key && APP_TRANSLATIONS.fr[key]) || cuisine;
+}
+// Server-side twin of app.js applyTranslations(): the shared header/footer carry data-i18n keys, so a French page swaps
+// their text (and data-i18n-aria/-title/-placeholder attributes) before it leaves the server.
+function localizeHtml(html, lang) {
+  const dict = APP_TRANSLATIONS[lang];
+  if (!dict || lang === 'en') return html;
+  const attrFor = { 'data-i18n-aria': 'aria-label', 'data-i18n-title': 'title', 'data-i18n-placeholder': 'placeholder', 'data-i18n-tooltip': 'data-tooltip' };
+  return html
+    .replace(/(<[a-zA-Z][^<>]*\sdata-i18n="([^"]+)"[^<>]*>)([^<]*)(?=<)/g, (m, tag, key, text) => (dict[key] && text.trim() ? `${tag}${escapeHtml(dict[key])}` : m))
+    .replace(/<[a-zA-Z][^<>]*\sdata-i18n-(?:aria|title|placeholder|tooltip)="[^"]+"[^<>]*>/g, (tag) => {
+      let out = tag;
+      for (const [marker, attr] of Object.entries(attrFor)) {
+        const km = out.match(new RegExp(`\\s${marker}="([^"]+)"`));
+        if (!km || !dict[km[1]]) continue;
+        const value = escapeHtml(dict[km[1]]);
+        out = new RegExp(`\\s${attr}="[^"]*"`).test(out) ? out.replace(new RegExp(`(\\s${attr}=")[^"]*"`), `$1${value}"`) : out.replace(/>$/, ` ${attr}="${value}">`);
+      }
+      return out;
+    });
+}
+// Shared header/footer/dialog text that has no data-i18n key, in Canadian French. Applied (French pages only) to whole
+// text nodes and a few attributes, never inside <script> or <style>.
+const FR_STATIC_TEXT = {
+  'Favorites': 'Favoris',
+  'List an Event': 'Inscrire un \u00e9v\u00e9nement',
+  'Coming soon': 'Bient\u00f4t disponible',
+  'This directory is becoming the Okanagan Roam app': 'Ce r\u00e9pertoire devient l\u2019application Okanagan Roam',
+  'Same friendly filters, same directory, now in your pocket, including a live "happy hour now" check for wherever you happen to be standing.': 'Les m\u00eames filtres pratiques, le m\u00eame r\u00e9pertoire, maintenant dans votre poche, avec les happy hours en cours l\u00e0 o\u00f9 vous vous trouvez.',
+  'The app isn\'t available to download yet.': 'L\u2019application n\u2019est pas encore offerte au t\u00e9l\u00e9chargement.',
+  'Get in touch': '\u00c9crivez-nous',
+  'Questions, ideas, a correction or a hello? Send us a note and we will read it. We reply by email.': 'Une question, une id\u00e9e, une correction ou simplement un bonjour? \u00c9crivez-nous, nous lisons tous les messages. Nous r\u00e9pondons par courriel.',
+  'Your name': 'Votre nom',
+  'Your email': 'Votre courriel',
+  'Your message': 'Votre message',
+  'Leave this empty': 'Laissez ce champ vide',
+  'Send message': 'Envoyer',
+  'Message sent': 'Message envoy\u00e9',
+  'Thank you!': 'Merci!',
+  'Okanagan Roam received your message. We will reply by email as soon as we can.': 'Okanagan Roam a bien re\u00e7u votre message. Nous vous r\u00e9pondrons par courriel d\u00e8s que possible.',
+  'Close': 'Fermer',
+};
+const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
+function localizeStaticFr(html) {
+  return html.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
+    if (i % 2 === 1) return part;
+    let out = part.replace(/>(\s*)([^<>]+?)(\s*)</g, (m, a, text, b) => {
+      const key = text.replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"');
+      return FR_STATIC_TEXT[key] ? `>${a}${escapeHtml(FR_STATIC_TEXT[key])}${b}<` : m;
+    });
+    for (const [en, frAttr] of Object.entries(FR_STATIC_ATTRS)) out = out.split(en).join(frAttr);
+    return out;
+  }).join('');
+}
+// Favorite / Add to trip buttons in French, with app.js's own labels (card.favorite, trip.addToTrip).
+function frFavTripButtons(html, venue) {
+  const name = escapeHtml(venue.name);
+  return html
+    .replace(` Favorite</button>`, ` ${escapeHtml(APP_TRANSLATIONS.fr['card.favorite'] || 'Favori')}</button>`)
+    .replace(/(?:\u{1F9F3} Add to trip|&#65291; Add to Trip)<\/button>/u, `${escapeHtml(APP_TRANSLATIONS.fr['trip.addToTrip'] || 'Ajouter au voyage')}</button>`)
+    .replace(`aria-label="Favorite ${name}"`, `aria-label="Favori : ${name}"`)
+    .replace(`aria-label="Add ${name} to trip"`, `aria-label="Ajouter ${name} au voyage"`);
+}
+// "de" before a town name, elided before a vowel: "pr\u00e8s d\u2019Osoyoos", "pr\u00e8s de Kelowna".
+function frDe(name) {
+  return /^[aeiouyh\u00e0\u00e2\u00e9\u00e8\u00ea\u00ee\u00f4\u00fb]/i.test(name) ? `d\u2019${name}` : `de ${name}`;
+}
+function venuePagePath(venue, lang = 'en') {
+  return `${lang === 'fr' ? '/fr' : ''}/${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}`;
+}
+// A place has a French page when it has a French description.
+function venueHasFrench(venue) {
+  return !!(venue && venue.description_fr && String(venue.description_fr).trim() && CATEGORY_SLUGS[venue.type] && venue.slug && !venue.redirect_to);
+}
+function venueAlternates(venue) {
+  const en = `https://okanaganroam.com${venuePagePath(venue)}`;
+  return [{ hreflang: 'en-CA', href: en }, { hreflang: 'fr-CA', href: `https://okanaganroam.com${venuePagePath(venue, 'fr')}` }, { hreflang: 'x-default', href: en }];
+}
+
 // Place share cards (2026-10-13): a place page's share image is its own generated card (share-card.js) -- the brand mark, a
 // gold "WINERY · KELOWNA, BC" line and the place's name -- instead of the site logo. It is only the og:image preview, never
 // the place's schema image. The URL carries a short hash of the card's text, so a renamed place gets a fresh card in caches.
-function venueShareCardLabel(venue) {
-  const type = CATEGORY_LABELS[venue.type] ? CATEGORY_LABELS[venue.type].singular : '';
-  const town = REGION_LABELS[venue.region] ? `${REGION_LABELS[venue.region]}, BC` : '';
+function venueShareCardLabel(venue, lang = 'en') {
+  const labels = lang === 'fr' ? CATEGORY_LABELS_FR : CATEGORY_LABELS;
+  const type = labels[venue.type] ? labels[venue.type].singular : '';
+  const town = REGION_LABELS[venue.region] ? `${REGION_LABELS[venue.region]}, ${lang === 'fr' ? 'C.-B.' : 'BC'}` : '';
   return [type, town].filter(Boolean).join(' \u00b7 ').toUpperCase();
 }
-function venueShareCardUrl(venue) {
+function venueShareCardUrl(venue, lang = 'en') {
   if (!shareCardModule || !CATEGORY_SLUGS[venue.type] || !venue.slug) return null;
-  const v = require('crypto').createHash('sha1').update(`${venue.name}|${venueShareCardLabel(venue)}`).digest('hex').slice(0, 8);
-  return `https://okanaganroam.com/share/${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}.png?v=${v}`;
+  const v = require('crypto').createHash('sha1').update(`${venue.name}|${venueShareCardLabel(venue, lang)}`).digest('hex').slice(0, 8);
+  return `https://okanaganroam.com/share/${lang === 'fr' ? 'fr/' : ''}${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}.png?v=${v}`;
 }
 const shareCardCache = new Map(); // key -> PNG buffer; oldest dropped past 300 entries
-function venueShareCardPng(venue) {
-  const label = venueShareCardLabel(venue);
+function venueShareCardPng(venue, lang = 'en') {
+  const label = venueShareCardLabel(venue, lang);
   const key = `${venue.id}|${venue.name}|${label}`;
   if (shareCardCache.has(key)) return shareCardCache.get(key);
   const png = shareCardModule.renderShareCard({ name: venue.name, label });
@@ -16375,9 +16507,13 @@ function venueShareCardPng(venue) {
 }
 
 // GET /:region/:category/:slug — individual venue page
-function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
-  // Page-only editorial copy: no database changes or effects on other venues.
-  const editorial = !venue.redirect_to && venue.type === 'restaurant'
+function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
+  // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
+  const fr = opts.lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  const hasFrench = venueHasFrench(venue);
+  // Page-only editorial copy: no database changes or effects on other venues. It is English, so the French page skips it.
+  const editorial = !fr && !venue.redirect_to && venue.type === 'restaurant'
     ? venue.region === 'vernon' && venue.slug === 'elora-restaurant-bar'
       ? require('./data/elora-dining.json')
       : venue.region === 'penticton' && venue.slug === 'kin-folk'
@@ -16388,10 +16524,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const pageHours = editorial && editorial.hours ? JSON.stringify(editorial.hours) : venue.hours;
   const regionLabel = REGION_LABELS[venue.region];
   const catSlug = CATEGORY_SLUGS[venue.type];
-  const label = CATEGORY_LABELS[venue.type];
-  const canonical = `https://okanaganroam.com/${venue.region}/${catSlug}/${venue.slug}`;
-  const title = editorial ? editorial.title : `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`;
-  const rawDesc = venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`;
+  const label = (fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[venue.type];
+  const canonical = `https://okanaganroam.com${venuePagePath(venue, fr ? 'fr' : 'en')}`;
+  const title = editorial ? editorial.title : fr ? `${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam` : `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`;
+  const rawDesc = fr ? venue.description_fr : (venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`);
   const description = editorial ? editorial.metaDescription
     : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
   const editorialHtml = editorial ? editorial.sections.map((section) => `
@@ -16402,7 +16538,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   </section>`).join('') : '';
 
   const breadcrumb = breadcrumbListSchema([
-    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: L('Home', 'Accueil'), url: 'https://okanaganroam.com/' },
     { name: regionLabel, url: `https://okanaganroam.com/${venue.region}` },
     { name: label.plural, url: `https://okanaganroam.com/${venue.region}/${catSlug}` },
     { name: venue.name, url: canonical },
@@ -16416,7 +16552,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     '@context': 'https://schema.org',
     '@type': SCHEMA_TYPE_MAP[venue.type] || 'LocalBusiness',
     name: venue.name,
-    description: editorial ? editorial.intro : (venue.description || undefined),
+    description: editorial ? editorial.intro : ((fr ? venue.description_fr : venue.description) || undefined),
     url: canonical,
     telephone: venue.phone || undefined,
     address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
@@ -16438,8 +16574,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
   const dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
-  const attributeChips = badgeChipsHtml(venue, { skipDogFriendly: dogFriendlyNote !== undefined });
-  const hiddenGemChip = (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
+  const attributeChips = fr
+    ? BOOL_FIELDS.filter((f) => venue[f] && !(dogFriendlyNote !== undefined && f === 'dog_friendly')).map((f) => `<span class="chip">${escapeHtml(frBadgeLabel(f))}</span>`).join(' ')
+    : badgeChipsHtml(venue, { skipDogFriendly: dogFriendlyNote !== undefined });
+  const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);
+  const hiddenGemChip = frChip((isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : ''));
 
   // Stage 2 (2026-09-29): read through hours.js like Open Now and the
   // structured data. A day that is absent or malformed is "Hours not listed",
@@ -16450,12 +16589,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   let hoursHtml = '';
   const parsedHours = pageHours && hoursModule ? hoursModule.parseHours(pageHours) : null;
   if (parsedHours && parsedHours.known) {
-    const dayNames = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+    const dayNames = fr ? FR_DAY_NAMES : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
     const rows = hoursModule.HOURS_WEEKDAYS.map((d) => {
-      const text = hoursModule.dayHoursText(parsedHours.days[d]);
+      const text = fr ? frHoursText(hoursModule.dayHoursText(parsedHours.days[d])) : hoursModule.dayHoursText(parsedHours.days[d]);
       return `<li><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
     }).join('');
-    hoursHtml = `<div class="detail-row"><span class="label">Hours</span></div><ul class="hours-list">${rows}</ul>`;
+    hoursHtml = `<div class="detail-row"><span class="label">${L('Hours', 'Heures')}</span></div><ul class="hours-list">${rows}</ul>`;
   }
 
   // Outbound links carry a data-track kind so the venue-page engagement
@@ -16468,18 +16607,18 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // split the /golf directory already uses; the JSON-LD @type stays
   // GolfCourse and every other category keeps label.singular.
   const golfDetail = venue.type === 'golf' ? golfDetailsFor([venue]).get(`${venue.region}/${venue.slug}`) : undefined;
-  const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? 'Indoor Golf'
-    : (golfData && golfData.isPracticeFacility(golfDetail)) ? 'Driving Range & Practice' : label.singular;
+  const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? L('Indoor Golf', 'Golf int\u00e9rieur')
+    : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique') : label.singular;
 
   const detailRows = [
     ['Type', venue.type === 'golf' ? golfKindLabel : label.singular],
-    ['Region', `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`],
-    venue.cuisine ? ['Cuisine', escapeHtml(venue.cuisine)] : null,
-    venue.address ? ['Address', escapeHtml(venue.address)] : null,
-    venue.phone ? ['Phone', `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
-    venue.website ? ['Website', `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
-    (venue.price && venue.type !== 'golf') ? ['Price', '$'.repeat(venue.price)] : null,
-    (venue.rating && venue.reviews) ? ['Rating', `${venue.rating}\u2605 (${venue.reviews} reviews)`] : (venue.rating ? ['Rating', `${venue.rating}\u2605`] : null),
+    [L('Region', 'R\u00e9gion'), `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`],
+    venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
+    venue.address ? [L('Address', 'Adresse'), escapeHtml(venue.address)] : null,
+    venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
+    venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
+    (venue.price && venue.type !== 'golf') ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
+    (venue.rating && venue.reviews) ? [L('Rating', 'Note'), `${venue.rating}\u2605 (${venue.reviews} ${L('reviews', 'avis')})`] : (venue.rating ? [L('Rating', 'Note'), `${venue.rating}\u2605`] : null),
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
@@ -16523,21 +16662,21 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
     : (venue.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}` : null);
   const locationHtml = (venue.address || mapsUrl)
     ? `<div class="venue-section venue-location">
-        <h2>Location</h2>
+        <h2>${L('Location', 'Emplacement')}</h2>
         ${venue.address ? `<p class="venue-address">${escapeHtml(venue.address)}</p>` : ''}
-        ${mapsUrl ? `<a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>View on map \u2197</a>` : ''}
+        ${mapsUrl ? `<a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}
       </div>`
     : '';
 
   // CTA buttons — only ever rendered when the underlying data already
   // exists; nothing here fabricates a website, phone number, or address.
   const ctaButtons = [
-    venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>Visit Website</a>` : null,
-    mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>Get Directions</a>` : null,
-    venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>Call</a>` : null,
+    venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${L('Visit Website', 'Visiter le site Web')}</a>` : null,
+    mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('Get Directions', 'Itin\u00e9raire')}</a>` : null,
+    venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
-    usesEngagementControls(venue.type) ? golfFavTripButtonsHtml(venue, { appLabels: themedShell }) : null,
+    usesEngagementControls(venue.type) ? (fr ? frFavTripButtons(golfFavTripButtonsHtml(venue, { appLabels: themedShell }), venue) : golfFavTripButtonsHtml(venue, { appLabels: themedShell })) : null,
   ].filter(Boolean).join('\n  ');
   const ctaRowAttrs = usesEngagementControls(venue.type)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
@@ -16546,15 +16685,17 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // description and the CTA row; '' for the overwhelming majority of
   // venues, which keeps their page markup byte-identical.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes().get(venue.id);
-  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${advisoryNoticeHtml(venueAdvisoryNote)}` : '';
+  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
-  const golfGlanceHtml = golfAtAGlanceHtml(venue);
+  const golfGlanceHtml = fr ? '' : golfAtAGlanceHtml(venue);
   // Golf data (2026-09-26): link to the club's own course map/scorecard page
   // and the verified green fees ('' when there is no data for this course).
-  const golfMapHtml = golfData && golfDetail ? golfData.golfCourseMapHtml(golfDetail) : '';
-  const golfFeesHtml = golfData && golfDetail ? golfData.golfFeesSectionHtml(golfDetail) : '';
-  const golfValueHtml = golfData && golfDetail ? golfData.golfValueSectionHtml(golfDetail) : '';
+  const golfMapHtml = !fr && golfData && golfDetail ? golfData.golfCourseMapHtml(golfDetail) : '';
+  const golfFeesHtml = !fr && golfData && golfDetail ? golfData.golfFeesSectionHtml(golfDetail) : '';
+  const golfValueHtml = !fr && golfData && golfDetail ? golfData.golfValueSectionHtml(golfDetail) : '';
+  // Golf fees and course details exist only in English, so the French page links to them.
+  const golfEnglishNote = fr && golfDetail ? `<p class="venue-meta">Tarifs et d\u00e9tails du parcours\u00a0: <a href="${venuePagePath(venue)}" hreflang="en" lang="en">voir la page en anglais</a>.</p>` : '';
 
   // One bulk lookup for all related+nearby cards together (reusing the
   // existing getHiddenGemVenueIds(), not a new query) -- O(1) Set lookups
@@ -16564,13 +16705,14 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const relatedNearbyLocalFavouriteIds = (relatedVenues.length || nearbyVenues.length) ? getCollectionVenueIds('local_favorite') : new Set();
 
   function relatedCard(v) {
-    const meta = [v.cuisine, v.rating ? `${v.rating}\u2605` : null].filter(Boolean).join(' \u00b7 ');
+    const meta = [fr && v.cuisine ? frCuisine(v.cuisine) : v.cuisine, v.rating ? `${v.rating}\u2605` : null].filter(Boolean).join(' \u00b7 ');
     const badge = ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
+    const band = fr ? compactVisualBandHtml(v.type, { size: 'small' }).replace(`>${escapeHtml(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)}<`, `>${escapeHtml(CATEGORY_LABELS_FR[v.type] ? CATEGORY_LABELS_FR[v.type].singular : v.type)}<`) : compactVisualBandHtml(v.type, { size: 'small' });
     return `<div class="related-card related-card-${v.type}">
-      ${compactVisualBandHtml(v.type, { size: 'small' })}
-      <a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>
-      <div class="related-meta">${meta ? escapeHtml(meta) + ' ' : ''}${badge}</div>
+      ${band}
+      <a href="${fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`}">${escapeHtml(v.name)}</a>
+      <div class="related-meta">${meta ? escapeHtml(meta) + ' ' : ''}${frChip(badge)}</div>
     </div>`;
   }
 
@@ -16585,10 +16727,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   const venueEvents = listUpcomingEventsAtVenue(venue.id, { limit: 3 });
   const venueEventsHtml = venueEvents.length
     ? `<div class="related-section">
-        <h2>Events at ${escapeHtml(venue.name)}</h2>
+        <h2>${L('Events at', '\u00c9v\u00e9nements \u00e0')} ${escapeHtml(venue.name)}</h2>
         <div class="related-grid">${venueEvents.map((e) => {
-      const when = upcomingEventDateLabel(e.nextDate, e.nextEndDate);
-      const cat = e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '';
+      const when = fr ? (e.nextDate ? (e.nextEndDate && e.nextDate < todayLocal() && e.nextEndDate >= todayLocal() ? `Jusqu\u2019au ${frDateShort(e.nextEndDate)}` : frDateShort(e.nextDate)) : '') : upcomingEventDateLabel(e.nextDate, e.nextEndDate);
+      const cat = fr ? '' : (e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '');
       const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
       return `<div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
     }).join('')}</div>
@@ -16597,19 +16739,19 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
 
   const relatedHtml = relatedVenues.length
     ? `<div class="related-section">
-        <h2>Other ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}</h2>
+        <h2>${fr ? `Autres ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Other ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}`}</h2>
         <div class="related-grid">${relatedVenues.map(relatedCard).join('')}</div>
       </div>`
     : '';
 
   const nearbyHtml = nearbyVenues.length
     ? `<div class="related-section">
-        <h2>More to explore near ${escapeHtml(regionLabel)}</h2>
+        <h2>${fr ? `\u00c0 d\u00e9couvrir pr\u00e8s ${escapeHtml(frDe(regionLabel))}` : `More to explore near ${escapeHtml(regionLabel)}`}</h2>
         <div class="related-grid">${nearbyVenues.map(relatedCard).join('')}</div>
       </div>`
     : '';
 
-  const guideLinks = featuredInGuidesHtml(`${venue.region}/${venue.slug}`) + (venueGuidePages.length
+  const guideLinks = fr ? '' : featuredInGuidesHtml(`${venue.region}/${venue.slug}`) + (venueGuidePages.length
     ? `<p class="venue-meta">Also see: ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}">${escapeHtml(BADGE_LABELS[c.badge].title)} in ${escapeHtml(regionLabel)}</a>`).join(', ')}</p>`
     : '');
 
@@ -16620,33 +16762,34 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages) {
   // category's venue page is unaffected. Built from the venue's own
   // region field, never hardcoded to any one venue/region.
   const venueBackLink = ALL_REGIONS_CATEGORIES.includes(venue.type)
-    ? `<a class="category-back-link" href="/${venue.region}/${catSlug}">\u2190 ${escapeHtml(regionLabel)} ${escapeHtml(ALL_REGIONS_BACK_LABEL[venue.type] || label.plural)}</a>`
+    ? `<a class="category-back-link" href="/${venue.region}/${catSlug}">\u2190 ${fr ? `${escapeHtml(label.plural)} \u00e0 ${escapeHtml(regionLabel)}` : `${escapeHtml(regionLabel)} ${escapeHtml(ALL_REGIONS_BACK_LABEL[venue.type] || label.plural)}`}</a>`
     : '';
 
-  return `<!DOCTYPE html>
-<html lang="en">
+  const page = `<!DOCTYPE html>
+<html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { shareImage: venueShareCardUrl(venue), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { alternates: hasFrench ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
-    { name: 'Home', href: '/' },
+    { name: L('Home', 'Accueil'), href: '/' },
     { name: regionLabel, href: `/${venue.region}` },
     { name: label.plural, href: `/${venue.region}/${catSlug}` },
     { name: venue.name },
   ])}
+  ${hasFrench ? `<p class="venue-lang-switch" style="margin:-4px 0 10px;font-size:.92rem">${fr ? `<a href="${venuePagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${venuePagePath(venue, 'fr')}" hreflang="fr" lang="fr">Fran\u00e7ais</a>`}</p>` : ''}
   ${venueBackLink}
   ${imageHtml}
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
-  <p class="venue-description">${editorial ? escapeHtml(editorial.intro) : bilingualDescHtml(venue.description, venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
-  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}
+  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr) : bilingualDescHtml(venue.description, venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
+  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
   <div class="venue-section venue-key-info">
-    <h2>Good to Know</h2>
+    <h2>${L('Good to Know', 'Bon \u00e0 savoir')}</h2>
     ${detailRows}
   </div>
   ${locationHtml}
@@ -16654,14 +16797,15 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
   ${guideLinks}
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
-  <a class="cta secondary" href="/${venue.region}/${catSlug}">Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}</a>
-  <a class="cta secondary" href="/${venue.region}">Explore all of ${escapeHtml(regionLabel)}</a>
+  <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
+  <a class="cta secondary" href="/${venue.region}">${fr ? `Tout d\u00e9couvrir \u00e0 ${escapeHtml(regionLabel)}` : `Explore all of ${escapeHtml(regionLabel)}`}</a>
   ${themedShell ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
   ${themedShell ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfVenueEngagementScriptHtml(venue)}
 </body>
 </html>`;
+  return fr ? localizeStaticFr(localizeHtml(page, 'fr')) : page;
 }
 
 // GET /:region/events/:slug — Phase 1 (Events architecture gate).
@@ -23061,7 +23205,7 @@ const server = http.createServer(async (req, res) => {
       // all of them after the startup backfill, but this guards against any
       // edge case rather than emitting a broken sitemap entry).
       const venueRows = db
-        .prepare('SELECT region, type, slug, updated_at FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
+        .prepare('SELECT region, type, slug, updated_at, description_fr FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
         .all()
         .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
 
@@ -23132,10 +23276,14 @@ const server = http.createServer(async (req, res) => {
           ({ slug }) =>
             `  <url>\n    <loc>https://okanaganroam.com/outdoors/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
         ),
-        ...venueRows.map(
-          ({ region, type, slug, updated_at }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>`
-        ),
+        // French twins (2026-10-13): a place with a French page lists both URLs, each carrying the pair as xhtml:link alternates.
+        ...venueRows.flatMap((v) => {
+          const { region, type, slug, updated_at } = v;
+          const enUrl = `https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}`;
+          const alts = venueHasFrench(v) ? venueAlternates(v).map((a) => `\n    <xhtml:link rel="alternate" hreflang="${a.hreflang}" href="${a.href}"/>`).join('') : '';
+          const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
+          return alts ? [entry(enUrl), entry(`https://okanaganroam.com${venuePagePath(v, 'fr')}`)] : [entry(enUrl)];
+        }),
         // Phase 1 (Events architecture gate): only non-expired events —
         // listEventsForSitemap() already applies the same "don't advertise
         // dead pages" filtering the venue rows above get via redirect_to.
@@ -23148,7 +23296,7 @@ const server = http.createServer(async (req, res) => {
       ];
       const sitemap = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
         ...urlEntries,
         '</urlset>',
         '',
@@ -23181,16 +23329,16 @@ const server = http.createServer(async (req, res) => {
       '/badges/featured-on-okanagan-roam.png': { file: 'public/badges/featured-on-okanagan-roam.png', type: 'image/png' },
     };
     // GET /share/<region>/<category>/<slug>.png -- a place's share card (2026-10-13). Only live places with a public page get one.
-    const shareCardMatch = method === 'GET' ? pathname.match(/^\/share\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\.png$/) : null;
+    const shareCardMatch = method === 'GET' ? pathname.match(/^\/share\/(fr\/)?([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\.png$/) : null;
     if (shareCardMatch) {
-      const [, scRegion, scCategory, scSlug] = shareCardMatch;
+      const [, scFr, scRegion, scCategory, scSlug] = shareCardMatch;
       const scType = Object.keys(CATEGORY_SLUGS).find((t) => CATEGORY_SLUGS[t] === scCategory);
       const scVenue = shareCardModule && scType && REGION_LABELS[scRegion] ? db.prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND slug = ? AND redirect_to IS NULL').get(scRegion, scType, scSlug) : null;
       if (!scVenue) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         return res.end('Not found');
       }
-      const png = venueShareCardPng(scVenue);
+      const png = venueShareCardPng(scVenue, scFr ? 'fr' : 'en');
       res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': png.length, 'Cache-Control': 'public, max-age=604800' });
       return res.end(png);
     }
@@ -24916,6 +25064,34 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    // GET /fr/:region/:category/:slug -- a place's French page (2026-10-13). A place without a French description, or a
+    // retired one, goes to its English page / its successor's French page; anything else under /fr/ is not served.
+    const frVenueMatch = method === 'GET' ? pathname.match(/^\/fr\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/) : null;
+    if (frVenueMatch) {
+      const [, region, categorySlug, slug] = frVenueMatch;
+      const type = SLUG_TO_TYPE[categorySlug];
+      const venue = REGION_LABELS[region] && type ? findVenueBySlug(region, type, slug) : null;
+      if (venue && venue.redirect_to) {
+        const target = getVenue(venue.redirect_to);
+        if (target && !target.redirect_to && CATEGORY_SLUGS[target.type] && target.slug) {
+          res.writeHead(301, { Location: venueHasFrench(target) ? venuePagePath(target, 'fr') : venuePagePath(target) });
+          return res.end();
+        }
+      }
+      if (venue && !venue.redirect_to) {
+        if (!venueHasFrench(venue)) {
+          res.writeHead(302, { Location: venuePagePath(venue) });
+          return res.end();
+        }
+        const venueGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && venue[c.badge]);
+        const html = renderVenuePage(venue, getRelatedVenues(venue), getNearbyVenues(venue), venueGuidePages, { lang: 'fr' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': 'fr-CA' });
+        return res.end(html);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
+    }
+
     // GET /:region/:category/:slug — individual venue page
     const venuePageMatch = pathname.match(/^\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/);
     if (venuePageMatch && method === 'GET') {
@@ -25316,6 +25492,13 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  localizeHtml,
+  localizeStaticFr,
+  frHoursText,
+  frDe,
+  venueHasFrench,
+  venuePagePath,
+  APP_TRANSLATIONS,
   venueShareCardUrl,
   venueShareCardLabel,
   regionPageSchemas,
