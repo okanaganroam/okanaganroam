@@ -17580,8 +17580,11 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       for (const [k, b] of Object.entries(app.WHATSON_CATEGORY_BANNERS)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${k} photo exists`);
       const woNight = (await WINTER_GET(base, '/whats-on?categories=nightlife')).text;
       assert.match(woNight, /id="whatsOnBanner"><img src="\/images\/whats-on\/nightlife\.jpg"/);
+      assert.match(woNight, /<h1>Nightlife in the Okanagan<\/h1>\s*<p class="outdoor-intro whatson-intro">DJ nights/, 'one category: its own heading and intro');
+      assert.deepEqual(Object.keys(app.WHATSON_CATEGORY_TEXT).filter((k) => k !== 'all').sort(), Object.keys(app.WHATSON_CATEGORY_BANNERS).sort(), 'every category has text');
       const woTwo = (await WINTER_GET(base, '/whats-on?categories=nightlife,arts-culture')).text;
       assert.match(woTwo, /id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"/);
+      assert.match(woTwo, /<h1>What&#39;s On in the Okanagan<\/h1>/);
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });

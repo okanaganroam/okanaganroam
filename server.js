@@ -15550,6 +15550,23 @@ const WHATS_ON_BANNER = Object.freeze({ src: '/images/whats-on/whats-on.jpg', al
 // What's On category. Choosing exactly one category shows its photo (server-
 // side for ?categories=, live as the chips change); anything else shows
 // WHATS_ON_BANNER. Live Music keeps the concert crowd.
+// Heading and intro per What's On category (2026-10-12), swapped with the
+// banner: one category chosen shows its own, anything else the general text.
+const WHATSON_CATEGORY_TEXT = Object.freeze({
+  all: { heading: "What's On in the Okanagan", intro: 'Festivals on the lakeshore, live music in the vineyards, farmers\u2019 markets, hockey nights and holiday lights \u2014 there is always something happening somewhere in the valley.' },
+  'events-festivals': { heading: 'Events & Festivals in the Okanagan', intro: 'Street festivals, cultural celebrations, parades and big weekend events \u2014 the dates worth planning a trip around, from the North Okanagan to Osoyoos.' },
+  'live-music': { heading: 'Live Music in the Okanagan', intro: 'Concerts, gigs and open stages \u2014 from big-name shows to winery patio sets and local bands in pubs across the valley.' },
+  'sports-recreation': { heading: 'Sports & Recreation in the Okanagan', intro: 'Hockey nights, races, tournaments and outdoor challenges \u2014 games to cheer at and events to sign up for around the valley.' },
+  'arts-culture': { heading: 'Arts & Culture in the Okanagan', intro: 'Theatre, gallery openings, film, dance and talks \u2014 the valley\u2019s stages, studios and cultural centres at their liveliest.' },
+  'food-drink-events': { heading: 'Food & Drink Events in the Okanagan', intro: 'Long-table dinners, tastings, food festivals and chef nights \u2014 the best ways to eat and drink your way around the valley.' },
+  'markets-fairs': { heading: 'Markets & Fairs in the Okanagan', intro: 'Farmers\u2019 markets, craft fairs and pop-ups \u2014 local produce, makers and bakers gathered in one place, week after week.' },
+  'family-kids': { heading: 'Family & Kids Events in the Okanagan', intro: 'Family days, kids\u2019 shows, fairs and hands-on fun \u2014 events that work for little ones, and for the grown-ups bringing them.' },
+  nightlife: { heading: 'Nightlife in the Okanagan', intro: 'DJ nights, dance parties, comedy and late shows \u2014 where the valley goes when the sun goes down.' },
+  'wineries-wine-events': { heading: 'Wineries & Wine Events in the Okanagan', intro: 'Tastings, release parties, harvest celebrations and winery dinners \u2014 wine country at its most social.' },
+  'holiday-seasonal': { heading: 'Holiday & Seasonal Events in the Okanagan', intro: 'Holiday lights, winter markets, harvest weekends and seasonal celebrations \u2014 what\u2019s on this time of year across the valley.' },
+  'workshops-classes': { heading: 'Workshops & Classes in the Okanagan', intro: 'Pottery, painting, cooking, wellness and more \u2014 hands-on classes to learn something new while you\u2019re here.' },
+  'community-events': { heading: 'Community Events in the Okanagan', intro: 'Fundraisers, town gatherings, cleanups and local celebrations \u2014 the events that bring each community together.' },
+});
 const WHATSON_CATEGORY_BANNERS = Object.freeze({
   'events-festivals': { src: '/images/whats-on/events-festivals.jpg', alt: 'Friends dancing at an outdoor summer festival', pos: 55 },
   'live-music': WHATS_ON_BANNER,
@@ -15561,7 +15578,7 @@ const WHATSON_CATEGORY_BANNERS = Object.freeze({
   'nightlife': { src: '/images/whats-on/nightlife.jpg', alt: 'Friends dancing on a nightclub dance floor', pos: 25 },
   'wineries-wine-events': { src: '/images/whats-on/wineries-wine-events.jpg', alt: 'Friends toasting with wine in a vineyard at harvest', pos: 40 },
   'holiday-seasonal': { src: '/images/whats-on/holiday-seasonal.jpg', alt: 'Two friends with warm drinks under holiday lights', pos: 35 },
-  'workshops-classes': { src: '/images/whats-on/workshops-classes.jpg', alt: 'A group enjoying a pottery class in a cozy studio', pos: 30 },
+  'workshops-classes': { src: '/images/whats-on/workshops-classes.jpg', alt: 'Hands shaping clay on a potter\u2019s wheel', pos: 50 },
   'community-events': { src: '/images/whats-on/community-events.jpg', alt: 'Neighbours chatting at a community gathering in a park', pos: 40 },
 });
 function renderWhatsOnPage(filter = null) {
@@ -15582,6 +15599,7 @@ function renderWhatsOnPage(filter = null) {
   } : null;
   const dateState = { when: window.preset === 'upcoming' ? '' : (window.preset === 'custom' ? 'custom' : window.preset), from: window.preset === 'custom' ? window.from : '', to: window.preset === 'custom' ? window.to : '' };
   const heading = "What's On in the Okanagan";
+  const woText = (selectedCategories.length === 1 && WHATSON_CATEGORY_TEXT[selectedCategories[0]]) || WHATSON_CATEGORY_TEXT.all;
   const title = `${heading} | Okanagan Roam`;
   const description = 'Discover what is happening across the Okanagan Valley: festivals, live music, markets, wine events, family days and more, by community and by category.';
   const canonical = 'https://okanaganroam.com/whats-on';
@@ -15626,18 +15644,22 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(`<div class="category-banner" id="whatsOnBanner"><img src="${whatsOnBanner.src}" alt="${escapeHtml(whatsOnBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${whatsOnBanner.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
-    var map = ${JSON.stringify(WHATSON_CATEGORY_BANNERS).replace(/</g, '\\u003c')}, general = ${JSON.stringify(WHATS_ON_BANNER).replace(/</g, '\\u003c')};
+    var map = ${JSON.stringify(WHATSON_CATEGORY_BANNERS).replace(/</g, '\\u003c')}, general = ${JSON.stringify(WHATS_ON_BANNER).replace(/</g, '\\u003c')}, text = ${JSON.stringify(WHATSON_CATEGORY_TEXT).replace(/</g, '\\u003c')};
     var box = document.getElementById('whatsOnBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.whatson-cat-chip[data-category][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-category'); });
       var b = (on.length === 1 && map[on[0]]) || general;
       if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      var t = (on.length === 1 && text[on[0]]) || text.all;
+      var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .whatson-intro');
+      if (h && h.textContent !== t.heading) h.textContent = t.heading;
+      if (p && p.textContent !== t.intro) p.textContent = t.intro;
     };
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
-  </script>`, `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro whatson-intro">Festivals on the lakeshore, live music in the vineyards, farmers’ markets, hockey nights and holiday lights — there is always something happening somewhere in the valley.</p>`)}
+  </script>`, `<h1>${escapeHtml(woText.heading)}</h1>
+  <p class="outdoor-intro whatson-intro">${escapeHtml(woText.intro)}</p>`)}
   ${whatsOnSearchHtml()}
   ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
   ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory })}
@@ -23367,6 +23389,7 @@ module.exports = {
   SKI_SNOW_BANNER,
   WHATS_ON_BANNER,
   WHATSON_CATEGORY_BANNERS,
+  WHATSON_CATEGORY_TEXT,
   DOG_FRIENDLY_BANNER,
   LOCAL_FAVOURITES_BANNER,
   HIDDEN_GEMS_BANNER,
