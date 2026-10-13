@@ -9434,7 +9434,7 @@ function renderGolfThemeStyles() {
   body.golf-page .card-grid > .venue-card > .chips:empty + .card-actions { margin-top: auto; }
   body.golf-page .card-slot:empty { display: none; }
   body.golf-page .card-slot-desc { display: flex; flex-direction: column; }
-  /* Two-up rows (2026-10-12): each card spans eight rows of the list's grid
+  /* Two-up rows (2026-10-12): each card spans ten rows of the list's grid
      and shares them (subgrid), so the name, description, notice, note, badge
      and button rows line up across the row; an empty slot becomes a blank
      row only when its neighbour fills that row. */
@@ -9443,7 +9443,20 @@ function renderGolfThemeStyles() {
       body.golf-page .card-grid { row-gap: 0; }
       /* content-visibility: auto (the long-list paint saver) implies layout
          containment, which switches subgrid off, so two-up cards opt out. */
-      body.golf-page .card-grid > .venue-card { display: grid; grid-template-rows: subgrid; grid-row: span 8; row-gap: 0; margin-bottom: 16px; align-content: start; content-visibility: visible; contain-intrinsic-size: none; }
+      body.golf-page .card-grid > .venue-card { display: grid; grid-template-rows: subgrid; grid-row: span 10; row-gap: 0; margin-bottom: 16px; align-content: start; content-visibility: visible; contain-intrinsic-size: none; }
+      /* Every card part has its own row (2026-10-12): Food & Drink and browse
+         cards add an open-now line under the meta, which pushed the badges and
+         buttons into one shared row when the rows were auto-placed. A card
+         without a part leaves that row empty, so rows still line up. */
+      body.golf-page .card-grid > .venue-card > h2 { grid-row: 1; }
+      body.golf-page .card-grid > .venue-card > .venue-meta { grid-row: 2; }
+      body.golf-page .card-grid > .venue-card > .card-slot-fee { grid-row: 4; }
+      body.golf-page .card-grid > .venue-card > .card-slot-desc { grid-row: 5; }
+      body.golf-page .card-grid > .venue-card > .card-slot-notice { grid-row: 6; }
+      body.golf-page .card-grid > .venue-card > .card-slot-notes { grid-row: 7; }
+      body.golf-page .card-grid > .venue-card > .chips { grid-row: 8; }
+      body.golf-page .card-grid > .venue-card > .card-actions { grid-row: 9; }
+      body.golf-page .card-grid > .venue-card > .card-links { grid-row: 10; }
       body.golf-page .card-grid > .venue-card > .card-slot:empty { display: block; }
       body.golf-page .card-grid > .venue-card > .chips:empty { display: block; margin: 0; padding: 0; border: 0; }
       /* One spacing for every card type, so the badge and button rows match. */
@@ -12680,6 +12693,8 @@ function renderFoodDrinkOpenNowStyles() {
      the meta line's own 10px before the description. The .venue-card
      selector outranks the golf theme's ".venue-card p" sizing. Filled dot =
      open, hollow dot = closed, no dot when today's hours are not listed. */
+  /* Two-up card rows (2026-10-12): the open-now line has its own row under the meta (see the golf theme's card rows). */
+  @supports (grid-template-rows: subgrid) { @media (min-width: 900px) { body.golf-page .card-grid > .venue-card > .fd-open-status { grid-row: 3; } } }
   body.fd-page .venue-card .fd-open-status { display: flex; align-items: center; gap: 7px; margin: -6px 0 10px; font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; line-height: 1.3; color: var(--ink); opacity: 1; }
   body.fd-page .venue-card .fd-open-status::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
@@ -23146,6 +23161,7 @@ module.exports = {
   SCHEMA_TYPE_MAP,
   ALL_REGIONS_CATEGORIES,
   renderGolfThemeStyles,
+  renderFoodDrinkOpenNowStyles,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
