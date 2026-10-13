@@ -8016,7 +8016,10 @@ function renderHomepageDiscoveryStyles() {
   }
   .mood-card-icon { color: #fff; opacity: 0.95; margin-bottom: 4px; }
   .mood-card-icon svg { display: block; width: 18px; height: 18px; }
-  .mood-card-title { font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 700; display: block; }
+  .mood-card-title { font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 700; display: block; line-height: 1.15; text-wrap: balance; }
+  /* The longest tile title (Indoor & Rainy Day / Intérieur et pluie, 2026-10-13) is a step smaller and wraps as two even lines,
+     so it covers less of the photo. */
+  .mood-card-indoor .mood-card-title { font-size: 0.84rem; }
 
   @media (min-width: 720px) {
     .mood-card-grid { grid-template-columns: repeat(6, 1fr); }
