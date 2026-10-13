@@ -1,0 +1,201 @@
+{
+ "heading": "Apex & Baldy: The Okanagan's Smaller Ski Hills",
+ "title": "Apex & Baldy Ski Hill Guide | Okanagan Roam",
+ "description": "Apex and Baldy, two smaller Okanagan ski hills: night skiing, tubing, a forest skating loop, snowshoe trails, and where to eat after.",
+ "banner": "ski-snow",
+ "parent": {
+  "name": "Ski & Snow",
+  "href": "/ski-snow"
+ },
+ "noPlace": true,
+ "intro": [
+  "Not every ski day needs a big resort. Above Penticton and Oliver, Apex and Baldy are smaller, family-sized hills where there's plenty to do off the runs as well: tubing, skating, snowshoeing and cross-country trails nearby.",
+  "Here's what's at each hill and where to eat once you're there. Each place shows its town."
+ ],
+ "sections": [
+  {
+   "id": "apex-skiing-tubing-and-skating",
+   "jump": "Apex",
+   "heading": "Apex: skiing, tubing and skating",
+   "items": [
+    {
+     "ref": "apex/apex-mountain-resort",
+     "name": "Apex Mountain Resort",
+     "text": "Penticton's home mountain, a short 30-minute drive from town, with 2,000 vertical feet and 1,112 skiable acres. Friday and Saturday nights, from 4 to 9 pm, the T-bar and Magic Carpet run under lights for night skiing, the tube park opens for night tubing and the skating loop stays open late.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/tim-hortons-tube-park-apex",
+     "name": "Tim Hortons Tube Park – Apex",
+     "text": "at the base area beside the beginner slopes, running on weekends and holidays through the season, with tubing under the lights on Friday and Saturday nights. Tickets are sold in two-hour blocks, and children need to be 42 inches tall to ride alone.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/adventure-skating-loop-apex",
+     "name": "Adventure Skating Loop & Shinny Pond – Apex",
+     "text": "a kilometre of Zamboni-smoothed ice looping through the forest, with the Shinny Pond beside it for pickup hockey. A new Skate Shack at the start of the loop sells skate passes and rents skates and helmets on weekends; it's weather-dependent natural ice.",
+     "where": "Apex"
+    }
+   ]
+  },
+  {
+   "id": "cross-country-and-the-backcoun",
+   "jump": "Apex cross-country",
+   "heading": "Cross-country and the backcountry near Apex",
+   "items": [
+    {
+     "ref": "apex/nickel-plate-nordic-centre",
+     "name": "Nickel Plate Nordic Centre",
+     "text": "at 1,850 metres, 6.5 km past Apex Mountain Resort, with 45 km of groomed trails for classic and skate skiing, 22.5 km of marked snowshoe trails, and rentals, lessons and snowshoe tours. Dogs are welcome on the K-9 loop at any time.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/nickel-plate-provincial-park",
+     "name": "Nickel Plate Provincial Park",
+     "text": "a quiet, semi-wilderness park just past Apex Mountain Village, built around Nickel Plate Lake. In winter it turns to Nordic skiing, snowmobiling and ice fishing.",
+     "where": "Apex"
+    }
+   ]
+  },
+  {
+   "id": "eating-and-drinking-at-apex",
+   "jump": "Apex food & drink",
+   "heading": "Eating and drinking at Apex",
+   "items": [
+    {
+     "ref": "apex/the-gunbarrel-saloon",
+     "name": "The Gunbarrel Saloon",
+     "text": "a mountain lodge pub at Apex Mountain Resort with real pub fare and a friendly, chill vibe. Rated 4.4 stars.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/longshots-steak-house",
+     "name": "Longshots Steak House",
+     "text": "an upscale steakhouse in Apex Village from the team behind Shaughnessy's Cove and the Gunbarrel Saloon, with a rustic-cabin-meets-jazz-club atmosphere. Open Friday and Saturday, and reservations are recommended.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/the-edge-bistro",
+     "name": "The Edge Bistro",
+     "text": "a cozy grab-and-go bistro built around a ski-in ski-out takeaway window, with specialty coffees and sandwiches staff will kick up with extra flavour at no charge.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/the-artisan-s-den-at-apex",
+     "name": "The Artisan's Den at Apex",
+     "text": "a small coffee shop in the Apex Mountain Resort village, serving skiers and boarders their morning coffee before they hit the lifts. Rated 5 stars.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/pit-stop-cafeteria",
+     "name": "Pit Stop Cafeteria",
+     "text": "a quick-bite cafeteria window in the heart of Apex Mountain Village for burgers, poutine and chicken strips between runs.",
+     "where": "Apex"
+    }
+   ]
+  },
+  {
+   "id": "baldy-the-south-okanagan-s-ski",
+   "jump": "Baldy",
+   "heading": "Baldy: the South Okanagan's ski hill",
+   "items": [
+    {
+     "ref": "baldy/baldy-mountain-resort",
+     "name": "Baldy Mountain Resort",
+     "text": "a small, friendly family hill with short lift lines. New for this winter is cat skiing from the top of the Eagle Chair to Baldy's upper terrain, and the Magic Carpet stays open until 7 pm on Friday and Saturday nights for tubing and beginner skiing under the lights.",
+     "where": "Baldy"
+    },
+    {
+     "ref": "baldy/baldy-snowshoe-trails",
+     "name": "Baldy Snowshoe Trails",
+     "text": "about 13 kilometres of marked trail through the high forest around the day lodge. Go your own way with the resort's snowshoe map, rent snowshoes, or ask about a guided tour. Baldy is about 45 minutes from Oliver on a road that turns to gravel near the top, so bring winter tyres.",
+     "where": "Baldy"
+    },
+    {
+     "ref": "baldy/mckinney-nordic-ski-club-trails",
+     "name": "McKinney Nordic Ski Club – Snowshoe & Cross-Country Trails",
+     "text": "a small, volunteer-run trail area a few minutes before the road reaches Baldy, with roughly five kilometres of marked snowshoe trail. Dogs and families are welcome and parking is free; the club's nine kilometres of cross-country ski trail are not being groomed.",
+     "where": "Baldy"
+    },
+    {
+     "ref": "baldy/corduroy-cafe",
+     "name": "Corduroy Cafe",
+     "text": "the café and the upstairs Baldy Bar are the social hub for anyone staying at the resort, with trivia nights, live music and karaoke, and a kitchen that will swap bacon for a vegetarian option. Rated 4.4 stars.",
+     "where": "Baldy"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Night skiing under the lights",
+    [
+     "apex/apex-mountain-resort|Apex Mountain Resort",
+     "baldy/baldy-mountain-resort|Baldy Mountain Resort"
+    ]
+   ],
+   [
+    "Tubing with the kids",
+    [
+     "apex/tim-hortons-tube-park-apex|Tim Hortons Tube Park – Apex",
+     "baldy/baldy-mountain-resort|Baldy Mountain Resort"
+    ]
+   ],
+   [
+    "A skate through the trees",
+    [
+     "apex/adventure-skating-loop-apex|Adventure Skating Loop & Shinny Pond – Apex"
+    ]
+   ],
+   [
+    "Cross-country skiing",
+    [
+     "apex/nickel-plate-nordic-centre|Nickel Plate Nordic Centre"
+    ]
+   ],
+   [
+    "Snowshoeing",
+    [
+     "baldy/baldy-snowshoe-trails|Baldy Snowshoe Trails",
+     "baldy/mckinney-nordic-ski-club-trails|McKinney Nordic Ski Club – Snowshoe & Cross-Country Trails"
+    ]
+   ],
+   [
+    "A sit-down steak dinner",
+    [
+     "apex/longshots-steak-house|Longshots Steak House"
+    ]
+   ],
+   [
+    "Coffee before the first chair",
+    [
+     "apex/the-artisan-s-den-at-apex|The Artisan's Den at Apex",
+     "apex/the-edge-bistro|The Edge Bistro"
+    ]
+   ],
+   [
+    "A quick lunch between runs",
+    [
+     "apex/pit-stop-cafeteria|Pit Stop Cafeteria",
+     "apex/the-edge-bistro|The Edge Bistro"
+    ]
+   ],
+   [
+    "A lodge pub night",
+    [
+     "apex/the-gunbarrel-saloon|The Gunbarrel Saloon",
+     "baldy/corduroy-cafe|Corduroy Cafe"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/ski-snow\">Ski &amp; Snow</a>, <a href=\"/tours/winter\">Winter tours</a>"
+}

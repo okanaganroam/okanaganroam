@@ -1,0 +1,187 @@
+{
+ "heading": "Winter Festivals & Events in the Okanagan, January–March 2027",
+ "title": "Okanagan Winter Events, Jan–Mar 2027 | Okanagan Roam",
+ "description": "Frost Fest in Penticton, a Polar Bear Dip, a ski race, a chef dinner, ballet and Come From Away across the Okanagan, Jan–Mar 2027.",
+ "banner": "whats-on-events-festivals",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "This guide covers the winter 2027 season, from New Year's Day to the end of March. It's a short list: our winter listings are mostly theatre nights and single concerts, so the picks below are the events that stand out, from a winter carnival in Penticton and a Polar Bear Dip on New Year's Day to a ski race, a chef dinner and ballet. Dates and details can change, so check each event page before you go.",
+  "Events are grouped by type. Each one shows its town and date."
+ ],
+ "sections": [
+  {
+   "id": "festivals-winter-fun",
+   "jump": "Festivals",
+   "heading": "Festivals & winter fun",
+   "items": [
+    {
+     "ref": "event:kelowna/polar-bear-dip",
+     "name": "Polar Bear Dip",
+     "text": "at Tugboat Beach in Waterfront Park, 1 to 2:30 pm. Admission is $15.",
+     "where": "Kelowna, Jan 1"
+    },
+    {
+     "ref": "event:big-white/jr-chef-challenge",
+     "name": "Jr. Chef Challenge",
+     "text": "at Big White Ski Resort.",
+     "where": "Big White, Jan 13"
+    },
+    {
+     "ref": "event:penticton/frost-fest-winter-carnival",
+     "name": "Frost Fest Winter Carnival",
+     "text": "at Gyro Park.",
+     "where": "Penticton, Jan 22 – 24"
+    }
+   ]
+  },
+  {
+   "id": "on-the-slopes",
+   "jump": "On the slopes",
+   "heading": "On the slopes",
+   "items": [
+    {
+     "ref": "event:silverstar/over-the-hill-downhill-2027",
+     "name": "Over The Hill Downhill 2027",
+     "text": "Canada's longest-running recreational downhill ski race, at SilverStar Mountain Resort.",
+     "where": "SilverStar, Feb 5 – 7"
+    },
+    {
+     "ref": "event:big-white/mountain-glow-women-s-ski-day-with-kelsey-serwa",
+     "name": "Mountain Glow: Women's Ski Day with Kelsey Serwa",
+     "text": "save the date; details are still to come.",
+     "where": "Big White, Mar 13"
+    }
+   ]
+  },
+  {
+   "id": "food-wine-a-valentine-s-treat",
+   "jump": "Food & wine",
+   "heading": "Food, wine & a Valentine's treat",
+   "items": [
+    {
+     "ref": "event:kelowna/valentine-s-day-bliss-yoga-sound-local-chocolate-in-the-salt-cave",
+     "name": "Valentine’s Day Bliss: Yoga, Sound & Local Chocolate in the Salt Cave",
+     "text": "at Room and Pillar Spa, 6:30 to 7:30 pm. Admission is $55.",
+     "where": "Kelowna, Feb 15"
+    },
+    {
+     "ref": "event:big-white/mission-hill-chef-collaboration-dinner",
+     "name": "Mission Hill Chef Collaboration Dinner",
+     "text": "at the Kettle Valley Steakhouse.",
+     "where": "Big White, Feb 25"
+    }
+   ]
+  },
+  {
+   "id": "theatre-dance",
+   "jump": "Theatre & dance",
+   "heading": "Theatre & dance",
+   "items": [
+    {
+     "ref": "event:kelowna/the-princess-proms-concert",
+     "name": "The Princess Proms Concert",
+     "text": "at Kelowna Community Theatre, 3:30 to 5:45 pm. Admission is from $44.",
+     "where": "Kelowna, Jan 2"
+    },
+    {
+     "ref": "event:kelowna/come-from-away",
+     "name": "Come From Away",
+     "text": "at the Actors Studio & Dinner Theatre. Admission is $93 to $100.",
+     "where": "Kelowna, Feb 3 – 21"
+    },
+    {
+     "ref": "event:vernon/ballet-jorgen-swan-lake",
+     "name": "Ballet Jörgen: Swan Lake",
+     "text": "at the Vernon & District Performing Arts Centre, 7:30 to 9:30 pm.",
+     "where": "Vernon, Feb 4"
+    },
+    {
+     "ref": "event:kelowna/ballet-kelowna-a-streetcar-named-desire",
+     "name": "Ballet Kelowna: A Streetcar Named Desire",
+     "text": "at Kelowna Community Theatre, 7:30 pm. Admission is $41.94 to $105.61.",
+     "where": "Kelowna, Feb 12 – 13"
+    },
+    {
+     "ref": "event:vernon/ballet-kelowna-cikilaxwm-controlled-burn-spotlight-dance-series",
+     "name": "Ballet Kelowna: Cikilaxwm Controlled Burn SPOTLIGHT Dance Series",
+     "text": "at the Vernon & District Performing Arts Centre, 7:30 to 9:30 pm.",
+     "where": "Vernon, Mar 16"
+    },
+    {
+     "ref": "event:vernon/vdpac-presents-louisa-may-alcott-s-little-women",
+     "name": "VDPAC Presents: Louisa May Alcott's LITTLE WOMEN",
+     "text": "at the Vernon & District Performing Arts Centre, 7:30 to 9:30 pm.",
+     "where": "Vernon, Mar 30"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A winter carnival",
+    [
+     "event:penticton/frost-fest-winter-carnival|Frost Fest Winter Carnival"
+    ]
+   ],
+   [
+    "A brisk start to the year",
+    [
+     "event:kelowna/polar-bear-dip|Polar Bear Dip"
+    ]
+   ],
+   [
+    "A ski-hill event",
+    [
+     "event:silverstar/over-the-hill-downhill-2027|Over The Hill Downhill 2027",
+     "event:big-white/mountain-glow-women-s-ski-day-with-kelsey-serwa|Mountain Glow: Women's Ski Day with Kelsey Serwa"
+    ]
+   ],
+   [
+    "A night at the theatre",
+    [
+     "event:kelowna/come-from-away|Come From Away",
+     "event:vernon/vdpac-presents-louisa-may-alcott-s-little-women|VDPAC Presents: Louisa May Alcott's LITTLE WOMEN"
+    ]
+   ],
+   [
+    "Ballet",
+    [
+     "event:vernon/ballet-jorgen-swan-lake|Ballet Jörgen: Swan Lake",
+     "event:kelowna/ballet-kelowna-a-streetcar-named-desire|Ballet Kelowna: A Streetcar Named Desire"
+    ]
+   ],
+   [
+    "Something for kids",
+    [
+     "event:kelowna/the-princess-proms-concert|The Princess Proms Concert",
+     "event:big-white/jr-chef-challenge|Jr. Chef Challenge"
+    ]
+   ],
+   [
+    "A Valentine's outing",
+    [
+     "event:kelowna/valentine-s-day-bliss-yoga-sound-local-chocolate-in-the-salt-cave|Valentine’s Day Bliss: Yoga, Sound & Local Chocolate in the Salt Cave"
+    ]
+   ],
+   [
+    "A dinner at the hill",
+    [
+     "event:big-white/mission-hill-chef-collaboration-dinner|Mission Hill Chef Collaboration Dinner"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>"
+}

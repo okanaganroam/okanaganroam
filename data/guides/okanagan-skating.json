@@ -1,0 +1,205 @@
+{
+ "heading": "Where to skate this winter",
+ "title": "Okanagan Skating: Rinks & Outdoor Ice | Okanagan Roam",
+ "description": "Where to skate in the Okanagan: forest loops and ponds in the ski villages, free outdoor rinks in town, and arenas with public skates.",
+ "banner": "whats-on-sports-recreation",
+ "parent": {
+  "name": "Ski & Snow",
+  "href": "/ski-snow"
+ },
+ "noPlace": true,
+ "intro": [
+  "Okanagan skating comes in three flavours: natural ice up in the ski villages, outdoor rinks in the valley towns that open when the cold settles in, and indoor arenas that run public skates on a regular schedule. Some are free, some lend or rent skates, and many ask you to bring your own.",
+  "Outdoor ice depends on the weather and arena sessions shift around hockey bookings, so check the rink's own schedule before you go."
+ ],
+ "sections": [
+  {
+   "id": "ski-village-ice",
+   "jump": "Ski villages",
+   "heading": "Ski-village ice",
+   "items": [
+    {
+     "ref": "apex/adventure-skating-loop-apex",
+     "name": "Adventure Skating Loop & Shinny Pond – Apex",
+     "text": "A kilometre of Zamboni-smoothed ice looping through the forest, with the Shinny Pond beside it for pickup hockey. For 2026/27 a full-day skate pass is $15 for ages 13 and up and $7.50 for 12 and under; it is weather-dependent natural ice.",
+     "where": "Apex"
+    },
+    {
+     "ref": "silverstar/brewers-pond-skating-silverstar",
+     "name": "Brewer's Pond Skating – SilverStar",
+     "text": "Two and a half acres of natural ice with a fire at the edge, included in the resort's My1Pass day ticket and season pass. Skate rentals, stick rentals and sharpening are at the Brewer's Pond Base.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "big-white/happy-valley-ice-skating-rink",
+     "name": "Happy Valley Ice Skating Rink – Big White",
+     "text": "What the resort calls Canada's highest outdoor skating rink, fully lit for night skating, with a bonfire every afternoon after 3 pm and \"ice buddies\" to steady beginners. Skates, sticks and helmets can be rented at the Happy Valley rental shop.",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "outdoor-rinks-in-town",
+   "jump": "Outdoor rinks",
+   "heading": "Outdoor rinks in town",
+   "items": [
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "A free rink on the downtown waterfront that opens in early December, weather permitting. The rental hut runs 11 a.m. to 8 p.m. daily but closes when the temperature drops below −10°C.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/penticton-outdoor-skating-rink-gyro-park",
+     "name": "Penticton Outdoor Skating Rink (Gyro Park)",
+     "text": "Free and open 9 a.m. to 9 p.m. daily when the weather allows, near the Okanagan Lake beach. It is a family-skating rink with no sticks and no rentals.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "peachland/peachland-outdoor-ice-rink-mountain-view-park",
+     "name": "Peachland Outdoor Ice Rink (Mountain View Park)",
+     "text": "Flooded nightly by Peachland Fire and Rescue volunteers and open free from 7 a.m. to 9 p.m., set up for 3-on-3 hockey as well as pleasure skating. It relies on natural freezing, typically from late December or January into February.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "coldstream/jeffers-park-skating-rink",
+     "name": "Jeffers Park Skating Rink",
+     "text": "A covered, volunteer-run outdoor rink in Lavington, free and first-come, first-served, lit until 10:45 p.m. There is a public skate with no sticks daily from 4 to 5 p.m. and on Saturday and Sunday mornings from 9 to 10.",
+     "where": "Coldstream"
+    },
+    {
+     "ref": "vernon/vernon-recreation-complex-priest-valley-arena-centennial-outdoor-rink",
+     "name": "Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink",
+     "text": "The Centennial Outdoor Rink is free from December through February, weather permitting, and indoor Priest Valley Arena hosts public skating you register for ahead of time. There are no skate rentals, so bring your own.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "north-okanagan-arenas",
+   "jump": "North arenas",
+   "heading": "North Okanagan arenas",
+   "items": [
+    {
+     "ref": "enderby/enderby-arena",
+     "name": "Enderby Arena",
+     "text": "Free public skating from September 1 through March: Tuesday to Thursday from 2 to 3 p.m., Friday from 3 to 5 p.m. and Sunday from 3:30 to 5 p.m. Bring your own gear, as rentals are not listed.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "lumby/pat-duke-memorial-arena",
+     "name": "Pat Duke Memorial Arena",
+     "text": "No charge for public skating or for the parent-and-tot and seniors' skate sessions. The schedule changes week to week, so check the calendar or call 250-547-2171, and bring your own skates.",
+     "where": "Lumby"
+    },
+    {
+     "ref": "armstrong/nor-val-sports-centre",
+     "name": "Nor-Val Sports Centre",
+     "text": "A weekday drop-in program from September 9 to the end of March, with a free parent-and-tot skate on Fridays and a Sunday Family Skate from 3:30 to 5:30 p.m. at $5 a person. There are no skate rentals.",
+     "where": "Armstrong"
+    }
+   ]
+  },
+  {
+   "id": "central-okanagan-arenas",
+   "jump": "Central arenas",
+   "heading": "Central Okanagan arenas",
+   "items": [
+    {
+     "ref": "kelowna/rutland-arena",
+     "name": "Rutland Arena",
+     "text": "Open public skates, parent-and-tot sessions and seniors' skates through the winter, pre-booked online. The rental counter carries skates, helmets and push-along skate bars.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-memorial-arena",
+     "name": "Kelowna Memorial Arena",
+     "text": "The old downtown rink, with City public skating and a dedicated Seniors Skate. There are no rentals here, and sessions are pre-booked online.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mnp-place",
+     "name": "MNP Place",
+     "text": "From Thanksgiving to Spring Break the leisure rink opens for weekday public skating, with skate and skate-trainer rentals. Stick & Puck and Adult Drop-In Hockey (19+) are booked through the venue's online calendar.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/mount-boucherie-arenas-jim-lind-arena-royal-lepage-place",
+     "name": "Mount Boucherie Arenas – Jim Lind Arena & Royal LePage Place",
+     "text": "Public and family skates, adult-only sessions, an adaptive skate and Big & Little sessions for parents with toddlers. Skate rentals are $2.95 a pair.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "lake-country/winfield-arena",
+     "name": "Winfield Arena",
+     "text": "The Sunday afternoon public skate (3 to 4 p.m.) and Wednesday evening session (7 to 8 p.m.) are free, and Friday night has a DJ Skate. There are no skate rentals, so bring your own.",
+     "where": "Lake Country"
+    }
+   ]
+  },
+  {
+   "id": "south-okanagan-arenas",
+   "jump": "South arenas",
+   "heading": "South Okanagan arenas",
+   "items": [
+    {
+     "ref": "penticton/mclaren-park-arena",
+     "name": "McLaren Park Arena",
+     "text": "Open for skating from October to mid-March, with Open Public Skate, Family Skate, Adult Only Skate and Lap Skate sessions. Skate rentals are $4.25 ($3.25 for preschoolers).",
+     "where": "Penticton"
+    },
+    {
+     "ref": "osoyoos/sun-bowl-arena",
+     "name": "Sun Bowl Arena",
+     "text": "The Saturday session from 5:15 to 6:15 p.m. and the Sunday afternoon skate from 3:30 to 4:45 p.m. are free, and the Skate Library lends skates for free. Helmets are required.",
+     "where": "Osoyoos"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Skating through the trees",
+    [
+     "apex/adventure-skating-loop-apex|Adventure Skating Loop & Shinny Pond – Apex"
+    ]
+   ],
+   [
+    "A free skate near downtown",
+    [
+     "kelowna/stuart-park-outdoor-rink|Stuart Park Outdoor Rink",
+     "penticton/penticton-outdoor-skating-rink-gyro-park|Penticton Outdoor Skating Rink (Gyro Park)"
+    ]
+   ],
+   [
+    "Free skating with loaner skates",
+    [
+     "osoyoos/sun-bowl-arena|Sun Bowl Arena"
+    ]
+   ],
+   [
+    "Rentals for the whole family",
+    [
+     "kelowna/rutland-arena|Rutland Arena",
+     "penticton/mclaren-park-arena|McLaren Park Arena"
+    ]
+   ],
+   [
+    "A pickup game outdoors",
+    [
+     "peachland/peachland-outdoor-ice-rink-mountain-view-park|Peachland Outdoor Ice Rink (Mountain View Park)",
+     "coldstream/jeffers-park-skating-rink|Jeffers Park Skating Rink"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/outdoors/winter\">Winter outdoors</a>, <a href=\"/ski-snow\">Ski &amp; Snow</a>, <a href=\"/indoor\">Indoor &amp; Rainy Day</a>"
+}

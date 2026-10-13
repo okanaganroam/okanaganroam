@@ -1,0 +1,156 @@
+{
+ "heading": "Saunas, Spas & Warm Soaks for Cold Days",
+ "title": "Okanagan Saunas, Spas & Hot Tubs | Okanagan Roam",
+ "description": "Floating lake saunas, a social bathhouse, a thermal spa circuit and pools with hot tubs and steam rooms for warming up on a cold Okanagan day.",
+ "banner": "spas",
+ "parent": {
+  "name": "Spas",
+  "href": "/indoor/spas"
+ },
+ "noPlace": true,
+ "intro": [
+  "When the valley turns grey and cold, a bit of real heat goes a long way. Around the Okanagan you can sit in a cedar sauna on the lake, work through a hot-and-cold circuit, or take the kids for a swim and slip into the hot tub yourself.",
+  "Here's where to warm up, from saunas built for an evening with friends to the community pools with a hot tub and steam room. Each place shows its town."
+ ],
+ "sections": [
+  {
+   "id": "floating-saunas-on-the-lake",
+   "jump": "Floating saunas",
+   "heading": "Floating saunas on the lake",
+   "items": [
+    {
+     "ref": "kelowna/loyly-floating-sauna",
+     "name": "Löyly Floating Sauna",
+     "text": "a Finnish-style cedar sauna floating at Kelowna's Downtown Marina, with a lake cold plunge and a warm solarium lounge overlooking Okanagan Lake. Book a shared 80-minute community session or take over the whole sauna with friends.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/shelter-floating-sauna",
+     "name": "Shelter Floating Sauna",
+     "text": "a cedar sauna floating on Okanagan Lake at the Lakeside Resort marina, where you cycle between heat, a cold plunge in the lake and rest. Join a shared social session or book the whole sauna privately for up to eight people.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "bathhouses-and-thermal-spas",
+   "jump": "Bathhouses",
+   "heading": "Bathhouses and thermal spas",
+   "items": [
+    {
+     "ref": "kelowna/tality-wellness-kelowna",
+     "name": "Tality Wellness Kelowna",
+     "text": "a downtown social bathhouse with a 20-person cedar sauna, four cold plunges and a lounge around a vapour firepit, with robes, towels and kombucha included. Book a shared community session or a private group slot.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cleopatra-s-rituals-thermal-spa-and-steam",
+     "name": "Cleopatra's Rituals Thermal Spa and Steam",
+     "text": "a thermal spa with a hot-cold circuit of sauna, steam, thermal showers and a falling-snow room. Book a Thermal Ritual session solo, or reserve the space for a private group.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "pools-with-a-hot-tub-sauna-or-",
+   "jump": "Pools & hot tubs",
+   "heading": "Pools with a hot tub, sauna or steam room",
+   "items": [
+    {
+     "ref": "kelowna/h2o-adventure-fitness-centre",
+     "name": "H2O Adventure + Fitness Centre",
+     "text": "a YMCA-run indoor waterpark with waterslides, a FlowRider, wave pool, lazy river and splash park. A go-to for families on a cold or rainy day, with a hot tub and steam room for grown-ups.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/vernon-aquatic-centre",
+     "name": "Vernon Aquatic Centre",
+     "text": "a warm leisure pool with a waterslide, rapids channel, rope swing, climbing wall and bubble pit, plus a sauna, steam room and hot tub.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "penticton/penticton-community-centre-pool-lazy-river",
+     "name": "Penticton Community Centre (Pool & Lazy River)",
+     "text": "a leisure pool with a lazy river, spray features and a waterslide, and a big whirlpool, sauna and steam room for warming up on a cold day.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "west-kelowna/johnson-bentley-memorial-aquatic-centre",
+     "name": "Johnson Bentley Memorial Aquatic Centre",
+     "text": "an indoor pool with slides, a rope swing, a warm soaking pool, a hot tub and a steam room. Public swim sessions run daily.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "summerland/summerland-aquatic-fitness-centre",
+     "name": "Summerland Aquatic & Fitness Centre",
+     "text": "an indoor pool and hot tub, celebrating 50 years in 2026, with evening and weekend public swims. Drop-in admission is inexpensive, and families get a combined rate.",
+     "where": "Summerland"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A sauna with a plunge in the lake",
+    [
+     "kelowna/loyly-floating-sauna|Löyly Floating Sauna",
+     "penticton/shelter-floating-sauna|Shelter Floating Sauna"
+    ]
+   ],
+   [
+    "A hot-and-cold circuit indoors",
+    [
+     "kelowna/cleopatra-s-rituals-thermal-spa-and-steam|Cleopatra's Rituals Thermal Spa and Steam",
+     "kelowna/tality-wellness-kelowna|Tality Wellness Kelowna"
+    ]
+   ],
+   [
+    "A private session for your group",
+    [
+     "penticton/shelter-floating-sauna|Shelter Floating Sauna",
+     "kelowna/tality-wellness-kelowna|Tality Wellness Kelowna"
+    ]
+   ],
+   [
+    "Robes and towels included",
+    [
+     "kelowna/tality-wellness-kelowna|Tality Wellness Kelowna"
+    ]
+   ],
+   [
+    "Slides for the kids, steam for you",
+    [
+     "kelowna/h2o-adventure-fitness-centre|H2O Adventure + Fitness Centre",
+     "vernon/vernon-aquatic-centre|Vernon Aquatic Centre"
+    ]
+   ],
+   [
+    "A lazy river, then the sauna",
+    [
+     "penticton/penticton-community-centre-pool-lazy-river|Penticton Community Centre"
+    ]
+   ],
+   [
+    "A warm soak on any day of the week",
+    [
+     "west-kelowna/johnson-bentley-memorial-aquatic-centre|Johnson Bentley Memorial Aquatic Centre"
+    ]
+   ],
+   [
+    "An inexpensive drop-in hot tub",
+    [
+     "summerland/summerland-aquatic-fitness-centre|Summerland Aquatic & Fitness Centre"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/indoor/spas\">Spas</a>"
+}

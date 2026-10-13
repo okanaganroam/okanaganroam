@@ -1,0 +1,116 @@
+{
+ "heading": "Winter in the Okanagan",
+ "title": "Winter in the Okanagan: Things to Do | Okanagan Roam",
+ "description": "Things to do in the Okanagan this winter: skiing and beyond, skating, snowshoeing, sleigh rides, holiday events, saunas, winter wine and cozy spots.",
+ "banner": "ski-snow",
+ "parent": {
+  "name": "Ski & Snow",
+  "href": "/ski-snow"
+ },
+ "noPlace": true,
+ "intro": [
+  "Winter in the Okanagan means snow on the ski hills and quieter, frosty days in the valley below. There's plenty to do on and off the slopes, from skating and snowshoeing to sleigh rides, holiday markets and long, warm evenings by a fire.",
+  "Here are our winter guides, all built from verified listings."
+ ],
+ "sections": [
+  {
+   "id": "on-the-snow",
+   "jump": "On the snow",
+   "heading": "On the snow",
+   "items": [
+    {
+     "lead": "Ski season:",
+     "tip": "{page:/guides/ski-season-big-white-silverstar|Big White and SilverStar ski guide} covers après-ski, lunch on the mountain, dinner and things to do off the slopes."
+    },
+    {
+     "lead": "The smaller hills:",
+     "tip": "{page:/guides/apex-baldy-ski-guide|Apex & Baldy} covers the Okanagan's smaller ski hills and what's around them."
+    },
+    {
+     "lead": "Beyond downhill:",
+     "tip": "{page:/guides/okanagan-winter-beyond-skiing|Beyond the ski hills} rounds up tube parks, fat biking, lit forest walks, snowshoe dinners, ice fishing and winter birding."
+    },
+    {
+     "lead": "Cross-country:",
+     "tip": "{page:/guides/okanagan-nordic-snowshoe|Nordic skiing & snowshoeing} covers groomed trails and snowshoe routes across the valley."
+    },
+    {
+     "lead": "On the ice:",
+     "tip": "{page:/guides/okanagan-skating|Skating in the Okanagan} lists rinks, arenas and outdoor ice."
+    },
+    {
+     "lead": "Guided adventures:",
+     "tip": "{page:/guides/okanagan-sleigh-rides-dog-sledding|Sleigh rides, dog sledding & snowmobile tours} covers horse-drawn sleighs, husky tours, snowmobiles and snowcats."
+    }
+   ]
+  },
+  {
+   "id": "holidays-and-events",
+   "jump": "Holidays & events",
+   "heading": "Holidays and events",
+   "items": [
+    {
+     "lead": "The holidays:",
+     "tip": "{page:/guides/okanagan-holiday-events|Holiday markets, lights & Christmas events 2026}."
+    },
+    {
+     "lead": "After New Year:",
+     "tip": "{page:/guides/okanagan-winter-events|Winter festivals & events, January–March 2027}."
+    },
+    {
+     "lead": "Hockey:",
+     "tip": "{page:/guides/okanagan-hockey-season|Hockey season in the Okanagan} lists home games for the valley's teams."
+    }
+   ]
+  },
+  {
+   "id": "warm-up",
+   "jump": "Warm up",
+   "heading": "Warm up",
+   "items": [
+    {
+     "lead": "Heat and steam:",
+     "tip": "{page:/guides/okanagan-saunas-spas|Saunas, spas & warm soaks} covers floating saunas, bathhouses and pools with a hot tub."
+    },
+    {
+     "lead": "By the fire:",
+     "tip": "{page:/guides/cozy-spots-okanagan|Cozy spots for cool days} finds fireside dining rooms, fire pits and heated patios."
+    },
+    {
+     "lead": "Comfort food:",
+     "tip": "{page:/guides/soup-ramen-pho-okanagan|Soup, ramen & pho}."
+    },
+    {
+     "lead": "Winter wine:",
+     "tip": "{page:/guides/okanagan-winter-wine|Winter wine & icewine} covers icewine makers and wine tours from the ski hills."
+    }
+   ]
+  },
+  {
+   "id": "grey-day-plans",
+   "jump": "Grey days",
+   "heading": "Grey-day plans",
+   "items": [
+    {
+     "lead": "Indoors:",
+     "tip": "{page:/guides/rainy-day-okanagan|A rainy day in the Okanagan} covers museums, an indoor waterpark, shows and more."
+    },
+    {
+     "lead": "Keep swinging:",
+     "tip": "{page:/guides/indoor-golf-okanagan|Indoor golf in the Okanagan} lists the valley's golf simulators."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": []
+ },
+ "footerHtml": ""
+}

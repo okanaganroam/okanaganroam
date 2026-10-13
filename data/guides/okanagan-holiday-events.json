@@ -1,0 +1,345 @@
+{
+ "heading": "Holiday Markets, Lights & Christmas Events in the Okanagan, 2026",
+ "title": "Okanagan Christmas & Holiday Events 2026 | Okanagan Roam",
+ "description": "Holiday markets, tree lightings, Christmas concerts, Santa at Big White and New Year's Eve in the Okanagan, from mid-November 2026 into January.",
+ "banner": "whats-on-holiday-seasonal",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "This guide covers the 2026 holiday season, from mid-November through New Year's Day. It gathers the festive events in our listings: holiday markets, tree lightings and light-ups, Christmas concerts, Santa and family days at the ski hills, cozy winery evenings and a few ways to ring in 2027. Dates and details can change, so check each event page before you go.",
+  "Events are grouped by type. Each one shows its town and date."
+ ],
+ "sections": [
+  {
+   "id": "christmas-markets-craft-fairs",
+   "jump": "Markets",
+   "heading": "Christmas markets & craft fairs",
+   "items": [
+    {
+     "ref": "event:kelowna/delta-grand-holiday-market",
+     "name": "Delta Grand Holiday Market",
+     "text": "at Delta Hotels by Marriott Grand Okanagan Resort, 10 am to 4 pm. Admission is by donation.",
+     "where": "Kelowna, Nov 22"
+    },
+    {
+     "ref": "event:kelowna/holiday-magic-market",
+     "name": "Holiday Magic Market",
+     "text": "at the Rotary Centre for the Arts, 1 to 7 pm. Admission is by donation.",
+     "where": "Kelowna, Nov 27"
+    },
+    {
+     "ref": "event:osoyoos/christmas-faire",
+     "name": "Christmas Faire",
+     "text": "at the OSCA Osoyoos Activity Centre.",
+     "where": "Osoyoos, Nov 28"
+    },
+    {
+     "ref": "event:kelowna/craft-culture-holiday-market",
+     "name": "Craft Culture Holiday Market",
+     "text": "at Prospera Place, 1 to 7 pm on Dec 4. Admission is $7.",
+     "where": "Kelowna, from Dec 4, several dates"
+    }
+   ]
+  },
+  {
+   "id": "lights-trees-festive-walks",
+   "jump": "Lights",
+   "heading": "Lights, trees & festive walks",
+   "items": [
+    {
+     "ref": "event:west-kelowna/festival-of-trees-at-mission-hill",
+     "name": "Festival of Trees at Mission Hill",
+     "text": "a festive display of community-decorated holiday trees, with a guided experience and seasonal wine tasting supporting BC Children's Hospital. This is the 10th annual Festival of Trees.",
+     "where": "West Kelowna, Nov 20 – Jan 3"
+    },
+    {
+     "ref": "event:kelowna/tree-of-hope-festival",
+     "name": "Tree of Hope Festival",
+     "text": "the annual tree-lighting tradition in the Landmark District, with festive entertainment, seasonal treats and family-friendly activities. The organizer will announce the detailed schedule closer to the date.",
+     "where": "Kelowna, Nov 21"
+    },
+    {
+     "ref": "event:west-kelowna/west-kelowna-light-up-2026",
+     "name": "West Kelowna Light Up 2026",
+     "text": "the City of West Kelowna's brightest event of the year, at Westbank Centre from 5 to 8 pm, with holiday lights, entertainment and family activities.",
+     "where": "West Kelowna, Dec 4"
+    },
+    {
+     "ref": "event:silverstar/silverstar-annual-light-up-2026",
+     "name": "SilverStar Annual Light Up",
+     "text": "help light up the village at SilverStar Mountain Resort's annual Light Up celebration.",
+     "where": "SilverStar, Dec 5"
+    },
+    {
+     "ref": "event:big-white/big-white-s-twinkling-trail-light-up",
+     "name": "Big White's Twinkling Trail Light Up",
+     "text": "at Big White Ski Resort.",
+     "where": "Big White, Dec 12"
+    }
+   ]
+  },
+  {
+   "id": "holiday-shows-concerts",
+   "jump": "Shows",
+   "heading": "Holiday shows & concerts",
+   "items": [
+    {
+     "ref": "event:lake-country/matt-dusk-a-very-sinatra-christmas",
+     "name": "Matt Dusk – A Very Sinatra Christmas",
+     "text": "at Creekside Theatre, ticketed through the theatre's box office.",
+     "where": "Lake Country, Nov 18"
+    },
+    {
+     "ref": "event:kelowna/a-celtic-family-christmas-party",
+     "name": "A Celtic Family Christmas Party",
+     "text": "at Kelowna Community Theatre, 7:30 pm. Admission is $70.21.",
+     "where": "Kelowna, Nov 23"
+    },
+    {
+     "ref": "event:vernon/the-celtic-tenors-a-celtic-christmas",
+     "name": "The Celtic Tenors: A Celtic Christmas",
+     "text": "at the Vernon District & Performing Arts Centre, 7:30 to 9:30 pm.",
+     "where": "Vernon, Nov 28"
+    },
+    {
+     "ref": "event:oliver/the-celtic-tenors-a-celtic-christmas",
+     "name": "The Celtic Tenors: A Celtic Christmas",
+     "text": "at Venables Theatre, 7:30 pm.",
+     "where": "Oliver, Nov 29"
+    },
+    {
+     "ref": "event:summerland/summerland-strummers-christmas-carol-singalong",
+     "name": "Summerland Strummers Christmas Carol Singalong",
+     "text": "at the Summerland Community Centre, starting at 7 pm. Confirm tickets with the venue.",
+     "where": "Summerland, Dec 12"
+    },
+    {
+     "ref": "event:lake-country/oh-come-all-ye-soulful",
+     "name": "Oh Come All Ye Soulful",
+     "text": "at Creekside Theatre, ticketed through the theatre's box office.",
+     "where": "Lake Country, Dec 17"
+    },
+    {
+     "ref": "event:summerland/south-okanagan-big-band-jazzy-christmas",
+     "name": "South Okanagan Big Band — Jazzy Christmas",
+     "text": "at the Summerland Community Centre, starting at 7 pm. Confirm tickets with the venue.",
+     "where": "Summerland, Dec 18"
+    },
+    {
+     "ref": "event:vernon/a-coast-to-coast-cowboy-christmas-with-george-canyon-aaron-pritchett",
+     "name": "A Coast-to-Coast Cowboy Christmas with George Canyon & Aaron Pritchett",
+     "text": "at the Vernon District & Performing Arts Centre, 7:30 to 9:30 pm.",
+     "where": "Vernon, Dec 19"
+    }
+   ]
+  },
+  {
+   "id": "festive-wine-country-workshops",
+   "jump": "Wine country",
+   "heading": "Festive wine country & workshops",
+   "items": [
+    {
+     "ref": "event:okanagan-falls/wine-tasting-the-heart-of-wine-country-holiday-cheer-open-house",
+     "name": "Wine Tasting: The Heart of Wine Country™ Holiday Cheer Open House",
+     "text": "at various wineries throughout the Okanagan Falls and Skaha region, 11 am to 4 pm.",
+     "where": "Okanagan Falls, Nov 14 – 15"
+    },
+    {
+     "ref": "event:okanagan-falls/workshop-holiday-wreath-workshop-and-barrel-sampling-noble-ridge-vineyard-and-winery",
+     "name": "Workshop: Holiday Wreath Workshop and Barrel Sampling @ Noble Ridge Vineyard and Winery",
+     "text": "at Noble Ridge Vineyard and Winery, 1 to 3 pm.",
+     "where": "Okanagan Falls, Nov 15"
+    },
+    {
+     "ref": "event:oliver/holiday-mingle",
+     "name": "Holiday Mingle",
+     "text": "at Phantom Creek Estates, noon to 4 pm.",
+     "where": "Oliver, Nov 21"
+    },
+    {
+     "ref": "event:lake-country/christmas-gnome-workshop",
+     "name": "Christmas Gnome Workshop",
+     "text": "at Gray Monk Estate Winery.",
+     "where": "Lake Country, Nov 22"
+    },
+    {
+     "ref": "event:oliver/okanagan-winery-holiday-dinner",
+     "name": "Okanagan Winery Holiday Dinner",
+     "text": "at The Sonora Room Restaurant at Burrowing Owl Estate Winery, 6 to 9 pm.",
+     "where": "Oliver, Nov 28"
+    },
+    {
+     "ref": "event:oliver/poinsettia-ornament-workshop",
+     "name": "Poinsettia Ornament Workshop",
+     "text": "at Phantom Creek Estates, 2 to 4 pm.",
+     "where": "Oliver, Dec 6"
+    },
+    {
+     "ref": "event:kelowna/holiday-paint-sip-christmas-tree-charcuterie-board",
+     "name": "Holiday Paint & Sip: Christmas Tree Charcuterie Board",
+     "text": "at Sandhill Wines, 5:30 to 8:30 pm. Admission is $75.",
+     "where": "Kelowna, Dec 21"
+    }
+   ]
+  },
+  {
+   "id": "family-santa-community-events",
+   "jump": "Family & Santa",
+   "heading": "Family, Santa & community events",
+   "items": [
+    {
+     "ref": "event:big-white/welcome-to-winter-big-white-2026",
+     "name": "Welcome to Winter at Big White",
+     "text": "the resort's season-opening celebration in the village, with family activities and festivities, 5 to 7:05 pm.",
+     "where": "Big White, Nov 28"
+    },
+    {
+     "ref": "event:osoyoos/christmas-dinner-and-dance",
+     "name": "Christmas Dinner and Dance",
+     "text": "at the OSCA Osoyoos Activity Centre.",
+     "where": "Osoyoos, Dec 11"
+    },
+    {
+     "ref": "event:osoyoos/christmas-themed-bingo",
+     "name": "Christmas Themed Bingo",
+     "text": "at the OSCA Osoyoos Activity Centre.",
+     "where": "Osoyoos, Dec 17"
+    },
+    {
+     "ref": "event:big-white/santa-s-workshop",
+     "name": "Santa's Workshop",
+     "text": "at Big White Ski Resort.",
+     "where": "Big White, daily Dec 18 – 24"
+    },
+    {
+     "ref": "event:silverstar/silverstar-12-days-of-holidays",
+     "name": "SilverStar 12 Days of Holidays",
+     "text": "SilverStar's holiday programme in the village.",
+     "where": "SilverStar, Dec 21 – Jan 1"
+    },
+    {
+     "ref": "event:big-white/big-white-s-christmas-eve-festival",
+     "name": "Big White's Christmas Eve Festival",
+     "text": "at Big White Ski Resort.",
+     "where": "Big White, Dec 24"
+    },
+    {
+     "ref": "event:big-white/ski-with-santa",
+     "name": "Ski with Santa",
+     "text": "at Big White Ski Resort.",
+     "where": "Big White, Dec 25"
+    },
+    {
+     "ref": "event:kelowna/xmas-fusion-dj-night",
+     "name": "Xmas Fusion DJ Night",
+     "text": "at Revelry Food+Music Hub, 7 pm to 1 am. Admission is $15 to $70.",
+     "where": "Kelowna, Dec 25"
+    }
+   ]
+  },
+  {
+   "id": "new-year-s-eve-new-year-s-day",
+   "jump": "New Year's",
+   "heading": "New Year's Eve & New Year's Day",
+   "items": [
+    {
+     "ref": "event:silverstar/silverstar-new-year-s-eve",
+     "name": "SilverStar New Year’s Eve",
+     "text": "cheers to the New Year in SilverStar Village.",
+     "where": "SilverStar, Dec 31"
+    },
+    {
+     "ref": "event:vernon/nye-the-justin-glibbery-sextet-at-the-vernon-jazz-club",
+     "name": "NYE!! The Justin Glibbery Sextet at the Vernon Jazz Club",
+     "text": "at the Vernon Jazz Club, 9 pm to 11:59 pm.",
+     "where": "Vernon, Dec 31"
+    },
+    {
+     "ref": "event:kelowna/polar-bear-dip",
+     "name": "Polar Bear Dip",
+     "text": "at Tugboat Beach in Waterfront Park, 1 to 2:30 pm. Admission is $15.",
+     "where": "Kelowna, Jan 1"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Holiday shopping at a market",
+    [
+     "event:kelowna/delta-grand-holiday-market|Delta Grand Holiday Market",
+     "event:kelowna/holiday-magic-market|Holiday Magic Market",
+     "event:kelowna/craft-culture-holiday-market|Craft Culture Holiday Market"
+    ]
+   ],
+   [
+    "Christmas trees and lights",
+    [
+     "event:west-kelowna/festival-of-trees-at-mission-hill|Festival of Trees at Mission Hill",
+     "event:kelowna/tree-of-hope-festival|Tree of Hope Festival",
+     "event:west-kelowna/west-kelowna-light-up-2026|West Kelowna Light Up 2026"
+    ]
+   ],
+   [
+    "A Christmas concert",
+    [
+     "event:oliver/the-celtic-tenors-a-celtic-christmas|The Celtic Tenors: A Celtic Christmas",
+     "event:vernon/a-coast-to-coast-cowboy-christmas-with-george-canyon-aaron-pritchett|A Coast-to-Coast Cowboy Christmas with George Canyon & Aaron Pritchett"
+    ]
+   ],
+   [
+    "Carols to sing along with",
+    [
+     "event:summerland/summerland-strummers-christmas-carol-singalong|Summerland Strummers Christmas Carol Singalong"
+    ]
+   ],
+   [
+    "Santa time for the kids",
+    [
+     "event:big-white/santa-s-workshop|Santa's Workshop",
+     "event:big-white/ski-with-santa|Ski with Santa"
+    ]
+   ],
+   [
+    "A festive afternoon at a winery",
+    [
+     "event:oliver/holiday-mingle|Holiday Mingle",
+     "event:west-kelowna/festival-of-trees-at-mission-hill|Festival of Trees at Mission Hill"
+    ]
+   ],
+   [
+    "A make-and-take workshop",
+    [
+     "event:lake-country/christmas-gnome-workshop|Christmas Gnome Workshop",
+     "event:oliver/poinsettia-ornament-workshop|Poinsettia Ornament Workshop"
+    ]
+   ],
+   [
+    "Something by donation",
+    [
+     "event:kelowna/delta-grand-holiday-market|Delta Grand Holiday Market",
+     "event:kelowna/holiday-magic-market|Holiday Magic Market"
+    ]
+   ],
+   [
+    "New Year's Eve",
+    [
+     "event:silverstar/silverstar-new-year-s-eve|SilverStar New Year’s Eve",
+     "event:vernon/nye-the-justin-glibbery-sextet-at-the-vernon-jazz-club|NYE!! The Justin Glibbery Sextet at the Vernon Jazz Club"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>"
+}

@@ -1,0 +1,168 @@
+{
+ "heading": "Sleigh Rides, Dog Sledding & Snowmobile Tours",
+ "title": "Sleigh Rides & Dog Sledding | Okanagan Roam",
+ "description": "Horse-drawn sleigh rides, husky dog-sled tours, guided snowmobile tours and snowcat dinners and catskiing across the Okanagan this winter.",
+ "banner": "tour-winter",
+ "parent": {
+  "name": "Winter tours",
+  "href": "/tours/winter"
+ },
+ "noPlace": true,
+ "intro": [
+  "Winter in the Okanagan isn't only about the ski runs. Up in the mountains and out on the farms, you can ride a horse-drawn sleigh, head down a forest trail behind a team of huskies, or get into the backcountry by snowmobile or snowcat.",
+  "Here's where to find them, grouped by how you'll be travelling. Tube parks, fat biking and ice fishing are in {page:/guides/okanagan-winter-beyond-skiing|Beyond the ski hills}. Each place shows its town. Dress warmly, and check each listing for booking details before you head up."
+ ],
+ "sections": [
+  {
+   "id": "sleighs-pulled-by-horses-and-h",
+   "jump": "Sleighs & huskies",
+   "heading": "Sleighs pulled by horses and huskies",
+   "items": [
+    {
+     "ref": "big-white/big-white-horse-drawn-sleigh-rides",
+     "name": "Big White Horse-Drawn Sleigh Rides & Dining Tours",
+     "text": "sleigh rides leave from outside the Happy Valley Day Lodge from December 14, 2026 through March 30, 2027. Choose a regular ride, a small private sleigh for up to four, or the dinner tour through the snowy trails to a cabin in the woods for a family-style gourmet meal (book dining tours at least a day ahead).",
+     "where": "Big White"
+    },
+    {
+     "ref": "armstrong/caravan-farm-theatre-winter-sleigh-ride-show",
+     "name": "Caravan Farm Theatre – Winter Sleigh Ride Show",
+     "text": "an outdoor theatre company on an 80-acre farm whose Winter Sleigh Ride Show carries audiences by horse-drawn sleigh through a story staged in the snowy fields and woods. Shows last about an hour, with live music, a fire and hot cider; the season runs December to January.",
+     "where": "Armstrong"
+    },
+    {
+     "ref": "big-white/candle-creek-kennels-dog-sled-tours",
+     "name": "Candle Creek Kennels – Dog Sled Tours at Big White",
+     "text": "a team of enthusiastic Alaskan huskies, an orientation to the dogs, sled and harnessing, then about half an hour of mushing on a six-kilometre groomed trail through pine forest and alpine meadows. Each sled carries up to two riders.",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "snowmobile-tours-and-trails",
+   "jump": "Snowmobiles",
+   "heading": "Snowmobile tours and trails",
+   "items": [
+    {
+     "ref": "big-white/outback-snowmobile-tours-big-white",
+     "name": "Outback Snowmobile Tours – Big White",
+     "text": "tours built for people who have never sat on a sled, with a guide setting the pace to the least experienced rider. Pick the one-hour or the two-hour tour; drivers must be at least 16 with a valid driver's licence.",
+     "where": "Big White"
+    },
+    {
+     "ref": "vernon/okanagan-rec-rentals-snowmobile-tours",
+     "name": "Okanagan Rec Rentals – Snowmobile Tours",
+     "text": "guided tours depart from SilverStar Mountain Resort into the snowy forest and open terrain behind the mountain. Tours run from one to three hours (hot chocolate comes with the three-hour tour), and every price covers safety gear and a snowmobile orientation.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/graystokes-snowmobile-area-kelowna-snowmobile-club",
+     "name": "Graystokes Snowmobile Area – Kelowna Snowmobile Club",
+     "text": "the Central Okanagan's big sledding country, a high plateau of meadows, bowls and forest roads east of Kelowna where the club grooms more than 300 kilometres of trail and keeps eight warm-up cabins. This is avalanche and backcountry terrain, so ride prepared.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "silverstar/vernon-snowmobile-association-silver-star-trails",
+     "name": "Vernon Snowmobile Association – Silver Star Trails",
+     "text": "the oldest snowmobile club in British Columbia, with 160 kilometres of regularly groomed trails through Silver Star Provincial Park, signed trails for cruising, open meadows and bowls, and two shelters that double as warm-up and emergency stops.",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "snowcat-rides-and-catskiing",
+   "jump": "Snowcats",
+   "heading": "Snowcat rides and catskiing",
+   "items": [
+    {
+     "ref": "silverstar/paradise-camp-snowcat-dinner-tours-silverstar",
+     "name": "Paradise Camp Snowcat Dinner Tours – SilverStar",
+     "text": "an evening snowcat ride from SilverStar village to Paradise Camp on the back side of the mountain, followed by a candlelit multi-course dinner. The half-hour ride climbs about 8 km through the snowy forest, on select evenings from December to April.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "baldy/baldy-mountain-resort",
+     "name": "Baldy Mountain Resort",
+     "text": "new this winter, cat skiing by snowcat from the top of the Eagle Chair to Baldy's upper terrain and 120 acres of new lines, running Friday to Sunday by single ride or private booking with an Eagle lift ticket.",
+     "where": "Baldy"
+    },
+    {
+     "ref": "lumby/gostlin-keefer-lake-lodge-catskiing",
+     "name": "Gostlin Keefer Lake Lodge – Catskiing",
+     "text": "a remote backcountry lodge in the Monashee Mountains east of Lumby, with all-inclusive guided catskiing packages of three or four days and private cat charters for groups of up to 14, lodging and meals included. Season: December to April.",
+     "where": "Lumby"
+    },
+    {
+     "ref": "lumby/monashee-powder-snowcats",
+     "name": "Monashee Powder Snowcats",
+     "text": "multi-day guided snowcat skiing and snowboarding, staging from the Cherryville Roadhouse with transfers to a backcountry lodge on Tsuius Mountain. Two- to four-day packages include lodging, meals and guiding for intermediate-to-expert riders aged 14 and up.",
+     "where": "Lumby"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A sleigh ride for the whole family",
+    [
+     "big-white/big-white-horse-drawn-sleigh-rides|Big White Horse-Drawn Sleigh Rides & Dining Tours"
+    ]
+   ],
+   [
+    "Theatre from a sleigh",
+    [
+     "armstrong/caravan-farm-theatre-winter-sleigh-ride-show|Caravan Farm Theatre – Winter Sleigh Ride Show"
+    ]
+   ],
+   [
+    "Dinner at the end of the ride",
+    [
+     "big-white/big-white-horse-drawn-sleigh-rides|Big White Horse-Drawn Sleigh Rides & Dining Tours",
+     "silverstar/paradise-camp-snowcat-dinner-tours-silverstar|Paradise Camp Snowcat Dinner Tours – SilverStar"
+    ]
+   ],
+   [
+    "Mushing with huskies",
+    [
+     "big-white/candle-creek-kennels-dog-sled-tours|Candle Creek Kennels – Dog Sled Tours at Big White"
+    ]
+   ],
+   [
+    "A first snowmobile ride with a guide",
+    [
+     "big-white/outback-snowmobile-tours-big-white|Outback Snowmobile Tours – Big White",
+     "vernon/okanagan-rec-rentals-snowmobile-tours|Okanagan Rec Rentals – Snowmobile Tours"
+    ]
+   ],
+   [
+    "Groomed club trails to ride",
+    [
+     "kelowna/graystokes-snowmobile-area-kelowna-snowmobile-club|Graystokes Snowmobile Area – Kelowna Snowmobile Club",
+     "silverstar/vernon-snowmobile-association-silver-star-trails|Vernon Snowmobile Association – Silver Star Trails"
+    ]
+   ],
+   [
+    "A taste of catskiing",
+    [
+     "baldy/baldy-mountain-resort|Baldy Mountain Resort"
+    ]
+   ],
+   [
+    "A multi-day catskiing trip",
+    [
+     "lumby/gostlin-keefer-lake-lodge-catskiing|Gostlin Keefer Lake Lodge – Catskiing",
+     "lumby/monashee-powder-snowcats|Monashee Powder Snowcats"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/tours/winter\">Winter tours</a>, <a href=\"/ski-snow\">Ski &amp; Snow</a>"
+}
