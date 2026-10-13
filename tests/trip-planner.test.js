@@ -823,6 +823,13 @@ const OVERVIEW_BANNED = /\b(perfect|atmosphere|award|awards|award-winning|always
 const OVERVIEW_SEASONAL = /\b(swim|swimming|paddl\w*|summer|winter|snow|warm|sunny|weather|season\w*)\b/i;
 const WORD_COUNTS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, a: 1, an: 1 };
 
+test('unrequested filler stops are clearly labeled as optional suggestions', () => {
+  const p = plan('Plan one day in Kelowna with a winery visit and dinner');
+  const optional = allStops(p).flatMap(s => s.reasons || []).filter(r => r.code === 'complement');
+  assert.ok(optional.length > 0, 'fixture produces a complementary stop');
+  assert.ok(optional.every(r => /^Optional suggestion:/i.test(r.text)), optional.map(r => r.text).join('\n'));
+});
+
 test('Phase 1 overview: 2-day golf plan is named from its days, region and golf theme, and counts its real stops', () => {
   for (const q of ['Plan a golf weekend around Kelowna.', 'Plan a relaxed 2-day golf getaway in Kelowna']) {
     const p = plan(q);

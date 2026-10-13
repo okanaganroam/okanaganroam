@@ -1,4 +1,5 @@
 'use strict';
+const {t3FrenchText,t3FrenchEvent,t3FrenchPlan}=require('./trip-french-copy');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -21,6 +22,116 @@
 // unchanged: its .trip-btn / .fav-btn handlers run Add to Trip / Favorites.
 
 // ---- pure helpers, shared with the browser (see CLIENT_HELPERS_SRC) ----
+
+function t3TimelineRows(p,removed={}){
+ const stops=p.days?.length?p.days.flatMap(d=>(d.stops||[]).map(s=>({...s,day:d.day}))):(p.itinerary?.stops||p.outing?.stops||[]).map(s=>({...s,day:1}));
+ let previous=null,changedDay=null;
+ return (p.schedule||[]).map(item=>{
+  const stop=stops.find(s=>s.day===item.day&&(item.notScheduledMeal?s.unscheduledMeal&&s.daypart===item.daypart:item.venueId!=null?s.venue?.id===item.venueId:s.event?.id===item.eventId));
+  if(stop&&removed[stop.day+'-'+stop.daypart]){previous=null;changedDay=item.day;return null;}
+  if(changedDay===item.day){const row={...item,name:stop?.venue?.name||stop?.event?.name||'',status:'unverified',gapMinutes:null,transferMinutes:undefined,arrivalAllowanceMinutes:undefined};if(item.venueId!=null){row.startMinutes=undefined;row.endMinutes=undefined;delete row.mealWindow;}return row;}
+  const gap=previous?.day===item.day&&Number.isFinite(previous.endMinutes)&&Number.isFinite(item.startMinutes)&&Number.isFinite(item.transferMinutes)?Math.max(0,item.startMinutes-previous.endMinutes-item.transferMinutes-(item.arrivalAllowanceMinutes||0)):null;
+  const row={...item,name:item.notScheduledMeal?(stop?.label||'Dinner'):stop?.venue?.name||stop?.event?.name||'',gapMinutes:gap};previous=item;return row;
+ }).filter(Boolean);
+}
+function t3EventPlaceHtml(event,language,esc){
+ const venue=String(event?.venueName||'').trim();if(!venue)return '';
+ return '<p class="t3-event-place">'+esc(language==='fr'?'Lieu : ':'Venue: ')+esc(venue)+'</p>';
+}
+function t3VenueCardId(id){
+ return 't3-venue-card-'+String(id).replace(/[^A-Za-z0-9_-]/g,'-');
+}
+function t3ListingGapGroups(p){
+ const stops=(p.days||[]).reduce((all,d)=>all.concat(d.stops||[]),[]).concat((p.itinerary||{}).stops||[],(p.outing||{}).stops||[],p.recommendations||[]);
+ const groups={hours:[],location:[]},seen={hours:{},location:{}};
+ stops.forEach(s=>{
+  if(!s||!s.venue)return;
+  (s.caveats||[]).forEach(c=>{
+   const kind=/No usable hours listed|Aucun horaire utilisable/i.test(c)?'hours':/No map location on file|emplacement.*carte/i.test(c)?'location':null;
+   if(!kind)return;
+   const v=s.venue,key=v.id!=null?'id:'+v.id:'name:'+String(v.name||'');
+   if(seen[kind][key])return;
+   seen[kind][key]=true;
+   groups[kind].push({id:v.id!=null?v.id:null,name:String(v.name||'Venue'),url:typeof v.url==='string'&&/^\/(?!\/)/.test(v.url)?v.url:null});
+  });
+ });
+ return Object.keys(groups).filter(kind=>groups[kind].length).map(kind=>({kind,venues:groups[kind]}));
+}
+function t3ListingGapSummaryHtml(p,fr,esc){
+ const groups=t3ListingGapGroups(p);
+ if(!groups.length)return '';
+ const labels=fr?{title:'Détails à confirmer',hours:'Horaires non indiqués',location:'Emplacement sur la carte manquant',confirm:'Confirmez directement auprès de ces lieux.'}:{title:'Details to confirm',hours:'Hours not listed',location:'Map location missing',confirm:'Confirm directly with these venues.'};
+ return '<section class="t3-warnings" aria-label="'+esc(labels.title)+'"><h3>'+esc(labels.title)+'</h3>'+groups.map(g=>'<p><strong>'+esc(labels[g.kind])+':</strong> '+g.venues.map(v=>v.id!=null?'<a href="#'+esc(t3VenueCardId(v.id))+'">'+esc(v.name)+'</a>':esc(v.name)).join(', ')+'.</p>').join('')+'<p>'+esc(labels.confirm)+'</p></section>';
+}
+function t3PlanNextSteps(p) {
+  var steps=[],seen={};
+  function browseUrl(item){
+    var types={restaurant:'restaurants',cafe:'cafes',winery:'wineries',brewery:'breweries',pub:'pubs-bars',cocktail:'cocktail-lounges',distillery:'distilleries',beach:'beaches',golf:'golf',indoor:'indoor',outdoor:'outdoors',sport:'sports-recreation',tour:'tours'};
+    var validRegions=['kelowna','west-kelowna','peachland','lake-country','naramata','penticton','kaleden','okanagan-falls','summerland','oliver','osoyoos','vernon','coldstream','lumby','armstrong','enderby','big-white','silverstar','apex','baldy'];
+    var regions=p.intent&&Array.isArray(p.intent.regions)?p.intent.regions:[];
+    if(item.kind==='event'){
+      var categories={festival:'events-festivals',market:'markets-fairs','live-music':'live-music',hockey:'sports-recreation'};
+      var params=[];if(regions.length===1&&validRegions.indexOf(regions[0])!==-1)params.push('regions='+regions[0]);
+      if(categories[item.eventKind])params.push('categories='+categories[item.eventKind]);
+      return '/whats-on'+(params.length?'?'+params.join('&'):'');
+    }
+    var slug=item.kind==='feature'&&item.value==='dog_friendly'?'dog-friendly':['type','type_count'].indexOf(item.kind)!==-1?types[item.value]:null;
+    if(!slug)return null;
+    var region=['type','type_count'].indexOf(item.kind)!==-1&&regions.length===1&&validRegions.indexOf(regions[0])!==-1?regions[0]:null;
+    return '/'+(region?region+'/':'')+slug;
+  }
+  (p.requirementResults||[]).forEach(function(i){
+    if(i.status!=='unmet'||['type','type_count','venue_kind','venue','activity','event','rainy','feature'].indexOf(i.kind)===-1)return;
+    var key=i.kind+':'+i.value;if(seen[key])return;seen[key]=true;
+    var eventLabels={hockey:'hockey game','live-music':'live music',festival:'festival',market:'market'};
+    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):String(i.value).replace(/_/g,' '),url:browseUrl(i)});
+  });
+  var stops=p.days&&p.days.length?p.days.reduce(function(a,d){return a.concat(d.stops||[]);},[]):((p.itinerary&&p.itinerary.stops)||(p.outing&&p.outing.stops)||[]);
+  (p.schedule||[]).forEach(function(i){
+    if(i.status==='estimated'||!i.venueId||seen['venue:'+i.venueId])return;
+    var stop=stops.find(function(s){return s.venue&&s.venue.id===i.venueId;});if(!stop)return;
+    seen['venue:'+i.venueId]=true;
+    var url=stop.venue.url;
+    steps.push({kind:'timing',name:stop.venue.name,checks:i.confirmationReasons,mealWindow:i.mealWindow,url:typeof url==='string'&&/^\/(?!\/)/.test(url)?url:null});
+  });
+  (p.schedule||[]).forEach(function(i){
+    if(i.status==='estimated'||i.venueId)return;
+    var stop=stops.find(function(s){return s.event&&s.event.id===i.eventId;});
+    if(!stop){if(!seen.eventFallback){
+      var fallbackChecks=[];
+      if(!Number.isFinite(i.startMinutes))fallbackChecks.push('event_start');
+      if(!Number.isFinite(i.endMinutes))fallbackChecks.push('event_duration');
+      if(i.status==='unmet')fallbackChecks.push('event_arrival');
+      fallbackChecks.push('event_travel');
+      steps.push({kind:'event_timing',checks:fallbackChecks});seen.eventFallback=true;
+    }return;}
+    var key='event:'+i.eventId;if(seen[key])return;seen[key]=true;
+    var checks=[];
+    if(!Number.isFinite(i.startMinutes))checks.push('event_start');
+    if(!Number.isFinite(i.endMinutes))checks.push('event_duration');
+    if(i.status==='unmet')checks.push('event_arrival');
+    checks.push('event_travel');
+    var url=stop.event.url;
+    steps.push({kind:'event_timing',name:stop.event.name,checks:checks,url:typeof url==='string'&&/^\/(?!\/)/.test(url)?url:null});
+  });
+  return steps;
+}
+
+function t3TimingChecklist(step,fr){
+  var labels=fr?{event_start:'l’heure de début de l’événement',event_duration:'la durée de l’événement',event_arrival:'un départ plus tôt pour arriver avant l’événement',event_travel:'le trajet et l’heure d’arrivée',hours:'les horaires',listing_hours:'les horaires indiqués dans le texte de la fiche',prior_timing:'l’horaire de l’arrêt précédent',sport_access:'l’accès sportif ou les conditions de réservation',visit_duration:'la durée de visite',travel:'le trajet'}:{event_start:'the event’s start time',event_duration:'event duration',event_arrival:'an earlier departure to arrive before the event',event_travel:'travel and arrival time',hours:'opening hours',listing_hours:'hours stated in the listing text',prior_timing:'the preceding stop’s timing',sport_access:'sports access or booking requirements',visit_duration:'visit duration',travel:'travel'};
+  var keys=Array.isArray(step.checks)?step.checks:['hours','visit_duration','travel'];
+  var parts=keys.filter(function(k,i){return labels[k]&&keys.indexOf(k)===i;}).map(function(k){return labels[k];});
+  if(!parts.length)parts=['hours','visit_duration','travel'].map(function(k){return labels[k];});
+  return (fr?'Confirmez ':'Confirm ')+(parts.length>1?parts.slice(0,-1).join(', ')+(fr?' et ':' and ')+parts[parts.length-1]:parts[0])+'.';
+}
+
+function t3EditLosesMatch(previous,next) {
+  var kinds=['type','type_count','venue_kind','venue','activity','event','rainy'];
+  return !!previous && (previous.requirementResults || []).some(function(old){
+    if(old.status!=='satisfied'||kinds.indexOf(old.kind)===-1)return false;
+    return (next.requirementResults || []).some(function(now){return now.id===old.id&&now.kind===old.kind&&now.value===old.value&&now.status==='unmet';});
+  });
+}
 
 // Straight-line kilometres between two stored coordinates, or null.
 function t3Km(a, b) {
@@ -63,6 +174,13 @@ function t3StateToQuery(s) {
   if (o.days) add('days', String(o.days));
   if (o.pace) add('pace', o.pace);
   if (o.baseRegion) add('base', o.baseRegion);
+  if(o.shortWalkVenueIds?.length)add('walk',[...new Set(o.shortWalkVenueIds)].filter(id).sort((a,b)=>a-b).join(','));
+  if(o.dayStartMinutes&&Object.keys(o.dayStartMinutes).length)add('starts',Object.keys(o.dayStartMinutes).sort().map(d=>d+':'+o.dayStartMinutes[d]).join(','));
+  if(o.startDate)add('date',o.startDate);
+  if(o.startMinutes!==undefined)add('start',String(o.startMinutes));
+  if (o.budgetMode) add('budget',o.budgetMode);
+  if (o.durationMinutes) add('minutes',String(o.durationMinutes));
+  if (Number.isSafeInteger(o.eventId) && o.eventId > 0 && o.eventId < 1e9) add('event',String(o.eventId));
   const locks = slots(s.locks);
   if (locks.length) add('keep', locks.join(','));
   const ex = (s.exclude || []).filter(id).slice(-200);
@@ -98,8 +216,15 @@ function t3QueryToState(search, regions) {
   if (q.seed !== undefined && !seedOk) invalid = true;
   const overrides = {};
   if (/^[1-7]$/.test(q.days || '')) overrides.days = Number(q.days); else if (q.days !== undefined) invalid = true;
+  if (/^[1-9]\d{0,8}$/.test(q.event || '')) overrides.eventId = Number(q.event); else if (q.event !== undefined) invalid = true;
   if (['relaxed', 'standard', 'packed'].indexOf(q.pace) !== -1) overrides.pace = q.pace; else if (q.pace !== undefined) invalid = true;
   if (q.base === 'valley' || (regions || []).indexOf(q.base) !== -1) overrides.baseRegion = q.base; else if (q.base !== undefined) invalid = true;
+  if(q.date!==undefined){if(/^\d{4}-\d{2}-\d{2}$/.test(q.date)&&Number.isFinite(Date.parse(q.date+'T12:00:00Z'))&&new Date(q.date+'T12:00:00Z').toISOString().slice(0,10)===q.date)overrides.startDate=q.date;else invalid=true;}
+  if(q.walk!==undefined){const ids=q.walk.split(',');if(ids.length<=10&&ids.every(id=>/^[1-9]\d{0,8}$/.test(id))&&new Set(ids).size===ids.length)overrides.shortWalkVenueIds=ids.map(Number);else invalid=true;}
+  if(q.starts!==undefined){const entries=q.starts.split(',');if(entries.length<=7&&entries.every(e=>/^[1-7]:\d{1,4}$/.test(e)&&Number(e.split(':')[1])<1440)&&new Set(entries.map(e=>e.split(':')[0])).size===entries.length)overrides.dayStartMinutes=Object.fromEntries(entries.map(e=>e.split(':').map(Number)));else invalid=true;}
+  if(q.start!==undefined){if(/^\d{1,4}$/.test(q.start)&&Number(q.start)<1440)overrides.startMinutes=Number(q.start);else invalid=true;}
+  if (['full','shorter'].indexOf(q.budget)!==-1) overrides.budgetMode=q.budget; else if(q.budget!==undefined) invalid=true;
+  if (/^\d{1,4}$/.test(q.minutes||'') && Number(q.minutes)>=1 && Number(q.minutes)<=1440) overrides.durationMinutes=Number(q.minutes); else if(q.minutes!==undefined) invalid=true;
   const slotMap = (raw, max) => {
     if (raw === undefined) return null;
     const out = {};
@@ -161,7 +286,7 @@ function t3MapPoints(days, removed) {
   });
   return out;
 }
-const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   'Plan me a 3-day September trip with wine, great food and golf, with one relaxed day by the lake',
@@ -248,6 +373,7 @@ function renderStyles() {
   .t3-details summary { cursor: pointer; font-weight: 700; }
   .t3-details ul { margin: 8px 0 0; padding-left: 18px; }
   .t3-warnings { background: #FFF6E6; border: 1px solid rgba(201,162,39,0.45); color: #5B4212; border-radius: 12px; padding: 12px 16px; margin: 0 0 16px; font-size: 0.9rem; }
+  .t3-event-choices { display: flex; flex-wrap: wrap; gap: 8px; }
   .t3-warnings ul { margin: 0; padding-left: 18px; }
 
   .t3-daynav { position: sticky; top: 0; z-index: 20; display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; margin: 0 0 8px; background: var(--ref-cream); scrollbar-width: none; }
@@ -324,6 +450,7 @@ function renderStyles() {
   .t3-card-top { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(27,43,58,0.6); }
   .t3-card h4 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.22rem; margin: 4px 0 4px; line-height: 1.25; }
   .t3-card h4 a { color: var(--ref-navy); text-decoration: none; } .t3-card h4 a:hover { text-decoration: underline; }
+  .t3-event-place { margin: 0 0 8px; color: rgba(27,43,58,0.78); font-size: 0.92rem; font-weight: 700; }
   .t3-address { margin: 0 0 6px; font-size: 0.84rem; color: rgba(27,43,58,0.72); }
   .t3-facts { margin: 0 0 8px; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
   .t3-star { color: var(--ref-gold); }
@@ -393,7 +520,9 @@ function renderStyles() {
     .t3-when::after { display: none; }
     .t3-leg { margin-left: 0; }
     .t3-plan-head { padding: 20px 18px 16px; border-radius: 14px; }
-    .t3-plan-actions .t3-btn { flex: 1 1 auto; justify-content: center; }
+    .t3-plan-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .t3-plan-actions .t3-btn { min-width: 0; padding: 10px 12px; justify-content: center; text-align: center; }
+    .t3-plan-actions [data-t3-add-all] { grid-column: 1 / -1; }
     .t3-day-head { min-height: 130px; }
     .t3-day-headin { padding: 14px 14px; }
     .t3-map { padding: 12px; }
@@ -461,7 +590,15 @@ function renderScript(d) {
   var MAP_HEADERS = ${JSON.stringify(d.mapHeaders || {})};
   var TRIP_MAX_STOPS = 10; // My Trip's own limit (MAX_STOPS in /scripts/app.js)
   ${CLIENT_HELPERS_SRC}
+  ${t3EditLosesMatch.toString()}
+  ${t3PlanNextSteps.toString()}
+  ${t3TimingChecklist.toString()}
+  ${t3TimelineRows.toString()}
+  ${t3FrenchText.toString()}
+  ${t3FrenchEvent.toString()}
+  ${t3FrenchPlan.toString()}
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
+  var renderedVenueCardAnchors = {};
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
@@ -512,7 +649,7 @@ function renderScript(d) {
     opts = opts || {};
     var body = { text: state.text, seed: state.seed, excludeVenueIds: state.exclude.slice(-200) };
     var o = state.overrides, ov = {};
-    ['days', 'pace', 'baseRegion'].forEach(function(k){ if (o[k] !== undefined) ov[k] = o[k]; });
+    ['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId'].forEach(function(k){ if (o[k] !== undefined) ov[k] = o[k]; });
     if (Object.keys(ov).length) body.overrides = ov;
     for (var k in extra) body[k] = extra[k];
     var requestType = opts.requestType || 'initial';
@@ -527,10 +664,15 @@ function renderScript(d) {
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function(res){
         done();
+        if (['replace','regenerate','regenerate_day'].indexOf(requestType)!==-1 && t3EditLosesMatch(state.last,res.j)) {
+          var message=document.documentElement.lang==='fr' ? 'Aucune nouvelle combinaison ne conserve toutes vos activités. Votre itinéraire actuel est conservé.' : 'No new combination keeps all your matched activities. Your current itinerary has been kept.';
+          state.exclude=(state.lastReq && state.lastReq.exclude || []).slice();
+          res={ok:false,status:res.status,incomplete:true,j:{error:message}};
+        }
         if (!res.ok) {
           setStatus(res.j && res.j.error ? res.j.error : tx('tripv3.error'), 'error');
           showEditError(trigger, statusEl.textContent);
-          track('trip_plan_error', { request_type: requestType, error_type: 'response', http_status: res.status });
+          track('trip_plan_error', { request_type: requestType, error_type: res.incomplete ? 'incomplete_edit' : 'response', http_status: res.status });
           return;
         }
         setStatus('');
@@ -808,12 +950,14 @@ function renderScript(d) {
   function cardHtml(stop, key, opts){
     opts = opts || {};
     var v = stop.venue, url = safeUrl(v.url), counts = opts.counts || {};
+    var cardAnchor = v.id != null && !renderedVenueCardAnchors[v.id] ? ' id="' + esc(t3VenueCardId(v.id)) + '"' : '';
+    if (v.id != null) renderedVenueCardAnchors[v.id] = true;
     var kept = key && state.locks[key] === v.id;
     // The listed hours are shown once, as the fact line above the reasons.
     var why = (stop.why || []).filter(function(w){ return !(v.listedHours && /^Listed hours/.test(w)) && !/\(straight line\)/.test(w); }).slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
-    var cav = (stop.caveats || []).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
+    var cav = (stop.caveats || []).filter(function(c){ return !/No usable hours listed|Aucun horaire utilisable|No map location on file|emplacement.*carte/i.test(c); }).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
     var same = counts[v.name] > 1;
-    var html = '<article class="t3-card' + (kept ? ' is-kept' : '') + '" data-venue-id="' + esc(v.id) + '">'
+    var html = '<article class="t3-card' + (kept ? ' is-kept' : '') + '"' + cardAnchor + ' data-venue-id="' + esc(v.id) + '">'
       // Four groups (head / tags / body / actions) so that cards in the same
       // grid row can share row tracks (see .t3-grid) and line up. Each group
       // is always present, empty or not.
@@ -883,10 +1027,16 @@ function renderScript(d) {
         html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-removed">' + esc(tx('tripv3.removedStop')) + ' <button type="button" class="t3-act" data-t3-undo="' + esc(key) + '">' + esc(tx('tripv3.undo')) + '</button><button type="button" class="t3-act" data-t3-swap="' + esc(key) + '">' + esc(tx('tripv3.suggestAnother')) + '</button></div></li>';
         return;
       }
+      if (s.unscheduledMeal) {
+        var mealFr=lang()==='fr';
+        html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty"><strong>' + (mealFr?'Souper non planifié':'Dinner not scheduled') + '</strong><p>' + (mealFr?'Aucun restaurant selon les horaires indiqués ne convient avant l’événement et la marge d’arrivée.':'No listed restaurant fits before the event and arrival allowance.') + '</p></div></li>';
+        return;
+      }
       if (!s.venue) {
         if (s.kind === 'event' && s.event) {
           var e = s.event, u = safeUrl(e.url);
           html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+            + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
             + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
@@ -966,8 +1116,48 @@ function renderScript(d) {
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
       + '</section>';
   }
+  function warningSummaryHtml(p){
+    var stops=(p.days||[]).reduce(function(all,d){return all.concat(d.stops||[]);},[]).concat((p.itinerary||{}).stops||[],(p.outing||{}).stops||[],p.recommendations||[]);
+    var missingEvents=t3PlanNextSteps(p).filter(function(step){return step.kind==='missing_event';});
+    var visible=[], repeated=[];
+    (p.warnings||[]).forEach(function(w){
+      if(missingEvents.some(function(step){return w.indexOf('Not met: '+step.label)===0||w.indexOf('Non satisfait : '+t3FrenchText(step.label))===0;}))return;
+      var duplicate=stops.some(function(s){
+        var name=s.venue?s.venue.name:s.event?s.event.name:null;
+        var prefix=name?name+': ':'';
+        var body=w.slice(prefix.length);
+        return prefix && w.indexOf(prefix)===0 && (body.indexOf('Provisional visit')===0 || body.indexOf('Visite provisoire')===0) && s.scheduleNote && s.scheduleNote.indexOf(body)===0;
+      });
+      (duplicate?repeated:visible).push(w);
+    });
+    var list=function(items){return '<ul>'+items.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul>';};
+    var html=visible.length?'<div class="t3-warnings" role="note">'+list(visible)+'</div>':'';
+    if(repeated.length)html+='<details class="t3-warnings"><summary>'+(lang()==='fr'?'Détails horaires déjà indiqués avec vos arrêts':'Timing details already shown with your stops')+' ('+repeated.length+')</summary>'+list(repeated)+'</details>';
+    return html;
+  }
+  function requirementSummaryHtml(p){
+    var checks = p.requirementResults || [];
+    if (!checks.length) return '';
+    var fr = lang() === 'fr';
+    var titles = fr ? ['Demandes vérifiées', 'Correspondances', 'Manquant', 'À confirmer'] : ['Requests checked', 'Matched', 'Missing', 'Needs confirmation'];
+    var names = fr ? {museum:'musée', gallery:'galerie', spa:'spa', easy_walk:'promenade facile', walk:'promenade', sunset:'point de vue au coucher du soleil', cafe:'café', restaurant:'restaurant', winery:'vignoble', rainy:'activité intérieure', duration:'durée', price_limit:'coût total', 'exact budget':'budget exact', 'party size':'taille du groupe', 'age suitability':'âge des enfants', accessibility:'accessibilité'} : {easy_walk:'easy walk', sunset:'sunset viewpoint', cafe:'coffee', rainy:'indoor suitability', duration:'visit duration', price_limit:'total cost'};
+    var statuses = ['satisfied', 'unmet', 'unverified'];
+    return '<section class="t3-warnings" aria-label="' + esc(titles[0]) + '"><h3>' + esc(titles[0]) + '</h3><p>' + esc(fr ? 'Les correspondances concernent les fiches du site. Les disponibilités, les réservations et le temps de trajet restent à confirmer.' : 'Matches refer to listing information. Availability, reservations and travel timing still need confirmation.') + '</p>' + statuses.map(function(status, n){
+      var items = checks.filter(function(i){ return i.status === status; });
+      if (!items.length) return '';
+      return '<details><summary>' + esc(titles[n + 1]) + ' (' + items.length + ')</summary><ul>' + items.map(function(i){
+        var value = i.kind === 'duration' || i.kind === 'price_limit' || i.kind === 'rainy' ? i.kind : i.value;
+        var label = names[value] || String(value).replace(/_/g, ' ');
+        if (i.kind === 'days') label = i.value + (fr ? ' jour(s)' : ' day(s)');
+        if (i.kind === 'venue') label = i.sourceText || label;
+        if (i.kind.indexOf('excluded_') === 0) label = (fr ? 'Sans ' : 'No ') + label;
+        return '<li>' + esc(label) + (i.reason ? ' — ' + esc(i.reason) : '') + '</li>';
+      }).join('') + '</ul></details>';
+    }).join('') + '</section>';
+  }
   function render(focus){
-    var p = state.last;
+    var p = lang()==='fr' ? t3FrenchPlan(state.last) : state.last;
+    renderedVenueCardAnchors = {};
     var counts = nameCounts();
     var planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';
     var hasStops = planKinds || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary && (p.itinerary.stops || []).length);
@@ -976,6 +1166,7 @@ function renderScript(d) {
     var html = understoodHtml(p)
       + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
       + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
+      + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert" aria-live="polite"><p>' + esc(lang()==='fr' ? 'Plusieurs événements correspondent à «'+p.eventAmbiguity.phrase+'». Choisissez celui que vous voulez ajouter à votre sortie :' : 'More than one listed event matches “'+p.eventAmbiguity.phrase+'”. Choose the one you want to add to your outing:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name,i){var id=p.eventAmbiguity.candidateIds&&p.eventAmbiguity.candidateIds[i];return Number.isSafeInteger(id)&&id>0?'<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="'+id+'">'+esc(name)+'</button>':'';}).join('') + '</div></section>' : '')
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
       + (p.experience && p.experience.text ? '<p class="t3-expect">' + esc(p.experience.text) + '</p>' : '')
       + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
@@ -987,12 +1178,91 @@ function renderScript(d) {
       + '</div><p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p>'
       + (notes.length ? '<details class="t3-details"><summary>' + esc(tx('tripv3.howMade')) + '</summary><ul>' + notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></details>' : '')
       + '</header>';
-    var issues = (p.warnings || []).slice();
-    if (issues.length) html += '<div class="t3-warnings" role="note"><ul>' + issues.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>';
+    if(p.timeBudget){
+      var budget=p.timeBudget, fr=document.documentElement.lang==='fr';
+      html+='<section class="t3-warnings" aria-label="'+(fr?'Options de durée':'Time budget options')+'"><h3>'+(fr?'Adaptez la sortie à votre temps':'Make this outing fit your time')+'</h3>';
+      if(budget.shorter){
+        html+='<p>'+esc((fr?'Option plus courte : ':'Shorter option: ')+budget.shorter.stops.join(', '))+'. '+budget.shorter.estimate.minMinutes+'–'+budget.shorter.estimate.maxMinutes+' '+(fr?'minutes estimées.':'estimated minutes.')+'</p><p>'+esc((fr?'Activités retirées : ':'Left out: ')+budget.shorter.omitted.join(', '))+'.</p>';
+        html+='<button type="button" class="t3-btn" data-t3-budget="'+(budget.selected?'full':'shorter')+'">'+(fr?(budget.selected?'Revenir au plan complet':'Choisir cette option'):(budget.selected?'Return to full plan':'Use shorter option'))+'</button> ';
+      }else html+='<p>'+(fr?'Aucune option plus courte ne peut être estimée sans retirer une priorité ou utiliser une durée inconnue.':'No shorter option can be estimated while keeping your priorities and using known timing allowances.')+'</p>';
+      if(budget.extensionMinutes && budget.extensionMinutes<=1440)html+='<button type="button" class="t3-btn t3-btn-ghost" data-t3-time="'+budget.extensionMinutes+'">'+(fr?'Prévoir ':'Allow ')+budget.extensionMinutes+' '+(fr?'minutes pour le plan complet':'minutes for the full plan')+'</button>';
+      html+='<p>'+(fr?'Estimations uniquement : trajets réels et horaires restent à confirmer.':'Estimates only: actual routes and opening-hour sequencing still need confirmation.')+'</p></section>';
+    }
+    var timeline=t3TimelineRows(p,state.removed);
+    if(timeline.length){
+      var french=lang()==='fr',clock=function(m){return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+(m>=1440?(french?' (+1 jour)':' (+1 day)'):'');};
+      html+='<section class="t3-warnings" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><h3>'+(french?'Votre horaire':'Your timeline')+'</h3><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row){
+        var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
+        if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
+        var detail=[];
+        if(row.mealWindow)detail.push(french?'Fenêtre conditionnelle selon les horaires indiqués; trajet et service en cuisine à confirmer. Aucun horaire de visite fixé.':'Conditional window based on listed hours; travel and kitchen service need confirmation. No visit time is scheduled.');
+        if(Number.isFinite(row.transferMinutes)&&row.transferMinutes>0)detail.push((french?'Trajet estimé : ':'Estimated travel: ')+row.transferMinutes+' min');
+        if(row.arrivalAllowanceMinutes>0)detail.push((french?'Marge d’arrivée : ':'Arrival allowance: ')+row.arrivalAllowanceMinutes+' min');
+        if(row.gapMinutes>0)detail.push((row.status==='provisional'?(french?'Intervalle libre provisoire : ':'Provisional free interval: '):(french?'Intervalle libre avant cet arrêt : ':'Free interval before this stop: '))+row.gapMinutes+' min');
+        if(row.shortWalkSelected)detail.push(french?'Promenade courte · durée estimée de 30 à 60 min':'Short walk · allow 30–60 min');
+        if(row.daylight){
+          if(Number.isFinite(row.daylight.sunriseMinutes))detail.push((french?'Lumière du jour estimée : ':'Estimated daylight: ')+clock(row.daylight.sunriseMinutes)+'–'+clock(row.daylight.sunsetMinutes));
+          if(row.daylight.marginMinutes)detail.push((french?'Marge avant le coucher du soleil : ':'Margin before sunset: ')+row.daylight.marginMinutes+' min');
+          if(row.daylight.status!=='estimated')detail.push(row.daylight.status==='conflict'?(french?'Conflit avec la lumière du jour · partez plus tôt':'Daylight conflict · start earlier'):(french?'Lumière du jour à confirmer':'Daylight unverified'));
+        }
+        if(row.notScheduledMeal)detail.push(french?'Aucun restaurant ne convient avant l’événement.':'No restaurant fits before the event.');
+        else if(row.status!=='estimated')detail.push(row.status==='unmet'?(french?'Conflit d’horaire':'Timing conflict'):row.status==='provisional'?(french?'Horaire provisoire · à confirmer':'Provisional timing · confirm before visiting'):(french?'À confirmer':'Needs confirmation'));
+        return '<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+time)+'</strong><br>'+esc(row.notScheduledMeal?(french?'Souper non planifié':'Dinner not scheduled'):row.name)+(detail.length?'<br><small>'+esc(detail.join(' · '))+'</small>':'')+'</li>';
+      }).join('')+'</ol></section>';
+    }
+    if(['itinerary','outing','multi_day','day_plan'].indexOf(p.kind)!==-1){
+      var timingFr=lang()==='fr',selectedDate=state.overrides.startDate||(p.schedule||[])[0]?.date||'',selectedMinutes=state.overrides.startMinutes;
+      var timeValue=selectedMinutes!==undefined?String(Math.floor(selectedMinutes/60)).padStart(2,'0')+':'+String(selectedMinutes%60).padStart(2,'0'):'';
+      html+='<section class="t3-warnings" aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><h3>'+(timingFr?'Ajuster votre horaire':'Adjust your schedule')+'</h3><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale de l’Okanagan. Les événements conservent leurs heures indiquées.':'Okanagan local time. Events keep their listed times.')+'</p></section>';
+    }
+    if(p.shortWalkRepairs && !Object.keys(state.removed).length){
+      var swFr=lang()==='fr';
+      html+='<section class="t3-warnings" aria-label="'+(swFr?'Une promenade plus courte':'A shorter walk')+'"><h3>'+(swFr?'Gardez votre heure de départ':'Keep your departure time')+'</h3><p>'+(swFr?'Choisissez une promenade facile au même endroit. Durée estimée de 30 à 60 minutes; confirmez le sentier, les horaires et les conditions. Les autres journées restent inchangées.':'Choose an easy walk at the same place. Allow 30–60 minutes; confirm the route, hours and conditions. The other days stay unchanged.')+'</p>'+p.shortWalkRepairs.map(function(sw){return '<button type="button" data-t3-short-walk="'+sw.venueId+'">'+esc((swFr?'Jour ':'Day ')+sw.day+(swFr?' : promenade courte à ':' — short walk at ')+sw.name)+'</button>';}).join(' ')+'</section>';
+    }
+    if(p.dayDepartureRepairs && !Object.keys(state.removed).length){
+      var drFr=lang()==='fr';
+      html+='<section class="t3-warnings" aria-label="'+(drFr?'Ajuster une journée':'Adjust an individual day')+'"><h3>'+(drFr?'Corriger la lumière du jour':'Fix a daylight conflict')+'</h3><p>'+(drFr?'Conservez les mêmes arrêts et les autres journées. Horaires provisoires : confirmez les durées et les conditions.':'Keep the same stops and the other days. Provisional times: confirm durations and conditions.')+'</p>'+p.dayDepartureRepairs.map(function(dr){var drTime=String(Math.floor(dr.startMinutes/60)).padStart(2,'0')+':'+String(dr.startMinutes%60).padStart(2,'0');return '<button type="button" data-t3-day-start="'+dr.day+'" data-t3-minutes="'+dr.startMinutes+'">'+(drFr?'Jour ':'Day ')+dr.day+(drFr?' : essayer un départ à ':' — try departing at ')+drTime+'</button>';}).join(' ')+'</section>';
+    }
+    if(p.earlierDeparture && !Object.keys(state.removed).length){
+      var ed=p.earlierDeparture,edFr=lang()==='fr',edTime=String(Math.floor(ed.startMinutes/60)).padStart(2,'0')+':'+String(ed.startMinutes%60).padStart(2,'0');
+      html+='<section class="t3-warnings" aria-label="'+(edFr?'Ajuster pour la lumière du jour':'Adjust for daylight')+'"><h3>'+(edFr?'Partez plus tôt pour cette activité':'Start earlier for this activity')+'</h3><p>'+(edFr?'Les mêmes arrêts, dans le même ordre, avec des horaires compatibles avec la lumière du jour estimée.':'The same stops, in the same order, with times that fit the estimated daylight window.')+' '+(ed.provisional?(edFr?'Suggestion provisoire : confirmez les horaires, les durées et les conditions.':'Provisional suggestion: confirm hours, durations and conditions.'):(edFr?'Durées et trajets estimés; confirmez avant de partir.':'Durations and travel are estimates; confirm before visiting.'))+'</p><button type="button" data-t3-later-start="'+ed.startMinutes+'">'+(edFr?'Essayer un départ à ':'Try departing at ')+edTime+'</button></section>';
+    }
+    if(p.laterDeparture && !Object.keys(state.removed).length){
+      var ld=p.laterDeparture,ldFr=lang()==='fr',ldTime=String(Math.floor(ld.startMinutes/60)).padStart(2,'0')+':'+String(ld.startMinutes%60).padStart(2,'0');
+      html+='<section class="t3-warnings" aria-label="'+(ldFr?'Moins d’attente':'Less waiting')+'"><h3>'+(ldFr?'Évitez une longue pause':'Avoid a long gap')+'</h3><p>'+(ldFr?'Les mêmes arrêts avec environ '+ld.savedMinutes+' minutes d’attente en moins.':'The same stops with about '+ld.savedMinutes+' fewer minutes waiting.')+' '+(ld.provisional?(ldFr?'Suggestion provisoire : confirmez les horaires et durées.':'Provisional suggestion: confirm hours and durations.'):(ldFr?'Horaires indiqués vérifiés; durées et trajets estimés.':'Checked against listed hours; durations and travel are estimates.'))+'</p><button type="button" data-t3-later-start="'+ld.startMinutes+'">'+(ldFr?'Essayer un départ à ':'Try departing at ')+ldTime+'</button></section>';
+    }
+    if(p.eventAlternatives && p.eventAlternatives.length){
+      var eaFr=lang()==='fr';
+      html+='<section class="t3-warnings" aria-label="'+(eaFr?'Événements à d’autres dates':'Events on nearby dates')+'"><h3>'+(eaFr?'Si vos dates sont flexibles':'If your dates are flexible')+'</h3><p>'+(eaFr?'Ces événements du même type sont en dehors des dates du voyage. Ils ne sont pas ajoutés au programme. Consultez la fiche, puis choisissez une date pour refaire le programme en gardant votre demande.':'These events of the requested type fall outside your trip dates. They are not added to your itinerary. Check the listing, then choose a date to replan while keeping your request.')+'</p><ul>'+p.eventAlternatives.map(function(e){var eventDate=String(e.startDate||''),planDate=String(e.suggestedDate||eventDate),eventUrl=typeof e.url==='string'&&e.url.charAt(0)==='/'&&e.url.charAt(1)!=='/'?e.url:null,planDateLabel=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?new Date(planDate+'T12:00:00Z').toLocaleDateString(eaFr?'fr-CA':'en-CA',{month:'short',day:'numeric'}):'',choose=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?'<button type="button" class="t3-act" data-t3-event-date="'+esc(planDate)+'">'+(eaFr?'Planifier le ':'Plan for ')+esc(planDateLabel)+'</button>':'';return '<li>'+(eventUrl?'<a href="'+esc(eventUrl)+'">'+esc(e.name)+'</a>':esc(e.name))+(eventDate?' — '+esc(eventDate+(e.endDate&&e.endDate!==eventDate?' – '+e.endDate:'')):'')+(e.time?' · '+esc(e.time):'')+' '+choose+'</li>';}).join('')+'</ul></section>';
+    }
+    if(p.accessConflicts && p.accessConflicts.length){
+      var acFr=lang()==='fr';
+      html+='<section class="t3-warnings" aria-label="'+(acFr?'Accès à confirmer':'Potential access conflict')+'"><h3>'+(acFr?'L’accès du matin est à confirmer':'Morning access needs confirmation')+'</h3><p>'+(acFr?'La fiche limite l’accès les jours d’école. La date demandée est en semaine; nous ne savons pas si l’école est ouverte ce jour-là. Cet arrêt n’est pas programmé. Confirmez avec l’exploitant ou choisissez une autre heure.':'The listing limits access on school days. Your requested date is a weekday; we do not know whether school is in session that day. This stop is not scheduled. Confirm with the operator or choose a different time.')+'</p>'+p.accessConflicts.map(function(a){return '<p><strong>'+esc(a.name)+'</strong> — '+esc(a.source)+(safeUrl(a.url)?' <a href="'+esc(a.url)+'">'+(acFr?'Consulter la fiche':'Check access details')+'</a>':'')+'</p>'+(a.alternatives&&a.alternatives.length?'<p>'+(acFr?'Autres lieux pour cette activité, non ajoutés au programme; confirmez leur accès et leurs horaires :':'Other places for this activity, not added to the itinerary; confirm their access and hours:')+'</p><ul>'+a.alternatives.filter(function(v){return safeUrl(v.url);}).map(function(v){return '<li><a href="'+esc(v.url)+'">'+esc(v.name)+'</a></li>';}).join('')+'</ul>':'');}).join('')+'</section>';
+    }
+    var nextSteps=t3PlanNextSteps(p);
+    if(nextSteps.length){
+      var nextFr=lang()==='fr';
+      html+='<section class="t3-warnings" aria-label="'+(nextFr?'Avant de partir':'Before you go')+'"><h3>'+(nextFr?'Avant de partir':'Before you go')+'</h3><ul>'+nextSteps.map(function(step){
+        if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
+        if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
+        if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
+        return '<li>'+esc(nextFr?t3FrenchText(step.label):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+'</li>';
+      }).join('')+'</ul></section>';
+    }
+    html += requirementSummaryHtml(p);
+    if(p.sparseRecovery){
+      var sr=p.sparseRecovery, srFr=lang()==='fr';
+      html+='<section class="t3-warnings" aria-label="'+(srFr?'Options pour les journées libres':'Options for activity gaps')+'"><h3>'+(srFr?'Adapter ce voyage':'Make this trip fit')+'</h3><p>'+(srFr?'Certaines journées n’ont aucune autre activité correspondante. Choisissez une option; votre plan ne change pas automatiquement.':'Some days have no additional matching activity. Choose an option; your plan stays unchanged until you do.')+'</p>';
+      if(sr.shorterDays)html+='<button type="button" class="t3-btn" data-t3-shorten="'+sr.shorterDays+'">'+(srFr?'Essayer '+sr.shorterDays+' jour(s)':'Try '+sr.shorterDays+' day(s)')+'</button> ';
+      if(sr.region&&REGIONS.some(function(r){return r.slug===sr.region;}))html+='<a class="t3-btn t3-btn-ghost" href="/'+esc(sr.region)+'">'+(srFr?'Voir les lieux de cette région':'Review local places')+'</a>';
+      html+='</section>';
+    }
+    html += t3ListingGapSummaryHtml(p,lang()==='fr',esc);
+    html += warningSummaryHtml(p);
     if (planKinds && days().length) {
       html += '<div class="t3-map-slot" data-t3-map-slot></div>';
       if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a href="#t3-day-' + d.day + '">' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
-      html += days().map(function(d){ return dayHtml(d, counts); }).join('');
+      html += (p.days || []).map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
       html += '<h3 class="t3-section-title">' + esc(tx('tripv3.yourOuting')) + '</h3>' + stopsListHtml(p.outing.stops, function(s){ return null; }, counts);
       if ((p.outing.alternates || []).length) html += '<h3 class="t3-section-title">' + esc(tx('tripv3.otherOptions')) + '</h3><div class="t3-grid">' + p.outing.alternates.map(function(a){ return cardHtml(a, null, { counts: {} }); }).join('') + '</div>';
@@ -1113,6 +1383,41 @@ function renderScript(d) {
     var t = e.target.closest ? e.target : null;
     if (!t) return;
     var b;
+    if ((b=t.closest('[data-t3-event-date]'))) {
+      var eventDate=b.getAttribute('data-t3-event-date');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate || '')) return;
+      state.overrides.startDate=eventDate;
+      delete state.overrides.eventId;
+      if (!(state.last && state.last.requirementResults)) state.locks={};
+      state.removed={};
+      request(Object.keys(state.locks).length ? { pinned: state.locks } : {}, { requestType: 'refine', trigger: b, focus: false });
+      return;
+    }
+    if ((b=t.closest('[data-t3-event-choice]'))) {
+      var eventId=Number(b.getAttribute('data-t3-event-choice'));
+      if (!Number.isSafeInteger(eventId) || eventId < 1) return;
+      state.overrides.eventId=eventId;state.locks={};state.removed={};
+      request({}, { requestType: 'refine', trigger: b, focus: false });return;
+    }
+    if((b=t.closest('[data-t3-shorten]'))){
+      state.overrides.days=Number(b.getAttribute('data-t3-shorten'));state.removed={};
+      request(Object.keys(state.locks).length?{pinned:state.locks}:{},{requestType: 'refine',trigger:b,focus:false});return;
+    }
+    if ((b=t.closest('[data-t3-short-walk]'))) {
+      state.overrides.shortWalkVenueIds=Array.from(new Set((state.overrides.shortWalkVenueIds||[]).concat(Number(b.getAttribute('data-t3-short-walk')))));
+      var walkPins=Object.assign({},state.locks);
+      (state.last.days||[]).forEach(function(day){(day.stops||[]).forEach(function(stop){if(stop.venue&&stop.daypart)walkPins[day.day+'-'+stop.daypart]=stop.venue.id;});});
+      request({pinned:walkPins},{ requestType: 'refine', trigger: b, focus: false });return;
+    }
+    if ((b=t.closest('[data-t3-day-start]'))) {
+      var repairDay=b.getAttribute('data-t3-day-start');
+      state.overrides.dayStartMinutes=Object.assign({},state.overrides.dayStartMinutes||{});
+      state.overrides.dayStartMinutes[repairDay]=Number(b.getAttribute('data-t3-minutes'));
+      var preserved=Object.assign({},state.locks);
+      (state.last.days||[]).forEach(function(day){(day.stops||[]).forEach(function(stop){if(stop.venue&&stop.daypart)preserved[day.day+'-'+stop.daypart]=stop.venue.id;});});
+      request({pinned:preserved},{ requestType: 'refine', trigger: b, focus: false });return;
+    }
+    if ((b=t.closest('[data-t3-later-start]'))) { state.overrides.startMinutes=Number(b.getAttribute('data-t3-later-start')); request(Object.keys(state.locks).length?{pinned:state.locks}:{},{ requestType: 'refine', trigger: b, focus: false }); return; }
     if ((b = t.closest('[data-t3-add-all]'))) { addStops(null); return; }
     if ((b = t.closest('[data-t3-add-day]'))) { addStops(b.getAttribute('data-t3-add-day')); return; }
     if ((b = t.closest('[data-t3-view-trip]'))) {
@@ -1135,6 +1440,14 @@ function renderScript(d) {
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(ok, manual);
       else manual();
       return;
+    }
+    if ((b = t.closest('[data-t3-budget]'))) {
+      state.overrides.budgetMode=b.getAttribute('data-t3-budget');
+      request(Object.keys(state.locks).length ? {pinned:state.locks} : {}, { requestType: 'refine', trigger: b });return;
+    }
+    if ((b = t.closest('[data-t3-time]'))) {
+      state.overrides.durationMinutes=Number(b.getAttribute('data-t3-time'));state.overrides.budgetMode='full';
+      request(Object.keys(state.locks).length ? {pinned:state.locks} : {}, { requestType: 'refine', trigger: b });return;
     }
     if ((b = t.closest('[data-t3-keep]'))) {
       var key = b.getAttribute('data-t3-keep'), s = stopAt(key);
@@ -1213,9 +1526,11 @@ function renderScript(d) {
     var sel = e.target.closest ? e.target.closest('[data-t3-override]') : null;
     if (!sel) return;
     var k = sel.getAttribute('data-t3-override'), v = sel.value;
-    if (k === 'days') state.overrides.days = Number(v);
+    if(k==='startDate'){if(!v)return;state.overrides.startDate=v;delete state.overrides.eventId;}
+    else if(k==='startMinutes'){if(!/^\\d{2}:\\d{2}$/.test(v))return;state.overrides.startMinutes=Number(v.slice(0,2))*60+Number(v.slice(3));}
+    else if (k === 'days') state.overrides.days = Number(v);
     else if (k === 'pace') state.overrides.pace = v;
-    else if (k === 'baseRegion') { if (v) state.overrides.baseRegion = v; else delete state.overrides.baseRegion; }
+    else if (k === 'baseRegion') { if (v) state.overrides.baseRegion = v; else delete state.overrides.baseRegion; delete state.overrides.eventId; }
     // Complex plans keep locks through settings edits. The server reports
     // incompatible locks instead of silently replacing the visitor's choices.
     // Preserve the existing fresh-plan behavior for ordinary requests.
@@ -1319,4 +1634,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

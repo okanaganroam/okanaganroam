@@ -65,3 +65,34 @@ test('Timing regression: a known start with an unknown event end is explicitly f
 
 test('Review regression: trailing nearby relationships do not establish activities',()=>{for(const description of ['Ski resort is nearby.','Hiking trails are nearby.'])assert.deepEqual(r.inferPlannerActivities({type:'outdoor',name:'Picnic Area',description}),[]);});
 test('Review regression: contrast ends negation before an offered activity',()=>{const a=r.inferPlannerActivities({type:'outdoor',name:'Forest Recreation',description:'No skiing, but snowshoeing trails are available.'});assert.ok(a.includes('snowshoeing'));assert.ok(a.includes('winter'));assert.ok(!a.includes('skiing'));});
+
+for(const text of ['I want to plan a date night, an ice hockey game and dinner in kelowna.','Plan a romantic dinner and hockey game in Kelowna','Plan dinner and a concert in Kelowna','Plan a date night with dinner and live music in Kelowna'])test(`Outing regression: ${text} retains explicit event and one dinner`,()=>{
+ const intent=d.interpretDiscoveryQuery(text,taxonomy),trip=d.interpretTripComponents(text,taxonomy,intent);
+ assert.equal(trip.multi,true);assert.equal(trip.components.filter(c=>c.kind==='event').length,1);assert.equal(trip.components.filter(c=>c.kind==='venue').length,1);assert.equal(trip.components.find(c=>c.kind==='venue').meal,'dinner');
+ assert.ok(!(trip.leftoverTerms||[]).includes('ice'));
+});
+test('Outing regression: missing hockey cannot become ice cream or a second meal',()=>{
+ const p=plan('I want to plan a date night, an ice hockey game and dinner in kelowna.',{facts:[{id:100,name:'Ice Cream Cafe',type:'cafe',region:'kelowna',textName:'ice cream cafe',textDesc:'ice cream',features:{},activities:[],collections:[],fdTypes:[],plannerKinds:[]},{id:101,name:'Dinner Restaurant',type:'restaurant',region:'kelowna',textName:'dinner restaurant',textDesc:'romantic intimate dinner',features:{},activities:[],collections:[],fdTypes:[],plannerKinds:[]}]});
+ assert.equal(p.kind,'itinerary');assert.deepEqual(ids(p),[101]);assert.ok(p.warnings.some(w=>/Not met: hockey game/i.test(w)));assert.equal(p.requirementResults.find(i=>i.eventKind==='hockey').status,'unmet');
+ assert.doesNotMatch(p.summary,/hockey/i,'the headline must not claim a missing event is part of the itinerary');
+ assert.match(p.summary,/date night/i,'the headline should preserve the requested occasion when only dinner is available');
+});
+test('Outing regression: recognized hockey phrase is not a food search',()=>{const q=r.extractTripRequirements({text:'an ice hockey game and dinner'});const consumed=r.consumedTerms(q);for(const w of ['ice','hockey','game'])assert.ok(consumed.has(w));});
+test('Outing guard: explicit multi-day plans keep the day planner',()=>{const s='Plan three days in Kelowna with dinner and hockey',i=d.interpretDiscoveryQuery(s,taxonomy);assert.equal(d.interpretTripComponents(s,taxonomy,i).multi,false);});
+test('Outing guard: negated hockey is not an event component',()=>{const s='Plan dinner in Kelowna, no hockey game',i=d.interpretDiscoveryQuery(s,taxonomy);assert.ok(!d.interpretTripComponents(s,taxonomy,i).components.some(c=>c.kind==='event'));});
+
+test('Outing regression: an available hockey occurrence is retained alongside one dinner',()=>{
+ const text='I want to plan a date night, an ice hockey game and dinner in kelowna.',intent=d.interpretDiscoveryQuery(text,taxonomy),trip=d.interpretTripComponents(text,taxonomy,intent);
+ const events=trip.components.map(c=>c.kind==='event'?[{id:200,name:'Kelowna Hockey Game',region:'kelowna',categories:['sports-recreation'],startDate:'2026-10-17',endDate:'2026-10-17',time:'7 pm'}]:null);
+ const p=plan(text,{tripEvents:events,facts:[{id:101,name:'Dinner Restaurant',type:'restaurant',region:'kelowna',textName:'dinner restaurant',textDesc:'romantic intimate dinner',features:{},activities:[],collections:[],fdTypes:[],plannerKinds:[]}]});
+ assert.equal(p.kind,'itinerary');assert.deepEqual(ids(p),[101]);assert.equal(p.events[0].id,200);assert.equal(p.requirementResults.find(i=>i.eventKind==='hockey').status,'satisfied');
+ assert.match(p.summary,/hockey/i,'the headline should include an event when it is actually selected');
+});
+
+for(const text of ['Plan dinner and a winery in Kelowna, no hockey game','Plan no dinner, hockey and a winery in Kelowna'])test(`Outing guard: negated mention does not activate short outing: ${text}`,()=>{const i=d.interpretDiscoveryQuery(text,taxonomy);assert.equal(d.interpretTripComponents(text,taxonomy,i).multi,false);});
+
+test('Outing regression: requested date-night ranking is applied to the dinner',()=>{
+ const text='I want to plan a date night, an ice hockey game and dinner in kelowna.';
+ const p=plan(text,{facts:[{id:101,name:'Romantic Dinner',type:'restaurant',region:'kelowna',textName:'romantic dinner',textDesc:'romantic intimate dinner',features:{},activities:[],collections:[],fdTypes:[],plannerKinds:[]}]});
+ assert.ok(!p.unsupported.includes('a date'));assert.ok(p.itinerary.stops.find(s=>s.venue).reasons.some(s=>/date night|romantic|intimate/.test(typeof s==='string'?s:s.text)));
+});

@@ -28,7 +28,7 @@ const STRONG = new Set(('musee musees evasion guidee guidees visites atelier ate
   + 'resto restos bouffe manger dejeuner deux trois quatre cinq huit dix planifie planifiez planifier organisez '
   + 'suggere suggerez recommande recommandez proposez vignes cave caves vinerie vineries distillerie '
   + 'nager peche plein exterieur interieur matin soir midi nuits beaucoup quelques sans pas une vue parcs joyaux favoris locaux '
-  + 'chers cheres filles gars amis anniversaire musique planche pagaie').split(' '));
+  + 'chers cheres filles gars amis anniversaire musique planche pagaie voiture voitures auto pied conduite').split(' '));
 // Common French function words: two different ones are needed.
 const WEAK = new Set(('le la les l des du de d un une et ou au aux en dans sur chez pour mon ma mes nos notre votre vos est sont '
   + 'que qui ce cette ces il y').split(' '));
@@ -76,10 +76,12 @@ const PHRASES = [
   ['jours de pluie', 'rainy days'], ['mauvais temps', 'wet weather'], ['a l interieur', 'indoors'], ['a le interieur', 'indoors'],
   ['pluie', 'rain'], ['pluvieux', 'rainy'], ['pluvieuse', 'rainy'], ['interieur', 'indoor'], ['interieurs', 'indoor'],
   // time
+  ['a partir du', 'from'],
+  ['heures', 'hours'], ['heure', 'hour'],
   ['aujourdhui', 'today'], ['aujourd hui', 'today'], ['ce matin', 'this morning'], ['cet apres midi', 'this afternoon'],
   ['ce soir', 'tonight'], ['demain', 'tomorrow'], ['maintenant', 'right now'], ['en ce moment', 'right now'],
   ['tout de suite', 'right now'], ['ce mois ci', 'this month'], ['ce mois', 'this month'],
-  ['le matin', 'in the morning'], ['en matinee', 'in the morning'], ['matin', 'morning'],
+  ['une matinee', 'a morning'], ['la matinee', 'the morning'], ['matinee', 'morning'], ['le matin', 'in the morning'], ['en matinee', 'in the morning'], ['matin', 'morning'],
   ['l apres midi', 'in the afternoon'], ['le apres midi', 'in the afternoon'], ['en apres midi', 'in the afternoon'], ['apres midi', 'afternoon'],
   ['le soir', 'in the evening'], ['en soiree', 'in the evening'], ['soir', 'evening'], ['soiree', 'evening'], ['la nuit', 'at night'],
   ['pendant la journee', 'during the day'], ['de jour', 'by day'],
@@ -107,6 +109,7 @@ const PHRASES = [
   ['incontournables', 'must see'], ['incontournable', 'must see'], ['a ne pas manquer', 'do not miss'],
   ['meilleurs', 'best'], ['meilleures', 'best'], ['meilleur', 'best'], ['meilleure', 'best'],
   // food and drink
+  ['un seul souper', 'one dinner'], ['un seul repas du soir', 'one dinner'],
   ['petit dejeuner', 'breakfast'], ['petits dejeuners', 'breakfasts'], ['dejeuner', 'breakfast'], ['dejeuners', 'breakfasts'],
   ['diner', 'lunch'], ['diners', 'lunches'], ['souper', 'dinner'], ['soupers', 'dinners'],
   ['bonne bouffe', 'great food'], ['bonne nourriture', 'great food'], ['bonne cuisine', 'great food'], ['bonne table', 'great food'],
@@ -132,6 +135,8 @@ const PHRASES = [
   ['sans alcool', 'non alcoholic'], ['bar sportif', 'sports bar'], ['bars sportifs', 'sports bars'],
   ['regarder le match', 'watch the game'], ['regarder le hockey', 'watch the hockey'], ['sports a la tele', 'sports tv'],
   // outdoors
+  ['promenades faciles', 'easy walks'], ['balades faciles', 'easy walks'], ['marches faciles', 'easy walks'],
+  ['promenade facile', 'easy walk'], ['balade facile', 'easy walk'], ['marche facile', 'easy walk'],
   ['plage pour chiens', 'dog beach'], ['plage pour chien', 'dog beach'], ['plages pour chiens', 'dog beaches'],
   ['plage canine', 'dog beach'], ['plages canines', 'dog beaches'], ['plage', 'beach'], ['plages', 'beaches'],
   ['se baigner', 'swimming'], ['baignade', 'swimming'], ['nager', 'swim'], ['natation', 'swimming'],
@@ -189,6 +194,12 @@ const PHRASES = [
   ['en couple', 'couple'], ['a deux', 'for two'], ['pour deux', 'for two'], ['tous les deux', 'just the two of us'],
   ['decompresser', 'unwind'], ['se detendre', 'unwind'], ['detente', 'relaxing'], ['relaxant', 'relaxing'], ['relaxante', 'relaxing'],
   ['grand groupe', 'large group'], ['grands groupes', 'large groups'], ['en groupe', 'groups'], ['groupe', 'groups'], ['groupes', 'groups'],
+  // Transport phrases map to the existing English walking constraints.
+  ['nous n avons pas de voiture', 'we do not have a car'], ['je n ai pas de voiture', 'i do not have a car'],
+  ['pas de voiture', 'no car'], ['sans voiture', 'without a car'], ['sans auto', 'without a car'],
+  ['a pied', 'on foot'], ['pas de conduite', 'no driving'], ['sans conduire', 'no driving'],
+  ['marcher entre les arrets', 'walk between stops'], ['marcher entre les lieux', 'walk between places'],
+  ['marcher entre les endroits', 'walk between places'],
   // dietary
   ['sans gluten', 'gluten free'], ['coeliaque', 'celiac'], ['vegetalien', 'vegan'], ['vegetalienne', 'vegan'],
   ['vegetaliens', 'vegan'], ['vegane', 'vegan'], ['vegetarien', 'vegetarian'], ['vegetarienne', 'vegetarian'],
@@ -343,6 +354,20 @@ function tripPlannerText(text, taxonomy) {
   for (let i = 0; i < tokens.length;) {
     const w = tokens[i];
     if (keep.has(i) || /^[,.;]$/.test(w)) { out.push(w); i += 1; continue; }
+    // French departure clocks use 24-hour h notation. Rewrite only an
+    // explicit start phrase, preserving durations and protected venue names.
+    const departure = /^(?:depart|en partant|en commencant|commencer|a partir de)\s+(?:a\s+)?([01]?\d|2[0-3])\s*h(?:\s*([0-5]\d))?(?=$|[\s,.;])/.exec(tokens.slice(i, i + 8).join(' '));
+    if (departure) {
+      const consumed = departure[0].trim().split(/\s+/).length;
+      if (!tokens.slice(i, i + consumed).some((_, n) => keep.has(i + n))) {
+        const hour = Number(departure[1]);
+        out.push(`starting at ${hour % 12 || 12}:${departure[2] || '00'} ${hour >= 12 ? 'pm' : 'am'}`);
+        i += consumed; continue;
+      }
+    }
+    // Calendar ranges must preserve both days before ordinary du/au grammar.
+    if (w === 'du' && /^\d{1,2}$/.test(tokens[i+1] || '')) {out.push('from');i++;continue;}
+    if (w === 'au' && /^\d{1,2}$/.test(tokens[i-1] || '') && /^\d{1,2}$/.test(tokens[i+1] || '')) {out.push('to');i++;continue;}
     // Routes and places: "de Kelowna à Penticton" -> "from kelowna to
     // penticton"; "à / en / au Kelowna" -> "in kelowna".
     const fr = Object.keys(REGION_FRENCH).find((p) => tokens.slice(i, i + p.split(' ').length).join(' ') === p);
