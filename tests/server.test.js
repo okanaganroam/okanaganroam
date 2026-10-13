@@ -18190,6 +18190,26 @@ test('Weekend pages (2026-10-13): /whats-on/this-weekend and /<region>/events/th
   }
 });
 
+test('Town pages (2026-10-13): a TouristDestination plus an ItemList of the category pages the page links to, never a filtered view', async () => {
+  const page = await s5get('/kelowna');
+  assert.equal(page.status, 200);
+  const ld = s5jsonLd(page.text);
+  const dest = ld.find((b) => b['@type'] === 'TouristDestination');
+  assert.equal(dest.name, 'Kelowna, BC');
+  assert.equal(dest.url, 'https://okanaganroam.com/kelowna');
+  assert.equal(dest.containedInPlace.name, 'Okanagan Valley, British Columbia');
+  const list = ld.find((b) => b['@type'] === 'ItemList');
+  assert.ok(list && list.itemListElement.length > 0);
+  assert.equal(list.numberOfItems, list.itemListElement.length);
+  for (const [i, x] of list.itemListElement.entries()) {
+    assert.equal(x.position, i + 1);
+    assert.ok(!x.url.includes('?'), `${x.url} is a page of its own`);
+    assert.match(x.name, / in Kelowna$/);
+    assert.ok(page.text.includes(`href="${x.url.replace('https://okanaganroam.com', '')}"`), `${x.url} is linked from the page`);
+  }
+  assert.equal(app.regionPageSchemas('kelowna', 'Kelowna', 'd', 'https://x', [{ key: 'a', label: 'Dog Friendly', count: 3, href: '/dog-friendly?regions=kelowna' }, { key: 'b', label: 'Golf', count: 0, href: null }]).length, 1, 'no list when nothing qualifies');
+});
+
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });
