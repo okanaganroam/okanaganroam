@@ -17673,3 +17673,19 @@ test('Sports activity chips (2026-10-13): /sports?activity= narrows to skate, bi
   assert.doesNotMatch(courts, /sport-coming-soon"/, 'an empty chip never shows the general coming-soon line');
   assert.match(app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [], sportActivity: 'bogus' }), /<a href="\/sports" aria-current="page">/, 'an unknown activity falls back to All');
 });
+
+test('Indoor experience chips (2026-10-13): each /indoor?activity= chip swaps in its own photo, heading and intro; All keeps the Indoor banner', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const c of app.INDOOR_EXPERIENCES) {
+    assert.ok(c.banner && fs.existsSync(path.join(__dirname, '..', 'public', c.banner.src)), `${c.slug} photo exists`);
+    assert.ok(c.heading && c.intro && c.banner.alt, `${c.slug} has its own heading, intro and alt text`);
+  }
+  const venues = [{ id: 990201, name: 'Banner Escape Room', slug: 'banner-escape-room', region: 'kelowna', type: 'indoor', description: 'Fixture.' }];
+  const all = app.renderCategoryAllRegionsPage('indoor', venues, null, { indoorGolf: [], indoorAlso: [] });
+  assert.match(all, /<img src="\/images\/indoor\/indoor\.jpg"/);
+  const games = app.renderCategoryAllRegionsPage('indoor', venues, null, { indoorGolf: [], indoorAlso: [], indoorActivity: 'games' });
+  assert.match(games, /<img src="\/images\/indoor\/activity-games\.jpg"/);
+  assert.match(games, /<h1>Games &amp; Escape Rooms in the Okanagan<\/h1>/);
+  assert.doesNotMatch(games, /<h1>Indoor &amp; Rainy Day in the Okanagan<\/h1>/);
+});
