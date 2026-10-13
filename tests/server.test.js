@@ -17618,6 +17618,21 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['apex'] }), /<h1>Apex Mountain Resort<\/h1>/);
       assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['big-white', 'apex'] }), /<h1>Ski &amp; Snow<\/h1>/, 'two resorts: general text');
       assert.deepEqual(Object.keys(app.SKI_SNOW_REGION_CONTENT).sort(), ['apex', 'baldy', 'big-white', 'silverstar']);
+      // Tours: activity chips sort tours by keyword rules (+ overrides) and swap the banner, heading and intro.
+      const tv = (name, description) => ({ name, description });
+      assert.equal(app.tourActivityOf(tv('Vivid Tours', 'guided wine tasting tours')), 'wine');
+      assert.equal(app.tourActivityOf(tv('Big White Winter eBike Tours', 'fat-tire e-bike rides')), 'winter', 'winter beats bike');
+      assert.equal(app.tourActivityOf(tv('Kelowna Cruises', 'public cruises on Okanagan Lake')), 'lake');
+      assert.equal(app.tourActivityOf(tv('Tiki Time Tours', 'bring your own wine')), 'lake', 'override');
+      assert.equal(app.tourActivityOf(tv('Kettle Valley Steam Railway', 'restored 1912 steam locomotive')), 'culture');
+      const toursV = [{ id: 990016, name: 'Fixture Wine Tours', slug: 'fixture-wine-tours', region: 'kelowna', type: 'tour', description: 'wine tours' }, { id: 990017, name: 'Fixture Boat Rentals', slug: 'fixture-boat-rentals', region: 'kelowna', type: 'tour', description: 'boat rentals' }];
+      const toursLake = app.renderCategoryAllRegionsPage('tour', toursV, null, { tourActivity: 'lake', toursAlso: [] });
+      assert.match(toursLake, /<img src="\/images\/tours\/activity-lake\.jpg"/);
+      assert.match(toursLake, /<h1>Lake &amp; Boat Experiences in the Okanagan<\/h1>/);
+      assert.match(toursLake, /<a href="\/tours\?activity=lake" aria-current="page">Lake &amp; Boats <span>1<\/span><\/a>/);
+      assert.ok(toursLake.includes('Fixture Boat Rentals') && !toursLake.includes('Fixture Wine Tours'), 'only the chosen activity is listed');
+      assert.match(app.renderCategoryAllRegionsPage('tour', toursV, null, { toursAlso: [] }), /<a href="\/tours" aria-current="page">All <span>2<\/span><\/a>/);
+      for (const a of app.TOUR_ACTIVITIES) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', a.banner.src)), `${a.slug} photo exists`);
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
