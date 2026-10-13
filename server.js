@@ -14723,6 +14723,12 @@ function countHiddenGemsOutsideSecretSpots(regions = []) {
 // at golden hour -- free Unsplash photo z5jXAMKlHso by Kolby Milton
 // (Unsplash License), cropped to 3:2 -- with an 800px thumbs/ copy.
 const SECRET_SPOTS_BANNER = Object.freeze({ src: '/images/secret-spots/secret-spots.jpg', alt: 'A lone bench under a pine on a hilltop overlooking Kelowna and Okanagan Lake at golden hour', pos: 55 });
+// Secret Spots per-category heading and intro (2026-10-12); photos reuse each
+// category's own banner.
+const SECRET_SPOTS_CATEGORY_CONTENT = Object.freeze({
+  beach: { banner: CATEGORY_BANNER_IMAGES.beach, heading: 'Secret Beaches in the Okanagan', intro: 'Quieter beaches and tucked-away lakeside spots that are easy to miss \u2014 the places to find a patch of sand away from the summer crowds.' },
+  outdoor: { banner: CATEGORY_BANNER_IMAGES.outdoor, heading: 'Secret Outdoor Spots in the Okanagan', intro: 'Tucked-away parks, gardens, waterfalls and viewpoints worth seeking out once you\u2019ve seen the famous ones.' },
+});
 function renderSecretSpotsPage(venues, filter = null) {
   return renderCuratedCollectionPage({
     path: '/secret-spots',
@@ -14737,6 +14743,7 @@ function renderSecretSpotsPage(venues, filter = null) {
     cardNotes: getPublicCollectionNotes('hidden_gem'),
     cardNoteLabel: 'Why it\u2019s a gem:',
     banner: SECRET_SPOTS_BANNER,
+    categoryContent: SECRET_SPOTS_CATEGORY_CONTENT,
   }, venues, filter);
 }
 
@@ -23488,6 +23495,7 @@ module.exports = {
   HIDDEN_GEMS_BANNER,
   HIDDEN_GEMS_CATEGORY_CONTENT,
   SECRET_SPOTS_BANNER,
+  SECRET_SPOTS_CATEGORY_CONTENT,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
