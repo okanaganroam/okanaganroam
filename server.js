@@ -17,7 +17,8 @@ function golfDetailsFor(venues) {
 // their own hours logic. Guarded like golf-data.js so a copy of the app
 // without hours.js (e.g. the isolated homepage tests) starts exactly as before.
 const hoursModule = (() => { try { return require('./hours.js'); } catch (e) { return null; } })();
-const { renderShareCard } = require('./share-card.js');
+// Guarded like hours.js: a copy of the server without share-card.js (isolated tests) runs on, with the brand share image.
+const shareCardModule = (() => { try { return require('./share-card.js'); } catch (e) { return null; } })();
 
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
@@ -16358,7 +16359,7 @@ function venueShareCardLabel(venue) {
   return [type, town].filter(Boolean).join(' \u00b7 ').toUpperCase();
 }
 function venueShareCardUrl(venue) {
-  if (!CATEGORY_SLUGS[venue.type] || !venue.slug) return null;
+  if (!shareCardModule || !CATEGORY_SLUGS[venue.type] || !venue.slug) return null;
   const v = require('crypto').createHash('sha1').update(`${venue.name}|${venueShareCardLabel(venue)}`).digest('hex').slice(0, 8);
   return `https://okanaganroam.com/share/${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}.png?v=${v}`;
 }
@@ -16367,7 +16368,7 @@ function venueShareCardPng(venue) {
   const label = venueShareCardLabel(venue);
   const key = `${venue.id}|${venue.name}|${label}`;
   if (shareCardCache.has(key)) return shareCardCache.get(key);
-  const png = renderShareCard({ name: venue.name, label });
+  const png = shareCardModule.renderShareCard({ name: venue.name, label });
   shareCardCache.set(key, png);
   if (shareCardCache.size > 300) shareCardCache.delete(shareCardCache.keys().next().value);
   return png;
@@ -23184,7 +23185,7 @@ const server = http.createServer(async (req, res) => {
     if (shareCardMatch) {
       const [, scRegion, scCategory, scSlug] = shareCardMatch;
       const scType = Object.keys(CATEGORY_SLUGS).find((t) => CATEGORY_SLUGS[t] === scCategory);
-      const scVenue = scType && REGION_LABELS[scRegion] ? db.prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND slug = ? AND redirect_to IS NULL').get(scRegion, scType, scSlug) : null;
+      const scVenue = shareCardModule && scType && REGION_LABELS[scRegion] ? db.prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND slug = ? AND redirect_to IS NULL').get(scRegion, scType, scSlug) : null;
       if (!scVenue) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         return res.end('Not found');
