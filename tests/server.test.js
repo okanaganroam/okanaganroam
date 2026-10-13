@@ -17640,3 +17640,36 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(pub.id, pub2.id);
   }
 });
+
+test('Sports activity chips (2026-10-13): /sports?activity= narrows to skate, bike, disc golf or courts (a spot can sit under several), and swaps the banner, heading and intro', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  assert.deepEqual(app.SPORT_ACTIVITIES.map((a) => a.slug), ['skate', 'bike', 'disc', 'courts']);
+  for (const a of app.SPORT_ACTIVITIES) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', a.banner.src)), `${a.slug} photo exists`);
+    assert.ok(a.heading && a.intro && a.banner.alt, `${a.slug} has its own heading, intro and alt text`);
+  }
+  const notes = new Map([[990105, 'Skate park and four tennis courts']]);
+  const of = (v) => app.sportActivitiesOf(v, notes);
+  assert.deepEqual(of({ id: 990101, type: 'sport', name: 'Glenmore Skate Park', description: 'Also has tennis courts.' }), ['skate'], 'a sport spot matches on its name');
+  assert.deepEqual(of({ id: 990102, type: 'sport', name: 'Lakeview Park', description: 'A disc golf course and pickleball courts.' }), ['disc'], 'no name match -> first description match only');
+  assert.deepEqual(of({ id: 990103, type: 'sport', name: 'Knox Mountain Bike Park', description: '' }), ['bike']);
+  assert.deepEqual(of({ id: 990105, type: 'outdoor', name: 'City Park', description: 'Pickleball.' }), ['skate', 'courts'], 'a tagged spot matches on its Play: note, under every chip it fits');
+  const venues = [
+    { id: 990101, name: 'Glenmore Skate Park', slug: 'glenmore-skate-park', region: 'kelowna', type: 'sport', description: 'Fixture.' },
+    { id: 990102, name: 'Lakeview Disc Golf', slug: 'lakeview-disc-golf', region: 'penticton', type: 'sport', description: 'Fixture.' },
+  ];
+  const all = app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [] });
+  assert.match(all, /<nav class="tour-activity-filters" aria-label="Choose a sport or activity">/);
+  assert.match(all, /<a href="\/sports" aria-current="page">All <span>2<\/span><\/a>/);
+  assert.match(all, /<a href="\/sports\?activity=disc">Disc Golf <span>1<\/span><\/a>/);
+  assert.match(all, /<img src="\/images\/sports\/sports\.jpg"/, 'All keeps the Sports banner');
+  const disc = app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [], sportActivity: 'disc' });
+  assert.match(disc, /<img src="\/images\/sports\/activity-disc\.jpg"/);
+  assert.match(disc, /<h1>Disc Golf in the Okanagan<\/h1>/);
+  assert.match(disc, /<a href="\/sports\?activity=disc" aria-current="page">/);
+  assert.match(disc, /Lakeview Disc Golf/); assert.doesNotMatch(disc, /Glenmore Skate Park/);
+  const courts = app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [], sportActivity: 'courts' });
+  assert.doesNotMatch(courts, /sport-coming-soon"/, 'an empty chip never shows the general coming-soon line');
+  assert.match(app.renderCategoryAllRegionsPage('sport', venues, null, { sportsAlso: [], sportActivity: 'bogus' }), /<a href="\/sports" aria-current="page">/, 'an unknown activity falls back to All');
+});

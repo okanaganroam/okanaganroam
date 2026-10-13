@@ -12387,6 +12387,39 @@ function renderTourActivityHtml(venues, selected) {
   </nav>`;
 }
 
+// Sports activity chips (2026-10-13): /sports?activity=<slug> narrows Sports
+// & Recreation to one activity and swaps the banner, heading and intro, like
+// the tour chips. A spot can sit under several chips (a park with a skate
+// bowl and tennis courts). Sport venues match on their name (falling back to
+// the first match in the description); tagged sports_also venues match on
+// their name and "Play:" note. Photos: licensed free Adobe Stock (283502174,
+// 513807899, 281855538); bike reuses the Sports banner.
+const SPORT_ACTIVITIES = [
+  { slug: 'skate', label: 'Skate Parks & BMX', pattern: /skate|pump track|bmx/i, banner: { src: '/images/sports/activity-skate.jpg', alt: 'A skateboarder riding a ramp at a tree-lined skate park', pos: 10 }, heading: 'Skate Parks & BMX in the Okanagan', intro: 'Skate parks, pump tracks and BMX tracks across the valley — free to ride, from beginner bowls to big street plazas.' },
+  { slug: 'bike', label: 'Mountain Biking', pattern: /bike park|mountain[- ]bike|mtb|singletrack|freeride|bike skills|dirt jump/i, banner: { src: '/images/sports/sports.jpg', alt: 'A mountain biker riding a leafy forest trail in autumn', pos: 60 }, heading: 'Mountain Biking in the Okanagan', intro: 'Bike parks, skills areas, dirt jumps and singletrack networks — where to ride, from first jumps to lift-served downhill.' },
+  { slug: 'disc', label: 'Disc Golf', pattern: /disc golf/i, banner: { src: '/images/sports/activity-disc.jpg', alt: 'A disc golf basket on a grassy fairway among tall trees', pos: 55 }, heading: 'Disc Golf in the Okanagan', intro: 'Disc golf courses through parks, pines and hillsides — most are free to play, so bring a disc and go.' },
+  { slug: 'courts', label: 'Courts', pattern: /pickleball|tennis|volleyball|basketball|courts?\b/i, banner: { src: '/images/sports/activity-courts.jpg', alt: 'Outdoor tennis and pickleball courts under a pink evening sky', pos: 55 }, heading: 'Pickleball, Tennis & Courts in the Okanagan', intro: 'Pickleball, tennis, basketball and beach volleyball courts — public places to play a game across the valley.' },
+];
+function sportActivitiesOf(venue, notes) {
+  const note = notes && notes.get(venue.id);
+  const text = venue.type === 'sport' ? (venue.name || '') : `${venue.name || ''} ${note || ''}`;
+  const hits = SPORT_ACTIVITIES.filter((a) => a.pattern.test(text)).map((a) => a.slug);
+  if (hits.length || venue.type !== 'sport') return hits;
+  const first = SPORT_ACTIVITIES.find((a) => a.pattern.test(venue.description || ''));
+  return first ? [first.slug] : [];
+}
+function renderSportActivityHtml(venues, selected, notes) {
+  const choices = [{ slug: '', label: 'All' }, ...SPORT_ACTIVITIES];
+  const links = choices.map((c) => {
+    const count = c.slug ? venues.filter((v) => sportActivitiesOf(v, notes).includes(c.slug)).length : venues.length;
+    return `<a href="/sports${c.slug ? '?activity=' + c.slug : ''}"${c.slug === selected ? ' aria-current="page"' : ''}>${escapeHtml(c.label)} <span>${count}</span></a>`;
+  }).join('\n    ');
+  return `${TOUR_ACTIVITY_STYLE}
+  <nav class="tour-activity-filters" aria-label="Choose a sport or activity">
+    ${links}
+  </nav>`;
+}
+
 function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   const indoorActivity = type === 'indoor' && INDOOR_EXPERIENCES.some((c) => c.slug === opts.indoorActivity) ? opts.indoorActivity : '';
   const indoorUniverse = type === 'indoor' ? [...venues, ...(opts.indoorGolf || []), ...(opts.indoorAlso || []).filter((v) => !(opts.indoorGolf || []).some((g) => g.id === v.id))] : [];
@@ -12397,6 +12430,16 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
     venues = venues.filter((v) => tourActivityOf(v) === tourActivity);
     opts = { ...opts, toursAlso: (opts.toursAlso || []).filter((v) => tourActivityOf(v) === tourActivity) };
   }
+  const sportActivity = type === 'sport' && SPORT_ACTIVITIES.some((a) => a.slug === opts.sportActivity) ? opts.sportActivity : '';
+  const sportNotes = type === 'sport' ? getSportsAlsoNotes() : null;
+  const sportUniverse = type === 'sport' ? [...venues, ...(opts.sportsAlso || [])] : [];
+  const sportContent = sportActivity ? SPORT_ACTIVITIES.find((a) => a.slug === sportActivity) : null;
+  if (sportActivity) {
+    const inActivity = (v) => sportActivitiesOf(v, sportNotes).includes(sportActivity);
+    venues = venues.filter(inActivity);
+    opts = { ...opts, sportsAlso: (opts.sportsAlso || []).filter(inActivity) };
+  }
+  const activityContent = tourContent || sportContent;
   if (type === 'indoor') {
     venues = venues.filter((v) => indoorExperienceMatches(v, indoorActivity));
     opts = { ...opts,
@@ -12541,7 +12584,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   </section>` : ''}`
     : '';
   const sportsHubHtml = isSportsHub
-    ? `${venues.length ? '' : '<p class="sport-coming-soon">More sports and recreation spots are coming soon &mdash; skate parks, pump tracks, bike parks, disc golf courses and courts across the valley.</p>\n  '}${sportsAlso.length ? `<section class="sport-also-section" aria-labelledby="sportsAlsoHeading">
+    ? `${venues.length || sportActivity ? '' : '<p class="sport-coming-soon">More sports and recreation spots are coming soon &mdash; skate parks, pump tracks, bike parks, disc golf courses and courts across the valley.</p>\n  '}${sportsAlso.length ? `<section class="sport-also-section" aria-labelledby="sportsAlsoHeading">
   <h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play</h2>
   <p class="sport-also-lead">Parks with skate parks, courts and bike trails, and more, listed with their own categories.</p>
   ${renderCategoryCardsHtml('sport', sportsAlso, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true, cardNotes: getSportsAlsoNotes(), cardNoteLabel: 'Play:' })}
@@ -12578,8 +12621,8 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: 'Home', href: '/' },
     { name: label.plural },
   ])}
-  ${tourContent ? CATEGORY_BANNER_STYLE + categoryHeroHtml(`<div class="category-banner"><img src="${tourContent.banner.src}" alt="${escapeHtml(tourContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${tourContent.banner.pos}%" fetchpriority="high"></div>`, '<h1>' + escapeHtml(tourContent.heading) + '</h1>\n  <p class="hub-intro">' + escapeHtml(tourContent.intro) + '</p>') : CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
-  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}
+  ${activityContent ? CATEGORY_BANNER_STYLE + categoryHeroHtml(`<div class="category-banner"><img src="${activityContent.banner.src}" alt="${escapeHtml(activityContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${activityContent.banner.pos}%" fetchpriority="high"></div>`, '<h1>' + escapeHtml(activityContent.heading) + '</h1>\n  <p class="hub-intro">' + escapeHtml(activityContent.intro) + '</p>') : CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
+  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}${type === 'sport' ? renderSportActivityHtml(sportUniverse, sportActivity, sportNotes) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
@@ -23225,7 +23268,7 @@ const server = http.createServer(async (req, res) => {
       if (venues.length >= MIN_CATEGORY_VENUES || type === 'indoor' || type === 'tour' || type === 'sport') {
         // /outdoors?regions=..&activities=.. renders pre-filtered (see
         // parseOutdoorFilterQuery); /indoor also accepts an activity choice.
-        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorActivity: type === 'indoor' ? query.activity : undefined, indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined, tourActivity: type === 'tour' ? query.activity : undefined, sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined });
+        const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorActivity: type === 'indoor' ? query.activity : undefined, indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined, tourActivity: type === 'tour' ? query.activity : undefined, sportActivity: type === 'sport' ? query.activity : undefined, sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -23562,6 +23605,8 @@ module.exports = {
   SKI_SNOW_REGION_CONTENT,
   TOUR_ACTIVITIES,
   tourActivityOf,
+  SPORT_ACTIVITIES,
+  sportActivitiesOf,
   WHATS_ON_BANNER,
   WHATSON_CATEGORY_BANNERS,
   WHATSON_CATEGORY_TEXT,
