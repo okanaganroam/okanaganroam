@@ -17507,17 +17507,26 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
   try {
     await withWinterServer(async (base) => {
       const scoped = (await WINTER_GET(base, '/kelowna/pubs')).text;
-      // Heading then photo in one hero block (side by side on desktop, photo first on phones).
-      assert.match(scoped, /<div class="category-hero">\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>\s*<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" fetchpriority="high"><\/div>/);
-      assert.match(scoped, /@media \(min-width: 900px\) \{\s*\.category-hero \{ display: grid; grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\);[\s\S]*?\.category-hero \.category-banner \{ order: 0; margin: 0; aspect-ratio: 3 \/ 2; \}/, 'desktop shows the whole 3:2 photo beside the heading');
+      // Photo full width above the heading, cropped at the photo's own focus point.
+      assert.match(scoped, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" style="object-position: 50% 65%" fetchpriority="high"><\/div>\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>/);
+      assert.match(scoped, /@media \(min-width: 900px\) \{[\s\S]*?\.category-banner \{ aspect-ratio: 12 \/ 5;/, 'desktop banner is a 2.4:1 strip');
+      assert.doesNotMatch(scoped, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\)/, 'no side-by-side layout');
       const golf = (await WINTER_GET(base, '/kelowna/golf')).text;
       assert.doesNotMatch(golf, /class="category-banner"/, 'non-food pages carry no banner');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
       assert.match(hubAll, /<div class="category-banner" id="fdBanner" hidden><img src=""/);
+      assert.match(hubAll, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const hubPub = (await WINTER_GET(base, '/food-drink?types=pub')).text;
       assert.match(hubPub, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/pubs\.jpg"/);
+      // One chosen type: the heading and intro are that type's, not the general Food & Drink text.
+      assert.match(hubPub, /<h1 id="fdHeading">Pubs &amp; Bars in the Okanagan<\/h1>\s*<p class="outdoor-intro fd-intro" id="fdIntro">Neighbourhood pubs/);
+      const hubCocktail = (await WINTER_GET(base, '/food-drink?types=cocktail')).text;
+      assert.match(hubCocktail, /<h1 id="fdHeading">Cocktail Lounges in the Okanagan<\/h1>/);
+      assert.match(hubCocktail, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/, 'the page title and canonical stay the hub\'s');
+      assert.deepEqual(Object.keys(app.FD_HUB_HEADINGS).sort(), ['all', 'brewery', 'cafe', 'cocktail', 'distillery', 'pub', 'restaurant']);
       const hubTwo = (await WINTER_GET(base, '/food-drink?types=pub,brewery')).text;
       assert.match(hubTwo, /id="fdBanner" hidden/);
+      assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });

@@ -13183,60 +13183,75 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
 // Category banners (2026-10-12): a licensed Adobe Stock photo across the top
 // of a Food & Drink category page.
 const CATEGORY_BANNER_IMAGES = Object.freeze({
-  restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table' },
-  cafe: { src: '/images/food-drink/cafes.jpg', alt: 'Coffee and fresh croissants on a café table' },
-  pub: { src: '/images/food-drink/pubs.jpg', alt: 'A bartender pouring a craft beer from the tap' },
-  cocktail: { src: '/images/food-drink/cocktail-lounges.jpg', alt: 'A bartender pouring a cocktail at night' },
-  brewery: { src: '/images/food-drink/breweries.jpg', alt: 'A flight of craft beers' },
-  distillery: { src: '/images/food-drink/distilleries.jpg', alt: 'A copper still at a craft distillery' },
-  winery: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata' },
+  restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table', pos: 10 },
+  cafe: { src: '/images/food-drink/cafes.jpg', alt: 'Coffee and fresh croissants on a café table', pos: 75 },
+  pub: { src: '/images/food-drink/pubs.jpg', alt: 'A bartender pouring a craft beer from the tap', pos: 65 },
+  cocktail: { src: '/images/food-drink/cocktail-lounges.jpg', alt: 'A bartender pouring a cocktail at night', pos: 75 },
+  brewery: { src: '/images/food-drink/breweries.jpg', alt: 'A flight of craft beers', pos: 57 },
+  distillery: { src: '/images/food-drink/distilleries.jpg', alt: 'A copper still at a craft distillery', pos: 57 },
+  winery: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata', pos: 72 },
 });
 const CATEGORY_BANNER_STYLE = `<style id="category-banner">
-  /* Phones: the photo runs across the top, above the heading. Desktop
-     (2026-10-12): heading and intro on the left, the whole photo (3:2, no
-     crop) on the right -- a full-width strip cut off the top and bottom. */
-  .category-hero { display: flex; flex-direction: column; margin: 4px 0 18px; }
-  .category-hero .category-banner { order: -1; }
+  /* The photo runs full width above the heading: 2:1 on phones, 2.4:1 on
+     desktop. Each photo's pos (CATEGORY_BANNER_IMAGES) keeps its subject --
+     faces, the glass -- inside the crop. */
+  .category-hero { margin: 4px 0 18px; }
   .category-hero-text > :last-child { margin-bottom: 0; }
-  .category-banner { margin: 0 0 16px; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 8; background: #2A6B67; }
+  .category-banner { margin: 0 0 16px; border-radius: 16px; overflow: hidden; aspect-ratio: 2 / 1; background: #2A6B67; }
   .category-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .category-banner[hidden] { display: none; }
   @media (max-width: 700px) { .category-banner { border-radius: 12px; } }
   @media (min-width: 900px) {
-    .category-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 36px; align-items: center; margin: 8px 0 26px; }
-    .category-hero:has(.category-banner[hidden]) { grid-template-columns: minmax(0, 1fr); }
-    .category-hero .category-banner { order: 0; margin: 0; aspect-ratio: 3 / 2; }
+    .category-hero { margin: 8px 0 22px; }
+    .category-banner { aspect-ratio: 12 / 5; margin-bottom: 20px; }
   }
 </style>`;
 function categoryBannerHtml(type) {
   const b = CATEGORY_BANNER_IMAGES[type];
   if (!b) return '';
-  return `<div class="category-banner"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" fetchpriority="high"></div>`;
+  return `<div class="category-banner"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" style="object-position: 50% ${b.pos}%" fetchpriority="high"></div>`;
 }
-// The page's heading block with its banner: text then photo, side by side on
-// desktop, photo first on phones. No banner: the text exactly as before.
+// The page's heading block with its banner: the photo, then the heading.
+// No banner: the text exactly as before.
 function categoryHeroHtml(bannerHtml, textHtml) {
   if (!bannerHtml) return textHtml;
   return `<div class="category-hero">
-  <div class="category-hero-text">${textHtml}</div>
   ${bannerHtml}
+  <div class="category-hero-text">${textHtml}</div>
   </div>`;
 }
+// /food-drink's heading and intro follow the type chips too: one chosen type
+// gets its own ("Cocktail Lounges in the Okanagan"), anything else the
+// general Food & Drink text.
+const FD_HUB_HEADINGS = Object.freeze({
+  all: { heading: 'Food & Drink in the Okanagan', intro: 'Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley\u2019s best dining rooms \u2014 every restaurant, caf\u00e9, pub, cocktail lounge and brewery Okanagan Roam has verified.' },
+  restaurant: { heading: 'Restaurants in the Okanagan', intro: 'Lakeside patios, farm-to-table dining rooms and easygoing local favourites \u2014 every restaurant across the Okanagan that Okanagan Roam has verified.' },
+  cafe: { heading: 'Caf\u00e9s in the Okanagan', intro: 'Third-wave coffee, fresh baking and cozy corners for a slow morning \u2014 every caf\u00e9 across the Okanagan that Okanagan Roam has verified.' },
+  pub: { heading: 'Pubs & Bars in the Okanagan', intro: 'Neighbourhood pubs, sports bars and patios for a pint and a bite \u2014 every pub and bar across the Okanagan that Okanagan Roam has verified.' },
+  cocktail: { heading: 'Cocktail Lounges in the Okanagan', intro: 'Craft cocktails, intimate lounges and late-night bars \u2014 every cocktail lounge across the Okanagan that Okanagan Roam has verified.' },
+  brewery: { heading: 'Breweries in the Okanagan', intro: 'Taprooms, tasting flights and patio pints from the valley\u2019s craft brewers \u2014 every brewery across the Okanagan that Okanagan Roam has verified.' },
+  distillery: { heading: 'Distilleries in the Okanagan', intro: 'Small-batch gin, vodka, whisky and liqueurs with tasting rooms to visit \u2014 every craft distillery across the Okanagan that Okanagan Roam has verified.' },
+});
 // The /food-drink hub filters in the page, so its banner follows the type
 // chips: one selected type with a photo shows it, anything else hides it.
 function foodDrinkHubBannerHtml(types) {
   const one = types.length === 1 && CATEGORY_BANNER_IMAGES[types[0]] ? CATEGORY_BANNER_IMAGES[types[0]] : null;
   const map = JSON.stringify(CATEGORY_BANNER_IMAGES).replace(/</g, '\\u003c');
-  return `<div class="category-banner" id="fdBanner"${one ? '' : ' hidden'}><img src="${one ? one.src : ''}" alt="${one ? escapeHtml(one.alt) : ''}" width="1600" height="1067"></div>
+  const text = JSON.stringify(Object.fromEntries(Object.entries(FD_HUB_HEADINGS).map(([k, x]) => [k, { h: x.heading, i: x.intro }]))).replace(/</g, '\\u003c');
+  return `<div class="category-banner" id="fdBanner"${one ? '' : ' hidden'}><img src="${one ? one.src : ''}" alt="${one ? escapeHtml(one.alt) : ''}" width="1600" height="1067"${one ? ` style="object-position: 50% ${one.pos}%"` : ''}></div>
   <script>
   (function(){
-    var map = ${map};
+    var map = ${map}, text = ${text};
     var box = document.getElementById('fdBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-fd-type'); });
       var b = on.length === 1 ? map[on[0]] : null;
-      if (b) { if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; } box.hidden = false; } else { box.hidden = true; }
+      if (b) { if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; } box.hidden = false; } else { box.hidden = true; }
+      var t = (on.length === 1 && text[on[0]]) || text.all;
+      var h = document.getElementById('fdHeading'), p = document.getElementById('fdIntro');
+      if (h && h.textContent !== t.h) h.textContent = t.h;
+      if (p && p.textContent !== t.i) p.textContent = t.i;
     };
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
     sync();
@@ -13375,6 +13390,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow };
 
   const heading = 'Food & Drink in the Okanagan';
+  const hubText = (f.types.length === 1 && FD_HUB_HEADINGS[f.types[0]]) || FD_HUB_HEADINGS.all;
   const title = `${heading} | Okanagan Roam`;
   const description = `${venues.length} restaurants, cafés, pubs and breweries across the Okanagan Valley. Filter by patio, dog-friendly, vegan or gluten-free.`;
   const canonical = 'https://okanaganroam.com/food-drink';
@@ -13441,8 +13457,8 @@ ${CATEGORY_BANNER_STYLE}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Food & Drink' }])}
-  ${categoryHeroHtml(foodDrinkHubBannerHtml(f.types), `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley&rsquo;s best dining rooms &mdash; every restaurant, caf&eacute;, pub, cocktail lounge and brewery Okanagan Roam has verified.</p>`)}
+  ${categoryHeroHtml(foodDrinkHubBannerHtml(f.types), `<h1 id="fdHeading">${escapeHtml(hubText.heading)}</h1>
+  <p class="outdoor-intro fd-intro" id="fdIntro">${escapeHtml(hubText.intro)}</p>`)}
   ${foodDrinkSearchHtml()}
   ${foodDrinkTypeChipsHtml(state)}
   ${foodDrinkFilterBarHtml(venues, state).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
@@ -23229,6 +23245,7 @@ module.exports = {
   renderGolfThemeStyles,
   renderFoodDrinkOpenNowStyles,
   CATEGORY_BANNER_IMAGES,
+  FD_HUB_HEADINGS,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
