@@ -10806,7 +10806,7 @@ ${upcomingEvents.map((e) => {
       return `          <div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
     }).join('\n')}
         </div>
-        <p><a href="/whats-on?regions=${encodeURIComponent(region)}">See what&rsquo;s on in ${escapeHtml(regionLabel)} &rarr;</a></p>
+        <p><a href="/${encodeURIComponent(region)}/events">See what&rsquo;s on in ${escapeHtml(regionLabel)} &rarr;</a></p>
       </div>`
     : '';
 
@@ -12631,6 +12631,74 @@ function renderSportActivityHtml(venues, selected, notes) {
 // The /tours/<slug>, /sports/<slug> and /indoor/<slug> pages that list at
 // least one place right now (for the sitemap), matched exactly as the pages
 // filter them.
+// What's On pages by type and by town (2026-10-13): /whats-on/<category key> and /<region>/events are the What's On page scoped to
+// one category or one town, each with its own title, intro, canonical and an ItemList of its events. They show the next 90 days
+// (date choices still work), and a page with fewer than WHATSON_SCOPE_MIN_EVENTS events in that window is noindex and left out of
+// the sitemap. A town page counts only that town's own events, not valley-wide ones, though it lists both.
+const WHATSON_SCOPE_WINDOW_DAYS = 90;
+const WHATSON_SCOPE_MIN_EVENTS = 3;
+function whatsOnScopeFromPath(pathname) {
+  let m = pathname.match(/^\/whats-on\/([a-z-]+)\/?$/);
+  if (m && WHATSON_CATEGORY_BY_KEY[m[1]]) return { category: m[1] };
+  m = pathname.match(/^\/([a-z-]+)\/events\/?$/);
+  if (m && REGION_LABELS[m[1]]) return { region: m[1] };
+  return null;
+}
+function whatsOnScopePath(scope) {
+  return scope.category ? `/whats-on/${scope.category}` : `/${scope.region}/events`;
+}
+function whatsOnScopeWindow(now = new Date()) {
+  const today = todayLocal(now);
+  return { from: today, to: addLocalDays(today, WHATSON_SCOPE_WINDOW_DAYS), preset: 'upcoming', fallback: false, days: WHATSON_SCOPE_WINDOW_DAYS };
+}
+// The events that count toward a scope (and its thin check).
+function whatsOnScopeEvents(scope, events) {
+  return scope.category
+    ? events.filter((e) => (e.categories || []).includes(scope.category))
+    : events.filter((e) => !e.valleyWide && e.region === scope.region);
+}
+function whatsOnScopeText(scope) {
+  if (scope.category) {
+    const t = WHATSON_CATEGORY_TEXT[scope.category];
+    const label = WHATSON_CATEGORY_BY_KEY[scope.category].label;
+    return {
+      heading: t.heading, intro: t.intro, crumb: label,
+      title: `${t.heading} | Okanagan Roam`,
+      description: `${label} in the Okanagan: what\u2019s on over the next three months, with dates, places and details for each event, from Vernon to Osoyoos.`,
+    };
+  }
+  const town = REGION_LABELS[scope.region];
+  return {
+    heading: `What\u2019s On in ${town}`, crumb: town,
+    intro: `Festivals, live music, markets, family days and more in ${town} over the next three months. Pick a type of event or change the dates to narrow it down.`,
+    title: `${town} Events: What\u2019s On in ${town} | Okanagan Roam`,
+    description: `Upcoming events in ${town}, BC: festivals, live music, markets, family days and more over the next three months, with dates and details for each.`,
+  };
+}
+// Every scope with enough events to be indexed, categories first (in chip order), then towns (in region order).
+function liveWhatsOnScopes(now = new Date()) {
+  const events = getWhatsOnEvents(whatsOnScopeWindow(now));
+  const scopes = [...WHATSON_CATEGORIES.map((c) => ({ category: c.key })), ...canonicalOutdoorRegionOrder().map((r) => ({ region: r }))];
+  return scopes
+    .map((scope) => ({ scope, path: whatsOnScopePath(scope), count: whatsOnScopeEvents(scope, events).length }))
+    .filter((x) => x.count >= WHATSON_SCOPE_MIN_EVENTS);
+}
+// Crawlable links to the live scoped pages, shown under the results on every What's On page.
+function whatsOnBrowseLinksHtml(live, current = null) {
+  if (!live.length) return '';
+  const link = (x) => {
+    const label = x.scope.category ? WHATSON_CATEGORY_BY_KEY[x.scope.category].label : REGION_LABELS[x.scope.region];
+    return x.path === current ? `<li><span aria-current="page">${escapeHtml(label)}</span></li>` : `<li><a href="${x.path}">${escapeHtml(label)}</a></li>`;
+  };
+  const byType = live.filter((x) => x.scope.category), byTown = live.filter((x) => x.scope.region);
+  return `<nav class="whatson-browse" aria-label="Browse What\u2019s On">${byType.length ? `
+    <h2 class="category-subsection-heading">Browse by type</h2>
+    <ul class="whatson-browse-list">${byType.map(link).join('')}</ul>` : ''}${byTown.length ? `
+    <h2 class="category-subsection-heading">Browse by town</h2>
+    <ul class="whatson-browse-list">${byTown.map(link).join('')}</ul>` : ''}
+  </nav>`;
+}
+
 function liveActivityPagePaths() {
   const paths = [];
   const tours = [...getVenuesByCategory('tour'), ...getToursAlsoVenues()];
@@ -15369,16 +15437,17 @@ const WHATSON_DATE_PRESETS = [
 function whatsOnDateStepHtml(state = {}) {
   const win = state.window || null;
   if (!win) return '';
+  const base = state.basePath || '/whats-on';
   const active = win.preset;
   const chip = (d) => {
     if (d.key === 'custom') return '';
     const pressed = active === d.key;
-    return `<a class="outdoor-filter-chip whatson-date-chip" href="/whats-on?when=${d.key}" data-when="${d.key}" aria-pressed="${pressed ? 'true' : 'false'}">${escapeHtml(d.label)}</a>`;
+    return `<a class="outdoor-filter-chip whatson-date-chip" href="${base}?when=${d.key}" data-when="${d.key}" aria-pressed="${pressed ? 'true' : 'false'}">${escapeHtml(d.label)}</a>`;
   };
   const customPressed = active === 'custom';
   const upcoming = active === 'upcoming';
   const label = upcoming
-    ? `Showing the next ${WHATSON_DEFAULT_WINDOW_DAYS} days: ${escapeHtml(formatLocalDateShort(win.from, { weekday: false }))} – ${escapeHtml(formatLocalDateShort(win.to, { weekday: false }))}`
+    ? `Showing the next ${win.days || WHATSON_DEFAULT_WINDOW_DAYS} days: ${escapeHtml(formatLocalDateShort(win.from, { weekday: false }))} – ${escapeHtml(formatLocalDateShort(win.to, { weekday: false }))}`
     : `Showing ${escapeHtml(formatLocalDateShort(win.from))}${win.to !== win.from ? ` – ${escapeHtml(formatLocalDateShort(win.to))}` : ''}`;
   const note = win.fallback ? `<p class="whatson-date-note" role="status">Those dates weren’t a valid range (real dates, start before end, at most ${MAX_CUSTOM_WINDOW_DAYS} days), so the next ${WHATSON_DEFAULT_WINDOW_DAYS} days are shown instead.</p>` : '';
   // `compact` (2026-09-24) renders the same controls without the step
@@ -15394,7 +15463,7 @@ function whatsOnDateStepHtml(state = {}) {
     ${WHATSON_DATE_PRESETS.map(chip).filter(Boolean).join('\n    ')}
     <button type="button" class="outdoor-filter-chip whatson-date-chip" id="whatsOnCustomToggle" data-when="custom" aria-pressed="${customPressed ? 'true' : 'false'}" aria-expanded="${customPressed ? 'true' : 'false'}" aria-controls="whatsOnCustomDates">Choose Dates</button>
   </div>
-  <form class="whatson-custom-dates" id="whatsOnCustomDates" method="get" action="/whats-on"${customPressed ? '' : ' hidden'}>
+  <form class="whatson-custom-dates" id="whatsOnCustomDates" method="get" action="${base}"${customPressed ? '' : ' hidden'}>
     <input type="hidden" name="when" value="custom">
     <label>From <input type="date" name="from" id="whatsOnFrom" value="${customPressed ? escapeHtml(win.from) : ''}" required></label>
     <label>To <input type="date" name="to" id="whatsOnTo" value="${customPressed ? escapeHtml(win.to) : ''}" required></label>
@@ -15548,7 +15617,7 @@ function whatsOnFilterBarHtml(state = {}) {
     </div>`;
   return `<div class="whatson-controls">
     ${pop('whatsOnRegions', 'Regions', '&#128205;', nRegions || '', whatsOnRegionChipsHtml(state))}
-    ${state.hasInventory ? pop('whatsOnDate', 'Date', '&#128197;', dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true })) : ''}
+    ${state.hasInventory ? pop('whatsOnDate', 'Date', '&#128197;', dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true, basePath: state.basePath })) : ''}
   </div>`;
 }
 
@@ -15703,6 +15772,10 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.whatson-page .whatson-pop-apply:hover { background: var(--ref-navy-deep); }
   body.whatson-page .whatson-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.whatson-page .whatson-browse { margin: 40px 0 8px; }
+  body.whatson-page .whatson-browse-list { list-style: none; padding: 0; margin: 8px 0 20px; display: flex; flex-wrap: wrap; gap: 8px 10px; }
+  body.whatson-page .whatson-browse-list a, body.whatson-page .whatson-browse-list span { display: inline-block; background: var(--paper); border-radius: 999px; padding: 7px 14px; font-weight: 700; text-decoration: none; }
+  body.whatson-page .whatson-browse-list span { opacity: .6; }
   body.whatson-page .whatson-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.whatson-page .whatson-results-step { margin-top: 4px; }
@@ -15726,6 +15799,8 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
   var INVENTORY = ${inventory ? 'true' : 'false'};
   var DATE = ${JSON.stringify(dateState).replace(/</g, '\\u003c')};
+  // A /whats-on/<category> or /<region>/events page's own chip, used when the address bar picks none (2026-10-13).
+  var SCOPE = ${JSON.stringify({ region: state.scope && state.scope.region ? [state.scope.region] : [], category: state.scope && state.scope.category ? [state.scope.category] : [] })};
   var chips = Array.prototype.slice.call(document.querySelectorAll('.outdoor-filter-chip, .outdoor-activity-toggle')).filter(function(c){ return !c.hasAttribute('data-when') && !c.hasAttribute('data-category-all'); });
   var allChip = document.querySelector('[data-category-all]');
   var searchInput = document.getElementById('whatsOnSearch');
@@ -15806,8 +15881,10 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     var d = date || DATE, q = [];
     if (d.when) q.push('when=' + encodeURIComponent(d.when));
     if (d.when === 'custom') { if (d.from) q.push('from=' + encodeURIComponent(d.from)); if (d.to) q.push('to=' + encodeURIComponent(d.to)); }
-    if (regions.length) q.push('regions=' + regions.join(','));
-    if (categories.length) q.push('categories=' + categories.join(','));
+    // On a scoped page, its own selection is the page's default, so it needs no parameters.
+    var isScope = (SCOPE.region.length || SCOPE.category.length) && regions.join(',') === SCOPE.region.join(',') && categories.join(',') === SCOPE.category.join(',');
+    if (!isScope && regions.length) q.push('regions=' + regions.join(','));
+    if (!isScope && categories.length) q.push('categories=' + categories.join(','));
     return q.length ? '?' + q.join('&') : '';
   }
   function dateParamsOf(search){ var p = new URLSearchParams(search); return { when: p.get('when') || '', from: p.get('from') || '', to: p.get('to') || '' }; }
@@ -15902,6 +15979,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     try {
       var params = new URLSearchParams(window.location.search);
       var pre = { region: (params.get('regions') || '').split(',').filter(Boolean), category: (params.get('categories') || '').split(',').filter(Boolean) };
+      if (!pre.region.length && !pre.category.length) pre = { region: SCOPE.region.slice(), category: SCOPE.category.slice() };
       chips.forEach(function(c){ ['region', 'category'].forEach(function(k){ var v = c.getAttribute('data-' + k); if (v) c.setAttribute('aria-pressed', pre[k].indexOf(v) !== -1 ? 'true' : 'false'); }); });
     } catch (e) {}
   }
@@ -16052,14 +16130,21 @@ const WHATSON_CATEGORY_BANNERS = Object.freeze({
   'workshops-classes': { src: '/images/whats-on/workshops-pottery-wheel.jpg', alt: 'Hands shaping clay on a potter\u2019s wheel', pos: 50 },
   'community-events': { src: '/images/whats-on/community-events.jpg', alt: 'Neighbours chatting at a community gathering in a park', pos: 40 },
 });
-function renderWhatsOnPage(filter = null) {
-  const selectedRegions = filter ? filter.regions : [];
-  const selectedCategories = filter ? filter.categories : [];
+function renderWhatsOnPage(filter = null, opts = {}) {
+  // opts.scope ({ category } or { region }) renders a scoped page (see whatsOnScopeFromPath): it pre-selects that chip unless the
+  // query picks its own, and defaults to the scope's 90-day window unless the query sets dates.
+  const scope = opts.scope || null;
+  const queryPicks = !!(filter && (filter.regions.length || filter.categories.length));
+  const selectedRegions = queryPicks ? filter.regions : (scope && scope.region ? [scope.region] : []);
+  const selectedCategories = queryPicks ? filter.categories : (scope && scope.category ? [scope.category] : []);
+  const queryDates = !!(filter && (filter.when !== undefined || filter.from !== undefined || filter.to !== undefined));
+  const scopeText = scope ? whatsOnScopeText(scope) : null;
+  const basePath = scope ? whatsOnScopePath(scope) : '/whats-on';
   const whatsOnBanner = (selectedCategories.length === 1 && WHATSON_CATEGORY_BANNERS[selectedCategories[0]]) || WHATS_ON_BANNER;
   // Step 6: the date window is resolved server-side from ?when= / ?from=&to=
   // (default: the rolling next 30 days) and selects the events rendered;
   // region/category chips then filter that set exactly as before.
-  const window = resolveWhatsOnWindow(filter || {});
+  const window = scope && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {});
   const events = getWhatsOnEvents(window);
   const matching = filterWhatsOnEvents(events, selectedRegions, selectedCategories);
   const filtered = selectedRegions.length > 0 || selectedCategories.length > 0;
@@ -16070,14 +16155,28 @@ function renderWhatsOnPage(filter = null) {
   } : null;
   const dateState = { when: window.preset === 'upcoming' ? '' : (window.preset === 'custom' ? 'custom' : window.preset), from: window.preset === 'custom' ? window.from : '', to: window.preset === 'custom' ? window.to : '' };
   const heading = "What's On in the Okanagan";
-  const woText = (selectedCategories.length === 1 && WHATSON_CATEGORY_TEXT[selectedCategories[0]]) || WHATSON_CATEGORY_TEXT.all;
-  const title = `${heading} | Okanagan Roam`;
-  const description = 'Discover what is happening across the Okanagan Valley: festivals, live music, markets, wine events, family days and more, by community and by category.';
-  const canonical = 'https://okanaganroam.com/whats-on';
+  // A town page's own heading/intro stand in for the "all" text, so the client sync shows them whenever no single type is chosen.
+  const allText = scope && scope.region ? { heading: scopeText.heading, intro: scopeText.intro } : WHATSON_CATEGORY_TEXT.all;
+  const woText = (selectedCategories.length === 1 && WHATSON_CATEGORY_TEXT[selectedCategories[0]]) || allText;
+  const title = scopeText ? scopeText.title : `${heading} | Okanagan Roam`;
+  const description = scopeText ? scopeText.description : 'Discover what is happening across the Okanagan Valley: festivals, live music, markets, wine events, family days and more, by community and by category.';
+  const canonical = `https://okanaganroam.com${basePath}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
-    { name: "What's On", url: canonical },
+    { name: "What's On", url: 'https://okanaganroam.com/whats-on' },
+    ...(scope ? [{ name: scopeText.crumb, url: canonical }] : []),
   ]);
+  const live = hasInventory ? liveWhatsOnScopes() : [];
+  const scopeThin = scope ? !live.some((x) => x.path === basePath) : false;
+  const scopeList = scope ? whatsOnScopeEvents(scope, matching).concat(scope.region ? matching.filter((e) => e.valleyWide) : []) : [];
+  const itemList = scope && scopeList.length ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: scopeText.heading,
+    url: canonical,
+    numberOfItems: Math.min(scopeList.length, 100),
+    itemListElement: scopeList.slice(0, 100).map((e, i) => ({ '@type': 'ListItem', position: i + 1, name: e.name, url: `https://okanaganroam.com/${e.region}/events/${e.slug}` })),
+  } : null;
   // Step 6: every event in the window is rendered (non-matching cards start
   // hidden) so a shared pre-filtered URL can still reveal the rest when a
   // chip is unselected -- the client script only shows/hides cards.
@@ -16098,7 +16197,7 @@ function renderWhatsOnPage(filter = null) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { shareImage: WHATS_ON_BANNER.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
 ${renderWhatsOnStyles()}
 ${CATEGORY_BANNER_STYLE}
 ${renderAnalyticsHeadHtml('hub')}
@@ -16110,12 +16209,13 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
-    { name: "What's On" },
+    scope ? { name: "What's On", href: '/whats-on' } : { name: "What's On" },
+    ...(scope ? [{ name: scopeText.crumb }] : []),
   ])}
   ${categoryHeroHtml(`<div class="category-banner" id="whatsOnBanner"><img src="${whatsOnBanner.src}" alt="${escapeHtml(whatsOnBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${whatsOnBanner.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
-    var map = ${JSON.stringify(WHATSON_CATEGORY_BANNERS).replace(/</g, '\\u003c')}, general = ${JSON.stringify(WHATS_ON_BANNER).replace(/</g, '\\u003c')}, text = ${JSON.stringify(WHATSON_CATEGORY_TEXT).replace(/</g, '\\u003c')};
+    var map = ${JSON.stringify(WHATSON_CATEGORY_BANNERS).replace(/</g, '\\u003c')}, general = ${JSON.stringify(WHATS_ON_BANNER).replace(/</g, '\\u003c')}, text = ${JSON.stringify({ ...WHATSON_CATEGORY_TEXT, all: allText }).replace(/</g, '\\u003c')};
     var box = document.getElementById('whatsOnBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
@@ -16133,7 +16233,7 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-intro whatson-intro">${escapeHtml(woText.intro)}</p>`)}
   ${whatsOnSearchHtml()}
   ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
-  ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory })}
+  ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory, basePath })}
   <span class="visually-hidden" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span>
   <section class="outdoor-step outdoor-step-results whatson-results-step" aria-labelledby="whatsOnResultsTop">
   <h2 class="visually-hidden" id="whatsOnResultsTop">Results</h2>
@@ -16145,10 +16245,11 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 ? '' : ' hidden'}>No events match that combination yet. <a href="/whats-on" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
+  ${whatsOnBrowseLinksHtml(live, scope ? basePath : null)}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
-  ${renderWhatsOnFilterScriptHtml({ hasInventory, dateState })}
+  ${renderWhatsOnFilterScriptHtml({ hasInventory, dateState, scope })}
 </body>
 </html>`;
 }
@@ -16565,8 +16666,29 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     url: canonical,
     image: [eventImageUrl(event, categories)],
     location,
+    organizer: eventOrganizerSchema(event),
+    offers: eventOffersSchema(event),
     subEvent: others.length ? others.map(sub) : undefined,
   };
+}
+// Organizer and offers (2026-10-13), Google's recommended Event fields, from
+// stored data only: the organizer is named only when the listing's source IS
+// the organizer; the offer is just the official event/ticket link (no price
+// or availability is stored, so none is claimed). Both are omitted otherwise.
+function eventOfficialUrl(event) {
+  const ok = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
+  if (ok(event.website)) return event.website.trim();
+  if (EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) && ok(event.source_url)) return event.source_url.trim();
+  return null;
+}
+function eventOrganizerSchema(event) {
+  if (event.source_type !== 'official_organizer' || typeof event.source_name !== 'string' || !event.source_name.trim()) return undefined;
+  const url = eventOfficialUrl(event);
+  return { '@type': 'Organization', name: event.source_name.trim(), url: url || undefined };
+}
+function eventOffersSchema(event) {
+  const url = eventOfficialUrl(event);
+  return url ? { '@type': 'Offer', url } : undefined;
 }
 // SEO-1 E (2026-10-02): when another event has exactly the same name in the
 // same region, both pages would carry an identical <title>; such pages add
@@ -16701,7 +16823,7 @@ ${related.map((r) => {
     return `      <li><a href="/${r.region}/events/${r.slug}">${escapeHtml(r.name)}</a>${when ? ` <span class="event-related-meta">${escapeHtml(when)}${cat ? ` &middot; ${escapeHtml(cat)}` : ''}</span>` : ''}</li>`;
   }).join('\n')}
     </ul>
-    <p class="event-related-all"><a href="/whats-on?regions=${encodeURIComponent(full.region)}">See what&rsquo;s on in ${escapeHtml(regionLabel)}</a></p>
+    <p class="event-related-all"><a href="/${encodeURIComponent(full.region)}/events">See what&rsquo;s on in ${escapeHtml(regionLabel)}</a></p>
   </section>` : '';
 
   return `<!DOCTYPE html>
@@ -22829,6 +22951,8 @@ const server = http.createServer(async (req, res) => {
         // self-canonical and indexable; /whats-on is the only internal parent
         // of every event detail URL below, so it belongs in the sitemap too.
         `  <url>\n    <loc>https://okanaganroam.com/whats-on</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>`,
+        // What's On by type and by town (2026-10-13): only scopes with enough upcoming events (see liveWhatsOnScopes).
+        ...liveWhatsOnScopes().map((x) => `  <url>\n    <loc>https://okanaganroam.com${x.path}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com/outdoors</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -24370,6 +24494,14 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(html);
     }
+    // GET /whats-on/<category> and /<region>/events -- What's On by type and by town (2026-10-13). Before the event-page and generic
+    // /:region/:category routes, which would otherwise 404 them.
+    const whatsOnScope = method === 'GET' ? whatsOnScopeFromPath(pathname) : null;
+    if (whatsOnScope) {
+      const html = renderWhatsOnPage(parseWhatsOnPageQuery(query), { scope: whatsOnScope });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(html);
+    }
 
     // GET /events -- the pre-What's-On index (renderEventsIndexPage) is no
     // longer the public destination (2026-09-22): permanent redirect to
@@ -25022,6 +25154,11 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  whatsOnScopeFromPath,
+  liveWhatsOnScopes,
+  WHATSON_SCOPE_MIN_EVENTS,
+  eventOrganizerSchema,
+  eventOffersSchema,
   guideItemListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,

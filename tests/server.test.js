@@ -4273,7 +4273,7 @@ test('H1 Step 2: region pages link the next publishable events, omit the block b
   for (const href of kelownaLinks) assert.match(href, /^\/kelowna\/events\/[a-z0-9-]+$/, `canonical event URL: ${href}`);
   assert.match(kelowna, /<h2>Upcoming events in Kelowna<\/h2>/);
   // 6. The secondary link exists alongside the block, and only as a secondary link.
-  assert.match(kelowna, /<a href="\/whats-on\?regions=kelowna">See what&rsquo;s on in Kelowna &rarr;<\/a>/);
+  assert.match(kelowna, /<a href="\/kelowna\/events">See what&rsquo;s on in Kelowna &rarr;<\/a>/);
   assert.equal(kelownaLinks.filter((h) => h.includes('whats-on')).length, 0, 'no filtered URL is used as a primary event link');
 
   // 7. The pre-existing region page is otherwise intact.
@@ -18028,4 +18028,81 @@ test('Build My Trip: one explicit dinner is not repeated across a romantic weeke
  const p=app.runTripPlan({text:'A romantic weekend in Kelowna with wineries and one great dinner.'},new Date('2026-10-13T19:00:00Z'));
  assert.equal(p.days.length,2);
  assert.equal(p.days.flatMap(day=>day.stops).filter(s=>s.venue?.type==='restaurant').length,1);
+});
+
+// ---- What's On by type and by town (2026-10-13) ----------------------------------
+test('What\'s On pages (2026-10-13): /whats-on/<category> and /<region>/events render scoped, self-canonical pages with an ItemList; thin ones are noindex and out of the sitemap', async () => {
+  assert.deepEqual(app.whatsOnScopeFromPath('/whats-on/holiday-seasonal'), { category: 'holiday-seasonal' });
+  assert.deepEqual(app.whatsOnScopeFromPath('/lumby/events/'), { region: 'lumby' });
+  assert.equal(app.whatsOnScopeFromPath('/whats-on/not-a-category'), null);
+  assert.equal(app.whatsOnScopeFromPath('/nowhere/events'), null);
+  const day = (n) => app.addLocalDays(app.todayLocal(), n);
+  const made = [];
+  const mk = (name, over) => { const e = s5create({ name, occurrences: [{ start_date: day(10 + made.length), start_time: '19:00' }], ...over }); made.push(e); return e; };
+  try {
+    // Names share no significant words, so the duplicate gate doesn't hold any back.
+    for (const n of ['Zebra Disco', 'Quartz Comedy', 'Velvet Karaoke']) mk(n, { region: 'lumby', venue_id: undefined, venue_name_text: 'Lumby Hall', categories: ['nightlife'] });
+    mk('Ember Ballroom', { region: 'lumby', venue_id: undefined, venue_name_text: 'Lumby Hall', categories: ['nightlife'], occurrences: [{ start_date: day(200) }] });
+    const live = app.liveWhatsOnScopes().map((x) => x.path);
+    assert.ok(live.includes('/lumby/events'), 'three Lumby events in the next 90 days make the town page live');
+    assert.ok(live.includes('/whats-on/nightlife'));
+    const town = await s5get('/lumby/events');
+    assert.equal(town.status, 200);
+    assert.match(town.text, /<title>Lumby Events: What’s On in Lumby \| Okanagan Roam<\/title>/);
+    assert.match(town.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/lumby\/events">/);
+    assert.doesNotMatch(town.text, /name="robots" content="noindex/);
+    assert.match(town.text, /<h1>What’s On in Lumby<\/h1>/);
+    assert.match(town.text, /Showing the next 90 days:/);
+    const ld = s5jsonLd(town.text);
+    assert.deepEqual(ld.find((b) => b['@type'] === 'BreadcrumbList').itemListElement.map((x) => x.name), ['Home', "What's On", 'Lumby']);
+    const list = ld.find((b) => b['@type'] === 'ItemList');
+    const urls = list.itemListElement.map((x) => x.url);
+    for (const e of made.slice(0, 3)) assert.ok(urls.includes(`https://okanaganroam.com/lumby/events/${e.slug}`), `${e.name} is listed`);
+    assert.ok(!urls.some((u) => u.endsWith(made[3].slug)), 'an event past the 90-day window is not listed');
+    assert.match(town.text, /<nav class="whatson-browse"[\s\S]*<span aria-current="page">Lumby<\/span>/, 'the browse links mark the current page');
+    const cat = await s5get('/whats-on/nightlife');
+    assert.match(cat.text, /<title>Nightlife in the Okanagan \| Okanagan Roam<\/title>/);
+    assert.match(cat.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/whats-on\/nightlife">/);
+    assert.match(cat.text, /class="whatson-cat-chip[^"]*"[^>]*data-category="nightlife"[^>]*aria-pressed="true"|data-category="nightlife"[^>]*aria-pressed="true"/, 'the page\'s own chip starts selected');
+    assert.match(cat.text, /var SCOPE = \{"region":\[\],"category":\["nightlife"\]\}/);
+    const sitemap = (await s5get('/sitemap.xml')).text;
+    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/lumby/events</loc>'));
+    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/whats-on/nightlife</loc>'));
+    // Thin: a town with no events of its own is noindex and not in the sitemap.
+    const thinTown = Object.keys(app.REGION_LABELS).find((r) => !app.liveWhatsOnScopes().some((x) => x.path === `/${r}/events`));
+    const thin = await s5get(`/${thinTown}/events`);
+    assert.equal(thin.status, 200);
+    assert.match(thin.text, /name="robots" content="noindex/);
+    assert.ok(!sitemap.includes(`<loc>https://okanaganroam.com/${thinTown}/events</loc>`));
+    assert.equal((await s5get('/whats-on/not-a-category')).status, 404);
+    // The general page keeps its own canonical and lists the live pages.
+    const all = await s5get('/whats-on');
+    assert.match(all.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/whats-on">/);
+    assert.match(all.text, /<a href="\/lumby\/events">Lumby<\/a>/);
+  } finally {
+    for (const e of made) {
+      for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(e.id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+    }
+  }
+});
+
+test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
+  const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
+  assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });
+  assert.deepEqual(app.eventOffersSchema(base), { '@type': 'Offer', url: 'https://www.kettlevalleyrail.org/x' });
+  assert.equal(app.eventOrganizerSchema({ ...base, source_type: 'official_venue' }), undefined, 'a ticket seller is not the organizer');
+  assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'official_venue' }), { '@type': 'Offer', url: 'https://www.kettlevalleyrail.org/x' }, 'an official ticketing page is the offer link');
+  assert.equal(app.eventOffersSchema({ ...base, source_type: 'tourism_org' }), undefined, 'a tourism listing is not a ticket link');
+  assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'tourism_org', website: 'https://example.com/tickets' }), { '@type': 'Offer', url: 'https://example.com/tickets' }, 'the event\'s own website always counts');
+  const ev = s5create({ name: 'Schema Organizer Fixture', source_type: 'official_organizer', source_name: 'Fixture Society' });
+  try {
+    const ld = app.eventJsonLd(app.getEventById(ev.id), app.listEventOccurrences(ev.id), ['live-music'], null, 'https://x', app.todayLocal());
+    assert.equal(ld.organizer.name, 'Fixture Society');
+    assert.equal(ld.offers['@type'], 'Offer');
+    assert.equal(ld.offers.price, undefined, 'no price is claimed');
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
 });
