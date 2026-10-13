@@ -11230,15 +11230,15 @@ function categoryDirectoryEntries() {
   const typeEntry = (type, href) => ({ label: CATEGORY_LABELS[type].plural, href, tagline: CATEGORY_TAGLINES[type] || null, ...(CATEGORY_BANNER_IMAGES[type] && !FOOD_DRINK_TYPES.includes(type) && type !== 'winery' ? { image: categoryCardImage(CATEGORY_BANNER_IMAGES[type]) } : {}) });
   const foodDrink = has(countFoodDrinkHubVenues()) ? [
     { label: 'All Food & Drink', href: '/food-drink', tagline: 'Every restaurant, cafe, pub, brewery, distillery and lounge in one place.' },
-    ...FOOD_DRINK_TYPES.map((t) => typeEntry(t, `/food-drink?types=${t}`)),
+    ...FOOD_DRINK_TYPES.filter((t) => has(countVenuesByCategory(t))).map((t) => typeEntry(t, `/${CATEGORY_SLUGS[t]}`)),
   ] : [];
   if (has(countVenuesByCategory('winery'))) foodDrink.push(typeEntry('winery', `/${CATEGORY_SLUGS.winery}`));
-  const cocktail = foodDrink.find((e) => e.href === '/food-drink?types=cocktail');
+  const cocktail = foodDrink.find((e) => e.href === `/${CATEGORY_SLUGS.cocktail}`);
   if (cocktail) cocktail.tagline = 'Cocktail bars and lounges for an evening out.';
   // Photos (2026-10-12): each Food & Drink card shows its page's banner
   // photo, as an 800px thumbnail.
   for (const e of foodDrink) {
-    const t = e.href === '/food-drink' ? null : (e.href.match(/types=(\w+)/) || [])[1] || (e.href === `/${CATEGORY_SLUGS.winery}` ? 'winery' : null);
+    const t = e.href === '/food-drink' ? null : SLUG_TO_TYPE[e.href.slice(1)] || null;
     const b = e.href === '/food-drink' ? FOOD_DRINK_HUB_BANNER : CATEGORY_BANNER_IMAGES[t];
     if (b) e.image = categoryCardImage(b);
   }
@@ -13014,6 +13014,8 @@ function renderFoodDrinkHubStyles() {
   return `<style>
   body.fd-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   body.fd-page .fd-intro { margin: 0 0 14px; max-width: 70ch; }
+  body.fd-page .fd-type-page-link { margin: -4px 0 14px; font-weight: 700; }
+  body.fd-page .fd-type-page-link a { color: var(--teal); }
 
   body.fd-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
   body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
@@ -13473,7 +13475,7 @@ function foodDrinkHubBannerHtml(types) {
   return `<div class="category-banner" id="fdBanner"><img src="${one.src}" alt="${escapeHtml(one.alt)}" width="1600" height="1067" style="object-position: 50% ${one.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
-    var map = ${map}, general = ${general}, text = ${text};
+    var map = ${map}, general = ${general}, text = ${text}, pages = ${JSON.stringify(Object.fromEntries(FOOD_DRINK_TYPES.map((t) => [t, { href: `/${CATEGORY_SLUGS[t]}`, label: CATEGORY_LABELS[t].plural.toLowerCase() }]))).replace(/</g, '\\u003c')};
     var box = document.getElementById('fdBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
@@ -13484,6 +13486,8 @@ function foodDrinkHubBannerHtml(types) {
       var h = document.getElementById('fdHeading'), p = document.getElementById('fdIntro');
       if (h && h.textContent !== t.h) h.textContent = t.h;
       if (p && p.textContent !== t.i) p.textContent = t.i;
+      var lk = document.getElementById('fdTypePageLink');
+      if (lk) { var pg = on.length === 1 && pages[on[0]]; lk.hidden = !pg; if (pg) { var a = lk.querySelector('a'); a.href = pg.href; a.textContent = 'See the ' + pg.label + ' page \u2192'; } }
     };
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
     sync();
@@ -13493,10 +13497,16 @@ function foodDrinkHubBannerHtml(types) {
 }
 function renderFoodDrinkScopedPage(venues, filter, scope) {
   const { region, type, categoryCounts, categoryGuidePages = [] } = scope;
-  const regionLabel = REGION_LABELS[region];
+  // Valley-wide type pages (SEO, 2026-10-13): with no region, the same page
+  // renders /restaurants, /cafes, /pubs, /cocktail-lounges, /breweries and
+  // /distilleries -- the type's heading, intro and photo, region links down
+  // to /<region>/<type>, breadcrumb Home > Food & Drink > <type>.
+  const valleyWide = !region;
+  const regionLabel = valleyWide ? null : REGION_LABELS[region];
   const catSlug = CATEGORY_SLUGS[type];
   const label = CATEGORY_LABELS[type];
-  const path = `/${region}/${catSlug}`;
+  const valleyText = FD_HUB_HEADINGS[type];
+  const path = valleyWide ? `/${catSlug}` : `/${region}/${catSlug}`;
 
   // Only primary type counts: every card answers to this page's category.
   const catsById = new Map(venues.map((v) => [v.id, [v.type]]));
@@ -13513,14 +13523,14 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   const filtered = f.features.length > 0;
   const state = { types: [], features: f.features, regions: [], counts };
 
-  const title = `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
-  const description = venues.length === 0
+  const title = valleyWide ? `${valleyText.heading} | Okanagan Roam` : `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
+  const description = valleyWide ? valleyText.intro : venues.length === 0
     ? `No ${label.plural.toLowerCase()} are currently listed in ${regionLabel}, BC. Browse everything else Okanagan Roam covers in ${regionLabel}.`
     : `${venues.length} verified ${label.plural.toLowerCase()} in ${regionLabel}, BC — real listings with hours, ratings, and attributes, reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com${path}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
-    { name: regionLabel, url: `https://okanaganroam.com/${region}` },
+    valleyWide ? { name: 'Food & Drink', url: 'https://okanaganroam.com/food-drink' } : { name: regionLabel, url: `https://okanaganroam.com/${region}` },
     { name: label.plural, url: canonical },
   ]);
   const itemList = {
@@ -13531,7 +13541,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
     itemListElement: venues.map((v, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      url: `https://okanaganroam.com/${region}/${catSlug}/${v.slug}`,
+      url: `https://okanaganroam.com/${v.region}/${catSlug}/${v.slug}`,
       item: {
         '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
         name: v.name,
@@ -13544,7 +13554,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   const advisoryNotes = getAdvisoryNotes();
   const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false) : '';
   const emptyHtml = venues.length === 0
-    ? `<p class="fd-no-results" id="fdNoResults">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`
+    ? `<p class="fd-no-results" id="fdNoResults">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel || 'the Okanagan')} right now.</p>`
     : `<p class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(label.plural.toLowerCase())} here match that combination yet. <a href="${path}" id="fdNoResultsClear">Clear the filters</a> to see all of them.</p>`;
   const guideLinks = categoryGuidePages.length
     ? `<div class="related-section">
@@ -13558,7 +13568,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_IMAGES[type].src : null, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
@@ -13572,11 +13582,13 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
-    { name: regionLabel, href: `/${region}` },
+    valleyWide ? { name: 'Food & Drink', href: '/food-drink' } : { name: regionLabel, href: `/${region}` },
     { name: label.plural },
   ])}
-  ${categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>`)}
-  ${regionCategoryTabsHtml(region, categoryCounts, type)}
+  ${valleyWide
+    ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
+    : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>`)}
+  ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
   ${venues.length ? foodDrinkSearchHtml() : ''}
   ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures) : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
@@ -13587,7 +13599,7 @@ ${renderGolfHeaderHtml()}
   <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
   </section>
   ${guideLinks}
-  <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
+  ${valleyWide ? '<a class="cta" href="/food-drink">Back to all Food &amp; Drink</a>' : `<a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>`}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
@@ -13626,6 +13638,9 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   const title = `${heading} | Okanagan Roam`;
   const description = `${venues.length} restaurants, cafés, pubs and breweries across the Okanagan Valley. Filter by patio, dog-friendly, vegan or gluten-free.`;
   const canonical = 'https://okanaganroam.com/food-drink';
+  // One type chosen (?types=brewery): the canonical is that type's own page
+  // (SEO, 2026-10-13), so Google indexes /breweries rather than a filter view.
+  const pageCanonical = f.types.length === 1 && !f.features.length && !f.regions.length && !openNow ? `https://okanaganroam.com/${CATEGORY_SLUGS[f.types[0]]}` : canonical;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
     { name: 'Food & Drink', url: canonical },
@@ -13676,7 +13691,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: FOOD_DRINK_HUB_BANNER.src, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, pageCanonical, [breadcrumb, itemList], { shareImage: FOOD_DRINK_HUB_BANNER.src, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
@@ -13690,7 +13705,8 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Food & Drink' }])}
   ${categoryHeroHtml(foodDrinkHubBannerHtml(f.types), `<h1 id="fdHeading">${escapeHtml(hubText.heading)}</h1>
-  <p class="outdoor-intro fd-intro" id="fdIntro">${escapeHtml(hubText.intro)}</p>`)}
+  <p class="outdoor-intro fd-intro" id="fdIntro">${escapeHtml(hubText.intro)}</p>
+  <p class="fd-type-page-link" id="fdTypePageLink"${f.types.length === 1 ? '' : ' hidden'}><a href="${f.types.length === 1 ? `/${CATEGORY_SLUGS[f.types[0]]}` : '#'}">See the ${escapeHtml(f.types.length === 1 ? CATEGORY_LABELS[f.types[0]].plural.toLowerCase() : '')} page &rarr;</a></p>`)}
   ${foodDrinkSearchHtml()}
   ${foodDrinkTypeChipsHtml(state)}
   ${foodDrinkFilterBarHtml(venues, state).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
@@ -21488,6 +21504,8 @@ const server = http.createServer(async (req, res) => {
         ...liveActivityPagePaths().map((path) => `  <url>\n    <loc>https://okanaganroam.com${path}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        // Valley-wide Food & Drink type pages (SEO, 2026-10-13).
+        ...FOOD_DRINK_TYPES.filter((t) => countVenuesByCategory(t) >= MIN_CATEGORY_VENUES).map((t) => `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS[t]}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com/dog-friendly</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...(getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES
           ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
@@ -23054,6 +23072,24 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
+    }
+
+    // GET /restaurants, /cafes, /pubs, /cocktail-lounges, /breweries,
+    // /distilleries (SEO, 2026-10-13): valley-wide Food & Drink type pages,
+    // the region pages' layout without a region. Same minimum as the hubs.
+    const fdTypeSlug = pathname.replace(/^\/|\/$/g, '');
+    if (FOOD_DRINK_TYPES.includes(SLUG_TO_TYPE[fdTypeSlug]) && /^\/[a-z-]+\/?$/.test(pathname) && method === 'GET') {
+      const type = SLUG_TO_TYPE[fdTypeSlug];
+      const typeVenues = getVenuesByCategory(type);
+      if (typeVenues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderFoodDrinkHubPage(typeVenues, parseFoodDrinkFilterQuery(query), { region: null, type });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      // Too few to list on their own (the header links here): the Food &
+      // Drink hub filtered to the type, never a 404.
+      res.writeHead(302, { Location: `/food-drink?types=${type}` });
+      return res.end();
     }
 
     // GET /dog-friendly -- Dog Friendly Finds (2026-09-24), the destination

@@ -10049,7 +10049,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), '318e3ad004834be0981610e78882752c', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
+  assert.equal(md5('okanagan.html'), '05d0841fe606e175a97c7cc82527df37', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
   assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
@@ -11390,13 +11390,13 @@ const HEADER_SPEC = [
   ] },
   { label: 'Food &amp; Drink', key: 'mood.foodDrink.title', items: [
     ['/food-drink', 'mood.foodDrink.title', 'Food &amp; Drink'],
-    ['/food-drink?types=restaurant', 'wizard.restaurants', 'Restaurants'],
-    ['/food-drink?types=cafe', 'wizard.cafes', 'Cafes'],
-    ['/food-drink?types=pub', 'wizard.pubsAndBars', 'Pubs &amp; Bars'],
+    ['/restaurants', 'wizard.restaurants', 'Restaurants'],
+    ['/cafes', 'wizard.cafes', 'Cafes'],
+    ['/pubs', 'wizard.pubsAndBars', 'Pubs &amp; Bars'],
     ['/wineries', 'wizard.wineries', 'Wineries'],
-    ['/food-drink?types=brewery', 'wizard.breweries', 'Breweries'],
-    ['/food-drink?types=distillery', 'nav.distilleries', 'Distilleries'],
-    ['/food-drink?types=cocktail', 'wizard.cocktailLounges', 'Cocktail Lounges'],
+    ['/breweries', 'wizard.breweries', 'Breweries'],
+    ['/distilleries', 'nav.distilleries', 'Distilleries'],
+    ['/cocktail-lounges', 'wizard.cocktailLounges', 'Cocktail Lounges'],
   ] },
   { href: '/whats-on', key: 'mood.whatsOn.title', label: 'What\'s On' },
   { href: '/trip', key: 'trip.buildMyTrip', label: 'Build My Trip', mobileOnly: true },
@@ -11890,7 +11890,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '318e3ad004834be0981610e78882752c'); // SEO-2 (2026-10-02) descriptions
+  assert.equal(md5('okanagan.html'), '05d0841fe606e175a97c7cc82527df37'); // SEO (2026-10-13): header Food & Drink links go to /restaurants, /cafes, /pubs, /breweries, /distilleries, /cocktail-lounges
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
@@ -16121,7 +16121,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   // Frozen files are byte-identical.
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '318e3ad004834be0981610e78882752c');
+  assert.equal(md5('okanagan.html'), '05d0841fe606e175a97c7cc82527df37');
   assert.equal(md5('public/scripts/app.js'), '4bb652d191eeb611c7c3c4e86bdbefa5');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
@@ -17738,6 +17738,31 @@ test('Activity pages (SEO, 2026-10-13): /tours/<slug>, /sports/<slug> and /indoo
       const res = await fetch(`${base}/tours?activity=wine`, { redirect: 'manual' });
       assert.equal(res.status, 301);
       assert.equal(res.headers.get('location'), '/tours/wine');
+    });
+  } finally { fixtures.forEach((v) => db.prepare('DELETE FROM venues WHERE id = ?').run(v.id)); }
+});
+
+test('Food & Drink type pages (SEO, 2026-10-13): /breweries etc. are valley-wide pages with their own title, canonical, photo and region links; /food-drink?types=<one> points Google at them', async () => {
+  const fixtures = ['kelowna', 'penticton', 'vernon'].map((region, i) => app.createVenue({ name: `Type Page Brewery ${i}`, slug: `type-page-brewery-${i}`, region, type: 'brewery', description: 'Fixture.' }));
+  try {
+    await withWinterServer(async (base) => {
+      const page = await WINTER_GET(base, '/breweries');
+      assert.equal(page.status, 200);
+      assert.match(page.text, /<title>Breweries in the Okanagan \| Okanagan Roam<\/title>/);
+      assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/breweries">/);
+      assert.match(page.text, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/food-drink\/breweries\.jpg">/);
+      assert.match(page.text, /<h1>Breweries in the Okanagan<\/h1>/);
+      assert.match(page.text, /"name":"Food & Drink","item":"https:\/\/okanaganroam\.com\/food-drink"/);
+      assert.match(page.text, /<a href="\/kelowna\/breweries">Kelowna<\/a>/, 'region links lead to the region pages');
+      assert.match(page.text, /href="\/penticton\/breweries\/type-page-brewery-1"/, 'cards link to each venue in its own region');
+      const hub = await WINTER_GET(base, '/food-drink?types=brewery');
+      assert.match(hub.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/breweries">/);
+      assert.match(hub.text, /<p class="fd-type-page-link" id="fdTypePageLink"><a href="\/breweries">/);
+      assert.match((await WINTER_GET(base, '/food-drink?types=pub,brewery')).text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink">/);
+      assert.match((await WINTER_GET(base, '/food-drink')).text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink">/);
+      const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+      assert.ok(sitemap.includes('<loc>https://okanaganroam.com/breweries</loc>'));
+      assert.match((await WINTER_GET(base, '/categories')).text, /href="\/breweries"/);
     });
   } finally { fixtures.forEach((v) => db.prepare('DELETE FROM venues WHERE id = ?').run(v.id)); }
 });
