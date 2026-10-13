@@ -17889,3 +17889,28 @@ test('Brunch guide (2026-10-13): /guides/best-brunch-kelowna renders on the shar
     assert.ok((await WINTER_GET(base, '/sitemap.xml')).text.includes('<loc>https://okanaganroam.com/guides/best-brunch-kelowna</loc>'));
   });
 });
+
+test('Rainy-day guide (2026-10-13): /guides/rainy-day-okanagan renders on the shared guide page with each place\'s town, the indoor banner, and is linked from /indoor and in the sitemap', async () => {
+  const html = app.renderRainyGuidePage();
+  assert.match(html, /<title>Rainy Day Things to Do in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/rainy-day-okanagan">/);
+  assert.match(html, /"@type":"Article","headline":"A Rainy Day in the Okanagan"/);
+  assert.match(html, /"name":"Indoor & Rainy Day","item":"https:\/\/okanaganroam\.com\/indoor"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/indoor\/indoor\.jpg"/);
+  assert.equal(app.RAINY_GUIDE.sections.reduce((n, s) => n + s.items.length, 0), 36);
+  const sicamous = db.prepare("SELECT id FROM venues WHERE region = 'penticton' AND slug = 'ss-sicamous-museum-heritage-park'").get();
+  if (sicamous) assert.match(html, /SS Sicamous Museum &amp; Heritage Park<\/a><\/strong> \(Penticton\):/);
+  await withWinterServer(async (base) => {
+    assert.equal((await WINTER_GET(base, '/guides/rainy-day-okanagan')).status, 200);
+    assert.ok((await WINTER_GET(base, '/sitemap.xml')).text.includes('<loc>https://okanaganroam.com/guides/rainy-day-okanagan</loc>'));
+    assert.match((await WINTER_GET(base, '/indoor')).text, /href="\/guides\/rainy-day-okanagan"/);
+  });
+});
+
+test('Editorial guides (2026-10-13): a section whose places are all gone drops out with its jump link, and an all-gone quick-picks table is not shown', () => {
+  const g = { ...app.RAINY_GUIDE, sections: [{ id: 'gone', jump: 'Gone', heading: 'Gone section', items: [{ ref: 'nowhere/not-a-place', name: 'Ghost', text: 'gone' }] }], table: { ...app.RAINY_GUIDE.table, rows: [['Nothing', ['nowhere/not-a-place|Ghost']]] } };
+  const html = app.renderEditorialGuidePage(g, '/guides/test');
+  assert.doesNotMatch(html, /href="#gone"|Gone section/);
+  assert.doesNotMatch(html, /href="#quick-picks"|<h2>Quick picks<\/h2>/);
+  assert.match(html, /See everything:/, 'the footer links stay');
+});

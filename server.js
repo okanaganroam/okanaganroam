@@ -12743,7 +12743,7 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     ...(activityContent ? [{ name: label.plural, href: `/${catSlug}` }, { name: activityContent.label }] : [{ name: label.plural }]),
   ])}
   ${activityContent ? CATEGORY_BANNER_STYLE + categoryHeroHtml(`<div class="category-banner"><img src="${activityContent.banner.src}" alt="${escapeHtml(activityContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${activityContent.banner.pos}%" fetchpriority="high"></div>`, '<h1>' + escapeHtml(activityContent.heading) + '</h1>\n  <p class="hub-intro">' + escapeHtml(activityContent.intro) + '</p>') : CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
-  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${type === 'winery' || (type === 'tour' && tourActivity === 'wine') ? `<p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a></p>\n  ` : ''}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}${type === 'sport' ? renderSportActivityHtml(sportUniverse, sportActivity, sportNotes) : ''}
+  ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${type === 'winery' || (type === 'tour' && tourActivity === 'wine') ? `<p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a></p>\n  ` : ''}${isIndoorHub ? `<p class="subtitle"><a href="${RAINY_GUIDE_PATH}">Guide: a rainy day in the Okanagan &rarr;</a></p>\n  ` : ''}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}${type === 'tour' ? renderTourActivityHtml(tourUniverse, tourActivity) : ''}${type === 'sport' ? renderSportActivityHtml(sportUniverse, sportActivity, sportNotes) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
   ${hubThemed ? '</main>' : ''}
@@ -20343,8 +20343,13 @@ function renderEditorialGuidePage(g, path) {
     const place = item.where || (item.noPlace || g.noPlace ? '' : REGION_LABELS[v.region] || '');
     return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${guideTipHtml(item.text)}</li>`;
   };
+  // Only sections (and quick-pick rows) with at least one live place render,
+  // and the jump links follow what rendered, so a closed place never leaves
+  // an empty heading or a dead jump link.
+  const liveSections = new Set();
   const sectionsHtml = g.sections.map((sec) => {
     const items = sec.items.map(itemHtml).join('');
+    if (items) liveSections.add(sec.id);
     return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${escapeHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
   }).join('');
   const rowsHtml = g.table.rows.map(([area, refs]) => {
@@ -20384,14 +20389,14 @@ ${renderGolfHeaderHtml()}
       ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
       <div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
       </div>
-      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a></nav>${sectionsHtml}
-      <section class="ski-guide-resort" id="${g.table.id}">
+      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}
+      <section class="ski-guide-resort" id="${g.table.id}">${rowsHtml ? `
         <h2>${escapeHtml(g.table.heading)}</h2>
         <table class="patio-picks">
           ${g.table.head ? `<thead><tr><th scope="col">${escapeHtml(g.table.head[0])}</th><th scope="col">${escapeHtml(g.table.head[1])}</th></tr></thead>` : ''}
           <tbody>${rowsHtml}
           </tbody>
-        </table>
+        </table>` : ''}
         <p>${g.footerHtml}</p>
       </section>
     </article>
@@ -20770,6 +20775,269 @@ const BRUNCH_GUIDE = {
   footerHtml: '<strong>See more:</strong> <a href="/kelowna/restaurants">All Kelowna restaurants</a> and <a href="/kelowna/cafes">caf\u00e9s</a>, or places that <a href="/guide/kelowna/open_early">open early</a>.',
 };
 function renderBrunchGuidePage() { return renderEditorialGuidePage(BRUNCH_GUIDE, BRUNCH_GUIDE_PATH); }
+
+// ---------- A rainy day in the Okanagan (2026-10-13): /guides/rainy-day-okanagan ----------
+// Approved copy generated from drafts/rainy-day-okanagan.md; shared guide
+// page, valley-wide, so each place shows its town.
+const RAINY_GUIDE_PATH = '/guides/rainy-day-okanagan';
+const RAINY_GUIDE = {
+  heading: 'A Rainy Day in the Okanagan',
+  title: 'Rainy Day Things to Do in the Okanagan | Okanagan Roam',
+  description: 'What to do when it rains in the Okanagan: museums, galleries, an indoor waterpark, escape rooms, floating saunas, live theatre and climbing gyms.',
+  banner: () => CATEGORY_BANNER_IMAGES.indoor,
+  parent: { name: 'Indoor & Rainy Day', href: '/indoor' },
+  intro: [
+    "The Okanagan is famous for sunshine, but grey days happen, especially in the shoulder seasons and winter. The good news: the valley has plenty to do indoors, from a restored 1914 sternwheeler and a planetarium to an indoor waterpark, floating lakeside saunas and a 1929 movie house.",
+    "Here's where to go, grouped by the kind of rainy day you're having. Each place shows its town."
+  ],
+  sections: [
+    {
+      "id": "museums",
+      "jump": "Museums",
+      "heading": "Museums and a bit of history",
+      "items": [
+        {
+          "ref": "penticton/ss-sicamous-museum-heritage-park",
+          "name": "SS Sicamous Museum & Heritage Park",
+          "text": "a restored 1914 sternwheeler beached at Okanagan Beach. Explore it deck by deck, from the cabins and dining saloon to the wheelhouse."
+        },
+        {
+          "ref": "kelowna/okanagan-heritage-museum",
+          "name": "Okanagan Heritage Museum",
+          "text": "the natural and human history of the Okanagan, from syilx culture to settler life, with exhibits such as Dinosaurs of BC."
+        },
+        {
+          "ref": "kelowna/okanagan-wine-orchard-museum-laurel-packinghouse",
+          "name": "Okanagan Wine & Orchard Museum",
+          "text": "how orchards and vineyards shaped the valley, in the historic 1918 Laurel Packinghouse."
+        },
+        {
+          "ref": "west-kelowna/sncewips-heritage-museum",
+          "name": "Sncewips Heritage Museum",
+          "text": "Westbank First Nation's living museum of syilx history, language and present-day culture. Drop in or book a guided tour."
+        },
+        {
+          "ref": "summerland/summerland-museum-archives",
+          "name": "Summerland Museum & Archives",
+          "text": "Syilx history, early orchard farming and a detailed scale model of the Kettle Valley Railway through town."
+        },
+        {
+          "ref": "kelowna/kf-aerospace-centre-for-excellence",
+          "name": "KF Aerospace Centre for Excellence",
+          "text": "nine vintage aircraft, including a DC-3, a Mosquito and a CF-104 Starfighter, in a working hangar near the airport, plus a flight simulator."
+        },
+        {
+          "ref": "summerland/nixdorf-classic-cars",
+          "name": "Nixdorf Classic Cars",
+          "text": "a 14,000 sq ft showroom of restored 1930s–1970s cars, each with its restoration story. Admission supports charities for children with disabilities."
+        }
+      ]
+    },
+    {
+      "id": "science",
+      "jump": "Science",
+      "heading": "Science and the stars",
+      "items": [
+        {
+          "ref": "vernon/okanagan-science-centre",
+          "name": "Okanagan Science Centre",
+          "text": "hands-on exhibits, planetarium shows and live animals in Polson Park."
+        },
+        {
+          "ref": "kaleden/dominion-radio-astrophysical-observatory-drao",
+          "name": "Dominion Radio Astrophysical Observatory",
+          "text": "free one-hour guided tours of the National Research Council's radio telescopes in the White Lake valley."
+        },
+        {
+          "ref": "vernon/canadian-wildlife-museum",
+          "name": "Canadian Wildlife Museum",
+          "text": "more than 350 mounted specimens, from mice to bison, in life-like dioramas."
+        }
+      ]
+    },
+    {
+      "id": "galleries",
+      "jump": "Galleries",
+      "heading": "Art galleries",
+      "items": [
+        {
+          "ref": "kelowna/kelowna-art-gallery",
+          "name": "Kelowna Art Gallery",
+          "text": "rotating contemporary and historical exhibitions in the downtown Cultural District, with family programs."
+        },
+        {
+          "ref": "penticton/penticton-art-gallery",
+          "name": "Penticton Art Gallery",
+          "text": "rotating exhibitions on the waterfront by Okanagan Beach."
+        },
+        {
+          "ref": "vernon/vernon-public-art-gallery",
+          "name": "Vernon Public Art Gallery",
+          "text": "the largest public art gallery in the North Okanagan, with hands-on art activities for all ages."
+        },
+        {
+          "ref": "enderby/cardiff-miller-art-warehouse",
+          "name": "Cardiff Miller Art Warehouse",
+          "text": "about ten large sound and installation works by internationally known artists Janet Cardiff and George Bures Miller."
+        },
+        {
+          "ref": "kelowna/geert-maas-sculpture-gardens-gallery",
+          "name": "Geert Maas Sculpture Gardens & Gallery",
+          "text": "hundreds of works, including one of Canada's largest collections of bronze sculpture."
+        }
+      ]
+    },
+    {
+      "id": "kids",
+      "jump": "Kids",
+      "heading": "Let the kids burn off energy",
+      "items": [
+        {
+          "ref": "kelowna/h2o-adventure-fitness-centre",
+          "name": "H2O Adventure + Fitness Centre",
+          "text": "an indoor waterpark with waterslides, a FlowRider, a wave pool, a lazy river and a splash park, plus a hot tub and steam room for the grown-ups."
+        },
+        {
+          "ref": "kelowna/energyplex",
+          "name": "Energyplex",
+          "text": "laser tag, a 30-foot climbing wall, a laser maze, an arcade with 35+ games and a kids' zone, plus a licensed lounge."
+        },
+        {
+          "ref": "penticton/springers-gymnastics-drop-in-gym",
+          "name": "Springers Gymnastics",
+          "text": "drop-in sessions to tumble, bounce and climb on proper gym equipment."
+        },
+        {
+          "ref": "vernon/elodie-s-playhouse-cafe",
+          "name": "Elodie's Playhouse Cafe",
+          "text": "real toys for babies and toddlers, and good coffee for the parents."
+        }
+      ]
+    },
+    {
+      "id": "games",
+      "jump": "Games & climbing",
+      "heading": "Games, escape rooms and climbing",
+      "items": [
+        {
+          "ref": "kelowna/kelowna-escape-room-by-omni",
+          "name": "Kelowna Escape Room by Omni",
+          "text": "a downtown escape game across several themed rooms, with live actors. Ages 7 and up."
+        },
+        {
+          "ref": "vernon/beyond-belief-escape-rooms",
+          "name": "Beyond Belief Escape Rooms",
+          "text": "six themed rooms, from Lost Island to Wizards Academy, for teams of 2 to 8."
+        },
+        {
+          "ref": "kelowna/mccurdy-bowling-centre",
+          "name": "McCurdy Bowling Centre",
+          "text": "24 ten-pin and 6 five-pin lanes, cosmic bowling, and food and drinks from the attached brewpub."
+        },
+        {
+          "ref": "vernon/bna-brewing-vernon-40",
+          "name": "BNA Brewing Vernon",
+          "text": "bowling lanes and arcade games alongside the beer list."
+        },
+        {
+          "ref": "kelowna/gneiss-climbing-og-banks",
+          "name": "Gneiss Climbing",
+          "text": "bouldering with regularly reset problems, day passes for all ages and a cheap twilight pass after 9 pm."
+        },
+        {
+          "ref": "vernon/the-rock-garden-climbing-centre",
+          "name": "The Rock Garden Climbing Centre",
+          "text": "bouldering and roped routes, with rentals and intro lessons for beginners."
+        }
+      ]
+    },
+    {
+      "id": "make",
+      "jump": "Make something",
+      "heading": "Make something",
+      "items": [
+        {
+          "ref": "kelowna/work-of-art-pottery-studio",
+          "name": "Work of Art Pottery Studio",
+          "text": "paint-your-own pottery with no experience needed, plus build-a-mug workshops."
+        },
+        {
+          "ref": "penticton/donut-house-studios",
+          "name": "Donut House Studios",
+          "text": "bookable workshops like mug making and lino printing, plus wheel-throwing courses."
+        }
+      ]
+    },
+    {
+      "id": "spas",
+      "jump": "Saunas & spas",
+      "heading": "Warm up: saunas and spas",
+      "items": [
+        {
+          "ref": "kelowna/loyly-floating-sauna",
+          "name": "Löyly Floating Sauna",
+          "text": "a Finnish-style cedar sauna floating at the Downtown Marina, with a lake cold plunge and a warm solarium lounge."
+        },
+        {
+          "ref": "penticton/shelter-floating-sauna",
+          "name": "Shelter Floating Sauna",
+          "text": "a cedar sauna floating on Okanagan Lake. Cycle between heat, a cold plunge in the lake and rest."
+        },
+        {
+          "ref": "kelowna/cleopatra-s-rituals-thermal-spa-and-steam",
+          "name": "Cleopatra's Rituals Thermal Spa and Steam",
+          "text": "a hot-cold circuit of sauna, steam, thermal showers and a falling-snow room."
+        }
+      ]
+    },
+    {
+      "id": "shows",
+      "jump": "Shows & movies",
+      "heading": "A show or a movie",
+      "items": [
+        {
+          "ref": "vernon/vernon-towne-theatre",
+          "name": "Vernon Towne Theatre",
+          "text": "a historic 1929 cinema showing new releases, classics, indie films, concerts and comedy. Named Canada's top independent theatre in 2023."
+        },
+        {
+          "ref": "oliver/oliver-theatre",
+          "name": "Oliver Theatre",
+          "text": "a single-screen movie house showing films since 1947, with family matinees on weekends."
+        },
+        {
+          "ref": "kelowna/kelowna-actors-studio",
+          "name": "Kelowna Actors Studio",
+          "text": "Broadway-style musical theatre, with dinner-theatre or show-only seating."
+        },
+        {
+          "ref": "kelowna/bernie-s-supper-club-cinema",
+          "name": "Bernie's Supper Club & Cinema",
+          "text": "a speakeasy-style supper club with an upstairs theatre for a show after dinner."
+        },
+        {
+          "ref": "kelowna/kelowna-comedy-club-at-dakoda-s-comedy-lounge",
+          "name": "Kelowna Comedy Club at Dakoda's",
+          "text": "touring and local comics every Friday and Saturday night."
+        },
+        {
+          "ref": "penticton/the-dream-live-music-venue",
+          "name": "The Dream",
+          "text": "a 135-seat listening room for folk, blues, rock and jazz."
+        }
+      ]
+    }
+  ],
+  table: { id: 'quick-picks', jump: 'Quick picks', heading: 'Quick picks', head: ['If you want\u2026', 'Go to'], rows: [
+    ['Something unique to the Okanagan', ['penticton/ss-sicamous-museum-heritage-park|SS Sicamous', 'kelowna/okanagan-wine-orchard-museum-laurel-packinghouse|Okanagan Wine & Orchard Museum']],
+    ['To tire out the kids', ['kelowna/h2o-adventure-fitness-centre|H2O Adventure + Fitness Centre', 'kelowna/energyplex|Energyplex']],
+    ['Something free', ['kaleden/dominion-radio-astrophysical-observatory-drao|DRAO guided tours (Kaleden)']],
+    ['To warm up after the cold', ['kelowna/loyly-floating-sauna|L\u00f6yly', 'penticton/shelter-floating-sauna|Shelter floating saunas']],
+    ['A night out', ['kelowna/kelowna-actors-studio|Kelowna Actors Studio', 'vernon/vernon-towne-theatre|Vernon Towne Theatre']],
+  ] },
+  footerHtml: '<strong>See everything:</strong> <a href="/indoor">Indoor &amp; Rainy Day</a> across the valley, by <a href="/indoor/arts">museums &amp; galleries</a>, <a href="/indoor/family">family fun</a>, <a href="/indoor/games">games</a>, <a href="/indoor/spas">spas</a> and <a href="/indoor/theatre">theatre</a>.',
+};
+function renderRainyGuidePage() { return renderEditorialGuidePage(RAINY_GUIDE, RAINY_GUIDE_PATH); }
 
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
@@ -22259,6 +22527,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
+        `  <url>\n    <loc>https://okanaganroam.com${RAINY_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${BRUNCH_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${DOG_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${WINE_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -23875,6 +24144,10 @@ const server = http.createServer(async (req, res) => {
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
     // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if ((pathname === RAINY_GUIDE_PATH || pathname === `${RAINY_GUIDE_PATH}/`) && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderRainyGuidePage());
+    }
     if ((pathname === BRUNCH_GUIDE_PATH || pathname === `${BRUNCH_GUIDE_PATH}/`) && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderBrunchGuidePage());
@@ -24372,6 +24645,10 @@ module.exports = {
   BRUNCH_GUIDE,
   BRUNCH_GUIDE_PATH,
   renderBrunchGuidePage,
+  RAINY_GUIDE,
+  RAINY_GUIDE_PATH,
+  renderRainyGuidePage,
+  renderEditorialGuidePage,
   renderListYourVenuePage,
   validateVenueSubmission,
   buildVenueSubmissionEmail,
