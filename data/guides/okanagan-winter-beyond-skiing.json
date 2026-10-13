@@ -1,0 +1,168 @@
+{
+ "heading": "Winter in the Okanagan, without the downhill",
+ "title": "Winter Beyond the Ski Hills | Okanagan Roam",
+ "description": "Tube parks, fat bikes, lit forest trails, snowshoe dinners, ice fishing and winter birding: Okanagan winter fun that doesn't need a lift ticket.",
+ "banner": "big-white",
+ "parent": {
+  "name": "Ski & Snow",
+  "href": "/ski-snow"
+ },
+ "noPlace": true,
+ "intro": [
+  "Not everyone in the group wants to ski all day, and plenty of people don't ski at all. The Okanagan's mountain villages and valley towns have a whole second winter going on: tube parks that run into the evening, trails built for fat bikes, lit forest walks and snowshoe dinners, plus quiet lakeshore spots where the winter birds gather.",
+  "{page:/guides/okanagan-skating|Skating rinks} and {page:/guides/okanagan-nordic-snowshoe|cross-country and snowshoe trails} have their own guides, and so do {page:/guides/okanagan-sleigh-rides-dog-sledding|sleigh rides, dog sledding and snowmobile tours}, so this one sticks to everything else. Mountain conditions change fast, so check each operator's hours before you drive up."
+ ],
+ "sections": [
+  {
+   "id": "tubing-and-snow-play",
+   "jump": "Tubing",
+   "heading": "Tubing and snow play",
+   "items": [
+    {
+     "ref": "big-white/big-white-tube-park",
+     "name": "Big White Tube Park (Happy Valley)",
+     "text": "Five specially groomed lanes and a tube lift, with no skill or equipment needed. Tickets are sold for timed two-hour windows and only a limited number go on sale, so book online ahead.",
+     "where": "Big White"
+    },
+    {
+     "ref": "silverstar/tube-town-silverstar-tube-park",
+     "name": "Tube Town – SilverStar Tube Park",
+     "text": "Truck-sized tubes, several lanes and a tube lift beside Brewer's Pond, included in the resort's My1Pass. Next door, a fenced mini-snowmobile track lets children aged six to twelve (under 100 lb) drive supervised laps.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "apex/tim-hortons-tube-park-apex",
+     "name": "Tim Hortons Tube Park – Apex",
+     "text": "At the base area beside the beginner slopes, running on weekends and holidays through the season. On Friday and Saturday nights it runs under the lights from 4 to 9 pm, with tickets sold in two-hour blocks.",
+     "where": "Apex"
+    },
+    {
+     "ref": "baldy/baldy-mountain-resort",
+     "name": "Baldy Mountain Resort",
+     "text": "The Magic Carpet stays open until 7 pm on Friday and Saturday nights for tubing and beginner skiing under the lights. You can also borrow discs at the ticket office for winter disc golf beside the Sugarlump Chair.",
+     "where": "Baldy"
+    }
+   ]
+  },
+  {
+   "id": "fat-bikes",
+   "jump": "Fat bikes",
+   "heading": "Fat bikes",
+   "items": [
+    {
+     "ref": "silverstar/silverstar-fat-bike-trails",
+     "name": "SilverStar Fat Bike Trails",
+     "text": "15 kilometres of packed, signed single- and double-track, with fat bike rentals in the village. Stay off the trails when the temperature climbs above zero.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "big-white/big-white-winter-ebike-tours",
+     "name": "Big White Winter eBike Tours",
+     "text": "One-hour guided fat-tire e-bike rides on snowy backcountry trails, from a 9am intro ride to a 3pm intermediate outing. Groups max 4, riders 15+.",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "evenings-lights-and-snowshoe-d",
+   "jump": "Evenings",
+   "heading": "Evenings: lights and snowshoe dinners",
+   "items": [
+    {
+     "ref": "big-white/twinkling-trail-big-white",
+     "name": "Twinkling Trail – Big White",
+     "text": "An illuminated walking path through the snowy forest of the Happy Valley Adventure Park, open to all ages and lit from dusk. No equipment and no skill are needed, and leashed dogs are welcome.",
+     "where": "Big White"
+    },
+    {
+     "ref": "silverstar/ravenwood-snowshoe-dinner-tours",
+     "name": "Ravenwood Snowshoe Dinner Tours – SilverStar",
+     "text": "A guided snowshoe through the darkening forest to Ravenwood Cabin, where dinner is waiting. Dates and pricing for the coming winter are announced by the resort and booked through Guest Services.",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "frozen-lakes-and-quiet-winter-",
+   "jump": "Frozen lakes",
+   "heading": "Frozen lakes and quiet winter outings",
+   "items": [
+    {
+     "ref": "west-kelowna/rodneys-reel-outdoors-ice-fishing-charters",
+     "name": "Rodney's REEL Outdoors – Ice Fishing Charters",
+     "text": "Full-day ice-fishing charters to a trout lake, with gear, an ice hut, a fire on shore and a hot lunch supplied. A BC freshwater fishing licence is required and not included.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "lumby/echo-lake-provincial-park",
+     "name": "Echo Lake Provincial Park",
+     "text": "A forested mountain lake reached by about 20 km of gravel road, popular for fishing for rainbow trout, lake trout and kokanee in both summer and winter.",
+     "where": "Lumby"
+    },
+    {
+     "ref": "kelowna/maude-roxby-wetland-bird-sanctuary",
+     "name": "Maude-Roxby Wetland (Bird Sanctuary)",
+     "text": "A raised boardwalk leads to a viewing platform over the lake. Winter brings rafts of gulls and waterfowl, with tundra and trumpeter swans possible; no dogs are allowed.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/rotary-marsh-park",
+     "name": "Rotary Marsh Park",
+     "text": "A restored wetland at the north end of Waterfront Park, where loons, grebes, hooded mergansers and diving ducks gather off the point in winter. It is free and open year-round, and no dogs are allowed.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "osoyoos/osoyoos-curling-club",
+     "name": "Osoyoos Curling Club",
+     "text": "A friendly community club with leagues, social draws and free Learn to Curl clinics for first-timers.",
+     "where": "Osoyoos"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Tubing under the lights",
+    [
+     "apex/tim-hortons-tube-park-apex|Tim Hortons Tube Park – Apex",
+     "baldy/baldy-mountain-resort|Baldy Mountain Resort"
+    ]
+   ],
+   [
+    "A first ride on a snow bike",
+    [
+     "silverstar/silverstar-fat-bike-trails|SilverStar Fat Bike Trails",
+     "big-white/big-white-winter-ebike-tours|Big White Winter eBike Tours"
+    ]
+   ],
+   [
+    "Dinner at the end of a snowshoe",
+    [
+     "silverstar/ravenwood-snowshoe-dinner-tours|Ravenwood Snowshoe Dinner Tours – SilverStar"
+    ]
+   ],
+   [
+    "An evening walk with small kids",
+    [
+     "big-white/twinkling-trail-big-white|Twinkling Trail – Big White"
+    ]
+   ],
+   [
+    "Something new on a valley day",
+    [
+     "osoyoos/osoyoos-curling-club|Osoyoos Curling Club",
+     "kelowna/rotary-marsh-park|Rotary Marsh Park"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/outdoors/winter\">Winter outdoors</a>, <a href=\"/ski-snow\">Ski &amp; Snow</a>, <a href=\"/indoor\">Indoor &amp; Rainy Day</a>"
+}

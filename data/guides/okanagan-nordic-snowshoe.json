@@ -1,0 +1,175 @@
+{
+ "heading": "Cross-country trails and snowshoe routes",
+ "title": "Nordic Skiing & Snowshoeing | Okanagan Roam",
+ "description": "Cross-country ski centres and snowshoe trails across the Okanagan, from SilverStar and Sovereign Lake to Telemark, Nickel Plate and Baldy.",
+ "banner": "winter",
+ "parent": {
+  "name": "Winter outdoors",
+  "href": "/outdoors/winter"
+ },
+ "noPlace": true,
+ "intro": [
+  "Cross-country skiing and snowshoeing are the quiet side of an Okanagan winter: no lift lines, just groomed track or a marked trail through the forest. The valley is well served, with big Nordic centres near Vernon, Kelowna and Penticton, smaller volunteer-run trail areas, and a few low-key spots closer to town for a short snowshoe.",
+  "Grooming and trail conditions change with the weather, so look at each club's grooming report or trail update before you set out."
+ ],
+ "sections": [
+  {
+   "id": "north-okanagan-silverstar-and-",
+   "jump": "North",
+   "heading": "North Okanagan: SilverStar and Sovereign Lake",
+   "items": [
+    {
+     "ref": "silverstar/sovereign-lake-nordic-centre",
+     "name": "Sovereign Lake Nordic Centre",
+     "text": "Canada's largest cross-country ski and snowshoe club, with roughly 58 km of trails groomed for classic and skate skiing plus 14 km of marked snowshoe trails. Dogs are permitted only on the designated dog ski trails.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/silverstar-cross-country-ski-trails",
+     "name": "SilverStar Cross-Country Ski Trails",
+     "text": "55 kilometres of daily-groomed trail starting right at the village, graded green, blue and black, with warming huts and a lit night loop. SilverStar's Nordic season opens on November 20, 2026.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/silverstar-snowshoe-trails",
+     "name": "SilverStar Snowshoe Trails",
+     "text": "Sixteen kilometres of singletrack snowshoe trail marked with hand-carved wooden signs and reflective markers. Dogs are welcome on all the snowshoe trails on a leash, and rentals are in the village.",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "central-okanagan-kelowna-west-",
+   "jump": "Central",
+   "heading": "Central Okanagan: Kelowna, West Kelowna and Big White",
+   "items": [
+    {
+     "ref": "west-kelowna/telemark-nordic-club",
+     "name": "Telemark Nordic Club",
+     "text": "More than 50 km of groomed skate and classic trails, several lit for night skiing, and 60 km of snowshoe trails, 9 km up Glenrosa Road. A one-day ski pass is $22 for adults, and there is a K9 trail.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-nordic-ski-snowshoe-club",
+     "name": "Kelowna Nordic Ski and Snowshoe Club",
+     "text": "75 km of double-tracked trails in the McCulloch highlands, normally groomed by 10 a.m., with marked snowshoe trails, warming cabins and designated K-9 trails. Check the grooming report before you go.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "big-white/big-white-nordic-wilderness-trails",
+     "name": "Big White Nordic & Wilderness Trails",
+     "text": "25 kilometres of Nordic and Wilderness trails around Happy Valley, with separate Wilderness trails for snowshoeing where leashed dogs are welcome. Access is included with any Big White day lift ticket or season pass.",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/big-white-guided-snowshoe-tours",
+     "name": "Big White Guided Snowshoe Tours",
+     "text": "Two-hour guided tours run daily at 10am and 1pm, as an interpretive group tour (ages 16+) or a private family tour (ages 8+).",
+     "where": "Big White"
+    },
+    {
+     "ref": "kelowna/myra-canyon-myra-bellevue-provincial-park",
+     "name": "Myra Canyon – Myra-Bellevue Provincial Park",
+     "text": "The park stays open through winter, when Little White Mountain offers backcountry skiing and snowshoeing.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kuipers-peak-mountain-park",
+     "name": "Kuipers' Peak Mountain Park",
+     "text": "A short climb in the Upper Mission with a view of Okanagan Lake from the peak, which the City also features for winter snowshoeing. Dogs are allowed on-leash only.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "south-okanagan-apex-penticton-",
+   "jump": "South",
+   "heading": "South Okanagan: Apex, Penticton, Naramata and Baldy",
+   "items": [
+    {
+     "ref": "apex/nickel-plate-nordic-centre",
+     "name": "Nickel Plate Nordic Centre",
+     "text": "At 1,850 metres, 6.5 km past Apex, with 45 km of groomed classic and skate trails and 22.5 km of marked snowshoe trails. Rentals, lessons and snowshoe tours run through the season, and dogs are welcome on the K-9 loop at any time.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/nickel-plate-provincial-park",
+     "name": "Nickel Plate Provincial Park",
+     "text": "A quiet, semi-wilderness park just past Apex Mountain Village that turns to Nordic skiing, snowmobiling and ice fishing in winter.",
+     "where": "Apex"
+    },
+    {
+     "ref": "penticton/carmi-recreational-trails",
+     "name": "Carmi Recreational Trails",
+     "text": "A loop network on the plateau east of Penticton, used for snowshoeing in winter, with a warming hut on the 7 km Okanagan View Loop. There are no fees.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/ellis-ridge-canyon-view-trails",
+     "name": "Ellis Ridge & Canyon View Trails",
+     "text": "Two short viewpoint walks from the Garnet Fire Interpretive Site, also used for snowshoeing. There are cliff edges, so keep children close.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "naramata/chute-lake-lodge",
+     "name": "Chute Lake Lodge",
+     "text": "A lodge above the Naramata Bench on the Kettle Valley Railway that rents snowshoes in winter, with a restaurant and cabins. The final 8 km is a gravel mountain road.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "baldy/baldy-snowshoe-trails",
+     "name": "Baldy Snowshoe Trails",
+     "text": "About 13 kilometres of marked trail around the day lodge, with snowshoe rentals and guided tours. It is a genuinely family-friendly outing.",
+     "where": "Baldy"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "The biggest groomed network",
+    [
+     "silverstar/sovereign-lake-nordic-centre|Sovereign Lake Nordic Centre",
+     "silverstar/silverstar-cross-country-ski-trails|SilverStar Cross-Country Ski Trails"
+    ]
+   ],
+   [
+    "Night skiing",
+    [
+     "west-kelowna/telemark-nordic-club|Telemark Nordic Club",
+     "silverstar/silverstar-cross-country-ski-trails|SilverStar Cross-Country Ski Trails"
+    ]
+   ],
+   [
+    "Snowshoeing with your dog",
+    [
+     "silverstar/silverstar-snowshoe-trails|SilverStar Snowshoe Trails",
+     "big-white/big-white-nordic-wilderness-trails|Big White Nordic & Wilderness Trails"
+    ]
+   ],
+   [
+    "A guided first snowshoe",
+    [
+     "big-white/big-white-guided-snowshoe-tours|Big White Guided Snowshoe Tours",
+     "baldy/baldy-snowshoe-trails|Baldy Snowshoe Trails"
+    ]
+   ],
+   [
+    "A short snowshoe near town",
+    [
+     "kelowna/kuipers-peak-mountain-park|Kuipers' Peak Mountain Park",
+     "penticton/carmi-recreational-trails|Carmi Recreational Trails"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/outdoors/winter\">Winter outdoors</a>, <a href=\"/ski-snow\">Ski &amp; Snow</a>"
+}

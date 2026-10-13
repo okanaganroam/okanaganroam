@@ -21169,6 +21169,11 @@ const GUIDE_BANNERS = {
   'nature': () => OUTDOOR_ACTIVITY_BANNERS.nature,
   'fishing': () => OUTDOOR_ACTIVITY_BANNERS.fishing,
   'tour-farm': () => TOUR_ACTIVITIES.find((a) => a.slug === 'farm').banner,
+  'tour-winter': () => TOUR_ACTIVITIES.find((a) => a.slug === 'winter').banner,
+  'winter': () => OUTDOOR_ACTIVITY_BANNERS.winter,
+  'ski-snow': () => SKI_SNOW_BANNER,
+  'big-white': () => SKI_SNOW_REGION_CONTENT['big-white'].banner,
+  'spas': () => INDOOR_EXPERIENCES.find((c) => c.slug === 'spas').banner,
 };
 for (const [key, b] of Object.entries(WHATSON_CATEGORY_BANNERS)) GUIDE_BANNERS[`whats-on-${key}`] = () => b;
 const FILE_GUIDES_DIR = path.join(__dirname, 'data', 'guides');
@@ -21194,7 +21199,7 @@ function renderFileGuidePage(pathname) {
 const GUIDE_GROUPS = [
   { key: 'fall', heading: 'Fall in the Okanagan', paths: ['/guides/fall-okanagan', '/guides/fall-farms-u-pick-okanagan', '/guides/okanagan-cideries', '/guides/okanagan-winery-restaurants', '/guides/kokanee-salmon-okanagan', '/guides/okanagan-waterfall-walks', '/guides/halloween-okanagan', '/guides/fall-events-okanagan', '/guides/okanagan-hockey-season'] },
   { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan'] },
-  { key: 'winter', heading: 'Winter', paths: ['/guides/ski-season-big-white-silverstar'] },
+  { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/ski-season-big-white-silverstar', '/guides/apex-baldy-ski-guide', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
   { key: 'year', heading: 'Food, drink and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna'] },
 ];
 // Season order for /guides (Okanagan local month): the current season leads.
@@ -21269,7 +21274,7 @@ const guideCardImage = (b) => {
 function seasonalGuideLink(now = new Date()) {
   const m = Number(todayLocal(now).slice(5, 7));
   if (m >= 9 && m <= 11 && FILE_GUIDES['/guides/fall-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/fall-okanagan'])) return { href: '/guides/fall-okanagan', label: 'Fall in the Okanagan: our seasonal guides' };
-  if (m === 12 || m <= 3) return { href: SKI_GUIDE_PATH, label: 'Winter in the Okanagan: the ski season guide' };
+  if (m === 12 || m <= 3) return FILE_GUIDES['/guides/winter-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/winter-okanagan']) ? { href: '/guides/winter-okanagan', label: 'Winter in the Okanagan: our seasonal guides' } : { href: SKI_GUIDE_PATH, label: 'Winter in the Okanagan: the ski season guide' };
   return null;
 }
 function renderGuidesIndexPage(now = new Date()) {

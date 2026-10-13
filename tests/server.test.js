@@ -17936,8 +17936,11 @@ test('Fall guides (2026-10-13): data/guides files load, render on the shared gui
     assert.doesNotMatch(article, /\{(page:|event:|[a-z-]+\/)[^}]*\||\]\(|\*\*/, `${p} has no raw markup`);
     assert.ok(g.title.length <= 70 && g.description.length <= 160, `${p} title/description lengths`);
   }
-  const hub = app.renderFileGuidePage('/guides/fall-okanagan');
-  for (const p of paths.filter((x) => x !== '/guides/fall-okanagan')) assert.ok(hub.includes(`href="${p}"`), `the fall hub links ${p}`);
+  for (const [key, hubPath] of [['fall', '/guides/fall-okanagan'], ['winter', '/guides/winter-okanagan']]) {
+    const hub = app.renderFileGuidePage(hubPath);
+    const group = app.GUIDE_GROUPS.find((x) => x.key === key).paths.filter((x) => x !== hubPath && app.FILE_GUIDES[x]);
+    for (const p of group) assert.ok(hub.includes(`href="${p}"`), `the ${key} hub links ${p}`);
+  }
   const upcoming = s5create({ name: 'Fall Guide Fixture Upcoming', occurrences: [{ start_date: '2032-10-20', start_time: '18:00', end_time: '20:00' }] });
   const past = s5create({ name: 'Fall Guide Fixture Past', occurrences: [{ start_date: '2020-10-20', start_time: '18:00', end_time: '20:00' }] });
   try {
@@ -17961,10 +17964,10 @@ test('Guides hub (2026-10-13): /guides lists live guides by season, header/foote
   assert.deepEqual(app.guideGroupOrder(oct), ['fall', 'cozy', 'winter', 'year'], 'fall leads in October');
   assert.deepEqual(app.guideGroupOrder(new Date('2027-01-15T12:00:00-08:00')), ['winter', 'cozy', 'year', 'fall'], 'winter leads in January');
   assert.deepEqual(app.guideGroupOrder(new Date('2027-06-15T12:00:00-07:00')), ['year', 'fall', 'cozy', 'winter'], 'year-round leads in summer');
-  assert.match(idx, /<h2>Winter<\/h2>/, 'the ski guide is always listed');
+  assert.match(idx, /<h2>Winter in the Okanagan<\/h2>/, 'the ski guide is always listed');
   assert.match(idx, /href="\/guides\/ski-season-big-white-silverstar"/);
   assert.equal(app.seasonalGuideLink(new Date('2026-07-15T12:00:00-07:00')), null, 'no seasonal link in summer');
-  assert.equal(app.seasonalGuideLink(new Date('2027-01-15T12:00:00-08:00')).href, '/guides/ski-season-big-white-silverstar');
+  assert.equal(app.seasonalGuideLink(new Date('2027-01-15T12:00:00-08:00')).href, app.FILE_GUIDES['/guides/winter-okanagan'] && !app.guideIsThin(app.FILE_GUIDES['/guides/winter-okanagan']) ? '/guides/winter-okanagan' : '/guides/ski-season-big-white-silverstar');
   // Thin: a guide whose places are all gone is noindex with a note.
   const ghost = { ...app.RAINY_GUIDE, sections: [{ id: 's', jump: 'S', heading: 'S', items: [{ ref: 'nowhere/gone', name: 'Gone', text: 'gone' }] }] };
   assert.ok(app.guideIsThin(ghost));
