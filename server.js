@@ -11178,10 +11178,11 @@ ${renderGolfHeaderHtml()}
 // venues yet) is left out, using the same getters and minimum as its route.
 // Taglines reuse CATEGORY_TAGLINES and the Hidden Gems card blurbs where
 // they exist.
+const categoryCardImage = (b) => ({ src: b.src.replace(/\/([^/]+)$/, '/thumbs/$1'), alt: b.alt, pos: b.pos });
 function categoryDirectoryEntries() {
   // Batch A (P-003): counts, not whole lists (see countVenueRows above).
   const has = (count) => count >= MIN_CATEGORY_VENUES;
-  const typeEntry = (type, href) => ({ label: CATEGORY_LABELS[type].plural, href, tagline: CATEGORY_TAGLINES[type] || null });
+  const typeEntry = (type, href) => ({ label: CATEGORY_LABELS[type].plural, href, tagline: CATEGORY_TAGLINES[type] || null, ...(CATEGORY_BANNER_IMAGES[type] && !FOOD_DRINK_TYPES.includes(type) && type !== 'winery' ? { image: categoryCardImage(CATEGORY_BANNER_IMAGES[type]) } : {}) });
   const foodDrink = has(countFoodDrinkHubVenues()) ? [
     { label: 'All Food & Drink', href: '/food-drink', tagline: 'Every restaurant, cafe, pub, brewery, distillery and lounge in one place.' },
     ...FOOD_DRINK_TYPES.map((t) => typeEntry(t, `/food-drink?types=${t}`)),
@@ -11194,7 +11195,7 @@ function categoryDirectoryEntries() {
   for (const e of foodDrink) {
     const t = e.href === '/food-drink' ? null : (e.href.match(/types=(\w+)/) || [])[1] || (e.href === `/${CATEGORY_SLUGS.winery}` ? 'winery' : null);
     const b = e.href === '/food-drink' ? FOOD_DRINK_HUB_BANNER : CATEGORY_BANNER_IMAGES[t];
-    if (b) e.image = { src: b.src.replace('/images/food-drink/', '/images/food-drink/thumbs/'), alt: b.alt, pos: b.pos };
+    if (b) e.image = categoryCardImage(b);
   }
 
   const experiences = [];
@@ -13224,7 +13225,8 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
 // canonical, H1, breadcrumb and ItemList are the ones renderCategoryPage
 // produced for these URLs, so the pages' SEO identity is unchanged.
 // Category banners (2026-10-12): a licensed Adobe Stock photo across the top
-// of a Food & Drink category page.
+// of a Food & Drink category page, and of the golf pages. Each also has an
+// 800px copy in a thumbs/ folder beside it for the /categories cards.
 const CATEGORY_BANNER_IMAGES = Object.freeze({
   restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table', pos: 5 },
   cafe: { src: '/images/food-drink/cafes.jpg', alt: 'Coffee and fresh croissants on a café table', pos: 60 },
@@ -13233,6 +13235,7 @@ const CATEGORY_BANNER_IMAGES = Object.freeze({
   brewery: { src: '/images/food-drink/breweries.jpg', alt: 'A flight of craft beers', pos: 57 },
   distillery: { src: '/images/food-drink/distilleries.jpg', alt: 'A copper still at a craft distillery', pos: 50 },
   winery: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata', pos: 40 },
+  golf: { src: '/images/golf/golf-courses.jpg', alt: 'Golf carts on a fairway beside a pond and pine trees', pos: 45 },
 });
 const CATEGORY_BANNER_STYLE = `<style id="category-banner">
   /* The photo runs full width above the heading: 2:1 on phones, 2.4:1 on
