@@ -11204,7 +11204,7 @@ function categoryDirectoryEntries() {
   if (has(countOutdoorLandingVenues())) experiences.push({ label: 'Outdoors', href: `/${CATEGORY_SLUGS.outdoor}`, tagline: 'Parks, trails, viewpoints and ski hills across the valley.', image: categoryCardImage(CATEGORY_BANNER_IMAGES.outdoor) });
   // Ski & Snow and Indoor & Rainy Day (2026-10-11): both pages always render
   // (never a 404), so both are always listed.
-  experiences.push({ label: 'Ski & Snow', href: SKI_SNOW_PATH, tagline: 'Ski hills, Nordic trails, tube parks and après at Big White, SilverStar, Apex and Baldy.' });
+  experiences.push({ label: 'Ski & Snow', href: SKI_SNOW_PATH, tagline: 'Ski hills, Nordic trails, tube parks and après at Big White, SilverStar, Apex and Baldy.', image: categoryCardImage(SKI_SNOW_BANNER) });
   experiences.push({ label: 'Indoor & Rainy Day', href: `/${CATEGORY_SLUGS.indoor}`, tagline: CATEGORY_TAGLINES.indoor });
   // Tours & Experiences (2026-10-11): /tours always renders too.
   experiences.push({ label: CATEGORY_LABELS.tour.plural, href: `/${CATEGORY_SLUGS.tour}`, tagline: CATEGORY_TAGLINES.tour });
@@ -14584,7 +14584,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderLocalFavouritesStyles()}
-${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHead : ''}
+${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHead : ''}${cfg.banner ? '\n' + CATEGORY_BANNER_STYLE : ''}
 </head>
 <body class="golf-page outdoor-page lf-page">
   ${renderGolfTripTrayHtml()}
@@ -14592,8 +14592,8 @@ ${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHe
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: heading }])}
-  <h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">${cfg.introHtml}</p>${cfg.leadHtml ? '\n  ' + cfg.leadHtml : ''}
+  ${categoryHeroHtml(cfg.banner ? `<div class="category-banner"><img src="${cfg.banner.src}" alt="${escapeHtml(cfg.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${cfg.banner.pos}%" fetchpriority="high"></div>` : '', `<h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">${cfg.introHtml}</p>`)}${cfg.leadHtml ? '\n  ' + cfg.leadHtml : ''}
   <div class="fd-search">
     <label class="visually-hidden" for="lfSearch">${escapeHtml(cfg.searchLabel)}</label>
     <input type="search" id="lfSearch" class="fd-search-input" placeholder="Search by name, place or category..." autocomplete="off" spellcheck="false">
@@ -14683,6 +14683,10 @@ function renderSecretSpotsPage(venues, filter = null) {
 // season guide and /outdoors/winter. No venue type of its own: membership
 // stays in collection_items. Renders (never 404s) with an empty collection.
 const SKI_SNOW_PATH = '/ski-snow';
+// Banner (2026-10-12): free Unsplash photo I-30st7mGAE (Glade Optics) -- a
+// skier carving past snow-covered firs -- with an 800px thumbs/ copy for
+// the /categories card.
+const SKI_SNOW_BANNER = Object.freeze({ src: '/images/ski-snow/ski-snow.jpg', alt: 'A skier carving past snow-covered fir trees under a blue sky', pos: 55 });
 const SKI_SNOW_REGIONS = ['big-white', 'silverstar', 'apex', 'baldy'];
 const SKI_SNOW_EAT_TYPES = ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery'];
 function getSkiSnowVenues() {
@@ -14737,6 +14741,7 @@ function renderSkiSnowPage(venues, eats, filter = null) {
     pluralNoun: 'ski & snow spots',
     summaryLabel: 'ski & snow',
     extraHead: renderSkiSnowStyles(),
+    banner: SKI_SNOW_BANNER,
     leadHtml,
     emptyHtml: '<p class="ski-snow-empty">Winter listings are on their way &mdash; check the ski season guide and winter outdoors above in the meantime.</p>',
     afterResultsHtml: eatsHtml,
@@ -23300,6 +23305,7 @@ module.exports = {
   CATEGORY_BANNER_IMAGES,
   FD_HUB_HEADINGS,
   FOOD_DRINK_HUB_BANNER,
+  SKI_SNOW_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
