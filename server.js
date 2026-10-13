@@ -6547,8 +6547,19 @@ function hiddenGemEditorialCardHtml(card) {
   </a>`;
 }
 
-function renderHiddenGemsHomepageHTML() {
-  const cards = HIDDEN_GEM_EDITORIAL_CARDS.map(hiddenGemEditorialCardHtml).join('\n');
+// Fall photos (2026-10-13): September through November (isFallHeroSeason), a card with a fall photo here shows it
+// instead, like the mood tiles' FALL_MOOD_IMAGES (free Adobe Stock, each under its own file name). Keyed by card href.
+const FALL_HIDDEN_GEM_IMAGES = Object.freeze({
+  '/dog-friendly': '/images/hidden-gems/dog-friendly-fall.jpg', // Adobe Stock 390790635: a woman and her dog on a dock by a fall lake
+  '/local-favorites': '/images/hidden-gems/local-favourites-fall.jpg', // Adobe Stock 239470335: a woman and a girl picking apples in an orchard
+  '/secret-spots': '/images/hidden-gems/secret-spots-fall.jpg', // Adobe Stock 542247752: a still lake at sunset with light fog and fall trees
+});
+
+function renderHiddenGemsHomepageHTML({ now = homepageNow() } = {}) {
+  const fall = isFallHeroSeason(now);
+  const cards = HIDDEN_GEM_EDITORIAL_CARDS
+    .map((c) => (fall && FALL_HIDDEN_GEM_IMAGES[c.href] ? { ...c, img: FALL_HIDDEN_GEM_IMAGES[c.href] } : c))
+    .map(hiddenGemEditorialCardHtml).join('\n');
 
   return `
 <section class="discover-section" id="hiddenGems">
@@ -22983,7 +22994,7 @@ const server = http.createServer(async (req, res) => {
         const discoveryStyles = renderHomepageDiscoveryStyles();
         const moodCards = renderMoodCardsHTML({ now: homepageNow() });
         html = seasonalHeroText(html, homepageNow());
-        const hiddenGemsSection = renderHiddenGemsHomepageHTML();
+        const hiddenGemsSection = renderHiddenGemsHomepageHTML({ now: homepageNow() });
         const exploreRegions = renderExploreRegionsHTML();
         const buildTripSection = renderBuildTripCTAHTML();
 
@@ -25605,6 +25616,7 @@ module.exports = {
   getSeasonStates,
   breadcrumbListSchema,
   FALL_MOOD_IMAGES,
+  FALL_HIDDEN_GEM_IMAGES,
   seasonalHeroText,
   isFallHeroSeason,
   retimeEventOccurrence,

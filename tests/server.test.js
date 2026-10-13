@@ -18419,6 +18419,21 @@ test('Fall tile photos (2026-10-13): Sep-Nov the Food & Drink, Wine, What\'s On 
   assert.doesNotMatch(app.renderMoodCardsHTML({ now: SUMMER_NOW }), /-fall\.jpg/);
 });
 
+test('Fall Hidden Gems photos (2026-10-13): Sep-Nov a card with a fall photo shows it; other months and other cards are unchanged', () => {
+  const srcOf = (html, href) => (html.match(new RegExp(`<a class="hidden-gem-card" href="${href}">\\s*<img class="hidden-gem-card-img" src="([^"]+)"`)) || [])[1];
+  const at = (iso) => app.renderHiddenGemsHomepageHTML({ now: new Date(`${iso}T19:00:00Z`) });
+  assert.ok(Object.keys(app.FALL_HIDDEN_GEM_IMAGES).length >= 1);
+  for (const iso of ['2026-09-01', '2026-10-13', '2026-11-30']) {
+    for (const card of app.HIDDEN_GEM_EDITORIAL_CARDS) {
+      const fallSrc = app.FALL_HIDDEN_GEM_IMAGES[card.href];
+      assert.equal(srcOf(at(iso), card.href), fallSrc || card.img, `${iso} ${card.href}`);
+      if (fallSrc) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', fallSrc)), `${fallSrc} exists`);
+    }
+  }
+  for (const iso of ['2026-07-15', '2026-08-31', '2026-12-01', '2027-03-01']) assert.equal(at(iso), app.renderHiddenGemsHomepageHTML({ now: SUMMER_NOW }), `${iso} unchanged`);
+  assert.doesNotMatch(app.renderHiddenGemsHomepageHTML({ now: SUMMER_NOW }), /-fall\.jpg/);
+});
+
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });
