@@ -12643,14 +12643,28 @@ function renderSportActivityHtml(venues, selected, notes) {
 const WHATSON_SCOPE_WINDOW_DAYS = 90;
 const WHATSON_SCOPE_MIN_EVENTS = 3;
 function whatsOnScopeFromPath(pathname) {
-  let m = pathname.match(/^\/whats-on\/([a-z-]+)\/?$/);
+  // Weekend pages (2026-10-13): /whats-on/this-weekend and /<region>/events/this-weekend.
+  if (/^\/whats-on\/this-weekend\/?$/.test(pathname)) return { weekend: true };
+  let m = pathname.match(/^\/([a-z-]+)\/events\/this-weekend\/?$/);
+  if (m && REGION_LABELS[m[1]]) return { region: m[1], weekend: true };
+  m = pathname.match(/^\/whats-on\/([a-z-]+)\/?$/);
   if (m && WHATSON_CATEGORY_BY_KEY[m[1]]) return { category: m[1] };
   m = pathname.match(/^\/([a-z-]+)\/events\/?$/);
   if (m && REGION_LABELS[m[1]]) return { region: m[1] };
   return null;
 }
 function whatsOnScopePath(scope) {
+  if (scope.weekend) return scope.region ? `/${scope.region}/events/this-weekend` : '/whats-on/this-weekend';
   return scope.category ? `/whats-on/${scope.category}` : `/${scope.region}/events`;
+}
+// The coming Friday-Sunday (the same window as the "This Weekend" date choice); from Friday on it is the current one.
+function whatsOnWeekendWindow(now = new Date()) {
+  return { ...dateWindowForPreset('this-weekend', todayLocal(now)), preset: 'this-weekend', fallback: false };
+}
+// Weekend pages are indexable exactly when their parent is (the valley page when there is any inventory, a town's when its
+// /<region>/events page is live), so they don't flip in and out of the index from one quiet weekend to the next.
+function liveWhatsOnWeekendPaths(live) {
+  return ['/whats-on/this-weekend', ...live.filter((x) => x.scope.region).map((x) => `${x.path}/this-weekend`)];
 }
 function whatsOnScopeWindow(now = new Date()) {
   const today = todayLocal(now);
@@ -12662,7 +12676,17 @@ function whatsOnScopeEvents(scope, events) {
     ? events.filter((e) => (e.categories || []).includes(scope.category))
     : events.filter((e) => !e.valleyWide && e.region === scope.region);
 }
-function whatsOnScopeText(scope) {
+function whatsOnScopeText(scope, window = null) {
+  if (scope.weekend) {
+    const place = scope.region ? REGION_LABELS[scope.region] : 'the Okanagan';
+    const dates = window ? `${formatLocalDateShort(window.from)}${window.to !== window.from ? ` \u2013 ${formatLocalDateShort(window.to)}` : ''}` : 'this weekend';
+    return {
+      heading: `Things to Do in ${place} This Weekend`, crumb: 'This Weekend',
+      intro: `What\u2019s on in ${place} this weekend, ${dates}: festivals, live music, markets, shows and family events. Pick a type of event to narrow it down.`,
+      title: `Things to Do in ${place} This Weekend | Okanagan Roam`,
+      description: `What\u2019s on in ${place}${scope.region ? ', BC,' : ''} this weekend (${dates}): festivals, live music, markets, shows and family events, with times and details for each.`,
+    };
+  }
   if (scope.category) {
     const t = WHATSON_CATEGORY_TEXT[scope.category];
     const label = WHATSON_CATEGORY_BY_KEY[scope.category].label;
@@ -12710,6 +12734,8 @@ function whatsOnRelatedGuidesHtml(guides) {
 // Crawlable links to the live scoped pages, shown under the results on every What's On page.
 function whatsOnBrowseLinksHtml(live, current = null) {
   if (!live.length) return '';
+  const weekend = liveWhatsOnWeekendPaths(live).map((p) => ({ path: p, label: p === '/whats-on/this-weekend' ? 'The whole valley' : REGION_LABELS[p.split('/')[1]] }));
+  const weekendLink = (x) => (x.path === current ? `<li><span aria-current="page">${escapeHtml(x.label)}</span></li>` : `<li><a href="${x.path}">${escapeHtml(x.label)}</a></li>`);
   const link = (x) => {
     const label = x.scope.category ? WHATSON_CATEGORY_BY_KEY[x.scope.category].label : REGION_LABELS[x.scope.region];
     return x.path === current ? `<li><span aria-current="page">${escapeHtml(label)}</span></li>` : `<li><a href="${x.path}">${escapeHtml(label)}</a></li>`;
@@ -12720,6 +12746,8 @@ function whatsOnBrowseLinksHtml(live, current = null) {
     <ul class="whatson-browse-list">${byType.map(link).join('')}</ul>` : ''}${byTown.length ? `
     <h2 class="category-subsection-heading">Browse by town</h2>
     <ul class="whatson-browse-list">${byTown.map(link).join('')}</ul>` : ''}
+    <h2 class="category-subsection-heading">This weekend</h2>
+    <ul class="whatson-browse-list">${weekend.map(weekendLink).join('')}</ul>
   </nav>`;
 }
 
@@ -15796,6 +15824,7 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.whatson-page .whatson-pop-apply:hover { background: var(--ref-navy-deep); }
   body.whatson-page .whatson-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.whatson-page .whatson-coming-up { margin: 32px 0 0; }
   body.whatson-page .whatson-guides { margin: 40px 0 0; }
   body.whatson-page .whatson-guides + .whatson-browse { margin-top: 12px; }
   body.whatson-page .whatson-browse { margin: 40px 0 8px; }
@@ -16164,13 +16193,14 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const selectedRegions = queryPicks ? filter.regions : (scope && scope.region ? [scope.region] : []);
   const selectedCategories = queryPicks ? filter.categories : (scope && scope.category ? [scope.category] : []);
   const queryDates = !!(filter && (filter.when !== undefined || filter.from !== undefined || filter.to !== undefined));
-  const scopeText = scope ? whatsOnScopeText(scope) : null;
+  const weekendWindow = scope && scope.weekend && !queryDates ? whatsOnWeekendWindow() : null;
+  const scopeText = scope ? whatsOnScopeText(scope, weekendWindow) : null;
   const basePath = scope ? whatsOnScopePath(scope) : '/whats-on';
   const whatsOnBanner = (selectedCategories.length === 1 && WHATSON_CATEGORY_BANNERS[selectedCategories[0]]) || WHATS_ON_BANNER;
   // Step 6: the date window is resolved server-side from ?when= / ?from=&to=
   // (default: the rolling next 30 days) and selects the events rendered;
   // region/category chips then filter that set exactly as before.
-  const window = scope && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {});
+  const window = weekendWindow || (scope && !scope.weekend && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {}));
   const events = getWhatsOnEvents(window);
   const matching = filterWhatsOnEvents(events, selectedRegions, selectedCategories);
   const filtered = selectedRegions.length > 0 || selectedCategories.length > 0;
@@ -16179,7 +16209,8 @@ function renderWhatsOnPage(filter = null, opts = {}) {
     regions: Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, filterWhatsOnEvents(events, [], selectedCategories).filter((e) => e.valleyWide || e.region === r).length])),
     categories: Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, filterWhatsOnEvents(events, selectedRegions, []).filter((e) => (e.categories || []).includes(c.key)).length])),
   } : null;
-  const dateState = { when: window.preset === 'upcoming' ? '' : (window.preset === 'custom' ? 'custom' : window.preset), from: window.preset === 'custom' ? window.from : '', to: window.preset === 'custom' ? window.to : '' };
+  // A weekend page's own weekend is its default, so it adds no date parameters to the address.
+  const dateState = weekendWindow ? { when: '', from: '', to: '' } : { when: window.preset === 'upcoming' ? '' : (window.preset === 'custom' ? 'custom' : window.preset), from: window.preset === 'custom' ? window.from : '', to: window.preset === 'custom' ? window.to : '' };
   const heading = "What's On in the Okanagan";
   // A town page's own heading/intro stand in for the "all" text, so the client sync shows them whenever no single type is chosen.
   const allText = scope && scope.region ? { heading: scopeText.heading, intro: scopeText.intro } : WHATSON_CATEGORY_TEXT.all;
@@ -16187,14 +16218,21 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const title = scopeText ? scopeText.title : `${heading} | Okanagan Roam`;
   const description = scopeText ? scopeText.description : 'Discover what is happening across the Okanagan Valley: festivals, live music, markets, wine events, family days and more, by community and by category.';
   const canonical = `https://okanaganroam.com${basePath}`;
+  // A town's weekend page sits under that town's events page.
+  const townCrumb = scope && scope.weekend && scope.region ? { name: REGION_LABELS[scope.region], href: `/${scope.region}/events` } : null;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
     { name: "What's On", url: 'https://okanaganroam.com/whats-on' },
+    ...(townCrumb ? [{ name: townCrumb.name, url: `https://okanaganroam.com${townCrumb.href}` }] : []),
     ...(scope ? [{ name: scopeText.crumb, url: canonical }] : []),
   ]);
   const live = hasInventory ? liveWhatsOnScopes() : [];
-  const scopeThin = scope ? !live.some((x) => x.path === basePath) : false;
-  const scopeList = scope ? whatsOnScopeEvents(scope, matching).concat(scope.region ? matching.filter((e) => e.valleyWide) : []) : [];
+  const scopeThin = scope ? (scope.weekend ? !liveWhatsOnWeekendPaths(live).includes(basePath) : !live.some((x) => x.path === basePath)) : false;
+  const scopeList = scope ? (scope.weekend ? matching : whatsOnScopeEvents(scope, matching).concat(scope.region ? matching.filter((e) => e.valleyWide) : [])) : [];
+  // A quiet weekend still gives the visitor something: the next events after it (up to 6 in the following 30 days).
+  const comingUp = scope && scope.weekend && scopeList.length < WHATSON_SCOPE_MIN_EVENTS
+    ? filterWhatsOnEvents(getWhatsOnEvents({ from: addLocalDays(window.to, 1), to: addLocalDays(window.to, 30) }), selectedRegions, []).slice(0, 6)
+    : [];
   const itemList = scope && scopeList.length ? {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -16236,6 +16274,7 @@ ${renderGolfHeaderHtml()}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     scope ? { name: "What's On", href: '/whats-on' } : { name: "What's On" },
+    ...(townCrumb ? [townCrumb] : []),
     ...(scope ? [{ name: scopeText.crumb }] : []),
   ])}
   ${categoryHeroHtml(`<div class="category-banner" id="whatsOnBanner"><img src="${whatsOnBanner.src}" alt="${escapeHtml(whatsOnBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${whatsOnBanner.pos}%" fetchpriority="high"></div>
@@ -16271,7 +16310,11 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 ? '' : ' hidden'}>No events match that combination yet. <a href="/whats-on" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
-  ${scope ? whatsOnRelatedGuidesHtml(whatsOnRelatedGuides(scopeList)) : ''}
+  ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
+    <h2 class="category-subsection-heading" id="whatsOnComingUpHeading">Coming up after the weekend</h2>
+    <ul class="card-grid">${comingUp.map(whatsOnEventCardHtml).join('')}</ul>
+  </section>` : ''}
+  ${scope ? whatsOnRelatedGuidesHtml(whatsOnRelatedGuides(scopeList.length ? scopeList : comingUp)) : ''}
   ${whatsOnBrowseLinksHtml(live, scope ? basePath : null)}
   </main>
   ${renderHomeFooterHTML(true)}
@@ -22979,7 +23022,8 @@ const server = http.createServer(async (req, res) => {
         // of every event detail URL below, so it belongs in the sitemap too.
         `  <url>\n    <loc>https://okanaganroam.com/whats-on</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>`,
         // What's On by type and by town (2026-10-13): only scopes with enough upcoming events (see liveWhatsOnScopes).
-        ...liveWhatsOnScopes().map((x) => `  <url>\n    <loc>https://okanaganroam.com${x.path}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`),
+        ...(() => { const live = whatsOnInventoryExists() ? liveWhatsOnScopes() : []; return [...live.map((x) => x.path), ...(live.length ? liveWhatsOnWeekendPaths(live) : [])]; })()
+          .map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com/outdoors</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -25209,6 +25253,7 @@ module.exports = {
   getSeasonStates,
   breadcrumbListSchema,
   whatsOnScopeFromPath,
+  whatsOnWeekendWindow,
   whatsOnRelatedGuides,
   liveWhatsOnScopes,
   WHATSON_SCOPE_MIN_EVENTS,

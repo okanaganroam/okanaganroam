@@ -18147,6 +18147,49 @@ test('What\'s On pages (2026-10-13): a type or town page links to the guides tha
   assert.match(JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'guides', 'okanagan-hockey-season.json'), 'utf8')).footerHtml, /href="\/whats-on\/sports-recreation"/);
 });
 
+test('Weekend pages (2026-10-13): /whats-on/this-weekend and /<region>/events/this-weekend show the coming Fri-Sun, are indexable when their town page is, and fill a quiet weekend with what comes next', async () => {
+  assert.deepEqual(app.whatsOnScopeFromPath('/whats-on/this-weekend'), { weekend: true });
+  assert.deepEqual(app.whatsOnScopeFromPath('/lumby/events/this-weekend'), { region: 'lumby', weekend: true });
+  assert.equal(app.whatsOnScopeFromPath('/nowhere/events/this-weekend'), null);
+  const wk = app.whatsOnWeekendWindow();
+  assert.equal(app.localWeekday(wk.to), 0, 'the window ends on a Sunday');
+  const made = [];
+  const mk = (name, date) => { const e = s5create({ name, region: 'lumby', venue_id: undefined, venue_name_text: 'Lumby Hall', categories: ['live-music'], occurrences: [{ start_date: date, start_time: '19:00' }] }); made.push(e); return e; };
+  try {
+    // A quiet weekend in a live town: three events later in the month, none this weekend.
+    for (const [n, name] of [[8, 'Harbour Lantern Gala'], [9, 'Cobalt Fiddle Night'], [10, 'Juniper Poetry Slam']]) mk(name, app.addLocalDays(wk.to, n));
+    let page = await s5get('/lumby/events/this-weekend');
+    assert.equal(page.status, 200);
+    assert.match(page.text, /<title>Things to Do in Lumby This Weekend \| Okanagan Roam<\/title>/);
+    assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/lumby\/events\/this-weekend">/);
+    assert.doesNotMatch(page.text, /name="robots" content="noindex/, 'indexable because /lumby/events is live');
+    assert.ok(page.text.includes(app.formatLocalDateShort(wk.from)), 'the intro names the weekend dates');
+    assert.match(page.text, /Coming up after the weekend<\/h2>[\s\S]*Harbour Lantern Gala/, 'a quiet weekend shows what comes next');
+    const crumbs = s5jsonLd(page.text).find((b) => b['@type'] === 'BreadcrumbList').itemListElement.map((x) => x.name);
+    assert.deepEqual(crumbs, ['Home', "What's On", 'Lumby', 'This Weekend']);
+    assert.match(page.text, /var DATE = \{"when":"","from":"","to":""\}/, 'the weekend is the page default, so no date parameters');
+    // A busy weekend: three events on the Sunday (always inside the window, whatever day the test runs).
+    for (const name of ['Saffron Blues Revue', 'Tundra Brass Quintet', 'Marigold Open Stage']) mk(name, wk.to);
+    page = await s5get('/lumby/events/this-weekend');
+    assert.doesNotMatch(page.text, /Coming up after the weekend<\/h2>/);
+    const list = s5jsonLd(page.text).find((b) => b['@type'] === 'ItemList');
+    for (const e of made.slice(3)) assert.ok(list.itemListElement.some((x) => x.url.endsWith(`/lumby/events/${e.slug}`)), `${e.name} is in the weekend list`);
+    assert.ok(!list.itemListElement.some((x) => x.url.endsWith(made[0].slug)), 'next month is not in the weekend list');
+    const sitemap = (await s5get('/sitemap.xml')).text;
+    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/whats-on/this-weekend</loc>'));
+    assert.ok(sitemap.includes('<loc>https://okanaganroam.com/lumby/events/this-weekend</loc>'));
+    assert.match((await s5get('/lumby/events')).text, /<a href="\/lumby\/events\/this-weekend">Lumby<\/a>/, 'town pages link the weekend pages');
+    const thinTown = Object.keys(app.REGION_LABELS).find((r) => !app.liveWhatsOnScopes().some((x) => x.path === `/${r}/events`));
+    assert.match((await s5get(`/${thinTown}/events/this-weekend`)).text, /name="robots" content="noindex/, 'a thin town\'s weekend page is noindex');
+    assert.ok(!sitemap.includes(`<loc>https://okanaganroam.com/${thinTown}/events/this-weekend</loc>`));
+  } finally {
+    for (const e of made) {
+      for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(e.id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+    }
+  }
+});
+
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });
