@@ -17511,6 +17511,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(scoped, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" style="object-position: 50% 65%" fetchpriority="high"><\/div>\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>/);
       assert.match(scoped, /@media \(min-width: 900px\) \{[\s\S]*?\.category-banner \{ aspect-ratio: 12 \/ 5;/, 'desktop banner is a 2.4:1 strip');
       assert.doesNotMatch(scoped, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\)/, 'no side-by-side layout');
+      assert.match(scoped, /\.category-banner \{[^}]*max-height: min\(44vh, 440px\);/, 'the banner never fills the window, so the heading stays in view');
       const golf = (await WINTER_GET(base, '/kelowna/golf')).text;
       assert.doesNotMatch(golf, /class="category-banner"/, 'non-food pages carry no banner');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
