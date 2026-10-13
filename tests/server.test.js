@@ -17570,6 +17570,11 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const favs = app.renderLocalFavouritesPage([{ id: 990007, name: 'Banner Diner', slug: 'banner-diner', region: 'kelowna', type: 'restaurant', description: 'Fixture.' }]);
       assert.match(favs, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Local Favourites<\/h1>/, '/local-favorites opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.LOCAL_FAVOURITES_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'local favourites thumbnail exists');
+      const secret = app.renderSecretSpotsPage([{ id: 990009, name: 'Banner Cove', slug: 'banner-cove', region: 'kelowna', type: 'beach', description: 'Fixture.' }]);
+      assert.match(secret, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/secret-spots\/secret-spots\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Secret Spots<\/h1>/, '/secret-spots opens with its photo above the heading');
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.SECRET_SPOTS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'secret spots thumbnail exists');
+      // Every Discovery entry now has a photo, so /categories shows it as a photo grid too.
+      assert.ok(app.categoryDirectoryEntries().filter((g) => g.label === 'Discovery').every((g) => g.categories.every((c) => c.image)), 'every Discovery card has a photo');
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
