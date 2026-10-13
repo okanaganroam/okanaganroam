@@ -15567,7 +15567,7 @@ const DOG_FRIENDLY_BANNER = Object.freeze({ src: '/images/dog-friendly/dog-frien
 // anything else the general Labradors and text. Dog Beaches keeps the Labs.
 // Restaurant and Cafe are licensed free Adobe Stock (665278733, 635597453);
 // the rest are free Unsplash photos (bIAL7-ZnlLg, scqC_TkHhE8, Evbn9CU12UU,
-// B1kiHKg-v-Y, wOHY5BQpAuk; Unsplash License). Wider scenes, so the dog
+// B1kiHKg-v-Y, gDcCFG0keeg; Unsplash License). Wider scenes, so the dog
 // still shows in the short desktop banner.
 const DOG_CATEGORY_CONTENT = Object.freeze({
   all: { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Friendly Finds', intro: 'Patios, caf\u00e9s, taprooms and tasting rooms across the Okanagan that welcome your dog \u2014 plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.' },
@@ -15577,7 +15577,7 @@ const DOG_CATEGORY_CONTENT = Object.freeze({
   cocktail: { banner: { src: '/images/dog-friendly/dog-cocktail.jpg', alt: 'A golden retriever sitting between leather stools at a stylish bar', pos: 60 }, heading: 'Dog-Friendly Cocktail Lounges in the Okanagan', intro: 'Cocktail bars and lounges that welcome dogs \u2014 for an evening out that the whole family, furry members included, can enjoy.' },
   brewery: { banner: { src: '/images/dog-friendly/dog-brewery-spaniel.jpg', alt: 'A spaniel with its paws on the bar beside the beer taps', pos: 45 }, heading: 'Dog-Friendly Breweries in the Okanagan', intro: 'Taprooms and brewery patios that welcome dogs \u2014 craft beer, good company, and a water bowl never far away.' },
   distillery: { banner: { src: '/images/dog-friendly/dog-distillery.jpg', alt: 'A bottle of craft spirits and a tasting glass beside a dog', pos: 70 }, heading: 'Dog-Friendly Distilleries in the Okanagan', intro: 'Craft distilleries and tasting rooms where your dog is welcome to come along while you sample small-batch spirits.' },
-  winery: { banner: { src: '/images/dog-friendly/dog-winery.jpg', alt: 'A curly white dog at a winery table beside glasses of red and white wine', pos: 55 }, heading: 'Dog-Friendly Wineries in the Okanagan', intro: 'Wineries and tasting rooms that welcome dogs \u2014 sip your way through wine country with your four-legged co-pilot.' },
+  winery: { banner: { src: '/images/dog-friendly/dog-winery-lab.jpg', alt: 'A happy black Labrador sitting in a vineyard', pos: 30 }, heading: 'Dog-Friendly Wineries in the Okanagan', intro: 'Wineries and tasting rooms that welcome dogs \u2014 sip your way through wine country with your four-legged co-pilot.' },
   'dog-beach': { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Beaches in the Okanagan', intro: 'Every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.' },
 });
 const WHATS_ON_BANNER = Object.freeze({ src: '/images/whats-on/whats-on.jpg', alt: 'A festival crowd with hands raised under bright stage lights', pos: 40 });
