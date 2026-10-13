@@ -1,0 +1,204 @@
+{
+ "heading": "Hockey Season in the Okanagan: Where to Catch a Game",
+ "title": "Okanagan Hockey: Where to Catch a Game | Okanagan Roam",
+ "description": "Where to watch hockey in the Okanagan this 2026–27 season: Rockets, Vees, Vipers, Warriors, Coyotes, Jets and Chiefs home games, plus UBCO Heat.",
+ "banner": "whats-on-sports-recreation",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "This guide covers the fall 2026 stretch of the 2026–27 season, with home games from Kelowna and West Kelowna to Vernon, Penticton, Summerland and Osoyoos. Each listing shows that team's upcoming home dates. Puck drop times are local, and the teams publish tickets and any schedule changes, so check each event page before you go.",
+  "Teams are grouped by league, as their listings describe them. Each one shows its town and when home games run to."
+ ],
+ "sections": [
+  {
+   "id": "whl",
+   "jump": "WHL",
+   "heading": "WHL",
+   "items": [
+    {
+     "ref": "event:kelowna/kelowna-rockets-home-games-2026-27",
+     "name": "Kelowna Rockets Home Games 2026–27",
+     "text": "WHL regular-season home games at Prospera Place. Tickets and any schedule changes are published by the team.",
+     "where": "Kelowna, home games until Mar 27, 2027"
+    },
+    {
+     "ref": "event:penticton/penticton-vees-home-games-2026-27",
+     "name": "Penticton Vees Home Games 2026–27",
+     "text": "WHL regular-season home games at the South Okanagan Events Centre. Tickets and any schedule changes are published by the team.",
+     "where": "Penticton, home games until Mar 26, 2027"
+    }
+   ]
+  },
+  {
+   "id": "bchl",
+   "jump": "BCHL",
+   "heading": "BCHL",
+   "items": [
+    {
+     "ref": "event:vernon/vernon-vipers-home-games-2026-27",
+     "name": "Vernon Vipers Home Games 2026–27",
+     "text": "BCHL regular-season home games at Kal Tire Place. Tickets and any schedule changes are published by the team.",
+     "where": "Vernon, home games until Mar 17, 2027"
+    },
+    {
+     "ref": "event:west-kelowna/west-kelowna-warriors-home-games-2026-27",
+     "name": "West Kelowna Warriors Home Games 2026–27",
+     "text": "BCHL regular-season home games at the Mount Boucherie Arenas (Jim Lind Arena & Royal LePage Place). Tickets and any schedule changes are published by the team.",
+     "where": "West Kelowna, home games until Mar 20, 2027"
+    }
+   ]
+  },
+  {
+   "id": "bc-hockey-conference",
+   "jump": "BC Hockey",
+   "heading": "BC Hockey Conference",
+   "items": [
+    {
+     "ref": "event:osoyoos/osoyoos-coyotes-home-games-2026-27",
+     "name": "Osoyoos Coyotes Home Games 2026–27",
+     "text": "BC Hockey Conference (formerly KIJHL) regular-season home games at the Sun Bowl Arena.",
+     "where": "Osoyoos, home games until Feb 24, 2027"
+    },
+    {
+     "ref": "event:summerland/summerland-jets-home-games-2026-27",
+     "name": "Summerland Jets Home Games 2026–27",
+     "text": "BC Hockey Conference (formerly KIJHL) regular-season home games at the Summerland Arena.",
+     "where": "Summerland, home games until Feb 20, 2027"
+    }
+   ]
+  },
+  {
+   "id": "kelowna-chiefs-at-rutland-aren",
+   "jump": "Kelowna Chiefs",
+   "heading": "Kelowna Chiefs at Rutland Arena",
+   "lead": "Three Chiefs home games are listed for late October, all at 7 pm at Rutland Arena.",
+   "items": [
+    {
+     "ref": "event:kelowna/kelowna-chiefs-vs-creston-valley-thunder-cats",
+     "name": "Kelowna Chiefs vs Creston Valley Thunder Cats",
+     "text": "7 to 10 pm. Admission is $6 to $10.",
+     "where": "Kelowna, Oct 23"
+    },
+    {
+     "ref": "event:kelowna/kelowna-chiefs-vs-oliver-outlaws",
+     "name": "Kelowna Chiefs vs Oliver Outlaws",
+     "text": "7 to 10 pm. Admission is $8 to $10.",
+     "where": "Kelowna, Oct 24"
+    },
+    {
+     "ref": "event:kelowna/kelowna-chiefs-vs-chase-heat",
+     "name": "Kelowna Chiefs vs Chase Heat",
+     "text": "7 to 10 pm. Admission is $8 to $10.",
+     "where": "Kelowna, Oct 27"
+    }
+   ]
+  },
+  {
+   "id": "more-on-the-ice",
+   "jump": "More on ice",
+   "heading": "More on the ice",
+   "items": [
+    {
+     "ref": "event:kelowna/skate-canada-international-2026",
+     "name": "2026 Skate Canada International",
+     "text": "not hockey, but world-class figure skating at Prospera Place, part of the ISU Grand Prix series. Session tickets are sold through the venue.",
+     "where": "Kelowna, Oct 30 to Nov 1"
+    }
+   ]
+  },
+  {
+   "id": "ubc-okanagan-heat",
+   "jump": "UBCO Heat",
+   "heading": "UBC Okanagan Heat",
+   "lead": "If you'd rather catch a university game, the UBC Okanagan Heat play home fixtures in Kelowna (Canada West / U SPORTS). Opponents and start times are on the Heat schedule.",
+   "items": [
+    {
+     "ref": "event:kelowna/ubco-heat-mens-basketball-2026-27-season",
+     "name": "UBCO Heat Men's Basketball 2026–27 Season",
+     "text": "at the UBCO Gymnasium.",
+     "where": "Kelowna, home fixtures Oct 16 to Feb 6, 2027"
+    },
+    {
+     "ref": "event:kelowna/ubco-heat-womens-basketball-2026-27-season",
+     "name": "UBCO Heat Women's Basketball 2026–27 Season",
+     "text": "at the UBCO Gymnasium.",
+     "where": "Kelowna, home fixtures Oct 30 to Feb 6, 2027"
+    },
+    {
+     "ref": "event:kelowna/ubco-heat-womens-volleyball-2026-27-season",
+     "name": "UBCO Heat Women's Volleyball 2026–27 Season",
+     "text": "at the UBCO Gymnasium.",
+     "where": "Kelowna, home fixtures Oct 23 to Feb 20, 2027"
+    },
+    {
+     "ref": "event:kelowna/ubco-heat-mens-volleyball-2026-27-season",
+     "name": "UBCO Heat Men's Volleyball 2026–27 Season",
+     "text": "at the UBCO Gymnasium.",
+     "where": "Kelowna, home fixtures Oct 23 to Feb 20, 2027"
+    },
+    {
+     "ref": "event:kelowna/ubco-heat-mens-rugby-2026-season",
+     "name": "UBCO Heat Men's Rugby 2026 Season",
+     "text": "the last listed home fixture of the season, at Parkinson Recreation Park East Field.",
+     "where": "Kelowna, Oct 17"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "WHL hockey",
+    [
+     "event:kelowna/kelowna-rockets-home-games-2026-27|Kelowna Rockets Home Games 2026–27",
+     "event:penticton/penticton-vees-home-games-2026-27|Penticton Vees Home Games 2026–27"
+    ]
+   ],
+   [
+    "BCHL hockey",
+    [
+     "event:vernon/vernon-vipers-home-games-2026-27|Vernon Vipers Home Games 2026–27",
+     "event:west-kelowna/west-kelowna-warriors-home-games-2026-27|West Kelowna Warriors Home Games 2026–27"
+    ]
+   ],
+   [
+    "Hockey in Osoyoos or Summerland",
+    [
+     "event:osoyoos/osoyoos-coyotes-home-games-2026-27|Osoyoos Coyotes Home Games 2026–27",
+     "event:summerland/summerland-jets-home-games-2026-27|Summerland Jets Home Games 2026–27"
+    ]
+   ],
+   [
+    "A game for $10 or less",
+    [
+     "event:kelowna/kelowna-chiefs-vs-creston-valley-thunder-cats|Kelowna Chiefs vs Creston Valley Thunder Cats",
+     "event:kelowna/kelowna-chiefs-vs-oliver-outlaws|Kelowna Chiefs vs Oliver Outlaws"
+    ]
+   ],
+   [
+    "Figure skating",
+    [
+     "event:kelowna/skate-canada-international-2026|2026 Skate Canada International"
+    ]
+   ],
+   [
+    "A university game",
+    [
+     "event:kelowna/ubco-heat-mens-basketball-2026-27-season|UBCO Heat Men's Basketball 2026–27 Season",
+     "event:kelowna/ubco-heat-womens-volleyball-2026-27-season|UBCO Heat Women's Volleyball 2026–27 Season"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>"
+}

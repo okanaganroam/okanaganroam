@@ -1,0 +1,104 @@
+{
+ "heading": "Fall in the Okanagan",
+ "title": "Fall in the Okanagan: Things to Do | Okanagan Roam",
+ "description": "Things to do in the Okanagan this fall: u-pick farms, cideries, winery restaurants, kokanee and waterfall walks, Halloween, events and cozy spots.",
+ "banner": "hiking",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "Fall is harvest time in the Okanagan: orchards and farm stands, cider and wine, and meals at winery restaurants. It's also a good season for creek walks, the kokanee run, Halloween and a busy events calendar, with plenty of cozy places to warm up when the evenings cool down.",
+  "Here are our fall guides, all built from verified listings."
+ ],
+ "sections": [
+  {
+   "id": "harvest-orchards-and-wine",
+   "jump": "Harvest & wine",
+   "heading": "Harvest, orchards and wine",
+   "items": [
+    {
+     "lead": "Pick your own:",
+     "tip": "{page:/guides/fall-farms-u-pick-okanagan|U-pick orchards, farm stands & farm visits} covers orchards, farm days out with animals, farm cafés and tastings among the trees."
+    },
+    {
+     "lead": "Cider season:",
+     "tip": "{page:/guides/okanagan-cideries|Okanagan cideries for apple season} rounds up orchard cideries, cider with a proper meal and family-friendly tasting rooms."
+    },
+    {
+     "lead": "A winery meal:",
+     "tip": "{page:/guides/okanagan-winery-restaurants|Okanagan winery restaurants for fall} lists winery dining rooms by area, starting with the heated, covered and cozy ones."
+    }
+   ]
+  },
+  {
+   "id": "outdoors",
+   "jump": "Outdoors",
+   "heading": "Outdoors",
+   "items": [
+    {
+     "lead": "The salmon run:",
+     "tip": "{page:/guides/kokanee-salmon-okanagan|Where to see the kokanee salmon run} covers the creeks where the listings mention spawning kokanee, plus other salmon runs and fishing."
+    },
+    {
+     "lead": "Waterfalls:",
+     "tip": "{page:/guides/okanagan-waterfall-walks|Okanagan waterfall walks} groups waterfall hikes from short and easy to full-day climbs."
+    }
+   ]
+  },
+  {
+   "id": "halloween-and-events",
+   "jump": "Halloween & events",
+   "heading": "Halloween and events",
+   "items": [
+    {
+     "lead": "Halloween:",
+     "tip": "{page:/guides/halloween-okanagan|Halloween in the Okanagan 2026} covers haunted mazes and trails, family events, Halloween at the wineries and nights out."
+    },
+    {
+     "lead": "What's on:",
+     "tip": "{page:/guides/fall-events-okanagan|Fall events & festivals, October–November 2026} picks the season's festivals, cider and beer events, harvest dinners and markets."
+    },
+    {
+     "lead": "Hockey:",
+     "tip": "{page:/guides/okanagan-hockey-season|Hockey season in the Okanagan} lists home games for the valley's teams."
+    }
+   ]
+  },
+  {
+   "id": "cozy-and-rainy-days",
+   "jump": "Cozy & rainy days",
+   "heading": "Cozy and rainy days",
+   "items": [
+    {
+     "lead": "Warm up:",
+     "tip": "{page:/guides/cozy-spots-okanagan|Cozy spots for cool days} finds fireside dining rooms, fire pits and heated, blanketed patios."
+    },
+    {
+     "lead": "Comfort food:",
+     "tip": "{page:/guides/soup-ramen-pho-okanagan|Soup, ramen & pho} covers ramen, pho, borscht, chowder, curries and dumplings."
+    },
+    {
+     "lead": "Rain plans:",
+     "tip": "{page:/guides/rainy-day-okanagan|A rainy day in the Okanagan} covers museums, an indoor waterpark, floating saunas and shows."
+    },
+    {
+     "lead": "Golf season's over:",
+     "tip": "{page:/guides/indoor-golf-okanagan|Indoor golf in the Okanagan} lists the valley's golf simulators, lessons and leagues."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": []
+ },
+ "footerHtml": ""
+}

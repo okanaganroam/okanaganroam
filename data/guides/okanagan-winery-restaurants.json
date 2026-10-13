@@ -1,0 +1,255 @@
+{
+ "heading": "Okanagan Winery Restaurants for Fall",
+ "title": "Okanagan Winery Restaurants for Fall | Okanagan Roam",
+ "description": "Heated patios, tasting menus, wood-fired pizza and lake views: Okanagan winery restaurants for an unhurried fall meal, from Lake Country to Osoyoos.",
+ "banner": "winery",
+ "parent": {
+  "name": "Wineries",
+  "href": "/wineries"
+ },
+ "noPlace": true,
+ "intro": [
+  "After harvest, the pace in wine country slows down, and a long meal at a winery is an easy way to spend a fall day. This guide picks winery restaurants worth lingering at, from covered and heated patios to tasting menus and casual plates on the lawn.",
+  "Many winery kitchens change their hours and service as the season winds down, so check the listing or book ahead before you set out."
+ ],
+ "sections": [
+  {
+   "id": "heated-covered-or-cozy",
+   "jump": "Heated & cozy",
+   "heading": "Heated, covered or cozy",
+   "items": [
+    {
+     "ref": "naramata/serendipity-winery",
+     "name": "Serendipity Winery",
+     "text": "A tiny, one-chef bistro and winery with a covered, heated patio, so weather rarely gets in the way. Booking ahead is essential.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "kelowna/summerhill-pyramid-winery",
+     "name": "Summerhill Pyramid Winery",
+     "text": "A certified-organic estate built around a pyramid, with a heated lake-view terrace and its own on-site restaurant.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cedarcreek-estate-winery",
+     "name": "CedarCreek Estate Winery",
+     "text": "A lake view and cozy outdoor booths. Regulars recommend the schnitzel with a glass of the estate's own Pinot Gris.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "kelowna-and-lake-country",
+   "jump": "Kelowna",
+   "heading": "Kelowna and Lake Country",
+   "items": [
+    {
+     "ref": "lake-country/lookout-restaurant",
+     "name": "Lookout Restaurant",
+     "text": "The fine-dining patio at Gray Monk Winery, high above Okanagan Lake, with scallops with pork belly anchoring the menu.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "lake-country/chaos-bistro",
+     "name": "Chaos Bistro",
+     "text": "The restaurant at Ex Nihilo Vineyards, with a chef happy to accommodate vegan guests, warm service, and a Canadian mushroom pizza reviewers call among the best they've had.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "lake-country/row-188-o-rourke-family-estate",
+     "name": "Row 188 @ O'Rourke Family Estate",
+     "text": "Upscale wine-paired tasting menus that reviewers call some of the best dining in the Okanagan. One to plan a special occasion around.",
+     "where": "Lake Country"
+    }
+   ]
+  },
+  {
+   "id": "west-kelowna-and-peachland",
+   "jump": "West Kelowna",
+   "heading": "West Kelowna and Peachland",
+   "items": [
+    {
+     "ref": "west-kelowna/terrace-restaurant",
+     "name": "Terrace Restaurant",
+     "text": "Mission Hill's upscale multi-course dining room, with wine-paired tasting menus, a complimentary welcome glass of wine and views over vineyards and Okanagan Lake.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/old-vines-restaurant",
+     "name": "Old Vines Restaurant",
+     "text": "Quails' Gate's fine dining room, with lake and mountain views, haskap-cured salmon and 63 Acres beef tenderloin, and staff who are patient with young families.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/tula-restaurant-little-straw-vineyards",
+     "name": "Tula Restaurant @ Little Straw Vineyards",
+     "text": "Indian-fusion cooking with real vegan dishes and patio seating over the vines.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/the-modest-butcher-kitchen-market",
+     "name": "The Modest Butcher Kitchen + Market",
+     "text": "A steakhouse at Mt. Boucherie Estate Winery with a Tomahawk steak specialty and patience for toddlers at the table.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "peachland/19-bistro-fitz",
+     "name": "19 Bistro @ Fitz",
+     "text": "At Fitzpatrick Family Vineyards above Peachland. The fish taco is the dish regulars mention first. Dog with you? No problem, and no reservation needed.",
+     "where": "Peachland"
+    }
+   ]
+  },
+  {
+   "id": "naramata-penticton-and-summerl",
+   "jump": "Naramata & Penticton",
+   "heading": "Naramata, Penticton and Summerland",
+   "items": [
+    {
+     "ref": "naramata/bench-1775-winery",
+     "name": "Bench 1775 Winery",
+     "text": "Bistro and winery in one, serving dim sum alongside the wine list. The patio looks out over the Naramata Bench, vines rolling toward the lake.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "naramata/lake-breeze-vineyards-tasting-room",
+     "name": "Lake Breeze Vineyards Tasting Room",
+     "text": "A shaded tasting-room restaurant overlooking the vines. Reviewers recommend the mussels and the whipped feta.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "naramata/hillside-winery",
+     "name": "Hillside Winery",
+     "text": "Award-winning wines and an on-site bistro that has warmly accommodated dinner with kids in tow.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "penticton/the-restaurant-at-poplar-grove-1012",
+     "name": "The Restaurant at Poplar Grove",
+     "text": "Fine dining with a stunning lake view, gluten-free bread, and a team that makes anniversaries and milestone birthdays feel special.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "naramata/the-hot-dog-lounge-at-joiefarm",
+     "name": "The Hot Dog Lounge at JoieFarm",
+     "text": "Gourmet hot dogs on the winery lawn, so a tasting can turn into a relaxed lunch. Toppings run from a classic ballpark dog to Korean-inspired kimchi and an elote-style street dog, with JoieFarm wine by the glass or a cold beer. Come early for the 11 to 1 happy hour.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "summerland/kitchen-ve-oh-lay-acres-honey-wine-farm",
+     "name": "Kitchen @ Ve Oh Lay Acres Honey Wine & Farm",
+     "text": "A dog-friendly taco kitchen at a honey winery and farm, with a shaded patio, non-alcoholic wine options and a family-friendly, laid-back feel.",
+     "where": "Summerland"
+    }
+   ]
+  },
+  {
+   "id": "okanagan-falls-oliver-and-osoy",
+   "jump": "South Okanagan",
+   "heading": "Okanagan Falls, Oliver and Osoyoos",
+   "items": [
+    {
+     "ref": "okanagan-falls/the-restaurant-at-liquidity-wines",
+     "name": "The Restaurant at Liquidity Wines",
+     "text": "Napa-level food with none of the attitude, and live music most Thursdays.",
+     "where": "Okanagan Falls"
+    },
+    {
+     "ref": "okanagan-falls/vineyard-kitchen-patio-at-nighthawk-vineyards",
+     "name": "Vineyard Kitchen & Patio at Nighthawk Vineyards",
+     "text": "A small family-run restaurant on Green Lake with an inspired, locally sourced menu.",
+     "where": "Okanagan Falls"
+    },
+    {
+     "ref": "okanagan-falls/wild-goose-winery",
+     "name": "Wild Goose Winery",
+     "text": "A patio with mountain and vineyard views, and a newly rebranded bistro putting out standout seasonal dishes.",
+     "where": "Okanagan Falls"
+    },
+    {
+     "ref": "oliver/terrafina-at-hester-creek",
+     "name": "Terrafina at Hester Creek",
+     "text": "A patio restaurant built around focaccia spreads and seasonal pasta.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/miradoro-restaurant-1029",
+     "name": "Miradoro Restaurant",
+     "text": "The restaurant at Tinhorn Creek Vineyards, with some of the best views in the South Okanagan, Neapolitan pizza and a black pepper carbonara with crispy smoked pork jowl. Well suited to larger groups.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/sonora-room-restaurant",
+     "name": "Sonora Room Restaurant",
+     "text": "A balcony restaurant at Burrowing Owl Estate Winery, with some of the best vineyard views in the South Okanagan.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "osoyoos/sweetgrass-nk-mip-cellars",
+     "name": "Sweetgrass @ Nk'Mip Cellars",
+     "text": "The restaurant at North America's first Indigenous-owned winery, with shareable plates like duck wings and bison meatballs and desert and lake views.",
+     "where": "Osoyoos"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A heated or covered patio",
+    [
+     "naramata/serendipity-winery|Serendipity Winery",
+     "kelowna/summerhill-pyramid-winery|Summerhill Pyramid Winery"
+    ]
+   ],
+   [
+    "A special-occasion tasting menu",
+    [
+     "lake-country/row-188-o-rourke-family-estate|Row 188 @ O'Rourke Family Estate",
+     "west-kelowna/terrace-restaurant|Terrace Restaurant"
+    ]
+   ],
+   [
+    "Vegan-friendly",
+    [
+     "west-kelowna/tula-restaurant-little-straw-vineyards|Tula Restaurant @ Little Straw Vineyards",
+     "lake-country/chaos-bistro|Chaos Bistro"
+    ]
+   ],
+   [
+    "Kids along",
+    [
+     "west-kelowna/old-vines-restaurant|Old Vines Restaurant",
+     "naramata/hillside-winery|Hillside Winery"
+    ]
+   ],
+   [
+    "The dog along",
+    [
+     "peachland/19-bistro-fitz|19 Bistro @ Fitz",
+     "summerland/kitchen-ve-oh-lay-acres-honey-wine-farm|Kitchen @ Ve Oh Lay Acres Honey Wine & Farm"
+    ]
+   ],
+   [
+    "Something casual",
+    [
+     "naramata/the-hot-dog-lounge-at-joiefarm|The Hot Dog Lounge at JoieFarm"
+    ]
+   ],
+   [
+    "A big group",
+    [
+     "oliver/miradoro-restaurant-1029|Miradoro Restaurant"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/wineries\">All Okanagan wineries</a>"
+}

@@ -1,0 +1,174 @@
+{
+ "heading": "Okanagan waterfall walks",
+ "title": "Fall Waterfall Walks in the Okanagan | Okanagan Roam",
+ "description": "Okanagan waterfall walks sorted by effort, from short flat strolls in Kelowna and Peachland to longer canyon trails and full-day mountain hikes.",
+ "banner": "outdoor",
+ "parent": {
+  "name": "Hiking & Trails",
+  "href": "/outdoors/hiking"
+ },
+ "noPlace": true,
+ "intro": [
+  "Cooler days are a fine time for a creekside walk, and the valley has more waterfalls than most people expect, from a ten-minute stroll in Peachland to a full day in the Monashees.",
+  "We've sorted them by effort, using the trail lengths and ratings in each listing. Conditions change, so check for closures and trail notices before you set out."
+ ],
+ "sections": [
+  {
+   "id": "short-and-easy",
+   "jump": "Short and easy",
+   "heading": "Short and easy",
+   "items": [
+    {
+     "ref": "peachland/hardy-falls-regional-park",
+     "name": "Hardy Falls Regional Park",
+     "text": "The Owl Trail is just 430 metres each way, flat and shaded, crossing Deep Creek on a series of bridges to a viewing platform below the falls. The trail and washrooms are accessible, and dogs are welcome on leash.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "peachland/antlers-beach-regional-park",
+     "name": "Antlers Beach Regional Park",
+     "text": "A sandy beach where Deep Creek meets Okanagan Lake; if you feel like a walk, follow Deep Creek up to Hardy Falls. Washrooms are on site, but dogs are not allowed.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "kelowna/mill-creek-regional-park",
+     "name": "Mill Creek Regional Park",
+     "text": "A flat, easy trail under cedars follows Mill Creek to a set of cascading waterfalls. The Waterfall Trail is only about 800 metres one way, so it suits small children; washrooms are on site and dogs are welcome on leash.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "lake-country/okanagan-rail-trail",
+     "name": "Okanagan Rail Trail",
+     "text": "An easy, flat multi-use trail that follows the east shore of Wood Lake past Ribbleworth Falls, orchards and farmland. It is shared with cyclists, and dogs must be on leash.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "naramata/naramata-creek-park-waterfall-trail",
+     "name": "Naramata Creek Park Waterfall Trail",
+     "text": "A 2.5 km round trip, easy to moderate, up the forested creek to a series of falls, crossing the creek two or three times. Dogs must be on leash. The listing notes it is best in summer and too icy in winter.",
+     "where": "Naramata"
+    }
+   ]
+  },
+  {
+   "id": "half-day-canyon-and-forest-tra",
+   "jump": "Half-day",
+   "heading": "Half-day canyon and forest trails",
+   "items": [
+    {
+     "ref": "west-kelowna/glen-canyon-regional-park",
+     "name": "Glen Canyon Regional Park",
+     "text": "Trails along Powers Creek range from easy creekside walks to challenging stairs, with views of the canyon's unusual geology and a 24-metre waterfall. Washrooms are on site and dogs are welcome on leash; the upper canyon is under a partial hazard closure, so respect the barriers.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "vernon/bx-creek-trail-bx-falls",
+     "name": "BX Creek Trail & BX Falls",
+     "text": "The falls trail runs 3.05 km one way with six bridges and a steep stairway at the falls, and Tourism Vernon rates it Difficult. The falls are also a short walk from the Tillicum Road parking lot. Dogs are permitted on leash.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "peachland/trepanier-creek-greenway-regional-park",
+     "name": "Trepanier Creek Greenway Regional Park",
+     "text": "A forested greenway along the canyon of Trepanier Creek, with a 3.9 km trail rated moderate, a waterfall along the way and the remnants of an old hydroelectric dam. Washrooms are provided and dogs are welcome on leash.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "west-kelowna/fintry-provincial-park",
+     "name": "Fintry Provincial Park",
+     "text": "Behind the beach, the Shorts Creek canyon trail runs past waterfalls and deep pools, with viewing platforms for birds, deer and bighorn sheep. Pets must be on leash at all times.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "lumby/denison-lake-trail",
+     "name": "Denison Lake Trail",
+     "text": "Tourism Vernon rates the full 9.8 km route Moderate, through shaded forest and over log crossings to a lake with picnic spots and an outlet waterfall. Poles help on the log crossings, and pets must be on a leash at all times.",
+     "where": "Lumby"
+    }
+   ]
+  },
+  {
+   "id": "full-day-hikes-and-big-climbs",
+   "jump": "Full-day",
+   "heading": "Full-day hikes and big climbs",
+   "items": [
+    {
+     "ref": "lumby/spectrum-lake-trail-monashee-provincial-park",
+     "name": "Spectrum Lake Trail (Monashee Provincial Park)",
+     "text": "A 6 km trail that BC Parks rates easy, about two hours one way, with two viewing platforms over Spectrum Creek at Rainbow Falls. The drive in is long and on active logging roads, dogs are not permitted anywhere in the park, and subzero temperatures are common in the subalpine.",
+     "where": "Lumby"
+    },
+    {
+     "ref": "west-kelowna/carrot-mountain-bluffs",
+     "name": "Carrot Mountain Bluffs",
+     "text": "One of the Okanagan's toughest short hikes, a 4.3 km loop climbing about 550 m past a seasonal waterfall to a ridge with a wide view over Okanagan Lake. Wear good footwear and skip it when it's wet or icy.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/mcdougall-rim-trail",
+     "name": "McDougall Rim Trail",
+     "text": "A demanding 20 km loop gaining about 1,100 m, with a seasonal waterfall around the 4 km mark. The route is unofficial and unmarked, so bring an offline map, plenty of water and a full day; there are no washrooms.",
+     "where": "West Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "The shortest, flattest walk",
+    [
+     "peachland/hardy-falls-regional-park|Hardy Falls Regional Park"
+    ]
+   ],
+   [
+    "Something easy for small children",
+    [
+     "kelowna/mill-creek-regional-park|Mill Creek Regional Park",
+     "peachland/hardy-falls-regional-park|Hardy Falls Regional Park"
+    ]
+   ],
+   [
+    "A walk with a beach at the end",
+    [
+     "peachland/antlers-beach-regional-park|Antlers Beach Regional Park",
+     "west-kelowna/fintry-provincial-park|Fintry Provincial Park"
+    ]
+   ],
+   [
+    "The tallest falls listed",
+    [
+     "west-kelowna/glen-canyon-regional-park|Glen Canyon Regional Park"
+    ]
+   ],
+   [
+    "A proper workout",
+    [
+     "west-kelowna/carrot-mountain-bluffs|Carrot Mountain Bluffs",
+     "vernon/bx-creek-trail-bx-falls|BX Creek Trail & BX Falls"
+    ]
+   ],
+   [
+    "A dog-free day",
+    [
+     "lumby/spectrum-lake-trail-monashee-provincial-park|Spectrum Lake Trail (Monashee Provincial Park)"
+    ]
+   ],
+   [
+    "A full day out",
+    [
+     "west-kelowna/mcdougall-rim-trail|McDougall Rim Trail",
+     "lumby/spectrum-lake-trail-monashee-provincial-park|Spectrum Lake Trail (Monashee Provincial Park)"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/outdoors/hiking\">Hiking &amp; Trails</a>, <a href=\"/outdoors/nature\">Nature &amp; Wildlife</a>"
+}

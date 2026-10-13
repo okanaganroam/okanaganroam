@@ -1,0 +1,265 @@
+{
+ "heading": "Soup, Ramen & Pho: Okanagan Comfort Food",
+ "title": "Soup, Ramen & Pho in the Okanagan | Okanagan Roam",
+ "description": "Ramen, pho, borscht, chowder, curries and dumplings: Okanagan spots for a warm bowl on a cool fall day, from Enderby down to Oliver.",
+ "banner": "restaurant",
+ "parent": {
+  "name": "Restaurants",
+  "href": "/restaurants"
+ },
+ "noPlace": true,
+ "intro": [
+  "When the days get shorter and the air turns cool, a hot bowl of something is hard to beat. From four-day ramen broth in Vernon to borscht in Lumby and chowder in Penticton, the valley has plenty of places that do warming food well.",
+  "Here they are, grouped by what's in the bowl. Each place shows its town."
+ ],
+ "sections": [
+  {
+   "id": "ramen",
+   "jump": "Ramen",
+   "heading": "Ramen",
+   "items": [
+    {
+     "ref": "vernon/sugoi-ramen-express",
+     "name": "Sugoi Ramen Express",
+     "text": "makes its own noodles in-house, with a broth that takes a full four days to prepare.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/raku-rice-noodle-bar",
+     "name": "Raku Rice & Noodle Bar",
+     "text": "a wide consensus calls it the best ramen in Vernon, and service is fast even on takeout orders.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/ramen-arashi-kelowna",
+     "name": "Ramen Arashi Kelowna",
+     "text": "a modern ramen shop regulars call the best in the city, with a stamp card that rewards frequent visits.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "enderby/kaze-japanese-restaurant",
+     "name": "Kaze Japanese Restaurant",
+     "text": "miso ramen reviewers call spectacular, served in a fireplace dining room in a converted old home downtown.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "kelowna/soy-asian-fusion-restaurant",
+     "name": "Soy Asian Fusion Restaurant",
+     "text": "a tucked-away Pandosy spot known for spicy coconut ramen and Japanese-fusion small plates.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/japanese-kitchen-kura",
+     "name": "Japanese Kitchen Kura",
+     "text": "a mom-and-pop restaurant with fresh sashimi and spicy ramen, where staff help you navigate dietary restrictions.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "pho-and-noodle-soups",
+   "jump": "Pho",
+   "heading": "Pho and noodle soups",
+   "items": [
+    {
+     "ref": "kelowna/pho-soc-trang-vietnamese-cuisine",
+     "name": "Pho Soc Trang Vietnamese Cuisine",
+     "text": "a well-loved downtown following built on rich, flavourful broth, with fresh salad rolls on the side.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/pho-more-vietnamese-restaurant",
+     "name": "Pho&More Vietnamese Restaurant",
+     "text": "husband-and-wife-run, with real chicken bone broth and hand-cut pork in the salad rolls.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "vernon/pho-fusion",
+     "name": "Pho Fusion",
+     "text": "a longtime family favourite with easy free parking and consistently fresh, never-too-salty broth.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/o-machi-taiwanese-appetizer-bento-house",
+     "name": "O-Machi Taiwanese Appetizer Bento House",
+     "text": "a small Taiwanese restaurant on Glenmore Drive serving bentos, noodle soups and appetizers. Reviewers single out the beef noodle soup and its broth.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mad-mango-cafe",
+     "name": "Mad Mango Cafe",
+     "text": "a cozy, colourful Bernard Ave pan-Asian soup spot blending Malaysian, Vietnamese and other Southeast Asian flavours. The laksa is the order.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "borscht-and-ukrainian-comfort",
+   "jump": "Borscht",
+   "heading": "Borscht and Ukrainian comfort",
+   "items": [
+    {
+     "ref": "vernon/anna-s-ukrainian-kitchen",
+     "name": "Anna's Ukrainian Kitchen",
+     "text": "a tiny market and kitchen where the borscht, rich and comforting, is the reason people keep coming back.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "summerland/sunflower-ukrainian-cafe",
+     "name": "Sunflower Ukrainian Cafe",
+     "text": "a family-run bakery-cafe with borscht, cabbage rolls and pierogies that taste homemade.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "kaleden/jane-s-farmhouse",
+     "name": "Jane's Farmhouse",
+     "text": "a tiny takeout spot with good cabbage rolls, perogies and borscht, plus farm-fresh eggs.",
+     "where": "Kaleden"
+    },
+    {
+     "ref": "lumby/blue-ox-pub",
+     "name": "Blue Ox Pub",
+     "text": "a rural pub with classic BC drafts, Wing Wednesdays and a borscht that has earned a following well beyond what you'd expect from a pub.",
+     "where": "Lumby"
+    }
+   ]
+  },
+  {
+   "id": "soup-bowls-chowder-and-stews",
+   "jump": "Soups & stews",
+   "heading": "Soup bowls, chowder and stews",
+   "items": [
+    {
+     "ref": "kelowna/little-hobo-soup-sandwich-shop",
+     "name": "Little Hobo Soup & Sandwich Shop",
+     "text": "a downtown hole-in-the-wall soup and sandwich shop that's been a local staple since the 1970s. Try the three-soup flight with a grilled cheese.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/brodo-kitchen",
+     "name": "BRODO Kitchen",
+     "text": "lunch-only soup and sandwiches, nothing flashy. Order a soup and sandwich combo.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/buy-the-sea-seafood",
+     "name": "Buy The Sea Seafood",
+     "text": "a cult following for its chowder, in both white and red versions. It's a seafood market too, so you can pick up fresh or frozen fish to take home.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "vernon/farmhouse-cafe",
+     "name": "Farmhouse Cafe",
+     "text": "grows what it cooks, with ingredients sourced on site for a simple soup and sandwich menu, plus fresh-baked scones.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/bon-ga-korean-cuisine",
+     "name": "Bon Ga Korean Cuisine",
+     "text": "a wholesome, family-owned Korean kitchen. Order the hot bone soup on a cold day, with spicy rice cake on the side.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "armstrong/tiffany-s-asian-treats",
+     "name": "Tiffany's Asian Treats",
+     "text": "a cozy Korean-Japanese spot inside a convenience store, known for chicken katsu and army stew.",
+     "where": "Armstrong"
+    }
+   ]
+  },
+  {
+   "id": "curries-and-dumplings",
+   "jump": "Curries",
+   "heading": "Curries and dumplings",
+   "items": [
+    {
+     "ref": "oliver/same-same-but-different-thai-food",
+     "name": "Same Same But Different Thai Food",
+     "text": "a couple-run Thai food truck at Sunview Market, with panang curry and tom yum that reviewers call Oliver's best-kept secret.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "vernon/the-curry-pot-indian-nepalese-cuisine-restaurant",
+     "name": "The Curry Pot Indian & Nepalese Cuisine Restaurant",
+     "text": "locals call it their favourite Indian-Nepalese restaurant in town, for the coconut chicken curry and soft momo.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/tropic-isle-mart",
+     "name": "Tropic Isle Mart",
+     "text": "a Caribbean grocery and hot food counter with jerk wings and a curry mutton regulars say tastes like home.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/sister-bodega",
+     "name": "Sister Bodega",
+     "text": "a cozy bodega and lunch counter with house-made dumplings, noodle salads and sandwiches, and a small grocery of local products in back.",
+     "where": "Penticton"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Ramen made from scratch",
+    [
+     "vernon/sugoi-ramen-express|Sugoi Ramen Express"
+    ]
+   ],
+   [
+    "Ramen by a fireplace",
+    [
+     "enderby/kaze-japanese-restaurant|Kaze Japanese Restaurant"
+    ]
+   ],
+   [
+    "Pho with real bone broth",
+    [
+     "penticton/pho-more-vietnamese-restaurant|Pho&More Vietnamese Restaurant"
+    ]
+   ],
+   [
+    "A bowl of borscht",
+    [
+     "vernon/anna-s-ukrainian-kitchen|Anna's Ukrainian Kitchen",
+     "summerland/sunflower-ukrainian-cafe|Sunflower Ukrainian Cafe"
+    ]
+   ],
+   [
+    "A soup and sandwich lunch",
+    [
+     "kelowna/little-hobo-soup-sandwich-shop|Little Hobo Soup & Sandwich Shop",
+     "penticton/brodo-kitchen|BRODO Kitchen"
+    ]
+   ],
+   [
+    "Chowder",
+    [
+     "penticton/buy-the-sea-seafood|Buy The Sea Seafood"
+    ]
+   ],
+   [
+    "A Thai curry from a food truck",
+    [
+     "oliver/same-same-but-different-thai-food|Same Same But Different Thai Food"
+    ]
+   ],
+   [
+    "Dumplings",
+    [
+     "penticton/sister-bodega|Sister Bodega",
+     "vernon/the-curry-pot-indian-nepalese-cuisine-restaurant|The Curry Pot Indian & Nepalese Cuisine Restaurant (momo)"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/restaurants\">Restaurants</a>, <a href=\"/cafes\">Cafés</a>, <a href=\"/food-drink\">Food &amp; Drink</a>"
+}

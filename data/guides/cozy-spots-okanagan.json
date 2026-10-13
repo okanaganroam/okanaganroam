@@ -1,0 +1,225 @@
+{
+ "heading": "Cozy Spots for Cool Days",
+ "title": "Cozy Fireside Spots & Heated Patios | Okanagan Roam",
+ "description": "Fireplaces, fire pits, heated patios and blankets: Okanagan pubs, cafés, restaurants and winery terraces that stay warm on cool fall days.",
+ "banner": "cafe",
+ "parent": {
+  "name": "Food & Drink",
+  "href": "/food-drink"
+ },
+ "noPlace": true,
+ "intro": [
+  "Fall in the Okanagan brings crisp mornings and cooler evenings, but that doesn't mean heading straight home. Plenty of places around the valley keep things warm with a fireplace inside, a fire pit outside, patio heaters or a stack of blankets.",
+  "Here's where to find them, grouped by the kind of warmth on offer. Each place shows its town."
+ ],
+ "sections": [
+  {
+   "id": "fireside-pubs-and-dining-rooms",
+   "jump": "Fireside",
+   "heading": "Fireside pubs and dining rooms",
+   "items": [
+    {
+     "ref": "enderby/kaze-japanese-restaurant",
+     "name": "Kaze Japanese Restaurant",
+     "text": "a cozy, family-run spot in a converted old home in downtown Enderby, with a fireplace dining room and miso ramen reviewers call spectacular.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "kelowna/brandt-s-creek-pub",
+     "name": "Brandt's Creek Pub",
+     "text": "a Glenmore neighbourhood pub with open ceilings and a fireplace, serving classic Canadian pub fare like wings, ribs, stacked burgers and a rosemary-scented beef dip.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mcculloch-station-pub",
+     "name": "McCulloch Station Pub",
+     "text": "a 19+ neighbourhood pub in East Kelowna with pub classics like prime rib dip and Yorkshire puddings, free pool tables and a fireplace for cooler nights.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "silverstar/the-bulldog-grand-cafe-silver-star",
+     "name": "The Bulldog Grand Cafe Silver Star",
+     "text": "a quaint pub with a large split patio, four gas fireplaces and TVs, and a warm-up stop between runs on the mountain.",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "fire-pits-and-outdoor-fireplac",
+   "jump": "Fire pits",
+   "heading": "Fire pits and outdoor fireplaces",
+   "items": [
+    {
+     "ref": "kelowna/the-galley-lakeside-cafe",
+     "name": "The Galley Lakeside Cafe",
+     "text": "a walk-up waterfront café by the Kelowna Yacht Club with outdoor fireplaces for chillier days, vegan options and a spectacular lake view.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/red-bird-brewing",
+     "name": "Red Bird Brewing",
+     "text": "a craft brewery on Richter Street pouring more than 15 house beers, with wood-fired wild-yeast sourdough pizzas and outdoor fire pits on the dog-friendly patio.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/dunnenzies-pizza-mission",
+     "name": "DunnEnzies Pizza Mission",
+     "text": "a family-friendly pizza spot with a fire pit patio, set up for hanging out with the dog after a Mission Creek walk.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/match-eatery-public-house-vernon",
+     "name": "MATCH Eatery & Public House (Vernon)",
+     "text": "the pub inside Lake City Casino, where a heated patio with a fire-pit table keeps outdoor seating in play year-round. Weekend evenings often bring live music or DJs.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "big-white/6-bistro",
+     "name": "6° Bistro",
+     "text": "an intimate, upscale set-menu bistro built around a warm outdoor fireplace and fur seating, with a tasting menu that includes vegetarian options.",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "heated-and-blanketed-patios",
+   "jump": "Heated patios",
+   "heading": "Heated and blanketed patios",
+   "items": [
+    {
+     "ref": "osoyoos/15-park-bistro",
+     "name": "15 Park Bistro",
+     "text": "French bistro comfort in downtown Osoyoos, where the heated patio lets you linger outside when the temperature drops. Prime rib Sundays are a local institution.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "west-kelowna/annie-s-beach-cafe-lounge",
+     "name": "Annie's Beach Cafe & Lounge",
+     "text": "heated dining domes keep the beach view going when the temperature drops, so you can watch the sun go down over the water. There's room nearby for kids to run and play.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "kelowna/earls-kitchen-bar",
+     "name": "Earls Kitchen + Bar",
+     "text": "a rooftop patio with sweeping lake and sunset views, with blankets provided if it cools off.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/flip-flops-hops-eatery",
+     "name": "Flip Flops & Hops Eatery",
+     "text": "a laid-back Glenmore eatery with couches, a heated patio and a beer list. Reviewers recommend the brisket mac and cheese, pork belly sandwich and sriracha perogies.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/masa-s-grill-at-the-harvest-golf-club",
+     "name": "Masa's Grill at The Harvest Golf Club",
+     "text": "garden views with patio heaters for cooler days, and a steak sandwich reviewers call perfectly cooked.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "osoyoos/owl-pub",
+     "name": "Owl Pub",
+     "text": "a lakeview patio with heaters that extend the season through the shoulder months, plus well-liked fish and chips.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "winery-terraces-with-heat",
+   "jump": "Winery terraces",
+   "heading": "Winery terraces with heat",
+   "items": [
+    {
+     "ref": "kelowna/summerhill-pyramid-winery",
+     "name": "Summerhill Pyramid Winery",
+     "text": "a certified-organic estate built around an actual pyramid, with a heated lake-view terrace and its own on-site restaurant.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "naramata/serendipity-winery",
+     "name": "Serendipity Winery",
+     "text": "a tiny, one-chef bistro and winery with a covered, heated patio, so weather rarely gets in the way. Booking ahead is essential.",
+     "where": "Naramata"
+    }
+   ]
+  },
+  {
+   "id": "a-different-kind-of-warm-up",
+   "jump": "Warm-up",
+   "heading": "A different kind of warm-up",
+   "items": [
+    {
+     "ref": "kelowna/tality-wellness-kelowna",
+     "name": "Tality Wellness Kelowna",
+     "text": "a downtown social bathhouse with a 20-person cedar sauna, four cold plunges and a lounge around a vapour firepit. Robes, towels and kombucha are included; book a shared community session or a private group slot.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A pub night by the fireplace",
+    [
+     "kelowna/brandt-s-creek-pub|Brandt's Creek Pub",
+     "kelowna/mcculloch-station-pub|McCulloch Station Pub"
+    ]
+   ],
+   [
+    "Ramen in a fireplace dining room",
+    [
+     "enderby/kaze-japanese-restaurant|Kaze Japanese Restaurant"
+    ]
+   ],
+   [
+    "Beer and pizza by a fire pit",
+    [
+     "kelowna/red-bird-brewing|Red Bird Brewing",
+     "kelowna/dunnenzies-pizza-mission|DunnEnzies Pizza Mission"
+    ]
+   ],
+   [
+    "Coffee by the lake with an outdoor fireplace",
+    [
+     "kelowna/the-galley-lakeside-cafe|The Galley Lakeside Cafe"
+    ]
+   ],
+   [
+    "A sunset view without the chill",
+    [
+     "kelowna/earls-kitchen-bar|Earls Kitchen + Bar",
+     "west-kelowna/annie-s-beach-cafe-lounge|Annie's Beach Cafe & Lounge"
+    ]
+   ],
+   [
+    "Wine country with a heated terrace",
+    [
+     "kelowna/summerhill-pyramid-winery|Summerhill Pyramid Winery",
+     "naramata/serendipity-winery|Serendipity Winery"
+    ]
+   ],
+   [
+    "A warm-up on the mountain",
+    [
+     "silverstar/the-bulldog-grand-cafe-silver-star|The Bulldog Grand Cafe Silver Star",
+     "big-white/6-bistro|6° Bistro"
+    ]
+   ],
+   [
+    "Heat of a different kind",
+    [
+     "kelowna/tality-wellness-kelowna|Tality Wellness Kelowna"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/restaurants\">Restaurants</a>, <a href=\"/cafes\">Cafés</a>, <a href=\"/food-drink\">Food &amp; Drink</a>"
+}
