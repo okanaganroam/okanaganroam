@@ -11322,6 +11322,14 @@ test('/categories: 200, each visitor-facing category once, linking to its own ex
     assert.equal((await fetch(`${base}${href}`)).status, 200, href);
   }
   assert.doesNotMatch(html, /id="searchInput"|class="venue-card"|type="search"/, 'no search box, filters or venue listing');
+  // Photos (2026-10-12): every Food & Drink card carries its page's banner photo as a lazy thumbnail; other sections stay text-only.
+  const fd = html.slice(html.indexOf('<ul class="card-grid category-photo-grid">'));
+  assert.ok(html.includes('<ul class="card-grid category-photo-grid">'), 'Food & Drink is a photo grid');
+  const fdList = fd.slice(0, fd.indexOf('</ul>'));
+  const fdCount = app.categoryDirectoryEntries().find((g) => g.label === 'Food & Drink').categories.length;
+  assert.equal((fdList.match(/<div class="category-card-photo"><img src="\/images\/food-drink\/thumbs\/[a-z-]+\.jpg" alt="" width="800" height="533" loading="lazy"/g) || []).length, fdCount);
+  for (const m of fdList.matchAll(/src="(\/images\/food-drink\/thumbs\/[a-z-]+\.jpg)"/g)) assert.ok(require('node:fs').existsSync(require('node:path').join(__dirname, '..', 'public', m[1])), m[1]);
+  assert.equal((html.match(/category-card-photo"/g) || []).length, fdCount, 'no photos outside Food & Drink');
   assert.match(html, /<footer/, 'shared footer present');
   assert.equal((await fetch(`${base}/categories/`)).status, 200);
 }));

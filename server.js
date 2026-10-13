@@ -11189,6 +11189,13 @@ function categoryDirectoryEntries() {
   if (has(countVenuesByCategory('winery'))) foodDrink.push(typeEntry('winery', `/${CATEGORY_SLUGS.winery}`));
   const cocktail = foodDrink.find((e) => e.href === '/food-drink?types=cocktail');
   if (cocktail) cocktail.tagline = 'Cocktail bars and lounges for an evening out.';
+  // Photos (2026-10-12): each Food & Drink card shows its page's banner
+  // photo, as an 800px thumbnail.
+  for (const e of foodDrink) {
+    const t = e.href === '/food-drink' ? null : (e.href.match(/types=(\w+)/) || [])[1] || (e.href === `/${CATEGORY_SLUGS.winery}` ? 'winery' : null);
+    const b = e.href === '/food-drink' ? FOOD_DRINK_HUB_BANNER : CATEGORY_BANNER_IMAGES[t];
+    if (b) e.image = { src: b.src.replace('/images/food-drink/', '/images/food-drink/thumbs/'), alt: b.alt, pos: b.pos };
+  }
 
   const experiences = [];
   if (has(countVenuesByCategory('golf'))) experiences.push(typeEntry('golf', `/${CATEGORY_SLUGS.golf}`));
@@ -11216,6 +11223,35 @@ function categoryDirectoryEntries() {
   ].filter((g) => g.categories.length > 0);
 }
 
+// Photo cards on /categories. The photo comes last in the markup (the name
+// stays the card's first child) and is moved above the text with order; the
+// name's link stretches over the whole card.
+const CATEGORY_PHOTO_GRID_STYLE = `<style id="category-photo-grid">
+  body.categories-page .category-photo-grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 0 0 30px; }
+  @media (min-width: 560px) { body.categories-page .category-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 900px) { body.categories-page .category-photo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  body.categories-page .category-photo-grid .category-card { position: relative; display: flex; flex-direction: column; margin: 0; padding: 0; overflow: hidden; border-radius: 16px; }
+  body.categories-page .category-photo-grid .category-card:hover { transform: translateY(-3px); box-shadow: 0 18px 32px -22px rgba(74,52,40,0.55); }
+  body.categories-page .category-photo-grid .category-card-photo { order: -1; aspect-ratio: 3 / 2; overflow: hidden; background: #2A6B67; }
+  body.categories-page .category-photo-grid .category-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.35s ease; }
+  body.categories-page .category-photo-grid .category-card:hover .category-card-photo img { transform: scale(1.04); }
+  body.categories-page .category-photo-grid .category-card h2 { margin: 16px 18px 4px; font-size: 1.15rem; }
+  body.categories-page .category-photo-grid .category-card h2 a::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+  body.categories-page .category-photo-grid .category-card h2 a:hover { text-decoration: none; }
+  body.categories-page .category-photo-grid .category-card:hover h2 a { color: var(--plum); }
+  body.categories-page .category-photo-grid .category-card h2 a:focus-visible { outline: none; }
+  body.categories-page .category-photo-grid .category-card:has(a:focus-visible) { outline: 3px solid var(--plum); outline-offset: 2px; }
+  body.categories-page .category-photo-grid .venue-meta { margin: 0 18px 18px; line-height: 1.45; }
+  /* Phones: a compact row -- small photo on the left, name and tagline beside it. */
+  @media (max-width: 559px) {
+    body.categories-page .category-photo-grid { gap: 12px; }
+    body.categories-page .category-photo-grid .category-card { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto 1fr; border-radius: 14px; }
+    body.categories-page .category-photo-grid .category-card-photo { grid-column: 1; grid-row: 1 / 3; aspect-ratio: auto; min-height: 96px; }
+    body.categories-page .category-photo-grid .category-card h2 { grid-column: 2; margin: 14px 14px 2px; font-size: 1.05rem; }
+    body.categories-page .category-photo-grid .venue-meta { grid-column: 2; margin: 0 14px 14px; font-size: 0.84rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { body.categories-page .category-photo-grid .category-card, body.categories-page .category-photo-grid .category-card-photo img { transition: none; transform: none !important; } }
+</style>`;
 function renderCategoriesPage(entries = categoryDirectoryEntries()) {
   const title = 'Explore All Categories | Okanagan Roam';
   const description = 'Browse every Okanagan Roam category, from restaurants, cafes and wineries to golf, beaches, the outdoors, events and hidden gems.';
@@ -11224,20 +11260,27 @@ function renderCategoriesPage(entries = categoryDirectoryEntries()) {
     { name: 'Home', url: 'https://okanaganroam.com/' },
     { name: 'All Categories', url: canonical },
   ]);
-  const sections = entries.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
-  <ul class="card-grid">
+  // A section whose every card has a photo becomes a photo grid: the photo
+  // above the name and tagline, the whole card one link.
+  const sections = entries.map((g) => {
+    const photos = g.categories.every((c) => c.image);
+    return `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
+  <ul class="card-grid${photos ? ' category-photo-grid' : ''}">
     ${g.categories.map((c) => `
       <li class="category-card">
         <h2><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h2>${c.tagline ? `
-        <p class="venue-meta">${escapeHtml(c.tagline)}</p>` : ''}
+        <p class="venue-meta">${escapeHtml(c.tagline)}</p>` : ''}${photos ? `
+        <div class="category-card-photo"><img src="${c.image.src}" alt="" width="800" height="533" loading="lazy" decoding="async" style="object-position: 50% ${c.image.pos}%"></div>` : ''}
       </li>`).join('\n')}
-  </ul>`).join('\n  ');
+  </ul>`;
+  }).join('\n  ');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 ${renderOutdoorThemeStyles()}
 ${golfEngagementHeadHtml('fd', true, 'hub')}
+${CATEGORY_PHOTO_GRID_STYLE}
 </head>
 <body class="golf-page outdoor-page region-page categories-page">
   ${renderGolfTripTrayHtml()}
