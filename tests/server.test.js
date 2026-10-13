@@ -16789,7 +16789,7 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Ski & Snow and Golf -> Indoo
 
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   const html = winterMood('2027-02-01');
-  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow-powder\.jpg" width="640" height="403" alt="" loading="lazy">/);
   assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.skiSnow\.title">Ski &amp; Snow</);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.indoor\.title">Indoor &amp; Rainy Day</);

@@ -6867,12 +6867,12 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
   ];
   // Winter (Oct-Mar, see isWinterMoodSeason): same six positions, with Ski &
   // Snow replacing Beaches and Indoor & Rainy Day replacing Golf. Summer
-  // output is byte-identical to before. ski-snow.jpg (no webp encoder on the build Mac) is cropped from
-  // /images/outdoors/winter.webp; indoor.jpg is 640x400 (the user-supplied
+  // output is byte-identical to before. ski-snow-powder.jpg (2026-10-13; no webp encoder on the build
+  // Mac) is the free Adobe Stock photo 499088168, a skier in powder through frosted trees; indoor.jpg is 640x400 (the user-supplied
   // photo), so it carries its own height. Its .mood-card-indoor rule keeps a
   // dusk-to-amber gradient behind the image as the loading/missing fallback.
   if (winter) {
-    cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
+    cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
   }
 
