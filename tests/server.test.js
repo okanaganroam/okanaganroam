@@ -17509,7 +17509,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${type} image exists`);
     assert.ok(b.alt && b.alt.length > 10, `${type} has alt text`);
   }
-  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'outdoor', 'pub', 'restaurant', 'tour', 'winery']);
+  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'outdoor', 'pub', 'restaurant', 'sport', 'tour', 'winery']);
   for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), `${type} has a card thumbnail`);
   const golfFixture = [{ id: 990001, name: 'Banner Golf', slug: 'banner-golf', region: 'kelowna', type: 'golf', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'golf', golfFixture, []), /<div class="category-banner"><img src="\/images\/golf\/golf-courses\.jpg"/, 'golf region pages open with the golf photo');
@@ -17521,6 +17521,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
   const tourFixture = [{ id: 990005, name: 'Banner Tour', slug: 'banner-tour', region: 'kelowna', type: 'tour', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'tour', tourFixture, []), /<div class="category-banner"><img src="\/images\/tours\/tours\.jpg"/, 'tour region pages open with the tours photo');
   assert.match(app.renderCategoryAllRegionsPage('tour', tourFixture), /<div class="category-banner"><img src="\/images\/tours\/tours\.jpg"/, 'the /tours hub too');
+  const sportFixture = [{ id: 990006, name: 'Banner Skate Park', slug: 'banner-skate-park', region: 'kelowna', type: 'sport', description: 'Fixture.' }];
+  assert.match(app.renderCategoryPage('kelowna', 'sport', sportFixture, []), /<div class="category-banner"><img src="\/images\/sports\/sports\.jpg"/, 'sports region pages open with the sports photo');
+  assert.match(app.renderCategoryAllRegionsPage('sport', sportFixture), /<div class="category-banner"><img src="\/images\/sports\/sports\.jpg"/, 'the /sports hub too');
   const outdoorFixture = [{ id: 990004, name: 'Banner Trail', slug: 'banner-trail', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'outdoor', outdoorFixture, []), /<div class="category-banner"><img src="\/images\/outdoors\/outdoors\.jpg"/, 'outdoor region pages open with the outdoors photo');
   const pub = app.createVenue({ name: 'Banner Test Pub', region: 'kelowna', type: 'pub', description: 'A fixture pub.', slug: 'banner-test-pub' });
@@ -17533,7 +17536,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(scoped, /@media \(min-width: 900px\) \{[\s\S]*?\.category-banner \{ aspect-ratio: 12 \/ 5;/, 'desktop banner is a 2.4:1 strip');
       assert.doesNotMatch(scoped, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\)/, 'no side-by-side layout');
       assert.match(scoped, /\.category-banner \{[^}]*max-height: min\(44vh, 440px\);/, 'the banner never fills the window, so the heading stays in view');
-      assert.doesNotMatch(app.renderCategoryPage('kelowna', 'sport', [{ id: 990002, name: 'Banner Park', slug: 'banner-park', region: 'kelowna', type: 'sport', description: 'Fixture.' }], []), /class="category-banner"/, 'categories without a photo carry no banner');
+      assert.doesNotMatch(app.renderCategoryPage('kelowna', 'indoor', [{ id: 990002, name: 'Banner Museum', slug: 'banner-museum', region: 'kelowna', type: 'indoor', description: 'Fixture.' }], []), /class="category-banner"/, 'categories without a photo carry no banner');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
       // No type or several: the hub's own photo with the general heading.
       assert.match(hubAll, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg" alt="Friends toasting drinks over a table of shared dishes"/);
