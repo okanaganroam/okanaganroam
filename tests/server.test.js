@@ -17517,6 +17517,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
   const beachFixture = [{ id: 990003, name: 'Banner Beach', slug: 'banner-beach', region: 'kelowna', type: 'beach', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'beach', beachFixture, []), /<div class="category-banner"><img src="\/images\/beaches\/beaches\.jpg"/, 'beach region pages open with the beach photo');
   assert.match(app.renderCategoryAllRegionsPage('beach', beachFixture), /<div class="category-banner"><img src="\/images\/beaches\/beaches\.jpg"/, 'the /beaches hub too');
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.SKI_SNOW_BANNER.src)) && fs.existsSync(path.join(__dirname, '..', 'public', app.SKI_SNOW_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'ski & snow photo and thumbnail exist');
   const outdoorFixture = [{ id: 990004, name: 'Banner Trail', slug: 'banner-trail', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'outdoor', outdoorFixture, []), /<div class="category-banner"><img src="\/images\/outdoors\/outdoors\.jpg"/, 'outdoor region pages open with the outdoors photo');
   const pub = app.createVenue({ name: 'Banner Test Pub', region: 'kelowna', type: 'pub', description: 'A fixture pub.', slug: 'banner-test-pub' });
@@ -17546,6 +17547,10 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const hubTwo = (await WINTER_GET(base, '/food-drink?types=pub,brewery')).text;
       assert.match(hubTwo, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
       assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
+      const ski = (await WINTER_GET(base, '/ski-snow')).text;
+      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Ski &amp; Snow<\/h1>/, '/ski-snow opens with its photo above the heading');
+      const gems = (await WINTER_GET(base, '/hidden-gems')).text;
+      assert.doesNotMatch(gems, /class="category-banner"/, 'other curated pages are unchanged');
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
