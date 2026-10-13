@@ -15652,14 +15652,14 @@ ${renderGolfHeaderHtml()}
       var b = (on.length === 1 && map[on[0]]) || general;
       if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var t = (on.length === 1 && text[on[0]]) || text.all;
-      var h = document.getElementById('whatsOnHeading'), p = document.getElementById('whatsOnIntro');
+      var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .whatson-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
     };
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
-  </script>`, `<h1 id="whatsOnHeading">${escapeHtml(woText.heading)}</h1>
-  <p class="outdoor-intro whatson-intro" id="whatsOnIntro">${escapeHtml(woText.intro)}</p>`)}
+  </script>`, `<h1>${escapeHtml(woText.heading)}</h1>
+  <p class="outdoor-intro whatson-intro">${escapeHtml(woText.intro)}</p>`)}
   ${whatsOnSearchHtml()}
   ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
   ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory })}
