@@ -17836,3 +17836,20 @@ test('Patio guide (2026-10-13): /guides/best-patios-kelowna renders the approved
     assert.match((await WINTER_GET(base, '/food-drink')).text, /href="\/guides\/best-patios-kelowna"/);
   });
 });
+
+test('Wine guide (2026-10-13): /guides/okanagan-wineries-first-timers renders live venue links (tip links too), Article schema and the winery banner, and is linked from /wineries and /tours/wine and in the sitemap', async () => {
+  const html = app.renderWineGuidePage();
+  assert.match(html, /<title>Okanagan Wineries for First-Timers: Where to Start \| Okanagan Roam<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/okanagan-wineries-first-timers">/);
+  assert.match(html, /"@type":"Article","headline":"Okanagan Wineries for First-Timers"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
+  assert.match(html, /"name":"Wineries","item":"https:\/\/okanaganroam\.com\/wineries"/);
+  // Tip links: a live place links, a missing one keeps its label as text.
+  assert.equal(app.guideTipHtml('See {nowhere/not-a-real-place|Ghost Winery} & more.'), 'See Ghost Winery &amp; more.');
+  await withWinterServer(async (base) => {
+    assert.equal((await WINTER_GET(base, '/guides/okanagan-wineries-first-timers')).status, 200);
+    assert.ok((await WINTER_GET(base, '/sitemap.xml')).text.includes('<loc>https://okanaganroam.com/guides/okanagan-wineries-first-timers</loc>'));
+    const wineries = await WINTER_GET(base, '/wineries');
+    if (wineries.status === 200) assert.match(wineries.text, /href="\/guides\/okanagan-wineries-first-timers"/);
+  });
+});
