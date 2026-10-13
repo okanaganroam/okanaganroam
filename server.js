@@ -12310,12 +12310,15 @@ const HUB_INTRO_STYLE = '<style>body.golf-page .hub-intro { font-size: 1.04rem; 
 // other category. Omitted = nothing selected = today's landing markup.
 // Indoor discovery choices use venue names and the existing family badge;
 // they do not write inferred amenities or taxonomy to the database.
+// Each experience chip swaps the /indoor banner, heading and intro (2026-10-13).
+// Photos: licensed free Adobe Stock (396397311, 172593598, 716719230, 444210300,
+// 329141845).
 const INDOOR_EXPERIENCES = [
-  { slug: 'arts', label: 'Museums & Galleries', pattern: /museum|gallery|galleries|art warehouse|observatory|centre for (?:excellence|contemporary art)|art(?:s)? cent(?:re|er)/i },
-  { slug: 'family', label: 'Family Fun' },
-  { slug: 'games', label: 'Games & Escape Rooms', pattern: /escape|bowling|bowl|arcade|laser tag|board game|simulator|indoor golf|energyplex/i },
-  { slug: 'spas', label: 'Spas', pattern: /spa\b|thermal|sauna|steam/i },
-  { slug: 'theatre', label: 'Theatre', pattern: /theatre|theater|cinema|actors studio|performing arts/i },
+  { slug: 'arts', label: 'Museums & Galleries', pattern: /museum|gallery|galleries|art warehouse|observatory|centre for (?:excellence|contemporary art)|art(?:s)? cent(?:re|er)/i, banner: { src: '/images/indoor/activity-arts.jpg', alt: 'Friends looking at artwork in a modern gallery hall', pos: 30 }, heading: 'Museums & Galleries in the Okanagan', intro: 'Museums, art galleries and heritage collections across the valley \u2014 local history, science and contemporary art for a slow, rainy afternoon.' },
+  { slug: 'family', label: 'Family Fun', banner: { src: '/images/indoor/activity-family.jpg', alt: 'A girl reaching for a hold on an indoor climbing wall', pos: 40 }, heading: 'Indoor Family Fun in the Okanagan', intro: 'Kid-friendly indoor spots for wet or cold days \u2014 climbing walls, play centres, bowling, museums and more to keep the whole family busy.' },
+  { slug: 'games', label: 'Games & Escape Rooms', pattern: /escape|bowling|bowl|arcade|laser tag|board game|simulator|indoor golf|energyplex/i, banner: { src: '/images/indoor/activity-games.jpg', alt: 'Four friends solving clues together in an escape room', pos: 35 }, heading: 'Games & Escape Rooms in the Okanagan', intro: 'Escape rooms, bowling, arcades, laser tag and golf simulators \u2014 the best ways to beat a rainy day with friends.' },
+  { slug: 'spas', label: 'Spas', pattern: /spa\b|thermal|sauna|steam/i, banner: { src: '/images/indoor/activity-spas.jpg', alt: 'A calm indoor spa pool lined with loungers', pos: 50 }, heading: 'Spas in the Okanagan', intro: 'Spas, saunas and warm pools to unwind in when the weather turns \u2014 a relaxing way to spend a grey day.' },
+  { slug: 'theatre', label: 'Theatre', pattern: /theatre|theater|cinema|actors studio|performing arts/i, banner: { src: '/images/indoor/activity-theatre.jpg', alt: 'An audience waiting in front of a red stage curtain', pos: 85 }, heading: 'Theatre & Cinema in the Okanagan', intro: 'Live theatre, performing arts centres and cinemas across the valley \u2014 plays, concerts and films for a night out of the rain.' },
 ];
 function indoorExperienceMatches(venue, slug) {
   const choice = INDOOR_EXPERIENCES.find((c) => c.slug === slug);
@@ -12439,7 +12442,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
     venues = venues.filter(inActivity);
     opts = { ...opts, sportsAlso: (opts.sportsAlso || []).filter(inActivity) };
   }
-  const activityContent = tourContent || sportContent;
+  const activityContent = tourContent || sportContent || (indoorActivity ? INDOOR_EXPERIENCES.find((c) => c.slug === indoorActivity) : null);
   if (type === 'indoor') {
     venues = venues.filter((v) => indoorExperienceMatches(v, indoorActivity));
     opts = { ...opts,
@@ -23606,6 +23609,7 @@ module.exports = {
   TOUR_ACTIVITIES,
   tourActivityOf,
   SPORT_ACTIVITIES,
+  INDOOR_EXPERIENCES,
   sportActivitiesOf,
   WHATS_ON_BANNER,
   WHATSON_CATEGORY_BANNERS,
