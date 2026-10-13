@@ -14066,6 +14066,7 @@ function renderDogHubPage(venues, filter = null) {
   const beachCount = venues.filter((v) => beachIds.has(v.id)).length;
 
   const heading = 'Dog Friendly Finds';
+  const dogContent = (f.types.length === 1 && DOG_CATEGORY_CONTENT[f.types[0]]) || DOG_CATEGORY_CONTENT.all;
   const title = `Dog Friendly Finds in the Okanagan | Okanagan Roam`;
   const description = `${venues.length} dog-friendly places across the Okanagan Valley: patios, cafés and tasting rooms, plus ${beachCount} designated dog beaches.`;
   const canonical = 'https://okanaganroam.com/dog-friendly';
@@ -14115,8 +14116,24 @@ ${golfEngagementHeadHtml('dog', true, 'hub')}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Dog Friendly Finds' }])}
-  ${categoryHeroHtml(`<div class="category-banner"><img src="${DOG_FRIENDLY_BANNER.src}" alt="${escapeHtml(DOG_FRIENDLY_BANNER.alt)}" width="1600" height="716" style="object-position: 50% ${DOG_FRIENDLY_BANNER.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro fd-intro">Patios, caf&eacute;s, taprooms and tasting rooms across the Okanagan that welcome your dog &mdash; plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.</p>`)}
+  ${categoryHeroHtml(`<div class="category-banner" id="dogBanner"><img src="${dogContent.banner.src}" alt="${escapeHtml(dogContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${dogContent.banner.pos}%" fetchpriority="high"></div>
+  <script>
+  (function(){
+    var c = ${JSON.stringify(DOG_CATEGORY_CONTENT).replace(/</g, '\\u003c')};
+    var box = document.getElementById('dogBanner'); if (!box) return;
+    var img = box.querySelector('img');
+    var sync = function(){
+      var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-dog-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-dog-type'); });
+      var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
+      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
+      if (h && h.textContent !== t.heading) h.textContent = t.heading;
+      if (p && p.textContent !== t.intro) p.textContent = t.intro;
+    };
+    try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
+  })();
+  </script>`, `<h1>${escapeHtml(dogContent.heading)}</h1>
+  <p class="outdoor-intro fd-intro">${escapeHtml(dogContent.intro)}</p>`)}
   ${dogSearchHtml()}
   ${dogTypeChipsHtml(state)}
   ${dogFilterBarHtml(venues, state)}
@@ -15545,6 +15562,23 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
 // Dog Friendly Finds banner (2026-10-12): licensed free Adobe Stock 68376380
 // -- three Labradors splashing through a lake (1600x716, a wide original).
 const DOG_FRIENDLY_BANNER = Object.freeze({ src: '/images/dog-friendly/dog-friendly.jpg', alt: 'Three Labradors splashing through the shallows of a lake', pos: 40 });
+// Per-category photo, heading and intro for /dog-friendly (2026-10-12),
+// swapped like /food-drink and /whats-on: one type chosen shows its own,
+// anything else the general Labradors and text. Dog Beaches keeps the Labs.
+// Restaurant and Cafe are licensed free Adobe Stock (665278733, 1219763791);
+// the rest are free Unsplash photos (bIAL7-ZnlLg, scqC_TkHhE8, bst0k-8Gsmg,
+// B1kiHKg-v-Y, wOHY5BQpAuk; Unsplash License).
+const DOG_CATEGORY_CONTENT = Object.freeze({
+  all: { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Friendly Finds', intro: 'Patios, caf\u00e9s, taprooms and tasting rooms across the Okanagan that welcome your dog \u2014 plus every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.' },
+  restaurant: { banner: { src: '/images/dog-friendly/dog-restaurant.jpg', alt: 'A dachshund sitting beside its owner at an outdoor restaurant table', pos: 35 }, heading: 'Dog-Friendly Restaurants in the Okanagan', intro: 'Restaurants with patios and spaces where your dog is welcome to join you \u2014 so nobody gets left at home when it\u2019s time to eat out.' },
+  cafe: { banner: { src: '/images/dog-friendly/dog-cafe.jpg', alt: 'A woman shaking paws with a golden retriever in a coffee shop', pos: 40 }, heading: 'Dog-Friendly Caf\u00e9s in the Okanagan', intro: 'Coffee shops and caf\u00e9s that welcome dogs \u2014 grab a latte, a pastry and maybe a treat for your four-legged friend.' },
+  pub: { banner: { src: '/images/dog-friendly/dog-pub.jpg', alt: 'A black Labrador lying by the fireplace in a cosy pub', pos: 60 }, heading: 'Dog-Friendly Pubs & Bars in the Okanagan', intro: 'Pubs and bars where dogs are welcome \u2014 settle in for a pint and a bite with your best friend at your feet.' },
+  cocktail: { banner: { src: '/images/dog-friendly/dog-cocktail.jpg', alt: 'A golden retriever sitting between leather stools at a stylish bar', pos: 60 }, heading: 'Dog-Friendly Cocktail Lounges in the Okanagan', intro: 'Cocktail bars and lounges that welcome dogs \u2014 for an evening out that the whole family, furry members included, can enjoy.' },
+  brewery: { banner: { src: '/images/dog-friendly/dog-brewery.jpg', alt: 'A man hugging his dog at a taproom table beside a pint of beer', pos: 35 }, heading: 'Dog-Friendly Breweries in the Okanagan', intro: 'Taprooms and brewery patios that welcome dogs \u2014 craft beer, good company, and a water bowl never far away.' },
+  distillery: { banner: { src: '/images/dog-friendly/dog-distillery.jpg', alt: 'A dog beside a bottle of spirits and a tasting glass', pos: 15 }, heading: 'Dog-Friendly Distilleries in the Okanagan', intro: 'Craft distilleries and tasting rooms where your dog is welcome to come along while you sample small-batch spirits.' },
+  winery: { banner: { src: '/images/dog-friendly/dog-winery.jpg', alt: 'A curly white dog at a winery table beside glasses of red and white wine', pos: 55 }, heading: 'Dog-Friendly Wineries in the Okanagan', intro: 'Wineries and tasting rooms that welcome dogs \u2014 sip your way through wine country with your four-legged co-pilot.' },
+  'dog-beach': { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Beaches in the Okanagan', intro: 'Every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.' },
+});
 const WHATS_ON_BANNER = Object.freeze({ src: '/images/whats-on/whats-on.jpg', alt: 'A festival crowd with hands raised under bright stage lights', pos: 40 });
 // Category banners (2026-10-12): one licensed free Adobe Stock photo per
 // What's On category. Choosing exactly one category shows its photo (server-
@@ -23391,6 +23425,7 @@ module.exports = {
   WHATSON_CATEGORY_BANNERS,
   WHATSON_CATEGORY_TEXT,
   DOG_FRIENDLY_BANNER,
+  DOG_CATEGORY_CONTENT,
   LOCAL_FAVOURITES_BANNER,
   HIDDEN_GEMS_BANNER,
   SECRET_SPOTS_BANNER,
