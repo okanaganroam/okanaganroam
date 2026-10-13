@@ -17494,7 +17494,7 @@ test('Card rows (2026-10-12): two-up cards give every part its own subgrid row, 
   assert.match(app.renderFoodDrinkOpenNowStyles(), /body\.golf-page \.card-grid > \.venue-card > \.fd-open-status \{ grid-row: 3; \}/);
 });
 
-test('Category banners (2026-10-12): every Food & Drink type and winery pages open with their photo; /food-drink shows one only for a single chosen type', async () => {
+test('Category banners (2026-10-12): every Food & Drink type and winery pages open with their photo; /food-drink shows the chosen type\'s photo or its own', async () => {
   const fs = require('node:fs');
   const path = require('node:path');
   for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) {
@@ -17515,7 +17515,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       const golf = (await WINTER_GET(base, '/kelowna/golf')).text;
       assert.doesNotMatch(golf, /class="category-banner"/, 'non-food pages carry no banner');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
-      assert.match(hubAll, /<div class="category-banner" id="fdBanner" hidden><img src=""/);
+      // No type or several: the hub's own photo with the general heading.
+      assert.match(hubAll, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg" alt="Friends toasting drinks over a table of shared dishes"/);
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.FOOD_DRINK_HUB_BANNER.src)), 'hub image exists');
       assert.match(hubAll, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const hubPub = (await WINTER_GET(base, '/food-drink?types=pub')).text;
       assert.match(hubPub, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/pubs\.jpg"/);
@@ -17526,7 +17528,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(hubCocktail, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/, 'the page title and canonical stay the hub\'s');
       assert.deepEqual(Object.keys(app.FD_HUB_HEADINGS).sort(), ['all', 'brewery', 'cafe', 'cocktail', 'distillery', 'pub', 'restaurant']);
       const hubTwo = (await WINTER_GET(base, '/food-drink?types=pub,brewery')).text;
-      assert.match(hubTwo, /id="fdBanner" hidden/);
+      assert.match(hubTwo, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
       assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);

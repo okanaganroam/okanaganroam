@@ -13233,22 +13233,26 @@ const FD_HUB_HEADINGS = Object.freeze({
   brewery: { heading: 'Breweries in the Okanagan', intro: 'Taprooms, tasting flights and patio pints from the valley\u2019s craft brewers \u2014 every brewery across the Okanagan that Okanagan Roam has verified.' },
   distillery: { heading: 'Distilleries in the Okanagan', intro: 'Small-batch gin, vodka, whisky and liqueurs with tasting rooms to visit \u2014 every craft distillery across the Okanagan that Okanagan Roam has verified.' },
 });
+// /food-drink's own photo, shown with the general heading (All, or two or
+// more types chosen).
+const FOOD_DRINK_HUB_BANNER = Object.freeze({ src: '/images/food-drink/food-drink.jpg', alt: 'Friends toasting drinks over a table of shared dishes', pos: 40 });
 // The /food-drink hub filters in the page, so its banner follows the type
-// chips: one selected type with a photo shows it, anything else hides it.
+// chips: one selected type shows its photo, anything else the hub's own.
 function foodDrinkHubBannerHtml(types) {
-  const one = types.length === 1 && CATEGORY_BANNER_IMAGES[types[0]] ? CATEGORY_BANNER_IMAGES[types[0]] : null;
+  const one = (types.length === 1 && CATEGORY_BANNER_IMAGES[types[0]]) || FOOD_DRINK_HUB_BANNER;
   const map = JSON.stringify(CATEGORY_BANNER_IMAGES).replace(/</g, '\\u003c');
+  const general = JSON.stringify(FOOD_DRINK_HUB_BANNER).replace(/</g, '\\u003c');
   const text = JSON.stringify(Object.fromEntries(Object.entries(FD_HUB_HEADINGS).map(([k, x]) => [k, { h: x.heading, i: x.intro }]))).replace(/</g, '\\u003c');
-  return `<div class="category-banner" id="fdBanner"${one ? '' : ' hidden'}><img src="${one ? one.src : ''}" alt="${one ? escapeHtml(one.alt) : ''}" width="1600" height="1067"${one ? ` style="object-position: 50% ${one.pos}%"` : ''}></div>
+  return `<div class="category-banner" id="fdBanner"><img src="${one.src}" alt="${escapeHtml(one.alt)}" width="1600" height="1067" style="object-position: 50% ${one.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
-    var map = ${map}, text = ${text};
+    var map = ${map}, general = ${general}, text = ${text};
     var box = document.getElementById('fdBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-fd-type'); });
-      var b = on.length === 1 ? map[on[0]] : null;
-      if (b) { if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; } box.hidden = false; } else { box.hidden = true; }
+      var b = (on.length === 1 && map[on[0]]) || general;
+      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var t = (on.length === 1 && text[on[0]]) || text.all;
       var h = document.getElementById('fdHeading'), p = document.getElementById('fdIntro');
       if (h && h.textContent !== t.h) h.textContent = t.h;
@@ -23247,6 +23251,7 @@ module.exports = {
   renderFoodDrinkOpenNowStyles,
   CATEGORY_BANNER_IMAGES,
   FD_HUB_HEADINGS,
+  FOOD_DRINK_HUB_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
