@@ -40,13 +40,6 @@ test('Complex itinerary: pinned venue known closed in its slot is not retained',
  assert.throws(()=>complex('Plan a day in Kelowna with a museum',{facts:facts.map(v=>v.id===1?{...v,hours,_hours:undefined}:v),pinned:{'1-afternoon':1},startWeekday:'sat'}),/locked/i);
 });
 test('Complex itinerary: impossible museum request remains explicitly unmet',()=>{const p=complex('Plan a day in Kelowna with a museum',{facts:facts.filter(v=>v.id!==1)});assert.equal(p.requirementResults.find(i=>i.value==='museum').status,'unmet');});
-test('Missing museum offers a related gallery as optional without satisfying or inserting it',()=>{
- const p=complex('Plan a day in Kelowna with a museum',{facts:facts.filter(v=>v.id!==1)});
- const missing=p.requirementResults.find(i=>i.value==='museum');
- assert.equal(missing.status,'unmet');
- assert.ok(!stops(p).some(s=>s.venue.id===3));
- assert.deepEqual(missing.optionalAlternatives.map(a=>[a.id,a.reasonCode]),[[3,'similar_activity']]);
-});
 test('Complex itinerary: exact requested venue outranks other cafes',()=>{const p=complex('Plan a day in Kelowna. Visit Morning Coffee and a museum.');assert.ok(stops(p).some(s=>s.venue.id===6));});
 test('Complex itinerary: known seasonal closure is assessed on each trip day',()=>{
  const f=facts.map(v=>v.id===1?{...v,seasonClosed:{from:'2026-10-16',to:'2026-10-18'},seasonClosedToday:false}:v);

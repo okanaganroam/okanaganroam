@@ -452,20 +452,6 @@ test('V3 missing venue requests link to the matching regional listings',()=>{
  assert.equal(v3.t3PlanNextSteps({intent:{regions:['kelowna','vernon']},requirementResults:[{id:'r1',kind:'type',value:'winery',status:'unmet'}]})[0].url,'/wineries');
  assert.equal(v3.t3PlanNextSteps({intent:{regions:['vernon']},requirementResults:[{id:'r1',kind:'feature',value:'dog_friendly',status:'unmet'}]})[0].url,'/dog-friendly');
 });
-test('V3 missing-request alternatives are clearly optional, linked, and kept out of the itinerary',()=>{
- const p={intent:{regions:['kelowna']},requirementResults:[{id:'r1',kind:'venue_kind',value:'museum',status:'unmet',optionalAlternatives:[{id:3,name:'Art Gallery',url:'/kelowna/indoor/art-gallery',reasonCode:'similar_activity'},{id:4,name:'Unsafe',url:'https://bad.example',reasonCode:'different_region'}]}]};
- const step=v3.t3PlanNextSteps(p)[0];
- assert.equal(step.label,'museum');
- assert.deepEqual(step.alternatives.map(a=>a.name),['Art Gallery']);
- const html=v3.t3OptionalAlternativesHtml(step,false,s=>String(s));
- assert.match(html,/Optional ideas to consider\. Choose one if you like; it will not be added automatically/);
- assert.match(html,/<a href="\/kelowna\/indoor\/art-gallery">Art Gallery<\/a>/);
- assert.doesNotMatch(html,/Unsafe|https:/);
- const fr=v3.t3OptionalAlternativesHtml(step,true,s=>String(s));
- assert.match(fr,/Options facultatives à considérer/);
- const page=v3.renderTripPlannerV3Page({esc:s=>String(s),title:'t',description:'d',canonical:'/trip',breadcrumbJson:'{}',headerHtml:'',tripTrayHtml:'',footerHtml:'',footerStyles:'',analyticsHead:'',regions:[],regionImages:{},preview:false});
- assert.match(page,/function t3OptionalAlternativesHtml/);
-});
 test('V3 missing event requests link to matching What’s On filters',()=>{
  const steps=v3.t3PlanNextSteps({intent:{regions:['kelowna']},requirementResults:[{id:'e1',kind:'event',value:'events-festivals',eventKind:'festival',status:'unmet'}]});
  assert.equal(steps[0].url,'/whats-on?regions=kelowna&categories=events-festivals');

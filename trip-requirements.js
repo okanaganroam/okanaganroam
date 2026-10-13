@@ -19,13 +19,12 @@ const KINDS = {
   boat_tour: /\b(?:boat tours?|lake cruises?|cruises?)\b/,
   guided_hike: /\b(?:guided hikes?|guided hiking|hiking tours?)\b/,
   cooking: /\bcooking class(?:es)?\b/,
-  pottery: /\b(?:pottery|ceramics?) (?:classes?|workshops?|studio)?\b/,
   park: /\bparks?\b/,
   horseback: /\b(?:horseback riding|horseback|horse riding|horse riding tours?)\b/,
   sunset: /\b(?:sunset|sunsets)\b/,
   snow_tour: /\b(?:sleigh rides?|dog sledding|dog sled tours?)\b/,
 };
-const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience'};
+const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',snow_tour:'snow experience'};
 const WALKING_TRANSPORT = /\b(?:no car|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const WORD_DAYS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7};

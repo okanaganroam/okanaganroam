@@ -1032,11 +1032,9 @@ function buildDays(facts, ctx, days, pinned) {
   const kmCost = PLAN_KM_PENALTY[ctx.pace] || PLAN_KM_PENALTY.standard;
   const allowed = allowedTypes(ctx);
   const focuses = focusList(ctx);
-  const coffeeRequested = ctx.types.has('cafe') || (ctx.requirements?.items || []).some(i => i.strength === 'must' && i.kind === 'type' && ['cafe', 'breakfast'].includes(i.value));
-  const wineAndDiningTrip = days > 1 && ctx.types.has('winery') && ctx.types.has('restaurant') && !coffeeRequested;
   // A venue that satisfies a requested focus (a Hidden Gem park, a hiking
   // trail, a place mentioning "poutine") is welcome whatever its type.
-  const pool = facts.filter((v) => eligible(v, ctx, false) && !(wineAndDiningTrip && v.type === 'cafe') && (!allowed || allowed.has(v.type) || focuses.some((f) => f.test(v)) || ctx.requirements?.items.some(i=>['rainy','venue_kind','activity','venue'].includes(i.kind)&&i.strength==='must'&&tripRequirements.matches(v,i))));
+  const pool = facts.filter((v) => eligible(v, ctx, false) && (!allowed || allowed.has(v.type) || focuses.some((f) => f.test(v)) || ctx.requirements?.items.some(i=>['rainy','venue_kind','activity','venue'].includes(i.kind)&&i.strength==='must'&&tripRequirements.matches(v,i))));
   const byId = new Map(facts.map((v) => [v.id, v]));
   const base = new Map(pool.map((v) => [v.id, scoreVenue(v, ctx)]));
   const used = new Set();
@@ -1832,7 +1830,6 @@ function planTrip(input) {
     });
   }
   result.requirementResults = tripRequirements.evaluateTripRequirements({ requirements, plan: result, facts: input.facts || [], tripDate: input.tripDate });
-  result.requirementResults = addOptionalRequirementAlternatives(result.requirementResults, result, requirements, input);
   result.warnings = [...new Set([...(result.warnings || []), ...requirements.conflicts, ...result.requirementResults.filter(i => i.status !== 'satisfied').map(i => {
     const label = i.kind === 'event'
       ? ({hockey:'hockey game','live-music':'live music',festival:'festival',market:'market'}[i.eventKind] || (i.value === 'sports-recreation' ? 'sports event' : 'event'))
@@ -1844,57 +1841,6 @@ function planTrip(input) {
     if (!result.days.find(d=>d.day===Number(day))?.stops.some(s=>s.daypart===part&&s.venue?.id===id)) { const error=new Error(`A locked stop cannot be kept (${key}). Unlock it or adjust the conflicting requirement.`); error.code='TRIP_CONFLICT'; throw error; }
   }
   return result;
-}
-
-// Offer grounded ways to adapt an unmet request without marking an option as
-// a match or inserting it into the itinerary.
-function addOptionalRequirementAlternatives(results, plan, requirements, input) {
-  const adjacentKinds = {
-    museum: ['gallery'], gallery: ['museum'],
-    easy_walk: ['walk'], walk: ['easy_walk'],
-    skiing: ['snowshoeing', 'tubing'], snowshoeing: ['skiing', 'tubing'], tubing: ['skiing', 'snowshoeing'],
-    hiking: ['easy_walk', 'walk'], viewpoints: ['sunset'],
-  };
-  const selected = new Set(tripRequirements.selectedStops(plan).filter(s => s.venue).map(s => s.venue.id));
-  const baseRegion = requirements.items.find(i => i.kind === 'base')?.value;
-  const requestedRegions = input.intent?.regions?.length ? input.intent.regions : baseRegion ? [baseRegion] : [];
-  const daypart = requirements.daypart || input.intent?.daypart || null;
-  const visitDate = requirements.startDate || input.tripDate;
-  return results.map(item => {
-    if (item.status !== 'unmet' || !['type', 'type_count', 'venue_kind', 'venue', 'activity', 'feature', 'rainy'].includes(item.kind)) return item;
-    let weekday = input.startWeekday || null;
-    if (daypart && visitDate && /^\d{4}-\d{2}-\d{2}$/.test(visitDate)) {
-      const firstDay = new Date(`${visitDate}T12:00:00Z`).getUTCDay();
-      weekday = WEEKDAYS[(firstDay + 6 + Math.max(0, (item.dayIndex || 1) - 1)) % 7];
-    } else if (daypart && weekday && item.dayIndex > 1) {
-      const firstDay = WEEKDAYS.indexOf(String(weekday).toLowerCase().slice(0, 3));
-      if (firstDay >= 0) weekday = WEEKDAYS[(firstDay + item.dayIndex - 1) % 7];
-    }
-    const adjacent = adjacentKinds[item.value] || [];
-    const candidates = [];
-    for (const venue of input.facts || []) {
-      if (selected.has(venue.id) || !venue.url || !/^\/(?!\/)/.test(venue.url)) continue;
-      if (!tripRequirements.venueAllowed(venue, requirements, item.dayIndex || 1, visitDate)) continue;
-      const exact = tripRequirements.matches(venue, item);
-      const kinds = venue.plannerKinds || tripRequirements.inferPlannerKinds(venue);
-      const related = !exact && adjacent.some(k => kinds.includes(k) || (venue.activities || []).includes(k));
-      if (!exact && !related) continue;
-      const local = !requestedRegions.length || requestedRegions.includes(venue.region);
-      const timeFit = daypart ? hoursFit(venue, daypart, weekday) : null;
-      let reasonCode = related ? 'similar_activity' : !local ? 'different_region' : 'another_listing';
-      if (!related && local && timeFit?.status === 'closed') reasonCode = 'different_time';
-      else if (!related && local && timeFit && ['unknown', 'partial'].includes(timeFit.status)) reasonCode = 'confirm_hours';
-      candidates.push({
-        id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
-        reasonCode, _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
-        _reviews: Number(venue.reviews) || 0,
-        _timeRank: daypart ? ({ verified: 0, short: 1, partial: 2, unknown: 3, closed: 4 }[timeFit.status] ?? 3) : 0,
-      });
-    }
-    candidates.sort((a, b) => Number(b._exact) - Number(a._exact) || Number(b._local) - Number(a._local) || a._timeRank - b._timeRank || b._rating - a._rating || b._reviews - a._reviews || String(a.name).localeCompare(String(b.name)));
-    const optionalAlternatives = candidates.slice(0, 3).map(({ _exact, _local, _timeRank, _rating, _reviews, ...candidate }) => candidate);
-    return optionalAlternatives.length ? { ...item, optionalAlternatives } : item;
-  });
 }
 
 function planTripCore(input) {

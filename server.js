@@ -2162,13 +2162,6 @@ function findEventBySlug(region, slug) {
 // Deliberately minimal: no date library, no RRULE, no occurrence expansion
 // -- exactly the helpers the expiry fix (below) and later steps need.
 const OKANAGAN_TIME_ZONE = 'America/Vancouver';
-// B.C. stays on UTC-7 after the clocks advance on November 1, 2026. Keep
-// planner dates and event times correct on runtimes whose bundled tzdata still
-// applies the old November fallback rule.
-const BC_PERMANENT_UTC7_FROM = Date.UTC(2026, 10, 1, 9, 0);
-function isAfterBCPermanentTimeChange(instant) {
-  return instant instanceof Date && instant.getTime() >= BC_PERMANENT_UTC7_FROM;
-}
 const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_CUSTOM_WINDOW_DAYS = 366; // frozen design: Choose Dates spans at most a year
@@ -2182,7 +2175,6 @@ const okanaganDateFormatter = new Intl.DateTimeFormat('en-CA', {
 // The Okanagan calendar date ('YYYY-MM-DD') of an instant. `now` is
 // injectable for tests; production callers pass nothing.
 function todayLocal(now = new Date()) {
-  if (isAfterBCPermanentTimeChange(now)) return new Date(now.getTime() - 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
   return okanaganDateFormatter.format(now);
 }
 
@@ -2283,7 +2275,6 @@ const okanaganOffsetFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: OKANAGAN_TIME_ZONE, timeZoneName: 'longOffset',
 });
 function offsetAtInstant(instantMs) {
-  if (instantMs >= BC_PERMANENT_UTC7_FROM) return { sign: -1, hours: 7, minutes: 0 };
   const part = okanaganOffsetFormatter.formatToParts(new Date(instantMs)).find((p) => p.type === 'timeZoneName');
   const m = /GMT([+-])(\d{2}):?(\d{2})?/.exec(part ? part.value : '');
   if (!m) return null;
@@ -4372,12 +4363,6 @@ function tripPlanDate(when, now = new Date()) {
 const OKANAGAN_CLOCK_FORMAT = { timeZone: OKANAGAN_TIME_ZONE, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
 const okanaganClockFormatter = new Intl.DateTimeFormat('en-US', OKANAGAN_CLOCK_FORMAT);
 function okanaganClock(now = new Date()) {
-  // This function is serialized into browser scripts with toString(), so keep
-  // the cutoff self-contained instead of depending on a server-only helper.
-  if (now instanceof Date && now.getTime() >= Date.UTC(2026, 10, 1, 9, 0)) {
-    const local = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-    return { weekday: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][local.getUTCDay()], minutes: local.getUTCHours() * 60 + local.getUTCMinutes() };
-  }
   const parts = Object.fromEntries(okanaganClockFormatter.formatToParts(now).map((x) => [x.type, x.value]));
   return { weekday: parts.weekday.slice(0, 3).toLowerCase(), minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute) };
 }
@@ -6852,6 +6837,12 @@ function homepageNow() {
 // Fall hero text (2026-10-13): September through November (Okanagan calendar date), the homepage hero's headline and its
 // two lead lines switch to their fall versions -- the hero.*Fall keys in app.js, in English and French, so the EN/FR
 // switch keeps working. The photo is unchanged, and every other month the hero is byte-identical to before.
+const FALL_MOOD_IMAGES = Object.freeze({
+  'food-drink': '/images/mood/food-drink-fall.jpg', // Adobe Stock 523052575: friends toasting red wine at a sunset dinner
+  wine: '/images/mood/wine-fall.jpg', // Adobe Stock 408049776: a vineyard row in red and gold fall colour
+  'whats-on': '/images/mood/whats-on-fall.jpg', // Adobe Stock 905676733: a scarecrow on hay bales at a pumpkin patch
+  outdoors: '/images/mood/outdoors-fall.jpg', // Adobe Stock 277081912: a hiker on a road through golden fall forest
+});
 function isFallHeroSeason(now = new Date()) {
   const month = Number(todayLocal(now).slice(5, 7));
   return month >= 9 && month <= 11;
@@ -6935,6 +6926,9 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
   // Mac) is the free Adobe Stock photo 499088168, a skier in powder through frosted trees; indoor.jpg is 640x400 (the user-supplied
   // photo), so it carries its own height. Its .mood-card-indoor rule keeps a
   // dusk-to-amber gradient behind the image as the loading/missing fallback.
+  // Fall photos (2026-10-13): September through November (isFallHeroSeason), a card with a fall photo in
+  // FALL_MOOD_IMAGES shows it instead (free Adobe Stock, each under its own file name). Other months are unchanged.
+  if (isFallHeroSeason(now)) cards.forEach((c) => { if (FALL_MOOD_IMAGES[c.key]) c.img = FALL_MOOD_IMAGES[c.key]; });
   if (winter) {
     cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
@@ -25595,6 +25589,7 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  FALL_MOOD_IMAGES,
   seasonalHeroText,
   isFallHeroSeason,
   retimeEventOccurrence,
