@@ -6287,7 +6287,7 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>${escapeHtml(badgeInfo.title)} Venues in ${escapeHtml(regionLabel)}, BC</h1>
   <p class="subtitle">${venues.length} verified ${escapeHtml(badgeInfo.noun)} in ${escapeHtml(regionLabel)} — badge-checked from real listings, not guessed.</p>
-  ${categoryLinksHtml}${region === 'kelowna' && badge === 'patio' ? `\n  <p class="subtitle"><a href="${PATIO_GUIDE_PATH}">Our picks: the best patios in Kelowna &rarr;</a></p>` : ''}${region === 'kelowna' && badge === 'dog_friendly' ? `\n  <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Our guide: dog beaches, trails and patios in Kelowna &rarr;</a></p>` : ''}
+  ${categoryLinksHtml}${region === 'kelowna' && badge === 'patio' ? `\n  <p class="subtitle"><a href="${PATIO_GUIDE_PATH}">Our picks: the best patios in Kelowna &rarr;</a></p>` : ''}${region === 'kelowna' && badge === 'open_early' ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Our picks: the best brunch in Kelowna &rarr;</a></p>` : ''}${region === 'kelowna' && badge === 'dog_friendly' ? `\n  <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Our guide: dog beaches, trails and patios in Kelowna &rarr;</a></p>` : ''}
   <ul class="card-grid">
     ${cards}
   </ul>
@@ -13635,7 +13635,7 @@ ${renderGolfHeaderHtml()}
   ])}
   ${valleyWide
     ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
-    : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>`)}
+    : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
   ${venues.length ? foodDrinkSearchHtml() : ''}
   ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures) : ''}
@@ -20341,7 +20341,7 @@ function renderEditorialGuidePage(g, path) {
     const v = guideRefVenue(item.ref);
     if (!v) return '';
     const place = item.where || (item.noPlace || g.noPlace ? '' : REGION_LABELS[v.region] || '');
-    return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${escapeHtml(item.text)}</li>`;
+    return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${guideTipHtml(item.text)}</li>`;
   };
   const sectionsHtml = g.sections.map((sec) => {
     const items = sec.items.map(itemHtml).join('');
@@ -20590,6 +20590,186 @@ const DOG_GUIDE = {
   footerHtml: '<strong>See every dog-friendly place in Kelowna:</strong> <a href="/guide/kelowna/dog_friendly">Dog-friendly venues in Kelowna</a>, or <a href="/dog-friendly">Dog Friendly Finds</a> across the whole valley.',
 };
 function renderDogGuidePage() { return renderEditorialGuidePage(DOG_GUIDE, DOG_GUIDE_PATH); }
+
+// ---------- Best brunch in Kelowna (2026-10-13): /guides/best-brunch-kelowna ----------
+// Approved copy generated from drafts/best-brunch-kelowna.md; shared guide page.
+const BRUNCH_GUIDE_PATH = '/guides/best-brunch-kelowna';
+const BRUNCH_GUIDE = {
+  heading: 'Best Brunch in Kelowna',
+  title: 'Best Brunch & Breakfast in Kelowna | Okanagan Roam',
+  description: 'Where to brunch in Kelowna: creative Bennys, lake-view terraces, family diners, gluten-free and vegan options, bakeries and even a drag brunch.',
+  banner: () => CATEGORY_BANNER_IMAGES.restaurant,
+  parent: { name: 'Restaurants', href: '/restaurants' },
+  noPlace: true,
+  intro: [
+    "Kelowna takes its weekend mornings seriously. There's a Turkish twist on eggs Benny downtown, mimosas at a lively gastropub, lake views over a Mediterranean terrace, and old-fashioned diners where breakfast is still affordable for the whole family.",
+    "These are the brunch and breakfast spots worth knowing, grouped by the kind of morning you're after."
+  ],
+  sections: [
+    {
+      "id": "wait",
+      "jump": "Worth the wait",
+      "heading": "Worth the wait",
+      "items": [
+        {
+          "ref": "kelowna/bohemian-cafe",
+          "name": "Bohemian Cafe",
+          "text": "fresh-baked bread sets the tone, and the Turkish eggs Benny is the dish regulars drive downtown for."
+        },
+        {
+          "ref": "kelowna/diner-deluxe-the-shore",
+          "name": "Diner Deluxe – The Shore",
+          "text": "retro-style breakfast and brunch on Lakeshore Road in Pandosy. Reviewers point to the cinnamon bun, the mascarpone French toast and the breakfast bowls. There's outdoor seating, and it doesn't take reservations."
+        },
+        {
+          "ref": "kelowna/istanbul-cafe-brunch",
+          "name": "Istanbul Cafe & Brunch",
+          "text": "an all-day brunch menu alongside baklava and Turkish coffee."
+        },
+        {
+          "ref": "kelowna/pur-simple",
+          "name": "Pur & Simple",
+          "text": "a bright, chic breakfast spot known for big, shareable portions. An easy pick when you're out with a group."
+        },
+        {
+          "ref": "kelowna/sunny-s-a-modern-diner",
+          "name": "Sunny's a modern diner",
+          "text": "a downtown diner that takes allergies seriously. Mention yours and the kitchen will already have safe substitutions in mind."
+        }
+      ]
+    },
+    {
+      "id": "views",
+      "jump": "Views & patios",
+      "heading": "With a view or a patio",
+      "items": [
+        {
+          "ref": "kelowna/maestro-s-mediterranean-restaurant-and-terrace",
+          "name": "Maestro's Mediterranean Restaurant and Terrace",
+          "text": "weekend brunch on a lake-view Mediterranean terrace. Book ahead."
+        },
+        {
+          "ref": "kelowna/the-cozy-cafe-bar",
+          "name": "The Cozy Cafe + Bar",
+          "text": "a downtown brunch spot with a beautiful patio. Book a patio table."
+        },
+        {
+          "ref": "kelowna/central-kitchen-bar",
+          "name": "Central Kitchen + Bar",
+          "text": "a family-friendly gastropub with a weekend mimosa brunch and a peach burger regulars mention first."
+        }
+      ]
+    },
+    {
+      "id": "family",
+      "jump": "Family breakfasts",
+      "heading": "Family breakfasts",
+      "items": [
+        {
+          "ref": "kelowna/norman-s-diner-kelowna",
+          "name": "Norman's Diner",
+          "text": "a Rutland diner regulars call one of the most welcoming, affordable family breakfast spots in Kelowna."
+        },
+        {
+          "ref": "kelowna/porter-s",
+          "name": "Porter's",
+          "text": "a real kids' menu, and a Ukrainian breakfast dish alongside the diner classics."
+        },
+        {
+          "ref": "kelowna/the-jammery-city",
+          "name": "The Jammery City",
+          "text": "all-day breakfast with house-made jam you can buy by the jar. Try the marble bread."
+        },
+        {
+          "ref": "kelowna/de-dutch-springfield",
+          "name": "De Dutch",
+          "text": "Dutch-style pannekoeken alongside classic breakfasts, on Springfield Road and in the {kelowna/de-dutch-capri-centre|Capri Centre}."
+        },
+        {
+          "ref": "kelowna/cora-kelowna",
+          "name": "Cora",
+          "text": "a fruit-heavy breakfast at Orchard Park, opening at 6 am on weekdays."
+        }
+      ]
+    },
+    {
+      "id": "dietary",
+      "jump": "Gluten-free & vegan",
+      "heading": "Gluten-free and vegan friendly",
+      "items": [
+        {
+          "ref": "kelowna/oeb-breakfast-co",
+          "name": "OEB Breakfast Co.",
+          "text": "known for inventive breakfast poutines. The Meatless To Say goes fully vegan on request."
+        },
+        {
+          "ref": "kelowna/vintners",
+          "name": "Vintners",
+          "text": "the Coast Capri Hotel's breakfast and brunch spot, with plenty of gluten-free options and occasional live music."
+        },
+        {
+          "ref": "kelowna/the-sandwich-company",
+          "name": "The Sandwich Company",
+          "text": "a well-loved breakfast burrito and real vegan options."
+        }
+      ]
+    },
+    {
+      "id": "bakeries",
+      "jump": "Coffee & bakeries",
+      "heading": "Coffee, bakeries and a quick breakfast",
+      "items": [
+        {
+          "ref": "kelowna/pulp-fiction-pandosy",
+          "name": "Pulp Fiction – Pandosy",
+          "text": "a coffee house that doubles as a rare and used bookstore, with a strong breakfast menu and a coffee milkshake regulars rave about."
+        },
+        {
+          "ref": "kelowna/bread-company",
+          "name": "Bread Company",
+          "text": "a long-running Bernard Avenue bakery and breakfast spot, famous for its chocolate croissant and pizza croissant. Go at a quieter time of day."
+        },
+        {
+          "ref": "kelowna/specialty-bakery-bistro-finns-road",
+          "name": "Specialty Bakery & Bistro",
+          "text": "a Rutland scratch bakery with all-day breakfast on weekdays. Grab a cream-filled Kelonut on the way out."
+        },
+        {
+          "ref": "kelowna/marmalade-cat-cafe-pandosy",
+          "name": "Marmalade Cat Cafe",
+          "text": "house-baked treats, including gluten-free ones, weekend brunch and local art in Pandosy Village."
+        },
+        {
+          "ref": "kelowna/rustic-reel-brewing-co",
+          "name": "Rustic Reel Brewing Co",
+          "text": "a coffee bar in the morning and a taproom with a weekend brunch menu, in the north-end brewery district."
+        }
+      ]
+    },
+    {
+      "id": "show",
+      "jump": "Drag brunch",
+      "heading": "Brunch with a show",
+      "items": [
+        {
+          "ref": "kelowna/unicorn-lounge",
+          "name": "Unicorn Lounge",
+          "text": "a 2SLGBTQ+ bar downtown known for its drag brunches. Check the lounge's website for the current schedule."
+        }
+      ]
+    }
+  ],
+  table: { id: 'quick-picks', jump: 'Quick picks', heading: 'Quick picks', head: ['If you want\u2026', 'Go to'], rows: [
+    ['A brunch dish worth the drive', ['kelowna/bohemian-cafe|Bohemian Cafe (Turkish Benny)']],
+    ['Brunch with a lake view', ['kelowna/maestro-s-mediterranean-restaurant-and-terrace|Maestro\u2019s']],
+    ['Mimosas with friends', ['kelowna/central-kitchen-bar|Central Kitchen + Bar']],
+    ['An affordable family breakfast', ['kelowna/norman-s-diner-kelowna|Norman\u2019s Diner', 'kelowna/porter-s|Porter\u2019s']],
+    ['Gluten-free or vegan', ['kelowna/oeb-breakfast-co|OEB Breakfast Co.', 'kelowna/vintners|Vintners']],
+    ['Coffee and a pastry', ['kelowna/pulp-fiction-pandosy|Pulp Fiction', 'kelowna/bread-company|Bread Company']],
+  ] },
+  footerHtml: '<strong>See more:</strong> <a href="/kelowna/restaurants">All Kelowna restaurants</a> and <a href="/kelowna/cafes">caf\u00e9s</a>, or places that <a href="/guide/kelowna/open_early">open early</a>.',
+};
+function renderBrunchGuidePage() { return renderEditorialGuidePage(BRUNCH_GUIDE, BRUNCH_GUIDE_PATH); }
 
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
@@ -22079,6 +22259,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
+        `  <url>\n    <loc>https://okanaganroam.com${BRUNCH_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${DOG_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${WINE_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${PATIO_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -23694,6 +23875,10 @@ const server = http.createServer(async (req, res) => {
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
     // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if ((pathname === BRUNCH_GUIDE_PATH || pathname === `${BRUNCH_GUIDE_PATH}/`) && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderBrunchGuidePage());
+    }
     if ((pathname === DOG_GUIDE_PATH || pathname === `${DOG_GUIDE_PATH}/`) && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderDogGuidePage());
@@ -24184,6 +24369,9 @@ module.exports = {
   DOG_GUIDE,
   DOG_GUIDE_PATH,
   renderDogGuidePage,
+  BRUNCH_GUIDE,
+  BRUNCH_GUIDE_PATH,
+  renderBrunchGuidePage,
   renderListYourVenuePage,
   validateVenueSubmission,
   buildVenueSubmissionEmail,

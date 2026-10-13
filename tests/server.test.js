@@ -17874,3 +17874,18 @@ test('Dog guide (2026-10-13): /guides/dog-friendly-kelowna uses the shared guide
     if (hub.status === 200) assert.match(hub.text, /href="\/guides\/dog-friendly-kelowna"/);
   });
 });
+
+test('Brunch guide (2026-10-13): /guides/best-brunch-kelowna renders on the shared guide page, item text can carry inline place links, and it is linked and in the sitemap', async () => {
+  const html = app.renderBrunchGuidePage();
+  assert.match(html, /<title>Best Brunch &amp; Breakfast in Kelowna \| Okanagan Roam<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/best-brunch-kelowna">/);
+  assert.match(html, /"@type":"Article","headline":"Best Brunch in Kelowna"/);
+  assert.match(html, /"name":"Restaurants","item":"https:\/\/okanaganroam\.com\/restaurants"/);
+  const dutch = db.prepare("SELECT id FROM venues WHERE region = 'kelowna' AND slug IN ('de-dutch-springfield', 'de-dutch-capri-centre')").all();
+  if (dutch.length === 2) assert.match(html, /on Springfield Road and in the <a href="\/kelowna\/restaurants\/de-dutch-capri-centre">Capri Centre<\/a>\./);
+  assert.ok(!/\{kelowna\//.test(html), 'no raw link tokens leak into the page');
+  await withWinterServer(async (base) => {
+    assert.equal((await WINTER_GET(base, '/guides/best-brunch-kelowna')).status, 200);
+    assert.ok((await WINTER_GET(base, '/sitemap.xml')).text.includes('<loc>https://okanaganroam.com/guides/best-brunch-kelowna</loc>'));
+  });
+});
