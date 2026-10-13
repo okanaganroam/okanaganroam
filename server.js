@@ -8041,6 +8041,8 @@ function renderHomepageDiscoveryStyles() {
     .mood-card-grid::-webkit-scrollbar { display: none; }
     .mood-card { flex: 0 0 calc((100% + var(--mood-pad) - 2 * var(--mood-gap)) / 2.25); scroll-snap-align: start; aspect-ratio: 1.59 / 1; }
     .mood-swipe-cue { display: inline-block; margin-left: auto; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.02em; color: rgba(42,32,25,0.62); white-space: nowrap; }
+    /* The seasonal guide link (2026-10-13) stacked the heading into three rows on phones; it shows from 641px up only. */
+    .mood-season-link { display: none; }
   }
 
   /* Reference redesign, forensic-comparison rebuild (supersedes the
