@@ -252,6 +252,23 @@ test('V3 "understood": the request in visitor words, no venue named', () => {
   assert.deepEqual(tp.buildUnderstood(wi, d.interpretTripComponents(walk, T, wi), LABELS, {}).notUsed, ['lake', 'walk']);
 });
 
+test('V3 recommended searches are autumn-relevant in English and French', () => {
+  assert.deepEqual(v3.T3_EXAMPLES, [
+    'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
+    '2 days in Penticton with the kids — museums, parks and easy food',
+    'A romantic autumn weekend in Naramata with wineries and a great dinner',
+    'A dog-friendly autumn weekend in Vernon',
+    'Coffee, an autumn hike, a winery and dinner in Kelowna',
+    'What can we do around Penticton if it rains?',
+  ]);
+  const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(app, /'tripv3\.example1': 'Plan 3 days in Kelowna this autumn/);
+  assert.match(app, /'tripv3\.example6': 'What can we do around Penticton if it rains\?'/);
+  assert.match(app, /'tripv3\.example1': 'Planifiez 3 jours à Kelowna cet automne/);
+  assert.match(app, /'tripv3\.example6': 'Que peut-on faire autour de Penticton s’il pleut\s*\?'/);
+  assert.doesNotMatch(app, /tripv3\.(?:placeholder|example[1-6]|how1Text).*?(?:September|septembre|golf|beaches|plages)/);
+});
+
 test('V3 page: every example chip is a request the planner turns into real stops', () => {
   for (const text of v3.T3_EXAMPLES) {
     const intent = d.interpretDiscoveryQuery(text, T);
