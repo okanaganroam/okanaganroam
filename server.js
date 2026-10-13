@@ -2993,6 +2993,39 @@ function upsertEventOccurrences(id, occurrences, meta) {
   }
 }
 
+// retimeEventOccurrence(eventId, startDate, fromTime, toTime, meta) (2026-10-13): move one stored date's start time
+// (e.g. a listing copied an hour late). Only the scheduled date that starts on startDate at fromTime moves; it is
+// refused when no such date exists or another date already starts at toTime. The change is logged like any other.
+function retimeEventOccurrence(eventId, startDate, fromTime, toTime, meta, endTo) {
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  if (!LOCAL_TIME_PATTERN.test(String(toTime || ''))) return eventFail('occurrence_start_time_invalid', toTime);
+  const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  if (!existing) return eventFail('event_not_found', eventId);
+  const occ = db.prepare('SELECT * FROM event_occurrences WHERE event_id = ? AND start_date = ? AND start_time IS ?').get(eventId, startDate, fromTime || null);
+  if (!occ) return eventFail('occurrence_not_found', `${startDate} ${fromTime || ''}`.trim());
+  if (db.prepare('SELECT 1 FROM event_occurrences WHERE event_id = ? AND start_date = ? AND start_time = ?').get(eventId, startDate, toTime)) return eventFail('duplicate_occurrence', `${startDate} ${toTime}`);
+  if (endTo !== undefined && endTo !== null && !LOCAL_TIME_PATTERN.test(String(endTo))) return eventFail('occurrence_end_time_invalid', endTo);
+  const newEnd = endTo !== undefined && endTo !== null ? endTo : occ.end_time;
+  if (newEnd && occ.start_date === occ.end_date && !occ.ends_next_day && newEnd < toTime) return eventFail('occurrence_end_time_before_start', `${startDate} ${toTime}-${newEnd}`);
+  const logMeta = { ...meta, source: meta.source || existing.source_name, confidence: existing.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    db.prepare('UPDATE event_occurrences SET start_time = ?, end_time = ? WHERE id = ?').run(toTime, newEnd, occ.id);
+    logEventChange(eventId, occ.id, 'start_time', fromTime, toTime, logMeta);
+    if (newEnd !== occ.end_time) logEventChange(eventId, occ.id, 'end_time', occ.end_time, newEnd, logMeta);
+    recomputeEventSpan(eventId);
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true };
+  } catch (err) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 // setEventOccurrenceStatus(eventId, occId, status, meta): cancel /
 // postpone / restore one date. Cancelling or postponing the LAST scheduled
 // occurrence of a scheduled event is refused ('last_occurrence') unless the
@@ -25362,6 +25395,16 @@ function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches'))
           if (!r.ok) { out.failed.push({ name: upd.name, reason: r.reason, detail: r.detail }); continue; }
           changed = changed || r.changed;
         }
+        // retime: [{ start_date, from, to, end_to? }] moves a stored date's start (and optionally end) time; a date
+        // already starting at `to` counts as done.
+        let retimeFailed = false;
+        for (const rt of Array.isArray(upd.retime) ? upd.retime : []) {
+          if (db.prepare('SELECT 1 FROM event_occurrences WHERE event_id = ? AND start_date = ? AND start_time = ?').get(row.id, rt.start_date, rt.to)) continue;
+          const r = retimeEventOccurrence(row.id, rt.start_date, rt.from, rt.to, meta, rt.end_to);
+          if (!r.ok) { out.failed.push({ name: upd.name, reason: r.reason, detail: r.detail }); retimeFailed = true; break; }
+          changed = true;
+        }
+        if (retimeFailed) continue;
         (changed ? out.created : out.skipped).push(changed ? `${upd.name} (updated)` : upd.name);
       } catch (e) { out.failed.push({ name: upd && upd.name, reason: 'error', detail: String(e && e.message) }); }
     }
@@ -25522,6 +25565,7 @@ module.exports = {
   guardedSeasonUpdate,
   getSeasonStates,
   breadcrumbListSchema,
+  retimeEventOccurrence,
   fitTitle,
   localizeHtml,
   localizeStaticFr,

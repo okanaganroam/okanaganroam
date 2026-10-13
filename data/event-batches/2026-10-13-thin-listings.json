@@ -1,0 +1,248 @@
+{
+ "batch_id": "2026-10-13-thin-listings",
+ "reason": "Health crawl follow-up: real descriptions for 11 thin Big White event listings, from each event’s page on bigwhite.com (checked 2026-10-13), and start times moved an hour earlier on six of them, where Big White’s page header and its own description disagree by an hour (descriptions are more specific). Disney’s Frozen the Musical corrected from the studio’s own box office: the run ends Dec 20 (not Dec 13), Sunday shows are 2 pm matinees, and Saturday 1 pm matinees and the final week are added (24 performances).",
+ "reviewed_by": "owner-approved 2026-10-13",
+ "add_occurrences": [
+  {
+   "region": "kelowna",
+   "name": "Disney's Frozen the Musical",
+   "occurrences": [
+    {
+     "start_date": "2026-11-28",
+     "start_time": "13:00",
+     "label": "Matinee"
+    },
+    {
+     "start_date": "2026-12-05",
+     "start_time": "13:00",
+     "label": "Matinee"
+    },
+    {
+     "start_date": "2026-12-12",
+     "start_time": "13:00",
+     "label": "Matinee"
+    },
+    {
+     "start_date": "2026-12-19",
+     "start_time": "13:00",
+     "label": "Matinee"
+    },
+    {
+     "start_date": "2026-12-16",
+     "start_time": "19:00"
+    },
+    {
+     "start_date": "2026-12-17",
+     "start_time": "19:00"
+    },
+    {
+     "start_date": "2026-12-18",
+     "start_time": "19:00"
+    },
+    {
+     "start_date": "2026-12-19",
+     "start_time": "19:00"
+    },
+    {
+     "start_date": "2026-12-20",
+     "start_time": "14:00",
+     "label": "Matinee"
+    }
+   ]
+  }
+ ],
+ "updates": [
+  {
+   "region": "big-white",
+   "name": "Big Reds at Big White",
+   "fields": {
+    "description": "A red-wine festival at Big White. A VIP private tasting runs 6–9 pm in the Kettle Valley Steakhouse ($150), and the Grand Tasting runs 7–9 pm in the Happy Valley Day Lodge ($100; tickets on sale Nov 1).",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/big-reds-big-white-2",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/big-reds-big-white-2",
+    "source_checked_at": "2026-10-13"
+   }
+  },
+  {
+   "region": "big-white",
+   "name": "Big White's Twinkling Trail Light Up",
+   "fields": {
+    "description": "The season’s first lighting of Big White’s Twinkling Trail, an illuminated walk through the forest from the Adventure Park trailhead in Happy Valley. Meet at 5 pm.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/big-whites-twinkling-trail",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/big-whites-twinkling-trail",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2026-12-12",
+     "from": "18:00",
+     "to": "17:00",
+     "end_to": "18:45"
+    }
+   ]
+  },
+  {
+   "region": "big-white",
+   "name": "Santa's Workshop",
+   "fields": {
+    "description": "Santa in the Village Centre daily from 11 am, with a free photo, elf crafts and storytime from 3:30 to 4 pm (Dec 18–23). On Christmas Eve it’s photos only, 11 am to 1 pm.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/santas-workshop",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/santas-workshop",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2026-12-18",
+     "from": "12:00",
+     "to": "11:00"
+    }
+   ]
+  },
+  {
+   "region": "big-white",
+   "name": "Big White's Christmas Eve Festival",
+   "fields": {
+    "description": "Christmas Eve in the Village Centre from 4:30 pm: booths, a Loose Moose dance party and fireworks at 7 pm. The Glow Stick Parade needs pre-registration, a lift ticket and a helmet (ages 6+).",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/big-white-christmas-eve-festival",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/big-white-christmas-eve-festival",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2026-12-24",
+     "from": "17:30",
+     "to": "16:30",
+     "end_to": "19:05"
+    }
+   ]
+  },
+  {
+   "region": "big-white",
+   "name": "Ski with Santa",
+   "fields": {
+    "description": "Meet Santa at 10:30 am in front of the Big Chair, ski Sun Run together, then warm up with hot chocolate at Santa’s Workshop.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/ski-santa",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/ski-santa",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2026-12-25",
+     "from": "11:30",
+     "to": "10:30",
+     "end_to": "11:30"
+    }
+   ]
+  },
+  {
+   "region": "big-white",
+   "name": "Jr. Chef Challenge",
+   "fields": {
+    "description": "A cooking contest for ages 5–13 on the top floor of the Happy Valley Day Lodge, with contestants assembling at 3:15 pm. Tickets go on sale in November.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/big-whites-jr-chef-challenge",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/big-whites-jr-chef-challenge",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2027-01-13",
+     "from": "16:15",
+     "to": "15:15",
+     "end_to": "17:15"
+    }
+   ]
+  },
+  {
+   "region": "big-white",
+   "name": "The Loose Moose Challenge – January",
+   "fields": {
+    "description": "A village scavenger hunt: pick up a card at the Events Tent in the Village Centre from 9 am, then return it the next afternoon (Jan 17, 2–4 pm).",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/loose-moose-challenge-january",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/loose-moose-challenge-january",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2027-01-16",
+     "from": "10:00",
+     "to": "09:00"
+    }
+   ]
+  },
+  {
+   "region": "big-white",
+   "name": "The Loose Moose Challenge – February",
+   "fields": {
+    "description": "A village scavenger hunt: pick up a card at the Events Tent in the Village Centre from 9 am, then return it the next afternoon.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/loose-moose-challenge-february",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/loose-moose-challenge-february",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2027-02-13",
+     "from": "10:00",
+     "to": "09:00"
+    }
+   ]
+  },
+  {
+   "region": "big-white",
+   "name": "The Loose Moose Challenge – March",
+   "fields": {
+    "description": "A village scavenger hunt: pick up a card at the Events Tent in the Village Centre from 9 am, then return it the next afternoon.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/loose-moose-challenge-march",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/loose-moose-challenge-march",
+    "source_checked_at": "2026-10-13"
+   }
+  },
+  {
+   "region": "big-white",
+   "name": "Mission Hill Chef Collaboration Dinner",
+   "fields": {
+    "description": "Chefs Boddie Macklin-Shaw and Patrick Gayler cook a dinner paired with Mission Hill wines in the Kettle Valley Steakhouse. More details to come from Big White.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/mission-hill-chef-collaboration-dinner",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/mission-hill-chef-collaboration-dinner",
+    "source_checked_at": "2026-10-13"
+   }
+  },
+  {
+   "region": "big-white",
+   "name": "Mountain Glow: Women's Ski Day with Kelsey Serwa",
+   "fields": {
+    "description": "A women’s ski day with Olympian Kelsey Serwa: skiing, a wine lunch, spa extras and champagne après, supporting the Kelowna Women’s Shelter. Full details to come from Big White.",
+    "website": "https://www.bigwhite.com/events-activities/events-calendar/mountain-glow-womens-ski-day-kelsey-serwa",
+    "source_url": "https://www.bigwhite.com/events-activities/events-calendar/mountain-glow-womens-ski-day-kelsey-serwa",
+    "source_checked_at": "2026-10-13"
+   }
+  },
+  {
+   "region": "kelowna",
+   "name": "Disney's Frozen the Musical",
+   "fields": {
+    "description": "Kelowna Actors Studio’s holiday-season production of Disney’s Frozen, Nov 25 to Dec 20: Wednesday to Saturday at 7 pm, with Saturday matinees at 1 pm and Sunday matinees at 2 pm (dark Mondays and Tuesdays). Doors open at 5:30 pm for dinner before evening shows; food is extra. Tourism Kelowna lists tickets at $72–$99, and many shows are close to selling out.",
+    "website": "https://kelownaactorsstudio.com/event/disneys-frozen",
+    "source_type": "official_organizer",
+    "source_name": "Kelowna Actors Studio",
+    "source_url": "https://kelownaactorsstudio.com/event/disneys-frozen",
+    "source_checked_at": "2026-10-13"
+   },
+   "retime": [
+    {
+     "start_date": "2026-11-29",
+     "from": "19:00",
+     "to": "14:00"
+    },
+    {
+     "start_date": "2026-12-06",
+     "from": "19:00",
+     "to": "14:00"
+    },
+    {
+     "start_date": "2026-12-13",
+     "from": "19:00",
+     "to": "14:00"
+    }
+   ]
+  }
+ ]
+}
