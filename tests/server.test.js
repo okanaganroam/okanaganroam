@@ -17914,3 +17914,33 @@ test('Editorial guides (2026-10-13): a section whose places are all gone drops o
   assert.doesNotMatch(html, /href="#quick-picks"|<h2>Quick picks<\/h2>/);
   assert.match(html, /See everything:/, 'the footer links stay');
 });
+
+test('Fall guides (2026-10-13): data/guides files load, render on the shared guide page, are in the sitemap; event refs link upcoming events and drop past ones', async () => {
+  const paths = Object.keys(app.FILE_GUIDES);
+  assert.ok(paths.length >= 12, 'the fall guides load from data/guides');
+  for (const p of paths) {
+    const g = app.FILE_GUIDES[p];
+    assert.ok(app.GUIDE_BANNERS[JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'data', 'guides', p.slice(8) + '.json'), 'utf8')).banner], `${p} names a known banner`);
+    const html = app.renderFileGuidePage(p);
+    assert.match(html, new RegExp(`<link rel="canonical" href="https://okanaganroam\\.com${p}">`));
+    assert.match(html, /"@type":"Article"/);
+    const article = html.slice(html.indexOf('<article'), html.indexOf('</article>'));
+    assert.doesNotMatch(article, /\{(page:|event:|[a-z-]+\/)[^}]*\||\]\(|\*\*/, `${p} has no raw markup`);
+    assert.ok(g.title.length <= 70 && g.description.length <= 160, `${p} title/description lengths`);
+  }
+  const hub = app.renderFileGuidePage('/guides/fall-okanagan');
+  for (const p of paths.filter((x) => x !== '/guides/fall-okanagan')) assert.ok(hub.includes(`href="${p}"`), `the fall hub links ${p}`);
+  const upcoming = s5create({ name: 'Fall Guide Fixture Upcoming', occurrences: [{ start_date: '2032-10-20', start_time: '18:00', end_time: '20:00' }] });
+  const past = s5create({ name: 'Fall Guide Fixture Past', occurrences: [{ start_date: '2020-10-20', start_time: '18:00', end_time: '20:00' }] });
+  try {
+    assert.equal(app.guideRefVenue(`event:kelowna/${upcoming.slug}`)._href, `/kelowna/events/${upcoming.slug}`);
+    assert.equal(app.guideRefVenue(`event:kelowna/${past.slug}`), null, 'a past event drops out');
+    assert.equal(app.guideRefVenue('event:kelowna/not-an-event'), null);
+    assert.equal(app.guideTipHtml(`See {event:kelowna/${upcoming.slug}|the show} or {event:kelowna/${past.slug}|the old one}.`), `See <a href="/kelowna/events/${upcoming.slug}">the show</a> or the old one.`);
+  } finally { /* fixtures stay, like the other Step 5 event fixtures */ }
+  await withWinterServer(async (base) => {
+    assert.equal((await WINTER_GET(base, '/guides/halloween-okanagan')).status, 200);
+    const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+    for (const p of paths) assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${p}</loc>`), `sitemap lists ${p}`);
+  });
+});

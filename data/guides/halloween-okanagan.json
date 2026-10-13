@@ -1,0 +1,340 @@
+{
+ "heading": "Halloween in the Okanagan 2026",
+ "title": "Halloween in the Okanagan 2026 | Okanagan Roam",
+ "description": "Haunted corn mazes, ghost tours, family Halloween events and costume nights out across the Okanagan for October 2026, with dates and towns.",
+ "banner": "whats-on",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "This guide covers Halloween season in fall 2026, from a haunted corn maze north of Vernon to costume dances in Osoyoos. Times, prices and dates can change, so open each event page for current details before you head out.",
+  "We've grouped things by the kind of Halloween you're after. Each item shows its town and date."
+ ],
+ "sections": [
+  {
+   "id": "haunted-mazes-trails-and-tours",
+   "jump": "Haunted",
+   "heading": "Haunted mazes, trails and tours",
+   "items": [
+    {
+     "ref": "event:vernon/field-of-screams-xiii-the-unlucky",
+     "name": "Field of Screams XIII: The Unlucky",
+     "text": "four separate walk-through mazes at Historic O'Keefe Ranch north of Vernon, each with its own set and its own live scare actors waiting in the corn. The mazes start taking people at 6:30, so the whole thing happens in the dark, and Wednesdays are discounted all season. Organizers don't recommend it for children under 12.",
+     "where": "Vernon, until Nov 1"
+    },
+    {
+     "ref": "event:armstrong/the-walk-of-terror-spectacular",
+     "name": "The Walk of Terror Spectacular",
+     "text": "an evening at Caravan Farm Theatre, 6:30 to 10 pm.",
+     "where": "Armstrong, Oct 24"
+    },
+    {
+     "ref": "event:armstrong/horse-drawn-halloween",
+     "name": "Horse Drawn Halloween",
+     "text": "at Caravan Farm Theatre from noon. Admission is $18.90 to $29.40.",
+     "where": "Armstrong, Oct 17 and 18"
+    },
+    {
+     "ref": "event:vernon/haunted-houses-of-pleasant-valley-rd-featuring-the-caetani-centre",
+     "name": "Haunted Houses of Pleasant Valley Rd featuring the Caetani Centre",
+     "text": "at the Caetani Cultural Centre.",
+     "where": "Vernon, Oct 15 to 16"
+    },
+    {
+     "ref": "event:vernon/ghost-tours-of-vernon-halloween-flagship-tours",
+     "name": "Ghost Tours of Vernon Halloween Flagship Tours",
+     "text": "from Justice Park at 7 pm.",
+     "where": "Vernon, nightly Oct 24 to 30"
+    },
+    {
+     "ref": "event:kelowna/tombstone-tours-best-of-the-buried",
+     "name": "Tombstone Tours: Best of the Buried",
+     "text": "a one-hour guided tour of the Pioneer Cemetery with Kelowna Museums, from 6 to 7 pm. Admission is $15; register with the organizer.",
+     "where": "Kelowna, Oct 23"
+    }
+   ]
+  },
+  {
+   "id": "family-friendly-and-community-",
+   "jump": "Family",
+   "heading": "Family-friendly and community Halloween",
+   "items": [
+    {
+     "ref": "event:west-kelowna/haunted-house-at-the-westbank-museum-2026",
+     "name": "Haunted House at the Museum",
+     "text": "the Westbank Museum's 6th annual Haunted House, open weekdays 9 am to 4 pm and Saturdays October 24 and 31 from noon to 7 pm. Entry is by cash or a non-perishable food donation to the Central Okanagan Food Bank.",
+     "where": "West Kelowna, Oct 20 to 31"
+    },
+    {
+     "ref": "event:summerland/haunted-halloween-trail-at-sagebrush-ranch",
+     "name": "Haunted Halloween Trail at Sagebrush Ranch",
+     "text": "at Sagebrush Stables, from noon.",
+     "where": "Summerland, several dates until Oct 31"
+    },
+    {
+     "ref": "event:west-kelowna/6th-annual-halloweenie-halloween-day-family-celebration",
+     "name": "6th Annual Halloweenie: Halloween Day Family Celebration",
+     "text": "at Grizzli Winery, noon to 4 pm. Admission is $10.",
+     "where": "West Kelowna, Oct 31"
+    },
+    {
+     "ref": "event:west-kelowna/gnome-a-ween",
+     "name": "Gnome-a-ween",
+     "text": "at Truck 59 Ciderhouse, 11 am to 3 pm.",
+     "where": "West Kelowna, Oct 24"
+    },
+    {
+     "ref": "event:osoyoos/all-hallows-festival",
+     "name": "All Hallows Festival",
+     "text": "at the Gyro Bandshell, 4 to 8 pm.",
+     "where": "Osoyoos, Oct 24 and 25"
+    },
+    {
+     "ref": "event:peachland/witches-on-the-water",
+     "name": "Witches on the Water",
+     "text": "on Beach Avenue across from Lakeshore Gardens, starting at 1:30 pm.",
+     "where": "Peachland, Oct 17"
+    },
+    {
+     "ref": "kelowna/don-o-ray-farm-adventure",
+     "name": "Don-O-Ray Farm Adventure",
+     "text": "in October the farm turns into a Haunted Farm Adventure. The farm also has a petting zoo and a 7,000-square-foot hedge maze.",
+     "where": "Kelowna, October"
+    },
+    {
+     "ref": "vernon/davison-orchards",
+     "name": "Davison Orchards",
+     "text": "a family farm with free admission where, in season, you can u-pick apples and pumpkins and ride the tractor-pulled apple-bin train.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "west-kelowna/paynter-s-fruit-market",
+     "name": "Paynter's Fruit Market",
+     "text": "in fall, the pumpkin patch and seasonal events make it an easy family outing.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "halloween-at-the-wineries",
+   "jump": "Wineries",
+   "heading": "Halloween at the wineries",
+   "items": [
+    {
+     "ref": "event:west-kelowna/spooky-cinema-series-featuring-sleepy-hollow",
+     "name": "Spooky Cinema Series Featuring: Sleepy Hollow",
+     "text": "at Grizzli Winery, 6 to 9 pm. Admission is $10 to $15.",
+     "where": "West Kelowna, Oct 17"
+    },
+    {
+     "ref": "event:lake-country/retro-halloween-social",
+     "name": "Retro Halloween Social",
+     "text": "at Ex Nihilo Vineyards, 6:30 to 10 pm. Admission is $30.",
+     "where": "Lake Country, Oct 24"
+    },
+    {
+     "ref": "event:oliver/halloween-movie-night",
+     "name": "Halloween Movie Night",
+     "text": "at District Wine Village, 5:30 to 9 pm.",
+     "where": "Oliver, Oct 30"
+    },
+    {
+     "ref": "event:oliver/hallowine",
+     "name": "Hallowine",
+     "text": "at Phantom Creek Estates, noon to 3 pm.",
+     "where": "Oliver, Oct 31"
+    },
+    {
+     "ref": "event:kelowna/indulgence-tasting-experience-halloween-edit",
+     "name": "Indulgence Tasting Experience - Halloween Edit",
+     "text": "at Azhadi Vineyards, 2 to 3:30 pm. Admission is $96.",
+     "where": "Kelowna, Oct 31"
+    },
+    {
+     "ref": "event:naramata/howl-oween-party-at-howling-bluff-winery",
+     "name": "Howl-oween Party at Howling Bluff Winery",
+     "text": "at Howling Bluff Estate Winery.",
+     "where": "Naramata, Oct 31"
+    },
+    {
+     "ref": "event:west-kelowna/a-haunting-at-crown-thieves",
+     "name": "A Haunting at Crown & Thieves",
+     "text": "7 to 10 pm.",
+     "where": "West Kelowna, Oct 31"
+    }
+   ]
+  },
+  {
+   "id": "halloween-nights-out",
+   "jump": "Nights out",
+   "heading": "Halloween nights out",
+   "items": [
+    {
+     "ref": "event:kelowna/creatures-of-the-night-aerial-acrobatics-live",
+     "name": "Creatures of the Night Aerial Acrobatics Live",
+     "text": "at Kelowna Community Theatre, 6:30 pm. Admission is $35 to $45.",
+     "where": "Kelowna, Oct 16"
+    },
+    {
+     "ref": "event:penticton/ceramic-pumpkin-planter-workshop-at-cannery-brewing",
+     "name": "Ceramic Pumpkin Planter Workshop at Cannery Brewing",
+     "text": "at Cannery Brewing, 6 pm.",
+     "where": "Penticton, Oct 19"
+    },
+    {
+     "ref": "event:vernon/ghost-tours-of-vernon-presents-boos-and-booze",
+     "name": "Ghost Tours of Vernon presents Boos and Booze",
+     "text": "8 to 11:30 pm, behind Cheek to Cheek Dance Studio in the back alley off 30th Street.",
+     "where": "Vernon, Oct 23"
+    },
+    {
+     "ref": "event:kelowna/horrorfest-xvii",
+     "name": "HorrorFest XVII",
+     "text": "at Metro Hub, 7 pm.",
+     "where": "Kelowna, Oct 24"
+    },
+    {
+     "ref": "event:osoyoos/spooky-music-bingo",
+     "name": "Spooky Music Bingo",
+     "text": "at the OSCA Osoyoos Activity Centre, 6:30 to 9:30 pm.",
+     "where": "Osoyoos, Oct 27"
+    },
+    {
+     "ref": "event:kelowna/god-is-a-scottish-drag-queen-halloween-spooktacular",
+     "name": "God is a Scottish Drag Queen Halloween Spooktacular",
+     "text": "at Kelowna Community Theatre, 7:30 pm. Admission is $54.11.",
+     "where": "Kelowna, Oct 28"
+    },
+    {
+     "ref": "event:kelowna/red-bull-turn-it-up",
+     "name": "Red Bull Turn It Up",
+     "text": "a live DJ competition at Revelry in downtown Kelowna to kick off Halloween weekend. Confirm the start time, age restrictions and tickets with the organizer.",
+     "where": "Kelowna, Oct 29"
+    },
+    {
+     "ref": "event:osoyoos/halloween-dance",
+     "name": "Halloween Dance",
+     "text": "at the OSCA Osoyoos Activity Centre, 6 pm.",
+     "where": "Osoyoos, Oct 30"
+    },
+    {
+     "ref": "event:vernon/halloween-howl",
+     "name": "Halloween Howl",
+     "text": "at the Army Navy & Airforce Veterans In Canada (ANAF), 6 to 10 pm.",
+     "where": "Vernon, Oct 31"
+    },
+    {
+     "ref": "event:osoyoos/halloween-dance-with-the-treblemaker-s",
+     "name": "Halloween Dance with The Treblemaker’s",
+     "text": "a Halloween night dance at the Osoyoos Elks Lodge with live music by The Treblemaker’s, from 6:30 pm.",
+     "where": "Osoyoos, Oct 31"
+    },
+    {
+     "ref": "event:kelowna/crystal-journey-halloween-concert",
+     "name": "Crystal Journey Halloween Concert",
+     "text": "at Kelowna Yoga Hub, 7 to 9 pm. Admission is $40.",
+     "where": "Kelowna, Oct 31"
+    },
+    {
+     "ref": "event:penticton/speedway-spooktacular-at-the-penticton-speedway",
+     "name": "Speedway Spooktacular at the Penticton Speedway",
+     "text": "at Penticton Speedway, 6 pm.",
+     "where": "Penticton, Oct 31"
+    }
+   ]
+  },
+  {
+   "id": "spooky-beyond-halloween-night",
+   "jump": "Year-round spooky",
+   "heading": "Spooky beyond Halloween night",
+   "items": [
+    {
+     "ref": "vernon/ghost-tours-of-vernon",
+     "name": "Ghost Tours of Vernon",
+     "text": "costumed hosts lead lantern-lit walking tours through downtown Vernon's Lower East Hill, mixing local history with ghost stories, a tradition now in its 23rd year. The flagship tour runs about 1 hour 45 minutes, and the season is July–August and October.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/caetani-cultural-centre",
+     "name": "Caetani Cultural Centre",
+     "text": "the historic heritage home of artist Sveva Caetani, which hosts art workshops, markets and seasonal ghost tours.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/exit-kelowna-escape-games",
+     "name": "Exit Kelowna Escape Games",
+     "text": "five themed escape rooms, including one called Haunted. A solid pick for groups and families.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/xperience-games-kelowna",
+     "name": "Xperience Games Kelowna",
+     "text": "tech-based escape rooms with no locks or keys, such as Haunted Apartment. Most games run 60 minutes for 2 to 6 players, ages 7 and up.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A proper scare (teens and adults)",
+    [
+     "event:vernon/field-of-screams-xiii-the-unlucky|Field of Screams XIII: The Unlucky"
+    ]
+   ],
+   [
+    "Something for younger kids",
+    [
+     "event:west-kelowna/haunted-house-at-the-westbank-museum-2026|Haunted House at the Museum",
+     "event:west-kelowna/6th-annual-halloweenie-halloween-day-family-celebration|6th Annual Halloweenie"
+    ]
+   ],
+   [
+    "A pumpkin patch",
+    [
+     "vernon/davison-orchards|Davison Orchards",
+     "west-kelowna/paynter-s-fruit-market|Paynter's Fruit Market"
+    ]
+   ],
+   [
+    "Ghost stories and local history",
+    [
+     "event:vernon/ghost-tours-of-vernon-halloween-flagship-tours|Ghost Tours of Vernon Halloween Flagship Tours",
+     "event:kelowna/tombstone-tours-best-of-the-buried|Tombstone Tours: Best of the Buried"
+    ]
+   ],
+   [
+    "Halloween with a glass of wine",
+    [
+     "event:lake-country/retro-halloween-social|Retro Halloween Social",
+     "event:oliver/hallowine|Hallowine"
+    ]
+   ],
+   [
+    "A Halloween night dance",
+    [
+     "event:osoyoos/halloween-dance-with-the-treblemaker-s|Halloween Dance with The Treblemaker’s",
+     "event:vernon/halloween-howl|Halloween Howl"
+    ]
+   ],
+   [
+    "A rainy-day spooky fix",
+    [
+     "kelowna/exit-kelowna-escape-games|Exit Kelowna Escape Games",
+     "kelowna/xperience-games-kelowna|Xperience Games Kelowna"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>"
+}

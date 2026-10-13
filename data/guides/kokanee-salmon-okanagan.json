@@ -1,0 +1,160 @@
+{
+ "heading": "Where to see the kokanee salmon run",
+ "title": "Where to See the Kokanee Salmon Run | Okanagan Roam",
+ "description": "Creekside walks where you can watch kokanee spawn in the Okanagan, plus other salmon runs nearby and a few verified ways to fish for kokanee.",
+ "banner": "nature",
+ "parent": {
+  "name": "Nature & Wildlife",
+  "href": "/outdoors/nature"
+ },
+ "noPlace": true,
+ "intro": [
+  "Fall is a good time to head down to the creeks. A handful of parks in the valley are known for their spawning kokanee, and most of them are short, easy walks, so they make a good outing with kids or an unhurried afternoon on your own.",
+  "Below are the spots where our listings mention kokanee spawning, a few places to see other salmon runs in the North and South Okanagan, and some verified ways to fish for kokanee on the lakes."
+ ],
+ "sections": [
+  {
+   "id": "kokanee-creeks-and-spawning-gr",
+   "jump": "Kokanee creeks",
+   "heading": "Kokanee creeks and spawning grounds",
+   "items": [
+    {
+     "ref": "peachland/hardy-falls-regional-park",
+     "name": "Hardy Falls Regional Park",
+     "text": "The flat, shaded Owl Trail runs just 430 metres each way over Deep Creek to a viewing platform below the falls. The park is ideal for wildlife watching, especially in the fall when kokanee return to spawn in the creek. The trail and washrooms are accessible, and dogs are welcome on leash.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "west-kelowna/rotary-trails-powers-creek",
+     "name": "Rotary Trails (Powers Creek)",
+     "text": "A short, flat, stroller-friendly loop along Powers Creek with footbridges, a boardwalk and interpretive signs. In late summer and fall you can watch kokanee running upstream. Park off Gellatly Road across from the yacht club.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "kelowna/mission-creek-regional-park",
+     "name": "Mission Creek Regional Park",
+     "text": "Home to the kokanee spawning channel and the EECO education centre, with about 7 km of easy trails including the short Kokanee Trail. Dogs are welcome on leash. Portions of the trails are closed for the Gerstmar Bridge work, so follow the closure signs and detours.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/goats-peak-regional-park",
+     "name": "Goats Peak Regional Park",
+     "text": "The park's waterfront sections are conservation areas for shore-spawning kokanee. Above the shore, the trails climb to a lookout with lake and valley views; dogs are welcome on leash.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "other-salmon-runs-nearby",
+   "jump": "Other salmon runs",
+   "heading": "Other salmon runs nearby",
+   "items": [
+    {
+     "ref": "lumby/lumby-salmon-trail",
+     "name": "Lumby Salmon Trail",
+     "text": "Three linked trails along Bessette and Duteau creeks, the easternmost spawning grounds for Coho and Chinook salmon in the Okanagan. Walks run from 1 km to 8 km on flat ground that suits wheelchairs and prams, with interpretive signs along the way. Leashed pets are welcome.",
+     "where": "Lumby"
+    },
+    {
+     "ref": "enderby/cooke-creek-recreation-site-shuswap-river",
+     "name": "Cooke Creek Recreation Site (Shuswap River)",
+     "text": "A riverside campsite on the road from Enderby to Mabel Lake, where the salmon run turns the river into a show in October. The Kingfisher hatchery and interpretive centre is a few minutes away on the same road.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "okanagan-falls/sxwexwnitkw-okanagan-falls-provincial-park-campground",
+     "name": "sx̌ʷəx̌ʷnitkʷ (Okanagan Falls) Provincial Park Campground",
+     "text": "In late September, sockeye salmon spawn in the Okanagan River right beside the campsites. The gate runs from April 1 to mid-October, and pets must be leashed.",
+     "where": "Okanagan Falls"
+    }
+   ]
+  },
+  {
+   "id": "fishing-for-kokanee",
+   "jump": "Fishing",
+   "heading": "Fishing for kokanee",
+   "items": [
+    {
+     "ref": "lake-country/al-ways-fishing-charters",
+     "name": "Al-ways Fishing Charters",
+     "text": "Guided trips across Wood Lake and up the channel into Kalamalka Lake, fishing for kokanee and trout. Trips suit first-timers as much as regulars, and depart from the dock at Wood Lake RV Park & Marina. A BC freshwater fishing licence is required.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "kelowna/desert-salmon-charters",
+     "name": "Desert Salmon Charters",
+     "text": "Private Okanagan Lake charters, trolling for kokanee, rainbow trout, lake trout and sockeye. Half-day and full-day trips take up to 6 guests.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/okanagan-bucktail-co",
+     "name": "Okanagan Bucktail Co.",
+     "text": "Guided trolling charters for trophy rainbow trout and kokanee, using hand-tied bucktail flies included free on every trip. Okanagan Lake is fished year-round, with charters leaving from the West Kelowna Yacht Club. A BC freshwater fishing licence is required.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "lake-country/wood-lake-fishing-dock",
+     "name": "Wood Lake Fishing Dock",
+     "text": "A fully accessible public fishing dock that lets anglers of every ability fish Wood Lake's kokanee and trout water from shore. There is a parking lot at the access park, and a BC freshwater fishing licence is required.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "lumby/echo-lake-provincial-park",
+     "name": "Echo Lake Provincial Park",
+     "text": "A forested mountain lake reached by about 20 km of gravel road, popular for fishing for rainbow trout, lake trout and kokanee in both summer and winter.",
+     "where": "Lumby"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "The easiest walk to watch spawning kokanee",
+    [
+     "peachland/hardy-falls-regional-park|Hardy Falls Regional Park",
+     "west-kelowna/rotary-trails-powers-creek|Rotary Trails (Powers Creek)"
+    ]
+   ],
+   [
+    "A nature lesson with your walk",
+    [
+     "kelowna/mission-creek-regional-park|Mission Creek Regional Park"
+    ]
+   ],
+   [
+    "A trail with wheelchair and pram access",
+    [
+     "lumby/lumby-salmon-trail|Lumby Salmon Trail"
+    ]
+   ],
+   [
+    "A bigger river run in the North Okanagan",
+    [
+     "enderby/cooke-creek-recreation-site-shuswap-river|Cooke Creek Recreation Site (Shuswap River)"
+    ]
+   ],
+   [
+    "Fishing from shore",
+    [
+     "lake-country/wood-lake-fishing-dock|Wood Lake Fishing Dock"
+    ]
+   ],
+   [
+    "A guided day on the water",
+    [
+     "west-kelowna/okanagan-bucktail-co|Okanagan Bucktail Co.",
+     "kelowna/desert-salmon-charters|Desert Salmon Charters"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/outdoors/nature\">Nature &amp; Wildlife</a>, <a href=\"/outdoors/hiking\">Hiking &amp; Trails</a>, <a href=\"/outdoors/fishing\">Fishing</a>"
+}

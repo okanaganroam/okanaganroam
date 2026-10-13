@@ -1,0 +1,210 @@
+{
+ "heading": "U-Pick Orchards, Farm Stands & Farm Visits",
+ "title": "Okanagan U-Pick Farms & Farm Stands | Okanagan Roam",
+ "description": "Pick apples and pumpkins, feed farm animals, stop at fruit stands and taste among the orchards. Okanagan farm visits for harvest season.",
+ "banner": "tour-farm",
+ "parent": {
+  "name": "Farms & Food Tours",
+  "href": "/tours/farm"
+ },
+ "noPlace": true,
+ "intro": [
+  "Harvest season is a good time to get out among the Okanagan's orchards and farms. This guide gathers places where you can pick your own, meet the farm animals, shop a fruit stand, taste wine or cider among the trees, or learn how orchards shaped the valley.",
+  "What's ready to pick depends on the crop and the year, so check each farm's listing or website before you head out."
+ ],
+ "sections": [
+  {
+   "id": "pick-your-own",
+   "jump": "Pick your own",
+   "heading": "Pick your own",
+   "items": [
+    {
+     "ref": "vernon/davison-orchards",
+     "name": "Davison Orchards",
+     "text": "A family farm on the edge of Vernon with free admission. In season you can u-pick apples and pumpkins, and tractor-pulled apple-bin train tours roll through the orchards and fields. Kids love the free Crazy Cow Kids Corral play area and the animal barn.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "west-kelowna/paynter-s-fruit-market",
+     "name": "Paynter's Fruit Market",
+     "text": "A family farm growing fruit since 1919. Pick your own in season or grab what they've already picked, book a farm tour, then finish with a coffee or a scoop of ice cream at the on-site café. In fall, the pumpkin patch and seasonal events make it an easy family outing.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "lake-country/rose-hill-orchard-cidery",
+     "name": "Rose Hill Orchard & Cidery",
+     "text": "Pick your own cherries, peaches or apples, then trade the bucket for a cider flight under the trees. It's a working orchard with a farm shop, picnic tables and lawn games for the kids.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "armstrong/sparrowgrass-field-flower",
+     "name": "Sparrowgrass Field & Flower",
+     "text": "A family farm on Knob Hill Road where you can wander the rows and cut your own u-pick flowers. There's a farmstand, a gift shop and a little café, plus seasonal happenings including a fall vintage market. Asparagus, peonies and heritage pumpkins mark the seasons, so check what's on before you drive out.",
+     "where": "Armstrong"
+    }
+   ]
+  },
+  {
+   "id": "farm-animals-and-a-full-day-ou",
+   "jump": "Farm days out",
+   "heading": "Farm animals and a full day out",
+   "items": [
+    {
+     "ref": "kelowna/don-o-ray-farm-adventure",
+     "name": "Don-O-Ray Farm Adventure",
+     "text": "A petting zoo where you can feed goats, a pony, ducks and bunnies, plus a 7,000-square-foot hedge maze. The market sells fresh produce, baked goods and ice cream, and in October the farm turns into a Haunted Farm Adventure.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "armstrong/log-barn-1912",
+     "name": "Log Barn 1912",
+     "text": "A rustic farm market and café with sheep, alpacas and llamas you can feed, and fresh-baked pies that reviewers call genuinely good.",
+     "where": "Armstrong"
+    },
+    {
+     "ref": "oliver/covert-farms-family-estate",
+     "name": "Covert Farms Family Estate",
+     "text": "A working organic vineyard with a play area for kids and a petting zoo with farm animals. Let the kids loose while you taste.",
+     "where": "Oliver"
+    }
+   ]
+  },
+  {
+   "id": "farm-stands-and-farm-caf-s",
+   "jump": "Farm stands & cafés",
+   "heading": "Farm stands and farm cafés",
+   "items": [
+    {
+     "ref": "summerland/crick-coffee-and-farm-store",
+     "name": "Crick Coffee and Farm Store",
+     "text": "A shady Trout Creek patio right next to an apple orchard, with farm-fresh produce for sale alongside your coffee. Dogs and kids are welcome.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "kaleden/farm-gate-winery-fruit-stand",
+     "name": "Farm Gate Winery & Fruit Stand",
+     "text": "Half fruit stand, half tasting bar. Grab local fruit, taste through an easygoing lineup of wines and walk out with a case at farm-gate prices.",
+     "where": "Kaleden"
+    }
+   ]
+  },
+  {
+   "id": "tasting-among-the-orchards",
+   "jump": "Orchard tastings",
+   "heading": "Tasting among the orchards",
+   "items": [
+    {
+     "ref": "naramata/elephant-island-winery",
+     "name": "Elephant Island Winery",
+     "text": "Berry and apricot fruit wines from an orchard setting on the Aikins Loop, poured in a tasting room with real family warmth.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "summerland/millionaires-row-cider-co",
+     "name": "Millionaires' Row Cider Co.",
+     "text": "A family-run cidery on a historic orchard, with a picnic area, board games and apple slushies for the kids.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "kelowna/ailm-estate",
+     "name": "Ailm Estate",
+     "text": "Sparkling Reserve Brut and estate wines poured on a covered patio above the orchards of southeast Kelowna. Small, unhurried and personal, and open Thursday to Sunday.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "oliver/here-s-the-thing-vineyards",
+     "name": "Here's the Thing Vineyards",
+     "text": "An orchard patio on Black Sage Road, where the $10 tasting fee goes entirely to ALS research.",
+     "where": "Oliver"
+    }
+   ]
+  },
+  {
+   "id": "orchard-history-and-an-orchard",
+   "jump": "Orchard history",
+   "heading": "Orchard history, and an orchard walk",
+   "items": [
+    {
+     "ref": "kelowna/okanagan-wine-orchard-museum-laurel-packinghouse",
+     "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+     "text": "The valley's fruit-growing and winemaking story, told in the historic 1918 Laurel Packinghouse in the Cultural District.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "lake-country/lake-country-museum-archives",
+     "name": "Lake Country Museum & Archives",
+     "text": "A heritage museum in Okanagan Centre covering Lake Country's story, from the syilx people and early orchards to the Applebox Belles. Volunteers offer guided looks at the collection.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "summerland/summerland-museum-archives",
+     "name": "Summerland Museum & Archives",
+     "text": "Covers Syilx history, early orchard farming and the Kettle Valley Railway, with kids' drop-in workshops.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/summerland-rotary-trail-lakeshore-loop",
+     "name": "Summerland Rotary Trail Lakeshore Loop",
+     "text": "A 6 km walk from Peach Orchard Beach Park north to Crescent Beach. The return leg winds back through orchards and vineyards.",
+     "where": "Summerland"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Apples and pumpkins to pick",
+    [
+     "vernon/davison-orchards|Davison Orchards",
+     "west-kelowna/paynter-s-fruit-market|Paynter's Fruit Market"
+    ]
+   ],
+   [
+    "A haunted farm in October",
+    [
+     "kelowna/don-o-ray-farm-adventure|Don-O-Ray Farm Adventure"
+    ]
+   ],
+   [
+    "Farm animals to feed",
+    [
+     "armstrong/log-barn-1912|Log Barn 1912",
+     "kelowna/don-o-ray-farm-adventure|Don-O-Ray Farm Adventure"
+    ]
+   ],
+   [
+    "Picking, then a cider",
+    [
+     "lake-country/rose-hill-orchard-cidery|Rose Hill Orchard & Cidery"
+    ]
+   ],
+   [
+    "Coffee and produce to take home",
+    [
+     "summerland/crick-coffee-and-farm-store|Crick Coffee and Farm Store"
+    ]
+   ],
+   [
+    "Fruit wine instead of grape",
+    [
+     "naramata/elephant-island-winery|Elephant Island Winery"
+    ]
+   ],
+   [
+    "A rainy-day orchard story",
+    [
+     "kelowna/okanagan-wine-orchard-museum-laurel-packinghouse|Okanagan Wine & Orchard Museum (Laurel Packinghouse)"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/tours/farm\">Farms &amp; food tours</a>, <a href=\"/wineries\">All Okanagan wineries</a>, <a href=\"/breweries\">Breweries</a>"
+}

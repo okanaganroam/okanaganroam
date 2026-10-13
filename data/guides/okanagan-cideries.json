@@ -1,0 +1,244 @@
+{
+ "heading": "Okanagan Cideries for Apple Season",
+ "title": "Okanagan Cideries: An Apple-Season Guide | Okanagan Roam",
+ "description": "Orchard cideries, cider with a proper meal, family- and dog-friendly tasting rooms and tours that do the driving, from Osoyoos to Enderby.",
+ "banner": "brewery",
+ "parent": {
+  "name": "Breweries & Cideries",
+  "href": "/breweries"
+ },
+ "noPlace": true,
+ "intro": [
+  "Apple season is a natural time to taste Okanagan cider. Many of the valley's cideries press fruit from their own orchards, and several pair a flight with a real kitchen, lawn games for the kids or a spot for the dog.",
+  "Some tasting rooms are seasonal, so check hours before you go. The {event:lake-country/lake-country-cider-fest|Lake Country Cider Fest} is listed for October 17 and 18 on the Lake Country Cider Trail; confirm details with the organizer before you go."
+ ],
+ "sections": [
+  {
+   "id": "cider-from-the-orchard-outside",
+   "jump": "Orchard cideries",
+   "heading": "Cider from the orchard outside the door",
+   "items": [
+    {
+     "ref": "penticton/creek-gully-cider",
+     "name": "Creek & Gully Cider",
+     "text": "Naramata Bench cider made from certified-organic apples grown right outside the tasting room. Take a flight of crisp, dry ciders onto the orchard patio and look out over the trees they came from.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "osoyoos/orchard-hill-estate-cidery",
+     "name": "Orchard Hill Estate Cidery",
+     "text": "One of BC's original estate cideries, pouring apple ciders from its own South Okanagan orchards on the highway between Oliver and Osoyoos. Open seasonally, mid-May through October.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "coldstream/tonys-craft-cidery",
+     "name": "Tony's Craft Cidery",
+     "text": "Small-batch ciders on a cozy tasting-room porch, out among 50 acres of apple and cherry trees in Lavington. Pair a flight with something from the seasonal menu. It's an easy, scenic detour on the road from Vernon to Lumby.",
+     "where": "Coldstream"
+    },
+    {
+     "ref": "lake-country/rose-hill-orchard-cidery",
+     "name": "Rose Hill Orchard & Cidery",
+     "text": "Pick your own cherries, peaches or apples, then trade the bucket for a cider flight under the trees. A working orchard with a farm shop and picnic tables.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "summerland/nomad-cider",
+     "name": "NOMAD Cider",
+     "text": "A small farm-to-glass cidery on Bottleneck Drive making low-intervention ciders from fresh-pressed Okanagan apples and pears. Its wild-fermented ciders take cues from England, France, Spain, Germany and Quebec, and the picnic area under the walnut trees looks out to Giant's Head Mountain.",
+     "where": "Summerland"
+    }
+   ]
+  },
+  {
+   "id": "cider-with-a-proper-meal",
+   "jump": "Cider with a meal",
+   "heading": "Cider with a proper meal",
+   "items": [
+    {
+     "ref": "vernon/cambium-cider-co",
+     "name": "Cambium Cider Co",
+     "text": "An orchard cidery paired with a genuine restaurant, so a quick stop can turn into a full afternoon. Order beyond a flight, because the kitchen is worth exploring too. Dogs aren't allowed inside or on the patio, but leashed dogs are welcome at a few picnic tables in the orchard.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "armstrong/farmstrong-cider-company",
+     "name": "Farmstrong Cider Company",
+     "text": "A menu that changes often, wood-fired pizzas reviewers call standout, and board games at the table for anyone who wants to linger.",
+     "where": "Armstrong"
+    },
+    {
+     "ref": "kelowna/upside-cidery",
+     "name": "Upside Cidery",
+     "text": "A big, lively cidery with lawn and upstairs patio seating, wood-fired pizza and real non-alcoholic options.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/ricardos-at-soma",
+     "name": "Ricardo's at Soma",
+     "text": "Chef Ricardo's Italian-leaning plates with Soma's craft ciders on an orchard patio in southeast Kelowna. A relaxed spot to linger over a flight and a shared board. Open seasonally, Thursday to Sunday.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "bring-the-kids-and-the-dog",
+   "jump": "Kids & dogs",
+   "heading": "Bring the kids (and the dog)",
+   "items": [
+    {
+     "ref": "lake-country/folktale-cider",
+     "name": "Folktale Cider",
+     "text": "A trampoline, zipline, chicken coop and cider-and-wine slushies. A rare cider stop where kids have as much to do as the adults.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "summerland/millionaires-row-cider-co",
+     "name": "Millionaires' Row Cider Co.",
+     "text": "A family-run cidery on a historic orchard, with a picnic area, board games and apple slushies for the kids.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "west-kelowna/truck-59-ciderhouse",
+     "name": "Truck 59 Ciderhouse",
+     "text": "An orchard cidery with a family-and-dog-friendly main lawn, lawn games and a separate adults-only lounge.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "summerland/summerland-heritage-cider-company",
+     "name": "Summerland Heritage Cider Company",
+     "text": "A \"bark board\" built for visiting dogs, and complimentary slushies for the humans.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "kelowna/scenic-road-cider-co",
+     "name": "Scenic Road Cider Co.",
+     "text": "An award-winning cidery in a 100-year-old heritage building, with a picnic area where you can bring your own food to go with the tastings.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "small-batch-and-something-diff",
+   "jump": "Small-batch",
+   "heading": "Small-batch and something different",
+   "items": [
+    {
+     "ref": "summerland/dominion-cider-co",
+     "name": "Dominion Cider Co.",
+     "text": "Dry, fruit-forward bottles, plus custom-label cans for events. A cidery for people who want something beyond the standard sweet apple can.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "enderby/shuswap-cider-company",
+     "name": "Shuswap Cider Company",
+     "text": "A small craft cidery run by two women on a farm beside the Shuswap River. The ciders use BC apples plus fruit and botanicals from the farm and the Shuswap area, poured as flights and on tap, with a dog-friendly patio.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "osoyoos/liber-farms-winery",
+     "name": "Liber Farms & Winery",
+     "text": "A small winery just off Highway 97 with a beautiful patio and homemade apple juice and cider.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "kelowna/the-view-winery-vineyard",
+     "name": "The View Winery & Vineyard",
+     "text": "A smaller winery with its own on-site cidery, so you can try cider alongside the wine, and live music on the patio.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "let-someone-else-drive-or-tast",
+   "jump": "Tours & markets",
+   "heading": "Let someone else drive, or taste at the market",
+   "items": [
+    {
+     "ref": "penticton/top-cat-tours",
+     "name": "Top Cat Tours",
+     "text": "Running since 2001, with daily shared and private tours and door-to-door pickup. Options include beer, cider and distillery tours. Season: March to November.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "kelowna/signature-connections-formerly-kelowna-concierge",
+     "name": "Signature Connections (formerly Kelowna Concierge)",
+     "text": "A long-running tour and shuttle company whose \"Sip and Sample\" tour takes in craft breweries, distilleries and cideries.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "lake-country/pedego-electric-bikes-oyama",
+     "name": "Pedego Electric Bikes Oyama",
+     "text": "E-bike rentals from Gatzke's Farm Market, right beside the Okanagan Rail Trail between Wood and Kalamalka lakes. Partner tours pair a ride with wine or cider tastings; riders must be 16 and up.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "penticton/penticton-farmers-market",
+     "name": "Penticton Farmers' Market",
+     "text": "Every Saturday morning from mid-April to the end of October on the 100 block of Main Street. Among more than 90 vendors, local wineries, cideries and breweries offer samples.",
+     "where": "Penticton"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Cider among the trees it came from",
+    [
+     "penticton/creek-gully-cider|Creek & Gully Cider",
+     "coldstream/tonys-craft-cidery|Tony's Craft Cidery"
+    ]
+   ],
+   [
+    "To pick apples, then taste",
+    [
+     "lake-country/rose-hill-orchard-cidery|Rose Hill Orchard & Cidery"
+    ]
+   ],
+   [
+    "A full meal with your cider",
+    [
+     "vernon/cambium-cider-co|Cambium Cider Co",
+     "armstrong/farmstrong-cider-company|Farmstrong Cider Company"
+    ]
+   ],
+   [
+    "Kids along",
+    [
+     "lake-country/folktale-cider|Folktale Cider",
+     "summerland/millionaires-row-cider-co|Millionaires' Row Cider Co."
+    ]
+   ],
+   [
+    "The dog along",
+    [
+     "summerland/summerland-heritage-cider-company|Summerland Heritage Cider Company",
+     "west-kelowna/truck-59-ciderhouse|Truck 59 Ciderhouse"
+    ]
+   ],
+   [
+    "Dry or unusual ciders",
+    [
+     "summerland/dominion-cider-co|Dominion Cider Co.",
+     "summerland/nomad-cider|NOMAD Cider"
+    ]
+   ],
+   [
+    "No driving",
+    [
+     "penticton/top-cat-tours|Top Cat Tours",
+     "lake-country/pedego-electric-bikes-oyama|Pedego Electric Bikes Oyama"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/breweries\">Breweries</a>, <a href=\"/wineries\">All Okanagan wineries</a>"
+}

@@ -1,0 +1,158 @@
+{
+ "heading": "Indoor golf in the Okanagan",
+ "title": "Indoor Golf Simulators in the Okanagan | Okanagan Roam",
+ "description": "Keep swinging after the courses close: Okanagan indoor golf simulators for 24/7 practice, lessons and club fitting, or a night out with friends.",
+ "banner": "golf",
+ "parent": {
+  "name": "Golf",
+  "href": "/golf"
+ },
+ "noPlace": true,
+ "intro": [
+  "When the outdoor season winds down, you don't have to put the clubs away. The valley has a good spread of simulator spaces in Kelowna, West Kelowna, Vernon and Penticton.",
+  "Some are self-serve bays you can book at any hour, some are built around lessons and real swing data, and some are as much a night out as a round of golf."
+ ],
+ "sections": [
+  {
+   "id": "play-any-hour",
+   "jump": "Play any hour",
+   "heading": "Play any hour",
+   "items": [
+    {
+     "ref": "kelowna/fringe-indoor-golf",
+     "name": "The Fringe Indoor Golf",
+     "text": "A 24/7, staffless simulator space off Lakeshore, where secure mobile access replaces a front desk. Four Trackman iO bays cover more than 300 virtual courses, with hourly rates and membership discounts.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/anytime-sim-golf",
+     "name": "Anytime Sim Golf",
+     "text": "A fully automated simulator on Vaughan Avenue: book a private bay online and a CloudKey unlocks the door when you arrive. It runs day or night, 365 days a year, on Foresight Sports launch monitors.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/golfbox",
+     "name": "GOLFBOX",
+     "text": "Three private bays with Trackman iO technology in a boutique space of live-edge wood and warm lighting, open 24/7. An upstairs boardroom makes it work for corporate bookings too.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "vernon/back-nine-indoor-golf",
+     "name": "Back Nine Indoor Golf",
+     "text": "Three roomy private bays on Full Swing technology, with a course library that includes Pebble Beach and St. Andrews. No membership is required to book a bay, and members get round-the-clock access.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "lessons-data-and-club-fitting",
+   "jump": "Lessons",
+   "heading": "Lessons, data and club fitting",
+   "items": [
+    {
+     "ref": "kelowna/golf-evolution",
+     "name": "Golf Evolution",
+     "text": "GC Hawk simulators with tour-level club and ball data, plus lessons, club fitting and maintenance from a Canadian Certified PGA Professional. Credit-based Evo Packs can be shared with friends or family, and there's a lounge with food and drinks.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/jsquared-golf",
+     "name": "JSquared Golf",
+     "text": "An instruction-focused operation on the Gallagher's Canyon property, with a GCQUAD launch monitor and PGA of Canada professionals teaching golfers of every level. Open daily from 8 a.m. to 10 p.m.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/predator-ridge-sim-lounge",
+     "name": "Predator Ridge SIM Lounge",
+     "text": "A seasonal indoor golf spot that reopens each fall and runs through the winter, with Foresight launch monitors and more than 90 virtual courses. Bookings are by phone only, in one-hour blocks for up to four, and a PGA of Canada professional offers lessons.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "leagues-and-a-night-out",
+   "jump": "Leagues",
+   "heading": "Leagues and a night out",
+   "items": [
+    {
+     "ref": "kelowna/okanagan-virtual-golf",
+     "name": "Okanagan Virtual Golf",
+     "text": "A Brewery District lounge with four bays and roughly 2,000 virtual courses, from Predator Ridge and Tower Ranch to Augusta. A fully licensed bar pours local craft beer, cocktails and mocktails, and there are organized leagues.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/okanagan-virtual-golf",
+     "name": "Okanagan Virtual Golf",
+     "text": "A simulator lounge on Main Street with three bays, more than 400 virtual courses and a dedicated training bay. Lessons come from instructors connected to Summerland Golf Club, and winter scramble leagues run once the outdoor season ends.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "vernon/dante-s-golf-lounge",
+     "name": "Dante's Golf Lounge",
+     "text": "The Rise's indoor golf spot, with two Foresight simulator bays, rental clubs and food and drinks from the restaurant next door. A winter scramble league adds some friendly competition.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/simplex-sportszone",
+     "name": "Simplex Sportszone",
+     "text": "Golf studios on Trackman 4 and Full Swing technology, with in-house PGA coaches, in a licensed building that also has simulators for hockey, baseball, soccer and more. Event hosting for groups of up to 40 makes it a go-to for birthdays and team outings.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A late-night or early-morning session",
+    [
+     "kelowna/fringe-indoor-golf|The Fringe Indoor Golf",
+     "kelowna/anytime-sim-golf|Anytime Sim Golf",
+     "west-kelowna/golfbox|GOLFBOX"
+    ]
+   ],
+   [
+    "To fix your swing with a pro",
+    [
+     "kelowna/golf-evolution|Golf Evolution",
+     "kelowna/jsquared-golf|JSquared Golf"
+    ]
+   ],
+   [
+    "A winter league",
+    [
+     "vernon/dante-s-golf-lounge|Dante's Golf Lounge",
+     "penticton/okanagan-virtual-golf|Okanagan Virtual Golf (Penticton)"
+    ]
+   ],
+   [
+    "Drinks with your round",
+    [
+     "penticton/okanagan-virtual-golf|Okanagan Virtual Golf (Kelowna)",
+     "vernon/dante-s-golf-lounge|Dante's Golf Lounge"
+    ]
+   ],
+   [
+    "A birthday or team outing",
+    [
+     "kelowna/simplex-sportszone|Simplex Sportszone",
+     "vernon/back-nine-indoor-golf|Back Nine Indoor Golf"
+    ]
+   ],
+   [
+    "A resort setting",
+    [
+     "vernon/predator-ridge-sim-lounge|Predator Ridge SIM Lounge"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/golf\">Golf</a>, <a href=\"/indoor\">Indoor &amp; Rainy Day</a>"
+}

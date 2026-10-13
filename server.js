@@ -20303,15 +20303,30 @@ const WINE_GUIDE = {
 };
 
 // A guide place by 'region/slug' (live), and its public URL.
+// Event refs (2026-10-13) are written 'event:region/slug': a scheduled event
+// that hasn't ended yet links to its page; a past, cancelled or missing one
+// drops out of the guide on its own, so seasonal guides never point at
+// events that are over.
 function guideRefVenue(ref) {
-  const [region, slug] = String(ref).split('/');
+  const r = String(ref);
+  if (r.startsWith('event:')) {
+    const [region, slug] = r.slice(6).split('/');
+    const e = REGION_LABELS[region] ? findEventBySlug(region, slug) : null;
+    const full = e ? getEventById(e.id) : null;
+    if (!full || full.status !== 'scheduled' || isEventExpired(full)) return null;
+    return { region, slug, name: full.name, _href: `/${region}/events/${slug}` };
+  }
+  const [region, slug] = r.split('/');
   return skiGuideVenue(region, slug);
 }
-const guideVenueHref = (v) => `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+const guideVenueHref = (v) => v._href || `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
 // Tip text with {region/slug|Label} links resolved live; everything else escaped.
 function guideTipHtml(text) {
-  return String(text).split(/(\{[a-z-]+\/[a-z0-9-]+\|[^}]+\})/).map((part) => {
-    const m = part.match(/^\{([a-z-]+\/[a-z0-9-]+)\|([^}]+)\}$/);
+  return String(text).split(/(\{(?:page:\/[a-z0-9\/_-]*|(?:event:)?[a-z-]+\/[a-z0-9-]+)\|[^}]+\})/).map((part) => {
+    // {page:/path|Label}: a plain internal link (another guide, a list page).
+    const pg = part.match(/^\{page:(\/[a-z0-9\/_-]*)\|([^}]+)\}$/);
+    if (pg) return `<a href="${escapeHtml(pg[1])}">${escapeHtml(pg[2])}</a>`;
+    const m = part.match(/^\{((?:event:)?[a-z-]+\/[a-z0-9-]+)\|([^}]+)\}$/);
     if (!m) return escapeHtml(part);
     const v = guideRefVenue(m[1]);
     return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(m[2])}</a>` : escapeHtml(m[2]);
@@ -20350,7 +20365,7 @@ function renderEditorialGuidePage(g, path) {
   const sectionsHtml = g.sections.map((sec) => {
     const items = sec.items.map(itemHtml).join('');
     if (items) liveSections.add(sec.id);
-    return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${escapeHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
+    return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${guideTipHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
   }).join('');
   const rowsHtml = g.table.rows.map(([area, refs]) => {
     const links = refs.map((x) => { const [ref, label] = x.split('|'); const v = guideRefVenue(ref); return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(label)}</a>` : ''; }).filter(Boolean);
@@ -20387,7 +20402,7 @@ ${renderGolfHeaderHtml()}
   ])}
     <article class="ski-guide">
       ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
-      <div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
+      <div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${guideTipHtml(p)}</p>`).join('')}
       </div>
       <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}
       <section class="ski-guide-resort" id="${g.table.id}">${rowsHtml ? `
@@ -21038,6 +21053,43 @@ const RAINY_GUIDE = {
   footerHtml: '<strong>See everything:</strong> <a href="/indoor">Indoor &amp; Rainy Day</a> across the valley, by <a href="/indoor/arts">museums &amp; galleries</a>, <a href="/indoor/family">family fun</a>, <a href="/indoor/games">games</a>, <a href="/indoor/spas">spas</a> and <a href="/indoor/theatre">theatre</a>.',
 };
 function renderRainyGuidePage() { return renderEditorialGuidePage(RAINY_GUIDE, RAINY_GUIDE_PATH); }
+
+// ---------- File-based editorial guides (2026-10-13) ----------
+// Seasonal guides live as data files in data/guides/<slug>.json (generated
+// from approved drafts) and render on the shared guide page at
+// /guides/<slug>. `banner` names one of the site's existing photos.
+const GUIDE_BANNERS = {
+  'outdoor': () => CATEGORY_BANNER_IMAGES.outdoor,
+  'winery': () => CATEGORY_BANNER_IMAGES.winery,
+  'restaurant': () => CATEGORY_BANNER_IMAGES.restaurant,
+  'cafe': () => CATEGORY_BANNER_IMAGES.cafe,
+  'brewery': () => CATEGORY_BANNER_IMAGES.brewery,
+  'golf': () => CATEGORY_BANNER_IMAGES.golf,
+  'indoor': () => CATEGORY_BANNER_IMAGES.indoor,
+  'food-drink': () => FOOD_DRINK_HUB_BANNER,
+  'whats-on': () => WHATS_ON_BANNER,
+  'hiking': () => OUTDOOR_ACTIVITY_BANNERS.hiking,
+  'nature': () => OUTDOOR_ACTIVITY_BANNERS.nature,
+  'fishing': () => OUTDOOR_ACTIVITY_BANNERS.fishing,
+  'tour-farm': () => TOUR_ACTIVITIES.find((a) => a.slug === 'farm').banner,
+};
+for (const [key, b] of Object.entries(WHATSON_CATEGORY_BANNERS)) GUIDE_BANNERS[`whats-on-${key}`] = () => b;
+const FILE_GUIDES_DIR = path.join(__dirname, 'data', 'guides');
+const FILE_GUIDES = (() => {
+  const out = {};
+  let files = [];
+  try { files = fs.readdirSync(FILE_GUIDES_DIR).filter((f) => f.endsWith('.json')); } catch (e) { return out; }
+  for (const f of files.sort()) {
+    const g = JSON.parse(fs.readFileSync(path.join(FILE_GUIDES_DIR, f), 'utf8'));
+    const bannerFn = GUIDE_BANNERS[g.banner] || GUIDE_BANNERS.outdoor;
+    out[`/guides/${f.replace(/\.json$/, '')}`] = { ...g, banner: bannerFn };
+  }
+  return out;
+})();
+function renderFileGuidePage(pathname) {
+  const g = FILE_GUIDES[pathname];
+  return g ? renderEditorialGuidePage(g, pathname) : null;
+}
 
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
@@ -22527,6 +22579,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // Editorial guides (2026-10-10).
+        ...Object.keys(FILE_GUIDES).map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com${RAINY_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${BRUNCH_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com${DOG_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -24144,6 +24197,10 @@ const server = http.createServer(async (req, res) => {
     // List Your Venue, Phase 1 (2026-09-25) -- see renderListYourVenuePage
     // and handleVenueSubmission above.
     // Ski season guide (2026-10-10) -- see renderSkiGuidePage.
+    if (method === 'GET' && FILE_GUIDES[pathname.replace(/\/$/, '')]) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderFileGuidePage(pathname.replace(/\/$/, '')));
+    }
     if ((pathname === RAINY_GUIDE_PATH || pathname === `${RAINY_GUIDE_PATH}/`) && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderRainyGuidePage());
@@ -24648,6 +24705,10 @@ module.exports = {
   RAINY_GUIDE,
   RAINY_GUIDE_PATH,
   renderRainyGuidePage,
+  FILE_GUIDES,
+  GUIDE_BANNERS,
+  renderFileGuidePage,
+  guideRefVenue,
   renderEditorialGuidePage,
   renderListYourVenuePage,
   validateVenueSubmission,

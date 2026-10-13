@@ -1,0 +1,248 @@
+{
+ "heading": "Fall Events & Festivals in the Okanagan, October–November 2026",
+ "title": "Okanagan Fall Events & Festivals 2026 | Okanagan Roam",
+ "description": "Cider fest, Oktoberfest, film festivals, Skate Canada, harvest dinners, farmers' markets and a big book sale across the Okanagan, Oct–Nov 2026.",
+ "banner": "whats-on-events-festivals",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "This guide covers the fall 2026 season, from mid-October into November. It's a short list of the events that stand out: a cider fest on the Lake Country Cider Trail, two Oktoberfests, film festivals, world-class figure skating in Kelowna, harvest dinners and the markets that keep going into the cooler months. Dates and details can change, so check each event page before you go.",
+  "Events are grouped by type. Each one shows its town and date."
+ ],
+ "sections": [
+  {
+   "id": "festivals-film-and-big-weekend",
+   "jump": "Festivals",
+   "heading": "Festivals, film and big weekends",
+   "items": [
+    {
+     "ref": "event:kelowna/okanagan-international-film-festival-and-forum-opening-night",
+     "name": "Okanagan International Film Festival and Forum Opening Night",
+     "text": "at the Rotary Centre for the Arts, 7:30 pm. Admission is $30.",
+     "where": "Kelowna, Oct 15"
+    },
+    {
+     "ref": "event:kelowna/okanagan-international-film-day-1",
+     "name": "Okanagan International Film: Day 1",
+     "text": "at Landmark Cinemas Grand 10, 4 pm. Admission is $15.",
+     "where": "Kelowna, Oct 16"
+    },
+    {
+     "ref": "event:kelowna/vancouver-international-mountain-film-festival-vimff",
+     "name": "Vancouver International Mountain Film Festival (VIMFF)",
+     "text": "at Kelowna Community Theatre, 7 pm. Admission is $40.",
+     "where": "Kelowna, Oct 23"
+    },
+    {
+     "ref": "event:kelowna/horrorfest-xvii",
+     "name": "HorrorFest XVII",
+     "text": "at Metro Hub, 7 pm.",
+     "where": "Kelowna, Oct 24"
+    },
+    {
+     "ref": "event:osoyoos/all-hallows-festival",
+     "name": "All Hallows Festival",
+     "text": "at the Gyro Bandshell, 4 to 8 pm.",
+     "where": "Osoyoos, Oct 24 and 25"
+    },
+    {
+     "ref": "event:vernon/field-of-screams-xiii-the-unlucky",
+     "name": "Field of Screams XIII: The Unlucky",
+     "text": "four walk-through haunted corn mazes at Historic O'Keefe Ranch, with live scare actors. Organizers say it's best suited to teens and adults.",
+     "where": "Vernon, until Nov 1"
+    },
+    {
+     "ref": "event:kelowna/skate-canada-international-2026",
+     "name": "2026 Skate Canada International",
+     "text": "world-class figure skating at Prospera Place, part of the ISU Grand Prix series. Session tickets are sold through the venue.",
+     "where": "Kelowna, Oct 30 to Nov 1"
+    }
+   ]
+  },
+  {
+   "id": "cider-beer-whisky-and-oktoberf",
+   "jump": "Cider & beer",
+   "heading": "Cider, beer, whisky and Oktoberfest",
+   "items": [
+    {
+     "ref": "event:lake-country/lake-country-cider-fest",
+     "name": "Lake Country Cider Fest",
+     "text": "on the Lake Country Cider Trail.",
+     "where": "Lake Country, Oct 17 and 18"
+    },
+    {
+     "ref": "event:kelowna/whisky-global",
+     "name": "Whisky Global",
+     "text": "at the Kelowna Event Centre.",
+     "where": "Kelowna, Oct 16 and 17"
+    },
+    {
+     "ref": "event:west-kelowna/oktoberfest-at-the-hatching-post",
+     "name": "Oktoberfest at The Hatching Post",
+     "text": "at The Hatching Post, 3 to 9 pm on Oct 16.",
+     "where": "West Kelowna, from Oct 16, two dates"
+    },
+    {
+     "ref": "event:osoyoos/oktoberfest-2026-10-17",
+     "name": "Oktoberfest",
+     "text": "at the OSCA Osoyoos Activity Centre, 5 pm.",
+     "where": "Osoyoos, Oct 17"
+    },
+    {
+     "ref": "event:kelowna/street-fest-2026",
+     "name": "Street Fest 2026",
+     "text": "at Rustic Reel Brewing Co., 4 to 10 pm. Early bird tickets are $35, general admission $39.",
+     "where": "Kelowna, Oct 17"
+    },
+    {
+     "ref": "event:kelowna/brewphoria-2026",
+     "name": "Brewphoria 2026",
+     "text": "at the Kelowna Beer Institute.",
+     "where": "Kelowna, Oct 24"
+    },
+    {
+     "ref": "event:kelowna/epic-okanagan-2026",
+     "name": "EPIC Okanagan 2026",
+     "text": "an evening of cocktails and bites at the Laurel Packinghouse, with competing cocktails from Okanagan bartenders and beverage makers paired with food from the region's restaurants. 7 to 9:30 pm.",
+     "where": "Kelowna, Nov 6"
+    }
+   ]
+  },
+  {
+   "id": "harvest-food-and-wine",
+   "jump": "Food & wine",
+   "heading": "Harvest food and wine",
+   "items": [
+    {
+     "ref": "event:oliver/harvest-long-table-dinner-series-at-the-sonora-room-restaurant",
+     "name": "Harvest Long Table Dinner Series at The Sonora Room Restaurant",
+     "text": "at the Sonora Room Restaurant at Burrowing Owl Estate Winery, 6 pm.",
+     "where": "Oliver, Oct 21"
+    },
+    {
+     "ref": "event:oliver/cooking-class-dinners-at-hester-creek-winery",
+     "name": "Cooking Class Dinners at Hester Creek Winery",
+     "text": "at Hester Creek Estate Winery, 6:30 to 9:15 pm.",
+     "where": "Oliver, several dates until Oct 30"
+    },
+    {
+     "ref": "event:kelowna/smokies-s-mores",
+     "name": "Smokies & S'mores",
+     "text": "at Meadow Vista Honey Wines. Admission is $25 to $39.",
+     "where": "Kelowna, until Nov 1"
+    },
+    {
+     "ref": "event:west-kelowna/2026-okanagan-mushroom-festival",
+     "name": "2026 Okanagan Mushroom Festival",
+     "text": "at the Westbank Lions Community Centre, 11 am to 4 pm, by donation.",
+     "where": "West Kelowna, Nov 1"
+    }
+   ]
+  },
+  {
+   "id": "markets-fairs-and-a-big-book-s",
+   "jump": "Markets",
+   "heading": "Markets, fairs and a big book sale",
+   "items": [
+    {
+     "ref": "event:kelowna/fall-36th-annual-great-okanagan-book-sale",
+     "name": "Fall 36th Annual Great Okanagan Book Sale",
+     "text": "at Immaculate Conception Parish Hall. Admission is free.",
+     "where": "Kelowna, Oct 14 to 17"
+    },
+    {
+     "ref": "event:vernon/vernon-farmers-market",
+     "name": "Vernon Farmers’ Market",
+     "text": "at Kal Tire Place (3445 43 Ave), 8 am to 1 pm.",
+     "where": "Vernon, Mondays and Thursdays until the end of October"
+    },
+    {
+     "ref": "event:penticton/penticton-farmers-market-2026",
+     "name": "Penticton Farmers’ Market 2026",
+     "text": "8:30 am to 1 pm.",
+     "where": "Penticton, several dates until Dec 12"
+    },
+    {
+     "ref": "event:kelowna/okanagan-vintage-fair",
+     "name": "Okanagan Vintage Fair",
+     "text": "at Parkinson Recreation Centre, 10 am to 3 pm. Admission is $3; kids 12 and under are free.",
+     "where": "Kelowna, Oct 24"
+    },
+    {
+     "ref": "event:penticton/bookish-market-aboard-the-ss-sicamous",
+     "name": "BOOKISH Market: Aboard the SS Sicamous",
+     "text": "on the SS Sicamous, 10 am to 3 pm.",
+     "where": "Penticton, Oct 25"
+    },
+    {
+     "ref": "event:kelowna/winter-warm-up-market",
+     "name": "Winter Warm-Up Market",
+     "text": "at the Rotary Centre for the Arts, 10 am to 4 pm, by donation.",
+     "where": "Kelowna, Nov 7"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A festival day out with cider",
+    [
+     "event:lake-country/lake-country-cider-fest|Lake Country Cider Fest"
+    ]
+   ],
+   [
+    "Oktoberfest",
+    [
+     "event:west-kelowna/oktoberfest-at-the-hatching-post|Oktoberfest at The Hatching Post",
+     "event:osoyoos/oktoberfest-2026-10-17|Oktoberfest (Osoyoos)"
+    ]
+   ],
+   [
+    "Films",
+    [
+     "event:kelowna/okanagan-international-film-festival-and-forum-opening-night|Okanagan International Film Festival and Forum Opening Night",
+     "event:kelowna/vancouver-international-mountain-film-festival-vimff|Vancouver International Mountain Film Festival (VIMFF)"
+    ]
+   ],
+   [
+    "A big-ticket sporting event",
+    [
+     "event:kelowna/skate-canada-international-2026|2026 Skate Canada International"
+    ]
+   ],
+   [
+    "A harvest dinner at a winery",
+    [
+     "event:oliver/harvest-long-table-dinner-series-at-the-sonora-room-restaurant|Harvest Long Table Dinner Series at The Sonora Room Restaurant",
+     "event:oliver/cooking-class-dinners-at-hester-creek-winery|Cooking Class Dinners at Hester Creek Winery"
+    ]
+   ],
+   [
+    "Something free or by donation",
+    [
+     "event:kelowna/fall-36th-annual-great-okanagan-book-sale|Fall 36th Annual Great Okanagan Book Sale",
+     "event:west-kelowna/2026-okanagan-mushroom-festival|2026 Okanagan Mushroom Festival"
+    ]
+   ],
+   [
+    "A morning at a market",
+    [
+     "event:penticton/penticton-farmers-market-2026|Penticton Farmers’ Market 2026",
+     "event:kelowna/okanagan-vintage-fair|Okanagan Vintage Fair"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>"
+}
