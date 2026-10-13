@@ -4814,7 +4814,7 @@ function renderOutdoorBannerSwapScript() {
       var img = document.querySelector('.category-banner img'); if (!img) return;
       var on = {}; Array.prototype.forEach.call(document.querySelectorAll('[data-activity][aria-pressed="true"]'), function(x){ on[x.getAttribute('data-activity')] = 1; });
       var keys = Object.keys(on), t = (keys.length === 1 && c[keys[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.outdoors-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -13747,10 +13747,27 @@ function categoryBannerHtml(type) {
 }
 // The page's heading block with its banner: the photo, then the heading.
 // No banner: the text exactly as before.
+// Phone-sized banners (2026-10-13): each banner photo wider than 900px has an 800px copy beside it (foo.jpg ->
+// foo-800.jpg), and the hero's first <img> lists both in a srcset so phones download about a third of the bytes for
+// what is usually the page's largest paint. Scripts that swap the banner drop the srcset and load the full photo.
+const smallBannerCache = new Map();
+function smallBannerFor(src) {
+  if (smallBannerCache.has(src)) return smallBannerCache.get(src);
+  const small = /^\/images\/[\w\/-]+\.(jpe?g|webp|png)$/.test(src) ? src.replace(/\.(jpe?g|webp|png)$/, '-800.jpg') : null;
+  const found = small && fs.existsSync(path.join(__dirname, 'public', small)) ? small : null;
+  smallBannerCache.set(src, found);
+  return found;
+}
+function withSmallBanner(bannerHtml) {
+  return bannerHtml.replace(/<img src="([^"]+)"(?![^>]*\ssrcset=)/, (m, src) => {
+    const small = smallBannerFor(src);
+    return small ? `<img src="${src}" srcset="${small} 800w, ${src} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : m;
+  });
+}
 function categoryHeroHtml(bannerHtml, textHtml) {
   if (!bannerHtml) return textHtml;
   return `<div class="category-hero">
-  ${bannerHtml}
+  ${withSmallBanner(bannerHtml)}
   <div class="category-hero-text">${textHtml}</div>
   </div>`;
 }
@@ -13785,7 +13802,7 @@ function foodDrinkHubBannerHtml(types) {
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-fd-type'); });
       var b = (on.length === 1 && map[on[0]]) || general;
-      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var t = (on.length === 1 && text[on[0]]) || text.all;
       var h = document.getElementById('fdHeading'), p = document.getElementById('fdIntro');
       if (h && h.textContent !== t.h) h.textContent = t.h;
@@ -14622,7 +14639,7 @@ ${renderGolfHeaderHtml()}
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-dog-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-dog-type'); });
       var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -15153,7 +15170,7 @@ ${renderGolfHeaderHtml()}
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-lf-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-lf-type'); });
       var rs = Array.prototype.slice.call(document.querySelectorAll('button.outdoor-filter-chip[data-region][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-region'); });
       var one = (on.length === 1 && c[on[0]]) || (rs.length === 1 && rc[rs[0]]), b = one ? one.banner : all.banner;
-      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       var ht = one ? one.heading : all.heading;
       if (h && h.textContent !== ht) h.textContent = ht;
@@ -16312,7 +16329,7 @@ ${renderGolfHeaderHtml()}
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.whatson-cat-chip[data-category][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-category'); });
       var b = (on.length === 1 && map[on[0]]) || general;
-      if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var t = (on.length === 1 && text[on[0]]) || text.all;
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .whatson-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
@@ -22929,7 +22946,7 @@ const server = http.createServer(async (req, res) => {
         // CSS and keeps hero.webp) is unchanged.
         html = html
           .replace('<section class="hero-scenic" id="heroScenic">', '<section class="hero-scenic hero-scenic-home" id="heroScenic">')
-          .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile.webp" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
+          .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
           .replace('</head>', `${HOME_HERO_STYLE}\n</head>`);
 
         // Anything still pointing at the now-removed sections (the header's

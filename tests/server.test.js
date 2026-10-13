@@ -15563,7 +15563,7 @@ test('homepage hero uses the 3:1 sunset panorama with its own crop and type, sco
   assert.ok(!home.includes('src="/images/hero.webp"'), 'the old hero image is gone from the homepage');
   // Phones get their own near-square crop of the same scene; everything wider keeps the panorama.
   const MOBILE = '/images/okanagan-valley-sunset-hero-mobile.webp';
-  assert.ok(home.includes(`<picture><source media="(max-width: 640px)" srcset="${MOBILE}" width="1159" height="1358"><img class="hero-media-img" src="${NEW}"`), 'the mobile image is a <source> for 640px and below only');
+  assert.ok(home.includes(`<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, ${MOBILE} 1159w" sizes="100vw" width="1159" height="1358"><img class="hero-media-img" src="${NEW}"`), 'the mobile image is a <source> for 640px and below only, with an 800px copy for phones (2026-10-13)');
   assert.equal(home.split(MOBILE).length - 1, 1);
   assert.equal(home.split('id="home-hero"').length - 1, 1, 'one scoped hero style');
   const css = home.slice(home.indexOf('id="home-hero"'), home.indexOf('</style>', home.indexOf('id="home-hero"')));
@@ -17590,14 +17590,14 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     await withWinterServer(async (base) => {
       const scoped = (await WINTER_GET(base, '/kelowna/pubs')).text;
       // Photo full width above the heading, cropped at the photo's own focus point.
-      assert.match(scoped, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" style="object-position: 50% 65%" fetchpriority="high"><\/div>\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>/);
+      assert.match(scoped, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg"(?: srcset="[^"]*" sizes="[^"]*")? alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" style="object-position: 50% 65%" fetchpriority="high"><\/div>\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>/);
       assert.match(scoped, /@media \(min-width: 900px\) \{[\s\S]*?\.category-banner \{ aspect-ratio: 12 \/ 5;/, 'desktop banner is a 2.4:1 strip');
       assert.doesNotMatch(scoped, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\)/, 'no side-by-side layout');
       assert.match(scoped, /\.category-banner \{[^}]*max-height: min\(44vh, 440px\);/, 'the banner never fills the window, so the heading stays in view');
       assert.deepEqual(Object.keys(app.CATEGORY_LABELS).filter((t) => !app.CATEGORY_BANNER_IMAGES[t]), [], 'every category has a banner photo');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
       // No type or several: the hub's own photo with the general heading.
-      assert.match(hubAll, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg" alt="Friends toasting drinks over a table of shared dishes"/);
+      assert.match(hubAll, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"(?: srcset="[^"]*" sizes="[^"]*")? alt="Friends toasting drinks over a table of shared dishes"/);
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.FOOD_DRINK_HUB_BANNER.src)), 'hub image exists');
       assert.match(hubAll, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const hubPub = (await WINTER_GET(base, '/food-drink?types=pub')).text;
