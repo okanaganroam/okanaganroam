@@ -8329,6 +8329,20 @@ const SEO_PAGE_CSS = `
     box-shadow: 0 8px 20px -16px rgba(74,52,40,0.35);
     transition: box-shadow 0.15s ease, transform 0.15s ease;
   }
+  /* Give every shared venue listing card a small regional visual while
+     businesses are still supplying their own photography. Event cards keep
+     their event-specific presentation. */
+  li.venue-card:not(.whatson-event-card) {
+    position: relative;
+    padding-top: 112px !important;
+    background-image:
+      linear-gradient(100deg, rgba(25,53,57,0.76), rgba(25,53,57,0.18)),
+      url('/images/venue-hero-okanagan.jpg') !important;
+    background-position: center top !important;
+    background-size: 100% 92px !important;
+    background-repeat: no-repeat !important;
+  }
+  li.venue-card:not(.whatson-event-card) > .venue-top { padding-top: 0 !important; }
   .venue-card h2, .category-card h2 {
     font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px;
   }
@@ -8507,6 +8521,7 @@ const SEO_PAGE_CSS = `
   .venue-hero-fallback {
     display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
     min-height: 220px; padding: 28px 30px; color: var(--paper);
+    --hero-shade: rgba(25,53,57,0.94); --hero-wash: rgba(25,53,57,0.44);
   }
   .venue-hero-fallback .venue-hero-type {
     font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
@@ -8514,6 +8529,7 @@ const SEO_PAGE_CSS = `
   }
   .venue-hero-fallback .venue-hero-name {
     font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.9rem; line-height: 1.15;
+    text-shadow: 0 2px 12px rgba(12,29,34,0.45);
   }
   /* Per-type gradient — the exact hue family already used for each type's
      badge/tag color elsewhere in this project (the SPA's .type-* rules),
@@ -8522,16 +8538,27 @@ const SEO_PAGE_CSS = `
      after the SPA's original palette), so it uses a complementary green
      consistent with the existing 'pub' hue family rather than reusing it
      outright. */
-  .venue-hero-restaurant { background: linear-gradient(135deg, #2A6B67, #1E4F4C); }
-  .venue-hero-winery     { background: linear-gradient(135deg, #8C4A5E, #6B2C40); }
-  .venue-hero-brewery    { background: linear-gradient(135deg, #E0A94E, #B8802E); }
-  .venue-hero-distillery { background: linear-gradient(135deg, #B8802E, #8A631F); }
-  .venue-hero-cafe       { background: linear-gradient(135deg, #C08A4E, #8A631F); }
-  .venue-hero-pub        { background: linear-gradient(135deg, #6B8B5E, #4A6741); }
-  .venue-hero-cocktail   { background: linear-gradient(135deg, #A25C93, #7A3B6E); }
-  .venue-hero-golf       { background: linear-gradient(135deg, #4E7A5E, #345942); }
-  .venue-hero-beach      { background: linear-gradient(135deg, #1B2B3A, #101B24); } /* tokens: --ref-navy -> --ref-navy-deep */
-  .venue-hero-outdoor    { background: linear-gradient(135deg, #4A3428, #2F2118); } /* token: --ink, deepened */
+  .venue-hero-restaurant { background: linear-gradient(135deg, #2A6B67, #1E4F4C); --hero-shade: rgba(22,72,68,0.94); --hero-wash: rgba(22,72,68,0.45); }
+  .venue-hero-winery     { background: linear-gradient(135deg, #8C4A5E, #6B2C40); --hero-shade: rgba(75,35,52,0.94); --hero-wash: rgba(75,35,52,0.44); }
+  .venue-hero-brewery    { background: linear-gradient(135deg, #E0A94E, #B8802E); --hero-shade: rgba(75,50,18,0.93); --hero-wash: rgba(75,50,18,0.42); }
+  .venue-hero-distillery { background: linear-gradient(135deg, #B8802E, #8A631F); --hero-shade: rgba(73,48,18,0.94); --hero-wash: rgba(73,48,18,0.44); }
+  .venue-hero-cafe       { background: linear-gradient(135deg, #C08A4E, #8A631F); --hero-shade: rgba(68,43,23,0.94); --hero-wash: rgba(68,43,23,0.42); }
+  .venue-hero-pub        { background: linear-gradient(135deg, #6B8B5E, #4A6741); --hero-shade: rgba(35,58,43,0.94); --hero-wash: rgba(35,58,43,0.44); }
+  .venue-hero-cocktail   { background: linear-gradient(135deg, #A25C93, #7A3B6E); --hero-shade: rgba(64,37,67,0.94); --hero-wash: rgba(64,37,67,0.43); }
+  .venue-hero-golf       { background: linear-gradient(135deg, #4E7A5E, #345942); --hero-shade: rgba(30,58,44,0.94); --hero-wash: rgba(30,58,44,0.43); }
+  .venue-hero-beach      { background: linear-gradient(135deg, #1B2B3A, #101B24); --hero-shade: rgba(16,31,43,0.94); --hero-wash: rgba(16,31,43,0.43); } /* tokens: --ref-navy -> --ref-navy-deep */
+  .venue-hero-outdoor    { background: linear-gradient(135deg, #4A3428, #2F2118); --hero-shade: rgba(43,34,29,0.94); --hero-wash: rgba(43,34,29,0.43); } /* token: --ink, deepened */
+  /* Missing-photo heroes share one regional illustration, with a deep
+     category tint on the text side so the existing ivory title stays
+     readable. Real business photos use .venue-hero-photo and never see
+     this artwork. */
+  .venue-hero-fallback {
+    background-image:
+      linear-gradient(100deg, var(--hero-shade) 0%, var(--hero-wash) 58%, rgba(16,32,38,0.12) 100%),
+      url('/images/venue-hero-okanagan.jpg');
+    background-size: cover;
+    background-position: center 48%;
+  }
 
   .venue-header { margin-bottom: 18px; }
   .venue-at-a-glance { color: var(--ink); opacity: 0.7; font-size: 0.98rem; margin: 6px 0 12px; }
