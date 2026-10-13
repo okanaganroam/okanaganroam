@@ -13181,10 +13181,10 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
 // canonical, H1, breadcrumb and ItemList are the ones renderCategoryPage
 // produced for these URLs, so the pages' SEO identity is unchanged.
 // Category banners (2026-10-12): a licensed Adobe Stock photo across the top
-// of a Food & Drink category page. Cafés have none yet (the candidate photos
-// read as somewhere other than the Okanagan).
+// of a Food & Drink category page.
 const CATEGORY_BANNER_IMAGES = Object.freeze({
   restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table' },
+  cafe: { src: '/images/food-drink/cafes.jpg', alt: 'Coffee and fresh croissants on a café table' },
   pub: { src: '/images/food-drink/pubs.jpg', alt: 'A bartender pouring a craft beer from the tap' },
   cocktail: { src: '/images/food-drink/cocktail-lounges.jpg', alt: 'A bartender pouring a cocktail at night' },
   brewery: { src: '/images/food-drink/breweries.jpg', alt: 'A flight of craft beers' },
