@@ -6805,8 +6805,8 @@ test('Wine, Beaches and Golf hubs render their intro directly under the H1; othe
   for (const [type, text] of Object.entries(intros)) {
     const html = app.renderCategoryAllRegionsPage(type, app.getVenuesByCategory(type));
     const esc = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Wineries and golf (2026-10-12): the banner photo then the H1 and intro share the hero block, then the count.
-    const between = type === 'winery' || type === 'golf' ? '</div>\\s*</div>\\s*' : '\\s*';
+    // Categories with a banner photo (2026-10-12): the photo then the H1 and intro share the hero block, then the count.
+    const between = app.CATEGORY_BANNER_IMAGES[type] ? '</div>\\s*</div>\\s*' : '\\s*';
     assert.match(html, new RegExp(`</h1>\\s*<p class="hub-intro">${esc}</p>${between}<p class="subtitle">`), `${type}: intro sits between the H1 and the count subtitle`);
     assert.match(html, /<style>body\.golf-page \.hub-intro \{/, `${type}: intro style loaded`);
     assert.equal((html.match(/class="hub-intro"/g) || []).length, 1, `${type}: exactly one intro`);
@@ -17509,11 +17509,14 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${type} image exists`);
     assert.ok(b.alt && b.alt.length > 10, `${type} has alt text`);
   }
-  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'pub', 'restaurant', 'winery']);
+  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'pub', 'restaurant', 'winery']);
   for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), `${type} has a card thumbnail`);
   const golfFixture = [{ id: 990001, name: 'Banner Golf', slug: 'banner-golf', region: 'kelowna', type: 'golf', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'golf', golfFixture, []), /<div class="category-banner"><img src="\/images\/golf\/golf-courses\.jpg"/, 'golf region pages open with the golf photo');
   assert.match(app.renderCategoryAllRegionsPage('golf', golfFixture), /<div class="category-banner"><img src="\/images\/golf\/golf-courses\.jpg"/, 'the /golf hub too');
+  const beachFixture = [{ id: 990003, name: 'Banner Beach', slug: 'banner-beach', region: 'kelowna', type: 'beach', description: 'Fixture.' }];
+  assert.match(app.renderCategoryPage('kelowna', 'beach', beachFixture, []), /<div class="category-banner"><img src="\/images\/beaches\/beaches\.jpg"/, 'beach region pages open with the beach photo');
+  assert.match(app.renderCategoryAllRegionsPage('beach', beachFixture), /<div class="category-banner"><img src="\/images\/beaches\/beaches\.jpg"/, 'the /beaches hub too');
   const pub = app.createVenue({ name: 'Banner Test Pub', region: 'kelowna', type: 'pub', description: 'A fixture pub.', slug: 'banner-test-pub' });
   const pub2 = app.createVenue({ name: 'Banner Test Pub Two', region: 'kelowna', type: 'pub', description: 'Another fixture pub.', slug: 'banner-test-pub-two' });
   try {
@@ -17524,7 +17527,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(scoped, /@media \(min-width: 900px\) \{[\s\S]*?\.category-banner \{ aspect-ratio: 12 \/ 5;/, 'desktop banner is a 2.4:1 strip');
       assert.doesNotMatch(scoped, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\)/, 'no side-by-side layout');
       assert.match(scoped, /\.category-banner \{[^}]*max-height: min\(44vh, 440px\);/, 'the banner never fills the window, so the heading stays in view');
-      assert.doesNotMatch(app.renderCategoryPage('kelowna', 'beach', [{ id: 990002, name: 'Banner Beach', slug: 'banner-beach', region: 'kelowna', type: 'beach', description: 'Fixture.' }], []), /class="category-banner"/, 'categories without a photo carry no banner');
+      assert.doesNotMatch(app.renderCategoryPage('kelowna', 'sport', [{ id: 990002, name: 'Banner Park', slug: 'banner-park', region: 'kelowna', type: 'sport', description: 'Fixture.' }], []), /class="category-banner"/, 'categories without a photo carry no banner');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
       // No type or several: the hub's own photo with the general heading.
       assert.match(hubAll, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg" alt="Friends toasting drinks over a table of shared dishes"/);

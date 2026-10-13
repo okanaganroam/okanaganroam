@@ -13225,7 +13225,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
 // canonical, H1, breadcrumb and ItemList are the ones renderCategoryPage
 // produced for these URLs, so the pages' SEO identity is unchanged.
 // Category banners (2026-10-12): a licensed Adobe Stock photo across the top
-// of a Food & Drink category page, and of the golf pages. Each also has an
+// of a Food & Drink category page, and of the golf and beach pages. Each also has an
 // 800px copy in a thumbs/ folder beside it for the /categories cards.
 const CATEGORY_BANNER_IMAGES = Object.freeze({
   restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table', pos: 5 },
@@ -13236,6 +13236,7 @@ const CATEGORY_BANNER_IMAGES = Object.freeze({
   distillery: { src: '/images/food-drink/distilleries.jpg', alt: 'A copper still at a craft distillery', pos: 50 },
   winery: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata', pos: 40 },
   golf: { src: '/images/golf/golf-courses.jpg', alt: 'Golf carts on a fairway beside a pond and pine trees', pos: 45 },
+  beach: { src: '/images/beaches/beaches.jpg', alt: 'A swimming dock on Okanagan Lake in Kelowna on a summer day', pos: 55 },
 });
 const CATEGORY_BANNER_STYLE = `<style id="category-banner">
   /* The photo runs full width above the heading: 2:1 on phones, 2.4:1 on
