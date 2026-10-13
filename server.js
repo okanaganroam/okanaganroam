@@ -14870,6 +14870,23 @@ function hiddenGemsPageDestination(intent) {
 // fyna7wKsHRk by Rodney Saigeon (Unsplash License) -- with an 800px thumbs/
 // copy for the /categories card. Shown on /hidden-gems and its badge views.
 const HIDDEN_GEMS_BANNER = Object.freeze({ src: '/images/hidden-gems-banner/hidden-gems.jpg', alt: 'Hardy Falls tumbling into Deep Creek in a rocky canyon near Peachland', pos: 45 });
+// Hidden Gems per-category heading and intro (2026-10-12); photos reuse each
+// category's own banner. Main /hidden-gems only -- the badge views keep their
+// own headings.
+const HIDDEN_GEMS_CATEGORY_CONTENT = Object.freeze({
+  restaurant: { banner: CATEGORY_BANNER_IMAGES.restaurant, heading: "Hidden Gem Restaurants in the Okanagan", intro: "Smaller, easy-to-miss restaurants worth seeking out \u2014 the kind of places you only hear about from someone who lives here." },
+  cafe: { banner: CATEGORY_BANNER_IMAGES.cafe, heading: "Hidden Gem Caf\u00e9s in the Okanagan", intro: "Tucked-away coffee shops and bakeries off the main drag \u2014 worth the detour for a quiet cup." },
+  pub: { banner: CATEGORY_BANNER_IMAGES.pub, heading: "Hidden Gem Pubs in the Okanagan", intro: "Low-key pubs away from the busy strips, with character, good food and a local crowd." },
+  cocktail: { banner: CATEGORY_BANNER_IMAGES.cocktail, heading: "Hidden Gem Cocktail Lounges in the Okanagan", intro: "Under-the-radar cocktail bars and lounges for a quieter, more interesting night out." },
+  brewery: { banner: CATEGORY_BANNER_IMAGES.brewery, heading: "Hidden Gem Breweries in the Okanagan", intro: "Small-batch breweries and taprooms that are easy to miss \u2014 and well worth finding." },
+  distillery: { banner: CATEGORY_BANNER_IMAGES.distillery, heading: "Hidden Gem Distilleries in the Okanagan", intro: "Small craft distilleries off the beaten path, pouring spirits you won\u2019t find just anywhere." },
+  winery: { banner: CATEGORY_BANNER_IMAGES.winery, heading: "Hidden Gem Wineries in the Okanagan", intro: "Smaller, quieter wineries beyond the big names \u2014 intimate tasting rooms where you\u2019ll often meet the winemaker." },
+  golf: { banner: CATEGORY_BANNER_IMAGES.golf, heading: "Hidden Gem Golf Courses in the Okanagan", intro: "Quieter courses with great views and easier tee times \u2014 the rounds locals keep to themselves." },
+  beach: { banner: CATEGORY_BANNER_IMAGES.beach, heading: "Hidden Gem Beaches in the Okanagan", intro: "Quieter beaches and lakeside spots away from the summer crowds \u2014 more sand, more space." },
+  outdoor: { banner: CATEGORY_BANNER_IMAGES.outdoor, heading: "Hidden Gem Outdoor Spots in the Okanagan", intro: "Lesser-known trails, waterfalls, parks and viewpoints \u2014 less crowds, more Okanagan." },
+  indoor: { banner: CATEGORY_BANNER_IMAGES.indoor, heading: "Hidden Gem Indoor Spots in the Okanagan", intro: "Small museums, galleries and rainy-day finds that most visitors walk right past." },
+  tour: { banner: CATEGORY_BANNER_IMAGES.tour, heading: "Hidden Gem Tours & Experiences in the Okanagan", intro: "Small, locally run tours and experiences that show you a side of the valley most visitors miss." },
+});
 function renderHiddenGemsPage(venues, filter = null, feature = null) {
   const badge = feature ? BADGE_LABELS[feature] : null;
   const heading = badge ? `${badge.title} Hidden Gems` : 'Hidden Gems';
@@ -14890,6 +14907,7 @@ function renderHiddenGemsPage(venues, filter = null, feature = null) {
     cardNotes: getPublicCollectionNotes('hidden_gem'),
     cardNoteLabel: 'Why it\u2019s a gem:',
     banner: HIDDEN_GEMS_BANNER,
+    categoryContent: badge ? null : HIDDEN_GEMS_CATEGORY_CONTENT,
   }, venues, filter);
 }
 
@@ -23468,6 +23486,7 @@ module.exports = {
   LOCAL_FAVOURITES_BANNER,
   LOCAL_FAVOURITES_CATEGORY_CONTENT,
   HIDDEN_GEMS_BANNER,
+  HIDDEN_GEMS_CATEGORY_CONTENT,
   SECRET_SPOTS_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
