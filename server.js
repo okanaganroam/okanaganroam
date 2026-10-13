@@ -11211,7 +11211,7 @@ function categoryDirectoryEntries() {
   // Sports & Recreation (2026-10-12): /sports always renders too.
   experiences.push({ label: CATEGORY_LABELS.sport.plural, href: `/${CATEGORY_SLUGS.sport}`, tagline: CATEGORY_TAGLINES.sport, image: categoryCardImage(CATEGORY_BANNER_IMAGES.sport) });
 
-  const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.' }];
+  const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', image: categoryCardImage(WHATS_ON_BANNER) }];
   if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.' });
   if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.' });
   if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.' });
@@ -15523,6 +15523,10 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
 </script>`;
 }
 // GET /whats-on -- the page. `filter` is parseWhatsOnFilterQuery(query).
+// Banner (2026-10-12): licensed free Adobe Stock 330262001 -- a festival
+// crowd with hands raised under stage lights -- with an 800px thumbs/ copy
+// for the /categories card.
+const WHATS_ON_BANNER = Object.freeze({ src: '/images/whats-on/whats-on.jpg', alt: 'A festival crowd with hands raised under bright stage lights', pos: 40 });
 function renderWhatsOnPage(filter = null) {
   const selectedRegions = filter ? filter.regions : [];
   const selectedCategories = filter ? filter.categories : [];
@@ -15569,6 +15573,7 @@ function renderWhatsOnPage(filter = null) {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { shareImage: '/images/mood/whats-on.webp', golfTheme: true, outdoorTheme: true, noindex: !hasInventory, savedSidecar: true })}
 ${renderWhatsOnStyles()}
+${CATEGORY_BANNER_STYLE}
 ${renderAnalyticsHeadHtml('hub')}
 </head>
 <body class="golf-page outdoor-page whatson-page">
@@ -15580,8 +15585,8 @@ ${renderGolfHeaderHtml()}
     { name: 'Home', href: '/' },
     { name: "What's On" },
   ])}
-  <h1>${escapeHtml(heading)}</h1>
-  <p class="outdoor-intro whatson-intro">Festivals on the lakeshore, live music in the vineyards, farmers’ markets, hockey nights and holiday lights — there is always something happening somewhere in the valley.</p>
+  ${categoryHeroHtml(`<div class="category-banner"><img src="${WHATS_ON_BANNER.src}" alt="${escapeHtml(WHATS_ON_BANNER.alt)}" width="1600" height="1067" style="object-position: 50% ${WHATS_ON_BANNER.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro whatson-intro">Festivals on the lakeshore, live music in the vineyards, farmers’ markets, hockey nights and holiday lights — there is always something happening somewhere in the valley.</p>`)}
   ${whatsOnSearchHtml()}
   ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
   ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory })}
@@ -23309,6 +23314,7 @@ module.exports = {
   FD_HUB_HEADINGS,
   FOOD_DRINK_HUB_BANNER,
   SKI_SNOW_BANNER,
+  WHATS_ON_BANNER,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,
