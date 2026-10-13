@@ -18337,6 +18337,16 @@ test('French helpers (2026-10-13): app.js dictionary is shared; header text, hou
   assert.equal(app.frDe('Kelowna'), 'de Kelowna');
 });
 
+test('Place schema (2026-10-13): no AggregateRating from third-party reviews, while the page still shows the rating', () => withFrenchDescriptions(() => {
+  const venue = db.prepare('SELECT * FROM venues WHERE rating IS NOT NULL AND reviews IS NOT NULL AND redirect_to IS NULL AND slug IS NOT NULL LIMIT 1').get();
+  assert.ok(venue, 'a rated place in the test data');
+  for (const lang of ['en', 'fr']) {
+    const html = app.renderVenuePage(venue, [], [], [], { lang });
+    assert.doesNotMatch(html, /AggregateRating|aggregateRating|ratingValue|reviewCount/, lang);
+    assert.match(html, /\u2605/, `${lang}: the rating is still on the page`);
+  }
+}));
+
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });

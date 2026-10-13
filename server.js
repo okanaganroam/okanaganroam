@@ -16528,7 +16528,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const label = (fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[venue.type];
   const canonical = `https://okanaganroam.com${venuePagePath(venue, fr ? 'fr' : 'en')}`;
   const title = editorial ? editorial.title : fr ? `${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam` : `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`;
-  const rawDesc = fr ? venue.description_fr : (venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`);
+  const rawDesc = fr && venue.description_fr ? venue.description_fr : (venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`);
   const description = editorial ? editorial.metaDescription
     : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
   const editorialHtml = editorial ? editorial.sections.map((section) => `
@@ -16564,11 +16564,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // never shown on golf pages; verified green fees are shown instead.
     priceRange: (venue.price && venue.type !== 'golf') ? '$'.repeat(venue.price) : undefined,
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
-    aggregateRating: (venue.rating && venue.reviews) ? {
-      '@type': 'AggregateRating',
-      ratingValue: venue.rating,
-      reviewCount: venue.reviews,
-    } : undefined,
+    // No aggregateRating (2026-10-13): the stored rating and review count come from Google reviews, not from Okanagan
+    // Roam, and Google's review-snippet rules don't allow marking up ratings collected on another site. The rating is
+    // still shown to visitors on the page.
     openingHoursSpecification: buildOpeningHoursSpecification(pageHours),
   };
 
@@ -16788,7 +16786,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     <p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
-  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr) : bilingualDescHtml(venue.description, venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
+  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : bilingualDescHtml(venue.description, venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
   <div class="venue-section venue-key-info">
     <h2>${L('Good to Know', 'Bon \u00e0 savoir')}</h2>
