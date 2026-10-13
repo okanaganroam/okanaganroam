@@ -16392,7 +16392,7 @@ function frDateShort(dateStr) {
 function frHoursText(text) {
   if (text === 'Closed') return 'Fermé';
   if (text === 'Hours not listed') return 'Heures non indiquées';
-  return text.replace(/\b(\d{1,2}):(\d{2})\b/g, (m, h, mm) => `${Number(h)} h${mm === '00' ? '' : ` ${mm}`}`);
+  return text.replace(/\b(\d{1,2}):(\d{2})\b/g, (m, h, mm) => (Number(h) === 0 && mm === '00' ? 'minuit' : `${Number(h)} h${mm === '00' ? '' : ` ${mm}`}`));
 }
 // A badge field (dog_friendly) -> app.js key (badge.dogFriendly) -> French.
 function frBadgeLabel(field) {
@@ -16511,6 +16511,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
   const fr = opts.lang === 'fr';
   const L = (en, frText) => (fr ? frText : en);
+  const num = (n) => (fr ? String(n).replace('.', ',') : String(n)); // French decimal comma: 4,6\u2605
   const hasFrench = venueHasFrench(venue);
   // Page-only editorial copy: no database changes or effects on other venues. It is English, so the French page skips it.
   const editorial = !fr && !venue.redirect_to && venue.type === 'restaurant'
@@ -16591,7 +16592,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   if (parsedHours && parsedHours.known) {
     const dayNames = fr ? FR_DAY_NAMES : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
     const rows = hoursModule.HOURS_WEEKDAYS.map((d) => {
-      const text = fr ? frHoursText(hoursModule.dayHoursText(parsedHours.days[d])) : hoursModule.dayHoursText(parsedHours.days[d]);
+      const stored = hoursModule.dayHoursText(parsedHours.days[d]);
+      const text = fr ? frHoursText(stored) : stored;
       return `<li><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
     }).join('');
     hoursHtml = `<div class="detail-row"><span class="label">${L('Hours', 'Heures')}</span></div><ul class="hours-list">${rows}</ul>`;
@@ -16618,7 +16620,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
     venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
     (venue.price && venue.type !== 'golf') ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
-    (venue.rating && venue.reviews) ? [L('Rating', 'Note'), `${venue.rating}\u2605 (${venue.reviews} ${L('reviews', 'avis')})`] : (venue.rating ? [L('Rating', 'Note'), `${venue.rating}\u2605`] : null),
+    (venue.rating && venue.reviews) ? [L('Rating', 'Note'), `${num(venue.rating)}\u2605 (${venue.reviews} ${L('reviews', 'avis')})`] : (venue.rating ? [L('Rating', 'Note'), `${num(venue.rating)}\u2605`] : null),
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
@@ -16650,7 +16652,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.type === 'golf' ? golfKindLabel : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     (venue.price && venue.type !== 'golf') ? '$'.repeat(venue.price) : null,
-    venue.rating ? `${venue.rating}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
+    venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
   ].filter(Boolean).join(' &middot; ');
 
   // Location section — static-map only, per Sprint 2 scope: a plain link
@@ -16705,7 +16707,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const relatedNearbyLocalFavouriteIds = (relatedVenues.length || nearbyVenues.length) ? getCollectionVenueIds('local_favorite') : new Set();
 
   function relatedCard(v) {
-    const meta = [fr && v.cuisine ? frCuisine(v.cuisine) : v.cuisine, v.rating ? `${v.rating}\u2605` : null].filter(Boolean).join(' \u00b7 ');
+    const meta = [fr && v.cuisine ? frCuisine(v.cuisine) : v.cuisine, v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
     const badge = ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
     const band = fr ? compactVisualBandHtml(v.type, { size: 'small' }).replace(`>${escapeHtml(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)}<`, `>${escapeHtml(CATEGORY_LABELS_FR[v.type] ? CATEGORY_LABELS_FR[v.type].singular : v.type)}<`) : compactVisualBandHtml(v.type, { size: 'small' });
