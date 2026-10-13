@@ -11205,11 +11205,11 @@ function categoryDirectoryEntries() {
   // Ski & Snow and Indoor & Rainy Day (2026-10-11): both pages always render
   // (never a 404), so both are always listed.
   experiences.push({ label: 'Ski & Snow', href: SKI_SNOW_PATH, tagline: 'Ski hills, Nordic trails, tube parks and après at Big White, SilverStar, Apex and Baldy.', image: categoryCardImage(SKI_SNOW_BANNER) });
-  experiences.push({ label: 'Indoor & Rainy Day', href: `/${CATEGORY_SLUGS.indoor}`, tagline: CATEGORY_TAGLINES.indoor });
+  experiences.push({ label: 'Indoor & Rainy Day', href: `/${CATEGORY_SLUGS.indoor}`, tagline: CATEGORY_TAGLINES.indoor, image: categoryCardImage(CATEGORY_BANNER_IMAGES.indoor) });
   // Tours & Experiences (2026-10-11): /tours always renders too.
-  experiences.push({ label: CATEGORY_LABELS.tour.plural, href: `/${CATEGORY_SLUGS.tour}`, tagline: CATEGORY_TAGLINES.tour });
+  experiences.push({ label: CATEGORY_LABELS.tour.plural, href: `/${CATEGORY_SLUGS.tour}`, tagline: CATEGORY_TAGLINES.tour, image: categoryCardImage(CATEGORY_BANNER_IMAGES.tour) });
   // Sports & Recreation (2026-10-12): /sports always renders too.
-  experiences.push({ label: CATEGORY_LABELS.sport.plural, href: `/${CATEGORY_SLUGS.sport}`, tagline: CATEGORY_TAGLINES.sport });
+  experiences.push({ label: CATEGORY_LABELS.sport.plural, href: `/${CATEGORY_SLUGS.sport}`, tagline: CATEGORY_TAGLINES.sport, image: categoryCardImage(CATEGORY_BANNER_IMAGES.sport) });
 
   const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.' }];
   if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.' });
@@ -12518,7 +12518,7 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: 'Home', href: '/' },
     { name: label.plural },
   ])}
-  ${isIndoorHub ? '<div class="indoor-hero"><img src="/images/indoor-rainy-day-banner.jpg" width="1586" height="992" alt="Illustrative rainy-day café scene with coffee, a sketchbook and a misty lake view" fetchpriority="high"><div><h1>' + escapeHtml(heading) + '</h1><p>Find your perfect rainy day.</p></div></div>' : (CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>')}
+  ${CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryHeroHtml(categoryBannerHtml(type), '<h1>' + escapeHtml(heading) + '</h1>' + (HUB_INTRO_TEXT[type] ? `\n  <p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>` : '')) : '<h1>' + escapeHtml(heading) + '</h1>'}
   ${HUB_INTRO_TEXT[type] && !CATEGORY_BANNER_IMAGES[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
@@ -13225,7 +13225,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
 // canonical, H1, breadcrumb and ItemList are the ones renderCategoryPage
 // produced for these URLs, so the pages' SEO identity is unchanged.
 // Category banners (2026-10-12): a licensed Adobe Stock photo across the top
-// of a Food & Drink category page, and of the golf, beach, outdoors, tours and sports pages. Each also has an
+// of a Food & Drink category page, and of every other category's pages. Each also has an
 // 800px copy in a thumbs/ folder beside it for the /categories cards.
 const CATEGORY_BANNER_IMAGES = Object.freeze({
   restaurant: { src: '/images/food-drink/restaurants.jpg', alt: 'Friends sharing dinner and wine at a restaurant table', pos: 5 },
@@ -13240,6 +13240,7 @@ const CATEGORY_BANNER_IMAGES = Object.freeze({
   outdoor: { src: '/images/outdoors/outdoors.jpg', alt: 'A Kettle Valley Railway trestle crossing a forested canyon near Kelowna', pos: 40 },
   tour: { src: '/images/tours/tours.jpg', alt: 'A winemaker pouring for two guests on a cellar tour among oak barrels', pos: 25 },
   sport: { src: '/images/sports/sports.jpg', alt: 'A mountain biker riding a leafy forest trail in autumn', pos: 60 },
+  indoor: { src: '/images/indoor/indoor.jpg', alt: 'Friends bowling together at an indoor bowling alley', pos: 40 },
 });
 const CATEGORY_BANNER_STYLE = `<style id="category-banner">
   /* The photo runs full width above the heading: 2:1 on phones, 2.4:1 on
