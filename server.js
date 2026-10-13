@@ -6779,12 +6779,13 @@ function bestRegionForCategoryType() {
   return bestRegionForType;
 }
 
-// Seasonal mood tiles (2026-10-11): November through March inclusive, by the
-// Okanagan calendar date (todayLocal), the homepage shows Ski & Snow in the
-// Beaches slot and Indoor & Rainy Day in the Golf slot.
+// Seasonal mood tiles (2026-10-11; from October since 2026-10-13): October
+// through March inclusive, by the Okanagan calendar date (todayLocal), the
+// homepage shows Ski & Snow in the Beaches slot and Indoor & Rainy Day in the
+// Golf slot.
 function isWinterMoodSeason(now = new Date()) {
   const month = Number(todayLocal(now).slice(5, 7));
-  return month >= 11 || month <= 3;
+  return month >= 10 || month <= 3;
 }
 
 // Test-only date override for the homepage's seasonal tiles: OKR_TODAY_OVERRIDE
@@ -6864,7 +6865,7 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
     { key: 'whats-on', href: '/whats-on', filter: null, img: '/images/mood/whats-on.webp', titleKey: 'mood.whatsOn.title', title: "What's On" },
     { key: 'outdoors', href: outdoorsHref, filter: null, img: '/images/mood/explore.webp', titleKey: 'mood.outdoors.title', title: 'Outdoors' },
   ];
-  // Winter (Nov-Mar, see isWinterMoodSeason): same six positions, with Ski &
+  // Winter (Oct-Mar, see isWinterMoodSeason): same six positions, with Ski &
   // Snow replacing Beaches and Indoor & Rainy Day replacing Golf. Summer
   // output is byte-identical to before. ski-snow.jpg (no webp encoder on the build Mac) is cropped from
   // /images/outdoors/winter.webp; indoor.jpg is 640x400 (the user-supplied
