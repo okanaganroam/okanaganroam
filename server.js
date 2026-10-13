@@ -15578,7 +15578,7 @@ const WHATSON_CATEGORY_BANNERS = Object.freeze({
   'nightlife': { src: '/images/whats-on/nightlife.jpg', alt: 'Friends dancing on a nightclub dance floor', pos: 25 },
   'wineries-wine-events': { src: '/images/whats-on/wineries-wine-events.jpg', alt: 'Friends toasting with wine in a vineyard at harvest', pos: 40 },
   'holiday-seasonal': { src: '/images/whats-on/holiday-seasonal.jpg', alt: 'Two friends with warm drinks under holiday lights', pos: 35 },
-  'workshops-classes': { src: '/images/whats-on/workshops-classes.jpg', alt: 'A group enjoying a pottery class in a cozy studio', pos: 30 },
+  'workshops-classes': { src: '/images/whats-on/workshops-classes.jpg', alt: 'Hands shaping clay on a potter\u2019s wheel', pos: 50 },
   'community-events': { src: '/images/whats-on/community-events.jpg', alt: 'Neighbours chatting at a community gathering in a park', pos: 40 },
 });
 function renderWhatsOnPage(filter = null) {
