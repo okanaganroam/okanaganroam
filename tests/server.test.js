@@ -17557,7 +17557,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(hubTwo, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
       assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const ski = (await WINTER_GET(base, '/ski-snow')).text;
-      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Ski &amp; Snow<\/h1>/, '/ski-snow opens with its photo above the heading');
+      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Ski &amp; Snow<\/h1>/, '/ski-snow opens with its photo above the heading');
       const gems = app.renderHiddenGemsPage([{ id: 990008, name: 'Banner Gem', slug: 'banner-gem', region: 'kelowna', type: 'cafe', description: 'Fixture.' }]);
       assert.match(gems, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Hidden Gems<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
@@ -17600,7 +17600,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(lfGolf, /<h1>Local Favourite Golf Courses in the Okanagan<\/h1>/);
       assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites<\/h1>/);
       for (const [k, c] of Object.entries(app.LOCAL_FAVOURITES_CATEGORY_CONTENT)) assert.ok(c.banner && c.heading && c.intro, `${k} has content`);
-      assert.doesNotMatch(app.renderSkiSnowPage([], []), /lfBanner/, 'other curated pages unchanged');
+      assert.doesNotMatch(app.renderHiddenGemsPage(lfV, null, 'dog_friendly'), /lfBanner/, 'badge views unchanged');
       const ssV = [{ id: 990014, name: 'SS Cove', slug: 'ss-cove', region: 'kelowna', type: 'beach', description: 'Fixture.' }, { id: 990015, name: 'SS Falls', slug: 'ss-falls', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
       const ssOut = app.renderSecretSpotsPage(ssV, { types: ['outdoor'], regions: [] });
       assert.match(ssOut, /id="lfBanner"><img src="\/images\/outdoors\/outdoors\.jpg"/);
@@ -17611,6 +17611,13 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(hgBeach, /id="lfBanner"><img src="\/images\/beaches\/beaches\.jpg"/);
       assert.match(hgBeach, /<h1>Hidden Gem Beaches in the Okanagan<\/h1>/);
       assert.doesNotMatch(app.renderHiddenGemsPage(hgV, { types: ['beach'], regions: [] }, 'dog_friendly'), /Hidden Gem Beaches in the Okanagan/, 'badge views keep their own heading');
+      // Ski & Snow: one ski-resort region chosen shows that resort's banner, heading and intro.
+      const skiBW = app.renderSkiSnowPage([], [], { types: [], regions: ['big-white'] });
+      assert.match(skiBW, /id="lfBanner"><img src="\/images\/ski-snow\/big-white-sunset\.jpg"/);
+      assert.match(skiBW, /<h1>Big White Ski Resort<\/h1>/);
+      assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['apex'] }), /<h1>Apex Mountain Resort<\/h1>/);
+      assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['big-white', 'apex'] }), /<h1>Ski &amp; Snow<\/h1>/, 'two resorts: general text');
+      assert.deepEqual(Object.keys(app.SKI_SNOW_REGION_CONTENT).sort(), ['apex', 'baldy', 'big-white', 'silverstar']);
       const wine = (await WINTER_GET(base, '/wineries')).text;
       assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
     });
