@@ -17571,7 +17571,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(favs, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Local Favourites<\/h1>/, '/local-favorites opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.LOCAL_FAVOURITES_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'local favourites thumbnail exists');
       const secret = app.renderSecretSpotsPage([{ id: 990009, name: 'Banner Cove', slug: 'banner-cove', region: 'kelowna', type: 'beach', description: 'Fixture.' }]);
-      assert.match(secret, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/secret-spots\/secret-spots\.jpg"[^>]*><\/div>\s*<div class="category-hero-text"><h1>Secret Spots<\/h1>/, '/secret-spots opens with its photo above the heading');
+      assert.match(secret, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/secret-spots\/secret-spots\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Secret Spots<\/h1>/, '/secret-spots opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.SECRET_SPOTS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'secret spots thumbnail exists');
       // Every Discovery entry now has a photo, so /categories shows it as a photo grid too.
       assert.ok(app.categoryDirectoryEntries().filter((g) => g.label === 'Discovery').every((g) => g.categories.every((c) => c.image)), 'every Discovery card has a photo');
@@ -17600,7 +17600,11 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(lfGolf, /<h1>Local Favourite Golf Courses in the Okanagan<\/h1>/);
       assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites<\/h1>/);
       for (const [k, c] of Object.entries(app.LOCAL_FAVOURITES_CATEGORY_CONTENT)) assert.ok(c.banner && c.heading && c.intro, `${k} has content`);
-      assert.doesNotMatch(app.renderSecretSpotsPage(lfV), /lfBanner/, 'other curated pages unchanged');
+      assert.doesNotMatch(app.renderSkiSnowPage([], []), /lfBanner/, 'other curated pages unchanged');
+      const ssV = [{ id: 990014, name: 'SS Cove', slug: 'ss-cove', region: 'kelowna', type: 'beach', description: 'Fixture.' }, { id: 990015, name: 'SS Falls', slug: 'ss-falls', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
+      const ssOut = app.renderSecretSpotsPage(ssV, { types: ['outdoor'], regions: [] });
+      assert.match(ssOut, /id="lfBanner"><img src="\/images\/outdoors\/outdoors\.jpg"/);
+      assert.match(ssOut, /<h1>Secret Outdoor Spots in the Okanagan<\/h1>/);
       // Hidden Gems: one type chosen shows that category's photo, heading and intro (main page only).
       const hgV = [{ id: 990012, name: 'HG Cafe', slug: 'hg-cafe', region: 'kelowna', type: 'cafe', description: 'Fixture.' }, { id: 990013, name: 'HG Beach', slug: 'hg-beach', region: 'kelowna', type: 'beach', description: 'Fixture.' }];
       const hgBeach = app.renderHiddenGemsPage(hgV, { types: ['beach'], regions: [] });
