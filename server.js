@@ -11458,7 +11458,7 @@ ${golfEngagementHeadHtml(type, true, 'category')}
     { name: label.plural },
   ])}
   ${backLink}
-  <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
+  ${CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryBannerHtml(type) : ''}<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
   ${venues.length === 0
     ? (sportsAlso.length ? '' : `<p class="subtitle">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`)
     : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} in ${escapeHtml(regionLabel)}.</p>
@@ -12474,7 +12474,7 @@ ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' +
     { name: 'Home', href: '/' },
     { name: label.plural },
   ])}
-  ${isIndoorHub ? '<div class="indoor-hero"><img src="/images/indoor-rainy-day-banner.jpg" width="1586" height="992" alt="Illustrative rainy-day café scene with coffee, a sketchbook and a misty lake view" fetchpriority="high"><div><h1>' + escapeHtml(heading) + '</h1><p>Find your perfect rainy day.</p></div></div>' : '<h1>' + escapeHtml(heading) + '</h1>'}
+  ${isIndoorHub ? '<div class="indoor-hero"><img src="/images/indoor-rainy-day-banner.jpg" width="1586" height="992" alt="Illustrative rainy-day café scene with coffee, a sketchbook and a misty lake view" fetchpriority="high"><div><h1>' + escapeHtml(heading) + '</h1><p>Find your perfect rainy day.</p></div></div>' : (CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE + categoryBannerHtml(type) : '') + '<h1>' + escapeHtml(heading) + '</h1>'}
   ${HUB_INTRO_TEXT[type] ? `<p class="hub-intro">${escapeHtml(HUB_INTRO_TEXT[type])}</p>\n  ` : ''}${isOutdoorLanding || emptyMainList ? '' : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} across the Okanagan Valley.</p>\n  `}${outdoorIntroHtml}${isOutdoorLanding ? '' : regionSelector}${isIndoorHub ? renderIndoorDiscoveryHtml(indoorUniverse, indoorActivity) : ''}
   ${outdoorDirectoryHeading}${emptyMainList ? '' : cardsHtml}${isOutdoorLanding ? '\n  </section>' : ''}${indoorHubHtml}${toursHubHtml}${sportsHubHtml}
   ${isOutdoorLanding ? '' : '<a class="cta" href="/browse">Back to the full directory</a>'}
@@ -13180,6 +13180,49 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
 // categories are offered as sibling tabs instead. Title, description,
 // canonical, H1, breadcrumb and ItemList are the ones renderCategoryPage
 // produced for these URLs, so the pages' SEO identity is unchanged.
+// Category banners (2026-10-12): a licensed Adobe Stock photo across the top
+// of a Food & Drink category page. Restaurants and cafés have none yet (the
+// candidate photos read as somewhere other than the Okanagan).
+const CATEGORY_BANNER_IMAGES = Object.freeze({
+  pub: { src: '/images/food-drink/pubs.jpg', alt: 'A bartender pouring a craft beer from the tap' },
+  cocktail: { src: '/images/food-drink/cocktail-lounges.jpg', alt: 'A bartender pouring a cocktail at night' },
+  brewery: { src: '/images/food-drink/breweries.jpg', alt: 'A flight of craft beers' },
+  distillery: { src: '/images/food-drink/distilleries.jpg', alt: 'A copper still at a craft distillery' },
+  winery: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata' },
+});
+const CATEGORY_BANNER_STYLE = `<style id="category-banner">
+  .category-banner { margin: 4px 0 18px; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 5; background: #2A6B67; }
+  .category-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .category-banner[hidden] { display: none; }
+  @media (max-width: 700px) { .category-banner { aspect-ratio: 16 / 8; border-radius: 12px; } }
+</style>`;
+function categoryBannerHtml(type) {
+  const b = CATEGORY_BANNER_IMAGES[type];
+  if (!b) return '';
+  return `<div class="category-banner"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" fetchpriority="high"></div>\n  `;
+}
+// The /food-drink hub filters in the page, so its banner follows the type
+// chips: one selected type with a photo shows it, anything else hides it.
+function foodDrinkHubBannerHtml(types) {
+  const one = types.length === 1 && CATEGORY_BANNER_IMAGES[types[0]] ? CATEGORY_BANNER_IMAGES[types[0]] : null;
+  const map = JSON.stringify(CATEGORY_BANNER_IMAGES).replace(/</g, '\\u003c');
+  return `<div class="category-banner" id="fdBanner"${one ? '' : ' hidden'}><img src="${one ? one.src : ''}" alt="${one ? escapeHtml(one.alt) : ''}" width="1600" height="1067"></div>
+  <script>
+  (function(){
+    var map = ${map};
+    var box = document.getElementById('fdBanner'); if (!box) return;
+    var img = box.querySelector('img');
+    var sync = function(){
+      var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-fd-type'); });
+      var b = on.length === 1 ? map[on[0]] : null;
+      if (b) { if (img.getAttribute('src') !== b.src) { img.src = b.src; img.alt = b.alt; } box.hidden = false; } else { box.hidden = true; }
+    };
+    try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
+    sync();
+  })();
+  </script>
+  `;
+}
 function renderFoodDrinkScopedPage(venues, filter, scope) {
   const { region, type, categoryCounts, categoryGuidePages = [] } = scope;
   const regionLabel = REGION_LABELS[region];
@@ -13254,6 +13297,7 @@ ${renderDestinationCategoryStyles()}
 ${golfEngagementHeadHtml('fd', true, 'category')}
 </head>
 <body class="golf-page outdoor-page fd-page fd-scoped-page">
+${CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE : ''}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
@@ -13263,7 +13307,7 @@ ${renderGolfHeaderHtml()}
     { name: regionLabel, href: `/${region}` },
     { name: label.plural },
   ])}
-  <h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
+  ${categoryBannerHtml(type)}<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>
   ${regionCategoryTabsHtml(region, categoryCounts, type)}
   ${venues.length ? foodDrinkSearchHtml() : ''}
   ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures) : ''}
@@ -13370,12 +13414,13 @@ ${renderFoodDrinkOpenNowStyles()}
 ${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page fd-page">
+${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Food & Drink' }])}
-  <h1>${escapeHtml(heading)}</h1>
+  ${foodDrinkHubBannerHtml(f.types)}<h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro fd-intro">Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley&rsquo;s best dining rooms &mdash; every restaurant, caf&eacute;, pub, cocktail lounge and brewery Okanagan Roam has verified.</p>
   ${foodDrinkSearchHtml()}
   ${foodDrinkTypeChipsHtml(state)}
@@ -23162,6 +23207,7 @@ module.exports = {
   ALL_REGIONS_CATEGORIES,
   renderGolfThemeStyles,
   renderFoodDrinkOpenNowStyles,
+  CATEGORY_BANNER_IMAGES,
   THEMED_CATEGORY_TYPES,
   ENGAGEMENT_ONLY_TYPES,
   usesThemedCategoryLayout,

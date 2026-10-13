@@ -8851,7 +8851,8 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
 
   // None of the old oversized directory treatment.
-  assert.equal((markup.match(/<img/g) || []).length, 0, 'no images above or among the controls');
+  // The one exception (2026-10-12): the category banner, hidden unless a single type is chosen.
+  assert.equal((markup.replace(/<div class="category-banner" id="fdBanner"[^>]*><img [^>]*><\/div>/, '').match(/<img/g) || []).length, 0, 'no images above or among the controls besides the category banner');
   assert.doesNotMatch(markup.slice(0, markup.indexOf('<li class="venue-card"')), /<h2[^>]*class="category-subsection-heading"/, 'no visible step headings above the results');
   assert.match(markup, /<h2 class="visually-hidden" id="fdResultsTop">Results<\/h2>/, 'the Results heading is screen-reader only');
   assert.doesNotMatch(markup, /<select/, 'no dropdown controls');
@@ -17489,4 +17490,34 @@ test('Card rows (2026-10-12): two-up cards give every part its own subgrid row, 
   // The open-now line's row lives with the open-now styles, so pages without Open Now carry none of it.
   assert.doesNotMatch(css, /fd-open-status/);
   assert.match(app.renderFoodDrinkOpenNowStyles(), /body\.golf-page \.card-grid > \.venue-card > \.fd-open-status \{ grid-row: 3; \}/);
+});
+
+test('Category banners (2026-10-12): pub, cocktail, brewery, distillery and winery pages open with their photo; restaurants and cafés have none; /food-drink shows one only for a single chosen type', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${type} image exists`);
+    assert.ok(b.alt && b.alt.length > 10, `${type} has alt text`);
+  }
+  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['brewery', 'cocktail', 'distillery', 'pub', 'winery']);
+  const pub = app.createVenue({ name: 'Banner Test Pub', region: 'kelowna', type: 'pub', description: 'A fixture pub.', slug: 'banner-test-pub' });
+  const pub2 = app.createVenue({ name: 'Banner Test Pub Two', region: 'kelowna', type: 'pub', description: 'Another fixture pub.', slug: 'banner-test-pub-two' });
+  try {
+    await withWinterServer(async (base) => {
+      const scoped = (await WINTER_GET(base, '/kelowna/pubs')).text;
+      assert.match(scoped, /<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg" alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" fetchpriority="high"><\/div>\s*<h1>Pubs in Kelowna, BC<\/h1>/);
+      const rest = (await WINTER_GET(base, '/kelowna/restaurants')).text;
+      assert.doesNotMatch(rest, /class="category-banner"/);
+      const hubAll = (await WINTER_GET(base, '/food-drink')).text;
+      assert.match(hubAll, /<div class="category-banner" id="fdBanner" hidden><img src=""/);
+      const hubPub = (await WINTER_GET(base, '/food-drink?types=pub')).text;
+      assert.match(hubPub, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/pubs\.jpg"/);
+      const hubTwo = (await WINTER_GET(base, '/food-drink?types=pub,brewery')).text;
+      assert.match(hubTwo, /id="fdBanner" hidden/);
+      const wine = (await WINTER_GET(base, '/wineries')).text;
+      assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
+    });
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(pub.id, pub2.id);
+  }
 });
