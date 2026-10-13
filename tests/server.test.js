@@ -17689,3 +17689,20 @@ test('Indoor experience chips (2026-10-13): each /indoor?activity= chip swaps in
   assert.match(games, /<h1>Games &amp; Escape Rooms in the Okanagan<\/h1>/);
   assert.doesNotMatch(games, /<h1>Indoor &amp; Rainy Day in the Okanagan<\/h1>/);
 });
+
+test('Outdoor activity banners (2026-10-13): each live activity page opens with its own photo; the /outdoors landing swaps photo, heading and intro for a single pressed activity', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const [slug, b] of Object.entries(app.OUTDOOR_ACTIVITY_BANNERS)) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${slug} photo exists`);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), `${slug} thumbnail exists`);
+    assert.ok(b.alt && b.alt.length > 10, `${slug} has alt text`);
+  }
+  const venues = [{ id: 990301, name: 'Banner Trail', slug: 'banner-trail', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
+  const page = app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, venues);
+  assert.match(page, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/outdoors\/activity-hiking\.jpg"/);
+  assert.match(page, /<div class="category-hero-text"><h1>Hiking &amp; Trails in the Okanagan<\/h1><\/div>/);
+  const landing = app.renderCategoryAllRegionsPage('outdoor', venues, null, {});
+  assert.match(landing, /"fishing":\{"banner":\{"src":"\/images\/outdoors\/activity-fishing\.jpg"/, 'the landing carries each activity\'s swap content');
+  assert.match(landing, /querySelectorAll\('\[data-activity\]\[aria-pressed="true"\]'\)/);
+});
