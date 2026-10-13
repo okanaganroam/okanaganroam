@@ -17,6 +17,17 @@ const BY_ID = new Map(FACTS.map((v) => [v.id, v]));
 const plan = (text) => tp.planTrip({ intent: d.interpretDiscoveryQuery(text, T), facts: FACTS, labels: LABELS, seed: 0, clock: { weekday: 'tue', minutes: 720 } });
 const stops = (p) => (p.days || []).flatMap((x) => x.stops).filter((s) => s.venue);
 
+test('V3 timeline keeps an unscheduled dinner visible without linking it to an impossible venue',()=>{
+ const rows=v3.t3TimelineRows({itinerary:{stops:[{label:'Dinner',daypart:'evening',unscheduledMeal:true}]},schedule:[{day:1,daypart:'evening',status:'unmet',notScheduledMeal:true}]});
+ assert.equal(rows.length,1);assert.equal(rows[0].name,'Dinner');assert.equal(rows[0].notScheduledMeal,true);assert.equal(rows[0].status,'unmet');
+});
+
+test('V3 mobile plan actions stay clear of the fixed My Trip shortcut', () => {
+  const html = v3.renderTripPlannerV3Page({ esc: (s) => String(s), title: 't', description: 'd', canonical: 'https://okanaganroam.com/trip', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', analyticsHead: '', regions: [], regionImages: {}, preview: false });
+  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.t3-plan-actions\s*\{[^}]*display:\s*grid/);
+  assert.match(html, /\.t3-plan-actions\s*\[data-t3-add-all\][^}]*grid-column:\s*1\s*\/\s*-1/);
+});
+
 test('V3 helpers: straight-line distance only from two stored coordinates, worded as straight line', () => {
   assert.equal(v3.t3Km({ latitude: 49.88, longitude: -119.49 }, { latitude: null, longitude: -119.5 }), null);
   assert.equal(v3.t3Km({ latitude: 49.88 }, { latitude: 49.9, longitude: -119.5 }), null);
@@ -29,7 +40,7 @@ test('V3 helpers: straight-line distance only from two stored coordinates, worde
 });
 
 test('V3 helpers: a shared link carries only the request, seed, edits, kept and skipped stops -- and rejects anything else', () => {
-  const s = { text: 'Plan 3 days in Kelowna & wine', seed: 4, overrides: { days: 3, pace: 'relaxed', baseRegion: 'penticton' }, locks: { '1-morning': 12, '9-night': 5 }, exclude: [7, 8] };
+  const s = { text: 'Plan 3 days in Kelowna & wine', seed: 4, overrides: { days: 3, pace: 'relaxed', baseRegion: 'penticton', eventId: 812 }, locks: { '1-morning': 12, '9-night': 5 }, exclude: [7, 8] };
   const qs = v3.t3StateToQuery(s);
   assert.ok(!qs.includes('9-night'), 'invalid lock keys are not written');
   assert.deepEqual(v3.t3QueryToState(qs, ['penticton', 'kelowna']), { text: s.text, seed: 4, overrides: s.overrides, locks: { '1-morning': 12 }, exclude: [7, 8], pinned: null, avoid: [], removed: [], invalid: false });
@@ -38,6 +49,7 @@ test('V3 helpers: a shared link carries only the request, seed, edits, kept and 
   const junk = v3.t3QueryToState('?q=hi&seed=-1&days=12&pace=fast&base=seattle&keep=1-morning:abc,2-evening:5&skip=1,x,2', ['kelowna']);
   assert.deepEqual(junk, { text: 'hi', seed: 0, overrides: {}, locks: { '2-evening': 5 }, exclude: [1, 2], pinned: null, avoid: [], removed: [], invalid: true });
   assert.equal(v3.t3QueryToState('?q=' + 'a'.repeat(900), []).text.length, 500);
+  assert.equal(v3.t3QueryToState('?q=concert&event=0', []).invalid, true);
 });
 
 // ---- Stage 5A (F09, 2026-10-01): the link replays the request behind the plan on screen ----
@@ -399,4 +411,161 @@ test('Complex V3 edits: settings send existing locks to the server so conflicts 
   change({target:{closest:()=>({value:'1',getAttribute:()=> 'days'})}});
   assert.equal(sent.pinned?.['2-morning'],complex?41:undefined);
  }
+});
+
+test('V3: requirement summary distinguishes missing and unverified checks and escapes text',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','trip-planner-v3-page.js'),'utf8');
+  const match=source.match(/  function requirementSummaryHtml\(p\)\{([\s\S]*?)\n  \}\n  function render\(/);
+  assert.ok(match,'visible requirement summary helper exists');
+  const build=new Function('esc','lang','p',match[1]);
+  const escape=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const p={requirementResults:[{kind:'venue_kind',value:'museum',status:'satisfied'},{kind:'venue_kind',value:'spa',status:'unmet'},{kind:'unsupported',value:'accessibility',status:'unverified'},{kind:'venue',value:'<script>',status:'unmet'}]};
+  const html=build(escape,()=> 'en',p);
+  assert.match(html,/Matched \(1\)/);assert.match(html,/Missing \(2\)/);assert.match(html,/Needs confirmation \(1\)/);assert.match(html,/&lt;script&gt;/);assert.ok(!html.includes('<script>'));
+  assert.match(build(escape,()=> 'fr',p),/À confirmer/);assert.equal(build(escape,()=> 'en',{}),'');
+});
+
+test('V3 compatible edits: losing a previously matched activity keeps the current plan',()=>{
+ const old={requirementResults:[{id:'r1',kind:'type',value:'cafe',status:'satisfied'},{id:'r2',kind:'venue_kind',value:'easy_walk',status:'satisfied'}]};
+ const next={requirementResults:[{id:'r1',kind:'type',value:'cafe',status:'satisfied'},{id:'r2',kind:'venue_kind',value:'easy_walk',status:'unmet'}]};
+ assert.equal(v3.t3EditLosesMatch(old,next),true);
+ assert.equal(v3.t3EditLosesMatch(old,old),false);
+ assert.equal(v3.t3EditLosesMatch(null,next),false);
+ assert.equal(v3.t3EditLosesMatch(next,next),false);
+});
+
+test('V3 time-budget choices survive shared links and reject invalid values',()=>{
+ const state={text:'Coffee and museum in 1 hour',overrides:{budgetMode:'shorter',durationMinutes:120}};
+ const qs=v3.t3StateToQuery(state);const restored=v3.t3QueryToState(qs,[]);
+ assert.equal(restored.overrides.budgetMode,'shorter');assert.equal(restored.overrides.durationMinutes,120);
+ assert.equal(v3.t3QueryToState('q=coffee&budget=invalid&minutes=0',[]).overrides.budgetMode,undefined);
+});
+test('V3 incomplete plans: next steps distinguish missing activities from unknown timing',()=>{
+ const p={requirementResults:[{kind:'event',value:'sports-recreation',eventKind:'hockey',sourceText:'2026 with dinner and hockey',status:'unmet'},{kind:'duration',status:'unverified'}],schedule:[{venueId:1,status:'unverified'}],itinerary:{stops:[{venue:{id:1,name:'Named Cafe',url:'/kelowna/cafes/named-cafe'}}]}};
+ const steps=v3.t3PlanNextSteps(p);assert.ok(steps.some(s=>s.kind==='missing_event'&&s.label==='hockey game'));assert.ok(steps.some(s=>s.kind==='timing'&&s.url==='/kelowna/cafes/named-cafe'));assert.equal(steps.length,2);
+ assert.deepEqual(v3.t3PlanNextSteps({requirementResults:[{status:'satisfied'}],schedule:[{status:'estimated'}]}),[]);
+});
+test('V3 missing venue requests link to the matching regional listings',()=>{
+ const steps=v3.t3PlanNextSteps({intent:{regions:['vernon']},requirementResults:[{id:'r1',kind:'type',value:'winery',status:'unmet'}]});
+ assert.equal(steps[0].url,'/vernon/wineries');
+ assert.equal(v3.t3PlanNextSteps({intent:{regions:['vernon']},requirementResults:[{id:'r1',kind:'type_count',value:'winery',status:'unmet'}]})[0].url,'/vernon/wineries');
+ assert.equal(v3.t3PlanNextSteps({intent:{regions:['kelowna','vernon']},requirementResults:[{id:'r1',kind:'type',value:'winery',status:'unmet'}]})[0].url,'/wineries');
+ assert.equal(v3.t3PlanNextSteps({intent:{regions:['vernon']},requirementResults:[{id:'r1',kind:'feature',value:'dog_friendly',status:'unmet'}]})[0].url,'/dog-friendly');
+});
+test('V3 missing event requests link to matching What’s On filters',()=>{
+ const steps=v3.t3PlanNextSteps({intent:{regions:['kelowna']},requirementResults:[{id:'e1',kind:'event',value:'events-festivals',eventKind:'festival',status:'unmet'}]});
+ assert.equal(steps[0].url,'/whats-on?regions=kelowna&categories=events-festivals');
+});
+test('V3 date and start controls: share links round-trip midnight and reject invalid dates',()=>{
+ const s={text:'Dinner and a concert',overrides:{startDate:'2026-10-16',startMinutes:0},locks:{},exclude:[],removed:{}};
+ const q=v3.t3StateToQuery(s),restored=v3.t3QueryToState(q,[]);
+ assert.equal(restored.overrides.startDate,'2026-10-16');assert.equal(restored.overrides.startMinutes,0);
+ assert.ok(v3.t3QueryToState('?q=dinner&date=2026-02-30',[]).invalid);
+ assert.ok(v3.t3QueryToState('?q=dinner&start=1440',[]).invalid);
+});
+test('V3 day departure overrides survive shared links and reject invalid days or times',()=>{
+ const s={text:'Two days in Kelowna',overrides:{dayStartMinutes:{1:0,2:870}},locks:{},removed:{}};
+ assert.deepEqual(v3.t3QueryToState(v3.t3StateToQuery(s),[]).overrides.dayStartMinutes,{1:0,2:870});
+ assert.ok(v3.t3QueryToState('?q=trip&starts=8:600',[]).invalid);
+ assert.ok(v3.t3QueryToState('?q=trip&starts=2:1440',[]).invalid);
+});
+
+test('V3 short-walk choices survive shared links and reject malformed IDs',()=>{
+ const s={text:'Two days in Kelowna',overrides:{shortWalkVenueIds:[8,2]},locks:{},removed:{}};
+ assert.deepEqual(v3.t3QueryToState(v3.t3StateToQuery(s),[]).overrides.shortWalkVenueIds,[2,8]);
+ for(const bad of ['0','2,2','-1','abc','1000000000'])assert.equal(v3.t3QueryToState('?q=Kelowna&walk='+bad,[]).invalid,true);
+});
+
+test('nearby event recovery display compiles with bilingual copy and safe listing links',()=>{
+ const html=require('../trip-planner-v3-page').renderTripPlannerV3Page({esc:s=>String(s),regions:[],regionImages:{},preview:false});
+ const js=html.slice(html.lastIndexOf('<script>')+8,html.lastIndexOf('</script>'));
+ new Function(js);
+ assert.ok(js.includes('Events on nearby dates'));assert.ok(js.includes('Événements à d’autres dates'));
+ assert.ok(js.includes('They are not added to your itinerary.'));
+});
+
+test('V3 warning summary collapses only timing warnings already shown on a stop',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'..','trip-planner-v3-page.js'),'utf8');
+ const match=source.match(/  function warningSummaryHtml\(p\)\{([\s\S]*?)\n  \}\n/);
+ assert.ok(match);
+ const build=new Function('esc','lang','t3PlanNextSteps','t3FrenchText','p',match[1]);
+ const frenchText=require('../trip-french-copy').t3FrenchText;
+ const esc=s=>String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ const p={warnings:['Cafe: Provisional visit. Confirm hours.','No matching hockey event.','<unsafe>'],itinerary:{stops:[{venue:{name:'Cafe'},scheduleNote:'Provisional visit. Confirm hours. Estimated daylight.'}]}};
+ const before=JSON.stringify(p),html=build(esc,()=> 'en',v3.t3PlanNextSteps,frenchText,p);
+ assert.match(html,/<details/);assert.match(html,/Timing details already shown with your stops \(1\)/);
+ assert.ok(html.indexOf('No matching hockey event.')<html.indexOf('<details'));
+ assert.match(html,/&lt;unsafe&gt;/);assert.equal(JSON.stringify(p),before);
+ assert.match(build(esc,()=> 'fr',v3.t3PlanNextSteps,frenchText,p),/Détails horaires déjà indiqués/);
+ assert.doesNotMatch(build(esc,()=> 'en',v3.t3PlanNextSteps,frenchText,{warnings:['Cafe: different warning'],itinerary:p.itinerary}),/<details/);
+ assert.doesNotMatch(build(esc,()=> 'en',v3.t3PlanNextSteps,frenchText,{warnings:['Cafe: This visit cannot fit before closing.'],itinerary:{stops:[{venue:{name:'Cafe'},scheduleNote:'This visit cannot fit before closing.'}]}}),/<details/);
+ const missingEvent={warnings:['Not met: hockey game — No matching event was scheduled for the requested dates.'],requirementResults:[{kind:'event',eventKind:'hockey',value:'sports-recreation',status:'unmet'}]};
+ assert.doesNotMatch(build(esc,()=> 'en',v3.t3PlanNextSteps,frenchText,missingEvent),/Not met: hockey game/);
+ const missingEventFr={warnings:['Non satisfait : match de hockey — Aucun événement correspondant n’a été prévu aux dates demandées.'],requirementResults:missingEvent.requirementResults};
+ assert.doesNotMatch(build(esc,()=> 'fr',v3.t3PlanNextSteps,frenchText,missingEventFr),/Non satisfait : match de hockey/);
+});
+test('V3 listing-data summary groups missing hours and map locations with links to each affected stop',()=>{
+ const p={days:[{day:1,stops:[
+  {venue:{id:11,name:'Cafe <One>',url:'/kelowna/cafes/one'},caveats:['No usable hours listed on Okanagan Roam — check before you go']},
+  {venue:{id:11,name:'Cafe <One>',url:'/kelowna/cafes/one'},caveats:['No map location on file for this stop or the one before it, so the distance between them isn’t known']},
+  {venue:{id:12,name:'Winery'},caveats:['Aucun horaire utilisable indiqué sur Okanagan Roam — vérifiez avant de partir']},
+  {venue:{id:13,name:'Restaurant'},caveats:['A different caveat remains on the stop']}
+ ]}]};
+ const gaps=v3.t3ListingGapGroups(p);
+ assert.deepEqual(gaps.map(g=>[g.kind,g.venues.map(v=>v.name)]),[
+  ['hours',['Cafe <One>','Winery']],['location',['Cafe <One>']]
+ ]);
+ const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+ const html=v3.t3ListingGapSummaryHtml(p,false,esc);
+ assert.match(html,/Details to confirm/);
+ assert.match(html,/Hours not listed/);
+ assert.match(html,/Map location missing/);
+ assert.match(html,/<a href="#t3-venue-card-11">Cafe &lt;One&gt;<\/a>/);
+ assert.match(html,/<a href="#t3-venue-card-12">Winery<\/a>/);
+ const french=v3.t3ListingGapSummaryHtml(p,true,esc);
+ assert.match(french,/Détails à confirmer/);
+ assert.match(french,/Horaires non indiqués/);
+ assert.match(french,/Emplacement sur la carte manquant/);
+});
+test('V3 page includes gap-summary helpers and gives the first card for a venue its jump target',()=>{
+ const html=v3.renderTripPlannerV3Page({esc:s=>String(s),title:'t',description:'d',canonical:'https://okanaganroam.com/trip',breadcrumbJson:'{}',headerHtml:'',tripTrayHtml:'',footerHtml:'',footerStyles:'',analyticsHead:'',regions:[],regionImages:{},preview:false});
+ const js=html.slice(html.lastIndexOf('<script>')+8,html.lastIndexOf('</script>'));
+ assert.match(js,/function t3ListingGapGroups\(p\)/);
+ assert.match(js,/function t3ListingGapSummaryHtml\(p,fr,esc\)/);
+ assert.match(js,/var cardAnchor = v\.id != null && !renderedVenueCardAnchors\[v\.id\] \? ' id=\"' \+ esc\(t3VenueCardId\(v\.id\)\)/);
+});
+test('Before you go checklist uses explicit confirmation reasons and preserves fallback',()=>{
+ const p={itinerary:{stops:[{venue:{id:1,name:'Dinner',url:'/dinner'}}]},schedule:[{venueId:1,status:'provisional',confirmationReasons:['prior_timing','visit_duration','travel']}]};
+ const step=v3.t3PlanNextSteps(p)[0];
+ assert.deepEqual(step.checks,['prior_timing','visit_duration','travel']);
+ assert.equal(v3.t3TimingChecklist(step,false),'Confirm the preceding stop’s timing, visit duration and travel.');
+ assert.match(v3.t3TimingChecklist(step,true),/arrêt précédent/);
+ assert.doesNotMatch(v3.t3TimingChecklist(step,false),/opening hours/);
+ assert.equal(v3.t3TimingChecklist({checks:['hours','sport_access','visit_duration','travel']},false),'Confirm opening hours, sports access or booking requirements, visit duration and travel.');
+ assert.match(v3.t3TimingChecklist({},false),/opening hours/);
+});
+test('Event next steps identify each uncertain event and preserve listed times',()=>{
+ const p={days:[{day:1,stops:[{event:{id:4,name:'Concert <one>',url:'/events/concert'}},{event:{id:5,name:'Concert two',url:'https://unsafe.example'}}]}],schedule:[{day:1,eventId:4,status:'unverified',startMinutes:1140},{day:1,eventId:5,status:'unmet',startMinutes:1200,endMinutes:1260},{day:1,eventId:4,status:'unverified',startMinutes:1140}]};
+ const before=JSON.stringify(p),steps=v3.t3PlanNextSteps(p).filter(s=>s.kind==='event_timing');
+ assert.equal(steps.length,2);assert.equal(steps[0].name,'Concert <one>');assert.equal(steps[0].url,'/events/concert');
+ assert.deepEqual(steps[0].checks,['event_duration','event_travel']);
+ assert.doesNotMatch(v3.t3TimingChecklist(steps[0],false),/start time/);
+ assert.match(v3.t3TimingChecklist(steps[0],false),/event duration/);
+ assert.equal(steps[1].url,null);assert.ok(steps[1].checks.includes('event_arrival'));
+ assert.equal(JSON.stringify(p),before);
+ const unknown=v3.t3PlanNextSteps({itinerary:{stops:[{event:{id:8,name:'Unknown',url:'/events/unknown'}}]},schedule:[{eventId:8,status:'unverified'}]})[0];
+ assert.ok(unknown.checks.includes('event_start'));assert.match(v3.t3TimingChecklist(unknown,true),/heure de début/);
+});
+test('Event fallback checklist asks about a start only when it is not listed',()=>{
+ const listed=v3.t3PlanNextSteps({schedule:[{eventId:9,status:'unverified',startMinutes:1145}]})[0];
+ assert.equal(listed.kind,'event_timing');assert.deepEqual(listed.checks,['event_duration','event_travel']);
+ assert.doesNotMatch(v3.t3TimingChecklist(listed,false),/start time/);
+ const unknown=v3.t3PlanNextSteps({schedule:[{eventId:10,status:'unverified'}]})[0];
+ assert.ok(unknown.checks.includes('event_start'));
+ assert.match(v3.t3TimingChecklist(unknown,false),/start time/);
+});
+test('Removing a preceding stop clears conditional meal windows from the displayed timeline',()=>{
+ const p={itinerary:{stops:[{daypart:'morning',venue:{id:1,name:'First'}},{daypart:'evening',venue:{id:2,name:'Dinner'}}]},schedule:[{day:1,venueId:1,startMinutes:540,endMinutes:600},{day:1,venueId:2,status:'unverified',mealWindow:{earliestStartMinutes:1200,latestStartMinutes:1290,visitMinutes:90}}]};
+ assert.ok(v3.t3TimelineRows(p)[1].mealWindow);
+ assert.equal(v3.t3TimelineRows(p,{'1-morning':true})[0].mealWindow,undefined);
 });

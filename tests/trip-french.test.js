@@ -328,3 +328,17 @@ test('French upgrade: separate day clauses and exact dates survive normalization
  assert.equal(requirements.items.find(i=>i.value==='museum').dayIndex,1);
  assert.equal(requirements.items.find(i=>i.value==='escape').dayIndex,2);
 });
+
+test('French departure: explicit 24-hour departure survives translation and reaches the planner',()=>{
+ const r=require('../trip-requirements');
+ for(const [phrase,minutes] of [['départ à 16 h',960],['départ à 16h30',990],['en commençant à 9 h 15',555],['à partir de 0 h',0]]){
+  const text=fr.tripPlannerText('Planifie 2 jours à Kelowna avec une randonnée et un souper, '+phrase+'.',TAXONOMY);
+  assert.equal(r.extractTripRequirements({text,taxonomy:TAXONOMY}).startMinutes,minutes,phrase);
+ }
+});
+test('French departure: a date does not become a time and an English request stays byte-identical',()=>{
+ const r=require('../trip-requirements');
+ const text=fr.tripPlannerText('Planifie 2 jours à Kelowna à partir du 16 octobre 2026 avec une randonnée et un souper, départ à 16 h.',TAXONOMY);
+ const req=r.extractTripRequirements({text,taxonomy:TAXONOMY});assert.equal(req.startDate,'2026-10-16');assert.equal(req.startMinutes,960);
+ const english='Plan 2 days in Kelowna from October 16, 2026 with a hike and dinner starting at 4 pm.';assert.equal(fr.tripPlannerText(english,TAXONOMY),english);
+});

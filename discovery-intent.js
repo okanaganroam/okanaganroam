@@ -98,6 +98,7 @@ const REGION_EXTRA_ALIASES = {
 const VALLEY_WIDE_PHRASES = ['okanagan', 'the okanagan', 'okanagan valley', 'the valley', 'anywhere', 'valley wide', 'bc', 'british columbia', 'okanagan lake'];
 
 const TYPE_ALIASES = {
+  sport: ['sports and recreation', 'sports venues', 'recreation activities', 'skate park', 'skate parks', 'skatepark', 'skateparks', 'disc golf', 'tennis', 'pickleball', 'bmx'],
   restaurant: ['restaurant', 'restaurants', 'dining', 'dinner', 'lunch', 'eat', 'eating', 'eats', 'food', 'place to eat', 'places to eat', 'somewhere to eat', 'bistro', 'bistros', 'eatery', 'eateries'],
   cafe: ['cafe', 'cafes', 'coffee', 'coffee shop', 'coffee shops', 'espresso'],
   pub: ['pub', 'pubs', 'bar', 'bars', 'gastropub'],
@@ -792,7 +793,6 @@ function correctionSourceWords(t) {
   // The tour aliases (2026-10-11) only when the taxonomy has the type, so a
   // taxonomy without it ("tour" is left out while /tours lists nothing, and
   // always for the trip planner) corrects exactly as before the type existed.
-  // Sports & Recreation (2026-10-12): the same for the sport aliases.
   const typeAliases = Object.fromEntries(Object.entries(TYPE_ALIASES).filter(([type]) => !CLAIMING_TYPES.includes(type) || t.types.includes(type)));
   for (const table of [typeAliases, FEATURE_ALIASES, COLLECTION_ALIASES, ACTIVITY_ALIASES, CUISINE_SYNONYMS, REGION_EXTRA_ALIASES]) addWords(Object.values(table).flat());
   addWords(VALLEY_WIDE_PHRASES);
@@ -1485,7 +1485,7 @@ function validateDiscoveryIntent(candidate, taxonomy, text) {
 // multi is true only for a find/events request with two or more parts, or a
 // route with at least one part; everything else keeps today's planner path.
 const TRIP_EVENT_KINDS = [
-  { kind: 'hockey', phrases: ['hockey game', 'hockey games', 'hockey match', 'hockey night', 'junior hockey', 'hockey'], category: 'sports-recreation', terms: ['hockey'], noun: 'hockey game' },
+  { kind: 'hockey', phrases: ['ice hockey game', 'ice hockey games', 'ice hockey match', 'ice hockey', 'hockey game', 'hockey games', 'hockey match', 'hockey night', 'junior hockey', 'hockey'], category: 'sports-recreation', terms: ['hockey'], noun: 'hockey game' },
   { kind: 'concert', phrases: ['concert', 'concerts', 'gig', 'gigs', 'live show', 'live shows'], category: 'live-music', terms: [], noun: 'concert' },
   { kind: 'live-music', phrases: ['live music', 'live band', 'live bands'], category: 'live-music', terms: [], noun: 'live music', venueFeature: 'live_music' },
   { kind: 'festival', phrases: ['festival', 'festivals'], category: 'events-festivals', terms: [], noun: 'festival' },
@@ -1585,7 +1585,12 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   // does ("coffee, a beach afternoon, a winery and dinner"). Normalization
   // drops punctuation, so the separator is made a word first.
   const normalized = normalizeDiscoveryText(typeof text === 'string' ? text.replace(/\s*[,;]\s*/g, ' and ') : text);
-  if (!normalized || base.exactVenue || !['find', 'events'].includes(base.mode)) return out;
+  // A planning verb does not turn dinner plus an event into a full-day trip.
+  // Explicit day counts continue through the day planner.
+  const shortEventOuting = base.mode === 'plan' && !base.days
+    && /\b(?:dinner|supper|lunch|brunch|breakfast)\b/.test(normalized)
+    && /\b(?:hockey|concerts?|live music|festivals?|events?|markets?)\b/.test(normalized);
+  if (!normalized || base.exactVenue || (!['find', 'events'].includes(base.mode) && !shortEventOuting)) return out;
   // Stage 3.2: the same corrections as the base request, word for word.
   const tokens = correctDiscoveryTokens(normalized.split(' '), discoveryIndex(taxonomy, t)).tokens;
   const table = tripPhraseTable(taxonomy);
@@ -1676,7 +1681,23 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
         modifier(h, { field: 'feature', value: k.venueFeature });
         continue;
       }
-      newComp(hit, { kind: 'event', event: { kind: k.kind, category: k.category && t.eventCategories.includes(k.category) ? k.category : null, terms: k.terms.slice(), noun: k.noun, venueFeature: k.venueFeature || null } });
+      // Unclaimed words immediately before the event kind name the requested artist.
+      // Stop at understood components so dinner/location words cannot become names.
+      const nameTerms = [];
+      for (let n = hit.start - 1; n >= 0; n--) {
+        if (out.leftoverTerms.includes(tokens[n])) nameTerms.unshift(tokens[n]);
+        else if (tokens[n] === 'and' && nameTerms.length && out.leftoverTerms.includes(tokens[n - 1])) continue;
+        else break;
+      }
+      if (['by', 'with', 'featuring'].includes(tokens[hit.end])) {
+        for (let n = hit.end + 1; n < tokens.length; n++) {
+          if (out.leftoverTerms.includes(tokens[n])) nameTerms.push(tokens[n]);
+          else if (tokens[n] === 'and' && nameTerms.length && out.leftoverTerms.includes(tokens[n + 1])) continue;
+          else break;
+        }
+      }
+      newComp(hit, { kind: 'event', event: { kind: k.kind, category: k.category && t.eventCategories.includes(k.category) ? k.category : null, terms: uniq([...k.terms, ...nameTerms]), ...(nameTerms.length ? {nameTerms} : {}), noun: k.noun, venueFeature: k.venueFeature || null } });
+      out.leftoverTerms = out.leftoverTerms.filter(w => !nameTerms.includes(w));
       continue;
     }
     if (meal) {
@@ -1747,6 +1768,8 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     if (out.party.kids) c.kids = true;
   }
   for (const c of parts) delete c.daypartFromText;
+  if (shortEventOuting && (!parts.some(c => c.kind === 'event') || !parts.some(c => c.kind === 'venue' && c.meal))) return { multi:false, components:[], route:null, regions:[], party:{dog:false,kids:false}, when:base.when || null, unknownPlaces:[] };
+  if (shortEventOuting && parts.some(c=>['dinner','supper'].includes(c.meal)) && ['date_night','romantic'].includes(base.occasion)) out.outingOccasion = base.occasion;
   out.components = parts;
   out.regions = uniq(out.regions);
   if (route && (route.from || route.to)) out.route = { from: route.from, to: route.to, via: route.via };

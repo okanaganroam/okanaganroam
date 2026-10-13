@@ -13659,7 +13659,10 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
   // Nothing else: same event names and the same number of track() calls; requestType only labels analytics.
   assert.equal((js.match(/track\('/g) || []).length, 16);
   assert.deepEqual([...new Set((js.match(/track\('[a-z_]+'/g) || []).map((c) => c.slice(7, -1)))].sort(), ['add_whole_trip', 'open_my_trip', 'outbound_click', 'trip_plan_complete', 'trip_plan_edit', 'trip_plan_error', 'trip_plan_regenerate', 'trip_plan_share', 'trip_plan_start'].sort());
-  for (const use of js.split('\n').filter((l) => /\brequestType\b/.test(l) && !/requestType: '|requestType: arrival|var requestType = /.test(l))) assert.match(use, /track\(|facts\.request_type = requestType/, use.trim());
+  // The planner also uses requestType to preserve the current itinerary when
+  // an edit would lose a matched activity; remaining uses should be analytics.
+  assert.ok(js.includes("t3EditLosesMatch(state.last,res.j)"), 'edit safety guard remains');
+  for (const use of js.split('\n').filter((l) => /\brequestType\b/.test(l) && !/requestType: '|requestType: arrival|var requestType = /.test(l) && !/t3EditLosesMatch/.test(l))) assert.match(use, /track\(|facts\.request_type = requestType/, use.trim());
   // V2 untouched.
   const v2 = app.renderTripPlannerPage(true);
   for (const s of ['facts.pace', "'restore'", 'arrival']) assert.ok(!v2.includes(s), s);
@@ -13667,7 +13670,7 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'trip-event-location.js', 'trip-french-copy.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -17943,4 +17946,11 @@ test('Fall guides (2026-10-13): data/guides files load, render on the shared gui
     const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
     for (const p of paths) assert.ok(sitemap.includes(`<loc>https://okanaganroam.com${p}</loc>`), `sitemap lists ${p}`);
   });
+});
+
+
+test('Build My Trip: one explicit dinner is not repeated across a romantic weekend',()=>{
+ const p=app.runTripPlan({text:'A romantic weekend in Kelowna with wineries and one great dinner.'},new Date('2026-10-13T19:00:00Z'));
+ assert.equal(p.days.length,2);
+ assert.equal(p.days.flatMap(day=>day.stops).filter(s=>s.venue?.type==='restaurant').length,1);
 });
