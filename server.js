@@ -6892,6 +6892,7 @@ function seasonalHeroText(html, now = new Date()) {
   return ['hero.headline', 'hero.lead', 'hero.leadMobile'].reduce((h, key) => swap(key)(h), html);
 }
 
+const SHOW_SKI_SNOW_MOOD_TILE = false;
 function renderMoodCardsHTML({ now = new Date() } = {}) {
   // Seasonal guide link (2026-10-13): Sep-Mar only, so summer output is unchanged.
   const seasonalLink = seasonalGuideLink(now);
@@ -6931,6 +6932,7 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
     'whats-on': '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>',
     outdoors: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 8l4 6 2-3 4 9z"/></svg>',
     'ski-snow': '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M4.5 6.5l15 11"/><path d="M19.5 6.5l-15 11"/><path d="M9.5 3.5 12 6l2.5-2.5"/><path d="M9.5 20.5 12 18l2.5 2.5"/></svg>',
+    sports: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/><path d="M5.5 17 9 9h6l3.5 8"/><path d="M9 9 12 17l3-8"/><path d="M8 6h3"/></svg>',
     indoor: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
   };
 
@@ -6968,7 +6970,11 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
   // FALL_MOOD_IMAGES shows it instead (free Adobe Stock, each under its own file name). Other months are unchanged.
   if (isFallHeroSeason(now)) cards.forEach((c) => { if (FALL_MOOD_IMAGES[c.key]) c.img = FALL_MOOD_IMAGES[c.key]; });
   if (winter) {
-    cards[2] = { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' };
+    // Sports & Recreation (Dayton, 2026-10-13): takes Ski & Snow's place "for now". Flip SHOW_SKI_SNOW_MOOD_TILE
+    // back to true to bring Ski & Snow back; its photo, icon and FR/EN titles are all still in place.
+    cards[2] = SHOW_SKI_SNOW_MOOD_TILE
+      ? { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' }
+      : { key: 'sports', href: `/${CATEGORY_SLUGS.sport}`, filter: null, img: '/images/mood/sports-rec.jpg', titleKey: 'mood.sports.title', title: 'Sports & Recreation' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
   }
 
@@ -8103,6 +8109,7 @@ function renderHomepageDiscoveryStyles() {
   }
   /* Indoor & Rainy Day winter tile (2026-10-11): a dusk-blue to warm-amber
      fill behind its photo, shown while the image loads or if it is missing. */
+  .mood-card-sports { background: var(--ref-navy); }
   .mood-card-indoor { background: linear-gradient(140deg, #2E3B5B 0%, #5A4A6A 52%, #C8874A 100%); }
   .mood-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
   .mood-card:hover .mood-card-img { transform: scale(1.045); }
@@ -8115,7 +8122,7 @@ function renderHomepageDiscoveryStyles() {
   .mood-card-title { font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 700; display: block; line-height: 1.15; text-wrap: balance; }
   /* The longest tile title (Indoor & Rainy Day / Intérieur et pluie, 2026-10-13) is a step smaller and wraps as two even lines,
      so it covers less of the photo. */
-  .mood-card-indoor .mood-card-title { font-size: 0.84rem; }
+  .mood-card-indoor .mood-card-title, .mood-card-sports .mood-card-title { font-size: 0.84rem; }
 
   @media (min-width: 720px) {
     .mood-card-grid { grid-template-columns: repeat(6, 1fr); }
