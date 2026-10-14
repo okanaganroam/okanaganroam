@@ -6780,7 +6780,18 @@ function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
 // real relative geography (and the lake's real bend west through the
 // Peachland/Summerland stretch before curving back east into Penticton)
 // rather than an invented shape.
-function renderBuildTripCTAHTML() {
+// Fall Build My Trip (2026-10-13): September through November (isFallHeroSeason) the band's photo is the same scene
+// colour-shifted to fall (trip-cta-fall.jpg) and the example asks for a fall trip (trip.exampleFall, EN and FR). The map is
+// an SVG drawn from OpenStreetMap lake and river outlines with every destination at its real coordinates
+// (data/trip-cta-map.svg, inlined so its town names are real text; all year), replacing the old illustration whose labels were out of place.
+const TRIP_CTA_MAP_SVG = (() => { try { return fs.readFileSync(path.join(__dirname, 'data', 'trip-cta-map.svg'), 'utf8').trim(); } catch (e) { return null; } })();
+function renderBuildTripCTAHTML({ now = homepageNow() } = {}) {
+  const fall = isFallHeroSeason(now);
+  const photo = fall ? '<img class="trip-cta-img" src="/images/trip-cta-fall.jpg" width="1600" height="656" alt="" loading="lazy">'
+    : '<img class="trip-cta-img" src="/images/trip-cta.webp" width="1600" height="656" alt="" loading="lazy">';
+  const example = fall
+    ? '<p class="trip-cta-example" data-i18n="trip.exampleFall">&ldquo;I&rsquo;m in Kelowna for a fall weekend. I want harvest wineries, a cozy dinner, a fall hike, what&rsquo;s on, and a few hidden gems.&rdquo;</p>'
+    : '<p class="trip-cta-example" data-i18n="trip.example">&ldquo;I&rsquo;m in Kelowna for 3 days. I want golf, wineries, great food and patios, a beach, what&rsquo;s happening, and a few hidden gems.&rdquo;</p>';
   // Map visual replaced with a real, pre-made illustrated map image
   // (2026-09-17) -- the previous hand-built inline SVG (real
   // equirectangular-projected coordinates, procedurally drawn terrain/
@@ -6790,17 +6801,17 @@ function renderBuildTripCTAHTML() {
 <section class="trip-cta-section" id="buildTrip">
   <div class="wrap-wide trip-cta-inner">
     <div class="trip-cta-visual" aria-hidden="true">
-      <img class="trip-cta-img" src="/images/trip-cta.webp" width="1600" height="656" alt="" loading="lazy">
+      ${photo}
       <div class="trip-cta-scrim"></div>
     </div>
     <button type="button" class="trip-cta-map" id="tripCtaOpenMap" aria-label="Open the interactive map" data-i18n-aria="trip.openMap">
-      <img class="trip-cta-map-img" src="/images/trip-cta-map.webp" width="1376" height="768" alt="" loading="lazy">
+      ${TRIP_CTA_MAP_SVG || '<img class="trip-cta-map-img" src="/images/trip-cta-map.webp" width="1376" height="768" alt="" loading="lazy">'}
     </button>
     <div class="trip-cta-content">
       <span class="trip-cta-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/><circle cx="17" cy="9" r="1.4" fill="currentColor" stroke="none"/></svg></span>
       <h2 class="trip-cta-title" data-i18n="trip.title">Build Your Perfect Okanagan Trip</h2>
       <p class="trip-cta-lead" data-i18n="trip.lead">Tell us what you&rsquo;re looking for. We&rsquo;ll help build your adventure.</p>
-      <p class="trip-cta-example" data-i18n="trip.example">&ldquo;I&rsquo;m in Kelowna for 3 days. I want golf, wineries, great food and patios, a beach, what&rsquo;s happening, and a few hidden gems.&rdquo;</p>
+      ${example}
       <div class="trip-cta-actions">
         <button type="button" class="trip-cta-btn" id="tripCtaOpenTrip"><span data-i18n="trip.buildMyTrip">Build My Trip</span> <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
@@ -8182,6 +8193,8 @@ function renderHomepageDiscoveryStyles() {
     position: absolute; top: 0; right: 0; bottom: 0; width: 40%; z-index: 1;
     border: none; padding: 0; margin: 0; cursor: pointer; overflow: hidden; display: block;
   }
+  .trip-cta-map { background: #F1ECDF; -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 42%); mask-image: linear-gradient(90deg, transparent 0%, black 42%); }
+  .trip-cta-map-svg { position: absolute; top: 2%; left: 22%; width: 78%; height: 96%; display: block; }
   .trip-cta-map-img {
     width: 100%; height: 100%; display: block; object-fit: cover;
     /* The soft dissolve: fully transparent at the map's own left edge,
@@ -23107,7 +23120,7 @@ const server = http.createServer(async (req, res) => {
         html = seasonalHeroText(html, homepageNow());
         const hiddenGemsSection = renderHiddenGemsHomepageHTML({ now: homepageNow() });
         const exploreRegions = renderExploreRegionsHTML({ now: homepageNow() });
-        const buildTripSection = renderBuildTripCTAHTML();
+        const buildTripSection = renderBuildTripCTAHTML({ now: homepageNow() });
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
         if (html.includes(heroToWizardAnchor)) {

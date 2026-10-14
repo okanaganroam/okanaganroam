@@ -93,6 +93,7 @@ var TRANSLATIONS = {
     'trip.title': 'Build Your Perfect Okanagan Trip',
     'trip.lead': 'Tell us what you\u2019re looking for. We\u2019ll help build your adventure.',
     'trip.example': '\u201cI\u2019m in Kelowna for 3 days. I want golf, wineries, great food and patios, a beach, what\u2019s happening, and a few hidden gems.\u201d',
+    'trip.exampleFall': '\u201cI\u2019m in Kelowna for a fall weekend. I want harvest wineries, a cozy dinner, a fall hike, what\u2019s on, and a few hidden gems.\u201d',
     'trip.buildMyTrip': 'Build My Trip',
     'trip.openMap': 'Open the interactive map',
 
@@ -563,6 +564,7 @@ var TRANSLATIONS = {
     'trip.title': 'Planifiez votre voyage parfait dans l\u2019Okanagan',
     'trip.lead': 'Dites-nous ce que vous recherchez. On vous aide \u00e0 planifier votre aventure.',
     'trip.example': '\u00ab\u00a0Je suis \u00e0 Kelowna pour 3 jours. Je veux du golf, des vignobles, de bons repas et des terrasses, une plage, des \u00e9v\u00e9nements, et quelques tr\u00e9sors cach\u00e9s.\u00a0\u00bb',
+    'trip.exampleFall': '\u00ab\u00a0Je suis \u00e0 Kelowna pour une fin de semaine d\u2019automne. Je veux des vignobles en pleine r\u00e9colte, un souper r\u00e9confortant, une randonn\u00e9e d\u2019automne, des \u00e9v\u00e9nements, et quelques tr\u00e9sors cach\u00e9s.\u00a0\u00bb',
     'trip.buildMyTrip': 'Planifiez mon voyage',
     'trip.openMap': 'Ouvrir la carte interactive',
 
