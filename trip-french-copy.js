@@ -7,6 +7,8 @@ function t3FrenchText(value){
  const accessPrefix='Access / schedule from the listing: “',accessSuffix='” Confirm access and scheduling with the operator before visiting.';
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';
  const phrases=[
+ ['An Okanagan Roam Local Favourite','Un coup de cœur local d’Okanagan Roam'],['One of Okanagan Roam’s Hidden Gems','L’un des trésors cachés d’Okanagan Roam'],
+ ['A fun pick for teenagers','Une activité amusante pour les ados'],['Indoor fun for kids','Du plaisir à l’intérieur pour les enfants'],['A good rainy-day pick','Un bon choix pour un jour de pluie'],['An all-vegetarian or vegan kitchen','Une cuisine entièrement végétarienne ou végane'],['A good walk with your dog','Une belle promenade avec votre chien'],['A guided food tour','Une visite gourmande guidée'],
  ['Has the Kid-Friendly badge','Possède le badge Adapté aux enfants'],
  ['A restaurant suits a date night','Un restaurant convient à une soirée en amoureux'],
  ['Indoor kinds of places come first.','Les lieux intérieurs sont proposés en priorité.'],
@@ -74,6 +76,12 @@ function t3FrenchText(value){
  ['Its description mentions','Sa description mentionne'],['Listed on Okanagan Roam for','Répertorié sur Okanagan Roam pour'],['Has the verified','Possède le badge vérifié'],
  ['Event start time is not listed; confirm before visiting.','L’heure de début n’est pas indiquée; confirmez avant de partir.'],
  ['Matched a dated event occurrence.','Correspond à une occurrence datée de l’événement.'],['Matched an actual listing.','Correspond à une fiche existante.'],['No selected stop matches this exclusion.','Aucun arrêt choisi ne correspond à cette exclusion.'],['A selected stop conflicts with this exclusion.','Un arrêt choisi contredit cette exclusion.'],
+ ['Wheelchair access isn’t listed on Okanagan Roam, so check with each place before you go.','L’accès en fauteuil roulant n’est pas indiqué sur Okanagan Roam; vérifiez auprès de chaque lieu avant de partir.'],
+ ['Group seating isn’t listed on Okanagan Roam, so book ahead for a large group.','Les places pour les groupes ne sont pas indiquées sur Okanagan Roam; réservez à l’avance pour un grand groupe.'],
+ ['Exact costs aren’t listed on Okanagan Roam; the plan favours lower price levels where they are known.','Les coûts exacts ne sont pas indiqués sur Okanagan Roam; le plan privilégie les prix plus bas lorsqu’ils sont connus.'],
+ ['Places with higher listed prices are left out; not every place lists a price, so check before you go.','Les lieux aux prix indiqués plus élevés sont exclus; tous les lieux n’indiquent pas leurs prix, alors vérifiez avant de partir.'],
+ ['No indoor backup could be fitted into this plan.','Aucune option intérieure n’a pu être intégrée à ce plan en cas de pluie.'],
+ ['You asked for one dinner, so it is planned once and the other evenings are left free.','Vous avez demandé un seul souper : il est prévu une fois et les autres soirées restent libres.'],
  ['No matching event was scheduled for the requested dates.','Aucun événement correspondant n’a été prévu aux dates demandées.'],['Not met:','Non satisfait :'],['Not verified:','Non vérifié :'],['hockey game','match de hockey'],['live music','musique en direct'],['sports event','événement sportif']
  ];
  for(const [a,b] of phrases)text=text.split(a).join(b);
@@ -84,6 +92,9 @@ function t3FrenchText(value){
  text=text.replace(/; includes (\d+) minutes waiting for the scheduled slot or opening/g,'; comprend $1 minutes d’attente pour le créneau prévu ou l’ouverture');
  text=text.replace(/Placed in the (morning|afternoon|evening) slot/g,(_,p)=>'Prévu '+({morning:'le matin',afternoon:'l’après-midi',evening:'le soir'}[p]));
  text=text.replace(/No selected stop meets (.+)\./g,'Aucun arrêt choisi ne satisfait $1.');
+ text=text.replace(/^No (.+) could be fitted into this plan\.$/,(_,w)=>'Impossible d’intégrer ce qui suit dans le plan : '+({beach:'une plage',winery:'un vignoble',restaurant:'un restaurant','café':'un café','breakfast or brunch spot':'un endroit pour le déjeuner ou le brunch','golf course':'un terrain de golf','outdoor stop':'un arrêt en plein air',tour:'une visite guidée',brewery:'une microbrasserie',pub:'un pub','cocktail lounge':'un bar à cocktails',distillery:'une distillerie','indoor attraction':'une attraction intérieure','hike or walk':'une randonnée ou une promenade','ski hill':'une station de ski','snowshoe trail':'un sentier de raquette','winter activity':'une activité hivernale',viewpoint:'un point de vue'}[w]||w)+'.');
+ text=text.replace(/^Not every stop is listed as (.+)\.$/,(_,w)=>'Les arrêts ne sont pas tous indiqués comme '+({'dog friendly':'acceptant les chiens','kid friendly':'adaptés aux enfants','vegetarian friendly':'offrant des options végétariennes','vegan friendly':'offrant des options végétaliennes','gluten-free friendly':'offrant des options sans gluten'}[w]||w)+'.');
+ text=text.replace(/^Okanagan Roam can’t check (.+) from its listings, so confirm it before you go\.$/,'Okanagan Roam ne peut pas vérifier « $1 » dans ses fiches; confirmez avant de partir.');
  text=text.replace(/No (.+) is listed on What’s On( for the evening| for the daytime)? for those dates, so the rest of the plan is shown\./g,(_,kind,part)=>'Aucun événement correspondant ('+kind+') n’est répertorié'+(part?' pour cette période de la journée':'')+' aux dates demandées; le reste du plan est affiché.');
  text=text.replace(/No matching activity fits the morning on day (\d+); that time is left free rather than adding a meal\./g,'Aucune activité correspondante ne convient le matin du jour $1; ce créneau reste libre plutôt que d’ajouter un repas.');
  text=text.replace(/Used instead of (.+) because its timing could not be verified\./g,'Choisi à la place de $1, dont l’horaire n’a pas pu être vérifié.');
@@ -95,10 +106,16 @@ function t3FrenchText(value){
  text=text.replace(/A later assumed start reduces waiting while keeping the same stops and listed opening hours\. Estimated first visit: ([\d:]+)\. Change your request to specify a start time\./g,'Un départ supposé plus tard réduit l’attente tout en conservant les mêmes arrêts et horaires indiqués. Première visite estimée : $1. Précisez une heure de départ dans votre demande.');
  text=text.replace(/Trip starts on (\d{4}-\d{2}-\d{2}) \(Okanagan calendar date\)\./g,'Le voyage commence le $1 (date locale de l’Okanagan).');
  text=text.replace(/^Date night: Dinner in (.+)\.$/,'Soirée en amoureux : souper à $1.');
+ text=text.replace(/^If it rains: (.+) (?:are|is) indoors nearby, so swap (?:one|it) in for a beach or outdoor stop\.$/,(_,names)=>'S’il pleut : '+names.replace(/ and (?!.* and )/,' et ')+(/ and /.test(names)?' sont des options intérieures à proximité; remplacez une plage ou une sortie en plein air par l’une d’elles.':' est une option intérieure à proximité; remplacez une plage ou une sortie en plein air par celle-ci.'));
+ text=text.replace(/^Okanagan Roam doesn’t list (.+) for these places, so they’re matched on the rest of your request; check with each place\.$/,(_,w)=>'Okanagan Roam n’indique pas '+w.replace(/“/g,'« ').replace(/”/g,' »').replace(/ and (?!.* and )/,' et ')+' pour ces lieux; ils correspondent au reste de votre demande. Vérifiez auprès de chaque lieu.');
+ text=text.replace(/^Based in (.+), with day (\d+) as your day trip to (.+)\.$/,'Basé à $1, avec le jour $2 consacré à votre excursion à $3.');
+ text=text.replace(/^Planned as a road trip from (.+) to (.+), one stretch of the valley each day\.$/,'Planifié comme un road trip de $1 à $2, une portion de la vallée chaque jour.');
  text=text.replace(/ on (\d{4}-\d{2}-\d{2})/g,' le $1');
- const words={Dinner:'Souper',Supper:'Souper',Lunch:'Dîner',Breakfast:'Déjeuner','Live-music':'Musique en direct','Live music':'Musique en direct',Morning:'Matin',Afternoon:'Après-midi',Evening:'Soir',cafes:'cafés',wineries:'vignobles',walks:'promenades','kid-friendly spots':'endroits adaptés aux enfants','indoor & rainy day spots':'lieux intérieurs et jours de pluie','outdoor destinations':'lieux de plein air','Hiking & Trails':'Randonnées et sentiers',daily:'tous les jours','Mon–Thu':'lun.–jeu.','Fri–Sat':'ven.–sam.',Sun:'dim.'};
- for(const [a,b] of Object.entries(words)){if(text===a)text=b;else if(a===a.toLowerCase()||a.includes('–'))text=text.replace(new RegExp('\\b'+a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'),b);}
+ const words={Cafes:'Cafés',Wineries:'Vignobles',Breweries:'Microbrasseries',Beaches:'Plages',Dinner:'Souper',Supper:'Souper',Lunch:'Dîner',Breakfast:'Déjeuner','Live-music':'Musique en direct','Live music':'Musique en direct',Morning:'Matin',Afternoon:'Après-midi',Evening:'Soir',cafes:'cafés',wineries:'vignobles',walks:'promenades','kid-friendly spots':'endroits adaptés aux enfants','indoor & rainy day spots':'lieux intérieurs et jours de pluie','outdoor destinations':'lieux de plein air','Hiking & Trails':'Randonnées et sentiers','dog-friendly spots':'endroits qui acceptent les chiens','vegetarian-friendly venues':'lieux avec options végétariennes','vegan-friendly venues':'lieux avec options véganes','lake time':'temps au bord du lac','golf courses':'terrains de golf','cocktail lounges':'bars à cocktails','tours & experiences':'visites et expériences',breweries:'microbrasseries',beaches:'plages',daily:'tous les jours','Mon–Thu':'lun.–jeu.','Fri–Sat':'ven.–sam.',Sun:'dim.'};
+ for(const [a,b] of Object.entries(words)){if(text===a)text=b;else if(a===a.toLowerCase()||a.includes('–')||a.includes('&'))text=text.replace(new RegExp('\\b'+a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'),b);}
  text=text.replace(/^In (.+), où a lieu l’événement$/, 'À $1, où a lieu l’événement');
+ // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
+ if(/\d{2}:\d{2}/.test(text))text=text.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d]));
  return text;
 }
 function t3FrenchEvent(event){
@@ -124,7 +141,7 @@ function t3FrenchPlan(plan){
   if(s.venue?.listedHours)s.venue.listedHours=t3FrenchText(s.venue.listedHours).replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d]));
   for(const a of s.alternates||[])translateStop(a);
  };
- if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(t3FrenchText);}
+ if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(t3FrenchText);if(typeof p.understood.when==='string')p.understood.when=t3FrenchEvent({dateLabel:p.understood.when}).dateLabel.replace(/,/g,'');}
  const stops=p.days?.length?p.days.flatMap(d=>d.stops||[]):p.itinerary?.stops||p.outing?.stops||p.recommendations||[];
  for(const s of stops)translateStop(s);
  if(p.events)p.events=p.events.map(t3FrenchEvent);
@@ -133,7 +150,8 @@ function t3FrenchPlan(plan){
  const names=stops.map(s=>s.venue?.name||s.event?.name).filter(Boolean);
  if(names.length){
   const translatedSummary=p.summary?t3FrenchText(p.summary):'';
-  p.headline=p.days?.length?'Votre voyage de '+p.days.length+' jours':translatedSummary&&translatedSummary!==p.summary?translatedSummary:'Votre itinéraire dans l’Okanagan';
+  const towns=[...new Set(stops.map(s=>s.venue?.regionLabel).filter(Boolean))],at=towns.length===1?' à '+towns[0]:towns.length===2?' à '+towns[0]+' et '+towns[1]:' dans l’Okanagan';
+  p.headline=p.days?.length?(p.days.length===1?'Votre journée'+at:'Votre voyage de '+p.days.length+' jours'+at):translatedSummary&&translatedSummary!==p.summary&&!/\b(?:and|in|with|the|of|for|near)\b/.test(translatedSummary)?translatedSummary:'Votre itinéraire'+at;
   if(p.experience)p.experience.text=p.experience.text?.startsWith('Timing conflict:')?t3FrenchText(p.experience.text):'Arrêts proposés, dans l’ordre : '+names.join(' → ')+'. Les horaires et les trajets restent à confirmer; consultez les détails de chaque arrêt.';
  }else {p.headline=t3FrenchText(p.headline||p.summary);if(p.experience?.text)p.experience.text=t3FrenchText(p.experience.text);}
  return p;

@@ -1082,7 +1082,7 @@ test('Sparse multi-day activity plans do not pad an empty activity day with opti
  const explicit='Plan 2 days in Kelowna with disc golf, lunch and dinner.';
  const ei=d.interpretDiscoveryQuery(explicit,t),et=d.interpretTripComponents(explicit,t,ei),er=r.extractTripRequirements({text:explicit,intent:ei,trip:et,taxonomy:t});
  const ep=tp.planTrip({intent:ei,trip:et.multi?et:null,requirements:er,facts:f,labels,tripDate:'2026-10-17'});
- assert.ok(ep.days.every(day=>day.stops.some(s=>s.daypart==='afternoon'&&s.venue?.type==='restaurant')),'explicit lunches are retained');
+ assert.ok(ep.days.every(day=>day.stops.some(s=>['midday','afternoon'].includes(s.daypart)&&s.venue?.type==='restaurant')),'explicit lunches are retained (2026-10-14: as a midday stop)');
 });
 
 test('Sparse recovery offers shortening only without discarding dated or named priorities',()=>{

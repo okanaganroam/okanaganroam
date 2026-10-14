@@ -147,6 +147,11 @@ function tripCalendar(text, referenceDate=null) {
       source=m[0];if(!conflict&&(!startDate||lastDay&&!endDate))conflict='The calendar date is invalid; choose a real date.';
     }
   }
+  // 2026-10-14: "next weekend" is the Saturday after the coming one (the one after today's, on a weekend).
+  if(!startDate&&!conflict&&referenceDate&&/^\d{4}-\d{2}-\d{2}$/.test(referenceDate)){
+    const next=/\bnext weekend\b/i.exec(text);
+    if(next){const ref=new Date(referenceDate+'T12:00:00Z'),wd=ref.getUTCDay();startDate=new Date(ref.getTime()+(wd===0?6:(6-wd)+7)*86400000).toISOString().slice(0,10);source=next[0];}
+  }
   if(startDate && source) {
     const before=String(text).slice(0,String(text).indexOf(source));
     const weekday=/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s*,?\s*$/i.exec(before);
@@ -156,6 +161,13 @@ function tripCalendar(text, referenceDate=null) {
   if(startDate&&endDate){days=Math.round((new Date(endDate+'T12:00:00Z')-new Date(startDate+'T12:00:00Z'))/86400000)+1;if(days<1)conflict='The calendar date range ends before it starts; confirm the travel dates.';else if(days>7)conflict='The calendar date range exceeds seven days; the planner supports up to seven days.';}
   return {startDate,endDate,days,source,conflict,cleanText:source?String(text).replace(source,' '):String(text)};
 }
+// 2026-10-14: "something indoors if it rains", "in case it rains", "a rainy-day backup" is a fallback, not the
+// trip's weather. Like "a rainy day option", it adds one indoor option and leaves the rest of the plan as asked
+// (a family who wants the beach "if it's nice" kept getting an all-indoor trip with "no beaches in Penticton").
+// Only a fallback when the rest of the request is about something else; "what can we do if it rains?" is a rainy-day
+// request outright.
+const RAIN_BACKUP_CONTEXT=/\b(?:beach|beaches|hike|hikes|hiking|walk|walks|park|parks|lake|outdoors?|outside|golf|swim|swimming|sunny|nice weather|if it s nice|weekend|nights?|[2-7] days?|two days|three days|four days|five days)\b/;
+const CONDITIONAL_RAIN=/\b(?:if|in case|incase|should|when) (?:it|the weather) (?:rains?|is (?:raining|rainy|bad|wet|crappy|lousy)|turns(?: bad| wet)?|gets (?:bad|wet|rainy))\b|\bin case of (?:rain|bad weather)\b|\b(?:back ?up|plan b|fallback|rain option)\b/;
 function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDate=null}) {
   const items=[],conflicts=[];let explicitMealCount=null;
   const original=String(text||''), normalizedText=norm(original);
@@ -197,7 +209,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       const before=c.slice(0,m.index), neg=/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(before);
       add(neg?'excluded_kind':'venue_kind',kind,scopeText);
     }
-    for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\bbreakfast\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:/\bbeach(?:es)?\b/,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/})) {
+    for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:/\bbeach(?:es)?\b/,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/})) {
       const m=re.exec(value==='golf'&&taxonomy?.types?.includes('sport')?c.replace(/\bdisc golf\b/g,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:{});
     }
     for (const count of c.matchAll(/\b([1-7]|one|two|three|four|five|six|seven)\s+(wineries|winery|vineyards?|cafes?|restaurants?|breweries|distilleries)\b/g)) {
@@ -207,7 +219,9 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     }
     const singleDinner=/\b(?:a|an|one)\s+(?:(?:relaxed|casual|romantic|special|easygoing|quiet|nice|great)\s+){0,2}(?:dinner|supper)\b/.exec(c);
     if(singleDinner&&!/\b(?:lunch|breakfast|meals?|dinners?|suppers?)\b/.test(c.replace(singleDinner[0],'')))explicitMealCount=1;
-    if (/\b(?:[2-9]\d*|two|three|four|five|six|seven)\s+(?:people|adults|children|kids|guests)\b/.test(c)) add('unsupported','party size',scopeText);
+    // 2026-10-14: only a large group is worth a note (seating and bookings); "our two kids" was reported as an
+    // unverifiable party size on every family trip.
+    if (/\b(?:[89]|[1-9]\d+|eight|nine|ten|eleven|twelve|fifteen|twenty)\s+(?:people|adults|guests|of us|friends|guys|girls|ladies)\b/.test(c)) add('unsupported','party size',scopeText);
     for (const event of c.matchAll(/\b(?:concerts?|live music|hockey|events?|festivals?|markets?)\b/g)) {
       if(!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,event.index))){
         const word=event[0].toLowerCase();
@@ -219,7 +233,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     for (const [activity,re] of Object.entries({skiing:/\b(?:ski|skiing)\b/,snowshoeing:/\b(?:snowshoeing|snowshoe)\b/,winter:/\b(?:ski|skiing|snowshoeing|snowshoe|winter activities?)\b/,hiking:/\b(?:hike|hiking|hikes)\b/,viewpoints:/\b(?:viewpoints?|lookouts?|sunset)\b/})) {
       const m=re.exec(c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('activity',activity,scopeText);
     }
-    if(/\b(?:rainy|rains?|indoors|indoor|wet weather)\b/.test(c)&&!/\b(?:no|avoid|without)\s+(?:rain|rainy|indoor)/.test(c)) add('rainy',true,scopeText,{activityOnly:/\brainy day (?:option|activity|activities)\b/.test(c)||!!trip.multi&&/^(?:a |an )?rainy day$/.test(c)});
+    if(/\b(?:rainy|rains?|indoors|indoor|wet weather)\b/.test(c)&&!/\b(?:no|avoid|without)\s+(?:rain|rainy|indoor)/.test(c)) add('rainy',true,scopeText,{activityOnly:/\brainy day (?:option|activity|activities)\b/.test(c)||!!trip.multi&&/^(?:a |an )?rainy day$/.test(c)||CONDITIONAL_RAIN.test(c)&&RAIN_BACKUP_CONTEXT.test(normalizedText),conditional:CONDITIONAL_RAIN.test(c)&&RAIN_BACKUP_CONTEXT.test(normalizedText)});
     for(const [feature,re] of Object.entries({vegetarian:/\bvegetarian\b/,vegan:/\bvegan\b/,gluten_free:/\bgluten free\b/})) {
       if(re.test(c)&&!/\b(?:not|no)\s+(?:vegetarian|vegan|gluten free)/.test(c))add('feature',feature,scopeText);
     }
@@ -232,7 +246,14 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     if(/\$\s*\d+/.test(String(text))&&/\b(?:budget|under|spend|cost|dollars|trip)\b/.test(c))add('unsupported','exact budget',scopeText);
     if(/\b(?:wheelchair|accessible|accessibility)\b/.test(c))add('unsupported','accessibility',scopeText);
     if(/\b(?:ages?|aged)\s*\d+\b|\b\d+\s*year olds?\b/.test(c))add('unsupported','age suitability',scopeText);
-    for(const length of c.matchAll(/\b([1-7]|one|two|three|four|five|six|seven)\s+days?\b/g)) add('days',Number(length[1])||WORD_DAYS[length[1]],scopeText,{dayIndex:null,weekday:null});
+    // 2026-10-14: "one day trip to Penticton" inside a longer stay is a day trip, not a second trip length.
+    const longerStay=/\b(?:[2-7]|two|three|four|five|six|seven)\s+days?\b|\bweekend\b|\bnights?\b|\bweek\b/.test(normalizedText);
+    for(const length of c.matchAll(/\b([1-7]|one|two|three|four|five|six|seven)\s+days?\b/g)) {
+      if(longerStay&&/^(?:1|one)$/.test(length[1])&&/^\s*trips?\b/.test(c.slice(length.index+length[0].length)))continue;
+      add('days',Number(length[1])||WORD_DAYS[length[1]],scopeText,{dayIndex:null,weekday:null});
+    }
+    const dayTrip=/\bday trips? (?:to|into|over to|down to|up to|out to) (.+)/.exec(c);
+    if(dayTrip&&longerStay){const region=(taxonomy.regions||[]).find(r=>dayTrip[1].startsWith(norm((taxonomy.regionLabels||{})[r]||r)));if(region)add('day_trip',region,scopeText);}
     const base=/\b(?:based|staying|stay)\s+(?:in|at)\s+(.+)/.exec(c);
     if(base){const region=(taxonomy.regions||[]).find(r=>base[1].startsWith(norm((taxonomy.regionLabels||{})[r]||r)));if(region)add('base',region,scopeText);}
     for(const type of ['beach','golf','winery','brewery','tour','outdoor','restaurant','pub']) {
@@ -264,7 +285,11 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       && c.event.nameTerms.every(term => norm(item.sourceText).split(' ').includes(term)));
     if (named.length === 1) item.nameTerms = named[0].event.nameTerms.slice();
   }
-  return {occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null};
+  // 2026-10-14: "pizza one night", "sushi once" -- that food is wanted on one meal, not every day (a 3-day family trip
+  // planned pizza for all three dinners). The word just before the frequency phrase is kept; the planner uses it once.
+  const onceTerms=[...normalizedText.matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|day|dinner|lunch|meal|time)\b|\b([a-z]{3,})\s+once\b/g)].map(m=>m[1]||m[2]).filter(w=>!/^(?:just|only|for|and|with|the|out|day|night|trip)$/.test(w));
+  const onceEvening=[...normalizedText.matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|dinner)\b/g)].map(m=>m[1]).filter(w=>onceTerms.includes(w));
+  return {onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null};
 }
 // Words covered by verified requirement grammar must not also become
 // unmatched cuisine searches. Unknown terms still reach the old interpreter.
@@ -373,6 +398,7 @@ function coffeeEvidence(v){
   return /\b(?:coffee|espresso|cappuccino|latte|americano|flat white|cortado)\b/.test(text);
 }
 function matches(v,i){
+  if(i.kind==='day_trip')return v.region===i.value;
   if(i.servesCoffee&&!coffeeEvidence(v))return false;
   if(i.kind==='venue_kind'||i.kind==='excluded_kind')return (v.plannerKinds||inferPlannerKinds(v)).includes(i.value);
   if(i.kind==='venue')return v.id===i.value;
