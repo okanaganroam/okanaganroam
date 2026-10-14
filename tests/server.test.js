@@ -16865,7 +16865,7 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Sports & Recreation (Ski & S
 
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   const html = winterMood('2027-02-01');
-  assert.match(html, /<a class="mood-card mood-card-sports" href="\/sports">\s*<img class="mood-card-img" src="\/images\/mood\/sports-rec\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.match(html, /<a class="mood-card mood-card-sports" href="\/sports">\s*<img class="mood-card-img" src="\/images\/mood\/sports-recreation\.jpg" width="640" height="403" alt="" loading="lazy">/);
   assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
   assert.match(html, /class="mood-card-title" data-i18n="mood\.sports\.title">Sports &amp; Recreation</);
   assert.doesNotMatch(html, /mood-card-ski-snow/, 'Ski & Snow is off the homepage for now');
@@ -16879,7 +16879,7 @@ test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   }
   assert.equal((html.match(/class="mood-card-title" data-i18n=/g) || []).length, 6);
   // Both images exist on disk.
-  for (const f of ['ski-snow-powder.jpg', 'sports-rec.jpg', 'indoor.jpg']) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'mood', f)), f);
+  for (const f of ['ski-snow-powder.jpg', 'sports-recreation.jpg', 'indoor.jpg']) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'mood', f)), f);
   // The indoor card keeps its gradient fallback rule, scoped to that card only.
   assert.match(app.renderHomepageDiscoveryStyles(), /\.mood-card-indoor \{ background: linear-gradient\(/);
 });
