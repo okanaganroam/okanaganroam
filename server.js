@@ -11281,6 +11281,133 @@ function regionPageSchemas(region, regionLabel, description, canonical, categori
   return [destination, list].filter(Boolean);
 }
 
+// Region page photos and cards (2026-10-14). Every town page opens with its
+// own photo: the wide region photo where there is one, the ski photos for the
+// resorts, otherwise the town's /destinations photo (800px, so it gets a
+// shorter banner). Below the guide, "Places to start" shows the places the
+// guide itself names as photo cards -- the guide's own picks, never a paid or
+// ranked slot -- and the categories become one photo grid with the empty
+// ones left out.
+function regionBannerPhoto(region) {
+  const label = REGION_LABELS[region];
+  if (region === 'big-white') return { src: '/images/ski-snow/big-white-sunset.jpg', alt: 'Sunset over snow-covered firs and mountain ridges at Big White', pos: 55, small: false };
+  if (SKI_RESORT_REGIONS.has(region)) return { src: SKI_SNOW_BANNER.src, alt: SKI_SNOW_BANNER.alt, pos: SKI_SNOW_BANNER.pos, small: false };
+  if (REGION_SHARE_IMAGES[region]) return { src: REGION_SHARE_IMAGES[region], alt: `${label} in the Okanagan Valley`, pos: 50, small: false };
+  const card = destinationCardPhoto(region);
+  return card && !card.map ? { src: card.src, alt: `${label} in the Okanagan Valley`, pos: 50, small: true } : null;
+}
+function regionBannerHtml(region) {
+  const b = regionBannerPhoto(region);
+  if (!b) return '';
+  return `<div class="category-banner${b.small ? ' region-banner-small' : ''}"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="${b.small ? 800 : 1600}" height="${b.small ? 533 : 667}" style="object-position: 50% ${b.pos}%" fetchpriority="high"></div>`;
+}
+// Ski hills are named as resorts ("Big White Ski Resort"), towns as "Kelowna, BC".
+function regionHeading(region) {
+  const ski = SKI_RESORT_REGIONS.has(region) && SKI_SNOW_REGION_CONTENT[region];
+  return ski ? ski.heading : `${REGION_LABELS[region]}, BC`;
+}
+// The URL of a card's example photo key ("cafe-1", "noodle", "indoorall-0").
+function cardPhotoKeyUrl(key) {
+  if (key === 'noodle') return '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg';
+  const m = /^([a-z]+)-(\d+|dog)$/.exec(key || '');
+  if (!m) return null;
+  if (m[2] === 'dog') return FD_CARD_DOG_PHOTOS[m[1]] || null;
+  return (FD_CARD_PHOTOS[m[1]] || [])[Number(m[2])] || null;
+}
+function regionStartVenues(region, max = 6) {
+  const intro = REGION_INTROS[region];
+  if (!intro) return [];
+  const html = intro.paragraphs.map((p) => p[1]).join(' ');
+  const seen = new Set(), out = [];
+  const find = db.prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL');
+  for (const m of html.matchAll(/href="\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)"/g)) {
+    const [, r, catSlug, slug] = m;
+    if (r !== region || !SLUG_TO_TYPE[catSlug] || seen.has(slug)) continue;
+    seen.add(slug);
+    const row = find.get(r, slug);
+    if (row) out.push(rowToVenue(row));
+    if (out.length >= max) break;
+  }
+  return out;
+}
+function regionPlacesToStartHtml(region) {
+  const venues = regionStartVenues(region);
+  if (venues.length < 3) return '';
+  const cards = venues.map((v) => {
+    const own = String(v.image_url || '').trim();
+    // Ski hills: their trails, tube parks and tours get winter photos.
+    const set = SKI_RESORT_REGIONS.has(region) && ['outdoor', 'tour', 'sport', 'beach'].includes(v.type) ? 'winter' : null;
+    const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v, set));
+    const type = CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : '';
+    return `
+      <li class="category-card region-start-card">
+        <h3><a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a></h3>
+        <p class="venue-meta">${escapeHtml(type)}</p>${src ? `
+        <div class="region-card-photo"><img src="${escapeHtml(src)}" alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
+      </li>`;
+  }).join('');
+  return `<section class="region-start" aria-labelledby="regionStartHeading">
+  <h2 class="category-subsection-heading" id="regionStartHeading">Places to start in ${escapeHtml(REGION_LABELS[region])}</h2>
+  <ul class="card-grid region-photo-grid">${cards}
+  </ul>
+  </section>`;
+}
+const REGION_DISCOVERY_IMAGES = Object.freeze({
+  'whats-on': '/images/whats-on/thumbs/whats-on.jpg',
+  'dog-friendly': '/images/dog-friendly/thumbs/dog-friendly.jpg',
+  'local-favourites': '/images/local-favourites/thumbs/local-favourites.jpg',
+  'hidden-gems': '/images/hidden-gems-banner/thumbs/hidden-gems.jpg',
+});
+function regionCategoryImage(c) {
+  if (c.type && CATEGORY_BANNER_IMAGES[c.type]) return categoryCardImage(CATEGORY_BANNER_IMAGES[c.type]).src;
+  return REGION_DISCOVERY_IMAGES[c.key] || null;
+}
+// The categories as photo cards, grouped as before, with empty categories
+// (and a group left with none) not shown at all.
+function regionCategoryGridHtml(region, categories) {
+  const label = REGION_LABELS[region];
+  const byKey = new Map(categories.map((c) => [c.key, c]));
+  // A small place (six categories or fewer) gets one grid, not three short rows.
+  const groups = categories.filter((c) => c.href).length <= 6
+    ? [{ label: `Explore ${label}`, keys: DESTINATION_CATEGORY_ORDER }]
+    : DESTINATION_CATEGORY_GROUPS;
+  return groups.map((g) => {
+    const live = g.keys.map((k) => byKey.get(k)).filter((c) => c && c.href);
+    if (!live.length) return '';
+    return `<h2 class="category-subsection-heading">${escapeHtml(g.label === 'Discovery' ? 'More ways to explore' : g.label)}</h2>
+  <ul class="card-grid region-photo-grid">
+    ${live.map((c) => {
+      const img = regionCategoryImage(c);
+      return `
+      <li class="category-card">
+        <h3><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h3>
+        <p class="venue-meta">${c.count} ${escapeHtml(c.count === 1 ? c.nounOne : c.nounMany)} in ${escapeHtml(label)}</p>${img ? `
+        <div class="region-card-photo"><img src="${img}" alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
+      </li>`;
+    }).join('\n')}
+  </ul>`;
+  }).filter(Boolean).join('\n  ');
+}
+const REGION_PAGE_STYLE = `<style id="region-page">
+  body.region-page .region-banner-small { max-height: min(34vh, 300px); }
+  @media (min-width: 900px) { body.region-page .region-banner-small { aspect-ratio: 3 / 1; } }
+  body.region-page .region-category-tabs { margin: 0 0 22px; }
+  body.region-page .region-start { margin: 6px 0 8px; }
+  body.region-page .region-photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0 0 28px; padding: 0; }
+  @media (min-width: 900px) { body.region-page .region-photo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; } }
+  body.region-page .region-photo-grid .category-card { position: relative; display: flex; flex-direction: column; margin: 0; padding: 0 0 12px; overflow: hidden; border-radius: 14px; }
+  body.region-page .region-photo-grid .category-card:hover { transform: translateY(-3px); box-shadow: 0 18px 32px -22px rgba(74,52,40,0.55); }
+  body.region-page .region-photo-grid .region-card-photo { order: -1; aspect-ratio: 3 / 2; overflow: hidden; background: #2A6B67; margin-bottom: 10px; }
+  body.region-page .region-photo-grid .region-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.35s ease; }
+  body.region-page .region-photo-grid .category-card:hover .region-card-photo img { transform: scale(1.04); }
+  body.region-page .region-photo-grid h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; margin: 0 12px 3px; }
+  body.region-page .region-photo-grid h3 a { color: var(--ink); text-decoration: none; }
+  body.region-page .region-photo-grid h3 a::after { content: ''; position: absolute; inset: 0; }
+  body.region-page .region-photo-grid h3 a:focus-visible { outline: none; }
+  body.region-page .region-photo-grid .category-card:focus-within { outline: 2px solid var(--teal-deep); outline-offset: 2px; }
+  body.region-page .region-photo-grid .venue-meta { margin: 0 12px; font-size: 0.82rem; }
+  body.region-page .region-more { margin: 24px 0 8px; font-weight: 700; }
+</style>`;
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
   const totalVenues = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
@@ -11309,23 +11436,9 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
   ]);
 
   const categories = destinationCategories(region, categoryCounts);
-  const byKey = new Map(categories.map((c) => [c.key, c]));
-  const categoryCard = (c) => (c.href
-    ? `
-      <li class="category-card">
-        <h2><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h2>
-        <p class="venue-meta">${c.count} ${c.count === 1 ? c.nounOne : c.nounMany} in ${escapeHtml(regionLabel)}</p>
-      </li>`
-    : `
-      <li class="category-card category-card-empty" aria-disabled="true">
-        <h2>${escapeHtml(c.label)}</h2>
-        <p class="venue-meta">None listed in ${escapeHtml(regionLabel)} yet</p>
-      </li>`);
-  const categorySections = DESTINATION_CATEGORY_GROUPS.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
-  <ul class="card-grid">
-    ${g.keys.map((k) => categoryCard(byKey.get(k))).join('\n')}
-  </ul>`).join('\n  ');
-
+  const placeCount = categories.filter((c) => c.type).reduce((a, c) => a + c.count, 0);
+  const categorySections = regionCategoryGridHtml(region, categories);
+  const startHtml = regionPlacesToStartHtml(region);
   // H1 Step 2 (2026-09-22): a short "Upcoming events in {Region}" block, built
   // from the same live predicate as the sitemap and the event-page block, so
   // links vanish by themselves as events expire. Direct canonical event URLs
@@ -11369,6 +11482,8 @@ ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(regi
 ${renderOutdoorThemeStyles()}
 ${renderDestinationCategoryStyles()}
 ${intro ? REGION_INTRO_STYLE : ''}
+${CATEGORY_BANNER_STYLE}
+${REGION_PAGE_STYLE}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head>
 <body class="golf-page outdoor-page region-page">
@@ -11380,12 +11495,13 @@ ${renderGolfHeaderHtml()}
     { name: 'Home', href: '/' },
     { name: regionLabel },
   ])}
-  <h1>${escapeHtml(regionLabel)}, BC</h1>
-  <p class="subtitle">${totalVenues} verified venues across ${Object.keys(categoryCounts).length} categories in ${escapeHtml(regionLabel)}.</p>
-  ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}${regionCategoryTabsHtml(region, categoryCounts, null, categories)}
+  ${categoryHeroHtml(regionBannerHtml(region), `<h1>${escapeHtml(regionHeading(region))}</h1>
+  <p class="subtitle">${placeCount} place${placeCount === 1 ? '' : 's'} to eat, drink and explore in ${escapeHtml(regionLabel)}</p>`)}
+  ${regionCategoryTabsHtml(region, categoryCounts, null, categories.filter((c) => c.href))}
+  ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}${startHtml}
   ${categorySections}
   ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
-  <a class="cta" href="https://okanaganroam.com/">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
+  <p class="region-more"><a href="/destinations">See all Okanagan destinations &rarr;</a></p>
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
@@ -11420,7 +11536,6 @@ const DESTINATION_DISCOVERY_LABELS = {
   'local-favourites': { plural: 'Local Favourites', nounOne: 'local favourite', nounMany: 'local favourites' },
   'hidden-gems': { plural: 'Hidden Gems', nounOne: 'hidden gem', nounMany: 'hidden gems' },
 };
-const DESTINATION_EVENTS_WINDOW_DAYS = 365; // within What's On's MAX_CUSTOM_WINDOW_DAYS
 
 // Batch A (2026-09-27, P-003): counts for the destination tabs and the
 // /categories directory, which only ever needed a number but loaded whole
@@ -11517,11 +11632,12 @@ function countOutdoorLandingVenues() {
 }
 
 function destinationCategories(region, categoryCounts, now = new Date()) {
-  const today = todayLocal(now);
   const discovery = {
     'whats-on': {
       count: countUpcomingEventsForRegion(region, now),
-      href: `/whats-on?regions=${encodeURIComponent(region)}&when=custom&from=${today}&to=${addLocalDays(today, DESTINATION_EVENTS_WINDOW_DAYS)}`,
+      // The region's own events page (2026-10-14), so the link carries no
+      // dates that go stale in a cached copy.
+      href: `/${encodeURIComponent(region)}/events`,
     },
     'dog-friendly': { count: countDogFriendlyHubVenues(region), href: `/dog-friendly?regions=${encodeURIComponent(region)}` },
     'local-favourites': { count: countLocalFavouriteVenues(region), href: `/local-favorites?regions=${encodeURIComponent(region)}` },
@@ -11529,9 +11645,12 @@ function destinationCategories(region, categoryCounts, now = new Date()) {
   };
   return DESTINATION_CATEGORY_ORDER.map((key) => {
     if (CATEGORY_SLUGS[key]) {
-      const count = categoryCounts[key] || 0;
+      // Sports (2026-10-14): /:region/sports also lists the region's
+      // sports_also venues, so its count does too.
+      const also = key === 'sport' ? getSportsAlsoVenues().filter((v) => v.region === region && v.type !== 'sport').length : 0;
+      const count = (categoryCounts[key] || 0) + also;
       const l = CATEGORY_LABELS[key];
-      return { key, type: key, label: l.plural, nounOne: l.singular.toLowerCase(), nounMany: l.plural.toLowerCase(), count, href: count >= MIN_CATEGORY_VENUES ? `/${region}/${CATEGORY_SLUGS[key]}` : null };
+      return { key, type: key, label: l.plural, nounOne: l.singular.toLowerCase(), nounMany: l.plural.toLowerCase(), count, href: count >= MIN_CATEGORY_VENUES || also > 0 ? `/${region}/${CATEGORY_SLUGS[key]}` : null };
     }
     const l = DESTINATION_DISCOVERY_LABELS[key];
     const d = discovery[key];
@@ -13750,6 +13869,7 @@ const FD_CARD_PHOTOS = Object.freeze({
   wetland: ['/images/trip-v3/stops/stop-outdoor-2-480.jpg', '/images/outdoors/activity-nature-800.jpg'],
   tour: ['/images/trip-v3/stops/stop-tour-480.jpg', '/images/trip-v3/stops/stop-tour-lake-480.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg', '/images/trip-v3/stops/stop-tour-farm-480.jpg'],
   sport: ['/images/trip-v3/stops/stop-sport-480.jpg'],
+  winter: ['/images/trip-v3/stops/stop-ski-480.jpg', '/images/trip-v3/stops/stop-winter-480.jpg', '/images/ski-snow/thumbs/ski-snow.jpg'],
   // Dog Friendly Finds (2026-10-14): dog beaches and dog-friendly parks.
   dogbeach: ['/images/trip-v3/stops/stop-dog-outdoor-480.jpg', '/images/trip-v3/stops/stop-beach-480.jpg', '/images/trip-v3/stops/stop-beach-2-480.jpg', '/images/beaches/beaches-800.jpg'],
   dogoutdoor: ['/images/trip-v3/stops/stop-hiking-480.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg', '/images/trip-v3/stops/stop-outdoor-480.jpg', '/images/trip-v3/stops/stop-viewpoints-480.jpg', '/images/outdoors/activity-hiking-800.jpg'],
@@ -28133,6 +28253,9 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  regionBannerPhoto,
+  regionHeading,
+  regionStartVenues,
   renderLocalFavouritesHubPage,
   renderSecretSpotsHubPage,
   renderCuratedHubPage,

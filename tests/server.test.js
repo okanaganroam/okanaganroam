@@ -4329,7 +4329,7 @@ test('H1 Step 2: region pages link the next publishable events, omit the block b
 
   // 7. The pre-existing region page is otherwise intact.
   assert.match(kelowna, /<h1>Kelowna, BC<\/h1>/);
-  assert.match(kelowna, /<ul class="card-grid">/);
+  assert.match(kelowna, /<ul class="card-grid region-photo-grid">/);
   assert.match(kelowna, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna">/);
   assert.doesNotMatch(kelowna, /<meta name="robots"/, 'region pages stay indexable');
   assert.equal(app.listUpcomingEventsForRegion('kelowna', { limit: 3 }).length, 3);
@@ -7471,7 +7471,7 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
 test('Region hub page lists a Beaches category card once a region has beaches', () => {
   const counts = app.getRegionCategoryCounts('kelowna');
   const html = app.renderRegionPage('kelowna', counts, []);
-  assert.match(html, /<h2><a href="\/kelowna\/beaches">Beaches<\/a><\/h2>/);
+  assert.match(html, /<h3><a href="\/kelowna\/beaches">Beaches<\/a><\/h3>/);
   assert.match(html, /2 beaches in Kelowna/);
 });
 
@@ -7587,7 +7587,7 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
 
     // Region hub shows the new category card.
     const hub = await (await fetch(`${base}/kelowna`)).text();
-    assert.match(hub, /<h2><a href="\/kelowna\/beaches">Beaches<\/a><\/h2>/);
+    assert.match(hub, /<h3><a href="\/kelowna\/beaches">Beaches<\/a><\/h3>/);
 
     // Trip planner: beach is not an interest, not a discovery kind, and never an itinerary stop.
     const badInterest = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 1, interests: ['beach'] }) });
@@ -7947,7 +7947,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     // valley-wide /outdoors hub is always listed, so match region-scoped URLs.)
     assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/[a-z-]+\/outdoors/);
     const hub = await (await fetch(`${base}/kelowna`)).text();
-    assert.match(hub, /<h2><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h2>/, 'region hub gains the category card, exactly as Beaches did');
+    assert.match(hub, /<h3><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h3>/, 'region hub gains the category card, exactly as Beaches did');
     // Phase 2: an activity page appears only once the activity has MIN_ACTIVITY_VENUES destinations.
     assert.equal((await fetch(`${base}/outdoors/hiking`)).status, 404, 'one member is below the activity threshold -> 404, never a thin page');
     assert.equal((await fetch(`${base}/outdoors/not-an-activity`)).status, 404);
@@ -11269,17 +11269,29 @@ function destRegions() {
   return Object.keys(app.REGION_LABELS || {}).filter((r) => Object.keys(app.getRegionCategoryCounts(r)).length > 0);
 }
 
-test('Destination pages: every destination shows the same 17 categories in the approved order (Indoor & Rainy Day, Tours & Experiences added 2026-10-11; Sports & Recreation 2026-10-12)', () => {
+// Region pages (2026-10-14): the tabs and the photo grid show only the
+// categories a place has, in the approved order; an empty category is not
+// shown at all (it was a "None listed yet" card before).
+test('Destination pages: every destination shows its live categories in the approved order, as tabs and as photo cards', () => {
   const regions = destRegions();
   assert.ok(regions.length > 0);
   assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'tour', 'sport', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
   for (const r of regions) {
-    const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
+    const counts = app.getRegionCategoryCounts(r);
+    const live = app.destinationCategories(r, counts).filter((c) => c.href);
+    const html = app.renderRegionPage(r, counts, []);
     const tabs = destTabs(html);
-    assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS, r);
-    // The cards list the same 17, grouped Food & Drink / Experiences / Discovery.
-    assert.match(html, /<h2 class="category-subsection-heading">Food &amp; Drink<\/h2>[\s\S]*<h2 class="category-subsection-heading">Experiences<\/h2>[\s\S]*<h2 class="category-subsection-heading">Discovery<\/h2>/, r);
-    assert.equal((html.match(/<li class="category-card/g) || []).length, 17, r);
+    assert.deepEqual(tabs.map((t) => t.label), live.map((c) => c.label), r);
+    assert.deepEqual(tabs.map((t) => t.label), DEST_ORDER_LABELS.filter((l) => tabs.some((t) => t.label === l)), `${r} keeps the approved order`);
+    assert.ok(tabs.every((t) => t.tag === 'a'), `${r}: every tab is a link`);
+    const cards = [...html.matchAll(/<li class="category-card">\s*<h3><a href="([^"]+)">/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+    assert.deepEqual(cards, live.map((c) => c.href), `${r}: one photo card per live category`);
+    assert.doesNotMatch(html, /None listed in/, `${r}: no empty category is shown`);
+    if (live.length > 6) {
+      assert.match(html, /<h2 class="category-subsection-heading">Food &amp; Drink<\/h2>[\s\S]*<h2 class="category-subsection-heading">(Experiences|More ways to explore)<\/h2>/, r);
+    } else {
+      assert.match(html, new RegExp(`<h2 class="category-subsection-heading">Explore ${app.REGION_LABELS[r]}</h2>`), `${r}: a small place gets one grid`);
+    }
   }
 });
 
@@ -11295,35 +11307,46 @@ test('Destination pages: counts and links come from existing data, filtered to t
       'local-favourites': inRegion(app.getLocalFavouriteVenues()),
       'hidden-gems': inRegion(app.getHiddenGemCollectionVenues()),
     };
-    cats.forEach((c, i) => {
-      const want = c.type ? (counts[c.type] || 0) : expected[c.key];
+    const sportsAlso = app.getSportsAlsoVenues().filter((v) => v.region === r && v.type !== 'sport').length;
+    for (const c of cats) {
+      const want = c.type ? (counts[c.type] || 0) + (c.type === 'sport' ? sportsAlso : 0) : expected[c.key];
       assert.equal(c.count, want, `${r} ${c.key}`);
-      assert.equal(tabs[i].count, want, `${r} ${c.key} tab`);
+      const tab = tabs.find((t) => t.label === c.label);
       if (want === 0) {
         assert.equal(c.href, null, `${r} ${c.key}: empty -> no link`);
-        assert.equal(tabs[i].tag, 'span', `${r} ${c.key}`);
-        assert.match(tabs[i].attrs, /aria-disabled="true"/, `${r} ${c.key}`);
-      } else {
-        assert.equal(tabs[i].tag, 'a', `${r} ${c.key}`);
-        const href = c.type ? `/${r}/${app.CATEGORY_SLUGS[c.type]}` : null;
-        if (href) assert.equal(c.href, href);
-        if (c.key === 'dog-friendly') assert.equal(c.href, `/dog-friendly?regions=${r}`);
-        if (c.key === 'local-favourites') assert.equal(c.href, `/local-favorites?regions=${r}`);
-        if (c.key === 'hidden-gems') assert.equal(c.href, `/hidden-gems?regions=${r}`);
-        if (c.key === 'whats-on') assert.match(c.href, new RegExp(`^/whats-on\\?regions=${r}&when=custom&from=\\d{4}-\\d{2}-\\d{2}&to=\\d{4}-\\d{2}-\\d{2}$`));
+        assert.equal(tab, undefined, `${r} ${c.key}: empty -> no tab`);
+        continue;
       }
-    });
+      assert.equal(tab && tab.count, want, `${r} ${c.key} tab`);
+      const href = c.type ? `/${r}/${app.CATEGORY_SLUGS[c.type]}` : null;
+      if (href) assert.equal(c.href, href);
+      if (c.key === 'dog-friendly') assert.equal(c.href, `/dog-friendly?regions=${r}`);
+      if (c.key === 'local-favourites') assert.equal(c.href, `/local-favorites?regions=${r}`);
+      if (c.key === 'hidden-gems') assert.equal(c.href, `/hidden-gems?regions=${r}`);
+      if (c.key === 'whats-on') assert.equal(c.href, `/${r}/events`, 'the region events page, with no dates to go stale');
+    }
   }
 }));
 
-test('Destination pages: an empty category card is visible but not a link; a region category page keeps its active pill', () => {
-  // Find any destination with at least one empty category.
-  const r = destRegions().find((x) => app.destinationCategories(x, app.getRegionCategoryCounts(x)).some((c) => !c.href));
-  assert.ok(r, 'fixture data has a destination with an empty category');
-  const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
-  const empty = app.destinationCategories(r, app.getRegionCategoryCounts(r)).find((c) => !c.href);
-  assert.match(html, new RegExp(`<li class="category-card category-card-empty" aria-disabled="true">\\s*<h2>${empty.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;').replace(/\u2019/g, '&rsquo;')}</h2>\\s*<p class="venue-meta">None listed in `));
-  assert.match(html, /\.category-region-selector-empty \{/, 'the zero-state style ships with the page');
+test('Region pages (2026-10-14): a banner photo, the resort heading on ski hills, "Places to start" from the guide, and no homepage link', () => {
+  for (const r of destRegions()) {
+    const html = app.renderRegionPage(r, app.getRegionCategoryCounts(r), []);
+    const photo = app.regionBannerPhoto(r);
+    if (photo) {
+      assert.match(html, /<div class="category-banner[^"]*"><img src="\/images\//, `${r} opens with a photo`);
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', photo.src)), `${r} banner exists`);
+    }
+    assert.doesNotMatch(html, /See all of [^<]* on Okanagan Roam/);
+    assert.match(html, /<a href="\/destinations">See all Okanagan destinations &rarr;<\/a>/);
+    assert.doesNotMatch(html, /verified venues across/);
+  }
+  assert.equal(app.regionHeading('big-white'), 'Big White Ski Resort');
+  assert.equal(app.regionHeading('kelowna'), 'Kelowna, BC');
+  // Places to start are only places the guide links to, in its order.
+  const start = app.regionStartVenues('kelowna');
+  const guide = app.REGION_INTROS.kelowna.paragraphs.map((p) => p[1]).join(' ');
+  for (const v of start) assert.ok(guide.includes(`/kelowna/${app.CATEGORY_SLUGS[v.type]}/${v.slug}"`), `${v.name} is named in the guide`);
+  assert.ok(start.length <= 6);
 });
 
 test('Destination pages: the Hidden Gems category reaches the right page whatever the flags; zero-result regions get no link', () => withDiscoveryFlag(undefined, () => withPlannerFlag(undefined, () => withHiddenGemScopeFixtures(() => withDiscoveryServer(async (base) => {
