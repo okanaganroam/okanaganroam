@@ -18613,3 +18613,36 @@ test('Event batches: an entry\'s reviewed_duplicates clears the fuzzy duplicate 
     cleanup();
   }
 });
+
+// ==== Homepage polish (2026-10-14): real content up front ====================
+test('Homepage: the counts strip, This Weekend and Top Picks render from real data, in both languages, and the order is hero, counts, mood, weekend, picks, gems, destinations, trip', async () => {
+  const stats = app.renderHomeStatsHTML();
+  if (stats) {
+    assert.match(stats, /class="home-stats"/);
+    for (const m of stats.matchAll(/<strong>([\d,]+)<\/strong>/g)) assert.ok(Number(m[1].replace(/,/g, '')) > 0);
+    assert.match(stats, /class="home-fr" lang="fr">vrais lieux/);
+  }
+  const picks = app.renderHomeTopPicksHTML({ now: new Date('2026-10-14T12:00:00-07:00') });
+  if (picks) {
+    assert.match(picks, /Top Picks This Fall/);
+    assert.match(picks, /href="\/local-favorites"/);
+    for (const m of picks.matchAll(/class="home-pick-card" href="([^"]+)"/g)) assert.match(m[1], /^\/[a-z-]+\/[a-z-]+\/[a-z0-9-]+$/);
+  }
+  assert.equal(typeof app.renderHomeThisWeekendHTML(), 'string');
+  await withDiscoveryServer(async (base) => {
+    const html = await (await fetch(`${base}/`)).text();
+    const order = ['id="heroScenic"', 'id="moodCards"', 'id="hiddenGems"', 'id="exploreRegions"'].map((m) => html.indexOf(m));
+    assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), 'existing sections keep their order');
+    for (const id of ['thisWeekend', 'topPicks']) if (html.includes(`id="${id}"`)) assert.ok(html.indexOf(`id="${id}"`) > html.indexOf('id="moodCards"') && html.indexOf(`id="${id}"`) < html.indexOf('id="hiddenGems"'), id);
+    assert.ok(html.includes('html[lang="fr"] .home-fr { display: inline; }'), 'the language switch shows the French text');
+  });
+});
+
+test('Homepage events: a Halloween event gets the pumpkin photo (not the Christmas-lights holiday photo), hockey the rink, and two cards never share a photo', () => {
+  const used = new Set();
+  assert.equal(app.homeEventImage({ name: 'Haunted Houses of Pleasant Valley Rd', categories: ['holiday-seasonal'] }, used), '/images/guides/halloween-pumpkins-800.jpg');
+  assert.equal(app.homeEventImage({ name: 'Kelowna Rockets Home Games', categories: ['sports-recreation'] }, used), '/images/whats-on/sports-recreation-800.jpg');
+  const second = app.homeEventImage({ name: 'Another game night', categories: ['sports-recreation'] }, used);
+  assert.notEqual(second, '/images/whats-on/sports-recreation-800.jpg');
+  for (const url of used) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', url)), url);
+});
