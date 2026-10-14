@@ -3,6 +3,7 @@
 //
 //   node scripts/apply-description-rewrites.js            # dry run: checks every listing, writes nothing
 //   ENRICHMENT_ADMIN_TOKEN=... node scripts/apply-description-rewrites.js --apply
+//   node scripts/apply-description-rewrites.js data/description-sports-2026-10.json   # another file, same rules
 //
 // Each venue is re-read first. It is updated only when its region and slug
 // still match the file AND its live English and French descriptions are
@@ -20,7 +21,8 @@ const crypto = require('node:crypto');
 const BASE = (process.env.OKR_BASE_URL || 'https://okanaganroam.com').replace(/\/$/, '');
 const APPLY = process.argv.includes('--apply');
 const TOKEN = process.env.ENRICHMENT_ADMIN_TOKEN;
-const data = require(path.join(__dirname, '..', 'data', 'description-rewrites-2026-10.json'));
+const fileArg = process.argv.slice(2).find((a) => a.endsWith('.json'));
+const data = require(fileArg ? path.resolve(fileArg) : path.join(__dirname, '..', 'data', 'description-rewrites-2026-10.json'));
 const sha1 = (text) => crypto.createHash('sha1').update(String(text || ''), 'utf8').digest('hex');
 
 async function main() {
