@@ -7,7 +7,7 @@ const { t3FrenchText, t3FrenchPlan } = require('../trip-french-copy');
 const regions = ['kelowna', 'penticton', 'oliver', 'osoyoos', 'vernon'];
 const regionLabels = { kelowna: 'Kelowna', penticton: 'Penticton', oliver: 'Oliver', osoyoos: 'Osoyoos', vernon: 'Vernon' };
 const types = ['restaurant', 'cafe', 'winery', 'indoor', 'outdoor', 'tour', 'beach', 'golf', 'pub', 'brewery', 'cocktail', 'distillery'];
-const taxonomy = { regions, regionLabels, types, features: ['dog_friendly', 'kid_friendly', 'vegetarian'], activities: ['hiking', 'viewpoints', 'nature'], collections: [], venues: [], eventCategories: ['live-music', 'holiday-seasonal'], datePresets: ['this-weekend', 'today'] };
+const taxonomy = { regions, regionLabels, types, features: ['dog_friendly', 'kid_friendly', 'vegetarian'], activities: ['hiking', 'viewpoints', 'nature'], collections: [], venues: [], eventCategories: ['live-music', 'holiday-seasonal'], datePresets: ['this-weekend', 'today'], paces: ['relaxed', 'standard', 'packed'] };
 const labels = { regions: regionLabels, types: Object.fromEntries(types.map((t) => [t, { singular: t, plural: `${t}s` }])) };
 
 let nextId = 1;
@@ -144,4 +144,24 @@ test('French copy for the new notes and headlines', () => {
   const fr = t3FrenchPlan({ summary: 'Dog-friendly cafes and dinner in Vernon.', itinerary: { stops: [{ venue: { name: 'Bean to Cup', regionLabel: 'Vernon' } }] } });
   assert.equal(fr.headline, 'Votre itinéraire à Vernon');
   assert.equal(t3FrenchPlan({ understood: { when: 'Sat, Oct 24 – Sun, Oct 25' }, days: [] }).understood.when, 'sam. 24 oct. – dim. 25 oct.');
+});
+
+test('a dish missing in town names the closest place that has it', () => {
+  const { p } = plan('A day in Oliver with a winery and pizza');
+  const w = p.warnings.find((x) => /pizza/.test(x));
+  assert.match(w, /is listed in Oliver; the closest is (?:Tratto Pizzeria|Slice Pizza) in Penticton\./);
+});
+
+test('"nothing too active" is a relaxed day: no golf, no hikes', () => {
+  const { p, intent } = plan('A day in Kelowna with my grandparents, nothing too active');
+  assert.equal(intent.pace, 'relaxed');
+  assert.ok(stops(p).length >= 2);
+  assert.ok(!stops(p).some((s) => s.venue.type === 'golf' || /mountain/i.test(s.venue.name)));
+});
+
+test('"a walk by the lake" keeps the lake on the walk instead of reporting it unused', () => {
+  const text = 'Breakfast and a walk by the lake in Kelowna';
+  const i = d.interpretDiscoveryQuery(text, taxonomy), trip = d.interpretTripComponents(text, taxonomy, i);
+  assert.deepEqual(trip.leftoverTerms, []);
+  assert.ok(trip.components.some((c) => c.lake));
 });

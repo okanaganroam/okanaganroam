@@ -1315,7 +1315,7 @@ function buildDays(facts, ctx, days, pinned) {
           else if (focuses.length) extra.push({ code: 'complement', text: 'Optional suggestion: Extra stop added to round out the day', weight: 2 });
           if (dayTypes[v.type]) score -= 18;
           // Variety: a second meal of the same cuisine on one trip (two Indian dinners) ranks lower.
-          if (v.type === 'restaurant' && v.textCuisine && tripCuisines.has(v.textCuisine) && !vFocus.length) score -= 10;
+          if (v.type === 'restaurant' && v.textCuisine && tripCuisines.has(v.textCuisine) && !vFocus.length) score -= 6;
           // A two-town day moves along the valley: the first town early, the second later.
           if (regionList.length > 1 && v.region === regionList[Math.round(dayDayparts.indexOf(daypart) * (regionList.length - 1) / Math.max(1, dayDayparts.length - 1))]) score += 15;
           // "One easy hike" on a longer trip is one hike; other mornings go to something else (2026-10-14).
@@ -1324,8 +1324,11 @@ function buildDays(facts, ctx, days, pinned) {
           if (daypart === 'evening' && ctx.kids && v.type !== 'restaurant' && !vFocus.some((f) => !f.key.startsWith('food:'))) score -= 40;
           // A trip with nothing particular asked for ("first time, show us the best") opens each day with a sight, a
           // lookout or a favourite park rather than another coffee.
-          if (!ctx.types.size && !ctx.foodTerms.length && !ctx.activities.size && daypart === 'morning' && v.type === 'outdoor' && (v.features.lake_view || v.collections.includes('local_favorite')) && !/\blodge\b|\bcampground\b/.test(v.textName || '')) score += 18;
-          if (!ctx.types.size && !ctx.foodTerms.length && !ctx.activities.size && !ctx.kids && daypart === 'morning' && v.type === 'cafe' && dayDayparts.length >= 3) score -= 15;
+          if (!ctx.types.size && !ctx.foodTerms.length && !ctx.activities.size && daypart === 'morning' && v.type === 'outdoor' && (v.features.lake_view || v.collections.includes('local_favorite')) && !/\blodge\b|\bcampground\b/.test(v.textName || '') && dayPace !== 'relaxed') score += 18;
+          // "Nothing too active": no hikes unless they were asked for.
+          if (dayPace === 'relaxed' && v.type === 'outdoor' && !ctx.activities.has('hiking') && ((v.activities || []).includes('hiking') || /\bmountain\b/.test(v.textName || ''))) score -= 12;
+          if (!ctx.types.size && !ctx.foodTerms.length && !ctx.activities.size && !ctx.kids && dayPace !== 'relaxed' && daypart === 'morning' && v.type === 'cafe' && dayDayparts.length >= 3) score -= 15;
+          if (dayPace === 'relaxed' && v.type === 'golf' && !ctx.types.has('golf')) continue; // a relaxed day is not a round of golf
           // Ski trips: the ski hill first; a dinner tour is not a morning stop.
           if (/\bski(?:ing|ers?)?\b/.test(ctx.queryText || ctx.requirements?.text || '') && v.type === 'outdoor') {
             if (/\b(?:ski|mountain resort|ski hill|ski area)\b/.test(v.textName || '') && daypart === 'morning') score += 25;
@@ -1334,7 +1337,7 @@ function buildDays(facts, ctx, days, pinned) {
           // A day with nothing particular asked for keeps its afternoon for something to do; lunch is not a stop unless asked.
           if (!ctx.types.size && !ctx.foodTerms.length && daypart === 'afternoon' && v.type === 'restaurant' && !hasExplicitMeals && dayDayparts.includes('evening')) score -= 12;
           // Dinner, not a bar, ends the day unless bars were asked for.
-          if (daypart === 'evening' && ['pub', 'brewery'].includes(v.type) && !ctx.types.has(v.type) && !vFocus.length) score -= 8;
+          if (daypart === 'evening' && ['pub', 'brewery'].includes(v.type) && !ctx.types.has(v.type) && !vFocus.length) score -= 14;
           // "Pizza one night" is a dinner, not lunch.
           if (daypart !== 'evening' && dayDayparts.includes('evening') && vFocus.some((f) => f.key.startsWith('food:') && onceEvening.has(f.key.slice(5)))) continue;
           // A food asked for without a count ("beach and pizza") is one meal a day at most, and on about half the days.
@@ -1454,7 +1457,7 @@ function nearbyFocusVenue(facts, ctx, f) {
   const term = f.key.slice(5), dish = DISH_WORDS_RE.test(term);
   // How well it matches: in its name or cuisine beats a passing mention in its description.
   const fit = (v) => { const m = foodMatch(v, { term, cuisine: null }) || {}; return (m.inName ? 3 : 0) + (m.inCui || m.cuisine ? 2 : 0) + (m.inDesc ? 1 : 0); };
-  const options = facts.filter((v) => !ctx.regions.includes(v.region) && at(v.region) >= 0 && gap(v) <= 2 && f.test(v) && (!dish || (['cafe', 'restaurant'].includes(v.type) && fit(v) >= 2)) && eligible(v, { ...ctx, regions: [] }, false));
+  const options = facts.filter((v) => !ctx.regions.includes(v.region) && at(v.region) >= 0 && gap(v) <= 3 && f.test(v) && (!dish || (['cafe', 'restaurant'].includes(v.type) && fit(v) >= 2)) && eligible(v, { ...ctx, regions: [] }, false));
   options.sort((a, b) => gap(a) - gap(b) || fit(b) - fit(a) || (Number(b.rating) || 0) - (Number(a.rating) || 0));
   return options[0] || null;
 }
