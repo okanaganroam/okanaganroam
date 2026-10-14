@@ -6620,7 +6620,16 @@ function renderExploreByCategoryHTML() {
 }
 
 const EXPLORE_REGION_PHOTOS = Object.freeze({ kelowna: '/images/regions/kelowna-explore.webp', penticton: '/images/regions/penticton-explore.webp' });
-function renderExploreRegionsHTML() {
+// Fall destination photos (2026-10-13): September through November (isFallHeroSeason), a card with a photo here shows it
+// instead, like the mood tiles and Hidden Gems cards. 960x375, each under its own file name; real photos tagged in that town.
+const FALL_EXPLORE_REGION_PHOTOS = Object.freeze({
+  kelowna: '/images/regions/kelowna-explore-fall.jpg', // Unsplash 6YVHxWkRrxY (Dithira Hettiarachchi), Kelowna: downtown and the lake from Knox Mountain, November
+  'west-kelowna': '/images/regions/west-kelowna-explore-fall.jpg', // Unsplash 0UCSYkG_RMk (Mike Benna), Mission Hill, West Kelowna: vines over the lake, colour-shifted to fall gold
+  'lake-country': '/images/regions/lake-country-explore-fall.jpg', // supplied by Dayton (2026-10-13): aerial of Wood Lake and orchards in fall colour
+  penticton: '/images/regions/penticton-explore-fall.jpg', // supplied by Dayton (2026-10-13): aerial of the SS Sicamous and Okanagan Beach
+  naramata: '/images/regions/naramata-explore-fall.jpg', // supplied by Dayton (2026-10-13): the Naramata Bench above Okanagan Lake in early fall
+});
+function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
   // Zero database queries — a curated subset of the existing, authoritative
   // REGION_LABELS taxonomy (no new destination schema, nothing invented).
   // Each card links straight to its real, existing /:region page -- no
@@ -6643,7 +6652,9 @@ function renderExploreRegionsHTML() {
   // Kelowna and Penticton (2026-10-06): new 960x375 photos made for these
   // cards. They have their own files so the shared 640px thumbnails (which
   // /trip's day headers also use) stay as they were.
-  const exploreImage = (region) => (EXPLORE_REGION_PHOTOS[region] ? { src: EXPLORE_REGION_PHOTOS[region], w: 960, h: 375 } : { src: `/images/regions/${region}.webp`, w: 640, h: 250 });
+  const fall = isFallHeroSeason(now);
+  const exploreImage = (region) => (fall && FALL_EXPLORE_REGION_PHOTOS[region] ? { src: FALL_EXPLORE_REGION_PHOTOS[region], w: 960, h: 375 }
+    : EXPLORE_REGION_PHOTOS[region] ? { src: EXPLORE_REGION_PHOTOS[region], w: 960, h: 375 } : { src: `/images/regions/${region}.webp`, w: 640, h: 250 });
   const cardHtml = curated
     .filter((region) => REGION_LABELS[region])
     .map((region) => {
@@ -23036,7 +23047,7 @@ const server = http.createServer(async (req, res) => {
         const moodCards = renderMoodCardsHTML({ now: homepageNow() });
         html = seasonalHeroText(html, homepageNow());
         const hiddenGemsSection = renderHiddenGemsHomepageHTML({ now: homepageNow() });
-        const exploreRegions = renderExploreRegionsHTML();
+        const exploreRegions = renderExploreRegionsHTML({ now: homepageNow() });
         const buildTripSection = renderBuildTripCTAHTML();
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
@@ -25659,6 +25670,7 @@ module.exports = {
   breadcrumbListSchema,
   FALL_MOOD_IMAGES,
   FALL_HIDDEN_GEM_IMAGES,
+  FALL_EXPLORE_REGION_PHOTOS,
   seasonalHeroText,
   isFallHeroSeason,
   retimeEventOccurrence,
