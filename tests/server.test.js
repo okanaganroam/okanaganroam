@@ -14647,9 +14647,9 @@ test('Stage 4.0 F07: V2 "View My Trip" opens the tray after the click, and stays
   q.openTripTray(); q.openTripTray(); q.flush();
   assert.equal(q.open.v, true);
   assert.equal(q.toggle.clicks, 1);
-  // The open_my_trip event is still sent only when the tray was closed at click time (unchanged handler).
+  // View My Trip now opens the full /my-trip page (2026-10-14), after sending open_my_trip.
   const page = app.renderTripPlannerPage(true);
-  assert.match(page, /if \(trayPanel && !trayPanel\.classList\.contains\('open'\)\) track\('open_my_trip', \{ trip_size: tripSize\(\), open_source: 'plan_view_trip' \}\);\s*openTripTray\(\);/);
+  assert.match(page, /track\('open_my_trip', \{ trip_size: tripSize\(\), open_source: 'plan_view_trip' \}\);\s*window\.location\.href = '\/my-trip';/);
 });
 
 test('Stage 4.0 F10: on phones the V2 stop links start their own line at the left; desktop and the planner-off page are unchanged', () => {
@@ -19353,4 +19353,31 @@ test('Contact (2026-10-14): topics, the app launch sign-up with only an email, a
   assert.match(teaser, /id="appSignupForm"/);
   assert.doesNotMatch(teaser, /App Store|Google Play|now in your pocket/, 'no store buttons that do nothing, no claim the app exists');
   assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/contact<\/loc>/);
+}));
+
+
+test('My Trip (2026-10-14): /api/trip-stops describes each stop, /my-trip is a private page with share, map and day grouping, and the tray links to it', () => withDiscoveryServer(async (base) => {
+  const v = db.prepare("SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL LIMIT 1").get();
+  const out = app.tripStopsFor([`venue:${v.id}`, 'venue:999999999', 'nonsense', 'venue:0']);
+  assert.equal(out.length, 2, 'malformed refs are skipped');
+  assert.equal(out[0].name, v.name);
+  assert.equal(out[0].url, `/${v.region}/${app.CATEGORY_SLUGS[v.type]}/${v.slug}`);
+  assert.match(out[0].photo, /^\/images\//);
+  assert.match(out[0].query, /Okanagan Valley, BC$/);
+  assert.deepEqual(out[1], { ref: 'venue:999999999', missing: true });
+  const api = await (await fetch(`${base}/api/trip-stops?refs=venue:${v.id}`)).json();
+  assert.equal(api.stops[0].ref, `venue:${v.id}`);
+  const res = await fetch(`${base}/my-trip`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /<meta name="robots" content="noindex">/, 'a personal page stays out of search');
+  assert.doesNotMatch(html, /<div id="tripTray">/, 'no tray here, so app.js does not hold a second copy of the trip');
+  for (const id of ['mtCopy', 'mtSave', 'mtMap', 'mtDays', 'mtEmpty']) assert.match(html, new RegExp(`id="${id}"`));
+  assert.ok(html.includes("'okanaganTripDays'"), 'reads the day of each stop');
+  const kelowna = await (await fetch(`${base}/kelowna`)).text();
+  assert.ok(kelowna.includes("full.href = '/my-trip'"), 'the tray offers the full trip');
+  assert.ok(kelowna.includes("/api/trip-stops?refs="), 'the tray links each stop to its page');
+  const planner = app.renderTripPlannerPage(true);
+  assert.ok(planner.includes("localStorage.setItem('okanaganTripDays'"), 'Add whole trip remembers the days');
+  assert.doesNotMatch(await (await fetch(`${base}/sitemap.xml`)).text(), /my-trip/);
 }));

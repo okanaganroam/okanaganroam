@@ -9653,6 +9653,11 @@ const TRIP_NAV_SNIPPET = `<style id="trip-nav">
 html.trip-nav-on #tripTrayToggle { display: none !important; }
 html.trip-nav-on #tripTray { top: 70px; bottom: auto; right: 16px; left: auto; }
 html.trip-nav-on #tripTrayPanel { position: static; width: min(320px, calc(100vw - 32px)); max-height: min(70vh, 520px); }
+#tripTrayPanel { position: relative; }
+#tripTrayPanel .trip-tray-close { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 999px; border: 0; background: rgba(27,43,58,0.08); font-size: 1.3rem; line-height: 1; cursor: pointer; color: inherit; }
+#tripTrayPanel .trip-item a { color: inherit; font-weight: 700; }
+#tripTrayPanel .trip-tray-full { display: block; margin: 10px 0 4px; text-align: center; font-weight: 800; font-size: 0.9rem; }
+#tripTrayPanel .trip-tray-full[hidden] { display: none; }
 .nav-links-mytrip { list-style: none; }
 .nav-mytrip-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
 .nav-mytrip-btn:focus-visible { outline: 2px solid var(--ref-gold, #E0A94E); outline-offset: 3px; border-radius: 6px; }
@@ -9707,6 +9712,44 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
     if (count && window.MutationObserver) new MutationObserver(sync).observe(count, { childList: true, characterData: true, subtree: true });
     if (window.MutationObserver) new MutationObserver(sync).observe(panel, { attributes: true, attributeFilter: ['class'] });
     sync();
+    enhanceTray(panel);
+  }
+  // Tray extras (2026-10-14): a close button, each stop linked to its page
+  // with a small "Restaurant \u00b7 Kelowna" line, and "Open full trip". app.js
+  // (frozen) still owns the list; this only decorates what it draws.
+  function enhanceTray(panel){
+    var list = document.getElementById('tripTrayList'), clear = document.getElementById('tripClearBtn');
+    if (!list || panel.getAttribute('data-enhanced')) return;
+    panel.setAttribute('data-enhanced', '1');
+    var close = document.createElement('button');
+    close.type = 'button'; close.className = 'trip-tray-close'; close.setAttribute('aria-label', 'Close My Trip'); close.innerHTML = '&times;';
+    close.addEventListener('click', function(e){ e.stopPropagation(); panel.classList.remove('open'); });
+    panel.insertBefore(close, panel.firstChild);
+    var full = document.createElement('a');
+    full.href = '/my-trip'; full.className = 'trip-tray-full'; full.textContent = 'Open full trip: days, map and share link \u2192';
+    if (clear) panel.insertBefore(full, clear);
+    var info = {}, busy = false;
+    function stored(){ try { return JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []; } catch (e) { return []; } }
+    function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function decorate(){
+      var items = list.querySelectorAll('.trip-item'), trip = stored();
+      full.hidden = !items.length;
+      Array.prototype.forEach.call(items, function(item, i){
+        var t = trip[i], d = t && t.ref && info[t.ref];
+        var span = item.querySelector('span');
+        if (!d || !span || item.getAttribute('data-linked') === t.ref) return;
+        item.setAttribute('data-linked', t.ref);
+        span.innerHTML = (i + 1) + '. <a href="' + esc(d.url) + '">' + esc(d.name) + '</a><br><small class="trip-distance">' + esc([d.type, d.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</small>';
+      });
+    }
+    function refresh(){
+      var refs = stored().map(function(x){ return x && x.ref; }).filter(function(r){ return r && !info[r]; });
+      if (!refs.length || busy || !window.fetch) { decorate(); return; }
+      busy = true;
+      fetch('/api/trip-stops?refs=' + encodeURIComponent(refs.join(','))).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ if (!x.missing) info[x.ref] = x; }); }).catch(function(){}).then(function(){ busy = false; decorate(); });
+    }
+    if (window.MutationObserver) new MutationObserver(function(){ refresh(); }).observe(list, { childList: true });
+    refresh();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
@@ -20791,6 +20834,12 @@ function renderTripPlannerV2Script() {
     } finally {
       window.__roamTripSource = null;
     }
+    // Remember each stop's day (2026-10-14) so /my-trip can group by day.
+    try {
+      var dayMap = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {};
+      ((state.last && state.last.days) || []).forEach(function(d){ d.stops.forEach(function(s){ if (s.venue && s.venue.id) dayMap['venue:' + s.venue.id] = d.day; }); });
+      localStorage.setItem('okanaganTripDays', JSON.stringify(dayMap));
+    } catch (e) {}
     if (added) track('add_whole_trip', { added_count: added, already_in_trip_count: already, no_room_count: noRoom, failed_count: failed, trip_size: tripSize(), plan_kind: planFacts(state.last).plan_kind });
     refreshAddAll();
     var msg = 'Added ' + stopsText(added) + ' to My Trip.';
@@ -20841,9 +20890,9 @@ function renderTripPlannerV2Script() {
     if (addAll) { addWholeTrip(); return; }
     var viewTrip = e.target.closest ? e.target.closest('[data-plan-view-trip]') : null;
     if (viewTrip) {
-      var trayPanel = document.getElementById('tripTrayPanel');
-      if (trayPanel && !trayPanel.classList.contains('open')) track('open_my_trip', { trip_size: tripSize(), open_source: 'plan_view_trip' });
-      openTripTray();
+      // The full My Trip page (2026-10-14), grouped by day.
+      track('open_my_trip', { trip_size: tripSize(), open_source: 'plan_view_trip' });
+      window.location.href = '/my-trip';
       return;
     }
     var replace = e.target.closest ? e.target.closest('[data-replace-id]') : null;
@@ -24647,6 +24696,236 @@ function renderContactPage() {
     <p class="info-updated">Okanagan Roam &middot; Kelowna, British Columbia &middot; <a href="/about">About us</a> &middot; <a href="/privacy">Privacy</a></p>`,
   });
 }
+// ---------- My Trip page (2026-10-14): /my-trip ----------
+// The full view of the visitor's My Trip (the okanaganTrip list app.js keeps
+// in this browser): every stop as a photo card with its type and town, in
+// their order, grouped by day when the stops came from a Build My Trip plan
+// (okanaganTripDays, written by "Add whole trip"), with up/down and remove,
+// a map, Google Maps directions per day and a "Copy trip link" that opens the
+// same trip on any device (/my-trip?stops=venue:1,venue:2&days=1,1). The
+// page has no trip tray, so app.js's in-memory copy of the trip is not
+// running here and this page is the only writer while it is open.
+const MY_TRIP_MAX_REFS = 30;
+function tripStopsFor(refs) {
+  const out = [];
+  const venueQ = db.prepare('SELECT * FROM venues WHERE id = ?');
+  const eventQ = db.prepare('SELECT * FROM events WHERE id = ?');
+  for (const ref of refs.slice(0, MY_TRIP_MAX_REFS)) {
+    const m = /^(venue|event):([1-9][0-9]*)$/.exec(String(ref || ''));
+    if (!m) continue;
+    if (m[1] === 'venue') {
+      let row = venueQ.get(Number(m[2]));
+      if (row && row.redirect_to) row = venueQ.get(row.redirect_to);
+      if (!row || row.redirect_to || !REGION_LABELS[row.region] || !CATEGORY_SLUGS[row.type] || !row.slug) { out.push({ ref, missing: true }); continue; }
+      const v = rowToVenue(row);
+      const own = String(v.image_url || '').trim();
+      out.push({
+        ref, kind: 'venue', name: v.name, type: CATEGORY_LABELS[v.type].singular, region: v.region, regionLabel: REGION_LABELS[v.region],
+        url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v)),
+        lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
+        lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
+        query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
+      });
+    } else {
+      const e = eventQ.get(Number(m[2]));
+      if (!e || !REGION_LABELS[e.region] || !e.slug) { out.push({ ref, missing: true }); continue; }
+      const host = e.venue_id ? venueQ.get(e.venue_id) : null;
+      out.push({
+        ref, kind: 'event', name: e.name, type: 'Event', region: e.region, regionLabel: REGION_LABELS[e.region],
+        url: `/${e.region}/events/${e.slug}`,
+        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(e.image_url || '')) ? e.image_url : WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'),
+        lat: host && host.latitude !== null ? Number(host.latitude) : null,
+        lng: host && host.longitude !== null ? Number(host.longitude) : null,
+        query: `${host ? host.name : (e.venue_name_text || e.name)}, ${REGION_LABELS[e.region]}, Okanagan Valley, BC`,
+      });
+    }
+  }
+  return out;
+}
+function renderMyTripPage() {
+  const title = 'My Trip | Okanagan Roam';
+  const description = 'Your Okanagan trip: every stop in order, by day, with a map, directions and a link to share it.';
+  const canonical = 'https://okanaganroam.com/my-trip';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [], { golfTheme: true })}
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style id="my-trip">
+  body.my-trip-page .mt-wrap { max-width: 1100px; padding: 0 0 48px; }
+  body.my-trip-page .mt-head { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; justify-content: space-between; margin: 0 0 18px; }
+  body.my-trip-page .mt-head p { margin: 4px 0 0; opacity: 0.75; }
+  body.my-trip-page .mt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.my-trip-page .mt-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 800; font-size: 0.92rem; cursor: pointer; text-decoration: none; }
+  body.my-trip-page .mt-btn.primary { background: var(--teal-deep, #1F5450); border-color: transparent; color: #fff; }
+  body.my-trip-page .mt-shared { margin: 0 0 18px; padding: 14px 18px; border-radius: 14px; background: #FFF4DA; }
+  body.my-trip-page .mt-status { min-height: 1.2em; margin: 0 0 10px; font-weight: 700; color: var(--teal-deep, #1F5450); }
+  body.my-trip-page #mtMap { height: 320px; border-radius: 16px; margin: 0 0 22px; background: #dfe9e6; z-index: 0; }
+  body.my-trip-page .mt-day { margin: 0 0 26px; }
+  body.my-trip-page .mt-day-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin: 0 0 10px; }
+  body.my-trip-page .mt-day-head h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem; margin: 0; }
+  body.my-trip-page .mt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  body.my-trip-page .mt-stop { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px; border-radius: 14px; background: var(--paper, #fffaf2); box-shadow: 0 8px 20px -16px rgba(74,52,40,0.45); }
+  body.my-trip-page .mt-photo { width: 120px; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; background: #2A6B67; }
+  body.my-trip-page .mt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  body.my-trip-page .mt-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.05rem; color: var(--ink); text-decoration: none; }
+  body.my-trip-page .mt-name:hover { text-decoration: underline; }
+  body.my-trip-page .mt-meta { margin: 2px 0 0; font-size: 0.86rem; opacity: 0.75; }
+  body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
+  body.my-trip-page .mt-tools { display: flex; gap: 6px; }
+  body.my-trip-page .mt-tools button { width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: #fff; font-size: 1rem; cursor: pointer; color: var(--ink); }
+  body.my-trip-page .mt-tools button[disabled] { opacity: 0.35; cursor: default; }
+  body.my-trip-page .mt-empty { padding: 26px; border-radius: 16px; background: var(--paper, #fffaf2); }
+  @media (max-width: 600px) {
+    body.my-trip-page .mt-stop { grid-template-columns: 84px minmax(0, 1fr); }
+    body.my-trip-page .mt-photo { width: 84px; }
+    body.my-trip-page .mt-tools { grid-column: 1 / -1; justify-content: flex-end; }
+  }
+</style>
+</head>
+<body class="golf-page my-trip-page">
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'My Trip' }])}
+  <div class="mt-wrap">
+    <div class="mt-head">
+      <div><h1>My Trip</h1><p id="mtSummary">Loading your trip&hellip;</p></div>
+      <div class="mt-actions" id="mtActions" hidden>
+        <button type="button" class="mt-btn primary" id="mtCopy">Copy trip link</button>
+        <a class="mt-btn" href="/trip">Build My Trip</a>
+        <button type="button" class="mt-btn" id="mtClear">Clear trip</button>
+      </div>
+    </div>
+    <div class="mt-shared" id="mtShared" hidden>
+      <strong>Someone shared this trip with you.</strong> <span id="mtSharedText"></span>
+      <div class="mt-actions" style="margin-top:10px"><button type="button" class="mt-btn primary" id="mtSave">Save to My Trip</button></div>
+    </div>
+    <p class="mt-status" id="mtStatus" role="status" aria-live="polite"></p>
+    <div id="mtMap" hidden></div>
+    <div id="mtDays"></div>
+    <div class="mt-empty" id="mtEmpty" hidden>
+      <h2>Your trip is empty</h2>
+      <p>Tap <strong>Add to trip</strong> on any place, or let us plan it for you.</p>
+      <div class="mt-actions"><a class="mt-btn primary" href="/trip">Build My Trip</a><a class="mt-btn" href="/food-drink">Food &amp; Drink</a><a class="mt-btn" href="/destinations">Destinations</a></div>
+    </div>
+  </div>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+  var KEY = 'okanaganTrip', DAYS = 'okanaganTripDays', REF = /^(venue|event):[1-9][0-9]*$/;
+  function load(k, d){ try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+  function store(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var trip = (load(KEY, []) || []).filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
+  var days = load(DAYS, {}) || {};
+  var params = new URLSearchParams(location.search);
+  var shared = (params.get('stops') || '').split(',').filter(function(r){ return REF.test(r); }).slice(0, ${MY_TRIP_MAX_REFS});
+  var sharedDays = (params.get('days') || '').split(',').map(function(n){ return parseInt(n, 10) || 0; });
+  var viewing = shared.length ? 'shared' : 'mine';
+  var info = {}, map = null, layer = null;
+  var el = function(id){ return document.getElementById(id); };
+  function status(t){ var s = el('mtStatus'); s.textContent = ''; setTimeout(function(){ s.textContent = t; }, 30); }
+  function list(){
+    if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0 }; });
+    return trip.map(function(t){ return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (t.ref && days[t.ref]) || 0, raw: t }; });
+  }
+  function fetchInfo(refs){
+    var need = refs.filter(function(r){ return r && !info[r]; });
+    if (!need.length) return Promise.resolve();
+    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(','))).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
+  }
+  function dirUrl(stops){
+    var q = stops.map(function(s){ return s.query || (info[s.ref] && info[s.ref].query) || s.name; });
+    if (q.length === 1) return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q[0]);
+    var u = 'https://www.google.com/maps/dir/?api=1&origin=' + encodeURIComponent(q[0]) + '&destination=' + encodeURIComponent(q[q.length - 1]);
+    if (q.length > 2) u += '&waypoints=' + encodeURIComponent(q.slice(1, -1).join('|'));
+    return u;
+  }
+  function render(){
+    var stops = list();
+    el('mtEmpty').hidden = stops.length > 0;
+    el('mtActions').hidden = viewing !== 'mine' || !stops.length;
+    el('mtShared').hidden = viewing !== 'shared';
+    el('mtSummary').textContent = stops.length ? (stops.length + (stops.length === 1 ? ' stop' : ' stops') + (viewing === 'shared' ? ' in this shared trip' : ' in your trip')) : 'Nothing here yet.';
+    if (viewing === 'shared') el('mtSharedText').textContent = trip.length ? 'Saving it replaces the ' + trip.length + (trip.length === 1 ? ' stop' : ' stops') + ' in your own trip.' : 'Save it to keep it and change it.';
+    // Group by day only when every stop has one; otherwise one list in order.
+    var byDay = stops.length && stops.every(function(s){ return s.day > 0; });
+    var groups = [];
+    stops.forEach(function(s, i){
+      var key = byDay ? s.day : 0;
+      var g = groups.length && groups[groups.length - 1].key === key ? groups[groups.length - 1] : null;
+      if (!g) { g = { key: key, stops: [] }; groups.push(g); }
+      g.stops.push({ s: s, i: i });
+    });
+    var mine = viewing === 'mine';
+    el('mtDays').innerHTML = groups.map(function(g){
+      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? 'Day ' + g.key : 'Your stops') + '</h2>' +
+        '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">Directions' + (g.key ? ' for Day ' + g.key : '') + ' in Google Maps</a></div>' +
+        '<ol class="mt-list">' + g.stops.map(function(x){
+          var d = info[x.s.ref] || {};
+          var name = d.url ? '<a class="mt-name" href="' + esc(d.url) + '">' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
+          var meta = d.missing ? 'No longer listed' : [d.type, d.regionLabel].filter(Boolean).join(' · ');
+          var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="Move ' + esc(x.s.name) + ' up"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="Move ' + esc(x.s.name) + ' down"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="Remove ' + esc(x.s.name) + '">✕</button></div>' : '';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + (x.i + 1) + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p></div>' + tools + '</li>';
+        }).join('') + '</ol></section>';
+    }).join('');
+    drawMap(stops);
+  }
+  function drawMap(stops){
+    var pts = stops.map(function(s, i){ var d = info[s.ref]; return d && d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng, n: i + 1, name: d.name } : null; }).filter(Boolean);
+    var box = el('mtMap');
+    if (!window.L || pts.length < 1) { box.hidden = true; return; }
+    box.hidden = false;
+    if (!map) { map = L.map(box, { scrollWheelZoom: false }); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map); }
+    if (layer) layer.remove();
+    layer = L.layerGroup(pts.map(function(p){ return L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: '<span class="mt-num" style="box-shadow:0 2px 6px rgba(0,0,0,.3)">' + p.n + '</span>', iconSize: [24, 24] }), title: p.name }); })).addTo(map);
+    if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [30, 30] });
+  }
+  function save(){ store(KEY, trip); }
+  document.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('[data-mt-up],[data-mt-down],[data-mt-remove]') : null;
+    if (!t || viewing !== 'mine') return;
+    var i;
+    if (t.hasAttribute('data-mt-up')) { i = +t.getAttribute('data-mt-up'); if (i > 0) { var a = trip[i]; trip[i] = trip[i - 1]; trip[i - 1] = a; status('Moved ' + trip[i - 1].name + ' up.'); } }
+    else if (t.hasAttribute('data-mt-down')) { i = +t.getAttribute('data-mt-down'); if (i < trip.length - 1) { var b = trip[i]; trip[i] = trip[i + 1]; trip[i + 1] = b; status('Moved ' + trip[i + 1].name + ' down.'); } }
+    else { i = +t.getAttribute('data-mt-remove'); var gone = trip.splice(i, 1)[0]; if (gone && gone.ref) delete days[gone.ref]; store(DAYS, days); status('Removed ' + (gone ? gone.name : 'the stop') + '.'); }
+    save(); render();
+  });
+  el('mtCopy').addEventListener('click', function(){
+    var refs = trip.filter(function(x){ return x.ref; });
+    var url = location.origin + '/my-trip?stops=' + refs.map(function(x){ return x.ref; }).join(',');
+    if (refs.length && refs.every(function(x){ return days[x.ref]; })) url += '&days=' + refs.map(function(x){ return days[x.ref]; }).join(',');
+    var done = function(){ status('Trip link copied. Send it to whoever you are travelling with.' + (refs.length < trip.length ? ' (' + (trip.length - refs.length) + ' older stop' + (trip.length - refs.length === 1 ? ' is' : 's are') + ' not in the link.)' : '')); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function(){ window.prompt('Copy this link:', url); });
+    else window.prompt('Copy this link:', url);
+  });
+  var clearArmed = false;
+  el('mtClear').addEventListener('click', function(){
+    if (!clearArmed) { clearArmed = true; el('mtClear').textContent = 'Tap again to clear'; setTimeout(function(){ clearArmed = false; el('mtClear').textContent = 'Clear trip'; }, 4000); return; }
+    trip = []; days = {}; save(); store(DAYS, days); clearArmed = false; el('mtClear').textContent = 'Clear trip'; status('Your trip is cleared.'); render();
+  });
+  el('mtSave').addEventListener('click', function(){
+    trip = []; days = {};
+    shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) days[r] = sharedDays[i]; });
+    save(); store(DAYS, days);
+    viewing = 'mine';
+    history.replaceState(null, '', '/my-trip');
+    status('Saved to My Trip.');
+    render();
+  });
+  fetchInfo(viewing === 'shared' ? shared : trip.map(function(x){ return x.ref; })).then(render);
+})();
+</script>
+</body>
+</html>`;
+}
+
 function renderPrivacyPage() {
   return renderInfoPage({
     path: '/privacy',
@@ -28058,6 +28337,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderSkiGuidePage());
     }
+    if ((pathname === '/my-trip' || pathname === '/my-trip/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderMyTripPage());
+    }
+    // GET /api/trip-stops?refs=venue:1,event:2 (2026-10-14): name, type, town,
+    // page link, photo, map position and directions query for My Trip.
+    if (pathname === '/api/trip-stops' && method === 'GET') {
+      const refs = String(query.refs || '').split(',').map((x) => x.trim()).filter(Boolean);
+      return sendJSON(res, 200, { stops: tripStopsFor(refs) });
+    }
     if (pathname === '/site.webmanifest' && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
       return res.end(SITE_WEBMANIFEST);
@@ -28911,6 +29200,8 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  renderMyTripPage,
+  tripStopsFor,
   renderContactPage,
   CONTACT_TOPICS,
   venueLookup,
