@@ -19035,3 +19035,24 @@ test('Shared directory search: short words match whole words, swapped letters co
   assert.equal(JSON.parse(ctx.plan('escpae')).corrected, 'escape');
   assert.deepEqual(JSON.parse(ctx.hits('escpae')), [2]);
 });
+
+// ---------- Indoor research data (2026-10-14) ----------
+test('Indoor research: every researched hours set passes the guarded validator, and every rewrite is sourced and rating-free', () => {
+  const hours = require('../data/indoor-hours-2026-10.json');
+  assert.ok(hours.reason && hours.batch_id);
+  for (const v of hours.venues) {
+    assert.equal(v.expected_current_hours, null, `${v.name}: only fills missing hours`);
+    assert.ok(app.HOURS_SOURCES.includes(v.verified.hours_source), v.name);
+    assert.match(v.verified.hours_checked_at, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(String(v.url), /^https?:\/\//, `${v.name}: source url`);
+    const r = app.validateVerifiedHours(v.verified.hours);
+    assert.ok(r.ok, `${v.name}: ${r.detail}`);
+  }
+  const desc = require('../data/description-indoor-2026-10.json');
+  assert.equal(desc.venues.length, desc.count);
+  for (const v of desc.venues) {
+    assert.match(v.before_sha1, /^[0-9a-f]{40}$/);
+    assert.ok(v.description.trim() && v.description_fr.trim(), v.name);
+    assert.doesNotMatch(v.description, /\b\d(?:\.\d)?\s*stars?\b/, v.name);
+  }
+});
