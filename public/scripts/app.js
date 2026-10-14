@@ -32,7 +32,7 @@ var TRANSLATIONS = {
     'hero.leadMobile': 'Explore wineries, food, beaches, golf, adventures and hidden gems across the Okanagan.',
     // Fall hero text (2026-10-13), shown Sep-Nov: the server swaps the hero to these keys (seasonalHeroText).
     'hero.headlineFall': 'Fall in the Okanagan',
-    'hero.leadFall': 'Okanagan Roam is your guide to fall in the Okanagan Valley, from Enderby to Osoyoos \u2014 harvest wineries and cideries, cozy restaurants, fall hikes, seasonal events and the start of ski season, all in one place.',
+    'hero.leadFall': 'Okanagan Roam is your guide to fall in the Okanagan Valley, from Enderby to Osoyoos \u2014 harvest wineries and cideries, cozy restaurants, fall hikes and seasonal events, all in one place.',
     'hero.leadMobileFall': 'Explore harvest wineries, cozy food, fall hikes and events across the Okanagan.',
     'mood.heading': 'What are you in the mood for?',
     'mood.lead': 'Start with what sounds good. We\u2019ll help you find somewhere worth going.',
@@ -509,7 +509,7 @@ var TRANSLATIONS = {
     'hero.lead': 'Okanagan Roam est votre guide de la vall\u00e9e de l\u2019Okanagan, d\u2019Enderby \u00e0 Osoyoos \u2014 stations de ski, vignobles, gastronomie, golf, plages, \u00e9v\u00e9nements, aventures et tr\u00e9sors cach\u00e9s, le tout au m\u00eame endroit.',
     'hero.leadMobile': 'D\u00e9couvrez vignobles, gastronomie, plages, golf, aventures et tr\u00e9sors cach\u00e9s partout dans l\u2019Okanagan.',
     'hero.headlineFall': 'L\u2019automne dans l\u2019Okanagan',
-    'hero.leadFall': 'Okanagan Roam est votre guide de l\u2019automne dans la vall\u00e9e de l\u2019Okanagan, d\u2019Enderby \u00e0 Osoyoos \u2014 vignobles et cidreries en pleine r\u00e9colte, restos chaleureux, randonn\u00e9es d\u2019automne, \u00e9v\u00e9nements saisonniers et d\u00e9but de la saison de ski, le tout au m\u00eame endroit.',
+    'hero.leadFall': 'Okanagan Roam est votre guide de l\u2019automne dans la vall\u00e9e de l\u2019Okanagan, d\u2019Enderby \u00e0 Osoyoos \u2014 vignobles et cidreries en pleine r\u00e9colte, restos chaleureux, randonn\u00e9es d\u2019automne et \u00e9v\u00e9nements saisonniers, le tout au m\u00eame endroit.',
     'hero.leadMobileFall': 'D\u00e9couvrez les vignobles en r\u00e9colte, la cuisine r\u00e9confortante, les randonn\u00e9es d\u2019automne et les \u00e9v\u00e9nements partout dans l\u2019Okanagan.',
     'mood.heading': "Qu'est-ce qui vous tente aujourd'hui\u00a0?",
     'mood.lead': 'Commencez par ce qui vous fait envie. On vous aide \u00e0 trouver un endroit qui en vaut la peine.',

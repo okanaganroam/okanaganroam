@@ -6974,7 +6974,7 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
     // back to true to bring Ski & Snow back; its photo, icon and FR/EN titles are all still in place.
     cards[2] = SHOW_SKI_SNOW_MOOD_TILE
       ? { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' }
-      : { key: 'sports', href: `/${CATEGORY_SLUGS.sport}`, filter: null, img: '/images/mood/sports-rec.jpg', titleKey: 'mood.sports.title', title: 'Sports & Recreation' };
+      : { key: 'sports', href: `/${CATEGORY_SLUGS.sport}`, filter: null, img: '/images/mood/sports-recreation.jpg', titleKey: 'mood.sports.title', title: 'Sports & Recreation' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
   }
 
