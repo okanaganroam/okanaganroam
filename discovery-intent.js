@@ -97,6 +97,9 @@ const REGION_EXTRA_ALIASES = {
 // Valley-wide scope: understood, and deliberately means "no region filter".
 const VALLEY_WIDE_PHRASES = ['okanagan', 'the okanagan', 'okanagan valley', 'the valley', 'anywhere', 'valley wide', 'bc', 'british columbia', 'okanagan lake'];
 
+// Places visitors name that Okanagan Roam does not cover.
+const OUTSIDE_PLACES = Object.fromEntries(['Vancouver', 'Victoria', 'Whistler', 'Kamloops', 'Calgary', 'Edmonton', 'Seattle', 'Banff', 'Jasper', 'Revelstoke', 'Nelson', 'Tofino', 'Squamish', 'Kimberley', 'Fernie', 'Merritt', 'Keremeos', 'Toronto', 'Montreal', 'Whitehorse'].map((p) => [p.toLowerCase(), p]));
+
 const TYPE_ALIASES = {
   sport: ['sports and recreation', 'sports venues', 'recreation activities', 'skate park', 'skate parks', 'skatepark', 'skateparks', 'disc golf', 'tennis', 'pickleball', 'bmx'],
   restaurant: ['restaurant', 'restaurants', 'dining', 'dinner', 'lunch', 'eat', 'eating', 'eats', 'food', 'place to eat', 'places to eat', 'somewhere to eat', 'bistro', 'bistros', 'eatery', 'eateries'],
@@ -1243,6 +1246,13 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     if (!intent.unsupported.includes(phrase)) intent.unsupported.push(phrase);
   }
 
+  // 6a. A well-known place outside the Okanagan ("a weekend in Vancouver") is reported as not covered, never searched
+  // for as a word (2026-10-14: it showed as an interest chip and the plan quietly moved to Kelowna).
+  for (const w of intent.textTerms.filter((x) => OUTSIDE_PLACES[x])) {
+    intent.textTerms = intent.textTerms.filter((x) => x !== w);
+    if (!intent.unsupported.includes(OUTSIDE_PLACES[w])) intent.unsupported.push(OUTSIDE_PLACES[w]);
+  }
+
   // 6b. The visitor's own food words, kept for display: "sushi" stays
   // "sushi" even though it matches the Japanese cuisine internally.
   for (const m of intent.matched) if (m.field === 'cuisine' && !intent.foodTerms.some((f) => f.term === m.phrase)) intent.foodTerms.push({ term: m.phrase, cuisine: m.value });
@@ -1833,6 +1843,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 }
 
 module.exports = {
+  OUTSIDE_PLACE_NAMES: Object.values(OUTSIDE_PLACES),
   DISCOVERY_INTENT_VERSION,
   DISCOVERY_NEVER_CORRECT: Object.freeze(Array.from(NEVER_CORRECT)),
   DISCOVERY_MAX_TEXT_LENGTH,
