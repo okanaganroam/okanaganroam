@@ -19096,3 +19096,35 @@ test("What's On page: soonest first under headings, every card a photo, 48 per p
   assert.equal(photos.length, cards.length, 'one photo per card');
   assert.doesNotMatch(html.replace(/<script[\s\S]*?<\/script>/g, ''), /confirm details with the organizer before you go\./, 'no template sentence on the cards');
 });
+
+// ---------- Event pages 9/10 pass (2026-10-14) ----------
+test('Event page: photo, status line, short summary, Tickets / directions / calendar, past dates folded, readable recurrence', () => withDiscoveryServer(async (base) => {
+  const t = '2026-10-14';
+  const o = (start_date, start_time, extra = {}) => ({ id: 1, start_date, end_date: start_date, start_time, all_day: 0, ...extra });
+  assert.equal(app.eventStatusText(o(t, '20:00'), t, false), 'Tonight · 8 pm');
+  assert.equal(app.eventStatusText(o(t, '14:00'), t, false), 'Today · 2 pm');
+  assert.equal(app.eventStatusText(o('2026-10-15', '19:30'), t, false), 'Tomorrow · 7:30 pm');
+  assert.equal(app.eventStatusText(o('2026-10-17', '18:05'), t, true), 'Next: Sat Oct 17 · 6:05 pm');
+  assert.equal(app.eventStatusText({ start_date: '2026-09-25', end_date: '2026-11-01', start_time: '18:30' }, t, false), 'On now · until Nov 1');
+  assert.equal(app.eventStatusText(o(t, '00:00'), t, false), 'Today', 'a stored 00:00 is no time');
+  assert.equal(app.readableRecurrence('Home games 2026-09-25 to 2027-03-26', '2026'), 'Home games Sep 25 to Mar 26, 2027');
+  const ics = app.eventIcs({ id: 9, name: 'Gala, Night; Two' }, [o('2099-06-01', '19:00', { end_time: '22:00' }), { id: 2, start_date: '2099-06-03', end_date: '2099-06-04', all_day: 1 }], 'Hall, 1 Main St', 'https://okanaganroam.com/kelowna/events/gala', new Date('2026-10-14T12:00:00Z'));
+  assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
+  assert.match(ics, /BEGIN:VTIMEZONE\r\nTZID:America\/Vancouver/);
+  assert.match(ics, /DTSTART;TZID=America\/Vancouver:20990601T190000\r\nDTEND;TZID=America\/Vancouver:20990601T220000/);
+  assert.match(ics, /DTSTART;VALUE=DATE:20990603\r\nDTEND;VALUE=DATE:20990605/, 'all-day end is exclusive');
+  assert.ok(ics.includes('SUMMARY:Gala\\, Night\\; Two'), 'commas and semicolons escaped');
+  assert.ok(ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75), 'lines folded at 75 octets');
+  const page = await (await fetch(`${base}/kelowna/events/test-future-festival`)).text();
+  assert.match(page, /<div class="event-hero"><img src="[^"]+"/);
+  assert.match(page, /<div class="event-layout">[\s\S]*<aside class="event-aside">/);
+  assert.match(page, /<a class="cta event-cta-primary" href="https:\/\/example\.com\/festival"[^>]*>Tickets &amp; info/);
+  assert.match(page, /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&amp;query=[^"]+"[^>]*>Get directions<\/a>/);
+  assert.match(page, /href="\/kelowna\/events\/test-future-festival\/calendar\.ics" download>Add to calendar<\/a>/);
+  assert.match(page, /<p class="event-status">/);
+  const cal = await fetch(`${base}/kelowna/events/test-future-festival/calendar.ics`);
+  assert.equal(cal.status, 200);
+  assert.match(cal.headers.get('content-type'), /text\/calendar/);
+  assert.match(await cal.text(), /SUMMARY:Test Future Festival/);
+  assert.equal((await fetch(`${base}/kelowna/events/no-such-event/calendar.ics`)).status, 404);
+}));

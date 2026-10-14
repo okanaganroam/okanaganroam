@@ -18754,6 +18754,65 @@ function eventPageTitle(full, regionLabel, mainOccurrence) {
   const date = formatLocalDateLong(dateStr, { weekday: false });
   return fitTitle([`${full.name} — ${date} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — ${date} — Event in ${regionLabel}, BC`, `${full.name} — ${date}`]);
 }
+// ---------- Event pages 9/10 pass (2026-10-14) ----------
+// The next occurrence a visitor can still go to (in progress or upcoming).
+function eventNextOccurrence(occurrences, todayStr) {
+  return occurrences.find((o) => o.end_date >= todayStr) || null;
+}
+// "Tonight · 8 pm", "Today · 2 pm", "Tomorrow · 7 pm", "On now · until Nov 1",
+// "Next: Sat Oct 17 · 6:05 pm" -- or null when nothing is coming up.
+function eventStatusText(next, todayStr, isSeries) {
+  if (!next) return null;
+  const time = next.all_day === 1 || !next.start_time || next.start_time === '00:00' ? '' : formatLocalTime(next.start_time);
+  const span = (Date.parse(`${next.end_date}T12:00:00Z`) - Date.parse(`${next.start_date}T12:00:00Z`)) / 86400000;
+  if (next.start_date <= todayStr && span >= 1) return `On now \u00b7 until ${formatLocalDateShort(next.end_date, { weekday: false })}`;
+  const withTime = (word) => (time ? `${word} \u00b7 ${time}` : word);
+  if (next.start_date === todayStr) return withTime(next.start_time && next.start_time >= '17:00' ? 'Tonight' : 'Today');
+  if (next.start_date === addLocalDays(todayStr, 1)) return withTime('Tomorrow');
+  return `${isSeries ? 'Next: ' : ''}${withTime(formatLocalDateShort(next.start_date))}`;
+}
+// Readable dates inside stored recurrence text ("Home games 2026-09-25 to 2027-03-26").
+function readableRecurrence(rule, refYear) {
+  return String(rule || '').replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (m, y, mo, d) => `${MONTH_SHORT[Number(mo) - 1]} ${Number(d)}${y === refYear ? '' : `, ${y}`}`);
+}
+// The event's picture: its own, else the photo for its kind of event (the
+// What's On card's picker), at full size when one exists beside the -800 copy.
+function eventHeroImage(full, categories) {
+  if (full.image_url && /^https:\/\//.test(full.image_url)) return { small: full.image_url, big: full.image_url };
+  const small = homeEventImage({ name: full.name, description: full.description, categories, image: full.image_url });
+  const big = small.replace(/-800\.jpg$/, '.jpg');
+  return { small, big: big !== small && fs.existsSync(path.join(__dirname, 'public', big)) ? big : small };
+}
+// iCalendar for an event's upcoming dates (up to 20), times in America/Vancouver.
+function icsEscape(t) { return String(t || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1'); }
+function eventIcs(full, occurrences, location, url, now = new Date()) {
+  const today = todayLocal(now);
+  const ymd = (d) => d.replace(/-/g, '');
+  const hm = (t) => t.replace(':', '') + '00';
+  const stamp = new Date(now).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Okanagan Roam//Events//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    // Pacific time (PST/PDT, current North American rules) so every calendar app reads the times as Okanagan local time.
+    'BEGIN:VTIMEZONE', 'TZID:America/Vancouver',
+    'BEGIN:DAYLIGHT', 'TZOFFSETFROM:-0800', 'TZOFFSETTO:-0700', 'TZNAME:PDT', 'DTSTART:19700308T020000', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU', 'END:DAYLIGHT',
+    'BEGIN:STANDARD', 'TZOFFSETFROM:-0700', 'TZOFFSETTO:-0800', 'TZNAME:PST', 'DTSTART:19701101T020000', 'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU', 'END:STANDARD',
+    'END:VTIMEZONE'];
+  for (const o of occurrences.filter((x) => x.end_date >= today).slice(0, 20)) {
+    lines.push('BEGIN:VEVENT', `UID:okr-event-${full.id}-${o.id}@okanaganroam.com`, `DTSTAMP:${stamp}`);
+    if (o.all_day === 1 || !o.start_time || o.start_time === '00:00') {
+      lines.push(`DTSTART;VALUE=DATE:${ymd(o.start_date)}`, `DTEND;VALUE=DATE:${ymd(addLocalDays(o.end_date, 1))}`);
+    } else {
+      const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date, 1) : o.end_date;
+      lines.push(`DTSTART;TZID=America/Vancouver:${ymd(o.start_date)}T${hm(o.start_time)}`);
+      if (o.end_time) lines.push(`DTEND;TZID=America/Vancouver:${ymd(endDate)}T${hm(o.end_time)}`);
+    }
+    lines.push(`SUMMARY:${icsEscape(o.label ? `${full.name} \u2013 ${o.label}` : full.name)}`);
+    if (location) lines.push(`LOCATION:${icsEscape(location)}`);
+    lines.push(`DESCRIPTION:${icsEscape(`Details: ${url}`)}`, `URL:${url}`, 'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  // Lines are folded at 75 octets per RFC 5545.
+  return lines.map((l) => { const out = []; let rest = l; while (Buffer.byteLength(rest) > 75) { let cut = 74; while (Buffer.byteLength(rest.slice(0, cut)) > 74) cut--; out.push(rest.slice(0, cut)); rest = ' ' + rest.slice(cut); } out.push(rest); return out.join('\r\n'); }).join('\r\n') + '\r\n';
+}
 function renderEventPage(event, hostVenue, opts = {}) {
   const now = opts.now || new Date();
   const todayStr = todayLocal(now);
@@ -18803,16 +18862,25 @@ function renderEventPage(event, hostVenue, opts = {}) {
     const next = upcoming[0];
     whenHtml = `${occurrences.length} dates${next ? ` &middot; next: ${escapeHtml(describeEventOccurrence(next).dateText)}` : ' &middot; all dates have passed'}`;
   }
-  const datesListHtml = isSeries ? `
-  <section class="event-dates" aria-labelledby="eventDatesHeading">
-    <h2 id="eventDatesHeading">All dates</h2>
-    <ol class="event-date-list">
-${occurrences.map((o) => {
+  // Past dates (2026-10-14) fold away under "Show N past dates", so the
+  // list opens on the next one.
+  const dateItem = (o) => {
     const d = describeEventOccurrence(o);
     const past = o.end_date < todayStr;
     return `      <li class="event-date${past ? ' event-date-past' : ''}"><span class="event-date-when">${escapeHtml(d.dateText)}${d.timeText ? ` &middot; ${escapeHtml(d.timeText)}` : ''}</span>${o.label ? ` <span class="event-date-label">${escapeHtml(o.label)}</span>` : ''}${past ? ' <span class="event-date-past-tag">(past)</span>' : ''}</li>`;
-  }).join('\n')}
-    </ol>
+  };
+  const pastOccs = occurrences.filter((o) => o.end_date < todayStr);
+  const comingOccs = occurrences.filter((o) => o.end_date >= todayStr);
+  const datesListHtml = isSeries ? `
+  <section class="event-dates" aria-labelledby="eventDatesHeading">
+    <h2 id="eventDatesHeading">${comingOccs.length ? 'Upcoming dates' : 'All dates'}</h2>
+    <ol class="event-date-list">
+${(comingOccs.length ? comingOccs : occurrences).map(dateItem).join('\n')}
+    </ol>${comingOccs.length && pastOccs.length ? `
+    <details class="event-past-dates"><summary>Show ${pastOccs.length} past date${pastOccs.length === 1 ? '' : 's'}</summary>
+    <ol class="event-date-list">
+${pastOccs.map(dateItem).join('\n')}
+    </ol></details>` : ''}
   </section>` : '';
 
   const venueHtml = hostVenue
@@ -18823,16 +18891,33 @@ ${occurrences.map((o) => {
   const chips = categories.filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
   const detailRows = [
     ['When', whenHtml],
-    full.recurrence_rule ? ['Recurs', escapeHtml(full.recurrence_rule)] : null,
+    full.recurrence_rule ? ['Recurs', escapeHtml(readableRecurrence(full.recurrence_rule, (occurrences[0] || {}).start_date ? occurrences[0].start_date.slice(0, 4) : ''))] : null,
     venueHtml ? ['Where', venueHtml] : null,
     ['Region', `<a href="/${full.region}">${escapeHtml(regionLabel)}</a>`],
-    full.website ? ['Website', `<a href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">${escapeHtml(full.website)}</a>`] : null,
+    full.website ? ['Website', `<a href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">${escapeHtml(String(full.website).replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, ''))}</a>`] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
-  const imageHtml = full.image_url
-    ? `<img src="${escapeHtml(full.image_url)}" alt="${escapeHtml(full.name)}" style="width:100%;max-height:340px;object-fit:cover;border-radius:10px;margin-bottom:20px;">`
-    : '';
+  // A photo for every event page (2026-10-14): its own, else one for its kind.
+  const hero = eventHeroImage(full, categories);
+  const ownImage = !!(full.image_url && /^\/(?!\/)|^https:\/\//.test(full.image_url));
+  const imageHtml = `<div class="event-hero"><img src="${escapeHtml(hero.big)}"${hero.big !== hero.small ? ` srcset="${escapeHtml(hero.small)} 800w, ${escapeHtml(hero.big)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${ownImage ? escapeHtml(full.name) : ''}" fetchpriority="high">${ownImage ? '' : '<span class="event-hero-example">Example photo</span>'}</div>`;
+  const next = eventNextOccurrence(occurrences, todayStr);
+  const statusText = expired ? null : eventStatusText(next, todayStr, isSeries);
+  // The calendar-import sentence becomes its short summary (the What's On card's).
+  const summary = whatsOnCardSummary({ name: full.name, description: full.description || '', categories, attribution: null });
+  const bodyText = editorial ? editorial.intro : (summary.text || full.description || '');
+  // Directions: the host venue's map point or address, else the stored place name and town.
+  const placeQuery = hostVenue && hostVenue.latitude && hostVenue.longitude ? `${hostVenue.latitude},${hostVenue.longitude}`
+    : hostVenue && hostVenue.address ? hostVenue.address
+      : full.venue_name_text ? `${full.venue_name_text}, ${regionLabel}, BC` : null;
+  const directionsUrl = placeQuery && full.valley_wide !== 1 ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeQuery)}` : null;
+  const ctaHtml = expired ? '' : `
+  <div class="event-cta-row">
+    ${full.website ? `<a class="cta event-cta-primary" href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">Tickets &amp; info &#8599;</a>` : ''}
+    ${directionsUrl ? `<a class="cta secondary" href="${escapeHtml(directionsUrl)}" rel="nofollow noopener" target="_blank">Get directions</a>` : ''}
+    ${next ? `<a class="cta secondary" href="/${full.region}/events/${full.slug}/calendar.ics" download>Add to calendar</a>` : ''}
+  </div>`;
   const tripQuery = `${full.name}, ${regionLabel}, Okanagan Valley, BC`;
   const actionsHtml = `
   <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}"${savedOccurrenceAttrs(upcoming[0])} data-surface="event_page">
@@ -18881,7 +18966,7 @@ ${related.map((r) => {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { shareImage: eventImagePath(full, categories), noindex: expired, golfTheme: true, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, eventSchema].filter(Boolean), { shareImage: eventHeroImage(full, getEventCategoryKeys(full.id)).big, noindex: expired, golfTheme: true, savedSidecar: true })}
 ${renderAnalyticsHeadHtml('event')}
 <style>
   /* Batch 4B (2026-09-27): the event page uses the themed shell, whose
@@ -18904,6 +18989,30 @@ ${renderAnalyticsHeadHtml('event')}
   .event-related-list li { margin: 6px 0; }
   .event-related-meta { color: #5f6b73; font-size: 0.9rem; }
   .event-related-all { margin: 0 0 20px; font-size: 0.95rem; }
+  /* 2026-10-14: photo, status line, buttons and a details sidebar. */
+  .event-hero { position: relative; width: 100%; height: clamp(170px, 26vw, 340px); margin: 0 0 18px; border-radius: 16px; overflow: hidden; background: #2A6B67; }
+  .event-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .event-hero-example { position: absolute; right: 14px; bottom: 12px; font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.88); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
+  .event-status { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 12px; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.98rem; color: var(--teal, #2A6B67); }
+  .event-status::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor; }
+  .event-body { font-size: 1.06rem; line-height: 1.65; max-width: 68ch; }
+  .event-cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 12px; }
+  .event-cta-row .cta { margin: 0; }
+  body.golf-page.event-page .event-aside .detail-row { display: flex; gap: 12px; max-width: none; }
+  body.golf-page.event-page .event-aside .detail-row .label { min-width: 74px; }
+  body.golf-page.event-page .event-aside .detail-row a { overflow-wrap: anywhere; }
+  .event-past-dates summary { cursor: pointer; font-weight: 700; color: var(--ref-navy, #1B2B3A); margin: 4px 0 8px; }
+  @media (min-width: 960px) {
+    .event-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0 40px; align-items: start; }
+    .event-aside { position: sticky; top: 84px; }
+    .event-aside .event-dates { max-height: 60vh; overflow: auto; }
+  }
+  @media (max-width: 640px) {
+    .event-hero { height: 160px; border-radius: 12px; }
+    .event-cta-row { display: grid; grid-template-columns: 1fr 1fr; }
+    .event-cta-row .event-cta-primary { grid-column: 1 / -1; }
+    .event-cta-row .cta { text-align: center; }
+  }
 </style>
 </head>
 <body class="golf-page event-page">
@@ -18917,15 +19026,26 @@ ${renderGolfHeaderHtml()}
     { name: full.name },
   ])}
   ${imageHtml}
+  <div class="event-layout">
+  <div class="event-main">
   <h1>${escapeHtml(full.name)}</h1>
   <p class="subtitle">${isSeries ? 'Event series' : 'Event'} in ${escapeHtml(regionLabel)}, BC${statusNote}</p>
+  ${statusText ? `<p class="event-status">${escapeHtml(statusText)}</p>` : ''}
   ${chips ? `<p class="chips">${chips}</p>` : ''}
+  <p class="event-body">${escapeHtml(bodyText)}</p>
+  ${ctaHtml}
   ${actionsHtml}
-  <p>${escapeHtml(editorial ? editorial.intro : (full.description || ''))}</p>
-  ${detailRows}
-  ${datesListHtml}
-  ${attribution}${editorialHtml}
+  ${editorialHtml}
   ${expired ? '' : featuredInGuidesHtml(`event:${full.region}/${full.slug}`)}
+  </div>
+  <aside class="event-aside">
+  <div class="venue-section event-details">
+  ${detailRows}
+  ${attribution}
+  </div>
+  ${datesListHtml}
+  </aside>
+  </div>
   ${relatedHtml}
   <a class="cta" href="/${full.region}">Explore all of ${escapeHtml(regionLabel)}</a>
   </main>
@@ -26616,6 +26736,23 @@ const server = http.createServer(async (req, res) => {
     // /segment/segment/segment shape). Expired events still render (200),
     // just with noindex applied inside renderEventPage/pageHead — they are
     // never 404'd purely for having ended.
+    // GET /:region/events/:slug/calendar.ics (2026-10-14): the event's upcoming
+    // dates as an iCalendar file, for the page's "Add to calendar" button.
+    const eventIcsMatch = pathname.match(/^\/([a-z-]+)\/events\/([a-z0-9-]+)\/calendar\.ics$/);
+    if (eventIcsMatch && method === 'GET') {
+      const [, region, slug] = eventIcsMatch;
+      const event = REGION_LABELS[region] ? findEventBySlug(region, slug) : null;
+      const full = event ? getEventById(event.id) : null;
+      if (full && full.status === 'scheduled') {
+        const hostVenue = full.venue_id ? getVenue(full.venue_id) : null;
+        const location = hostVenue ? [hostVenue.name, hostVenue.address].filter(Boolean).join(', ') : (full.venue_name_text ? `${full.venue_name_text}, ${REGION_LABELS[region]}, BC` : `${REGION_LABELS[region]}, BC`);
+        const ics = eventIcs(full, listEventOccurrences(full.id, { includeCancelled: false }), location, `https://okanaganroam.com/${region}/events/${slug}`);
+        res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="${slug}.ics"`, 'Cache-Control': 'no-cache' });
+        return res.end(ics);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('Not found');
+    }
     const eventPageMatch = pathname.match(/^\/([a-z-]+)\/events\/([a-z0-9-]+)\/?$/);
     if (eventPageMatch && method === 'GET') {
       const [, region, slug] = eventPageMatch;
@@ -27686,6 +27823,10 @@ module.exports = {
   whatsOnCategoryTileHtml,
   whatsOnCategoryGridHtml,
   whatsOnEventCardHtml,
+  eventStatusText,
+  readableRecurrence,
+  eventIcs,
+  eventHeroImage,
   whatsOnCardSummary,
   whatsOnWhenText,
   whatsOnGroupOf,
