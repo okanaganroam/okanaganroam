@@ -13959,20 +13959,20 @@ test('map day headers: a region whose config or image is missing falls back to t
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('Build My Trip V3 images: day headers map to the full-size copies with srcset widths that match the files; phones get the 640px thumbnail', () => {
+test('Build My Trip V3 images: day headers use the same current town photos as the Destinations page (2026-10-14)', () => {
   const m = app.TRIP_V3_REGION_IMAGES;
   for (const slug of ['kelowna', 'lake-country', 'naramata', 'penticton', 'vernon', 'west-kelowna']) {
-    assert.equal(m[slug].src, `/images/regions/wide/${slug}.webp`);
-    assert.equal(m[slug].srcset, `/images/regions/${slug}.webp 640w, /images/regions/wide/${slug}.webp 1648w`);
+    assert.deepEqual(m[slug], { src: `/images/regions/${slug}-explore-fall.jpg`, srcset: null }, `${slug}: the autumn panorama`);
   }
-  assert.deepEqual(m.oliver, { src: '/images/regions/wide/oliver.webp', srcset: '/images/regions/wide/oliver.webp 1376w' });
-  assert.deepEqual(m.osoyoos, { src: '/images/regions/wide/osoyoos.webp', srcset: '/images/regions/wide/osoyoos.webp 928w' });
-  assert.deepEqual(m.summerland, { src: '/images/regions/wide/summerland.webp', srcset: '/images/regions/wide/summerland.webp 928w' });
+  assert.deepEqual(m.oliver, { src: '/images/regions/cards/oliver.jpg', srcset: null });
+  assert.deepEqual(m.osoyoos, { src: '/images/regions/cards/osoyoos.jpg', srcset: null });
+  assert.deepEqual(m.summerland, { src: '/images/regions/cards/summerland.jpg', srcset: null });
+  assert.deepEqual(m['big-white'], { src: '/images/regions/cards/big-white.jpg', srcset: null });
   for (const v of Object.values(m)) for (const url of [v.src, ...(v.srcset || '').split(', ').map((x) => x.split(' ')[0]).filter(Boolean)]) {
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', url)), url);
   }
   const page = app.renderTripPlannerV3Page({ preview: true });
-  assert.ok(page.includes('/images/regions/wide/kelowna.webp 1648w'), 'the map reaches the page');
+  assert.ok(page.includes('/images/regions/kelowna-explore-fall.jpg'), 'the map reaches the page');
   assert.ok(page.includes('/images/trip-v3/hero.webp'));
 });
 

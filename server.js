@@ -18616,6 +18616,11 @@ const TRIP_V3_REGION_IMAGES = (() => {
   const out = {};
   const has = (rel) => fs.existsSync(path.join(__dirname, 'public', 'images', rel));
   for (const slug of Object.keys(REGION_LABELS)) {
+    // 2026-10-14: the day headers use the same, current town photos as the Destinations page -- the autumn panorama where
+    // there is one, otherwise the town's destination card photo -- not the older wide photos (Kelowna showed an old one).
+    if (has(`regions/${slug}-explore-fall.jpg`)) { out[slug] = { src: `/images/regions/${slug}-explore-fall.jpg`, srcset: null }; continue; }
+    const card = `regions/cards/${DESTINATION_CARD_FILES[slug] || slug}.jpg`;
+    if (has(card)) { out[slug] = { src: `/images/${card}`, srcset: null }; continue; }
     const wide = TRIP_V3_WIDE_REGION_WIDTHS[slug] && has(`regions/wide/${slug}.webp`) ? `/images/regions/wide/${slug}.webp` : null;
     const thumb = has(`regions/${slug}.webp`) ? `/images/regions/${slug}.webp` : null;
     if (wide) {
