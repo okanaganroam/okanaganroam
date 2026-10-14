@@ -1,0 +1,46 @@
+{
+  "reason": "Venue replies to the 2026-10-14 outreach email: corrections, hours and photos supplied by the venues",
+  "batch_id": "venue-replies-2026-10-14",
+  "venues": [
+    {
+      "id": 734,
+      "name": "Truck 59 Ciderhouse",
+      "region": "west-kelowna",
+      "slug": "truck-59-ciderhouse",
+      "source": "Email from Dana Haudenschild (Director of Marketing, Jason Parkes Customs) for Truck 59, 2026-10-14",
+      "expect": {
+        "description": "Truck 59 Ciderhouse is an orchard cidery in West Kelowna with a smart layout: a main lawn where families and dogs are welcome, and a separate adults-only lounge, so it suits almost any kind of visit. Either way, lawn games are on hand.",
+        "vegan": true,
+        "image_url": null
+      },
+      "set": {
+        "description": "In the heart of Okanagan Wine Country, Truck 59 is where crisp cider, wide-open lawns, and lakeside lounging come together. Now serving Hatching Post beer, cocktails, and JPC wine in our Truck Yard!",
+        "description_fr": "Au cœur du pays viticole de l'Okanagan, Truck 59 réunit cidre frais, grandes pelouses et détente au bord du lac. On y sert maintenant la bière Hatching Post, des cocktails et le vin JPC dans notre Truck Yard !",
+        "vegan": false,
+        "image_url": "/images/venues/truck-59-ciderhouse-exterior.jpg"
+      },
+      "hours": {
+        "expected_current_hours": "{\"mon\":[[\"11:00\",\"20:00\"]],\"tue\":[[\"11:00\",\"20:00\"]],\"wed\":[[\"11:00\",\"20:00\"]],\"thu\":[[\"11:00\",\"20:00\"]],\"fri\":[[\"11:00\",\"21:00\"]],\"sat\":[[\"11:00\",\"21:00\"]],\"sun\":[[\"11:00\",\"20:00\"]]}",
+        "hours": {"mon":[["11:00","18:00"]],"tue":[["11:00","18:00"]],"wed":[["11:00","18:00"]],"thu":[["11:00","18:00"]],"fri":[["11:00","18:00"]],"sat":[["11:00","18:00"]],"sun":[["11:00","18:00"]]},
+        "hours_source": "venue_owner",
+        "hours_checked_at": "2026-10-14"
+      }
+    },
+    {
+      "id": 63,
+      "name": "Bean to Cup",
+      "region": "vernon",
+      "slug": "bean-to-cup",
+      "source": "Email from Kunal at Bean to Cup, 2026-10-14 (confirmed the listing, sent photos)",
+      "expect": {
+        "description": "Bean to Cup is the Vernon cafe locals default to: strong coffee, homemade food and an unpretentious warmth. Dogs are always welcome on the front terrace, so bring yours and grab a seat outside for the morning.",
+        "image_url": null
+      },
+      "set": {
+        "description": "Bean to Cup is the Vernon cafe locals default to: strong coffee, homemade food and an unpretentious warmth. Butter chicken is on the menu every Wednesday. Dogs are always welcome on the front terrace, so bring yours and grab a seat outside for the morning.",
+        "description_fr": "Bean to Cup est le café où les gens de Vernon vont d'office : du café corsé, une cuisine maison et une chaleur sans prétention. Le poulet au beurre est au menu tous les mercredis. Les chiens sont toujours les bienvenus sur la terrasse à l'avant : amenez le vôtre et prenez une place dehors pour la matinée.",
+        "image_url": "/images/venues/bean-to-cup-lunch-plate.jpg"
+      }
+    }
+  ]
+}

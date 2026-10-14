@@ -1,0 +1,19 @@
+{
+  "reason": "Truck 59 Ciderhouse seasonal closure from November 1 (venue email, Dana Haudenschild, 2026-10-14: last day October 31; special events in Nov/Dec are listed separately on What's On)",
+  "batch_id": "venue-truck59-seasonal-2026-11-01",
+  "venues": [
+    {
+      "id": 734,
+      "name": "Truck 59 Ciderhouse",
+      "region": "west-kelowna",
+      "slug": "truck-59-ciderhouse",
+      "source": "Email from Dana Haudenschild (Director of Marketing, Jason Parkes Customs) for Truck 59, 2026-10-14",
+      "hours": {
+        "expected_current_hours": "{\"mon\":[[\"11:00\",\"18:00\"]],\"tue\":[[\"11:00\",\"18:00\"]],\"wed\":[[\"11:00\",\"18:00\"]],\"thu\":[[\"11:00\",\"18:00\"]],\"fri\":[[\"11:00\",\"18:00\"]],\"sat\":[[\"11:00\",\"18:00\"]],\"sun\":[[\"11:00\",\"18:00\"]]}",
+        "hours": {"mon":[],"tue":[],"wed":[],"thu":[],"fri":[],"sat":[],"sun":[]},
+        "hours_source": "venue_owner",
+        "hours_checked_at": "2026-10-14"
+      }
+    }
+  ]
+}
