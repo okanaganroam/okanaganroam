@@ -23342,7 +23342,9 @@ const server = http.createServer(async (req, res) => {
         const exploreRegions = renderExploreRegionsHTML({ now: homepageNow() });
         const buildTripSection = renderBuildTripCTAHTML({ now: homepageNow() });
         const thisWeekend = renderHomeThisWeekendHTML({ now: homepageNow() });
-        const topPicks = renderHomeTopPicksHTML({ now: homepageNow() });
+        // Top Picks is off for now (2026-10-14): it needs real venue photos, and it may become a paid featured spot.
+        // HOME_TOP_PICKS=on shows it (for previews).
+        const topPicks = /^(1|on|true|yes)$/i.test(process.env.HOME_TOP_PICKS || '') ? renderHomeTopPicksHTML({ now: homepageNow() }) : '';
         // The counts sit in a slim strip right under the hero.
         const statsHtml = renderHomeStatsHTML();
 
