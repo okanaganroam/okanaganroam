@@ -11169,7 +11169,10 @@ test('Hidden Gems link: mixed requests never get a /secret-spots destination jus
 // exactly the venues the request matches. Flags off: the path is a 404 as
 // before and nothing links to it.
 function hgVisibleIds(html) {
-  return [...html.matchAll(/<li class="venue-card"( hidden)? data-venue-id="(\d+)"/g)].filter((m) => !m[1]).map((m) => Number(m[2]));
+  // The cards shown: the shared directory's first batch, in #fdResults (the
+  // rest wait in the Show more template; the fixtures fit in one batch).
+  const grid = (html.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+  return [...grid.matchAll(/<li class="venue-card" data-fd-i="\d+" data-venue-id="(\d+)"/g)].map((m) => Number(m[1]));
 }
 function hgApiIds(q) {
   return app.runDiscovery(q, { limit: 60 }).results.items.map((x) => x.id);
@@ -11356,7 +11359,7 @@ test('Destination pages: the Hidden Gems category reaches the right page whateve
   assert.equal(kel.href, '/hidden-gems?regions=kelowna');
   const res = await fetch(base + kel.href);
   assert.equal(res.status, 200, 'served with both flags off');
-  const shown = [...(await res.text()).matchAll(/<li class="venue-card"( hidden)? data-venue-id="(\d+)"/g)].filter((m) => !m[1]).map((m) => Number(m[2])).sort();
+  const shown = hgVisibleIds(await res.text()).sort();
   assert.deepEqual(shown, kelownaGems, 'region filter shows exactly the Kelowna Hidden Gems');
   // A destination with no Hidden Gems gets the disabled state, not a link.
   const none = destRegions().find((r) => app.getHiddenGemCollectionVenues().every((v) => v.region !== r));
@@ -19224,4 +19227,24 @@ test('/destinations (2026-10-14): a line on each place, north-to-south order, a 
   const list = blocks.find((b) => b['@type'] === 'ItemList');
   assert.ok(list, 'an ItemList of destinations');
   assert.deepEqual(list.itemListElement.map((e) => e.url), order.map((r) => `https://okanaganroam.com/${r}`));
+});
+
+test('Hidden Gems (2026-10-14): six chips, a hidden chip per single type so links still filter exactly, photos and the Why it\'s a gem line', () => {
+  const venues = [
+    { id: 99101, name: 'HGX Cafe', slug: 'hgx-cafe', region: 'kelowna', type: 'cafe', description: 'Fixture.' },
+    { id: 99102, name: 'HGX Winery', slug: 'hgx-winery', region: 'kelowna', type: 'winery', description: 'Fixture.' },
+    { id: 99103, name: 'HGX Park', slug: 'hgx-park', region: 'vernon', type: 'outdoor', description: 'Fixture.' },
+  ];
+  assert.deepEqual(app.hiddenGemCats(venues[0]), ['food-drink', 'cafe']);
+  assert.deepEqual(app.hiddenGemCats(venues[1]), ['winery']);
+  assert.deepEqual(app.hiddenGemCats(venues[2]), ['parks', 'outdoor']);
+  assert.equal(app.HIDDEN_GEM_GROUPS.length, 6);
+  const html = app.renderHiddenGemsHubPage(venues, { types: ['cafe'], regions: [], features: [] });
+  assert.match(html, /data-fd-type="food-drink" aria-pressed="false">Food &amp; Drink/);
+  assert.match(html, /data-fd-type="cafe" aria-pressed="true" hidden>/, 'a single-type link presses its hidden chip');
+  const grid = (html.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+  assert.deepEqual([...grid.matchAll(/data-venue-id="(\d+)"/g)].map((m) => Number(m[1])), [99101]);
+  assert.doesNotMatch(html, /class="chip hidden-gem-badge"/);
+  assert.match(html, /<a href="\/secret-spots">Secret Spots &rarr;<\/a>/);
+  assert.doesNotMatch(html, /listed alphabetically/);
 });
