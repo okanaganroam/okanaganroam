@@ -5392,21 +5392,52 @@ function guardedCollectionMembershipUpdate(kind, venueId, action, note, meta) {
   return { ok: true, kind, venue_id: venueId, action, members };
 }
 
+// Venue page picks (2026-10-14). These used to be the six highest raw
+// ratings, which on a busy region meant six small 5.0 places with a handful
+// of reviews each. Related places now rank the way the Food & Drink list does
+// (rating weighted by review count, foodDrinkRecommendedScore) with places of
+// the same cuisine first; nearby places are the closest ones when both have
+// coordinates, at most two of any one type. Neither ever looks at an
+// editorial flag.
+function venueDistanceKm(a, b) {
+  if (!(a && b && a.latitude && a.longitude && b.latitude && b.longitude)) return null;
+  const rad = (d) => (Number(d) * Math.PI) / 180;
+  const dLat = rad(b.latitude - a.latitude), dLon = rad(b.longitude - a.longitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 function getRelatedVenues(venue, limit = 6) {
   // Same region + same category, excluding itself
-  return db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND id != ? AND redirect_to IS NULL ORDER BY rating DESC, name ASC LIMIT ?')
-    .all(venue.region, venue.type, venue.id, limit)
+  const rows = db
+    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND id != ? AND redirect_to IS NULL')
+    .all(venue.region, venue.type, venue.id)
     .map(rowToVenue);
+  const cuisine = String(venue.cuisine || '').toLowerCase();
+  const score = new Map(rows.map((v) => [v.id, foodDrinkRecommendedScore(v) + (cuisine && String(v.cuisine || '').toLowerCase() === cuisine ? 0.25 : 0)]));
+  return rows.sort((a, b) => score.get(b.id) - score.get(a.id) || String(a.name).localeCompare(String(b.name))).slice(0, limit);
 }
 
 function getNearbyVenues(venue, limit = 6) {
   // Same region, any other category, excluding itself — a broader
   // "explore this region more" set distinct from same-category related venues
-  return db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type != ? AND id != ? AND redirect_to IS NULL ORDER BY rating DESC, name ASC LIMIT ?')
-    .all(venue.region, venue.type, venue.id, limit)
+  const rows = db
+    .prepare('SELECT * FROM venues WHERE region = ? AND type != ? AND id != ? AND redirect_to IS NULL')
+    .all(venue.region, venue.type, venue.id)
     .map(rowToVenue);
+  const dist = new Map(rows.map((v) => [v.id, venueDistanceKm(venue, v)]));
+  const score = new Map(rows.map((v) => [v.id, foodDrinkRecommendedScore(v)]));
+  // Closest first (within a 0.5 km band the better-rated place leads); places
+  // without coordinates follow, best rated first.
+  const band = (v) => (dist.get(v.id) === null ? Infinity : Math.floor(dist.get(v.id) / 0.5));
+  rows.sort((a, b) => band(a) - band(b) || score.get(b.id) - score.get(a.id) || String(a.name).localeCompare(String(b.name)));
+  const perType = {}, out = [];
+  for (const v of rows) {
+    if ((perType[v.type] || 0) >= 2) continue;
+    perType[v.type] = (perType[v.type] || 0) + 1;
+    out.push(dist.get(v.id) === null ? v : { ...v, distance_km: dist.get(v.id) });
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 // ---------- Build My Trip, Stage 1 (backend itinerary generation) ----------
@@ -9506,7 +9537,84 @@ function renderEngagementControlStyles() {
 function renderGolfTripTrayHtml() {
   if (!fs.existsSync(SITE_PATH)) return '';
   const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
-  return extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+  return withTripNav(extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '');
+}
+
+// My Trip in the header (2026-10-14). The floating "Trip 0 \u2192" button sat over
+// page content on phones, so it is hidden and the same tray opens from a
+// "My Trip" item in the header menu instead (with the stop count, also shown
+// on the phone menu button). The tray markup and app.js (frozen) are
+// unchanged: the floating toggle stays in the page, hidden, because app.js's
+// tray module -- which also runs every Add to trip button -- needs it, and
+// the header item opens the tray by pressing it. Placed just before the tray
+// on every page that has one (withTripNav), including the homepage and
+// /browse, whose source file is frozen.
+const TRIP_NAV_SNIPPET = `<style id="trip-nav">
+html.trip-nav-on #tripTrayToggle { display: none !important; }
+html.trip-nav-on #tripTray { top: 70px; bottom: auto; right: 16px; left: auto; }
+html.trip-nav-on #tripTrayPanel { position: static; width: min(320px, calc(100vw - 32px)); max-height: min(70vh, 520px); }
+.nav-links-mytrip { list-style: none; }
+.nav-mytrip-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+.nav-mytrip-btn:focus-visible { outline: 2px solid var(--ref-gold, #E0A94E); outline-offset: 3px; border-radius: 6px; }
+.nav-mytrip-count, .nav-hamburger-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: var(--ref-navy, #1B2B3A); font-size: 0.72rem; font-weight: 800; line-height: 1; }
+.nav-mytrip-fr { display: none; }
+html[lang="fr"] .nav-mytrip-fr { display: inline; }
+html[lang="fr"] .nav-mytrip-en { display: none; }
+#navHamburger { position: relative; }
+#navHamburger .nav-hamburger-count { position: absolute; top: -2px; right: -8px; left: auto; bottom: auto; display: inline-flex; width: auto; min-width: 18px; height: 18px; margin: 0; padding: 0 5px; transform: none; opacity: 1; font-style: normal; font-size: 0.66rem; pointer-events: none; }
+#navHamburger .nav-hamburger-count[hidden] { display: none; }
+@media (max-width: 940px) {
+  .nav-links .nav-links-mytrip { order: -1; border-top: 0; padding: 4px 20px 6px; }
+  .nav-links .nav-mytrip-btn { width: 100%; justify-content: space-between; min-height: 48px; padding: 0 18px; border: 1px solid rgba(27,43,58,0.2); border-radius: 12px; font-weight: 800; color: var(--ref-navy, #1B2B3A); }
+  .nav-links .nav-mytrip-label { margin-right: auto; }
+}
+.nav-hamburger-count[hidden] { display: none; }
+@media (min-width: 941px) { #navHamburger .nav-hamburger-count { display: none; } }
+@media (min-width: 941px) and (max-width: 1099px) { .nav-mytrip-label { display: none; } }
+</style>
+<script>
+(function(){
+  function init(){
+    var tray = document.getElementById('tripTray'), toggle = document.getElementById('tripTrayToggle'), panel = document.getElementById('tripTrayPanel');
+    var count = document.getElementById('tripTrayCount'), links = document.getElementById('navLinks'), burger = document.getElementById('navHamburger');
+    if (!tray || !toggle || !panel || !links || document.querySelector('.nav-links-mytrip')) return;
+    document.documentElement.classList.add('trip-nav-on');
+    var li = document.createElement('li');
+    li.className = 'nav-links-mytrip';
+    li.innerHTML = '<button type="button" class="nav-mytrip-btn" aria-controls="tripTrayPanel" aria-expanded="false"><span aria-hidden="true">\u{1F9F3}</span> <span class="nav-mytrip-label"><span class="nav-mytrip-en">My Trip</span><span class="nav-mytrip-fr" lang="fr">Mon voyage</span></span> <span class="nav-mytrip-count">0</span></button>';
+    // Right after Build My Trip: on phones that pair leads the menu.
+    var tripLi = links.querySelector('.nav-links-trip');
+    links.insertBefore(li, tripLi ? tripLi.nextSibling : null);
+    var btn = li.querySelector('button'), navCount = li.querySelector('.nav-mytrip-count');
+    var badge = null;
+    if (burger) { badge = document.createElement('b'); badge.className = 'nav-hamburger-count'; badge.setAttribute('aria-hidden', 'true'); badge.hidden = true; burger.appendChild(badge); }
+    function sync(){
+      var n = count ? (parseInt(count.textContent, 10) || 0) : 0;
+      navCount.textContent = String(n);
+      btn.setAttribute('aria-label', (document.documentElement.lang === 'fr' ? 'Mon voyage : ' : 'My Trip: ') + n + (document.documentElement.lang === 'fr' ? (n === 1 ? ' arr\u00eat' : ' arr\u00eats') : (n === 1 ? ' stop' : ' stops')));
+      btn.setAttribute('aria-expanded', panel.classList.contains('open') ? 'true' : 'false');
+      if (badge) { badge.textContent = String(n); badge.hidden = n === 0; }
+    }
+    btn.addEventListener('click', function(e){
+      // The tray's own outside-click rule would close it again as this click
+      // bubbles, so it stops here; pressing the hidden toggle opens or closes
+      // the tray through app.js exactly as the floating button did.
+      e.stopPropagation();
+      if (links.classList.contains('open')) { links.classList.remove('open'); if (burger) burger.setAttribute('aria-expanded', 'false'); }
+      toggle.click();
+      sync();
+    });
+    if (count && window.MutationObserver) new MutationObserver(sync).observe(count, { childList: true, characterData: true, subtree: true });
+    if (window.MutationObserver) new MutationObserver(sync).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    sync();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+`;
+function withTripNav(html) {
+  if (!html || !html.includes('<div id="tripTray">') || html.includes('<style id="trip-nav">')) return html;
+  return html.replace('<div id="tripTray">', `${TRIP_NAV_SNIPPET}<div id="tripTray">`);
 }
 
 // app.js cache busting (2026-10-05): every page loads /scripts/app.js with
@@ -10871,7 +10979,7 @@ ${golfFavTripScriptBody(type)}
 // outbound_click reporting, but NOT the Favorite / Add to Trip module --
 // their pages have no such controls, so there is nothing else to report.
 function golfVenueEngagementScriptHtml(venue) {
-  const favTrip = usesEngagementControls(venue.type);
+  const favTrip = venuePageUsesEngagement(venue.type);
   const pageCtx = JSON.stringify({
     venue_id: venue.id,
     venue_name: venue.name,
@@ -17273,6 +17381,151 @@ function venueShareCardPng(venue, lang = 'en') {
   return png;
 }
 
+// ---------- Venue page 10/10 pass (2026-10-14) ----------
+// Food & Drink venue pages had no Favorite / Add to trip although every
+// Food & Drink card has both; the venue page now offers them for every type
+// whose cards do.
+function venuePageUsesEngagement(type) {
+  return usesEngagementControls(type) || FOOD_DRINK_TYPES.includes(type);
+}
+// Hero photo: the venue's own photo when it has one, otherwise the licensed
+// example photo of its kind of place (the category banner), labelled
+// "Example photo" so nobody takes it for this business.
+function venueHeroPhoto(venue) {
+  const own = String(venue.image_url || '').trim();
+  if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return { src: own, small: null, alt: venue.name, pos: 50, example: false };
+  const b = CATEGORY_BANNER_IMAGES[venue.type];
+  if (!b) return null;
+  return { src: b.src, small: smallBannerFor(b.src), alt: b.alt, pos: b.pos, example: true };
+}
+// A small photo for a related / nearby card: its own photo, else the same
+// example photo its Food & Drink card uses, else its type's trip photo.
+function venueThumbPhoto(v) {
+  const own = String(v.image_url || '').trim();
+  if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return own;
+  if (FD_CARD_PHOTOS[v.type]) {
+    const key = foodDrinkCardPhotoKey(v);
+    if (key === 'noodle') return '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg';
+    const m = key.match(/^([a-z]+)-(dog|\d+)$/);
+    if (m) return m[2] === 'dog' ? FD_CARD_DOG_PHOTOS[m[1]] : FD_CARD_PHOTOS[m[1]][Number(m[2])];
+  }
+  const stop = `/images/trip-v3/stops/stop-${v.type}-480.jpg`;
+  return fs.existsSync(path.join(__dirname, 'public', stop)) ? stop : null;
+}
+// Many stored descriptions end on a one-line tagline that restates what came
+// before ("Downtown Kelowna's decades-old soup and sandwich shop with the
+// ever-present owner."). The venue page leaves that closing line off when it
+// starts like a place tagline and at least 70% of its words already
+// appeared; the stored text, the meta description and the structured data
+// are untouched.
+const VENUE_TAGLINE_STOP = new Set('the a an and or of in on at to for with its it is this that by from as be are was were has have who which s their your you'.split(' '));
+function venueTaglineWords(s) {
+  return (String(s).toLowerCase().match(/[a-z0-9]+(?:-[a-z0-9]+)?/g) || []).filter((w) => w.length > 2 && !VENUE_TAGLINE_STOP.has(w));
+}
+function trimVenueTagline(text) {
+  const t = String(text || '').trim();
+  const sentences = t.split(/(?<=[.!?])\s+(?=[A-Z0-9"\u201c])/);
+  if (sentences.length < 3) return t;
+  const last = sentences[sentences.length - 1];
+  if (!/^(?:[A-Z][\w.&'-]*\s){0,5}[A-Z][\w.&-]*(?:'s|\u2019s|s'|s\u2019)\s/.test(last)) return t;
+  const words = venueTaglineWords(last);
+  if (!words.length) return t;
+  const earlier = new Set(sentences.slice(0, -1).flatMap(venueTaglineWords));
+  const overlap = words.filter((w) => earlier.has(w)).length / words.length;
+  return overlap >= 0.7 ? sentences.slice(0, -1).join(' ') : t;
+}
+// The weekly list in 12-hour time, the way every status line on the site
+// reads ("11 AM \u2013 2 PM"); French keeps its 24-hour "11 h\u201314 h".
+function venueDayHoursText(day, fr) {
+  const stored = hoursModule.dayHoursText(day);
+  if (fr) return frHoursText(stored);
+  if (!day || day.status !== 'open') return stored;
+  return day.ranges.map(([a, b]) => (a === 0 && b >= 1440 ? '12 AM \u2013 11:59 PM' : `${hoursModule.formatClockMinutes(a)} \u2013 ${hoursModule.formatClockMinutes(b)}`)).join(', ');
+}
+// "Open now \u00b7 Closes 2 PM" under the venue name: hours.js on the
+// Okanagan clock, exactly like the Food & Drink cards, and never for a venue
+// with a current advisory or no readable hours.
+const FR_STATUS_DAYS = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };
+function frStatusText(text) {
+  const time = (t) => t.replace(/\b(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g, (m, h, mm, ap) => { let H = Number(h) % 12; if (ap === 'PM') H += 12; return `${H} h${mm ? ` ${mm}` : ''}`; });
+  return time(text
+    .replace('Open now \u00b7 Closes ', 'Ouvert \u00b7 ferme \u00e0 ')
+    .replace('Open 24 hours', 'Ouvert 24 h sur 24')
+    .replace('Closed today \u00b7 Opens ', 'Ferm\u00e9 aujourd\u2019hui \u00b7 ouvre ')
+    .replace('Closed \u00b7 Opens ', 'Ferm\u00e9 \u00b7 ouvre ')
+    .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
+    .replace('Closed now', 'Ferm\u00e9 en ce moment')
+    .replace(/\btomorrow /, 'demain \u00e0 ')
+    .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, (m, d) => `${FR_STATUS_DAYS[d]} \u00e0 `)
+    .replace(/ouvre (\d)/, 'ouvre \u00e0 $1'));
+}
+function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
+  if (!hoursModule || !pageHours || hasAdvisory) return null;
+  const clock = okanaganClock(now);
+  const label = hoursModule.hoursStatusLabel(venueHoursStatusAt(pageHours, now), clock);
+  return label.state === 'unknown' ? null : { state: label.state, text: label.text, weekday: clock.weekday };
+}
+function renderVenuePageLayoutStyles() {
+  return `<style id="venue-page-layout">
+  /* Hero photo (2026-10-14): the photo fills the hero under the same tint,
+     so the title stays readable; an example photo is labelled as one. */
+  body.golf-page .venue-hero-fallback.venue-hero-has-photo { background-image: none; overflow: hidden; }
+  body.golf-page .venue-hero-has-photo .venue-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+  /* Layers: photo (0), tint (1), frame line (1), text and label (2). */
+  body.golf-page .venue-hero-fallback.venue-hero-has-photo::before { z-index: 1; background: linear-gradient(100deg, rgba(12,22,28,0.82) 0%, rgba(12,22,28,0.5) 50%, rgba(12,22,28,0.08) 100%); }
+  body.golf-page .venue-hero-fallback.venue-hero-has-photo::after { z-index: 1; }
+  body.golf-page .venue-hero-has-photo h1, body.golf-page .venue-hero-has-photo .venue-hero-type { z-index: 2; text-shadow: 0 2px 14px rgba(0,0,0,0.55); }
+  body.golf-page .venue-hero-has-photo .venue-hero-example { position: absolute; right: 18px; bottom: 16px; z-index: 2; font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.85); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
+  /* Open-now line under the name. */
+  body.golf-page .venue-open-status { display: flex; align-items: center; gap: 7px; margin: -2px 0 10px; font-family: 'Nunito', sans-serif; font-size: 0.92rem; font-weight: 800; color: var(--ink); }
+  body.golf-page .venue-open-status::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor; flex: 0 0 auto; }
+  body.golf-page .venue-open-status[data-open="open"] { color: var(--teal, #2A6B67); }
+  body.golf-page .venue-open-status[data-open="closed"] { color: rgba(42,32,25,0.72); }
+  body.golf-page .venue-open-status[data-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+  body.golf-page .venue-open-status a { font-weight: 700; color: inherit; opacity: 0.85; margin-left: 4px; }
+  /* Two columns on wide screens: the story and actions on the left, the
+     facts (details, map link, hours) in a sidebar on the right. */
+  body.golf-page .venue-layout { display: block; }
+  @media (min-width: 960px) {
+    body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 40px; align-items: start; }
+    body.golf-page .venue-aside { position: sticky; top: 84px; }
+  }
+  body.golf-page .venue-aside .venue-section { margin-top: 0; margin-bottom: 16px; }
+  body.golf-page .venue-aside .detail-row { display: flex; gap: 12px; }
+  body.golf-page .venue-aside .detail-row .label { min-width: 76px; }
+  body.golf-page .venue-aside .map-link { display: inline-block; margin-top: 4px; font-weight: 800; font-size: 0.86rem; }
+  body.golf-page .venue-hours h2 { margin-bottom: 6px; }
+  body.golf-page .hours-list li.is-today { font-weight: 800; color: var(--ink); }
+  body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 today"; font-weight: 700; opacity: 0.6; }
+  html[lang="fr"] body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 aujourd\u2019hui"; }
+  /* Actions: one primary button, then the rest two by two on a phone. */
+  @media (max-width: 640px) {
+    body.golf-page .venue-cta-row { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; flex-direction: initial; }
+    body.golf-page .venue-cta-row > * { width: auto !important; min-width: 0; margin: 0 !important; justify-content: center; text-align: center; }
+    body.golf-page .venue-cta-row > .cta:not(.secondary) { grid-column: 1 / -1; }
+    body.golf-page .venue-cta-row > :last-child:nth-child(even):not(.cta) { grid-column: auto; }
+    body.golf-page .venue-hero-fallback.venue-hero-has-photo { min-height: 190px; }
+    body.golf-page .venue-hero-fallback.venue-hero-has-photo::before { background: linear-gradient(180deg, rgba(12,22,28,0.35) 0%, rgba(12,22,28,0.62) 38%, rgba(12,22,28,0.88) 100%); }
+    body.golf-page .venue-hero-has-photo .venue-hero-example { top: 14px; bottom: auto; right: 14px; }
+    body.golf-page .venue-description { font-size: 1rem; }
+  }
+  /* Related and nearby cards: a photo, then the name and one meta line,
+     three across on wide screens and two across on phones. */
+  body.golf-page .related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (min-width: 760px) { body.golf-page .related-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+  body.golf-page .related-card.has-photo { padding: 0 !important; overflow: hidden; display: flex; flex-direction: column; }
+  body.golf-page .related-card.has-photo .related-photo { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #2A6B67; }
+  body.golf-page .related-card.has-photo .related-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; }
+  body.golf-page .related-card.has-photo .related-type { font-family: 'Nunito', sans-serif; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; }
+  body.golf-page .related-card.has-photo a { font-size: 0.95rem; line-height: 1.3; }
+  body.golf-page .related-card.has-photo a::after { content: ""; position: absolute; inset: 0; }
+  body.golf-page .related-card.has-photo { position: relative; }
+  body.golf-page .related-card.has-photo .related-meta { position: relative; z-index: 1; pointer-events: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+  body.golf-page .related-card.has-photo .related-meta .chip { font-size: 0.68rem; padding: 2px 8px; }
+  @media (max-width: 640px) { body.golf-page .related-card.has-photo .related-photo { aspect-ratio: 3 / 2; } }
+</style>`;
+}
+
 // GET /:region/:category/:slug — individual venue page
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
@@ -17360,12 +17613,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const parsedHours = pageHours && hoursModule ? hoursModule.parseHours(pageHours) : null;
   if (parsedHours && parsedHours.known) {
     const dayNames = fr ? FR_DAY_NAMES : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+    const today = okanaganClock(opts.now || new Date()).weekday;
     const rows = hoursModule.HOURS_WEEKDAYS.map((d) => {
-      const stored = hoursModule.dayHoursText(parsedHours.days[d]);
-      const text = fr ? frHoursText(stored) : stored;
-      return `<li><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
+      const text = venueDayHoursText(parsedHours.days[d], fr);
+      return `<li${d === today ? ' class="is-today"' : ''}><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
     }).join('');
-    hoursHtml = `<div class="detail-row"><span class="label">${L('Hours', 'Heures')}</span></div><ul class="hours-list">${rows}</ul>`;
+    hoursHtml = `<h2>${L('Hours', 'Heures')}</h2><ul class="hours-list" data-today="${today}">${rows}</ul>`;
   }
 
   // Outbound links carry a data-track kind so the venue-page engagement
@@ -17381,15 +17634,19 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? L('Indoor Golf', 'Golf int\u00e9rieur')
     : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique') : label.singular;
 
+  // Map link (built here so the address row can carry it).
+  const mapsUrl = (venue.latitude && venue.longitude)
+    ? `https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`
+    : (venue.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}` : null);
+  // Good to Know (2026-10-14): type, town and rating are already in the line
+  // under the name, so the card keeps only what is new -- and the address
+  // carries the map link, replacing the separate Location box.
   const detailRows = [
-    ['Type', venue.type === 'golf' ? golfKindLabel : label.singular],
-    [L('Region', 'R\u00e9gion'), `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`],
     venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
-    venue.address ? [L('Address', 'Adresse'), escapeHtml(venue.address)] : null,
+    venue.address ? [L('Address', 'Adresse'), `${escapeHtml(venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
     venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
     (venue.price && venue.type !== 'golf') ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
-    (venue.rating && venue.reviews) ? [L('Rating', 'Note'), `${num(venue.rating)}\u2605 (${venue.reviews} ${L('reviews', 'avis')})`] : (venue.rating ? [L('Rating', 'Note'), `${num(venue.rating)}\u2605`] : null),
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
@@ -17401,12 +17658,15 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // <h1> falls back into the header.
   const themedShell = usesThemedVenueShell(venue.type);
   const themedHeroTitle = themedShell && !venue.image_url;
+  const heroPhoto = themedHeroTitle ? venueHeroPhoto(venue) : null;
   const imageHtml = venue.image_url
     ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>`
     : themedHeroTitle
-      ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}">
+      ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
+        <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
         <span class="venue-hero-type">${escapeHtml(golfKindLabel)}</span>
-        <h1>${escapeHtml(venue.name)}</h1>
+        <h1>${escapeHtml(venue.name)}</h1>${heroPhoto && heroPhoto.example ? `
+        <span class="venue-hero-example">${L('Example photo', 'Photo d\u2019exemple')}</span>` : ''}
       </div>`
       : `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}">
         <span class="venue-hero-type">${escapeHtml(label.singular)}</span>
@@ -17428,14 +17688,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // built from existing latitude/longitude (no map library, no new script,
   // no new dependency). Falls back to showing the existing address text
   // alone when coordinates are absent; renders nothing when neither exists.
-  const mapsUrl = (venue.latitude && venue.longitude)
-    ? `https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`
-    : (venue.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}` : null);
-  const locationHtml = (venue.address || mapsUrl)
+  // No address but coordinates: the map link still has a home in the sidebar.
+  const locationHtml = (!venue.address && mapsUrl)
     ? `<div class="venue-section venue-location">
         <h2>${L('Location', 'Emplacement')}</h2>
-        ${venue.address ? `<p class="venue-address">${escapeHtml(venue.address)}</p>` : ''}
-        ${mapsUrl ? `<a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}
+        <a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>
       </div>`
     : '';
 
@@ -17447,9 +17704,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
-    usesEngagementControls(venue.type) ? (fr ? frFavTripButtons(golfFavTripButtonsHtml(venue, { appLabels: themedShell }), venue) : golfFavTripButtonsHtml(venue, { appLabels: themedShell })) : null,
+    venuePageUsesEngagement(venue.type) ? (fr ? frFavTripButtons(golfFavTripButtonsHtml(venue, { appLabels: themedShell }), venue) : golfFavTripButtonsHtml(venue, { appLabels: themedShell })) : null,
   ].filter(Boolean).join('\n  ');
-  const ctaRowAttrs = usesEngagementControls(venue.type)
+  const ctaRowAttrs = venuePageUsesEngagement(venue.type)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
     : '';
   // Temporary condition (advisory collection), rendered between the
@@ -17479,11 +17736,26 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     const meta = [fr && v.cuisine ? frCuisine(v.cuisine) : v.cuisine, v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
     const badge = ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
-    const band = fr ? compactVisualBandHtml(v.type, { size: 'small' }).replace(`>${escapeHtml(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)}<`, `>${escapeHtml(CATEGORY_LABELS_FR[v.type] ? CATEGORY_LABELS_FR[v.type].singular : v.type)}<`) : compactVisualBandHtml(v.type, { size: 'small' });
-    return `<div class="related-card related-card-${v.type}">
+    const photo = venueThumbPhoto(v);
+    const typeLabel = ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type;
+    const href = fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+    const away = typeof v.distance_km === 'number' ? (v.distance_km < 1 ? `${Math.max(100, Math.round(v.distance_km * 10) * 100)} m` : `${num(v.distance_km.toFixed(1))} km`) : '';
+    const metaLine = [meta, away].filter(Boolean).join(' \u00b7 ');
+    if (!photo) {
+      const band = fr ? compactVisualBandHtml(v.type, { size: 'small' }).replace(`>${escapeHtml(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)}<`, `>${escapeHtml(typeLabel)}<`) : compactVisualBandHtml(v.type, { size: 'small' });
+      return `<div class="related-card related-card-${v.type}">
       ${band}
-      <a href="${fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`}">${escapeHtml(v.name)}</a>
-      <div class="related-meta">${meta ? escapeHtml(meta) + ' ' : ''}${frChip(badge)}</div>
+      <a href="${href}">${escapeHtml(v.name)}</a>
+      <div class="related-meta">${metaLine ? escapeHtml(metaLine) + ' ' : ''}${frChip(badge)}</div>
+    </div>`;
+    }
+    // Photo cards (2026-10-14): the same example photo as the place's own
+    // listing card, and the whole card is the link.
+    return `<div class="related-card related-card-${v.type} has-photo">
+      <img class="related-photo" src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">
+      <div class="related-body"><span class="related-type">${escapeHtml(typeLabel)}</span>
+      <a href="${href}">${escapeHtml(v.name)}</a>
+      <div class="related-meta">${metaLine ? escapeHtml(metaLine) + ' ' : ''}${frChip(badge)}</div></div>
     </div>`;
   }
 
@@ -17532,14 +17804,17 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // venue navigation hierarchy worth surfacing here. Every other
   // category's venue page is unaffected. Built from the venue's own
   // region field, never hardcoded to any one venue/region.
-  const venueBackLink = ALL_REGIONS_CATEGORIES.includes(venue.type)
-    ? `<a class="category-back-link" href="/${venue.region}/${catSlug}">\u2190 ${fr ? `${escapeHtml(label.plural)} \u00e0 ${escapeHtml(regionLabel)}` : `${escapeHtml(regionLabel)} ${escapeHtml(ALL_REGIONS_BACK_LABEL[venue.type] || label.plural)}`}</a>`
+  // Every type (2026-10-14), not only the ALL_REGIONS_CATEGORIES ones.
+  const venueBackLink = `<a class="category-back-link" href="/${venue.region}/${catSlug}">\u2190 ${fr ? `${escapeHtml(label.plural)} \u00e0 ${escapeHtml(regionLabel)}` : `${escapeHtml(regionLabel)} ${escapeHtml(ALL_REGIONS_BACK_LABEL[venue.type] || label.plural)}`}</a>`;
+  const openStatus = venueOpenStatus(pageHours, venueAdvisoryNote !== undefined, opts.now || new Date());
+  const openStatusHtml = openStatus
+    ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '';
 
   const page = `<!DOCTYPE html>
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { alternates: hasFrench ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: usesEngagementControls(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() : ''}${usesEngagementControls(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { alternates: hasFrench ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
@@ -17553,19 +17828,25 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
   ${hasFrench ? `<p class="venue-lang-switch" style="margin:-4px 0 10px;font-size:.92rem">${fr ? `<a href="${venuePagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${venuePagePath(venue, 'fr')}" hreflang="fr" lang="fr">Fran\u00e7ais</a>`}</p>` : ''}
   ${venueBackLink}
   ${imageHtml}
+  <div class="venue-layout">
+  <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    <p class="chips">${hiddenGemChip}${attributeChips}</p>
+    ${openStatusHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>
   </div>
-  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : bilingualDescHtml(venue.description, venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
+  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
-  <div class="venue-section venue-key-info">
+  ${guideLinks}
+  </div>
+  <aside class="venue-aside">
+  ${detailRows ? `<div class="venue-section venue-key-info">
     <h2>${L('Good to Know', 'Bon \u00e0 savoir')}</h2>
     ${detailRows}
-  </div>
+  </div>` : ''}
   ${locationHtml}
-  ${hoursHtml ? `<div class="venue-section venue-hours">${hoursHtml}</div>` : ''}
-  ${guideLinks}
+  ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
+  </aside>
+  </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
@@ -18960,7 +19241,7 @@ function renderTripPlannerPage(v2 = false) {
   let headerHtml = '';
   if (fs.existsSync(SITE_PATH)) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
-    tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+    tripTrayHtml = withTripNav(extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '');
     headerHtml = extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '';
     headerHtml = withBuildMyTripPlacements(withFavoritesNavLink(headerHtml
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
@@ -19165,7 +19446,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
   let headerHtml = '';
   if (fs.existsSync(SITE_PATH)) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
-    tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+    tripTrayHtml = withTripNav(extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '');
     headerHtml = withBuildMyTripPlacements(withFavoritesNavLink((extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '')
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
@@ -23634,7 +23915,7 @@ const server = http.createServer(async (req, res) => {
     // of always rendering underneath the new homepage. See /browse below.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
-        let html = withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')));
+        let html = withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))));
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
         // not just via the sitemap (which some crawlers deprioritize). The
@@ -23845,7 +24126,7 @@ const server = http.createServer(async (req, res) => {
         // No venues to list (an empty database): fall back to the wizard page.
       }
       if (fs.existsSync(SITE_PATH)) {
-        let html = withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')));
+        let html = withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))));
 
         // /browse redesign harmonization pass (2026-09-18): marks this
         // response so page-scoped CSS can tell it apart from / (same
@@ -26624,6 +26905,14 @@ module.exports = {
   FD_CARD_PHOTOS,
   FD_CARD_DOG_PHOTOS,
   FD_HEART_USE,
+  venuePageUsesEngagement,
+  venueHeroPhoto,
+  venueThumbPhoto,
+  trimVenueTagline,
+  venueDayHoursText,
+  venueOpenStatus,
+  frStatusText,
+  venueDistanceKm,
   FD_HUB_FILTER_CLIENT_PREDICATE_SRC,
   canonicalOutdoorRegionOrder,
   OUTDOOR_REGION_GROUP_DEFAULT_OPEN,
@@ -26725,6 +27014,8 @@ module.exports = {
   withFavoritesNavLink,
   withoutFavoritesNavLink,
   FAVORITES_NAV_ITEM,
+  TRIP_NAV_SNIPPET,
+  withTripNav,
   FAVORITES_NAV_STYLE,
   BROWSE_HEAD_EXTRAS,
   mapAreaPins,
