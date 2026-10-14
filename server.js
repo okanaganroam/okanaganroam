@@ -11759,6 +11759,57 @@ const DESTINATION_PHOTO_GRID_STYLE = `<style id="destination-photo-grid">
   }
   @media (prefers-reduced-motion: reduce) { body.destinations-page .destination-photo-grid .category-card, body.destinations-page .destination-photo-grid .destination-card-photo img { transition: none; transform: none !important; } }
 </style>`;
+// Destinations page (2026-10-14): one line on each place, written from its
+// own region guide, so a first-time visitor can tell them apart; the places
+// in each group run north to south, the way the valley reads; and a short
+// "Not sure where to start?" box for the usual question of where to base a trip.
+const DESTINATION_TAGLINES = Object.freeze({
+  kelowna: 'The biggest city: beaches, wineries, trails and a lively downtown.',
+  'west-kelowna': 'Across the bridge: Mount Boucherie wineries and lakeside parks.',
+  peachland: 'A small lake town with a long, walkable waterfront.',
+  'lake-country': 'Three lakes, orchards and wineries between Kelowna and Vernon.',
+  summerland: 'Orchards, a small-town downtown and wineries and cideries close by.',
+  naramata: 'A quiet village on the Naramata Bench wine route.',
+  penticton: 'A beach town between two lakes, with wine country next door.',
+  kaleden: 'A quiet spot on Skaha Lake to slow down, swim and sip.',
+  'okanagan-falls': 'The south end of Skaha Lake, ringed by respected wineries.',
+  oliver: 'The Wine Capital of Canada: hot, sunny and lined with vineyards.',
+  osoyoos: 'One of Canada’s warmest lakes, in desert country by the border.',
+  vernon: 'The North Okanagan hub: three lakes, big parks and top golf.',
+  coldstream: 'Kalamalka Lake’s turquoise water and beaches, next to Vernon.',
+  lumby: 'The gateway to Mabel Lake, Sugar Lake and the Monashees.',
+  armstrong: 'A farming town with local food and a small-town main street.',
+  enderby: 'River floats and cliff-top hikes on the Shuswap River.',
+  'big-white': 'The biggest ski resort, with a ski-in, ski-out village.',
+  silverstar: 'A colourful village resort with famous cross-country trails.',
+  apex: 'A friendly, smaller ski hill 40 minutes from Penticton.',
+  baldy: 'A small, uncrowded ski hill above Oliver and Osoyoos.',
+});
+const DESTINATION_GEO_ORDER = ['enderby', 'armstrong', 'vernon', 'coldstream', 'lumby', 'lake-country', 'kelowna', 'west-kelowna', 'peachland', 'summerland', 'naramata', 'penticton', 'kaleden', 'okanagan-falls', 'oliver', 'osoyoos', 'silverstar', 'big-white', 'apex', 'baldy'];
+const DESTINATION_STARTS = [
+  { label: 'First trip', region: 'kelowna', why: 'Beaches, wineries and downtown, all close together.' },
+  { label: 'Beaches and wine', region: 'penticton', why: 'Two lakes in town and the Naramata Bench next door.' },
+  { label: 'Lakes and golf', region: 'vernon', why: 'Kalamalka Lake, big parks and resort courses.' },
+  { label: 'Warmest water', region: 'osoyoos', why: 'Desert sun and one of Canada’s warmest lakes.' },
+  { label: 'Ski trip', region: 'big-white', why: 'Ski-in, ski-out, an hour from Kelowna.' },
+];
+const DESTINATION_PAGE_EXTRA_STYLE = `<style id="destinations-extra">
+  body.destinations-page .destination-photo-grid .destination-tagline { margin: 0 18px 6px; font-size: 0.92rem; line-height: 1.45; color: var(--ink); }
+  body.destinations-page .destination-photo-grid .venue-meta { font-size: 0.82rem; opacity: 0.75; }
+  body.destinations-page .destination-starts { margin: 4px 0 30px; padding: 18px 20px; border-radius: 16px; background: var(--paper, #fffaf2); box-shadow: 0 10px 24px -20px rgba(74,52,40,0.5); }
+  body.destinations-page .destination-starts h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.destinations-page .destination-starts ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 8px 22px; }
+  @media (min-width: 760px) { body.destinations-page .destination-starts ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1100px) { body.destinations-page .destination-starts ul { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  body.destinations-page .destination-starts li { font-size: 0.95rem; line-height: 1.45; }
+  body.destinations-page .destination-starts strong { display: block; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--teal-deep, #1F5450); }
+  body.destinations-page .destination-starts a { font-weight: 800; }
+  @media (max-width: 559px) {
+    body.destinations-page .destination-photo-grid .category-card { grid-template-rows: auto auto 1fr; }
+    body.destinations-page .destination-photo-grid .destination-card-photo { grid-row: 1 / 4; }
+    body.destinations-page .destination-photo-grid .destination-tagline { grid-column: 2; margin: 0 14px 4px; font-size: 0.86rem; }
+  }
+</style>`;
 function renderDestinationsPage(entries = destinationRegionEntries()) {
   const title = 'Okanagan Destinations | Okanagan Roam';
   const description = 'Pick an Okanagan destination, from Enderby to Osoyoos and the ski hills, and find its restaurants, wineries, beaches and events.';
@@ -11767,14 +11818,31 @@ function renderDestinationsPage(entries = destinationRegionEntries()) {
     { name: 'Home', url: 'https://okanaganroam.com/' },
     { name: 'Destinations', url: canonical },
   ]);
-  const sections = entries.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
+  const geo = (r) => { const i = DESTINATION_GEO_ORDER.indexOf(r.region); return i < 0 ? 999 : i; };
+  const ordered = entries.map((g) => ({ ...g, regions: g.regions.slice().sort((a, b) => geo(a) - geo(b)) }));
+  const listed = new Set(ordered.flatMap((g) => g.regions.map((r) => r.region)));
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Okanagan destinations',
+    itemListElement: ordered.flatMap((g) => g.regions).map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: `https://okanaganroam.com/${r.region}`, item: { '@type': 'TouristDestination', name: `${r.label}, BC`, ...(DESTINATION_TAGLINES[r.region] ? { description: DESTINATION_TAGLINES[r.region] } : {}) } })),
+  };
+  const starts = DESTINATION_STARTS.filter((x) => listed.has(x.region));
+  const startsHtml = starts.length ? `<section class="destination-starts" aria-labelledby="destinationStartsHeading">
+    <h2 id="destinationStartsHeading">Not sure where to start?</h2>
+    <ul>
+${starts.map((x) => `      <li><strong>${escapeHtml(x.label)}</strong><a href="/${x.region}">${escapeHtml(REGION_LABELS[x.region])}</a> &mdash; ${escapeHtml(x.why)}</li>`).join('\n')}
+    </ul>
+  </section>` : '';
+  const sections = ordered.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
   <ul class="card-grid destination-photo-grid">
     ${g.regions.map((r) => {
       const photo = destinationCardPhoto(r.region);
       return `
       <li class="category-card">
-        <h2><a href="/${r.region}">${escapeHtml(r.label)}</a></h2>
-        <p class="venue-meta">${r.venues} verified venue${r.venues === 1 ? '' : 's'} across ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}</p>${photo ? `
+        <h2><a href="/${r.region}">${escapeHtml(r.label)}</a></h2>${DESTINATION_TAGLINES[r.region] ? `
+        <p class="destination-tagline">${escapeHtml(DESTINATION_TAGLINES[r.region])}</p>` : ''}
+        <p class="venue-meta">${r.venues} place${r.venues === 1 ? '' : 's'} to eat, drink and explore</p>${photo ? `
         <div class="destination-card-photo${photo.map ? ' destination-card-map' : ''}"><img src="${photo.src}" alt="" width="800" height="533" loading="lazy" decoding="async"></div>` : ''}
       </li>`;
     }).join('\n')}
@@ -11782,9 +11850,10 @@ function renderDestinationsPage(entries = destinationRegionEntries()) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { shareImage: '/images/okanagan-valley-sunset-hero.webp', golfTheme: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: '/images/okanagan-valley-sunset-hero.webp', golfTheme: true })}
 ${renderOutdoorThemeStyles()}
 ${DESTINATION_PHOTO_GRID_STYLE}
+${DESTINATION_PAGE_EXTRA_STYLE}
 ${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page region-page destinations-page">
@@ -11798,6 +11867,7 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>Choose Your Okanagan Destination</h1>
   <p class="subtitle">Every destination on Okanagan Roam, from Enderby to Osoyoos and the ski resorts. Pick one to see its restaurants, wineries, beaches, outdoor places, events and more.</p>
+  ${startsHtml}
   ${sections}
   </main>
   ${renderHomeFooterHTML(true)}
@@ -28268,6 +28338,8 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  DESTINATION_TAGLINES,
+  DESTINATION_GEO_ORDER,
   regionBannerPhoto,
   regionHeading,
   regionStartVenues,
