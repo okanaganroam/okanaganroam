@@ -8,7 +8,7 @@ function t3FrenchText(value){
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';
  const phrases=[
  ['An Okanagan Roam Local Favourite','Un coup de cœur local d’Okanagan Roam'],['One of Okanagan Roam’s Hidden Gems','L’un des trésors cachés d’Okanagan Roam'],
- ['A trail with a lake view','Un sentier avec vue sur le lac'],['A fun pick for teenagers','Une activité amusante pour les ados'],['Indoor fun for kids','Du plaisir à l’intérieur pour les enfants'],['A good rainy-day pick','Un bon choix pour un jour de pluie'],['An all-vegetarian or vegan kitchen','Une cuisine entièrement végétarienne ou végane'],['A good walk with your dog','Une belle promenade avec votre chien'],['A guided food tour','Une visite gourmande guidée'],
+ ['By the lake','Au bord du lac'],['A trail with a lake view','Un sentier avec vue sur le lac'],['A fun pick for teenagers','Une activité amusante pour les ados'],['Indoor fun for kids','Du plaisir à l’intérieur pour les enfants'],['A good rainy-day pick','Un bon choix pour un jour de pluie'],['An all-vegetarian or vegan kitchen','Une cuisine entièrement végétarienne ou végane'],['A good walk with your dog','Une belle promenade avec votre chien'],['A guided food tour','Une visite gourmande guidée'],
  ['Has the Kid-Friendly badge','Possède le badge Adapté aux enfants'],
  ['A restaurant suits a date night','Un restaurant convient à une soirée en amoureux'],
  ['Indoor kinds of places come first.','Les lieux intérieurs sont proposés en priorité.'],
@@ -109,6 +109,7 @@ function t3FrenchText(value){
  text=text.replace(/^Date night: Dinner in (.+)\.$/,'Soirée en amoureux : souper à $1.');
  text=text.replace(/^If it rains: (.+) (?:are|is) indoors nearby, so swap (?:one|it) in for a beach or outdoor stop\.$/,(_,names)=>'S’il pleut : '+names.replace(/ and (?!.* and )/,' et ')+(/ and /.test(names)?' sont des options intérieures à proximité; remplacez une plage ou une sortie en plein air par l’une d’elles.':' est une option intérieure à proximité; remplacez une plage ou une sortie en plein air par celle-ci.'));
  text=text.replace(/^Okanagan Roam doesn’t list (.+) for these places, so they’re matched on the rest of your request; check with each place\.$/,(_,w)=>'Okanagan Roam n’indique pas '+w.replace(/“/g,'« ').replace(/”/g,' »').replace(/ and (?!.* and )/,' et ')+' pour ces lieux; ils correspondent au reste de votre demande. Vérifiez auprès de chaque lieu.');
+ text=text.replace(/^Doesn’t list (.+); the best match left for this time$/,(_,b)=>'N’affiche pas '+b.replace(/the (.+?) badge/g,'le badge $1').replace(/ and (?!.* and )/,' et ')+'; le meilleur choix restant pour ce moment');
  text=text.replace(/^Based in (.+), with day (\d+) as your day trip to (.+)\.$/,'Basé à $1, avec le jour $2 consacré à votre excursion à $3.');
  text=text.replace(/^Planned as a road trip from (.+) to (.+), one stretch of the valley each day\.$/,'Planifié comme un road trip de $1 à $2, une portion de la vallée chaque jour.');
  text=text.replace(/ on (\d{4}-\d{2}-\d{2})/g,' le $1');

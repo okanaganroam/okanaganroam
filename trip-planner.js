@@ -646,6 +646,7 @@ function scoreVenue(v, ctx) {
 const DISH_WORDS_RE = /^(?:pizzas?|burgers?|sushi|tacos?|ramen|pho|bbq|barbecue|steaks?|steakhouse|seafood|fish and chips|wings|poutine|noodles?|dumplings?|curry|indian|thai|mexican|italian|chinese|japanese|korean|greek|vietnamese|french|middle eastern|lebanese|sandwich(?:es)?|ice cream|gelato|donuts?|doughnuts?|crepes?|waffles?|pancakes?|pasta|tapas|dim sum|shawarma|kebabs?|fried chicken|hot dogs?)$/;
 const THINGS_TO_DO_RE = /\b(?:things? to do|something (?:fun )?to do|stuff to do|what to do|what can we do|activities|something fun|fun things|have fun)\b/;
 const TEEN_FUN_WORDS = ['escape', 'arcade', 'laser tag', 'go kart', 'go karts', 'karting', 'climbing', 'bouldering', 'trampoline', 'mini golf', 'bowling', 'zipline', 'zip line', 'axe throwing', 'paintball', 'virtual reality', 'vr', 'waterslide', 'water park', 'bike park', 'skate park'];
+const SOFT_FEATURES = ['patio', 'lake_view', 'happy_hour', 'live_music', 'great_groups', 'sports_tv', 'open_late', 'open_early'];
 const KIDS_ADULT_WORDS = ['meadery', 'cidery', 'winery', 'brewery', 'distillery', 'casino', 'lounge', 'nightclub', 'cannabis', 'tasting room'];
 const ALCOHOL_SETTING_WORDS = ['winery', 'vineyard', 'vineyards', 'brewery', 'brewpub', 'taproom', 'wine bar', 'tasting room', 'estate winery'];
 const INDOOR_VISITOR_KINDS = ['museum', 'gallery', 'theatre', 'bowling', 'arcade', 'climbing', 'escape'];
@@ -1050,6 +1051,12 @@ function allowedTypes(ctx) {
     return base;
   }
   if (lake) { focusTypes.add('beach'); focusTypes.add('outdoor'); }
+  // A dog trip can include dog-friendly patios at wineries and breweries, and dog beaches (2026-10-14: an Osoyoos dog
+  // weekend had empty afternoons and evenings).
+  if (isDogTrip(ctx)) {
+    const drinksAsked = ['winery', 'brewery', 'pub', 'cocktail', 'distillery'].some((t) => focusTypes.has(t));
+    for (const t of drinksAsked ? ['beach', 'outdoor'] : ['winery', 'brewery', 'beach', 'outdoor']) focusTypes.add(t);
+  }
   // Breweries are valid when requested, but a winery/dinner itinerary should
   // not quietly turn into a brewery crawl just because a brewery is open in
   // the afternoon. Keep only meal/lounge stops as generic companions.
@@ -1315,6 +1322,15 @@ function buildDays(facts, ctx, days, pinned) {
           if (oneHike && tripHikes >= 1 && v.type === 'outdoor' && (v.activities || []).includes('hiking')) score -= 40;
           // A family's evening is dinner, not a brewery or a show (2026-10-14).
           if (daypart === 'evening' && ctx.kids && v.type !== 'restaurant' && !vFocus.some((f) => !f.key.startsWith('food:'))) score -= 40;
+          // A trip with nothing particular asked for ("first time, show us the best") opens each day with a sight, a
+          // lookout or a favourite park rather than another coffee.
+          if (!ctx.types.size && !ctx.foodTerms.length && !ctx.activities.size && daypart === 'morning' && v.type === 'outdoor' && (v.features.lake_view || v.collections.includes('local_favorite')) && !/\blodge\b|\bcampground\b/.test(v.textName || '')) score += 18;
+          if (!ctx.types.size && !ctx.foodTerms.length && !ctx.activities.size && !ctx.kids && daypart === 'morning' && v.type === 'cafe' && dayDayparts.length >= 3) score -= 15;
+          // Ski trips: the ski hill first; a dinner tour is not a morning stop.
+          if (/\bski(?:ing|ers?)?\b/.test(ctx.queryText || ctx.requirements?.text || '') && v.type === 'outdoor') {
+            if (/\b(?:ski|mountain resort|ski hill|ski area)\b/.test(v.textName || '') && daypart === 'morning') score += 25;
+            if (/\bdinner\b/.test(v.textName || '') && daypart !== 'evening') score -= 30;
+          }
           // A day with nothing particular asked for keeps its afternoon for something to do; lunch is not a stop unless asked.
           if (!ctx.types.size && !ctx.foodTerms.length && daypart === 'afternoon' && v.type === 'restaurant' && !hasExplicitMeals && dayDayparts.includes('evening')) score -= 12;
           // Dinner, not a bar, ends the day unless bars were asked for.
@@ -1365,6 +1381,16 @@ function buildDays(facts, ctx, days, pinned) {
         }
         cands.sort(compareScored);
         chosen = cands[0] || null;
+      }
+      // A nice-to-have badge (patio, lake view, happy hour) that leaves an afternoon or evening empty is relaxed for that
+      // slot, and the stop says which badge it lacks (2026-10-14: an Osoyoos dog weekend had no second dinner).
+      const softAsked = [...new Set(ctx.features.concat((ctx.requirements?.items || []).filter((i) => i.kind === 'feature').map((i) => i.value)))].filter((f) => SOFT_FEATURES.includes(f));
+      if (!chosen && softAsked.length && ['afternoon', 'evening'].includes(daypart)) {
+        const loose = { ...ctx, features: ctx.features.filter((f) => !softAsked.includes(f)) };
+        const want = daypart === 'evening' ? ['restaurant'] : ['restaurant', 'cafe', 'winery', 'brewery'];
+        const alt = facts.filter((v) => want.includes(v.type) && (!regionList.length || regionList.includes(v.region)) && !used.has(v.id) && !reserved.has(v.id) && eligible(v, loose, false) && tripRequirements.venueAllowed(v, ctx.requirements && { ...ctx.requirements, items: ctx.requirements.items.filter((i) => !(i.kind === 'feature' && softAsked.includes(i.value))) }, d, ctx.tripDate) && slotFit(v, ctx, daypart, d - 1, daypart).ok)
+          .map((v) => ({ v, ...scoreVenue(v, loose) })).sort(compareScored)[0];
+        if (alt) chosen = { v: alt.v, score: alt.score, reasons: alt.reasons, caveats: [`Doesn’t list ${listText(softAsked.map((f) => `the ${featureLabel(ctx, f)} badge`))}; the best match left for this time`] };
       }
       if (!chosen) {
         stops.push({ daypart, label: PLAN_DAYPART_LABELS[daypart], venue: null, reasons: [], why: [], caveats: [] });
@@ -2917,6 +2943,12 @@ function planItinerary(input) {
           const penalty=Math.min(60,travel.maxMinutes*0.8);score-=penalty;
           reasons.push({code:'event_travel',text:`Estimated ${travel.mode} travel to the event: ${travel.minMinutes}–${travel.maxMinutes} minutes; shorter transfers are preferred. Confirm the route.`,weight:-penalty});
         }else score-=12;
+      }
+      if (c.lake) {
+        // On the shore (by name or description) beats a lookout with a lake view.
+        const shore = /\b(?:lakeshore|lakeside|lakefront|beach|waterfront|promenade|marina|boardwalk|okanagan lake|skaha lake|kalamalka lake|wood lake|osoyoos lake)\b/.test(`${v.textName || ''} ${v.textDesc || ''}`);
+        const w = shore ? 30 : v.features.lake_view ? 10 : 0;
+        if (w) { score += w; reasons.push({ code: 'lake', text: shore ? 'By the lake' : 'Has the Lake View badge', weight: w }); }
       }
       if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
       const dogCaveat = dogSeasonCaveat(v, c);

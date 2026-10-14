@@ -355,7 +355,8 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   // Counts ("our two kids") are party sizes, not search words.
   + 'two three four five six seven eight nine ten eleven twelve dozen '
   // Teens are read by the planner from the request itself (activities first, no bars).
-  + 'teen teens teenager teenagers tween tweens adolescents').split(/\s+/));
+  + 'teen teens teenager teenagers tween tweens adolescents '
+  + 'first ever highlights must musts favourite favorite favourites favorites').split(/\s+/));
 
 // ---------- polarity (Stage 3.1, 2026-09-29) ----------
 // A negation word that no phrase claims ("not", "no", "nothing", "without",
@@ -1808,6 +1809,13 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   for (const c of parts) delete c.daypartFromText;
   if (shortEventOuting && (!parts.some(c => c.kind === 'event') || !parts.some(c => c.kind === 'venue' && c.meal))) return { multi:false, components:[], route:null, regions:[], party:{dog:false,kids:false}, when:base.when || null, unknownPlaces:[] };
   if (shortEventOuting && parts.some(c=>['dinner','supper'].includes(c.meal)) && ['date_night','romantic'].includes(base.occasion)) out.outingOccasion = base.occasion;
+  // 2026-10-14: "a walk by the lake", "a lake walk": the lake describes the walk, it is not a word left over.
+  const lakeWords = ['lake', 'lakeside', 'lakefront', 'lakeshore', 'waterfront'];
+  const walkPart = parts.find((c) => c.kind === 'venue' && ((c.activities || []).includes('hiking') || c.types.includes('outdoor')));
+  if (walkPart && (out.leftoverTerms || []).some((w) => lakeWords.includes(w))) {
+    walkPart.lake = true;
+    out.leftoverTerms = out.leftoverTerms.filter((w) => !lakeWords.includes(w));
+  }
   // 2026-10-14: a "brewery crawl", "pub crawl" or "wine hop" is three stops of that kind in a row, not a list.
   const CRAWL_TYPES = ['brewery', 'pub', 'winery', 'cocktail', 'distillery'];
   if (parts.length === 1 && parts[0].kind === 'venue' && !parts[0].meal && parts[0].types.length && parts[0].types.every((ty) => CRAWL_TYPES.includes(ty))
