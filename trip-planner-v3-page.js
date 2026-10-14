@@ -411,7 +411,8 @@ function renderStyles() {
   .t3-dh-frame { position: absolute; inset: 0; background: #E8E3D3; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(245,243,237,0.12); }
   .t3-dh-frame img { position: absolute; left: 50%; top: 50%; width: var(--dw); height: var(--dh); max-width: none; transform: translate(-50%, -50%); display: block; filter: none; }
   /* The destination is a hollow ring so the map's own town label stays readable underneath it. */
-  .t3-dh-ring { position: absolute; left: calc(50% + var(--ddx)); top: calc(50% + var(--ddy)); width: 20px; height: 20px; margin: -10px 0 0 -10px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid var(--ref-gold, #C9A227); box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8), inset 0 0 0 1.5px rgba(255,255,255,0.55); }
+  /* A small gold pin just above the town's name, so the name stays readable (2026-10-14: the ring sat over the label). */
+  .t3-dh-ring { position: absolute; left: calc(50% + var(--ddx)); top: calc(50% + var(--ddy)); width: 12px; height: 12px; margin: -24px 0 0 -6px; box-sizing: border-box; border-radius: 50%; background: var(--ref-gold, #C9A227); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(16,27,36,0.45); }
   .t3-dh-attr { position: absolute; right: 0; bottom: 0; z-index: 800; padding: 1px 6px; font-size: 0.66rem; line-height: 1.5; color: rgba(27,43,58,0.78); background: rgba(245,243,237,0.88); text-decoration: none; border-top-left-radius: 6px; }
   .t3-dh-attr a { color: inherit; text-decoration: none; }
   .t3-dh-attr a:hover, .t3-dh-attr a:focus-visible { text-decoration: underline; }
@@ -464,6 +465,28 @@ function renderStyles() {
   .t3-address { margin: 0 0 6px; font-size: 0.84rem; color: rgba(27,43,58,0.72); }
   .t3-facts { margin: 0 0 8px; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
   .t3-star { color: var(--ref-gold); }
+  .t3-nowrap { white-space: nowrap; }
+  .t3-checks { margin: 0 0 12px; font-size: 0.86rem; color: rgba(27,43,58,0.78); }
+  .t3-checks > summary { cursor: pointer; font-weight: 800; color: var(--teal-deep, #1E4F4C); min-height: 32px; display: flex; align-items: center; }
+  .t3-checks details { margin: 4px 0 0 4px; }
+  /* Dates and trip map: two matching pill buttons; an opened one becomes a card. */
+  .t3-tools .t3-map { background: none; box-shadow: none; padding: 0; min-height: 0; }
+  .t3-tools .t3-sched { background: none; border: none; box-shadow: none; min-height: 0; }
+  .t3-tools .t3-sched > summary { background: #fff; border: 1px solid rgba(27,43,58,0.2); border-radius: 999px; min-height: 44px; padding: 6px 16px; justify-content: center; }
+  .t3-tools .t3-sched > summary h3 { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); }
+  .t3-tools .t3-sched[open] { background: #fff; border: 1px solid rgba(27,43,58,0.08); border-radius: 14px; }
+  .t3-tools .t3-sched[open] > summary { border: none; justify-content: flex-start; }
+  /* Both tools stretch to the same height, so they match even when a label wraps (French). */
+  .t3-tools { align-items: stretch; }
+  .t3-tools > .t3-map-slot, .t3-tools .t3-map, .t3-tools .t3-map-bar { height: 100%; box-sizing: border-box; }
+  .t3-tools .t3-sched:not([open]) > summary, .t3-tools .t3-map-toggle { height: 100%; min-height: 44px; box-sizing: border-box; line-height: 1.2; text-align: center; }
+  .t3-tools .t3-map-bar { align-items: stretch; }
+  .t3-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; margin: 0 0 14px; }
+  .t3-tools > * { margin: 0; }
+  .t3-tools > .t3-sched, .t3-tools > .t3-map-slot { flex: 0 0 auto; }
+  .t3-tools > .t3-sched[open], .t3-tools > .t3-map-slot:has(.t3-map-panel:not([hidden])) { flex-basis: 100%; }
+  .t3-tools .t3-map { margin: 0; padding: 6px 8px; min-height: 56px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+  .t3-sched { background: #fff; border: 1px solid rgba(27,43,58,0.08); border-radius: 14px; box-shadow: 0 10px 22px -18px rgba(27,43,58,0.45); color: var(--ref-navy); font-size: 0.9rem; min-height: 56px; box-sizing: border-box; }
   .t3-sched { padding: 0; }
   .t3-sched > summary { list-style: none; cursor: pointer; padding: 12px 16px; min-height: 44px; display: flex; align-items: center; gap: 8px; }
   .t3-sched > summary::-webkit-details-marker { display: none; }
@@ -508,6 +531,20 @@ function renderStyles() {
     .t3-grid > .t3-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; margin-bottom: 14px; align-content: start; }
     .t3-grid > .t3-card .t3-actions { margin-top: 0; align-self: end; }
   }
+  /* Stop photos (2026-10-14). Plan stops: a photo column on the left on wider screens, a small thumbnail on phones.
+     Recommendation grids: a short banner across the top of the card. */
+  .t3-card-photo { position: relative; overflow: hidden; background: #E8E3D3; }
+  .t3-card-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .t3-photo-tag { position: absolute; left: 6px; bottom: 6px; padding: 1px 6px; border-radius: 6px; background: rgba(16,27,36,0.55); color: #fff; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; opacity: 0.85; }
+  .t3-stops .t3-card.has-photo { position: relative; padding-left: calc(200px + 20px); min-height: 172px; overflow: hidden; }
+  .t3-stops .t3-card.has-photo .t3-card-photo { position: absolute; left: 0; top: 0; bottom: 0; width: 200px; }
+  .t3-grid > .t3-card.has-photo .t3-card-photo { margin: -16px -18px 12px; height: 132px; border-radius: 14px 14px 0 0; }
+  @media (max-width: 720px) {
+    .t3-stops .t3-card.has-photo { padding-left: 18px; min-height: 0; }
+    .t3-stops .t3-card.has-photo .t3-card-photo { position: relative; float: right; width: 84px; height: 84px; margin: 0 0 6px 12px; border-radius: 12px; }
+    .t3-stops .t3-card.has-photo .t3-photo-tag { display: none; }
+    .t3-stops .t3-card.has-photo .t3-card-tags, .t3-stops .t3-card.has-photo .t3-card-body, .t3-stops .t3-card.has-photo .t3-actions { clear: both; }
+  }
   .t3-seeall { display: inline-block; margin-top: 18px; font-weight: 800; color: var(--ref-navy); }
 
   /* Whole-trip map (Stage 5G): collapsed until opened. The canvas is its own
@@ -535,6 +572,14 @@ function renderStyles() {
     .t3-how-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
+    /* Phone: dates and the trip map sit side by side until one is opened. */
+    .t3-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .t3-tools > .t3-sched[open], .t3-tools > .t3-map-slot:has(.t3-map-panel:not([hidden])) { grid-column: 1 / -1; }
+    .t3-tools > .t3-map-slot:only-child, .t3-tools > .t3-sched:only-child { grid-column: 1 / -1; }
+    .t3-sched > summary { padding: 8px 12px; min-height: 52px; }
+    .t3-sched > summary h3 { font-size: 0.84rem; line-height: 1.2; }
+    .t3-tools .t3-map { min-height: 52px; padding: 4px; }
+    .t3-tools .t3-map-toggle { width: 100%; min-height: 44px; justify-content: center; font-size: 0.84rem; }
     /* Phone: a stop's four actions sit on one row (2026-10-14). */
     .t3-plan .t3-actions { display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 6px; }
     .t3-plan .t3-actions > button, .t3-plan .t3-actions > a, .t3-plan .t3-actions .t3-more > summary { justify-content: center; text-align: center; padding: 6px 4px; font-size: 0.78rem; line-height: 1.15; width: 100%; box-sizing: border-box; }
@@ -985,6 +1030,22 @@ function renderScript(d) {
   var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', evening: 'Evening' };
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
   function whenLabel(s){ return DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; }
+  // Stop photos: each card in a plan gets a different photo where we have more than one for that kind of place, and a
+  // dog trip uses the dog photos first (2026-10-14: two restaurants showed the same photo).
+  var STOP_PHOTO_ALTS = { restaurant: ['restaurant', 'restaurant-2', 'restaurant-3'], winery: ['winery', 'winery-2', 'winery-3'], hiking: ['hiking', 'hiking-2', 'hiking-3'], beach: ['beach', 'beach-2', 'outdoor-2'], outdoor: ['outdoor', 'outdoor-2', 'viewpoints'], cocktail: ['cocktail', 'cocktail-2'], 'tour-farm': ['tour-farm', 'tour'], viewpoints: ['viewpoints', 'outdoor-2'], cafe: ['cafe', 'restaurant-3'] };
+  var STOP_PHOTO_DOG = { restaurant: 'dog-restaurant', 'restaurant-2': 'dog-restaurant', cafe: 'dog-cafe', brewery: 'dog-brewery', winery: 'dog-winery', pub: 'dog-pub', cocktail: 'dog-cocktail', distillery: 'dog-distillery', beach: 'dog-outdoor', outdoor: 'dog-outdoor', hiking: 'dog-outdoor' };
+  var renderedPhotos = {};
+  function stopPhotoUrl(v){
+    var url = safeUrl(v.photo);
+    var prefix = '/images/trip-v3/stops/stop-', suffix = '-480.jpg';
+    if (!url || url.indexOf(prefix) !== 0 || url.slice(-suffix.length) !== suffix) return url;
+    var key = url.slice(prefix.length, -suffix.length);
+    var dog = /dog/.test(((state.last && state.last.understood && state.last.understood.party) || []).join(' '));
+    var options = (dog && STOP_PHOTO_DOG[key] ? [STOP_PHOTO_DOG[key]] : []).concat(STOP_PHOTO_ALTS[key] || [key]);
+    var pick = options.filter(function(k){ return !renderedPhotos[k]; })[0] || options[0];
+    renderedPhotos[pick] = true;
+    return '/images/trip-v3/stops/stop-' + pick + '-480.jpg';
+  }
   function badgesHtml(v){
     // The badges that answer the request come first: the party's (dog, kids), then Okanagan Roam's own lists.
     var party = ((state.last && state.last.understood && state.last.understood.party) || []).join(' ');
@@ -1014,11 +1075,14 @@ function renderScript(d) {
     // A dated plan's timing ("Provisional visit 09:00–10:00 ...") is already in the timeline and the Before you go list.
     var cav = (stop.caveats || []).filter(function(c){ return !/No usable hours listed|Aucun horaire utilisable|No map location on file|emplacement.*carte|^Provisional visit|^Visite provisoire/i.test(c); }).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
     var same = counts[v.name] > 1;
-    var html = '<article class="t3-card' + (kept ? ' is-kept' : '') + '"' + cardAnchor + ' data-venue-id="' + esc(v.id) + '">'
+    // A photo of the kind of place (beach, winery, café...), shown as an example, never as the venue's own photo.
+    var photoUrl = stopPhotoUrl(v);
+    var photoHtml = photoUrl ? '<div class="t3-card-photo"><img src="' + esc(photoUrl) + '" alt="" width="480" height="320" loading="lazy" decoding="async"><span class="t3-photo-tag">' + esc(lang() === 'fr' ? 'Photo d’exemple' : 'Example photo') + '</span></div>' : '';
+    var html = '<article class="t3-card' + (kept ? ' is-kept' : '') + (photoUrl ? ' has-photo' : '') + '"' + cardAnchor + ' data-venue-id="' + esc(v.id) + '">'
       // Four groups (head / tags / body / actions) so that cards in the same
       // grid row can share row tracks (see .t3-grid) and line up. Each group
       // is always present, empty or not.
-      + '<div class="t3-card-head">'
+      + '<div class="t3-card-head">' + photoHtml
       + '<div class="t3-card-top"><span>' + esc(frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a href="' + esc(url) + '">' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
@@ -1026,7 +1090,7 @@ function renderScript(d) {
       + '</div>'
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
-      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + ' <span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></p>' : '')
+      + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (/venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
       + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
@@ -1077,7 +1141,8 @@ function renderScript(d) {
     else if (u.when) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(u.when) + '</li>');
     if (u.occasion) chips.push('<li class="t3-chip">' + esc(frLabel(OCCASION_KEYS[u.occasion], u.occasion.charAt(0).toUpperCase() + u.occasion.slice(1))) + '</li>');
     (u.party || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(frLabel(PARTY_KEYS[x], x.charAt(0).toUpperCase() + x.slice(1))) + '</li>'); });
-    (u.interests || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(x.charAt(0).toUpperCase() + x.slice(1)) + '</li>'); });
+    // A word the visitor typed (“pizza”) shows as a plain chip, “Pizza”, like the others.
+    (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«]\s*|\s*[”"»]$/g, ''); chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
     (u.themes || []).forEach(function(x){ chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.oneDay')) + '</span>' + esc(x) + '</li>'); });
     var notUsed = (u.notUsed || []).length ? '<p class="t3-notused">' + esc(tx('tripv3.notUsed', { list: '\u0001' })).split('\u0001').join(u.notUsed.map(function(w){ return (lang() === 'fr' ? '«\u00a0' : '“') + esc(w) + (lang() === 'fr' ? '\u00a0»' : '”'); }).join(', ')) + '</p>' : '';
     return '<div class="t3-understood"><p class="t3-eyebrow">' + esc(tx('tripv3.understood')) + '</p><ul class="t3-chips">' + chips.join('') + '</ul>' + notUsed + '</div>';
@@ -1175,7 +1240,9 @@ function renderScript(d) {
     var imgHtml = img ? '<img class="t3-day-img" src="' + esc(img.src) + '"' + (img.srcset ? ' srcset="' + esc(img.srcset) + '" sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1180px) calc(100vw - 64px), 1116px"' : '') + ' alt="" loading="lazy" decoding="async">' : '';
     var dayStops = d.stops.filter(function(s){ return s.venue && !state.removed[d.day + '-' + s.daypart]; });
     var maps = t3MapsUrl(dayStops.map(function(s){ return tripQuery(s.venue); }));
-    var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
+    // The town map shows on the first day in that town; a later day there shows the town's photo instead of the same map again.
+    var firstInRegion = !img || !days().some(function(x){ return x.region === d.region && x.day < d.day; });
+    var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets && firstInRegion ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
       + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
@@ -1205,6 +1272,16 @@ function renderScript(d) {
     if(repeated.length)html+='<details class="t3-warnings"><summary>'+(lang()==='fr'?'Détails horaires déjà indiqués avec vos arrêts':'Timing details already shown with your stops')+' ('+repeated.length+')</summary>'+list(repeated)+'</details>';
     return html;
   }
+  // When every request matched, the check is good news, not a warning: one quiet line that opens to the details.
+  function requirementSummaryBlock(p){
+    var html = requirementSummaryHtml(p);
+    var checks = p.requirementResults || [];
+    if (!html || !checks.every(function(i){ return i.status === 'satisfied'; })) return html;
+    var fr = lang() === 'fr';
+    var h3End = html.indexOf('</' + 'h3>');
+    var inner = html.slice(h3End + 5, html.length - ('</' + 'section>').length);
+    return '<details class="t3-checks"><summary>' + esc(fr ? '✓ Vos ' + checks.length + ' demandes correspondent à des fiches' : '✓ All ' + checks.length + ' of your requests matched a listing') + '</summary>' + inner + '</details>';
+  }
   function requirementSummaryHtml(p){
     var checks = p.requirementResults || [];
     if (!checks.length) return '';
@@ -1228,6 +1305,7 @@ function renderScript(d) {
   function render(focus){
     var p = lang()==='fr' ? t3FrenchPlan(state.last) : state.last;
     renderedVenueCardAnchors = {};
+    renderedPhotos = {};
     var counts = nameCounts();
     var planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';
     var hasStops = planKinds || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary && (p.itinerary.stops || []).length);
@@ -1284,12 +1362,13 @@ function renderScript(d) {
         return '<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+time)+'</strong><br>'+esc(row.notScheduledMeal?(french?'Souper non planifié':'Dinner not scheduled'):row.name)+(detail.length?'<br><small>'+esc(detail.join(' · '))+'</small>':'')+'</li>';
       }).join('')+'</ol></section>';
     }
+    var schedHtml='';
     if(['itinerary','outing','multi_day','day_plan'].indexOf(p.kind)!==-1){
       var timingFr=lang()==='fr',selectedDate=state.overrides.startDate||(p.schedule||[])[0]?.date||'',selectedMinutes=state.overrides.startMinutes;
       var timeValue=selectedMinutes!==undefined?String(Math.floor(selectedMinutes/60)).padStart(2,'0')+':'+String(selectedMinutes%60).padStart(2,'0'):'';
       // Closed until a date or time is set, so the plan's stops come first on a phone (2026-10-14).
       var schedOpen=!!(state.overrides.startDate||selectedMinutes!==undefined);
-      html+='<details class="t3-warnings t3-sched"'+(schedOpen?' open':'')+' aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><summary><h3>'+(timingFr?'Choisir les dates et l’heure de départ':'Set your dates & start time')+'</h3></summary><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale de l’Okanagan. Les événements conservent leurs heures indiquées.':'Okanagan local time. Events keep their listed times.')+'</p></details>';
+      schedHtml='<details class="t3-sched"'+(schedOpen?' open':'')+' aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><summary><h3>'+(timingFr?'Dates et heure de départ':'Dates & start time')+'</h3></summary><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale de l’Okanagan. Les événements conservent leurs heures indiquées.':'Okanagan local time. Events keep their listed times.')+'</p></details>';
     }
     if(p.shortWalkRepairs && !Object.keys(state.removed).length){
       var swFr=lang()==='fr';
@@ -1325,7 +1404,7 @@ function renderScript(d) {
         return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
       }).join('')+'</ul></section>';
     }
-    html += requirementSummaryHtml(p);
+    html += requirementSummaryBlock(p);
     if(p.sparseRecovery){
       var sr=p.sparseRecovery, srFr=lang()==='fr';
       html+='<section class="t3-warnings" aria-label="'+(srFr?'Options pour les journées libres':'Options for activity gaps')+'"><h3>'+(srFr?'Adapter ce voyage':'Make this trip fit')+'</h3><p>'+(srFr?'Certaines journées n’ont aucune autre activité correspondante. Choisissez une option; votre plan ne change pas automatiquement.':'Some days have no additional matching activity. Choose an option; your plan stays unchanged until you do.')+'</p>';
@@ -1335,14 +1414,17 @@ function renderScript(d) {
     }
     html += t3ListingGapSummaryHtml(p,lang()==='fr',esc);
     html += warningSummaryHtml(p);
+    // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
-      html += '<div class="t3-map-slot" data-t3-map-slot></div>';
+      html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
       if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a href="#t3-day-' + d.day + '">' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
       html += (p.days || []).map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
+      html += schedHtml ? '<div class="t3-tools">' + schedHtml + '</div>' : '';
       html += '<h3 class="t3-section-title">' + esc(tx('tripv3.yourOuting')) + '</h3>' + stopsListHtml(p.outing.stops, function(s){ return null; }, counts);
       if ((p.outing.alternates || []).length) html += '<h3 class="t3-section-title">' + esc(tx('tripv3.otherOptions')) + '</h3><div class="t3-grid">' + p.outing.alternates.map(function(a){ return cardHtml(a, null, { counts: {} }); }).join('') + '</div>';
     } else if (p.kind === 'itinerary' && p.itinerary) {
+      html += schedHtml ? '<div class="t3-tools">' + schedHtml + '</div>' : '';
       var it = p.itinerary;
       html += '<h3 class="t3-section-title">' + esc(tx('tripv3.yourItinerary')) + '</h3>';
       if (it.route && it.route.regions && it.route.regions.length > 1) html += '<p class="t3-hours">' + it.route.regions.map(function(r){ return esc(r.label); }).join(' → ') + '</p>';
@@ -1681,6 +1763,8 @@ function renderScript(d) {
     var arrival = 'link';
     try { var nav = performance.getEntriesByType('navigation')[0]; if (nav && (nav.type === 'reload' || nav.type === 'back_forward')) arrival = 'restore'; } catch (e) {}
     input.value = restored.text;
+    // A shared link to a French request opens in French too (a reload keeps whatever language was chosen).
+    if (arrival !== 'restore' && lang() !== 'fr' && !document.documentElement.getAttribute('data-page-lang') && t3LooksFrench(restored.text) && typeof setLanguage === 'function') setLanguage('fr');
     state = { text: restored.text, seed: restored.seed, overrides: restored.overrides, locks: restored.locks, exclude: restored.exclude, removed: {}, last: null, lastReq: null };
     track('trip_plan_start', { input_method: arrival });
     if (restored.invalid) track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
