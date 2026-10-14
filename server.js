@@ -11407,6 +11407,15 @@ const REGION_PAGE_STYLE = `<style id="region-page">
   body.region-page .region-photo-grid .category-card:focus-within { outline: 2px solid var(--teal-deep); outline-offset: 2px; }
   body.region-page .region-photo-grid .venue-meta { margin: 0 12px; font-size: 0.82rem; }
   body.region-page .region-more { margin: 24px 0 8px; font-weight: 700; }
+  /* Wide screens (2026-10-14): the guide on the left, Places to start beside
+     it in two columns, instead of the guide alone in the left half. */
+  @media (min-width: 1100px) {
+    body.region-page .region-lead-split { display: grid; grid-template-columns: minmax(0, 64ch) minmax(0, 1fr); gap: 40px; align-items: start; }
+    body.region-page .region-lead-split .region-start { margin-top: 2px; position: sticky; top: 96px; }
+    body.region-page .region-lead-split .region-start .category-subsection-heading { margin-top: 0; }
+    body.region-page .region-lead-split .region-start .region-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 0; }
+    body.region-page .region-lead-split .region-intro { max-width: none; }
+  }
 </style>`;
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
@@ -11436,7 +11445,9 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
   ]);
 
   const categories = destinationCategories(region, categoryCounts);
-  const placeCount = categories.filter((c) => c.type).reduce((a, c) => a + c.count, 0);
+  // Distinct places: a sports_also brewery is one place, though it shows
+  // under both Breweries and Sports.
+  const placeCount = totalVenues;
   const categorySections = regionCategoryGridHtml(region, categories);
   const startHtml = regionPlacesToStartHtml(region);
   // H1 Step 2 (2026-09-22): a short "Upcoming events in {Region}" block, built
@@ -11498,7 +11509,11 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(regionBannerHtml(region), `<h1>${escapeHtml(regionHeading(region))}</h1>
   <p class="subtitle">${placeCount} place${placeCount === 1 ? '' : 's'} to eat, drink and explore in ${escapeHtml(regionLabel)}</p>`)}
   ${regionCategoryTabsHtml(region, categoryCounts, null, categories.filter((c) => c.href))}
-  ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}${startHtml}
+  <div class="region-lead${intro && startHtml ? ' region-lead-split' : ''}">
+  <div class="region-lead-text">
+  ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}</div>
+  ${startHtml}
+  </div>
   ${categorySections}
   ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
   <p class="region-more"><a href="/destinations">See all Okanagan destinations &rarr;</a></p>
