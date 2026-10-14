@@ -1,0 +1,1526 @@
+{
+ "note": "2026-10-14: Indoor & Rainy Day write-ups with researched practical details (price or free / by donation, booking or drop-in, age rules, session length, accessibility, parking), each from an official source listed in \"sources\"; corrections where the official source differed. English and French.",
+ "count": 115,
+ "venues": [
+  {
+   "id": 39,
+   "region": "kelowna",
+   "slug": "bna-brewing-kelowna",
+   "name": "BNA Brewing Kelowna",
+   "before_sha1": "1d9d2ebead10c024c9f2891c705a066f857c9290",
+   "before_fr_sha1": "d3ba83d5a45f7c39e99ac4fdd45e1bcfe7fe7338",
+   "description": "BNA Kelowna packs a proper brewery, a six-lane bowling alley and a cocktail bar that's no afterthought into one building, suited to a first date, a birthday or a low-key Tuesday. Lanes hold up to six bowlers and cost about $45 an hour Sunday to Thursday or $55 Friday and Saturday; book up to two months ahead, tables separately. Shoes rent for $5 (bring socks), and minors can bowl until 10 p.m. Staff are practised at vegan and gluten-free orders. Bowl, order a flight, then stay for cocktails.",
+   "description_fr": "BNA Kelowna réunit sous un même toit une vraie microbrasserie, une salle de quilles de six allées et un bar à cocktails qui n'a rien d'accessoire : parfait pour un premier rendez-vous, une fête d'anniversaire ou un mardi tranquille. Chaque allée accueille jusqu'à six joueurs et coûte environ 45 $ l'heure du dimanche au jeudi ou 55 $ le vendredi et le samedi; on réserve jusqu'à deux mois d'avance, et la table se réserve à part. La location de souliers coûte 5 $ (apportez des bas), et les mineurs peuvent jouer jusqu'à 22 h. Le personnel a l'habitude des commandes véganes et sans gluten. Jouez une partie, commandez une planche de dégustation, puis restez pour les cocktails.",
+   "sources": [
+    "https://www.bnabrewing.com/bna-bowl"
+   ]
+  },
+  {
+   "id": 40,
+   "region": "vernon",
+   "slug": "bna-brewing-vernon-40",
+   "name": "BNA Brewing Vernon",
+   "before_sha1": "4ae19e527049a4336d20f2d5b3b7197712db19be",
+   "before_fr_sha1": "4204d98c24d4515b1d9370def0a195eac47f02a3",
+   "description": "BNA Vernon is the brewpub locals mention when they describe the town to out-of-towners. Four 10-pin lanes, three duckpin lanes and arcade games sit right alongside the beer list, so it suits a family night or a Friday with friends, with an easy, buzzing energy. Lanes hold up to six and start around $35 an hour for duckpin or $45 for 10-pin; book lanes and tables separately. Kids bowl with an adult until 10 p.m. Bowl a round, order a flight and let the kids loose on the arcade.",
+   "description_fr": "BNA Vernon, c'est le pub-brasserie dont les gens du coin parlent quand ils décrivent leur ville aux visiteurs. Quatre allées de quilles à dix quilles, trois allées de petites quilles (duckpin) et des jeux d'arcade côtoient la carte des bières : l'endroit convient aussi bien à une soirée en famille qu'à un vendredi entre amis, dans une ambiance animée et détendue. Chaque allée accueille jusqu'à six joueurs, à partir d'environ 35 $ l'heure pour les petites quilles ou 45 $ pour les dix quilles; les allées et les tables se réservent séparément. Les enfants jouent avec un adulte jusqu'à 22 h. Jouez une partie, commandez une planche de dégustation et laissez les enfants s'amuser à l'arcade.",
+   "sources": [
+    "https://www.bnabrewing.com/bna-bowl-vernon"
+   ]
+  },
+  {
+   "id": 67,
+   "region": "kelowna",
+   "slug": "bernie-s-supper-club-cinema",
+   "name": "Bernie's Supper Club & Cinema",
+   "before_sha1": "bf3ebbbc40dea21030477a5f584307e578c4f39b",
+   "before_fr_sha1": "0464ba8dc1817736c7cf934e1bdf3a07e8ed18ff",
+   "description": "Bernie's Supper Club & Cinema is a speakeasy-style supper club with an oyster bar and an upstairs theatre for a post-dinner show, one of Kelowna's most complete nights out. New films arrive every month, from cult classics to fan favourites, with tickets about $10.99, or $8.99 on Toonie Tuesday, and full food service in the theatre. Book cinema tickets and your table separately; under-19s are welcome until 10 p.m., subject to film ratings. Even the mocktails are good. Start with oysters and let date night or a celebration unfold.",
+   "description_fr": "Bernie's Supper Club & Cinema est un club-souper à l'allure de bar clandestin, avec un bar à huîtres et une salle de cinéma à l'étage pour un film après le repas : l'une des sorties les plus complètes de Kelowna. De nouveaux films arrivent chaque mois, des classiques cultes aux grands favoris, avec des billets à environ 10,99 $, ou 8,99 $ le mardi « Toonie », et un service complet en salle pendant la projection. Les billets de cinéma et la table se réservent séparément; les moins de 19 ans sont les bienvenus jusqu'à 22 h, selon le classement du film. Même la carte de mocktails est réussie. Commencez par les huîtres et laissez le rendez-vous galant ou la célébration suivre son cours.",
+   "sources": [
+    "https://bernieskelowna.com/",
+    "https://bernieskelowna.com/experience/"
+   ]
+  },
+  {
+   "id": 200,
+   "region": "vernon",
+   "slug": "elodie-s-playhouse-cafe",
+   "name": "Elodie's Playhouse Cafe",
+   "before_sha1": "4d56971f6e40c45b9d8ebbead6ef499901f6a15b",
+   "before_fr_sha1": "0983b38277bd3868e84347aa58def0939745fc01",
+   "description": "Elodie's Playhouse Cafe in Vernon is built entirely around families, with four little playhouses, toys and open play for kids up to age five, plus a playroom for birthday parties. Drop in any day or book ahead; play is $16 for the first child and $14 for each sibling, with two adults free per paid child. It's socks on, shoes off, grown-ups too. The coffee bar pours real espresso and lattes, so parents can enjoy a proper cup while the kids play, and parking out front is free.",
+   "description_fr": "Elodie's Playhouse Cafe, à Vernon, est entièrement pensé pour les familles, avec quatre petites maisonnettes, des jouets et du jeu libre pour les enfants jusqu'à cinq ans, ainsi qu'une salle de jeu pour les fêtes d'anniversaire. On passe n'importe quel jour ou on réserve à l'avance; l'entrée coûte 16 $ pour le premier enfant et 14 $ pour chaque frère ou sœur, et deux adultes entrent gratuitement par enfant payant. Ici, on garde ses bas et on enlève ses souliers, adultes compris. Le comptoir à café sert de vrais espressos et lattés, pour que les parents savourent un bon café pendant que les enfants jouent, et le stationnement devant est gratuit.",
+   "sources": [
+    "https://elodiesplayhouse.ca/",
+    "https://elodiesplayhouse.ca/contact",
+    "https://elodiesplayhouse.ca/menu",
+    "https://elodiesplayhouse.ca/open-play",
+    "https://elodiesplayhouse.ca/pricing"
+   ]
+  },
+  {
+   "id": 669,
+   "region": "vernon",
+   "slug": "the-boarding-house-cafe",
+   "name": "The Boarding House Cafe",
+   "before_sha1": "51780ac866a053bf59bdb4b5743e8ad57904debf",
+   "before_fr_sha1": "e45f4d72a69f18c7ec675441af878e1f45cf8646",
+   "description": "The Boarding House Cafe is a well-loved, family-friendly board game cafe in Vernon, with more than 300 games to play in-house, from classics and party favourites to modern strategy, plus games you can buy. Order a hot chocolate or a specialty coffee, add something from the bakery case or a plate of Korean comfort food, pick a game and settle into the cozy space for a proper game night.",
+   "description_fr": "The Boarding House Cafe est un café de jeux de société familial et très apprécié de Vernon, avec plus de 300 jeux à essayer sur place, des classiques aux jeux de stratégie modernes en passant par les jeux d'ambiance, et d'autres à acheter. Commandez un chocolat chaud ou un café de spécialité, ajoutez une gâterie du comptoir de pâtisseries ou une assiette coréenne réconfortante, choisissez un jeu et installez-vous dans cet espace douillet pour une vraie soirée de jeux.",
+   "sources": [
+    "https://boardinghousecafe.ca/"
+   ]
+  },
+  {
+   "id": 697,
+   "region": "vernon",
+   "slug": "the-kal",
+   "name": "The Kal",
+   "before_sha1": "21046a4462d50714aa626cf0d8a80f9c2508afd9",
+   "before_fr_sha1": "69018dc25627ce35b10dcce484694a30e9011e87",
+   "description": "The Kal serves burgers, pizza and wings inside Vernon's historic Kalamalka Hotel, shows NFL football all season long, and does online orders for pickup. A video arcade with new and classic games is attached and stays open into the evening, so challenge someone to a game after you eat, or book the place for a celebration.",
+   "description_fr": "The Kal sert burgers, pizzas et ailes dans l'historique Kalamalka Hotel de Vernon, diffuse le football de la NFL toute la saison et prend les commandes en ligne pour emporter. Une salle d'arcade attenante, avec des jeux récents et classiques, reste ouverte jusqu'en soirée : défiez quelqu'un à une partie après le repas, ou réservez l'endroit pour une fête.",
+   "sources": [
+    "https://www.thekal.ca/"
+   ]
+  },
+  {
+   "id": 742,
+   "region": "kelowna",
+   "slug": "twice-the-dice-board-game-cafe-and-bar",
+   "name": "Twice The Dice Board Game Cafe and bar",
+   "before_sha1": "211d699f853fc2f69157b6839bb43cd3a388c91a",
+   "before_fr_sha1": "86a48b6e0bb040fd7115c3ee62d717d2e3e52f90",
+   "description": "Twice The Dice is a cozy Kelowna board game cafe and bar, its walls lined floor to ceiling with jigsaw puzzles and more than 1,000 games to choose from. Play costs $7 for adults and $4 for kids 5 to 12, free under five; walk in or reserve a table online, and Tuesday after 6 p.m. is open game night. The surprise is the Hyderabadi biryani, which reviewers say is worth the drive from Enderby, so order it between games, then try a boozy milkshake.",
+   "description_fr": "Twice The Dice est un café-bar de jeux de société douillet de Kelowna, aux murs couverts de casse-tête du plancher au plafond, avec plus de 1 000 jeux au choix. Jouer coûte 7 $ pour les adultes et 4 $ pour les enfants de 5 à 12 ans, gratuit pour les moins de cinq ans; présentez-vous sans réservation ou réservez une table en ligne, et le mardi dès 18 h, c'est la soirée de jeux ouverte à tous. La surprise, c'est le biryani d'Hyderabad, qui vaut le trajet depuis Enderby selon les critiques : commandez-en un entre deux parties, puis essayez un lait frappé alcoolisé.",
+   "sources": [
+    "https://twicethedice.com/"
+   ]
+  },
+  {
+   "id": 981,
+   "region": "penticton",
+   "slug": "cue-s-game-room",
+   "name": "Cue's Game Room",
+   "before_sha1": "fd8fe4cb5a1a618d25dc403869c81b92483b16de",
+   "before_fr_sha1": "e67593000203ec967c2368f0bdae7e24e73f7421",
+   "description": "Cue's Game Room is a billiards hall and sports bar on Main Street in Penticton, known for some of the best-maintained pool tables in Western Canada: twelve 7-foot and two 9-foot Diamond tables plus a Star snooker table, at about $20 an hour, pro-rated to the minute. Book ahead; groups of any size are welcome. Five tables sit in an alcohol-free family area, and minors can join a parent in the 19+ section until 9 p.m. Expect darts and board games; well-behaved dogs are welcome on the patio.",
+   "description_fr": "Cue's Game Room est une salle de billard et un bar sportif de la rue Main à Penticton, réputé pour certaines des tables de billard les mieux entretenues de l'Ouest canadien : douze tables Diamond de 7 pieds et deux de 9 pieds, plus une table de snooker Star, à environ 20 $ l'heure, calculé à la minute. Il est fortement recommandé de réserver, et les groupes de toutes tailles sont les bienvenus. Cinq tables se trouvent dans une zone familiale sans alcool, et les mineurs peuvent accompagner un parent dans la section 19 ans et plus jusqu'à 21 h. Il y a des jeux de fléchettes et des jeux de société, et les chiens bien élevés sont les bienvenus sur la terrasse.",
+   "sources": [
+    "https://cuesgameroom.ca/"
+   ]
+  },
+  {
+   "id": 989,
+   "region": "penticton",
+   "slug": "bna-brewing",
+   "name": "BNA Brewing",
+   "before_sha1": "757c0e3a82cea7de7f0d21aa76ea8cffbc7b403e",
+   "before_fr_sha1": "e0982df6b2af1ef6fdb66f620ac63c6e8bd51ca4",
+   "description": "BNA Brewing in Penticton is a fun, laid-back hangout with four 10-pin bowling lanes, arcade games and pinball alongside food and cocktails. Lanes hold up to six players and cost about $45 an hour Sunday to Thursday or $55 on Fridays and Saturdays; book up to two months ahead and reserve dinner separately. Shoes rent for $5, and minors can bowl until 10 p.m. Happy hour deals are strong, and the sunny upstairs patio has a great vibe. Bowl a game, then head upstairs.",
+   "description_fr": "BNA Brewing à Penticton est un repaire amusant et décontracté avec quatre allées de quilles à dix quilles, des jeux d'arcade et des billards électriques, en plus de la nourriture et des cocktails. Chaque allée accueille jusqu'à six joueurs et coûte environ 45 $ l'heure du dimanche au jeudi ou 55 $ le vendredi et le samedi; on réserve jusqu'à deux mois d'avance, et le souper se réserve à part. La location de souliers coûte 5 $, et les mineurs peuvent jouer jusqu'à 22 h. Les aubaines du 5 à 7 sont excellentes, et la terrasse ensoleillée à l'étage a une super ambiance. Jouez une partie, puis montez à l'étage.",
+   "sources": [
+    "https://www.bnabrewing.com/bna-bowl-penticton"
+   ]
+  },
+  {
+   "id": 1123,
+   "region": "kelowna",
+   "slug": "golf-evolution",
+   "name": "Golf Evolution",
+   "before_sha1": "d5e38e665d14027797ec37ce3f76418c71c117c2",
+   "before_fr_sha1": "511d799c23283bfb97d027d7c6bc75f5ca1babae",
+   "description": "Golf Evolution is where Kelowna golfers go to fix their swing, not just hit balls into a screen. Three GC Hawk simulator bays deliver tour-level club and ball data across 2,000-plus courses, and a UK PGA Professional runs lessons, club fitting and maintenance in the same Enterprise Way space. Credit-based Evo Packs (from $550 plus tax) last a year and can be shared with friends and family. Park around the building, take the elevator to level 2, and linger in the lounge over food and drinks.",
+   "description_fr": "Golf Evolution, c'est là que les golfeurs de Kelowna vont pour corriger leur élan, pas seulement pour frapper des balles dans un écran. Trois simulateurs GC Hawk fournissent des données de bâton et de balle de calibre professionnel sur plus de 2 000 parcours, et un professionnel de la PGA du Royaume-Uni y donne des leçons et s'occupe de l'ajustement et de l'entretien des bâtons, dans le même local d'Enterprise Way. Les forfaits à crédits Evo Packs (à partir de 550 $ plus taxes) sont valides un an et peuvent être partagés avec des amis ou de la famille. Stationnez autour de l'édifice, prenez l'ascenseur jusqu'au 2e étage et attardez-vous au salon pour manger et prendre un verre.",
+   "sources": [
+    "https://golfevolutionkelowna.ca/"
+   ]
+  },
+  {
+   "id": 1124,
+   "region": "kelowna",
+   "slug": "simplex-sportszone",
+   "name": "Simplex Sportszone",
+   "before_sha1": "d6c864100ef605836190d774e7cfb88810be9bab",
+   "before_fr_sha1": "1ba7b0119e5df27073f1c7a4669f01bd1c8e73b6",
+   "description": "Simplex Sportszone is an indoor sports arcade that takes golf seriously: Trackman 4 and Full Swing studios offer 400-plus courses, with in-house PGA coaches on hand. The 6,000-square-foot licensed building adds hockey, baseball, soccer and other simulators plus six full-motion racing cockpits (ages 14 and up). Studios hold up to four players, from about $36.75 an hour Monday to Thursday; bring clubs or rent for $10, and plan an hour per golfer for 18 holes. Booking ahead is wise, and groups up to 40 can party here.",
+   "description_fr": "Simplex Sportszone est une salle d'arcade sportive intérieure qui prend le golf au sérieux : ses studios Trackman 4 et Full Swing offrent plus de 400 parcours, avec des entraîneurs PGA maison sur place. Le bâtiment de 6 000 pieds carrés, avec permis d'alcool, abrite aussi des simulateurs de hockey, de baseball, de soccer et plus encore, ainsi que six postes de course à mouvement complet (14 ans et plus). Chaque studio accueille jusqu'à quatre joueurs, à partir d'environ 36,75 $ l'heure du lundi au jeudi; apportez vos bâtons ou louez-en pour 10 $, et prévoyez une heure par golfeur pour 18 trous. Mieux vaut réserver, et les groupes jusqu'à 40 personnes peuvent y fêter.",
+   "sources": [
+    "https://simplexsports.com/",
+    "https://simplexsports.com/about/faq/",
+    "https://simplexsports.com/book/"
+   ]
+  },
+  {
+   "id": 1128,
+   "region": "kelowna",
+   "slug": "fringe-indoor-golf",
+   "name": "The Fringe Indoor Golf",
+   "before_sha1": "5a6f165ee780dc992fa37e343603e326bf1e0111",
+   "before_fr_sha1": "4c34196ac28be1df2170de2d26dc63a23eb4fc82",
+   "description": "The Fringe Indoor Golf is Kelowna's 24/7, staffless simulator space in the AQUA building right off Lakeshore. Book online, and secure mobile access with emailed entry details replaces a front desk. Four Trackman iO bays (three open, one private room) track every shot across more than 300 virtual courses, with Trackman tournaments for anyone chasing bragging rights. A quiet, naturally lit lounge feels more private club than warehouse, and hourly rates of about $40 to $80, with member discounts, suit beginners and low-handicappers alike.",
+   "description_fr": "The Fringe Indoor Golf, c'est la réponse de Kelowna pour jouer au golf à votre propre rythme : un espace de simulateurs ouvert 24 h sur 24, 7 jours sur 7, sans personnel, dans l'immeuble AQUA tout près de Lakeshore. On réserve en ligne, et un accès mobile sécurisé, avec les instructions d'entrée envoyées par courriel, remplace la réception. Quatre baies Trackman iO (trois ouvertes et une salle privée) suivent chaque coup sur plus de 300 parcours virtuels, avec les tournois Trackman pour ceux qui veulent se vanter. Un salon calme baigné de lumière naturelle a des airs de club privé plutôt que d'entrepôt, et les tarifs d'environ 40 $ à 80 $ l'heure, avec rabais pour les membres, conviennent aux débutants comme aux golfeurs à faible handicap.",
+   "sources": [
+    "https://golfthefringe.com/"
+   ]
+  },
+  {
+   "id": 1129,
+   "region": "west-kelowna",
+   "slug": "golfbox",
+   "name": "GOLFBOX",
+   "before_sha1": "bf6202ee66eda87c2ddf02ed8792a11248237680",
+   "before_fr_sha1": "da244b1abe7adbadb6907017ef3419fd7caf4bbc",
+   "description": "GOLFBOX brings a boutique feel to indoor golf on Westbank First Nation land in West Kelowna: live-edge wood, turf and warm lighting instead of a warehouse bay. Its three private Trackman iO bays, each holding up to four golfers, are open 24/7. Book online for a door code by email; winter rates run from about $35 an hour overnight to $60 at peak times. Bring your own clubs and clean indoor shoes, and note alcohol isn't allowed. An upstairs boardroom makes it work for corporate bookings, too.",
+   "description_fr": "GOLFBOX donne au golf intérieur une touche boutique sur les terres de la Première Nation de Westbank, à West Kelowna : bois brut, gazon et éclairage chaleureux plutôt qu'un entrepôt. Ses trois baies privées Trackman iO sont ouvertes 24 h sur 24, 7 jours sur 7, pour s'entraîner ou jouer une partie virtuelle, chacune accueillant jusqu'à quatre golfeurs. On réserve en ligne pour recevoir un code d'accès par courriel; les tarifs d'hiver vont d'environ 35 $ l'heure la nuit à 60 $ aux heures de pointe. Apportez vos bâtons et des chaussures d'intérieur propres, et sachez que l'alcool n'est pas permis. Une salle de réunion à l'étage en fait aussi un bon choix pour les réservations d'entreprise.",
+   "sources": [
+    "https://www.golfbox.ca/",
+    "https://www.golfbox.ca/our-space/policies-guidelines",
+    "https://www.golfbox.ca/simulator-bays/rates-info"
+   ]
+  },
+  {
+   "id": 1130,
+   "region": "vernon",
+   "slug": "predator-ridge-sim-lounge",
+   "name": "Predator Ridge SIM Lounge",
+   "before_sha1": "30cca279b847e47d15165cd12a4ab2a2eb1bf69c",
+   "before_fr_sha1": "ee3457e77ac7d90e2e9f5feeb54745f49ec54894",
+   "description": "The SIM Lounge at Predator Ridge Resort is a seasonal indoor golf retreat for Vernon golfers who don't want winter to end their season, reopening on November 2, 2026. Foresight Sports GCHawk and GCQuad launch monitors track every shot across more than 90 virtual courses, booked in one-hour blocks for up to four by phone only (250-503-3401), which keeps the vibe close to a private club. PGA of Canada professionals offer private and semi-private lessons from about $120, and sessions pair naturally with a meal at RANGE or Pallino's Bistro.",
+   "description_fr": "Le SIM Lounge du Predator Ridge Resort est un refuge de golf intérieur saisonnier pour les golfeurs de Vernon qui ne veulent pas que l'hiver mette fin à leur saison; il rouvre le 2 novembre 2026. Des moniteurs de lancement Foresight Sports GCHawk et GCQuad suivent chaque coup sur plus de 90 parcours virtuels, réservés par blocs d'une heure pour un maximum de quatre personnes, uniquement par téléphone (250-503-3401), ce qui donne à l'endroit une ambiance de club privé. Des professionnels de la PGA du Canada offrent des leçons privées et semi-privées à partir d'environ 120 $, et une séance se marie bien avec un repas au RANGE ou au Pallino's Bistro.",
+   "sources": [
+    "https://www.predatorridge.com/activities/golf-simulators/"
+   ]
+  },
+  {
+   "id": 1132,
+   "region": "penticton",
+   "slug": "okanagan-virtual-golf",
+   "name": "Okanagan Virtual Golf",
+   "before_sha1": "2a7aa55df98ccce82bd4d5438b26bcfd806cba09",
+   "before_fr_sha1": "0c691cf02bd0a4d66085954eb907bfffc62ac7fc",
+   "description": "Okanagan Virtual Golf's Penticton location gives downtown Main Street a winter golf club that plays like a real round without the drive out to a course. Three bays track ball flight from an overhead launch monitor across more than 2,500 virtual courses, and a training bay uses four-camera swing analysis. Book online, then order from the licensed bar or grab pizza from local partner Yummy Slice; bringing your own food is fine too. Pros from Summerland, Fairview Mountain and Nk'Mip Canyon teach lessons, and four-person scramble leagues run through winter.",
+   "description_fr": "L'établissement d'Okanagan Virtual Golf à Penticton offre à la rue Main, au centre-ville, un club de golf d'hiver où l'on joue comme sur un vrai parcours, sans avoir à se rendre jusqu'à un terrain. Trois baies suivent la trajectoire de la balle grâce à un moniteur de lancement aérien, sur plus de 2 500 parcours virtuels, et une baie d'entraînement analyse l'élan avec quatre caméras. On réserve en ligne, puis on commande au bar avec permis d'alcool ou on prend une pizza du partenaire local Yummy Slice; on peut aussi apporter sa propre nourriture. Des pros de Summerland, de Fairview Mountain et de Nk'Mip Canyon donnent des leçons, et des ligues de type « scramble » à quatre joueurs animent l'hiver.",
+   "sources": [
+    "https://ovgpenticton.com/"
+   ]
+  },
+  {
+   "id": 1318,
+   "region": "kelowna",
+   "slug": "rutland-arena",
+   "name": "Rutland Arena",
+   "before_sha1": "810d34c256bfb59b3ad81db7fa1f6c2bf9c13562",
+   "before_fr_sha1": "144bb3ecc89004fd4067c1d8b2baf3d14fc1f0d8",
+   "description": "Rutland Arena, or Rutland Twin Arena, is Kelowna's public-skating workhorse: two NHL-sized sheets on Dodd Road with public, parent-and-tot and seniors' skates from October. It is the easiest place to skate without gear, with skates to rent for $5, helmets $3, skate bars $2 and sharpening $7. Book at rec.kelowna.ca up to seven days ahead with your receipt, or pay cash at the door. Admission is $5, $4.25 for kids 6 to 13 and seniors 65+, free for preschoolers and $13.50 for families; call 250-469-8800 for reduced rates.",
+   "description_fr": "L'aréna Rutland, ou Rutland Twin Arena, est la bête de somme du patinage public à Kelowna : deux patinoires de format LNH sur le chemin Dodd, avec patinage public, parent-enfant et pour aînés dès octobre. C'est l'endroit le plus simple pour patiner sans équipement : location de patins à 5 $, de casques à 3 $ et de barres d'appui à 2 $, et aiguisage à 7 $. Réservez sur rec.kelowna.ca jusqu'à sept jours d'avance avec votre reçu, ou payez comptant à l'entrée. L'entrée coûte 5 $, 4,25 $ pour les enfants de 6 à 13 ans et les aînés de 65 ans et plus, c'est gratuit pour les tout-petits et 13,50 $ par famille; appelez au 250-469-8800 pour un tarif réduit.",
+   "sources": [
+    "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/public-skating-schedules"
+   ]
+  },
+  {
+   "id": 1319,
+   "region": "kelowna",
+   "slug": "kelowna-memorial-arena",
+   "name": "Kelowna Memorial Arena",
+   "before_sha1": "bca11aec53fcd0355c57e62ab0850c561c80dc69",
+   "before_fr_sha1": "5b1944eb689a22b8999e53dfc744fd62016c72c8",
+   "description": "Memorial Arena is the old downtown rink on Ellis Street, a few blocks from the lake, with City of Kelowna public skating from October and a quieter Seniors Skate that regulars prize. There are no rentals, so bring skates or get them at Rutland Arena or the Stuart Park hut. Book at rec.kelowna.ca (bring your receipt) or pay cash at the door: $5, $4.25 for kids 6 to 13 and seniors 65+, free for preschoolers, $13.50 for families. Online sells only the general rate, so call 250-469-8800 for others.",
+   "description_fr": "Le Memorial Arena est le vieil aréna du centre-ville, sur la rue Ellis, à quelques coins de rue du lac. La Ville de Kelowna y offre le patinage public dès octobre, ainsi qu'une séance pour aînés plus calme, très appréciée des habitués. Il n'y a pas de location : apportez vos patins ou louez-en à l'aréna Rutland ou à la cabane du parc Stuart. Réservez sur rec.kelowna.ca (apportez votre reçu) ou payez comptant sur place : 5 $, 4,25 $ pour les enfants de 6 à 13 ans et les aînés de 65 ans et plus, gratuit pour les tout-petits, 13,50 $ par famille. En ligne, seul le tarif général est offert; appelez au 250-469-8800 pour les autres.",
+   "sources": [
+    "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/public-skating-schedules"
+   ]
+  },
+  {
+   "id": 1322,
+   "region": "west-kelowna",
+   "slug": "mount-boucherie-arenas-jim-lind-arena-royal-lepage-place",
+   "name": "Mount Boucherie Arenas – Jim Lind Arena & Royal LePage Place",
+   "before_sha1": "8c38069beb390b53e3cbb4a180ea8507d2907667",
+   "before_fr_sha1": "72d52d84fcd348f2e1327b8069ad9e700f3d840a",
+   "description": "West Kelowna's Mount Boucherie Complex pairs Jim Lind Arena, the community rink, with Royal LePage Place, home of the West Kelowna Warriors, for a full drop-in ice program. Expect public, family and adult-only (19+) skates, an Adaptive Skate (support persons free, ice cleats for non-skaters) and Big & Little for parents with kids under six, the only session allowing strollers. Hockey players get Stick & Puck and Noon Hour Hockey, which needs advance registration. Adults pay $5.85, families $14; skates rent for $2.95. No skate aids in public sessions.",
+   "description_fr": "Au complexe Mount Boucherie de West Kelowna, le Jim Lind Arena, la patinoire communautaire, côtoie le Royal LePage Place, domicile des Warriors de West Kelowna, pour un programme de glace libre très complet. On y trouve du patinage public, familial et pour adultes seulement (19 ans et plus), un patinage adapté (gratuit pour les accompagnateurs, crampons prêtés aux non-patineurs) et le Big & Little pour les parents d'enfants de moins de six ans, seule séance où les poussettes sont permises. Les hockeyeurs ont le Stick & Puck et le Noon Hour Hockey, qui exige une inscription préalable. Les adultes paient 5,85 $ et les familles 14 $, et la location de patins est de 2,95 $. Pas d'appuis de patinage aux séances publiques.",
+   "sources": [
+    "https://www.westkelownacity.ca/en/parks-recreation-and-culture/public-skate-schedule.aspx"
+   ]
+  },
+  {
+   "id": 1323,
+   "region": "lake-country",
+   "slug": "winfield-arena",
+   "name": "Winfield Arena",
+   "before_sha1": "136f32645759d174b8d29de579482cca1151b5ef",
+   "before_fr_sha1": "0cc00d23262ebcf7045b9d6a4329222cd159b86f",
+   "description": "Winfield Arena is Lake Country's small-town rink on Bottom Wood Lake Road, and it keeps skating cheap: the Sunday (3 to 4 p.m.) and Wednesday (7 to 8 p.m.) public skates are free, and Friday's DJ Skate (7:30 to 9 p.m., cash only) is $2 for ages 8 to 17 and $4 for adults, with under-eights free. There are no rentals or sharpening, so bring skates; helmets are recommended. Friday Adult Shinny (9:15 p.m., $7, goalies free) is booked online from Thursday at 1 p.m. and fills fast.",
+   "description_fr": "L'aréna de Winfield est la petite patinoire de Lake Country, sur le chemin Bottom Wood Lake, et le patinage y reste abordable : les séances publiques du dimanche (15 h à 16 h) et du mercredi (19 h à 20 h) sont gratuites, et le DJ Skate du vendredi (19 h 30 à 21 h, comptant seulement) coûte 2 $ pour les 8 à 17 ans et 4 $ pour les adultes, gratuit pour les moins de huit ans. Il n'y a ni location ni aiguisage, alors apportez vos patins; le casque est recommandé. Le hockey libre pour adultes du vendredi (21 h 15, 7 $, gratuit pour les gardiens) se réserve en ligne dès le jeudi 13 h et se remplit vite.",
+   "sources": [
+    "https://www.lakecountry.bc.ca/arena"
+   ]
+  },
+  {
+   "id": 1324,
+   "region": "vernon",
+   "slug": "vernon-recreation-complex-priest-valley-arena-centennial-outdoor-rink",
+   "name": "Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink",
+   "before_sha1": "256913eff2f0fb54c48ab948f9ab5893aa841abc",
+   "before_fr_sha1": "cf463943edde25b75e114938e2f4a4a0bb1a11f7",
+   "description": "Vernon's Recreation Complex on 35th Avenue offers two kinds of ice. Outside, the Centennial Outdoor Rink is free from December through February, with public skating and shinny, weather permitting. Inside, Priest Valley Arena, home to Vernon's skating and ringette clubs, hosts public skating and adult drop-in hockey; register ahead and get a wristband. Skaters 12 and under need a CSA hockey helmet and an adult (no bike helmets). Bring skates: there are no rentals. Local residents, including Coldstream and the Okanagan Indian Band, get 50% off with photo ID.",
+   "description_fr": "Le complexe récréatif de Vernon, sur la 35e Avenue, offre deux types de glace. Dehors, la patinoire extérieure Centennial est gratuite de décembre à février, si la météo le permet, avec patinage public et hockey libre. À l'intérieur, l'aréna Priest Valley, domicile des clubs de patinage et de ringuette de Vernon, accueille le patinage public et le hockey libre pour adultes : inscrivez-vous d'avance et obtenez un bracelet. Les 12 ans et moins doivent porter un casque de hockey CSA et être accompagnés d'un adulte (casques de vélo interdits). Apportez vos patins : il n'y a pas de location. Les résidents de la région, dont Coldstream et la bande indienne de l'Okanagan, obtiennent 50 % de rabais avec pièce d'identité avec photo.",
+   "sources": [
+    "https://www.vernon.ca/parks-recreation/programs-schedules/skating-schedule-rates"
+   ]
+  },
+  {
+   "id": 1325,
+   "region": "armstrong",
+   "slug": "nor-val-sports-centre",
+   "name": "Nor-Val Sports Centre",
+   "before_sha1": "b75e2b03515d64d6e33186ac14ee303154d537e2",
+   "before_fr_sha1": "eee862fa1b86f26f1f7703b46af202885ea75d9a",
+   "description": "Armstrong's Nor-Val Sports Centre, whose ice now carries the name Sunbelt Arena, runs friendly weekday drop-ins from September 9 through March. Adult and senior (55+) shinny fills Monday and Friday mornings from 10 to 11:30, with adult (19+) shinny on Wednesday, each $7.50. Late mornings bring a $2 all-ages Toonie Skate on Monday, a $2 adult and seniors' skate on Wednesday and a free parent-and-tot skate on Friday, and the Sunday Family Skate (3:30 to 5:30 p.m.) is $5, under-twos free. Bring your own skates; times can shift.",
+   "description_fr": "Au Nor-Val Sports Centre d'Armstrong, dont la patinoire porte maintenant le nom de Sunbelt Arena, des séances libres sympathiques ont lieu en semaine du 9 septembre jusqu'à la fin mars. Le hockey libre pour adultes et aînés (55 ans et plus) occupe les lundis et vendredis de 10 h à 11 h 30, et celui pour adultes (19 ans et plus), le mercredi, à 7,50 $ la séance. En fin de matinée, il y a un Toonie Skate pour tous à 2 $ le lundi, un patinage pour adultes et aînés à 2 $ le mercredi et un patinage parent-enfant gratuit le vendredi, et le patinage familial du dimanche (15 h 30 à 17 h 30) coûte 5 $, gratuit pour les moins de deux ans. Apportez vos patins; les heures peuvent changer.",
+   "sources": [
+    "https://asprd.com/drop-in-programs/"
+   ]
+  },
+  {
+   "id": 1326,
+   "region": "enderby",
+   "slug": "enderby-arena",
+   "name": "Enderby Arena",
+   "before_sha1": "89e702f4aae78fc23c30f79ac7e77a4e612218cd",
+   "before_fr_sha1": "2f73d656506f19a0de263e292657447ea1882149",
+   "description": "Enderby Arena at the John Pritchard Memorial Sports Complex offers something rare: free public skating several afternoons a week, from mid-September through March. It's a straightforward, old-fashioned skate with no sticks or pucks, strollers welcome, everyone on the ice in skates and helmets strongly recommended. There's no skate rental, so bring your own, and don't leave children unattended. The 900-seat arena has a concession and is home to the Enderby Ice Hawks and local minor hockey, so check the posted cancellations or call 250-838-2665.",
+   "description_fr": "L'aréna d'Enderby, au complexe sportif John Pritchard Memorial, offre quelque chose de rare : du patinage public gratuit plusieurs après-midi par semaine, de la mi-septembre jusqu'en mars. C'est un patinage simple, à l'ancienne : pas de bâtons ni de rondelles, poussettes bienvenues, tout le monde sur la glace en patins et casque fortement recommandé. Il n'y a pas de location de patins, alors apportez les vôtres, et ne laissez pas les enfants sans surveillance. L'aréna de 900 places a un casse-croûte et accueille les Enderby Ice Hawks et le hockey mineur local; consultez les annulations affichées ou téléphonez au 250-838-2665.",
+   "sources": [
+    "https://www.enderbyrecreation.com/arena"
+   ]
+  },
+  {
+   "id": 1328,
+   "region": "penticton",
+   "slug": "mclaren-park-arena",
+   "name": "McLaren Park Arena",
+   "before_sha1": "3e731cb0609c5ccd59647bb7a72e36309563050b",
+   "before_fr_sha1": "0f9e339693610b0d52c5f4e7a3940f28163af802",
+   "description": "McLaren Park Arena skates from October to mid-March and on Saturdays the rest of the year. Family Skate staff help with skate aids, Open Public Skate saves a third of the ice for under-fives with a guardian, Lap Skate (8+) is for fitness. Drop-in hockey runs for 16+ ($10) and 55+ ($8), plus Preschool Stick 'N Puck. Adults pay $5.50 and families $14, and skates rent for $4.25. Helmets are strongly recommended, with a few free loaners, and required for hockey. Book sessions online.",
+   "description_fr": "L'aréna McLaren Park offre du patinage d'octobre à la mi-mars, puis le samedi le reste de l'année. Au Family Skate, le personnel aide avec les appuis de patinage; l'Open Public Skate réserve le tiers de la glace aux moins de cinq ans accompagnés; le Lap Skate (8 ans et plus) sert à l'entraînement. Le hockey libre est offert aux 16 ans et plus (10 $) et aux 55 ans et plus (8 $), et le Preschool Stick 'N Puck complète l'offre. Les adultes paient 5,50 $ et les familles 14 $, et la location de patins coûte 4,25 $. Le casque est fortement recommandé, avec quelques casques prêtés gratuitement, et obligatoire au hockey. Réservez en ligne.",
+   "sources": [
+    "https://www.penticton.ca/parks-recreation/facility-hours-rates-bookings/ice-skating"
+   ]
+  },
+  {
+   "id": 1330,
+   "region": "osoyoos",
+   "slug": "sun-bowl-arena",
+   "name": "Sun Bowl Arena",
+   "before_sha1": "7a02f354a952cf521770451689aa7feaded2e7ad",
+   "before_fr_sha1": "b425be5df84b82c2d853852cb2b515b0a62b71b0",
+   "description": "Skating in Canada's warmest town is free: the Rotary Club of Osoyoos sponsors public skating at the Sun Bowl Arena on Saturday (5:15 to 6:15 p.m.) and Sunday (3:30 to 4:45 p.m.), and the lobby Skate Library lends skates free. Bring a helmet, which is required. Monday and Wednesday from 9 to 10:30 a.m. is the Senior & Tot Skate, and Tuesday and Thursday is shinny for players 19+ in full gear. As home of the Osoyoos Coyotes, the arena sometimes bumps sessions for bookings, so check the town's calendar.",
+   "description_fr": "Dans la ville la plus chaude du Canada, le patinage est gratuit : le Club Rotary d'Osoyoos commandite le patinage public à l'aréna Sun Bowl le samedi (17 h 15 à 18 h 15) et le dimanche (15 h 30 à 16 h 45), et la Skate Library du hall prête des patins gratuitement. Apportez un casque, obligatoire. Les lundis et mercredis de 9 h à 10 h 30, c'est le Senior & Tot Skate, et les mardis et jeudis, le hockey libre pour les 19 ans et plus en équipement complet. Domicile des Coyotes d'Osoyoos, l'aréna annule parfois une séance pour une réservation : consultez le calendrier de la municipalité.",
+   "sources": [
+    "https://www.osoyoos.ca/sunbowl"
+   ]
+  },
+  {
+   "id": 1457,
+   "region": "kelowna",
+   "slug": "h2o-adventure-fitness-centre",
+   "name": "H2O Adventure + Fitness Centre",
+   "before_sha1": "b8f00089ffc36451b488d0d0c35ab752379e193a",
+   "before_fr_sha1": "f4fbeff106e3763261b38845511c6ec68a7fdf6c",
+   "description": "H2O Adventure + Fitness Centre is a YMCA-run indoor waterpark billing itself as Canada's largest municipal waterpark, with waterslides, a FlowRider, wave pool, lazy river and splash park. A go-to for families on a cold or rainy day, with a hot tub and steam room for grown-ups. Drop-in is about $13 for adults, $7 for kids or $34 for a family, and under-3s swim free. Kids 7 and under must stay within arm's reach of someone 16+, adults need photo ID, and there's a pool lift.",
+   "description_fr": "Le H2O Adventure + Fitness Centre est un parc aquatique intérieur géré par le YMCA, qui se présente comme le plus grand parc aquatique municipal au Canada, avec glissades d'eau, FlowRider, piscine à vagues, rivière paresseuse et jeux d'eau. Une valeur sûre pour les familles par une journée froide ou pluvieuse, avec un spa et un bain de vapeur pour les grands. L'entrée coûte environ 13 $ pour un adulte, 7 $ pour un enfant ou 34 $ pour une famille, et c'est gratuit pour les moins de 3 ans. Les enfants de 7 ans et moins doivent rester à portée de bras d'une personne de 16 ans et plus, les adultes doivent présenter une pièce d'identité avec photo, et un lève-personne donne accès à la piscine.",
+   "sources": [
+    "https://www.ymcasibc.ca/Locations/H2O",
+    "https://www.ymcasibc.ca/Locations/H2O/Drop-In"
+   ]
+  },
+  {
+   "id": 1459,
+   "region": "kelowna",
+   "slug": "airhouse-kelowna",
+   "name": "Airhouse Kelowna",
+   "before_sha1": "2db419b3c8d0c1919b48c2ed8d213925b3aae405",
+   "before_fr_sha1": "afdac4a52907c8d481dd9c14634a97d9023a0f52",
+   "description": "Airhouse Kelowna is a freestyle training centre with trampolines, a spring floor, skateboard ramps and parkour areas, offering drop-in sessions for all ages (kids must be 3 or older for the trampolines). An all-ages drop-in is about $27.50; sign the online waiver before you go, wear grip socks (sold at the desk) and reserve online, since space is limited. It also runs lessons, camps, ski and snowboard dryland training and birthday parties.",
+   "description_fr": "Airhouse Kelowna est un centre d'entraînement freestyle avec trampolines, plancher à ressorts, rampes de planche à roulettes et zones de parkour, qui propose des séances libres pour tous les âges (il faut avoir au moins 3 ans pour les trampolines). Une séance libre tous âges coûte environ 27,50 $; signez la décharge en ligne avant de partir, portez des chaussettes antidérapantes (vendues à l'accueil) et réservez en ligne, car les places sont limitées. On y offre aussi des cours, des camps, de l'entraînement hors neige pour le ski et la planche à neige, ainsi que des fêtes d'anniversaire.",
+   "sources": [
+    "https://airhouse-kelowna.pike13.com/pages/drop-in-sessions"
+   ]
+  },
+  {
+   "id": 1460,
+   "region": "kelowna",
+   "slug": "exit-kelowna-escape-games",
+   "name": "Exit Kelowna Escape Games",
+   "before_sha1": "e1fd0b454fe9087d9376440c5de7a5479afe493b",
+   "before_fr_sha1": "b43821720d9b6459703d565ffa21ded4caeff371",
+   "description": "Exit Kelowna Escape Games has five themed rooms: Abandoned, Haunted, Pirate Cove, Potions and Runaway Train. Teams of two to six work together against the clock, making it a solid pick for groups and families; players need to be 7 or older, with an adult along for kids up to 10. Book about a week ahead to be sure of a spot, and arrive 15 minutes early.",
+   "description_fr": "Exit Kelowna Escape Games propose cinq salles thématiques : Abandoned, Haunted, Pirate Cove, Potions et Runaway Train. Des équipes de deux à six joueurs collaborent contre la montre, ce qui en fait un excellent choix pour les groupes et les familles; il faut avoir au moins 7 ans, et les enfants jusqu'à 10 ans doivent être accompagnés d'un adulte. Réservez environ une semaine d'avance pour être sûr d'avoir une place, et arrivez 15 minutes avant l'heure.",
+   "sources": [
+    "https://e-exit.ca/kelowna/"
+   ]
+  },
+  {
+   "id": 1461,
+   "region": "kelowna",
+   "slug": "beyond-the-crux-climbing-gym",
+   "name": "Beyond the Crux Climbing Gym",
+   "before_sha1": "10b34255af71af9387526c88a2df2f78959f005c",
+   "before_fr_sha1": "5c803408b3ebe8952036c6ebdb56a2fff01f23cd",
+   "description": "Beyond the Crux Climbing Gym is a full-service indoor climbing gym with over 5,000 sq ft of bouldering, plus top rope and lead walls and a training area. Drop-in day passes run about $19 for adults, $16 for students and $13 for kids, and rentals make it easy for beginners to try. Fill out the online waiver first; an adult belay course (about $60) teaches you to climb the roped walls.",
+   "description_fr": "Beyond the Crux Climbing Gym est un centre d'escalade intérieur complet, avec plus de 5 000 pieds carrés de bloc, des murs de moulinette et de premier de cordée, et une zone d'entraînement. Les entrées à la journée coûtent environ 19 $ pour les adultes, 16 $ pour les étudiants et 13 $ pour les enfants, et la location d'équipement permet aux débutants de s'initier facilement. Remplissez d'abord la décharge en ligne; un cours d'assurage pour adultes (environ 60 $) vous prépare aux murs avec corde.",
+   "sources": [
+    "http://www.beyondthecrux.info/"
+   ]
+  },
+  {
+   "id": 1462,
+   "region": "kelowna",
+   "slug": "mccurdy-bowling-centre",
+   "name": "McCurdy Bowling Centre",
+   "before_sha1": "0957c7af8efe965b8c14ef187c223f0e42595c9e",
+   "before_fr_sha1": "0613371ad2461ce11614d69b9166779257c2b4c4",
+   "description": "McCurdy Bowling Centre is a big, all-ages bowling centre with 24 ten-pin and 6 five-pin lanes, plus cosmic bowling and lane-side food and drinks from the attached Freddy's Brewpub. It hosts leagues, birthday parties and group events, so reserving a lane online is a good idea, especially on a wet weekend.",
+   "description_fr": "Le McCurdy Bowling Centre est un grand centre de quilles pour tous les âges, avec 24 allées de quilles à dix et 6 allées de petites quilles, des quilles cosmiques, et bouchées et boissons servies aux allées par le Freddy's Brewpub voisin. On y accueille des ligues, des fêtes d'anniversaire et des événements de groupe, alors mieux vaut réserver une allée en ligne, surtout par une fin de semaine pluvieuse.",
+   "sources": [
+    "https://www.mccurdybowl.com/"
+   ]
+  },
+  {
+   "id": 1463,
+   "region": "kelowna",
+   "slug": "planet-lazer-kelowna",
+   "name": "Planet Lazer Kelowna",
+   "before_sha1": "94b34e5595c76c1d0590a82fb6f7dfa2f23a1edd",
+   "before_fr_sha1": "be1238751a46779dd2e6fe1b4772fa25387783e4",
+   "description": "Planet Lazer Kelowna is a long-running entertainment centre with multi-level laser tag, duckpin bowling, free-roam VR and a card-based arcade. Laser tag games last 12 minutes and start at about $9.50, cheaper per game if you buy two or three; reservations are recommended, and plan to arrive 20 minutes early. There's a kitchen and private party rooms for birthdays and groups.",
+   "description_fr": "Planet Lazer Kelowna est un centre de divertissement établi depuis longtemps, avec laser tag sur plusieurs niveaux, quilles duckpin, réalité virtuelle en déplacement libre et salle d'arcade à carte. Les parties de laser tag durent 12 minutes et coûtent à partir d'environ 9,50 $, moins cher la partie si vous en achetez deux ou trois; on recommande de réserver et d'arriver 20 minutes d'avance. Cuisine sur place et salles privées pour les fêtes d'anniversaire et les groupes.",
+   "sources": [
+    "https://planetlazerkelowna.com/"
+   ]
+  },
+  {
+   "id": 1464,
+   "region": "kelowna",
+   "slug": "xperience-games-kelowna",
+   "name": "Xperience Games Kelowna",
+   "before_sha1": "dbecbf98e56100893db88a5dbb01c80fec88b3d1",
+   "before_fr_sha1": "c8c4fd73adfcc446798533a2cddfb6f108cdc840",
+   "description": "Xperience Games Kelowna runs tech-based escape rooms with no locks or keys, such as Haunted Apartment and Cosmic Color Heist, alongside more than a dozen VR escape games. Most games run 60 minutes for two to six players, ages 7 and up. Physical rooms are private to your group at about $38 a player, while VR games cap out at four players.",
+   "description_fr": "Xperience Games Kelowna propose des jeux d'évasion technologiques sans cadenas ni clés, comme Haunted Apartment et Cosmic Color Heist, ainsi que plus d'une douzaine de jeux d'évasion en réalité virtuelle. La plupart des jeux durent 60 minutes, pour deux à six joueurs, dès 7 ans. Les salles physiques sont réservées à votre groupe, à environ 38 $ par joueur, tandis que les jeux en réalité virtuelle sont limités à quatre joueurs.",
+   "sources": [
+    "https://xperiencegames.ca/kelowna/escape-room"
+   ]
+  },
+  {
+   "id": 1466,
+   "region": "kelowna",
+   "slug": "kelowna-art-gallery",
+   "name": "Kelowna Art Gallery",
+   "before_sha1": "906de7f0f4a1292e961422d48fac34dbd31c6d85",
+   "before_fr_sha1": "273b6d25b9d00929ea1ed04661a2bfcea97a4ff1",
+   "description": "The Kelowna Art Gallery is the city's public art gallery in the downtown Cultural District, with rotating contemporary and historical exhibitions across several galleries plus a courtyard installation space. Admission is about $10 for adults or $20 for a family, kids under 12 get in free, and it's half price on Thursdays. Family programs and a gallery shop round out a visit.",
+   "description_fr": "La Kelowna Art Gallery est la galerie d'art publique de la ville, dans le quartier culturel du centre-ville, avec des expositions contemporaines et historiques qui changent régulièrement dans plusieurs salles, ainsi qu'un espace d'installation dans la cour. L'entrée coûte environ 10 $ par adulte ou 20 $ par famille, c'est gratuit pour les moins de 12 ans, et c'est à moitié prix le jeudi. Des activités familiales et une boutique complètent la visite.",
+   "sources": [
+    "https://kelownaartgallery.com/"
+   ]
+  },
+  {
+   "id": 1467,
+   "region": "kelowna",
+   "slug": "alternator-centre-for-contemporary-art",
+   "name": "Alternator Centre for Contemporary Art",
+   "before_sha1": "454139acb0c9ef1594e88ee716630dba003be10c",
+   "before_fr_sha1": "176df4232228574bf896273d74aa7e320145c93e",
+   "description": "The Alternator Centre for Contemporary Art is an artist-run centre that has called the Rotary Centre for the Arts home since 2002, showing contemporary work by emerging and established artists. It's free to drop in and browse the current exhibitions, an easy add-on if you're already at the arts centre for a show or a bite.",
+   "description_fr": "L'Alternator Centre for Contemporary Art est un centre géré par des artistes, installé au Rotary Centre for the Arts depuis 2002, qui présente des œuvres contemporaines d'artistes émergents et établis. L'entrée est libre pour venir voir les expositions en cours, un arrêt facile à ajouter si vous êtes déjà au centre des arts pour un spectacle ou une bouchée.",
+   "sources": [
+    "https://www.alternatorcentre.com/about"
+   ]
+  },
+  {
+   "id": 1468,
+   "region": "kelowna",
+   "slug": "okanagan-heritage-museum",
+   "name": "Okanagan Heritage Museum",
+   "before_sha1": "7babc65aa263b728c9e769bed7d8e667fc42ea37",
+   "before_fr_sha1": "a6814d2c9197e593de9d92d4ca536b7777de1aea",
+   "description": "The Okanagan Heritage Museum is a downtown museum covering the natural and human history of the Okanagan, from syilx culture to settler life, with exhibits such as Dinosaurs of BC. It also houses the Kelowna Public Archives. Admission is about $10 for adults or $25 for a family, kids five and under are free, and the second Sunday of each month is pay-what-you-wish.",
+   "description_fr": "L'Okanagan Heritage Museum est un musée du centre-ville consacré à l'histoire naturelle et humaine de l'Okanagan, de la culture syilx à la vie des colons, avec des expositions comme Dinosaurs of BC. Il abrite aussi les archives publiques de Kelowna. L'entrée coûte environ 10 $ par adulte ou 25 $ par famille, c'est gratuit pour les cinq ans et moins, et le deuxième dimanche de chaque mois, on paie ce qu'on veut.",
+   "sources": [
+    "https://www.kelownamuseums.ca/plan-your-visit/"
+   ]
+  },
+  {
+   "id": 1469,
+   "region": "kelowna",
+   "slug": "okanagan-wine-orchard-museum-laurel-packinghouse",
+   "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+   "before_sha1": "334b5ed0bfeb546b5d350433b1043c44c7148cdf",
+   "before_fr_sha1": "0e2a98a2a0294aa81d236b6db48985d3b2d1d1aa",
+   "description": "The Okanagan Wine & Orchard Museum tells the valley's fruit-growing and wine-making story from the historic 1918 Laurel Packinghouse in the Cultural District. Exhibits trace how orchards and vineyards shaped the Okanagan, and admission is by donation, with about $5 a person or $15 a family suggested. A good primer before, or instead of, a rainy winery day.",
+   "description_fr": "L'Okanagan Wine & Orchard Museum raconte l'histoire de l'arboriculture fruitière et de la viticulture de la vallée, dans l'historique Laurel Packinghouse de 1918, au quartier culturel. Les expositions montrent comment les vergers et les vignobles ont façonné l'Okanagan, et l'entrée se fait sur une base de dons, environ 5 $ par personne ou 15 $ par famille étant suggérés. Une bonne introduction avant, ou à la place, d'une journée pluvieuse dans les vignobles.",
+   "sources": [
+    "https://www.kelownamuseums.ca/plan-your-visit/"
+   ]
+  },
+  {
+   "id": 1471,
+   "region": "kelowna",
+   "slug": "kelowna-community-theatre",
+   "name": "Kelowna Community Theatre",
+   "before_sha1": "66cc74be4f5216fc7b64919937a15251e4f20b65",
+   "before_fr_sha1": "769565d86ce280cbb273d3b8818894cefa383a71",
+   "description": "Kelowna Community Theatre is a city-run, roughly 850-seat theatre in the Cultural District and the home stage of the Okanagan Symphony Orchestra, plus touring comedy, music and film festivals. A smaller Black Box space hosts cabaret and intimate shows. Tickets for mainstage events are sold at the box office just inside the front doors, and there are wheelchair spaces with companion seats.",
+   "description_fr": "Le Kelowna Community Theatre est un théâtre municipal d'environ 850 places situé dans le quartier culturel, où se produit l'Okanagan Symphony Orchestra et qui accueille aussi des spectacles d'humour en tournée, des concerts et des festivals de films. Une salle plus petite de type Black Box présente des cabarets et des spectacles intimistes. Les billets des spectacles sur la grande scène se vendent à la billetterie, juste à l'entrée, et des places pour fauteuils roulants avec sièges d'accompagnateur sont offertes.",
+   "sources": [
+    "https://theatre.kelowna.ca/node/29"
+   ]
+  },
+  {
+   "id": 1472,
+   "region": "kelowna",
+   "slug": "rotary-centre-for-the-arts",
+   "name": "Rotary Centre for the Arts",
+   "before_sha1": "52d68dcdcc583589238f2fddb73cb4e19653cdaa",
+   "before_fr_sha1": "13097205e4a4d1f303f5907b18b637b3d4f53b31",
+   "description": "The Rotary Centre for the Arts is a community arts hub with the 326-seat Mary Irwin Theatre hosting comedy, concerts and film, plus free-to-browse art galleries and artist studios. It also runs art programs and camps, and Roma Nord Bistro on site makes it easy to linger over a coffee or lunch between gallery visits.",
+   "description_fr": "Le Rotary Centre for the Arts est un pôle artistique communautaire avec le Mary Irwin Theatre de 326 places, qui présente de l'humour, des concerts et du cinéma, ainsi que des galeries d'art à visiter gratuitement et des ateliers d'artistes. On y offre aussi des programmes et des camps artistiques, et le Roma Nord Bistro, sur place, permet de s'attarder autour d'un café ou d'un dîner entre deux galeries.",
+   "sources": [
+    "https://rotarycentreforthearts.com/"
+   ]
+  },
+  {
+   "id": 1475,
+   "region": "kelowna",
+   "slug": "cineplex-cinemas-orchard-plaza",
+   "name": "Cineplex Cinemas Orchard Plaza",
+   "before_sha1": "c19d1e60b731366b9b726a9ecf5cd3a2d95b9c19",
+   "before_fr_sha1": "d950e85ada46123583f7ab5cfbe97ee3000b8804",
+   "description": "Cineplex Cinemas Orchard Plaza is the multiplex in Orchard Plaza Shopping Centre, screening new releases in full recliner seats, with RealD 3D, wheelchair access and hearing assistance. Special events include National Theatre Live and Metropolitan Opera broadcasts, and there are discounted Tuesdays and matinees for a cheaper rainy-day movie.",
+   "description_fr": "Le Cineplex Cinemas Orchard Plaza est le cinéma multisalle du centre commercial Orchard Plaza, qui présente les nouveautés dans des fauteuils entièrement inclinables, avec RealD 3D, accès en fauteuil roulant et aide à l'audition. Parmi les événements spéciaux figurent les retransmissions du National Theatre Live et du Metropolitan Opera, et il y a des rabais le mardi et aux matinées pour un film moins cher par jour de pluie.",
+   "sources": [
+    "https://www.cineplex.com/theatre/cineplex-cinemas-orchard-plaza"
+   ]
+  },
+  {
+   "id": 1479,
+   "region": "west-kelowna",
+   "slug": "sncewips-heritage-museum",
+   "name": "Sncewips Heritage Museum",
+   "before_sha1": "9dce45079a2a92f497ad3d36cefc24a1e50a5060",
+   "before_fr_sha1": "8b0f8f976cefd873eb3f57e10ef84be6d3303539",
+   "description": "Sncewips Heritage Museum is Westbank First Nation's living museum, sharing syilx history, language, tools, dwellings and present-day cultural practice through community-curated exhibits. Drop in for a self-guided look with no booking needed and entry by donation, or pre-book a guided tour for about $15 per person (groups over 15 should call ahead). Before you go, browse the gift shop.",
+   "description_fr": "Le Sncewips Heritage Museum est le musée vivant de la Première Nation de Westbank, qui fait découvrir l'histoire, la langue, les outils, les habitations et les pratiques culturelles actuelles des Syilx grâce à des expositions conçues par la communauté. Passez pour une visite libre, sans réservation et avec entrée par don, ou réservez à l'avance une visite guidée à environ 15 $ par personne (les groupes de plus de 15 personnes devraient appeler avant). Avant de repartir, faites un tour à la boutique de cadeaux.",
+   "sources": [
+    "https://www.sncewips.com/services"
+   ]
+  },
+  {
+   "id": 1480,
+   "region": "west-kelowna",
+   "slug": "westbank-museum",
+   "name": "Westbank Museum",
+   "before_sha1": "ea61dd5f696bcca2771b1219e4835771d9f989f0",
+   "before_fr_sha1": "f8a6abca39a1d214a91e92ca7667c9a235749d0c",
+   "description": "Westbank Museum is a small community museum sharing the West Kelowna Visitor Centre building, with admission by donation. It covers the Fur Brigade Trail, pioneer families, orchards, forestry and even Ogopogo, so there's something for history buffs and curious kids alike. Look for the working miniature sawmill, and pick up local tips from the visitor centre while you're there.",
+   "description_fr": "Le Westbank Museum est un petit musée communautaire qui partage l'édifice du centre d'information touristique de West Kelowna, avec entrée par don. Il raconte le sentier des brigades de fourrure (Fur Brigade Trail), les familles pionnières, les vergers, la foresterie et même l'Ogopogo, de quoi intéresser autant les passionnés d'histoire que les enfants curieux. Ne manquez pas la scierie miniature fonctionnelle, et profitez-en pour demander des conseils au centre d'information.",
+   "sources": [
+    "https://westbankmuseum.com/"
+   ]
+  },
+  {
+   "id": 1481,
+   "region": "west-kelowna",
+   "slug": "johnson-bentley-memorial-aquatic-centre",
+   "name": "Johnson Bentley Memorial Aquatic Centre",
+   "before_sha1": "8b9de651636eef94aae493fd0c8c4227e41c3b44",
+   "before_fr_sha1": "c79cb70baa73dfa4dace7ea31907f3df0737127e",
+   "description": "Johnson Bentley Memorial Aquatic Centre is West Kelowna's indoor pool, with a 25 m tank, slides, a rope swing, beach-entry access, a warm soaking pool, hot tub and steam room. Public swim sessions run daily, and drop-in admission is about $6.40 for adults, $3.80 for kids 6 to 12 or $13.35 for a family, with little ones under 18 months free. Aquatic wheelchairs, a transport lift and family change rooms help everyone get in the water.",
+   "description_fr": "Le Johnson Bentley Memorial Aquatic Centre est la piscine intérieure de West Kelowna, avec un bassin de 25 m, des glissades, une corde de Tarzan, une entrée en pente douce comme à la plage, un bassin d'eau chaude, un spa et un bain de vapeur. Des bains publics ont lieu tous les jours, et l'entrée coûte environ 6,40 $ pour un adulte, 3,80 $ pour un enfant de 6 à 12 ans ou 13,35 $ pour une famille; c'est gratuit pour les moins de 18 mois. Des fauteuils roulants aquatiques, un lève-personne et des vestiaires familiaux aident tout le monde à se mettre à l'eau.",
+   "sources": [
+    "https://www.westkelownacity.ca/en/parks-recreation-and-culture/johnson-bentley-aquatic-centre.aspx"
+   ]
+  },
+  {
+   "id": 1482,
+   "region": "west-kelowna",
+   "slug": "pearl-fern-pottery-studio",
+   "name": "Pearl & Fern Pottery Studio",
+   "before_sha1": "cd8bbff649bf3ac0b88bfab30963ca119549e2b3",
+   "before_fr_sha1": "8c010430451c3004df5d6d5dbb5e7eb2b85ce263",
+   "description": "Pearl & Fern Pottery Studio is a West Kelowna pottery studio and supply shop stocking thousands of clay supplies, with bookable classes, workshops and small-group clay experiences. Beginners can register for an intro to wheel throwing or hand building, no experience needed, then carry on with five-week courses. There are after-school classes for kids and teens, raku firings and pottery paint nights too. A creative way to spend a rainy afternoon on the Westside.",
+   "description_fr": "Pearl & Fern Pottery Studio est un atelier de poterie et une boutique de fournitures de West Kelowna qui tient des milliers d'articles pour l'argile, et qui propose des cours, des ateliers et des expériences d'argile en petit groupe, sur réservation. Les débutants peuvent s'inscrire à une initiation au tour ou au modelage à la main, sans aucune expérience, puis poursuivre avec des cours de cinq semaines. On y offre aussi des cours après l'école pour les enfants et les ados, des cuissons raku et des soirées de peinture sur poterie. Une façon créative de passer un après-midi pluvieux du côté de Westside.",
+   "sources": [
+    "https://pearlandfern.ca/",
+    "https://pearlandfern.ca/general-1"
+   ]
+  },
+  {
+   "id": 1483,
+   "region": "lake-country",
+   "slug": "lake-country-museum-archives",
+   "name": "Lake Country Museum & Archives",
+   "before_sha1": "d5192af77bf95c4326e5f4255a61ca785041ddb6",
+   "before_fr_sha1": "05a945bf5a9dfa84b6a2c2675d09924d5ea0e9b9",
+   "description": "Lake Country Museum & Archives is a heritage museum in Okanagan Centre Park telling Lake Country's story, from the syilx people and early orchards to the Applebox Belles and South Asian settlers. Volunteers offer guided looks at the collection. The museum stays open year-round, including on holiday Mondays.",
+   "description_fr": "Le Lake Country Museum & Archives est un musée patrimonial situé dans le parc d'Okanagan Centre qui raconte l'histoire de Lake Country, du peuple syilx et des premiers vergers jusqu'aux Applebox Belles et aux colons sud-asiatiques. Des bénévoles proposent des visites guidées de la collection. Le musée est ouvert toute l'année, y compris les lundis fériés.",
+   "sources": [
+    "https://www.lakecountry.bc.ca/node/346",
+    "https://www.lakecountrymuseum.com/contact/"
+   ]
+  },
+  {
+   "id": 1484,
+   "region": "lake-country",
+   "slug": "lake-country-art-gallery",
+   "name": "Lake Country Art Gallery",
+   "before_sha1": "ee792c233bb1b3ad5a1725eed147a96894e65808",
+   "before_fr_sha1": "afa2811865cf96421706f8734b8e1aab6557c661",
+   "description": "Lake Country Art Gallery is a free public gallery showing rotating exhibitions of regional contemporary art, with a small gift shop and a coffee house sharing the space. Entry is by donation, and donations are welcome. Its annual Under 200 show features affordable local work, and the gallery keeps longer hours during that exhibition. It can close briefly while new shows are installed, so check the exhibition dates before you go.",
+   "description_fr": "La Lake Country Art Gallery est une galerie publique gratuite qui présente des expositions d'art contemporain régional qui changent régulièrement, avec une petite boutique de cadeaux et un café qui partagent l'espace. L'entrée se fait sur contribution volontaire, et les dons sont les bienvenus. Son exposition annuelle Under 200 met en vedette des œuvres locales abordables, et la galerie prolonge ses heures pendant cette exposition. Elle peut fermer brièvement pendant le montage des expositions; vérifiez les dates avant d'y aller.",
+   "sources": [
+    "https://www.lakecountryartgallery.ca/"
+   ]
+  },
+  {
+   "id": 1485,
+   "region": "lake-country",
+   "slug": "creekside-theatre",
+   "name": "Creekside Theatre",
+   "before_sha1": "2f86c04e525ca3ed4946ce607602b539040f5f4e",
+   "before_fr_sha1": "0418cc8026c76f18ab04f53557510adac08ae84e",
+   "description": "Creekside Theatre is Lake Country's district-run, 250-seat community theatre, hosting touring musicians, tribute acts, comedy and dance in an intimate room, along with ballet, family theatre and magic shows. A strong roster of Canadian roots and folk artists comes through each season. Tickets sell online through Ticketseller, and newsletter subscribers get early access.",
+   "description_fr": "Le Creekside Theatre est le théâtre communautaire de 250 places géré par le district de Lake Country, qui accueille des musiciens en tournée, des spectacles hommages, de l'humour et de la danse dans une salle intime, ainsi que du ballet, du théâtre familial et des spectacles de magie. Chaque saison, une solide programmation d'artistes canadiens de musique roots et folk y défile. Les billets se vendent en ligne sur Ticketseller, et les abonnés à l'infolettre y ont accès en primeur.",
+   "sources": [
+    "https://www.lakecountry.bc.ca/parks-recreation-culture/creekside-theatre"
+   ]
+  },
+  {
+   "id": 1486,
+   "region": "peachland",
+   "slug": "peachland-museum",
+   "name": "Peachland Museum",
+   "before_sha1": "dae1ad56367ecd8000535264a91decca6e27235a",
+   "before_fr_sha1": "5b6a80c62fe122698595a946dc7f8e329ac43141",
+   "description": "Peachland Museum is a volunteer-run history museum in Peachland's distinctive 8-sided former Baptist church on the waterfront, built mainly by volunteers in 1910. Highlights include Beach Avenue in Miniature, circa 1967, and, on the upper floor, a model railway exhibit recreating the Kettle Valley Railway as it ran between 1955 and 1965.",
+   "description_fr": "Le Peachland Museum est un musée d'histoire géré par des bénévoles, installé au bord de l'eau dans l'ancienne église baptiste à huit côtés de Peachland, construite surtout par des bénévoles en 1910. Parmi les points forts : Beach Avenue in Miniature, vers 1967, et, à l'étage, un réseau ferroviaire miniature qui recrée le Kettle Valley Railway tel qu'il était entre 1955 et 1965.",
+   "sources": [
+    "https://peachlandhistory.ca/"
+   ]
+  },
+  {
+   "id": 1488,
+   "region": "kelowna",
+   "slug": "tality-wellness-kelowna",
+   "name": "Tality Wellness Kelowna",
+   "before_sha1": "8576c7b3d7be78d6a3de25fd37ea5f8b7596fc4b",
+   "before_fr_sha1": "c0d46636299615dba3fa370696177cc4a718e34a",
+   "description": "Tality Wellness Kelowna is a downtown social bathhouse with a 20-person cedar sauna (85-90°C), four cold plunges (3-11°C) and a lounge around a vapour firepit, with robes, towels, kombucha and hot tea included. Bring a bathing suit and a non-glass water bottle, and leave jewellery behind since it heats up. Book a shared community session or a private group slot through the app or website.",
+   "description_fr": "Tality Wellness Kelowna est un bain social du centre-ville avec un sauna de cèdre de 20 places (85 à 90 °C), quatre bains froids (3 à 11 °C) et un salon aménagé autour d'un foyer à vapeur; peignoirs, serviettes, kombucha et thé chaud sont inclus. Apportez un maillot et une gourde qui n'est pas en verre, et laissez vos bijoux à la maison, car ils chauffent. Réservez une séance communautaire partagée ou un créneau privé pour votre groupe dans l'appli ou sur le site Web.",
+   "sources": [
+    "https://www.talitywellness.ca/locations/kelowna"
+   ]
+  },
+  {
+   "id": 1489,
+   "region": "kelowna",
+   "slug": "virtual-rcades",
+   "name": "Virtual Rcades",
+   "before_sha1": "8d0e4453962f70f48b3f036e474f901547b2940c",
+   "before_fr_sha1": "5f6b17edce77d8a4a33fc5442adefadad8160256",
+   "description": "Virtual Rcades is a VR motion-simulator arcade with 30+ simulators and gaming pods across racing, flight, theme-park and adventure themes. General admission, about $40, buys 60 minutes of full access after a short orientation, so arrive 15 minutes early, and players 18 and under need a parent to sign the waiver. Seated, standing and non-motion options suit most ages and abilities, and there's a party room for groups.",
+   "description_fr": "Virtual Rcades est une arcade de simulateurs de mouvement en réalité virtuelle avec plus de 30 simulateurs et capsules de jeu sur les thèmes de la course, du vol, des parcs d'attractions et de l'aventure. L'entrée générale, environ 40 $, donne droit à 60 minutes d'accès complet après une courte orientation; arrivez donc 15 minutes d'avance, et un parent doit signer la décharge pour les 18 ans et moins. Des options assises, debout et sans mouvement conviennent à la plupart des âges et des capacités, et une salle de fête est offerte aux groupes.",
+   "sources": [
+    "https://www.virtualrcades.com/about.php"
+   ]
+  },
+  {
+   "id": 1492,
+   "region": "kelowna",
+   "slug": "gallery-421",
+   "name": "Gallery 421",
+   "before_sha1": "fe22abc96c5db8e71f4376637a9e33169ca9e7df",
+   "before_fr_sha1": "16f9247e1ed07131ea670b2a91e6d577da9a3663",
+   "description": "Gallery 421 is a commercial fine-art gallery near Pandosy Village with more than 500 original works by over 30 professional artists from near and far. Expect paintings and sculpture by local, national and international artists, plus blown glass. Walk-ins are welcome to browse, so it's an easy stop on a grey afternoon.",
+   "description_fr": "La Gallery 421 est une galerie d'art commerciale près du Pandosy Village, qui réunit plus de 500 œuvres originales de plus de 30 artistes professionnels d'ici et d'ailleurs. On y voit des peintures et des sculptures d'artistes locaux, canadiens et internationaux, ainsi que du verre soufflé. Les visiteurs sont les bienvenus sans rendez-vous, ce qui en fait un arrêt facile par un après-midi gris.",
+   "sources": [
+    "https://www.gallery421.ca/"
+   ]
+  },
+  {
+   "id": 1495,
+   "region": "kelowna",
+   "slug": "kelowna-karting-entertainment-centre",
+   "name": "Kelowna Karting Entertainment Centre",
+   "before_sha1": "d0d87c2125d87e7f4b3db98cfb6428c0ef3a3b88",
+   "before_fr_sha1": "f69e3692d3312869858038dd9a4671fcb23cac2a",
+   "description": "Kelowna Karting Entertainment Centre packs an electric go-kart track, Zero Latency free-roam VR, a gel-blaster and laser tag arena, axe throwing and an arcade under one roof, plenty for groups and older kids. Races are eight minutes on track from about $26; junior karts take ages 7+ (48 inches tall), adult karts 12+ (57 inches). Walk-ins are welcome, but book ahead on weekends and holidays, and wear closed-toe shoes.",
+   "description_fr": "Le Kelowna Karting Entertainment Centre réunit sous un même toit une piste de karting électrique, la réalité virtuelle en libre déplacement Zero Latency, une arène de gel blasters et de laser tag, du lancer de hache et une salle d'arcade, de quoi occuper les groupes et les enfants plus âgés. Les courses durent huit minutes sur la piste, à partir d'environ 26 $; les karts juniors acceptent les 7 ans et plus (48 pouces), les karts adultes les 12 ans et plus (57 pouces). On accepte les clients sans réservation, mais réservez la fin de semaine et les jours fériés, et portez des chaussures fermées.",
+   "sources": [
+    "https://kelownakarting.com/pages/faq",
+    "https://kelownakarting.com/pages/karting",
+    "https://kelownakarting.com/pages/pricing"
+   ]
+  },
+  {
+   "id": 1496,
+   "region": "kelowna",
+   "slug": "kf-aerospace-centre-for-excellence",
+   "name": "KF Aerospace Centre for Excellence",
+   "before_sha1": "f34a4f76ad8312f915014bea9afea11f5c5993af",
+   "before_fr_sha1": "f9dd7c93293a5b5156123c123206215dfd8e1c2d",
+   "description": "The KF Aerospace Centre for Excellence is an aviation centre near Kelowna airport displaying nine vintage aircraft, including a DC-3, Mosquito and CF-104 Starfighter, in a working hangar. It adds an interactive aviation exhibit, a flight simulator and an airfield viewing gallery. Admission is a bargain at about $5 a person or $10 for a family.",
+   "description_fr": "Le KF Aerospace Centre for Excellence est un centre de l'aviation près de l'aéroport de Kelowna qui présente neuf aéronefs d'époque, dont un DC-3, un Mosquito et un CF-104 Starfighter, dans un hangar en activité. On y trouve aussi une exposition interactive sur l'aviation, un simulateur de vol et une galerie d'observation donnant sur l'aérodrome. L'entrée est une aubaine : environ 5 $ par personne ou 10 $ par famille.",
+   "sources": [
+    "https://kfcentre.ca/"
+   ]
+  },
+  {
+   "id": 1497,
+   "region": "kelowna",
+   "slug": "cleopatra-s-rituals-thermal-spa-and-steam",
+   "name": "Cleopatra's Rituals Thermal Spa and Steam",
+   "before_sha1": "88c9fb60c2fa961025cb8a5409f04cd2934ea3de",
+   "before_fr_sha1": "13df659fe3d0616ecbc53f8e41df10fb2a6df084",
+   "description": "Cleopatra's Rituals Thermal Spa and Steam has a hot-cold circuit of sauna, steam, thermal showers and a falling-snow room. Thermal Ritual sessions are shared and co-ed, and there are no walk-ins, so pre-book online or call ahead. Wear a swimsuit and bring flip-flops if you can; everything else is provided. Private group bookings of the whole space start at about $500.",
+   "description_fr": "Cleopatra's Rituals Thermal Spa and Steam propose un circuit chaud-froid comprenant sauna, bain de vapeur, douches thermales et une salle de neige tombante. Les séances Thermal Ritual sont partagées et mixtes, et on n'accepte pas les clients sans réservation : réservez en ligne ou appelez d'avance. Portez un maillot et apportez des sandales si possible; tout le reste est fourni. La réservation privée de tout l'espace pour un groupe commence à environ 500 $.",
+   "sources": [
+    "https://www.cleopatrasrituals.com/"
+   ]
+  },
+  {
+   "id": 1498,
+   "region": "kelowna",
+   "slug": "okanagan-bowling-club-obc",
+   "name": "Okanagan Bowling Club (OBC)",
+   "before_sha1": "30087409b1637e30e657592dc8d02f96464c7870",
+   "before_fr_sha1": "7c8fc6b78007958bd5bf690a4ecc54ecdd70a3a1",
+   "description": "Okanagan Bowling Club (OBC) is a five-pin bowling centre in Capri Centre, in the former Capri Lanes space, billed as the largest 5-pin alley in the Okanagan. A game is about $8.50 for teens and adults and $8 for kids, plus shoe rental, and weekends add glow-in-the-dark laser bowling. Reserve a lane online (up to six bowlers each); food and drinks make it an easy group outing.",
+   "description_fr": "L'Okanagan Bowling Club (OBC) est un centre de petites quilles situé au Capri Centre, dans l'ancien local du Capri Lanes, présenté comme la plus grande salle de petites quilles de l'Okanagan. Une partie coûte environ 8,50 $ pour les ados et les adultes et 8 $ pour les enfants, plus la location de chaussures, et la fin de semaine on ajoute les quilles laser fluorescentes. Réservez une allée en ligne (jusqu'à six joueurs chacune); nourriture et boissons sur place en font une sortie de groupe facile.",
+   "sources": [
+    "https://okanaganbowlingclub.com/public-bowling/"
+   ]
+  },
+  {
+   "id": 1499,
+   "region": "kelowna",
+   "slug": "catelowna-cat-cafe",
+   "name": "Catelowna Cat Cafe",
+   "before_sha1": "cb54491318590e5692d5229dda911f8b961e932a",
+   "before_fr_sha1": "4170ceddc6ca5001587a547cd46ccf84f5e1367d",
+   "description": "Catelowna Cat Cafe is a downtown spot where you book an hour with resident and adoptable cats over coffee or tea. Sessions are about $16 a person; walk-ins get in only when the 16-person lounge has room, so reserve and arrive 10 minutes early to order your drink. Kids under 5 aren't allowed in the lounge, and 5- to 12-year-olds need an adult. Also runs events like cat yoga, Paint-A-Pet nights and afternoon Kit-Tea.",
+   "description_fr": "Le Catelowna Cat Cafe est un café à chats du centre-ville où vous réservez une heure avec des chats résidents ou à adopter, autour d'un café ou d'un thé. La séance coûte environ 16 $ par personne; on accepte les visiteurs sans réservation seulement s'il reste de la place dans le salon de 16 personnes, alors réservez et arrivez 10 minutes d'avance pour commander votre boisson. Les enfants de moins de 5 ans ne sont pas admis dans le salon, et ceux de 5 à 12 ans doivent être accompagnés d'un adulte. On y organise aussi des activités comme du yoga avec chats, des soirées Paint-A-Pet et un thé de l'après-midi, le Kit-Tea.",
+   "sources": [
+    "https://catelowna.com/book-a-visit"
+   ]
+  },
+  {
+   "id": 1501,
+   "region": "kelowna",
+   "slug": "geert-maas-sculpture-gardens-gallery",
+   "name": "Geert Maas Sculpture Gardens & Gallery",
+   "before_sha1": "489645f442e52ba161168407abf186731bd8b85c",
+   "before_fr_sha1": "98b98fc68211c6c4bbef6c763a1fa81f02e4bc7f",
+   "description": "The Geert Maas Sculpture Gardens & Gallery is a private garden and gallery in Kelowna's north end holding hundreds of works by artist Geert Maas, including one of Canada's largest collections of bronze sculpture. Viewing is self-guided indoors and out, admission is by donation, and exhibitions change often. Ring the intercom at the gate when you arrive, or call ahead to arrange a tour.",
+   "description_fr": "Le Geert Maas Sculpture Gardens & Gallery est un jardin de sculptures et une galerie privés, dans le nord de Kelowna, qui abritent des centaines d'œuvres de l'artiste Geert Maas, dont l'une des plus grandes collections de sculptures en bronze au Canada. La visite est libre à l'intérieur et à l'extérieur, l'entrée se fait sur une base de dons et les expositions changent souvent. Sonnez à l'interphone de la barrière en arrivant, ou appelez d'avance pour organiser une visite.",
+   "sources": [
+    "https://geertmaas.org/gallery-gardens/"
+   ]
+  },
+  {
+   "id": 1502,
+   "region": "penticton",
+   "slug": "penticton-art-gallery",
+   "name": "Penticton Art Gallery",
+   "before_sha1": "a1172133859251a16584c4008a1d9960f75ddf7d",
+   "before_fr_sha1": "95f82166b62d354f83fe12bdda61e3aa6214c22c",
+   "description": "Penticton Art Gallery is a public gallery on the Okanagan Lake waterfront by Okanagan Beach, with rotating exhibitions across several gallery rooms. Browse regional, provincial and national contemporary art plus seasonal shows and sales. Admission is about $10 for adults, $5 for seniors and students, and $20 for a family, while kids 12 and under, Indigenous visitors and support persons get in free.",
+   "description_fr": "La Penticton Art Gallery est une galerie publique au bord du lac Okanagan, près d'Okanagan Beach, avec des expositions qui changent régulièrement dans plusieurs salles. On y découvre de l'art contemporain régional, provincial et national, ainsi que des expositions-ventes saisonnières. L'entrée coûte environ 10 $ pour les adultes, 5 $ pour les aînés et les étudiants et 20 $ par famille; c'est gratuit pour les enfants de 12 ans et moins, les visiteurs autochtones et les accompagnateurs.",
+   "sources": [
+    "https://www.pentictonartgallery.com/"
+   ]
+  },
+  {
+   "id": 1503,
+   "region": "penticton",
+   "slug": "ss-sicamous-museum-heritage-park",
+   "name": "SS Sicamous Museum & Heritage Park",
+   "before_sha1": "f192a08e0e98ae411b4ac892374be395656a0a0d",
+   "before_fr_sha1": "8222100841de3bcd6aff6d9f339a5bce01bffe80",
+   "description": "SS Sicamous Museum & Heritage Park is a restored 1914 sternwheeler beached at the west end of Okanagan Beach, now a museum you can explore deck by deck. Wander the cabins, dining saloon and wheelhouse to learn about steamship travel on Okanagan Lake. The ship also hosts weddings and private rentals, so it's closed to visitors on some days, especially Saturdays; check before you go.",
+   "description_fr": "Le SS Sicamous Museum & Heritage Park est un bateau à roue arrière restauré de 1914, échoué à l'extrémité ouest d'Okanagan Beach, devenu un musée qu'on explore pont par pont. Parcourez les cabines, la salle à manger et la timonerie pour découvrir les voyages en vapeur sur le lac Okanagan. Le navire accueille aussi des mariages et des locations privées; il est donc fermé aux visiteurs certains jours, surtout le samedi. Vérifiez avant d'y aller.",
+   "sources": [
+    "https://www.sssicamous.ca/"
+   ]
+  },
+  {
+   "id": 1505,
+   "region": "penticton",
+   "slug": "penticton-community-centre-pool-lazy-river",
+   "name": "Penticton Community Centre (Pool & Lazy River)",
+   "before_sha1": "58667822963387080a5e4dc126749702a4bb2738",
+   "before_fr_sha1": "27eaf5e0651a7aa139b72b16db5db1a634b1c320",
+   "description": "Penticton Community Centre is the city's recreation centre on Power Street, with a 10-lane, 25 m lap pool plus a leisure pool featuring a lazy river, spray features and a waterslide; the slide and river both run during Public Swim. There's also a big whirlpool, sauna and steam room for warming up on a cold day. Children under seven need an adult (16+) within arm's reach in the water.",
+   "description_fr": "Le Penticton Community Centre est le centre récréatif de la ville, sur la rue Power, avec un bassin de 25 m à 10 couloirs et une piscine récréative avec rivière paresseuse, jeux d'eau et glissade d'eau; la glissade et la rivière fonctionnent pendant la baignade publique. On y trouve aussi un grand bain tourbillon, un sauna et un bain de vapeur pour se réchauffer par une journée froide. Les enfants de moins de sept ans doivent être accompagnés dans l'eau d'une personne de 16 ans et plus, à portée de bras.",
+   "sources": [
+    "https://www.penticton.ca/parks-recreation/facility-hours-rates-bookings/penticton-community-centre/pool",
+    "https://www.penticton.ca/parks-recreation/recreation-facilities/penticton-community-centre"
+   ]
+  },
+  {
+   "id": 1506,
+   "region": "penticton",
+   "slug": "landmark-cinemas-7-penticton",
+   "name": "Landmark Cinemas 7 Penticton",
+   "before_sha1": "77dc44b6bb1d2f2246da0cf274ce3a8f0e023500",
+   "before_fr_sha1": "e5af6e4bff0af67a9401ee847c4c5e4a56549ad6",
+   "description": "Landmark Cinemas 7 Penticton is a seven-screen downtown movie theatre showing first-run films with rocker seating. Tuesday is the bargain night, when Reel Deal tickets are up to 40% off all day and evening. It also hosts the Penticton Art Gallery's TIFF Film Circuit series, a good pick for film fans on a wet evening.",
+   "description_fr": "Le Landmark Cinemas 7 Penticton est un cinéma de sept salles au centre-ville qui présente des films en première sortie dans des fauteuils berçants. Le mardi est la soirée économique : avec le Reel Deal, les billets sont jusqu'à 40 % moins chers toute la journée et la soirée. Il accueille aussi la série TIFF Film Circuit de la Penticton Art Gallery, un bon choix pour les cinéphiles par une soirée pluvieuse.",
+   "sources": [
+    "https://www.landmarkcinemas.com/movie-deals/reel-deal/"
+   ]
+  },
+  {
+   "id": 1507,
+   "region": "penticton",
+   "slug": "cleland-community-theatre",
+   "name": "Cleland Community Theatre",
+   "before_sha1": "75dd35b321940b67df00d86362d158ed283bd4d9",
+   "before_fr_sha1": "1cda23dcd72aef5e58cbe1d914fc4692fa58dea5",
+   "description": "Cleland Community Theatre is the city-run, 443-seat performing arts theatre inside the Penticton Community Centre on Power Street, hosting symphonies, touring concerts, comedy, dance, speakers and local productions. Most tickets are sold through ValleyFirst Tix. Elevators reach the theatre, cloakroom and washrooms, and there are four wheelchair spaces. Check the event calendar and grab tickets for a show on a rainy evening.",
+   "description_fr": "Le Cleland Community Theatre est la salle de spectacles municipale de 443 places située dans le Penticton Community Centre, sur la rue Power, qui accueille orchestres symphoniques, concerts en tournée, humour, danse, conférenciers et productions locales. La plupart des billets se vendent par ValleyFirst Tix. Un ascenseur dessert la salle, le vestiaire et les toilettes, et on compte quatre places pour fauteuils roulants. Consultez le calendrier et réservez vos billets pour un spectacle par une soirée pluvieuse.",
+   "sources": [
+    "https://www.penticton.ca/node/34"
+   ]
+  },
+  {
+   "id": 1508,
+   "region": "penticton",
+   "slug": "roll-n-stones-fun-centre",
+   "name": "Roll N Stones Fun Centre",
+   "before_sha1": "b6507232ec278be7730109b89591618d3763aa6e",
+   "before_fr_sha1": "eac7e963014b4690b0b3f008ca1793749f97e347",
+   "description": "Roll N Stones Fun Centre is a family fun centre with bowling lanes, glow-in-the-dark laser bowling on Friday and Saturday nights, billiards, darts and an arcade. Thursdays bring all-you-can-bowl for about $25 a person, and birthday parties can be booked ahead. The licensed Victory Lane Bar & Grill serves pizza and wings lane-side.",
+   "description_fr": "Le Roll N Stones Fun Centre est un centre de divertissement familial avec des allées de quilles, des quilles laser fluorescentes les vendredis et samedis soir, du billard, des fléchettes et une arcade. Le jeudi, on joue aux quilles à volonté pour environ 25 $ par personne, et les fêtes d'anniversaire se réservent à l'avance. Le Victory Lane Bar & Grill, avec permis d'alcool, sert pizza et ailes de poulet au bord des allées.",
+   "sources": [
+    "https://www.rollnstonesfuncentre.ca/"
+   ]
+  },
+  {
+   "id": 1510,
+   "region": "penticton",
+   "slug": "leir-house-cultural-centre-penticton-arts-council-gallery",
+   "name": "Leir House Cultural Centre (Penticton Arts Council Gallery)",
+   "before_sha1": "f36c7c1b2c6da9804de11043c036afc56eed6aa2",
+   "before_fr_sha1": "647d10140844b973d451652db9c17f8c6f81ce05",
+   "description": "Leir House Cultural Centre is a historic 1920s house on Manor Park Avenue run by the Penticton & District Community Arts Council, with a community gallery showing six to eight exhibitions a year and resident artists' studios. Drop in to see local art or join one of the creative drop-in groups, from knitting and beading circles to board-game sessions, a monthly writing group and a weekly kids' D&D group, plus workshops.",
+   "description_fr": "Le Leir House Cultural Centre est une maison historique des années 1920 sur l'avenue Manor Park, gérée par le Penticton & District Community Arts Council, avec une galerie communautaire qui présente six à huit expositions par année et des ateliers d'artistes en résidence. Passez voir de l'art local ou joignez-vous à l'un des groupes créatifs libres, des cercles de tricot et de perlage aux séances de jeux de société, en passant par un groupe d'écriture mensuel et un groupe hebdomadaire de D&D pour enfants, sans oublier les ateliers.",
+   "sources": [
+    "https://www.pentictonartscouncil.com/"
+   ]
+  },
+  {
+   "id": 1511,
+   "region": "penticton",
+   "slug": "tempest-theatre-film",
+   "name": "Tempest Theatre & Film",
+   "before_sha1": "4fb87c2e2357769e0af57f3098839a77854e68ed",
+   "before_fr_sha1": "65d72f42dc15a19d2988718eeb2d46183abfa784",
+   "description": "Tempest Theatre & Film is an intimate black-box theatre near downtown Penticton that seats up to 80, staging local plays, film events and acting classes. Seating is first come, first served whatever ticket tier you buy, so arrive early for the best pick. The main theatre level is wheelchair accessible with an accessible washroom. Catch a small-stage show up close on a rainy evening.",
+   "description_fr": "Tempest Theatre & Film est une salle intime de type boîte noire près du centre-ville de Penticton, pouvant accueillir jusqu'à 80 personnes, qui présente des pièces locales, des événements cinéma et des cours de jeu. Les places ne sont pas attribuées, peu importe le prix du billet : arrivez tôt pour avoir le meilleur choix. Le niveau principal de la salle est accessible en fauteuil roulant, avec toilettes accessibles. Une belle façon de voir un spectacle de près par une soirée pluvieuse.",
+   "sources": [
+    "https://tempest.ca/tickets-and-seating"
+   ]
+  },
+  {
+   "id": 1512,
+   "region": "penticton",
+   "slug": "many-hats-theatre-company-cannery-stage",
+   "name": "Many Hats Theatre Company (Cannery Stage)",
+   "before_sha1": "f15f5a1fdd0499dd2a0e8e1e34662bd9aaf91523",
+   "before_fr_sha1": "1be68cd89d5a2d56e688e62c13e0722c5d77facb",
+   "description": "Many Hats Theatre Company is a community live-theatre company founded in 2007 that stages plays and musicals at the Cannery Stage in Penticton's Cannery Trade Centre. Check the season lineup for comedies, dramas and Canadian premieres. Two front-row wheelchair spaces can be booked through the box office, a wheelchair lift is reached through the restaurant, and non-alcoholic drinks are welcome in the theatre.",
+   "description_fr": "Many Hats Theatre Company est une troupe de théâtre communautaire fondée en 2007 qui présente des pièces et des comédies musicales au Cannery Stage, dans le Cannery Trade Centre de Penticton. Consultez la programmation de la saison pour des comédies, des drames et des premières canadiennes. Deux places pour fauteuils roulants à la première rangée se réservent à la billetterie, un ascenseur pour fauteuils est accessible par le restaurant, et les boissons non alcoolisées sont permises dans la salle.",
+   "sources": [
+    "https://manyhatstheatre.com/faqs"
+   ]
+  },
+  {
+   "id": 1513,
+   "region": "summerland",
+   "slug": "summerland-museum-archives",
+   "name": "Summerland Museum & Archives",
+   "before_sha1": "166606a06fc8744126fa334bd1ac915ac9baff92",
+   "before_fr_sha1": "0b3a915d9f76c28da5f10dd319bab1c25e248a99",
+   "description": "Summerland Museum & Archives is a community museum on Wharton Street covering Syilx history, early orchard farming and the Kettle Valley Railway. Upstairs, the Giant's Head Model Railway shows Summerland in the 1920s and 1950s. Kids' drop-in workshops and the Bert Simpson insect collection add hands-on fun. Admission is by donation (suggested $5 per adult, $2 per child), and the front entrance has a ramp, though the second floor is reached only by stairs.",
+   "description_fr": "Le Summerland Museum & Archives est un musée communautaire de la rue Wharton consacré à l'histoire syilx, aux débuts de l'arboriculture et au Kettle Valley Railway. À l'étage, le Giant's Head Model Railway représente Summerland dans les années 1920 et 1950. Des ateliers libres pour enfants et la collection d'insectes de Bert Simpson ajoutent une touche interactive. L'entrée se fait sur contribution volontaire (5 $ suggérés par adulte, 2 $ par enfant); l'entrée principale a une rampe, mais l'étage n'est accessible que par l'escalier.",
+   "sources": [
+    "https://www.summerlandmuseum.org/visitor-information"
+   ]
+  },
+  {
+   "id": 1514,
+   "region": "summerland",
+   "slug": "nixdorf-classic-cars",
+   "name": "Nixdorf Classic Cars",
+   "before_sha1": "fa2a2a7c45c8a89f83d60db8f31eb60ce0c87c39",
+   "before_fr_sha1": "1ac0f96e24b025aebf418725265d144b755fd5f0",
+   "description": "Nixdorf Classic Cars is a private classic-car museum in Summerland with a 14,000 sq ft showroom of more than 50 restored two-door hardtops and convertibles from 1936 to 1970, including Chevrolets, Fords, Oldsmobiles, Chryslers and muscle cars, each with its restoration story. Admission is about $20 per person ($15 each for groups of four or more), and proceeds support charities for children with disabilities. The building is wheelchair accessible, and the museum closes for the winter.",
+   "description_fr": "Nixdorf Classic Cars est un musée privé de voitures anciennes à Summerland, avec une salle d'exposition de 14 000 pi² regroupant plus de 50 coupés à toit rigide et décapotables restaurés de 1936 à 1970 (Chevrolet, Ford, Oldsmobile, Chrysler et voitures musclées), chacun accompagné de l'histoire de sa restauration. L'entrée coûte environ 20 $ par personne (15 $ chacun pour les groupes de quatre ou plus), et les profits appuient des organismes de bienfaisance pour les enfants handicapés. Le bâtiment est accessible en fauteuil roulant, et le musée ferme pour l'hiver.",
+   "sources": [
+    "https://nixdorfclassiccars.com/"
+   ]
+  },
+  {
+   "id": 1517,
+   "region": "osoyoos",
+   "slug": "okanagan-art-gallery",
+   "name": "Okanagan Art Gallery",
+   "before_sha1": "5cd7854077e0871924026e9bcc5ea01d05f50611",
+   "before_fr_sha1": "fc9c1febc1cc0cd7c3f7db34b61e3cdfeb4db5f8",
+   "description": "Okanagan Art Gallery is an artist-run co-op on Main Street with a bright 2,100 sq ft space spread over six rooms. It shows paintings, sculpture and photography by South Okanagan, Boundary and Similkameen artists, along with work in glass, wood and metal. A member artist staffs the gallery each day, so you can chat with the makers.",
+   "description_fr": "L'Okanagan Art Gallery est une galerie coopérative gérée par des artistes sur la rue Main, avec un espace lumineux de 2 100 pi² réparti sur six salles. On y voit des peintures, des sculptures et des photographies d'artistes du sud de l'Okanagan, de la Boundary et de la Similkameen, ainsi que des œuvres en verre, en bois et en métal. Un artiste membre tient la galerie chaque jour, ce qui permet de discuter avec les créateurs.",
+   "sources": [
+    "http://okanaganartgallery.com/"
+   ]
+  },
+  {
+   "id": 1518,
+   "region": "osoyoos",
+   "slug": "the-art-gallery-osoyoos",
+   "name": "The Art Gallery Osoyoos",
+   "before_sha1": "ebe0c431bd0a71da1dbbc376909bd19a8f6eacc7",
+   "before_fr_sha1": "113fbf141ab0efe2c87c1cf08ba72eee42c370ca",
+   "description": "The Art Gallery Osoyoos is the volunteer-run community gallery of the Osoyoos & District Arts Council, at Main Street and 89th Street just west of Town Hall. New shows by local and regional artists open year-round, most running about three weeks. Look out for its popular Summer and Christmas Artisan Markets, which feature smaller, more affordable works.",
+   "description_fr": "The Art Gallery Osoyoos est la galerie communautaire bénévole de l'Osoyoos & District Arts Council, à l'angle de la rue Main et de la 89e Rue, juste à l'ouest de l'hôtel de ville. De nouvelles expositions d'artistes locaux et régionaux y sont présentées toute l'année, la plupart pendant environ trois semaines. Surveillez ses populaires marchés d'artisans d'été et de Noël, qui proposent des œuvres plus petites et plus abordables.",
+   "sources": [
+    "https://theartgalleryosoyoos.ca/planning-your-visit/"
+   ]
+  },
+  {
+   "id": 1519,
+   "region": "oliver",
+   "slug": "venables-theatre",
+   "name": "Venables Theatre",
+   "before_sha1": "42134ad5f0573b804cabe973c1671f42dee78427",
+   "before_fr_sha1": "a18cd1b94c4ca44090ba6478143c2cdc52f90fcb",
+   "description": "Venables Theatre is Oliver's 400-seat performing arts theatre, hosting a busy season of touring concerts, comedy, ballet and dance, family programming and local theatre productions. Tickets are sold online through the theatre's website or at the door. There's an on-site lounge, free parking and full accessibility, so it's an easy choice for a night out when the weather turns.",
+   "description_fr": "Le Venables Theatre est la salle de spectacles de 400 places d'Oliver, qui accueille une saison chargée de concerts en tournée, d'humour, de ballet et de danse, de spectacles familiaux et de productions théâtrales locales. Les billets se vendent en ligne sur le site du théâtre ou à la porte. Il y a un salon sur place, un stationnement gratuit et une accessibilité complète : un choix facile pour une sortie quand la météo se gâte.",
+   "sources": [
+    "https://www.venablestheatre.ca/"
+   ]
+  },
+  {
+   "id": 1521,
+   "region": "penticton",
+   "slug": "donut-house-studios",
+   "name": "Donut House Studios",
+   "before_sha1": "cf61e5005c53df128a2f1b9de13d4de9ef883b86",
+   "before_fr_sha1": "ee69538283dc0b48624d6047b8e9da8c4c24df76",
+   "description": "Donut House Studios is a pottery and craft studio in the Cannery Trade Centre offering bookable one-day and two-part workshops like mug making, casserole dishes, lino printing and jewellery making, plus wheel-throwing courses. Classes suit all skill levels and are booked online; one-day lino printing starts at about $50 and two-part mug making is about $110. A good pick for a hands-on rainy afternoon with friends.",
+   "description_fr": "Donut House Studios est un atelier de poterie et d'artisanat du Cannery Trade Centre qui propose des ateliers d'une journée ou en deux parties, comme la fabrication de tasses, de cocottes, l'impression à la linogravure ou la création de bijoux, ainsi que des cours de tournage. Les cours conviennent à tous les niveaux et se réservent en ligne; la linogravure d'une journée commence à environ 50 $ et la fabrication de tasses en deux parties coûte environ 110 $. Un bon choix pour un après-midi pluvieux créatif entre amis.",
+   "sources": [
+    "https://donuthousestudios.com/"
+   ]
+  },
+  {
+   "id": 1523,
+   "region": "oliver",
+   "slug": "oliver-theatre",
+   "name": "Oliver Theatre",
+   "before_sha1": "1ceddbf52a119d4fbe639e33ecd9bb6b25097ccd",
+   "before_fr_sha1": "a11a6468328d5ce76f89f8a12f047696ef5f5466",
+   "description": "Oliver Theatre is a single-screen downtown movie house that has been showing films since 1947, now with digital projection, a big screen and surround sound. It's a nostalgic, budget-friendly way to spend a rainy evening, with family matinees on weekends. Doors open 30 minutes before each show, some Friday screenings are just $5, and gift certificates can be picked up any time it's open.",
+   "description_fr": "L'Oliver Theatre est un cinéma à écran unique du centre-ville qui présente des films depuis 1947, maintenant avec projection numérique, grand écran et son ambiophonique. C'est une façon nostalgique et économique de passer une soirée pluvieuse, avec des matinées familiales la fin de semaine. Les portes ouvrent 30 minutes avant chaque séance, certaines projections du vendredi ne coûtent que 5 $, et on peut se procurer des chèques-cadeaux en tout temps pendant les heures d'ouverture.",
+   "sources": [
+    "https://olivertheatre.ca/"
+   ]
+  },
+  {
+   "id": 1524,
+   "region": "vernon",
+   "slug": "museum-archives-of-vernon",
+   "name": "Museum & Archives of Vernon",
+   "before_sha1": "89ca34883b1214f3ee3b282ea976c6a3e58cb05c",
+   "before_fr_sha1": "e915305c13a82caca03d13c3ed96ac7a71998793",
+   "description": "The Museum & Archives of Vernon is the North Okanagan's community history museum, with permanent and changing exhibits, streetscapes and dioramas in a recently renovated exhibit space. Admission is by donation, with about $5 per person or $20 per family suggested. It also runs a speaker series and holds the regional archives, the Greater Vernon Archives, a well-regarded spot for local history research.",
+   "description_fr": "Le Museum & Archives of Vernon est le musée d'histoire communautaire du nord de l'Okanagan, avec des expositions permanentes et temporaires, des reconstitutions de rues et des dioramas dans une salle d'exposition récemment rénovée. L'entrée se fait par don, environ 5 $ par personne ou 20 $ par famille étant suggérés. Le musée présente aussi une série de conférences et conserve les archives régionales, les Greater Vernon Archives, une ressource réputée pour la recherche en histoire locale.",
+   "sources": [
+    "https://vernonmuseum.ca/"
+   ]
+  },
+  {
+   "id": 1525,
+   "region": "vernon",
+   "slug": "vernon-public-art-gallery",
+   "name": "Vernon Public Art Gallery",
+   "before_sha1": "e2a2b70ee085c488e5682aa1d502d1d45dc1ab7e",
+   "before_fr_sha1": "f91ab95af9147e7665eedcbacbfef829477e3663",
+   "description": "The Vernon Public Art Gallery is the largest public art gallery in the North Okanagan, presenting changing contemporary exhibitions through the year, with admission by donation. It also hosts artist talks, workshops and hands-on art activities for all ages, making it an easy, low-cost stop on a grey afternoon.",
+   "description_fr": "La Vernon Public Art Gallery est la plus grande galerie d'art publique du nord de l'Okanagan; elle présente des expositions d'art contemporain qui changent au fil de l'année, et l'entrée se fait par don. Elle accueille aussi des conférences d'artistes, des ateliers et des activités artistiques pratiques pour tous les âges : un arrêt facile et peu coûteux par un après-midi gris.",
+   "sources": [
+    "https://www.vernonpublicartgallery.com/"
+   ]
+  },
+  {
+   "id": 1526,
+   "region": "vernon",
+   "slug": "okanagan-science-centre",
+   "name": "Okanagan Science Centre",
+   "before_sha1": "1def2f086c8799a72d7210a9abe74e1751b33d00",
+   "before_fr_sha1": "694a4ef25addf12b6fbc54956969ab256f31247f",
+   "description": "The Okanagan Science Centre is a hands-on science centre in Polson Park with rotating interactive exhibits, planetarium shows and live animals. Just drop in and pay at the front desk: about $12 for adults, $7 for youth, students and seniors, $35 for a family of four, and free for kids under three. Planetarium shows need pre-registration, and anyone under 16 must come with an adult. It also runs workshops and science camps.",
+   "description_fr": "L'Okanagan Science Centre est un centre de sciences interactif situé dans le parc Polson, avec des expositions à manipuler qui changent régulièrement, des spectacles de planétarium et des animaux vivants. On s'y présente sans réservation et on paie à l'accueil : environ 12 $ pour les adultes, 7 $ pour les jeunes, les étudiants et les aînés, 35 $ pour une famille de quatre, et c'est gratuit pour les moins de trois ans. Les séances de planétarium exigent une inscription préalable, et les moins de 16 ans doivent être accompagnés d'un adulte. Le centre propose aussi des ateliers et des camps scientifiques.",
+   "sources": [
+    "https://okscience.ca/pages/booking-information"
+   ]
+  },
+  {
+   "id": 1527,
+   "region": "vernon",
+   "slug": "the-rock-garden-climbing-centre",
+   "name": "The Rock Garden Climbing Centre",
+   "before_sha1": "4909d4bd51d8824317d9611ba64fb103a524654c",
+   "before_fr_sha1": "d2688800b5c5a6e3bf053d1c2884cfd85201e91e",
+   "description": "The Rock Garden Climbing Centre is Vernon's indoor climbing gym, with a bouldering area and roped routes for beginners through experienced climbers. An adult day pass is about $20, and a typical gear rental adds about $8; youth and students pay less. Everyone needs a waiver on file, so fill it out online first, wear comfortable athletic clothes, and staff will give you a quick orientation. Intro lessons, kids' programs and birthday parties are available.",
+   "description_fr": "The Rock Garden Climbing Centre est le centre d'escalade intérieur de Vernon, avec une zone de bloc et des voies sur corde pour tous, des débutants aux grimpeurs expérimentés. Le laissez-passer journalier adulte coûte environ 20 $, et la location d'équipement typique ajoute environ 8 $; les jeunes et les étudiants paient moins. Tout le monde doit avoir signé une décharge, qu'on peut remplir en ligne d'avance; portez des vêtements de sport confortables, et le personnel vous fera une courte orientation. Cours d'initiation, programmes pour enfants et fêtes d'anniversaire sont offerts.",
+   "sources": [
+    "https://www.climbthegarden.com/first-visit-info"
+   ]
+  },
+  {
+   "id": 1528,
+   "region": "vernon",
+   "slug": "beyond-belief-escape-rooms",
+   "name": "Beyond Belief Escape Rooms",
+   "before_sha1": "1dc2f4139a8d06fc7cd10113caf0beee5370e149",
+   "before_fr_sha1": "346ed460d52fcdeb9389220123f245e07f2fb3de",
+   "description": "Beyond Belief Escape Rooms on 25th Street in Vernon has six themed escape rooms, from Lost Island to Wizards Academy, where teams of 2-8 have 60 minutes to solve their mission. Kids 12 and under are welcome with adult supervision. Rooms are booked online, and it's worth reserving early to get the time slot your group wants.",
+   "description_fr": "Beyond Belief Escape Rooms, sur la 25e Rue à Vernon, propose six salles d'évasion thématiques, de Lost Island à Wizards Academy, où des équipes de 2 à 8 personnes ont 60 minutes pour accomplir leur mission. Les enfants de 12 ans et moins sont les bienvenus sous la supervision d'un adulte. Les salles se réservent en ligne, et mieux vaut réserver tôt pour obtenir la plage horaire voulue.",
+   "sources": [
+    "https://www.beyondbelief.ca/"
+   ]
+  },
+  {
+   "id": 1529,
+   "region": "vernon",
+   "slug": "another-world-vr-vernon",
+   "name": "Another World VR Vernon",
+   "before_sha1": "8191cd489c742838905c82e5a3599c04ae627242",
+   "before_fr_sha1": "28998f215d1ab20975fd19e3364d72b207729b57",
+   "description": "Another World VR Vernon is a 4,100 sq ft free-roam virtual reality arena downtown where groups of 2-14 play multiplayer VR adventures, shooters and escape games (ages 6+). Most games run 35 to 50 minutes, with prices from about $30 Monday to Thursday and $35 on weekends. Foam-blaster battles and party packages with pizza and a private party room are also offered.",
+   "description_fr": "Another World VR Vernon est une arène de réalité virtuelle en libre déplacement de 4 100 pi² au centre-ville, où des groupes de 2 à 14 joueurs vivent des aventures, des jeux de tir et des jeux d'évasion multijoueurs en RV (6 ans et plus). La plupart des parties durent de 35 à 50 minutes, à partir d'environ 30 $ du lundi au jeudi et 35 $ la fin de semaine. On propose aussi des combats de pistolets en mousse et des forfaits de fête avec pizza et salle privée.",
+   "sources": [
+    "https://vernon.another-world.com/"
+   ]
+  },
+  {
+   "id": 1531,
+   "region": "vernon",
+   "slug": "caetani-cultural-centre",
+   "name": "Caetani Cultural Centre",
+   "before_sha1": "6c16559e0c354a1b1c480ba02ae0d12922a5ff31",
+   "before_fr_sha1": "81eaf3c0a3e025cd6507410fb06562f1e3331070",
+   "description": "Caetani Cultural Centre is the historic Pleasant Valley Road home of artist Sveva Caetani, with a gallery of her Recapitulation series and guided or self-led tours of the house and grounds. Guided tours trace the family's Vernon years and end in the gallery; they cost about $10 for adults and $6 for youth, and kids 12 and under go free. Private tours are by appointment. It also hosts art workshops, markets and seasonal ghost tours.",
+   "description_fr": "Le Caetani Cultural Centre est la maison patrimoniale de l'artiste Sveva Caetani, sur le chemin Pleasant Valley, avec une galerie consacrée à sa série Recapitulation et des visites guidées ou libres de la maison et du terrain. Les visites guidées retracent les années de la famille à Vernon et se terminent à la galerie; elles coûtent environ 10 $ pour les adultes et 6 $ pour les jeunes, et c'est gratuit pour les 12 ans et moins. Les visites privées se font sur rendez-vous. On y tient aussi des ateliers d'art, des marchés et des visites hantées saisonnières.",
+   "sources": [
+    "https://www.caetani.org/guided-tours",
+    "https://www.caetani.org/tours"
+   ]
+  },
+  {
+   "id": 1532,
+   "region": "vernon",
+   "slug": "vernon-district-performing-arts-centre",
+   "name": "Vernon & District Performing Arts Centre",
+   "before_sha1": "85626cee4bd81c965e5cfa56e61a7b46f17c2a33",
+   "before_fr_sha1": "04fbdebcd57a8008433a1cc8a6d8969a7c9deedc",
+   "description": "The Vernon & District Performing Arts Centre is Vernon's main performing arts venue, hosting touring concerts, comedy, dance, theatre and family shows year-round in a 750-seat auditorium with orchestra and balcony seating, plus the smaller Marie Fleming Studio. Its Spotlight Series includes kids' and First Stages programming for young audiences. Tickets for every show are sold through Ticketseller.ca.",
+   "description_fr": "Le Vernon & District Performing Arts Centre est la principale salle de spectacles de Vernon : concerts de tournée, humour, danse, théâtre et spectacles familiaux toute l'année, dans un auditorium de 750 places avec parterre et balcon, ainsi que dans le Marie Fleming Studio, plus intime. Sa série Spotlight comprend une programmation pour enfants et la série First Stages pour les jeunes publics. Les billets de tous les spectacles sont vendus sur Ticketseller.ca.",
+   "sources": [
+    "https://vdpac.ca/"
+   ]
+  },
+  {
+   "id": 1535,
+   "region": "vernon",
+   "slug": "galaxy-cinemas-vernon",
+   "name": "Galaxy Cinemas Vernon",
+   "before_sha1": "f2d982e1978f23cee338c1acd7b61f9718937b83",
+   "before_fr_sha1": "44c0568b65db933fd3ce9d6418f8f8dae3c04474",
+   "description": "Galaxy Cinemas Vernon is the city's Cineplex multiplex on Highway 6, an easy rainy-day fallback for first-run movies, with RealD 3D screenings. For accessibility, it offers wheelchair access, hearing assistance and CC/DS devices for closed captions and described video. Concessions include Starbucks and MiniMelts, so there's more than popcorn on the menu.",
+   "description_fr": "Le Galaxy Cinemas Vernon est le multiplexe Cineplex de la ville, sur l'autoroute 6, une valeur sûre les jours de pluie pour voir des films en première sortie, avec des projections RealD 3D. Côté accessibilité, il offre l'accès en fauteuil roulant, l'aide à l'audition et des appareils CC/DS pour le sous-titrage et la vidéodescription. Au comptoir, on trouve Starbucks et MiniMelts : il y a plus que du maïs soufflé au menu.",
+   "sources": [
+    "https://www.cineplex.com/theatre/galaxy-cinemas-vernon"
+   ]
+  },
+  {
+   "id": 1536,
+   "region": "vernon",
+   "slug": "vernon-aquatic-centre",
+   "name": "Vernon Aquatic Centre",
+   "before_sha1": "72d2ce321d1c781463bf266441435249b1c2f534",
+   "before_fr_sha1": "253d6d34a03360843e92ff68bc0e768abdd81d92",
+   "description": "The Vernon Aquatic Centre has an eight-lane, 25 m lap pool and a warm leisure pool featuring a waterslide, rapids channel, rope swing, climbing wall and bubble pit, plus a one-metre diving board. Sauna, steam room and hot tub round it out. It's well set up for accessibility, with a ramp into the leisure pool, lifts and aquatic wheelchairs. Kids under seven must stay within arm's reach of someone 16 or older, and Toonie Swims cost $2.",
+   "description_fr": "Le Vernon Aquatic Centre compte un bassin de 25 m à huit couloirs et un bassin récréatif bien chaud avec glissade d'eau, canal de rapides, corde à Tarzan, mur d'escalade et fosse à bulles, en plus d'un tremplin d'un mètre. Sauna, bain de vapeur et spa complètent le tout. Le centre est bien adapté à l'accessibilité, avec une rampe d'accès au bassin récréatif, des lève-personnes et des fauteuils roulants aquatiques. Les enfants de moins de sept ans doivent rester à portée de bras d'une personne de 16 ans ou plus, et les bains « Toonie » coûtent 2 $.",
+   "sources": [
+    "https://www.vernon.ca/node/562",
+    "https://www.vernon.ca/parks-recreation/programs-schedules/pool-schedule-rates"
+   ]
+  },
+  {
+   "id": 1537,
+   "region": "vernon",
+   "slug": "lincoln-lanes",
+   "name": "Lincoln Lanes",
+   "before_sha1": "f75a30783c1040892d5ff81444c8e21a6d1698f9",
+   "before_fr_sha1": "5ea8947f20d203f91e10a703a19b48a75f062fc8",
+   "description": "Lincoln Lanes is a family 5-pin bowling centre in Vernon with automatic scoring and a snack bar serving hot dogs, cheeseburgers and cold drinks. Bowlers of all ages and abilities are welcome, with adaptive ramps, bumpers and dedicated special-needs leagues. It also runs regular leagues, a seasonal Kids Bowl Free program and birthday party packages, so it's an easy pick when the weather turns.",
+   "description_fr": "Lincoln Lanes est un centre familial de petites quilles à Vernon, avec pointage automatique et un casse-croûte qui sert hot-dogs, cheeseburgers et boissons fraîches. Les quilleurs de tous âges et de toutes capacités y sont les bienvenus, grâce à des rampes adaptées, des bandes protectrices et des ligues réservées aux personnes ayant des besoins particuliers. On y trouve aussi des ligues régulières, un programme saisonnier Kids Bowl Free (quilles gratuites pour les enfants) et des forfaits pour fêtes d'anniversaire : un choix facile quand il fait mauvais.",
+   "sources": [
+    "https://www.lincolnlanes.ca/"
+   ]
+  },
+  {
+   "id": 1539,
+   "region": "armstrong",
+   "slug": "armstrong-spallumcheen-museum-art-gallery",
+   "name": "Armstrong Spallumcheen Museum & Art Gallery",
+   "before_sha1": "40e31c390365a9a468d6a83e891ce713f566daec",
+   "before_fr_sha1": "d2951c9c4365dc68c923b0883892a91230523017",
+   "description": "The Armstrong Spallumcheen Museum & Art Gallery in downtown Armstrong covers the history of Armstrong and Spallumcheen, paired with two galleries of rotating exhibitions by regional artists. There's also a gift shop, a used book sale and archives; if you're digging into local or family history, call ahead to book time with the archivist.",
+   "description_fr": "L'Armstrong Spallumcheen Museum & Art Gallery, au centre-ville d'Armstrong, est consacré à l'histoire d'Armstrong et de Spallumcheen, et jumelé à deux galeries d'expositions temporaires d'artistes de la région. On y trouve aussi une boutique de cadeaux, une vente de livres usagés et des archives; si vous faites des recherches en histoire locale ou familiale, appelez d'avance pour prendre rendez-vous avec l'archiviste.",
+   "sources": [
+    "https://armstrongspallmuseumart.com"
+   ]
+  },
+  {
+   "id": 1540,
+   "region": "enderby",
+   "slug": "cardiff-miller-art-warehouse",
+   "name": "Cardiff Miller Art Warehouse",
+   "before_sha1": "80f195ac21c9f45f3c6b480ff2209d2912276035",
+   "before_fr_sha1": "c3d4296248969280e34ee914c476df3ba6509ec4",
+   "description": "The Cardiff Miller Art Warehouse in Enderby is devoted to the immersive sound and installation art of internationally known artists Janet Cardiff and George Bures Miller, with about ten large installations on display. Admission is about $10, and students with valid ID get in free. Private group tours run an hour and a half for up to 30 people.",
+   "description_fr": "Le Cardiff Miller Art Warehouse, à Enderby, est une galerie aménagée dans un entrepôt et consacrée à l'art sonore et aux installations immersives des artistes de renommée internationale Janet Cardiff et George Bures Miller, avec une dizaine de grandes installations exposées. L'entrée coûte environ 10 $, et c'est gratuit pour les étudiants avec une carte valide. Des visites privées d'une heure et demie sont offertes pour des groupes d'au plus 30 personnes.",
+   "sources": [
+    "https://cardiffmillerartwarehouse.ca/info"
+   ]
+  },
+  {
+   "id": 1542,
+   "region": "lumby",
+   "slug": "lumby-district-museum",
+   "name": "Lumby & District Museum",
+   "before_sha1": "f0f015d42a26cdcb4ecc14e1d424810df2c29d21",
+   "before_fr_sha1": "31f30e3726877ffd8618b7a99ae8552c5c19a447",
+   "description": "Lumby & District Museum is a small volunteer-run museum on Glencaird Street telling the story of Lumby and the Monashee area's logging and pioneer history. It opens on summer afternoons only, running seasonally from June through September, so plan your visit for the warmer months; outside that season the doors stay closed.",
+   "description_fr": "Le Lumby & District Museum est un petit musée géré par des bénévoles, sur la rue Glencaird, qui raconte l'histoire forestière et pionnière de Lumby et de la région des Monashee. Il n'ouvre que les après-midi d'été, de juin à septembre; prévoyez donc votre visite pendant la belle saison, car il est fermé le reste de l'année.",
+   "sources": [
+    "https://rdno.ca/node/1324"
+   ]
+  },
+  {
+   "id": 1543,
+   "region": "silverstar",
+   "slug": "gallery-artiva",
+   "name": "Gallery Artiva",
+   "before_sha1": "106a1e16b6abe9d3f5f2753f4d18371d28d4e1b8",
+   "before_fr_sha1": "d94f30cae9aa22287a0150065a3cfed0cf52b869",
+   "description": "Gallery Artiva is a village gallery in the Lord Aberdeen Building at SilverStar, showing and selling fine art, crafts and gifts by Okanagan and Canadian artists, from stained-glass coasters to local books. It also hosts occasional paint-and-sip classes with Vaz Art, with tickets booked through Vaz Art's website.",
+   "description_fr": "Gallery Artiva est une galerie du village de SilverStar, dans le Lord Aberdeen Building, qui expose et vend des œuvres d'art, de l'artisanat et des cadeaux d'artistes de l'Okanagan et du Canada, des sous-verres en vitrail aux livres locaux. Elle accueille aussi à l'occasion des cours de peinture et vin avec Vaz Art, dont les billets se réservent sur le site de Vaz Art.",
+   "sources": [
+    "https://www.galleryartiva.com/"
+   ]
+  },
+  {
+   "id": 1545,
+   "region": "vernon",
+   "slug": "historic-o-keefe-ranch",
+   "name": "Historic O'Keefe Ranch",
+   "before_sha1": "15786a15953ba574bfaeb048f658e1924890d5bf",
+   "before_fr_sha1": "8396b2ca1ba6b6c491ee41b5b967ce75983e6dcd",
+   "description": "Historic O'Keefe Ranch is a heritage site just north of Vernon on Highway 97 where you can tour the 1860s-era O'Keefe Mansion, the general store and post office and St. Ann's Church. The historic buildings open on weekends from May through the end of October, and October brings historian-led mansion tours, a model railway display and a corn maze included with admission.",
+   "description_fr": "L'Historic O'Keefe Ranch est un site patrimonial juste au nord de Vernon, sur l'autoroute 97, où l'on visite le manoir O'Keefe des années 1860, le magasin général et bureau de poste ainsi que l'église St. Ann. Les bâtiments historiques ouvrent la fin de semaine de mai à la fin d'octobre, et octobre amène des visites du manoir commentées par un historien, une exposition de trains miniatures et un labyrinthe de maïs compris dans le prix d'entrée.",
+   "sources": [
+    "https://www.okeeferanch.ca/"
+   ]
+  },
+  {
+   "id": 1548,
+   "region": "kelowna",
+   "slug": "chances-casino-kelowna",
+   "name": "Chances Casino Kelowna",
+   "before_sha1": "14a578be6b09fccb8b1ba89e4985351b14a088a5",
+   "before_fr_sha1": "aeb4b946cc474c307e0f6ad32f0c367381923591",
+   "description": "Chances Casino Kelowna is the city's locally owned casino, with nearly 400 slots, a six-table poker room and both electronic and live table games such as blackjack, roulette, baccarat and Ultimate Texas Hold'em. There's also a sportsbook lounge with a 25-foot screen, and for food you can choose DICE Kitchen + Bar, Chips Café or Chances Bar.",
+   "description_fr": "Le Chances Casino Kelowna est le casino de propriété locale de la ville, avec près de 400 machines à sous, une salle de poker de six tables et des jeux de table électroniques et en direct comme le blackjack, la roulette, le baccara et l'Ultimate Texas Hold'em. On y trouve aussi un salon de paris sportifs avec un écran de 25 pieds et, pour manger, le DICE Kitchen + Bar, le Chips Café ou le Chances Bar.",
+   "sources": [
+    "https://www.chanceskelowna.ca/"
+   ]
+  },
+  {
+   "id": 1549,
+   "region": "kelowna",
+   "slug": "kelowna-curling-club",
+   "name": "Kelowna Curling Club",
+   "before_sha1": "c90608a113e56965e460bfe88b00f96c4af0fab7",
+   "before_fr_sha1": "939f8858757f54de4701e91836890a40bfb02dc9",
+   "description": "The Kelowna Curling Club is a 12-sheet club near downtown that offers one-hour Try Curling sessions with an instructor and all equipment supplied. It's about $25 a person, booked online in time slots of up to eight people, so small parties may be paired with other newcomers. Bigger groups can contact the club or book ice rentals for a curling party.",
+   "description_fr": "Le Kelowna Curling Club est un club de 12 pistes près du centre-ville qui offre des séances d'initiation d'une heure (Try Curling) avec un instructeur, tout l'équipement étant fourni. Il en coûte environ 25 $ par personne, en réservant en ligne des plages pouvant accueillir jusqu'à huit personnes; les petits groupes peuvent donc être jumelés à d'autres débutants. Les groupes plus nombreux peuvent communiquer avec le club ou louer la glace pour une fête de curling.",
+   "sources": [
+    "https://kelownacurling.com/sheets/index/try_curling/"
+   ]
+  },
+  {
+   "id": 1550,
+   "region": "kelowna",
+   "slug": "kelowna-comedy-club-at-dakoda-s-comedy-lounge",
+   "name": "Kelowna Comedy Club at Dakoda's Comedy Lounge",
+   "before_sha1": "19a11c546e6725085c335d6bab92bb075438830d",
+   "before_fr_sha1": "ee77d39285cdbc0d92cd568652503742f3e8f587",
+   "description": "Kelowna Comedy Club at Dakoda's Comedy Lounge is the city's dedicated stand-up room, inside Dakoda's Sports Bar & Grill, with touring and local comics at two shows every Friday and Saturday night. Thursday is open mic night, and themed charity shows pop up through the year. Grab tickets online through Showpass before you go.",
+   "description_fr": "Le Kelowna Comedy Club at Dakoda's Comedy Lounge est la salle d'humour stand-up attitrée de Kelowna, à l'intérieur du Dakoda's Sports Bar & Grill, avec des humoristes en tournée et de la région lors de deux spectacles tous les vendredis et samedis soir. Le jeudi est consacré aux micros ouverts, et des spectacles-bénéfices thématiques ont lieu au fil de l'année. Procurez-vous vos billets en ligne sur Showpass avant d'y aller.",
+   "sources": [
+    "https://kelownacomedy.ca/"
+   ]
+  },
+  {
+   "id": 1551,
+   "region": "west-kelowna",
+   "slug": "funspace-kids",
+   "name": "FunSpace Kids",
+   "before_sha1": "c5d5224991961f90c57323974b5091468ceb076e",
+   "before_fr_sha1": "ef1d8cc88165e5613294a8b3c525adc41e6f5edb",
+   "description": "FunSpace Kids in West Kelowna is an indoor playground for kids 1 to 12, with slides, a trampoline, a Lego wall and separate zones for toddlers and bigger kids. Just drop in: babies under one play free, and a single visit is about $13 for ages 1 to 4 and $16 for ages 5 and up, with no re-entry. An adult needs to supervise at all times, so grab a coffee at the café, and don't forget socks.",
+   "description_fr": "FunSpace Kids, à West Kelowna, est un terrain de jeux intérieur pour les enfants de 1 à 12 ans, avec glissoires, trampoline, mur de Lego et zones séparées pour les tout-petits et les plus grands. On s'y présente sans réservation : c'est gratuit pour les bébés de moins d'un an, et une entrée coûte environ 13 $ pour les 1 à 4 ans et 16 $ pour les 5 ans et plus, sans possibilité de sortir et revenir. Un adulte doit superviser en tout temps; profitez-en pour prendre un café au café, et n'oubliez pas les bas.",
+   "sources": [
+    "https://funspacekids.com/"
+   ]
+  },
+  {
+   "id": 1552,
+   "region": "kelowna",
+   "slug": "revelry-food-music-hub",
+   "name": "Revelry Food + Music Hub",
+   "before_sha1": "93f28e6159f8be41888f05cc801a9f941fa5060e",
+   "before_fr_sha1": "b54090af7298d568fdaf0524aee44588a2a60854",
+   "description": "Revelry Food + Music Hub is a two-level downtown music venue in the Cultural District that hosts touring bands, hip-hop, metal and indie acts plus other ticketed live shows. Expect a standing-room club vibe with food and drinks, though some shows offer limited reserved seats. Events starting after 5 pm are 19+, both floors are fully accessible, and ticket sales are final.",
+   "description_fr": "Le Revelry Food + Music Hub est une salle de spectacle sur deux niveaux au centre-ville, dans le Cultural District, qui accueille des groupes en tournée, du hip-hop, du métal, des artistes indie et d'autres spectacles en direct avec billets. Attendez-vous à une ambiance de club, surtout debout, avec à manger et à boire, même si certains spectacles offrent quelques places réservées. Les événements qui commencent après 17 h sont réservés aux 19 ans et plus, les deux étages sont entièrement accessibles et les billets ne sont pas remboursables.",
+   "sources": [
+    "https://www.revelrykelowna.com/"
+   ]
+  },
+  {
+   "id": 1553,
+   "region": "kelowna",
+   "slug": "parkinson-recreation-centre",
+   "name": "Parkinson Recreation Centre",
+   "before_sha1": "a079cc24dd0b29f6051f9146c9610ef528a99c1e",
+   "before_fr_sha1": "6125039308d5db6d59a9579f25b8686848108ddc",
+   "description": "Parkinson Recreation Centre, the City of Kelowna's main rec centre close to downtown, has a 25-metre pool and a children's play pool for drop-in public swims, plus a hot tub, steam room, gymnasiums and a fitness centre, so it's a handy, low-cost rainy-day swim. Swim times change, so check the city's pool schedule first. Outside, the Basil Meikle courts add 12 outdoor pickleball courts and 6 tennis courts.",
+   "description_fr": "Le Parkinson Recreation Centre, principal centre récréatif de la Ville de Kelowna, près du centre-ville, compte une piscine de 25 mètres et une pataugeoire pour les bains libres, ainsi qu'un spa, un bain de vapeur, des gymnases et un centre de conditionnement physique : une option de baignade pratique et peu coûteuse les jours de pluie. Les horaires de bain changent, alors consultez d'abord l'horaire des piscines de la Ville. À l'extérieur, les terrains Basil Meikle ajoutent 12 terrains de pickleball et 6 terrains de tennis.",
+   "sources": [
+    "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/parkinson-recreation-centre"
+   ]
+  },
+  {
+   "id": 1554,
+   "region": "kelowna",
+   "slug": "loyly-floating-sauna",
+   "name": "Löyly Floating Sauna",
+   "before_sha1": "6416e3f3240fbe39508178143ccf24fe5cb5cb51",
+   "before_fr_sha1": "bd3e8a6c97634af5f30ba0f917328d93e715d542",
+   "description": "Löyly Floating Sauna is a Finnish-style cedar sauna floating at Kelowna's Downtown Marina, with a lake cold plunge and a warm solarium lounge overlooking Okanagan Lake. Book a shared, mixed-gender 80-minute community session online, since walk-ins aren't guaranteed space, or take over the whole sauna with friends. All ages are welcome, with under-16s accompanied by an adult, and towels are sold on site if you forget yours.",
+   "description_fr": "Le Löyly Floating Sauna est un sauna finlandais en cèdre qui flotte à la Downtown Marina de Kelowna, avec un bain froid dans le lac et un solarium chaleureux donnant sur le lac Okanagan. Réservez en ligne une séance communautaire mixte et partagée de 80 minutes, car on ne garantit pas de place sans réservation, ou privatisez tout le sauna entre amis. Tous les âges sont les bienvenus, les moins de 16 ans devant être accompagnés d'un adulte, et on vend des serviettes sur place si vous oubliez la vôtre.",
+   "sources": [
+    "https://www.loylyfloatingsauna.ca/frequently-asked-questions"
+   ]
+  },
+  {
+   "id": 1557,
+   "region": "peachland",
+   "slug": "peachland-community-centre-drop-in-pickleball",
+   "name": "Peachland Community Centre – Drop-in Pickleball",
+   "before_sha1": "8717be87a0efcdbd7d97f0376b11199a7cbedbe3",
+   "before_fr_sha1": "e214278c619b89fbddb6e82dc1c27074ae520293",
+   "description": "The District of Peachland's community centre gym on Beach Avenue runs drop-in indoor pickleball for all levels, with skill-graded and all-play times. Sessions are about $5.50 each, or $52.50 for a 10-punch pass. Visitors can reserve online up to two hours before play, each session holds 22 players with two spots kept for walk-ins, and you can rent a paddle on site. Indoor court shoes are recommended.",
+   "description_fr": "Le gymnase du centre communautaire du District de Peachland, sur l'avenue Beach, propose du pickleball intérieur libre pour tous les niveaux, avec des plages selon le calibre et d'autres ouvertes à tous. Une séance coûte environ 5,50 $, ou 52,50 $ pour une carte de 10 séances. Les visiteurs peuvent réserver en ligne jusqu'à deux heures avant le jeu; chaque séance accueille 22 joueurs, dont deux places gardées pour les gens sans réservation, et on peut louer une raquette sur place. Des chaussures de sport d'intérieur sont recommandées.",
+   "sources": [
+    "https://www.peachland.ca/pickleball"
+   ]
+  },
+  {
+   "id": 1558,
+   "region": "penticton",
+   "slug": "cascades-casino-penticton",
+   "name": "Cascades Casino Penticton",
+   "before_sha1": "8453cf4fd23e3b01340619df5e9ad62216b406ed",
+   "before_fr_sha1": "4d9b4bc860d55251f1256859e9b9dd96aed084e5",
+   "description": "Cascades Casino Penticton sits beside the South Okanagan Events Centre, with more than 400 slot machines from 1¢ to $1, table games and a poker room. MATCH Eatery & Public House and the Summit Bar make it an easy evening out for adults (19+). Bring photo ID, since every guest has to show it at the door.",
+   "description_fr": "Le Cascades Casino Penticton se trouve à côté du South Okanagan Events Centre, avec plus de 400 machines à sous de 1 ¢ à 1 $, des tables de jeu et une salle de poker. Le MATCH Eatery & Public House et le Summit Bar en font une sortie facile en soirée pour les adultes (19 ans et plus). Apportez une pièce d'identité avec photo, car tous les clients doivent la présenter à l'entrée.",
+   "sources": [
+    "https://cascadescasinopenticton.com/",
+    "https://cascadescasinopenticton.com/gaming/"
+   ]
+  },
+  {
+   "id": 1559,
+   "region": "penticton",
+   "slug": "penticton-curling-club",
+   "name": "Penticton Curling Club",
+   "before_sha1": "d993a1eb24941909f2704a7d7fe06ef8847170a3",
+   "before_fr_sha1": "068b82ff577d266d96533461473059f264832393",
+   "description": "Penticton Curling Club, on Vees Drive across from the South Okanagan Events Centre, runs Learn to Curl sessions for newcomers each fall, with Saturday-morning sessions in October. It also hosts bonspiels like the Penticton Curling Classic on Thanksgiving weekend, where spectators can watch top-level curling with passes from about $10 a game, sold at the door, at the club office or online.",
+   "description_fr": "Le Penticton Curling Club, sur la promenade Vees en face du South Okanagan Events Centre, offre chaque automne des séances d'initiation (Learn to Curl) pour les débutants, le samedi matin en octobre. Il accueille aussi des bonspiels comme le Penticton Curling Classic, la fin de semaine de l'Action de grâce, où les spectateurs peuvent voir du curling de haut niveau avec des laissez-passer à partir d'environ 10 $ par partie, vendus à la porte, au bureau du club ou en ligne.",
+   "sources": [
+    "https://curlpenticton.com/"
+   ]
+  },
+  {
+   "id": 1561,
+   "region": "penticton",
+   "slug": "penticton-virtual-reality-studio",
+   "name": "Penticton Virtual Reality Studio",
+   "before_sha1": "ddcc981c495a107bed620aac2e7438d7fd7975e1",
+   "before_fr_sha1": "bae33b8cae825379f96c0eede0fc4a1eb3a2bd56",
+   "description": "Penticton Virtual Reality Studio is a small VR studio inside the Cannery Trade Centre where you book headsets by the hour, try VR escape experiences, or play free arcade games, an infinity game table and foosball. It's open by appointment only, so reserve your session online first. Private party packages add a game room plus a gift and dining area, making it a handy rainy-day birthday spot.",
+   "description_fr": "Le Penticton Virtual Reality Studio est un petit studio de réalité virtuelle dans le Cannery Trade Centre où l'on réserve des casques à l'heure, essaie des jeux d'évasion en RV ou profite gratuitement de jeux d'arcade, d'une table de jeu Infinity et d'un baby-foot. Il n'ouvre que sur rendez-vous; réservez donc votre séance en ligne. Les forfaits de fête privée ajoutent une salle de jeu ainsi qu'un espace cadeaux et repas : pratique pour un anniversaire un jour de pluie.",
+   "sources": [
+    "https://www.inthevive.com/"
+   ]
+  },
+  {
+   "id": 1562,
+   "region": "penticton",
+   "slug": "the-dream-live-music-venue",
+   "name": "The Dream (live music venue)",
+   "before_sha1": "0aafc385007cd3029c579ed8f556423f17fa03d8",
+   "before_fr_sha1": "d16f65fa86dfda7a0c5fce63789bddfbd7b6781a",
+   "description": "The Dream is a 135-seat listening room at 67 Front Street, run entirely by volunteers with the non-profit Dream Society and carrying on the Dream Cafe's legacy of folk, blues, rock and jazz shows. Touring and local acts play up close in a room built for acoustics and sightlines. The society says the room is under renovation with an opening date to be announced, so check where each show is held before you go.",
+   "description_fr": "The Dream est une salle d'écoute de 135 places au 67, rue Front, gérée entièrement par des bénévoles de l'organisme sans but lucratif Dream Society, qui perpétue l'héritage du Dream Cafe avec des spectacles de folk, de blues, de rock et de jazz. Des artistes locaux et en tournée y jouent de près, dans une salle conçue pour l'acoustique et la visibilité. Selon la société, la salle est en rénovation et sa date d'ouverture reste à annoncer; vérifiez donc le lieu de chaque spectacle avant d'y aller.",
+   "sources": [
+    "https://dreamsociety.ca/"
+   ]
+  },
+  {
+   "id": 1563,
+   "region": "penticton",
+   "slug": "shelter-floating-sauna",
+   "name": "Shelter Floating Sauna",
+   "before_sha1": "6cfd890d0f9ebd1fc8ac7783d25aa55de95f908f",
+   "before_fr_sha1": "ce2cefe2f7fd9cb3c6c302342cef6dda2821ed5f",
+   "description": "Shelter Floating Sauna is a cedar sauna that floats on Okanagan Lake at the Lakeside Resort marina, where you cycle between heat, a cold plunge in the lake and rest. Sessions last 70 minutes and are booked online ahead of time. Join a shared social session or book the whole sauna privately for up to eight people.",
+   "description_fr": "Shelter Floating Sauna est un sauna en cèdre qui flotte sur le lac Okanagan, à la marina du Lakeside Resort, où l'on alterne chaleur, plongeon froid dans le lac et repos. Les séances durent 70 minutes et se réservent en ligne à l'avance. Joignez-vous à une séance sociale partagée ou réservez tout le sauna en privé pour un groupe de huit personnes maximum.",
+   "sources": [
+    "https://www.sheltersauna.com/"
+   ]
+  },
+  {
+   "id": 1565,
+   "region": "osoyoos",
+   "slug": "sonora-community-centre",
+   "name": "Sonora Community Centre",
+   "before_sha1": "dd3b004d26ecd8106db074d8a7c1e8e952ee1e31",
+   "before_fr_sha1": "1787f67aaa0ffa779e96784f62af7f445bead74f",
+   "description": "Sonora Community Centre is Osoyoos's indoor recreation centre, with squash courts, a gymnasium hosting pay-per-visit drop-in pickleball and other sports, and a weight room. Visitors can drop in without a membership, a handy rainy-day way to stay active. Passes are sold in person at the centre and cover the weight room, squash and drop-in sports; check in at the front desk and bring clean, closed-toe athletic shoes.",
+   "description_fr": "Le Sonora Community Centre est le centre récréatif intérieur d'Osoyoos, avec des terrains de squash, un gymnase qui accueille du pickleball libre payable à la séance et d'autres sports, ainsi qu'une salle de musculation. Les visiteurs peuvent s'y présenter sans abonnement : une façon pratique de rester actif un jour de pluie. Les laissez-passer s'achètent en personne au centre et donnent accès à la salle de musculation, au squash et aux sports libres; présentez-vous à l'accueil et apportez des chaussures de sport propres et fermées.",
+   "sources": [
+    "https://www.osoyoos.v2.civikit.com/sonora"
+   ]
+  },
+  {
+   "id": 1566,
+   "region": "kaleden",
+   "slug": "dominion-radio-astrophysical-observatory-drao",
+   "name": "Dominion Radio Astrophysical Observatory (DRAO)",
+   "before_sha1": "6be8e3300e10b4e3620d245babf86b9144324c25",
+   "before_fr_sha1": "19960f8c5d49db55c77190706c30a042e0bb3e91",
+   "description": "The Dominion Radio Astrophysical Observatory (DRAO) is the National Research Council's radio telescope site in the White Lake valley, where free one-hour guided tours explain how its giant dishes and the CHIME telescope listen to the universe. There's no booking; tours are first-come, first-served, and the season wraps up in early November. Plan to switch off your phone and other electronics, which can disrupt the instruments. A fascinating, free outing for curious kids and science fans.",
+   "description_fr": "L'observatoire fédéral de radioastrophysique (DRAO) est le site de radiotélescopes du Conseil national de recherches du Canada, dans la vallée de White Lake, où des visites guidées gratuites d'une heure expliquent comment ses antennes géantes et le télescope CHIME écoutent l'univers. Pas de réservation : les visites se font selon l'ordre d'arrivée, et la saison se termine au début de novembre. Prévoyez éteindre votre téléphone et vos autres appareils électroniques, qui peuvent perturber les instruments. Une sortie fascinante et gratuite pour les enfants curieux et les passionnés de science.",
+   "sources": [
+    "https://nrc.canada.ca/en/research-development/nrc-facilities/visitor-tours"
+   ]
+  },
+  {
+   "id": 1568,
+   "region": "penticton",
+   "slug": "springers-gymnastics-drop-in-gym",
+   "name": "Springers Gymnastics (Drop-in Gym)",
+   "before_sha1": "74a8fd4ddb3c51a35ee54bc2ee6a3f7d9ad8c255",
+   "before_fr_sha1": "d16f7bc60cc55abd218e60bee14d614198b5797d",
+   "description": "Springers Gymnastics is a club in the Cannery Trade Centre that opens its gym for drop-in sessions alongside its registered classes. Weekday drop-ins are for ages 12 months to 9 years (about $10 a child, cash only), and Sunday family drop-ins welcome kids up to 10 with a parent supervising (about $15). Every child needs a registration form, waiver and a $72 yearly membership and insurance fee. Kids tumble, bounce and climb on proper equipment.",
+   "description_fr": "Springers Gymnastics est un club du Cannery Trade Centre qui ouvre son gymnase à des séances libres en plus de ses cours réguliers. Les séances libres en semaine s'adressent aux 12 mois à 9 ans (environ 10 $ par enfant, argent comptant seulement), et les séances familiales du dimanche accueillent les enfants jusqu'à 10 ans sous la supervision d'un parent (environ 15 $). Chaque enfant doit remplir un formulaire d'inscription et une décharge, et payer des frais annuels d'adhésion et d'assurance de 72 $. Les enfants culbutent, sautent et grimpent sur du vrai matériel.",
+   "sources": [
+    "https://pentictonspringers.wixsite.com/pentictonspringers/drop-in"
+   ]
+  },
+  {
+   "id": 1569,
+   "region": "penticton",
+   "slug": "ethos-parkour-movement",
+   "name": "Ethos Parkour & Movement",
+   "before_sha1": "83aa5dab0716b747bf679313529f151ed1e9df59",
+   "before_fr_sha1": "06f13830d02147060f69b7b65b7a2ffd8c2d73e7",
+   "description": "Ethos Parkour & Movement is an indoor parkour gym on Okanagan Avenue East with vaults, bars and walls, where kids, teens and adults can join supervised open-gym drop-ins. A one-hour drop-in is about $12.50; fill out the online waiver first (it's good for six months) and register through the gym's app. It also hosts birthday parties, camps and Parents' Night Out events.",
+   "description_fr": "Ethos Parkour & Movement est un gymnase de parkour intérieur sur l'avenue Okanagan Est, avec sauts, barres et murs, où enfants, ados et adultes peuvent participer à des séances libres supervisées. Une séance libre d'une heure coûte environ 12,50 $; remplissez d'abord la décharge en ligne (valide six mois) et inscrivez-vous dans l'application du gymnase. On y organise aussi des fêtes d'anniversaire, des camps et des soirées « Parents' Night Out ».",
+   "sources": [
+    "https://ethosparkour.com/",
+    "https://ethosparkour.com/pricing"
+   ]
+  },
+  {
+   "id": 1570,
+   "region": "penticton",
+   "slug": "lakeline-gallery",
+   "name": "Lakeline Gallery",
+   "before_sha1": "ecb2fe72334b230fdd492d2693f5787af4714c3f",
+   "before_fr_sha1": "d976266e4112e6584dc227aaf87c2315256d8588",
+   "description": "Lakeline Gallery is a two-floor downtown gallery on Martin Street, mixing street art and graffiti downstairs with a curated collector's gallery of original works upstairs. It also runs painting nights, graffiti sessions and other creative workshops, and private daytime viewings can be arranged by appointment if you'd like a quieter look at the collection.",
+   "description_fr": "La Lakeline Gallery est une galerie de deux étages au centre-ville, sur la rue Martin, qui réunit art urbain et graffitis au rez-de-chaussée et une galerie de collection d'œuvres originales à l'étage. On y propose aussi des soirées de peinture, des séances de graffiti et d'autres ateliers créatifs, et des visites privées de jour sont possibles sur rendez-vous pour découvrir la collection au calme.",
+   "sources": [
+    "https://lakelinegallery.com/"
+   ]
+  },
+  {
+   "id": 1571,
+   "region": "oliver",
+   "slug": "oliver-curling-club-eastlink-curling-centre",
+   "name": "Oliver Curling Club (Eastlink Curling Centre)",
+   "before_sha1": "bb2c9432f18f9106143dead453629d54dd037b8d",
+   "before_fr_sha1": "f5967ffdd914288d9077011cb8bd07819c0c95a1",
+   "description": "The Oliver Curling Club, home of the Eastlink Curling Centre, offers Learn to Curl sessions in both regular and stick curling for new curlers or anyone who has curled at the club for less than two years. The season starts in mid-October, and newcomers can contact the club or simply show up for the first session. Its ice also hosts provincial championships and local bonspiels.",
+   "description_fr": "L'Oliver Curling Club, qui abrite l'Eastlink Curling Centre, propose des séances d'initiation (Learn to Curl) au curling régulier et au curling avec bâton pour les nouveaux joueurs ou ceux qui jouent au club depuis moins de deux ans. La saison commence à la mi-octobre, et les débutants peuvent contacter le club ou simplement se présenter à la première séance. Sa glace accueille aussi des championnats provinciaux et des bonspiels locaux.",
+   "sources": [
+    "https://olivercurlingclub.org/"
+   ]
+  },
+  {
+   "id": 1572,
+   "region": "vernon",
+   "slug": "planet-bee-honey-farm-honeymoon-meadery",
+   "name": "Planet Bee Honey Farm & Honeymoon Meadery",
+   "before_sha1": "372311ca5d826af177b9f6791fed4dc2e0bf0a39",
+   "before_fr_sha1": "51d0ef7c00f06dbc9edf1f6413fa52eb4b7cbcf3",
+   "description": "Planet Bee Honey Farm & Honeymoon Meadery is a working honey farm in Vernon where you can watch live bees build comb in on-site viewing hives and learn how honey is made. Tasting is free: sample honey flavours and, for adults, honey wine at the Honeymoon Meadery tasting bar. Groups of any size can book a guided educational presentation online ahead of time.",
+   "description_fr": "Planet Bee Honey Farm & Honeymoon Meadery est une ferme apicole en activité à Vernon, où l'on peut observer des abeilles bâtir leurs rayons dans des ruches vitrées et découvrir comment se fait le miel. Les dégustations sont gratuites : on y goûte différentes saveurs de miel et, pour les adultes, du vin de miel au bar de dégustation de la Honeymoon Meadery. Les groupes de toutes tailles peuvent réserver en ligne une présentation éducative guidée.",
+   "sources": [
+    "https://planetbee.com",
+    "https://planetbee.com/pages/visit-our-farm"
+   ]
+  },
+  {
+   "id": 1573,
+   "region": "vernon",
+   "slug": "canadian-wildlife-museum",
+   "name": "Canadian Wildlife Museum",
+   "before_sha1": "9b4a90d96eeec28b234161ae620807c11860b12c",
+   "before_fr_sha1": "357cc6dd57ee38d09282016732265c9b77901181",
+   "description": "Canadian Wildlife Museum is a private natural-history museum north of Vernon with 350+ mounted specimens, from mice to bison, displayed in life-like dioramas over two floors. Browse 45 viewing stations, a large butterfly and moth collection and a gift shop. Allow at least half an hour, or closer to an hour if you love wildlife. Admission is about $18 for adults, $16 for seniors and $10 for kids 3 to 15, plus GST.",
+   "description_fr": "Le Canadian Wildlife Museum est un musée privé d'histoire naturelle au nord de Vernon qui présente plus de 350 spécimens naturalisés, de la souris au bison, dans des dioramas réalistes répartis sur deux étages. Parcourez 45 postes d'observation, une grande collection de papillons et de papillons de nuit, ainsi qu'une boutique de cadeaux. Prévoyez au moins une demi-heure, ou près d'une heure si vous aimez la faune. L'entrée coûte environ 18 $ pour les adultes, 16 $ pour les aînés et 10 $ pour les 3 à 15 ans, plus TPS.",
+   "sources": [
+    "https://canadianwildlifemuseum.com/"
+   ]
+  },
+  {
+   "id": 1574,
+   "region": "vernon",
+   "slug": "vernon-curling-club",
+   "name": "Vernon Curling Club",
+   "before_sha1": "4162400d5fb1b273bc0c2aa7f5af363bb4f6132d",
+   "before_fr_sha1": "f02fb350587e5183123c191d3b0f9ad9a5609017",
+   "description": "The Vernon Curling Club is a busy downtown club with leagues, bonspiels and the Stone's Throw Cafe overlooking the sheets. Newcomers can sign up solo or as a team for short instructional sessions that include a half-hour lesson and a six-end game, at about $30 a session. Groups of 8 to 80 can rent ice, with instruction available. Brooms and sliders are provided; wear loose clothing and bring clean rubber-soled shoes you haven't worn outside.",
+   "description_fr": "Le Vernon Curling Club est un club animé du centre-ville, avec des ligues, des bonspiels et le Stone's Throw Cafe qui donne sur les pistes. Les débutants peuvent s'inscrire seuls ou en équipe à de courtes séances d'initiation comprenant une leçon d'une demi-heure et une partie de six manches, pour environ 30 $ la séance. Les groupes de 8 à 80 personnes peuvent louer la glace, avec un encadrement offert. Balais et glisseurs sont fournis; portez des vêtements amples et apportez des souliers de course à semelle de caoutchouc propres, jamais portés dehors.",
+   "sources": [
+    "https://vernoncurling.ca/",
+    "https://vernoncurling.ca/index.php/about-the-club/rental-info"
+   ]
+  },
+  {
+   "id": 1633,
+   "region": "kelowna",
+   "slug": "okanagan-regional-library-kelowna-downtown-branch",
+   "name": "Okanagan Regional Library – Kelowna Downtown Branch",
+   "before_sha1": "959b35e613efdf04d8b0b4b0704dfae9f330db77",
+   "before_fr_sha1": "c2745f8414970a5d9ed7494278fefa05f2377d95",
+   "description": "The downtown Kelowna branch of the Okanagan Regional Library is a free, welcoming rainy-day stop in the Cultural District. Beyond books, there are computers, Wi-Fi, bookable study rooms and a makerspace with a 3D printer and recording studio, plus story times for little ones and free drop-in game nights with chess and puzzles. The Library Parkade is about $1.50 an hour on weekdays and free on weekends and after 5 pm.",
+   "description_fr": "La succursale du centre-ville de Kelowna de la bibliothèque régionale de l'Okanagan est un arrêt gratuit et accueillant par temps de pluie, dans le quartier culturel. En plus des livres, on y trouve des ordinateurs, le Wi-Fi, des salles d'étude à réserver et un espace de création avec imprimante 3D et studio d'enregistrement, ainsi que des heures du conte pour les tout-petits et des soirées de jeux gratuites, sans inscription, avec échecs et casse-têtes. Le stationnement Library Parkade coûte environ 1,50 $ l'heure en semaine et il est gratuit la fin de semaine et après 17 h.",
+   "sources": [
+    "https://www.orl.bc.ca/locations/kelowna"
+   ]
+  },
+  {
+   "id": 1634,
+   "region": "kelowna",
+   "slug": "kelowna-family-ymca",
+   "name": "Kelowna Family YMCA",
+   "before_sha1": "a2724532766ad95bf5553d814ab7d3fdd11af0d4",
+   "before_fr_sha1": "44edd6b55769ebdb526531379f9f40841cafa939",
+   "description": "The Kelowna Family YMCA in Rutland is a community health and fitness centre with long opening hours seven days a week. A drop-in, about $11.75 for adults or $5.95 for kids, covers the pools, hot tub, sauna, gym, climbing wall and youth zone, so it's a handy spot for a workout or a family activity when the weather turns. Adults need photo ID at the door.",
+   "description_fr": "Le YMCA familial de Kelowna, à Rutland, est un centre communautaire de santé et de mise en forme ouvert de longues heures, sept jours sur sept. L'entrée à la séance, environ 11,75 $ pour un adulte ou 5,95 $ pour un enfant, donne accès aux piscines, au spa, au sauna, au gymnase, au mur d'escalade et à l'espace jeunesse : un endroit pratique pour s'entraîner ou pour une activité en famille quand la météo se gâte. Les adultes doivent présenter une pièce d'identité avec photo.",
+   "sources": [
+    "https://www.ymcasibc.ca/Locations/Kelowna-Downtown-Y",
+    "https://www.ymcasibc.ca/Locations/Kelowna-Family-Y",
+    "https://www.ymcasibc.ca/Locations/Kelowna-Family-Y/Drop-In"
+   ]
+  },
+  {
+   "id": 1635,
+   "region": "kelowna",
+   "slug": "kelowna-downtown-ymca",
+   "name": "Kelowna Downtown YMCA",
+   "before_sha1": "61169635324c1f8fa22e589caf32344643aa3e82",
+   "before_fr_sha1": "a1d8228a4accdc37e5d07b48f592570e54448272",
+   "description": "The Kelowna Downtown YMCA is a fitness centre in the heart of downtown with free weights, strength machines and cardio equipment, plus around 22 group classes a week such as yoga, cycle, barre and TRX. A drop-in is about $11.75 for adults and includes lockers and showers; bring photo ID. It's an easy place for visitors staying downtown to keep up their routine.",
+   "description_fr": "Le YMCA du centre-ville de Kelowna est un centre de conditionnement physique en plein cœur du centre-ville, avec poids libres, appareils de musculation et équipement cardio, ainsi qu'environ 22 cours de groupe par semaine comme le yoga, le vélo, le barre et le TRX. L'entrée à la séance coûte environ 11,75 $ pour un adulte et donne accès aux casiers et aux douches; apportez une pièce d'identité avec photo. Un endroit pratique pour les visiteurs logés au centre-ville qui veulent garder leur routine.",
+   "sources": [
+    "https://www.ymcasibc.ca/Locations/Kelowna-Downtown-Y",
+    "https://www.ymcasibc.ca/Locations/Kelowna-Downtown-Y/Drop-In",
+    "https://www.ymcasibc.ca/Locations/Kelowna-Family-Y"
+   ]
+  },
+  {
+   "id": 1707,
+   "region": "vernon",
+   "slug": "dante-s-golf-lounge",
+   "name": "Dante's Golf Lounge",
+   "before_sha1": "d5eb25bc7d9a28bba13c8b26610f042175917df5",
+   "before_fr_sha1": "fb839d44c162ea22cbd76b959da2f7021a2493b8",
+   "description": "Dante's Golf Lounge is The Rise's indoor golf spot, tucked into The Edge in Vernon with two Foresight simulator bays and a full food and drink menu from the restaurant next door. Bays book online, with a fall rate of $60 an hour through October, and groups of eight or more can reserve both bays as a private room. Bringing your own clubs is recommended, though rental sets are about $50. Through the off-season, a five-month winter scramble series for three-person teams starts in November.",
+   "description_fr": "Dante's Golf Lounge, c'est le coin golf intérieur de The Rise, niché dans The Edge à Vernon, avec deux baies de simulateur Foresight et un menu complet de plats et de boissons du restaurant voisin. Les baies se réservent en ligne, au tarif d'automne de 60 $ l'heure jusqu'à la fin d'octobre, et les groupes de huit personnes ou plus peuvent réserver les deux baies en salle privée. On recommande d'apporter ses propres bâtons, mais des ensembles se louent environ 50 $. Pendant la saison morte, une série « scramble » d'hiver de cinq mois pour équipes de trois commence en novembre.",
+   "sources": [
+    "https://theriseresort.ca/dantes-golf-lounge/"
+   ]
+  },
+  {
+   "id": 1711,
+   "region": "coldstream",
+   "slug": "mackie-lake-house",
+   "name": "Mackie Lake House",
+   "before_sha1": "6a5c4a6585dcce31985f97a5d7ef64959de3d0f5",
+   "before_fr_sha1": "1ffcd8dad3e49d660621063d87dd5f20adf1eff6",
+   "description": "Mackie Lake House is a historic 1910 home on the shore of Kalamalka Lake, right beside Sovereign Park in Coldstream. Guided tours walk you through the house and its stories; they're currently by appointment, so book ahead, and admission is about $15 for adults, $8 for youth and free for kids 11 and under. The foundation also hosts tea services and concerts through the year. Pair a visit with a stroll down to the lake from Sovereign Park.",
+   "description_fr": "La Mackie Lake House est une maison historique de 1910 au bord du lac Kalamalka, juste à côté du parc Sovereign à Coldstream. Des visites guidées vous font découvrir la maison et son histoire; elles se font actuellement sur rendez-vous, alors réservez d'avance. L'entrée coûte environ 15 $ pour les adultes, 8 $ pour les jeunes et c'est gratuit pour les 11 ans et moins. La fondation y organise aussi des services de thé et des concerts au fil de l'année. Profitez-en pour descendre jusqu'au lac par le parc Sovereign.",
+   "sources": [
+    "https://www.mackiehouse.ca/tours/"
+   ]
+  },
+  {
+   "id": 1810,
+   "region": "okanagan-falls",
+   "slug": "okanagan-falls-museum-bassett-house",
+   "name": "Okanagan Falls Museum (Bassett House)",
+   "before_sha1": "07506d032146ed9cbc919a48196f2f427aa08bdb",
+   "before_fr_sha1": "8ca4ff3ae75bbb7ccc2852df79208bb830be47a7",
+   "description": "The Okanagan Falls Museum is run by the local heritage society around the Bassett House, a 1909 mail-order home shipped in pieces and hauled to the village by wagon. The grounds also hold pioneer photos and artifacts, an outdoor pavilion of early-1900s machinery and a log building honouring world champion rodeo cowboy Kenny McLean. Admission is by donation, and it opens from the May long weekend to the September long weekend, making it an easy summer stop on Main Street.",
+   "description_fr": "L'Okanagan Falls Museum est géré par la société patrimoniale locale autour de la Bassett House, une maison de 1909 commandée par catalogue, expédiée en pièces détachées et transportée jusqu'au village en chariot. Le site abrite aussi des photos et des artefacts de la vie pionnière, un pavillon extérieur de machinerie du début des années 1900 et un bâtiment en rondins qui rend hommage au champion du monde de rodéo Kenny McLean. L'entrée se fait sur contribution volontaire, et le musée ouvre de la longue fin de semaine de mai à celle de septembre : un arrêt facile l'été sur la rue Main.",
+   "sources": [
+    "http://www.okfallsmuseum.ca/"
+   ]
+  }
+ ]
+}

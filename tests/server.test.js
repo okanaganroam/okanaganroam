@@ -16993,10 +16993,10 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       assert.equal(empty.status, 200);
       assert.match(empty.text, /<h1>Indoor &amp; Rainy Day in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="indoor-coming-soon">More indoor spots are coming soon/);
-      assert.match(empty.text, /<h2 class="category-subsection-heading" id="indoorGolfHeading">Indoor golf &amp; simulators<\/h2>/);
+      // One list since 2026-10-14: the simulators sit in it, under the Indoor Golf chip.
+      assert.match(empty.text, /data-fd-type="golf" aria-pressed="false">Indoor Golf<span class="outdoor-activity-count">[1-9]\d*<\/span>/);
       assert.match(empty.text, /href="\/vernon\/golf\/winter-test-sim-lounge"/, 'the simulator links to its existing golf page');
-      assert.match(empty.text, /<body class="golf-page indoor-page">/);
-      assert.match(empty.text, /Indoor page theme \(2026-10-11\)/);
+      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page indoor-page indoor-hub-page">/);
       assert.doesNotMatch(empty.text, /noindex/);
       assert.equal((await WINTER_GET(base, '/vernon/indoor')).status, 404, 'an empty region/indoor pair 404s like any other');
 
@@ -17006,7 +17006,7 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       assert.equal(hub.status, 200);
       assert.match(hub.text, /href="\/kelowna\/indoor\/winter-test-gallery"/);
       assert.doesNotMatch(hub.text, /class="indoor-coming-soon"/);
-      assert.match(hub.text, /Indoor golf &amp; simulators/);
+      assert.match(hub.text, /href="\/vernon\/golf\/winter-test-sim-lounge"/, 'the simulator is still listed');
       const region = await WINTER_GET(base, '/kelowna/indoor');
       assert.equal(region.status, 200);
       assert.match(region.text, /Indoor &amp; Rainy Day Spots in Kelowna, BC/);
@@ -17041,7 +17041,7 @@ test('Indoor & Rainy Day: other-type venues tagged indoor_also get an "Also good
     assert.ok(app.NON_DISCOVERY_COLLECTION_KINDS.has(app.INDOOR_ALSO_COLLECTION_KIND), 'never offered as a trip discovery option');
     await withWinterServer(async (base) => {
       const before = await WINTER_GET(base, '/indoor');
-      assert.doesNotMatch(before.text, /indoorAlsoHeading/, 'no section without members');
+      assert.doesNotMatch(before.text, /also-test-arena/, 'not listed before it is tagged');
       for (const v of [arena, lanes]) {
         const r = app.guardedCollectionMembershipUpdate('indoor_also', v.id, 'add', v === arena ? 'Indoor ice: public skating sessions' : null, { reason: 'fixture', batch_id: 'test' });
         assert.ok(r.ok, JSON.stringify(r));
@@ -17049,7 +17049,7 @@ test('Indoor & Rainy Day: other-type venues tagged indoor_also get an "Also good
       assert.deepEqual(app.getIndoorAlsoVenues().map((v) => v.name), ['Also Test Arena', 'Also Test Lanes']);
       const hub = await WINTER_GET(base, '/indoor');
       assert.equal(hub.status, 200);
-      assert.match(hub.text, /<h2 class="category-subsection-heading" id="indoorAlsoHeading">Also good on a rainy day<\/h2>/);
+      // One list since 2026-10-14: tagged places sit with the rest.
       assert.match(hub.text, /href="\/vernon\/outdoors\/also-test-arena"/, 'an arena links to its outdoors page');
       assert.match(hub.text, /href="\/kelowna\/breweries\/also-test-lanes"/, 'a brewery links to its brewery page');
       assert.doesNotMatch(hub.text, /noindex/);
@@ -17058,7 +17058,7 @@ test('Indoor & Rainy Day: other-type venues tagged indoor_also get an "Also good
       assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
       // The card script wires every type on /indoor (Read more clamp, Favorite / Trip), not just indoor + golf.
       assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="brewery"\][^)]*\[data-venue-category="outdoor"\]/);
-      assert.match(hub.text, /body\.golf-page\.indoor-page \.golf-desc\.is-clamped p \{ -webkit-line-clamp: 3;/);
+      assert.match(hub.text, /body\.fd-page \.card-grid > li\.venue-card\[data-ph\] \.golf-desc p \{ display: -webkit-box; -webkit-line-clamp: 3;/);
       // Their own pages and types are untouched.
       assert.equal((await WINTER_GET(base, '/vernon/outdoors/also-test-arena')).status, 200);
       assert.equal(app.getVenue(arena.id).type, 'outdoor');
@@ -18990,4 +18990,69 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   const filtered = app.renderSportsHubPage([own], [big], notes, { types: ['bike'], features: [], regions: [], sort: 'town' });
   assert.match(filtered, /id="fdResultsSummary" aria-live="polite">1 of 2 places to play</);
   assert.match(filtered, /<option value="town" selected>/);
+});
+
+// ---------- Indoor & Rainy Day hub (2026-10-14) ----------
+test('Indoor hub: one list, experience chips incl. Indoor Golf, a real Family Fun, Open now, a mixed Recommended order, photos and links', () => {
+  const v = (id, name, type, extra = {}) => ({ id, name, type, region: 'kelowna', slug: name.toLowerCase().replace(/\W+/g, '-'), description: 'A fixture place with enough words to read like a listing.', ...extra });
+  const indoor = [
+    v(9101, 'Fixture Museum', 'indoor', { kid_friendly: 1, hours: '{"mon":[["10:00","17:00"]]}' }),
+    v(9102, 'Fixture Art Gallery', 'indoor', { kid_friendly: 1 }),
+    v(9103, 'Fixture Climbing Gym', 'indoor', { kid_friendly: 1 }),
+    v(9104, 'Fixture Escape Room', 'indoor'),
+  ];
+  const golf = [v(9105, 'Fixture Sim Golf', 'golf')];
+  const also = [v(9106, 'Fixture Brew & Bowl', 'brewery', { kid_friendly: 1 })];
+  const notes = new Map([[9106, 'Bowling lanes and arcade']]);
+  const html = app.renderIndoorHubPage(indoor, golf, also, notes, { types: [], features: [], regions: [] });
+  assert.match(html, /id="fdResultsSummary" aria-live="polite">6 places</);
+  assert.match(html, /data-fd-type="golf" aria-pressed="false">Indoor Golf<span class="outdoor-activity-count">1<\/span>/);
+  // Family Fun is the hands-on places, not every kid-friendly listing; never the brewery.
+  assert.deepEqual(app.indoorExperiencesOf(indoor[2], null), ['family']);
+  assert.ok(!app.indoorExperiencesOf(indoor[1], null).includes('family'), 'a kid-friendly gallery is not Family Fun');
+  assert.ok(!app.indoorExperiencesOf(also[0], notes.get(9106)).includes('family'), 'a brewery is never Family Fun');
+  assert.ok(app.indoorExperiencesOf(also[0], notes.get(9106)).includes('games'));
+  assert.match(html, /id="fdOpenNow"/);
+  assert.match(html, /<span class="card-note-label">Rainy day:<\/span> Bowling lanes and arcade/);
+  assert.match(html, /data-venue-id="9105"[^>]*data-ph="simgolf-0"/);
+  assert.match(html, /data-venue-id="9103"[^>]*data-ph="family-0"/);
+  for (const k of ['arts', 'family', 'games', 'spas', 'theatre', 'indoorall', 'simgolf']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
+  assert.match(html, /<option value="recommended" selected>Recommended<\/option><option value="town">By town<\/option>/);
+  assert.match(html, /var SEARCH_LABELS = \{"arts":"museum gallery"/, 'chip labels never widen search ("escape room")');
+  assert.match(html, /<a href="\/indoor\/arts">Museums &amp; Galleries <span>\d+<\/span><\/a>/);
+  const first = html.match(/data-venue-id="(\d+)"/)[1];
+  assert.notEqual(first, '9106', 'an indoor attraction leads, not the brewery');
+});
+
+test('Shared directory search: short words match whole words, swapped letters count as one typo', () => {
+  const html = app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), { types: [], features: [], regions: [] });
+  const script = html.match(/<script>\s*\(function\(\)\{\s*var LABELS[\s\S]*?<\/script>/)[0];
+  const src = script.slice(script.indexOf('  // Folded text is lower case'), script.indexOf('  var searchNote'));
+  const vm = require('node:vm');
+  const ctx = {};
+  vm.runInNewContext(`${src}; var cards = ${JSON.stringify(['Kelowna Thermal spa and steam', 'A spacious play space', 'Exit Escape Games'])}.map(function(t){ return { __fd: fdFold(t) }; }); this.hits = function(q){ searchPlan = fdPlan(q); return JSON.stringify(cards.map(function(c, i){ return fdSearchHit(c) ? i : -1; }).filter(function(i){ return i >= 0; })); }; this.plan = function(q){ return JSON.stringify(fdPlan(q)); };`, ctx);
+  assert.deepEqual(JSON.parse(ctx.hits('spa')), [0], '"spa" is not "space"');
+  assert.equal(JSON.parse(ctx.plan('escpae')).corrected, 'escape');
+  assert.deepEqual(JSON.parse(ctx.hits('escpae')), [2]);
+});
+
+// ---------- Indoor research data (2026-10-14) ----------
+test('Indoor research: every researched hours set passes the guarded validator, and every rewrite is sourced and rating-free', () => {
+  const hours = require('../data/indoor-hours-2026-10.json');
+  assert.ok(hours.reason && hours.batch_id);
+  for (const v of hours.venues) {
+    assert.equal(v.expected_current_hours, null, `${v.name}: only fills missing hours`);
+    assert.ok(app.HOURS_SOURCES.includes(v.verified.hours_source), v.name);
+    assert.match(v.verified.hours_checked_at, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(String(v.url), /^https?:\/\//, `${v.name}: source url`);
+    const r = app.validateVerifiedHours(v.verified.hours);
+    assert.ok(r.ok, `${v.name}: ${r.detail}`);
+  }
+  const desc = require('../data/description-indoor-2026-10.json');
+  assert.equal(desc.venues.length, desc.count);
+  for (const v of desc.venues) {
+    assert.match(v.before_sha1, /^[0-9a-f]{40}$/);
+    assert.ok(v.description.trim() && v.description_fr.trim(), v.name);
+    assert.doesNotMatch(v.description, /\b\d(?:\.\d)?\s*stars?\b/, v.name);
+  }
 });

@@ -13097,7 +13097,7 @@ const HUB_INTRO_STYLE = '<style>body.golf-page .hub-intro { font-size: 1.04rem; 
 const INDOOR_EXPERIENCES = [
   { slug: 'arts', label: 'Museums & Galleries', pattern: /museum|gallery|galleries|art warehouse|observatory|centre for (?:excellence|contemporary art)|art(?:s)? cent(?:re|er)/i, banner: { src: '/images/indoor/activity-arts.jpg', alt: 'Friends looking at artwork in a modern gallery hall', pos: 30 }, heading: 'Museums & Galleries in the Okanagan', intro: 'Museums, art galleries and heritage collections across the valley \u2014 local history, science and contemporary art for a slow, rainy afternoon.' },
   { slug: 'family', label: 'Family Fun', banner: { src: '/images/indoor/activity-family.jpg', alt: 'A girl reaching for a hold on an indoor climbing wall', pos: 40 }, heading: 'Indoor Family Fun in the Okanagan', intro: 'Kid-friendly indoor spots for wet or cold days \u2014 climbing walls, play centres, bowling, museums and more to keep the whole family busy.' },
-  { slug: 'games', label: 'Games & Escape Rooms', pattern: /escape|bowling|bowl|arcade|laser tag|board game|simulator|indoor golf|energyplex/i, banner: { src: '/images/indoor/activity-games.jpg', alt: 'Four friends solving clues together in an escape room', pos: 35 }, heading: 'Games & Escape Rooms in the Okanagan', intro: 'Escape rooms, bowling, arcades, laser tag and golf simulators \u2014 the best ways to beat a rainy day with friends.' },
+  { slug: 'games', label: 'Games & Escape Rooms', pattern: /escape|bowling|bowl|arcade|laser tag|board game|simulator|indoor golf|energyplex|\bgames\b|game room|virtual reality/i, banner: { src: '/images/indoor/activity-games.jpg', alt: 'Four friends solving clues together in an escape room', pos: 35 }, heading: 'Games & Escape Rooms in the Okanagan', intro: 'Escape rooms, bowling, arcades, laser tag and golf simulators \u2014 the best ways to beat a rainy day with friends.' },
   { slug: 'spas', label: 'Spas', pattern: /spa\b|thermal|sauna|steam/i, banner: { src: '/images/indoor/activity-spas.jpg', alt: 'A calm indoor spa pool lined with loungers', pos: 50 }, heading: 'Spas in the Okanagan', intro: 'Spas, saunas and warm pools to unwind in when the weather turns \u2014 a relaxing way to spend a grey day.' },
   { slug: 'theatre', label: 'Theatre', pattern: /theatre|theater|cinema|actors studio|performing arts/i, banner: { src: '/images/indoor/activity-theatre.jpg', alt: 'An audience waiting in front of a red stage curtain', pos: 85 }, heading: 'Theatre & Cinema in the Okanagan', intro: 'Live theatre, performing arts centres and cinemas across the valley \u2014 plays, concerts and films for a night out of the rain.' },
 ];
@@ -13663,6 +13663,14 @@ const FD_CARD_PHOTOS = Object.freeze({
   // Wineries (2026-10-14): Okanagan vineyard, autumn vines, two tastings and
   // the wine-country banner. No dog photo: the only one has a non-Okanagan
   // backdrop.
+  // Indoor & Rainy Day (2026-10-14), keyed by experience.
+  arts: ['/images/indoor/activity-arts-800.jpg'],
+  family: ['/images/indoor/activity-family-800.jpg'],
+  games: ['/images/indoor/activity-games-800.jpg'],
+  spas: ['/images/indoor/activity-spas-800.jpg'],
+  theatre: ['/images/indoor/activity-theatre-800.jpg'],
+  indoorall: ['/images/indoor/indoor-800.jpg'],
+  simgolf: ['/images/golf/golf-courses-800.jpg'],
   // Sports & Recreation (2026-10-14), keyed by activity, not venue type.
   skate: ['/images/sports/activity-skate-800.jpg'],
   bike: ['/images/sports/sports-800.jpg', '/images/trip-v3/stops/stop-cycling-480.jpg'],
@@ -14097,6 +14105,10 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
   return `<script>
 (function(){
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  // What each type chip adds to a card's searchable text, when that differs
+  // from its label ("Games & Escape Rooms" must not make every games place
+  // answer to "escape room").
+  var SEARCH_LABELS = ${JSON.stringify(opts.searchLabels || {}).replace(/</g, '\\u003c')};
   var dataEl = document.getElementById('fdVenueData');
   var DATA = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
   var typeChips = Array.prototype.slice.call(document.querySelectorAll('[data-fd-type]'));
@@ -14183,7 +14195,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     var d = DATA[id] || { c: [], f: [], r: '' };
     var meta = card.querySelector('.venue-meta'), desc = card.querySelector('.golf-desc');
     var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
-                 d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
+                 d.c.map(function(t){ return SEARCH_LABELS[t] || LABELS.types[t] || t; }).join(' '),
                  d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
                  meta ? meta.textContent : '', desc ? desc.textContent : '', d.k || ''];
     card.__fd = fdFold(parts.join(' '));
@@ -14200,8 +14212,11 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   var FD_STOP = { the:1, and:1, in:1, near:1, with:1, a:1, an:1, for:1, of:1, at:1, to:1, on:1, best:1, good:1, great:1, place:1, places:1, spot:1, spots:1, food:1, okanagan:1, bc:1, '&':1 };
   var FD_SYN = { coffee:['coffee','cafe','espresso'], cafe:['cafe','coffee'], beer:['beer','brew','pub','taproom'], pint:['beer','pub'], brewery:['brew'], cocktail:['cocktail'], drinks:['bar','pub','cocktail','lounge','brew','distill'], drink:['bar','pub','cocktail','lounge','brew','distill'], bar:['bar','pub','lounge'], wine:['wine'], brunch:['brunch','breakfast'], breakfast:['breakfast','brunch'], dog:['dog'], pet:['dog'], kid:['kid','family'], family:['kid','family'], veggie:['vegetarian','vegan'], gf:['gluten'], glutenfree:['gluten'], patio:['patio','terrace','deck'], dessert:['dessert','ice cream','bakery','gelato','sweet','chocolate'], icecream:['ice cream','gelato'], spirits:['distill'], whisky:['distill','whisk'], gin:['distill','gin'], vodka:['distill','vodka'] };
   function fdAlternatives(word){
-    var w = word.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''), alts = [w];
+    var w = word.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
     if (!w) return null;
+    // A word of three letters or fewer matches only as a whole word ("spa"
+    // never finds "space"); synonyms below still widen it.
+    var alts = [w.length <= 3 ? w + ' ' : w];
     var stem = w.length > 3 && /s$/.test(w) && !/ss$/.test(w) ? w.replace(/ies$/, 'y').replace(/s$/, '') : w;
     // The singular too ("burgers" -> "burger"); a short one only as a whole
     // word ("taco " but not "earl" inside "early").
@@ -14235,17 +14250,19 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     }
     return bestD <= max ? best : null;
   }
+  // Edit distance where swapping two neighbouring letters ("escpae") is one edit.
   function fdEditDistance(a, b, max){
-    var prev = [], cur, i, j;
+    var prev2 = null, prev = [], cur, i, j;
     for (j = 0; j <= b.length; j++) prev[j] = j;
     for (i = 1; i <= a.length; i++) {
       cur = [i]; var rowMin = i;
       for (j = 1; j <= b.length; j++) {
         cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+        if (prev2 && i > 1 && j > 1 && a.charAt(i - 1) === b.charAt(j - 2) && a.charAt(i - 2) === b.charAt(j - 1)) cur[j] = Math.min(cur[j], prev2[j - 2] + 1);
         if (cur[j] < rowMin) rowMin = cur[j];
       }
       if (rowMin > max) return max + 1;
-      prev = cur;
+      prev2 = prev; prev = cur;
     }
     return prev[b.length];
   }
@@ -15053,6 +15070,232 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('winery', true)}
   ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'wineries', noun: ['winery', 'wineries'] })}
+</body>
+</html>`;
+}
+
+// ---------- Indoor & Rainy Day hub (2026-10-14): /indoor on the Food & Drink engine ----------
+// /indoor listed 125 indoor places A-Z by town, then "Indoor golf &
+// simulators" and "Also good on a rainy day" as two more lists (156 in all,
+// while the top said 125), with no way to see what is open and the "Family
+// Fun" choice matching every kid-friendly place (102 of 156). It is now one
+// list on the shared directory engine: experience chips (Museums &
+// Galleries, Family Fun, Games & Escape Rooms, Spas, Theatre, Indoor Golf)
+// as the type filter, Open now from stored hours, search, Regions, features,
+// 48 at a time and an experience photo per card. Family Fun now means places
+// built for active or hands-on family time (play centres, climbing,
+// trampolines, pools, arenas, bowling, the science centre), not every
+// kid-friendly listing. Few of these places carry a rating, so Recommended
+// prefers the listings a visitor can act on (stored hours, a fuller
+// description), never an editorial flag. The experience pages
+// (/indoor/arts ...) and the town pages stay linked under the list.
+const INDOOR_HUB_EXPERIENCES = [
+  ...INDOOR_EXPERIENCES.map((e) => ({ slug: e.slug, label: e.label, pattern: e.pattern || null })),
+  { slug: 'golf', label: 'Indoor Golf', pattern: null },
+];
+const INDOOR_FAMILY_NAME_RE = /trampolin|bounce|play ?(?:ground|centre|center|land|zone|space|place|house)|indoor play|climb|boulder|aquatic|pool|swim|splash|water ?park|science|discovery|arcade|laser|bowl|mini[- ]?golf|ninja|parkour|airhouse|energyplex|kids|kidz|children|petting|family fun|fun ?zone|funspace|go[- ]?kart|karting|roller|skating|arena|gymnastics|sportszone/i;
+function indoorExperiencesOf(v, note) {
+  const text = `${v.name || ''} ${note || ''}`;
+  const out = [];
+  for (const e of INDOOR_HUB_EXPERIENCES) {
+    if (e.slug === 'golf') { if (v.type === 'golf') out.push('golf'); continue; }
+    if (e.slug === 'family') {
+      const desc = String(v.description || '');
+      const familyish = INDOOR_FAMILY_NAME_RE.test(text)
+        || (v.kid_friendly && /\bkids\b|children|families|family-friendly|toddlers|birthday/i.test(desc) && INDOOR_FAMILY_NAME_RE.test(desc));
+      if (familyish && !['brewery', 'pub', 'cocktail', 'distillery', 'winery'].includes(v.type)) out.push('family');
+      continue;
+    }
+    if (e.pattern && e.pattern.test(text)) out.push(e.slug);
+  }
+  return out;
+}
+const INDOOR_SORTS = [
+  { key: 'recommended', label: 'Recommended' },
+  { key: 'town', label: 'By town' },
+  { key: 'az', label: 'A\u2013Z' },
+];
+const INDOOR_SORT_KEYS = new Set(INDOOR_SORTS.map((x) => x.key));
+// Few of these places carry a rating (and the ones that do are mostly the
+// breweries and pubs listed for their bowling or games), so ratings are not
+// used: places that are indoor attractions first, then the ones a visitor
+// can plan around (stored hours, a fuller description).
+function indoorRecommendedScore(v) {
+  let score = v.type === 'indoor' || v.type === 'golf' ? 1 : 0;
+  if (v.hours) score += 1;
+  score += Math.min(String(v.description || '').split(/\s+/).length, 80) / 80;
+  if (v.kid_friendly) score += 0.2;
+  if (v.great_groups) score += 0.2;
+  return score;
+}
+function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter = null, now = new Date()) {
+  const f = { types: [], features: [], regions: [], ...(filter || {}) };
+  const sort = INDOOR_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
+  const openNow = !!f.openNow;
+  const seen = new Set();
+  const all = [...indoorVenues, ...golfVenues, ...alsoVenues].filter((v) => (seen.has(v.id) ? false : seen.add(v.id)));
+  const expById = new Map(all.map((v) => [v.id, indoorExperiencesOf(v, notes.get(v.id))]));
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
+  const score = new Map(all.map((v) => [v.id, indoorRecommendedScore(v)]));
+  const ranked = all.slice().sort((a, b) => score.get(b.id) - score.get(a.id) || byName(a, b));
+  // A mixed first screen: the next place is the best-ranked one whose main
+  // experience differs from the one before, so golf simulators or museums
+  // don't open the list back to back.
+  const leadOf = (v) => (v.type === 'golf' ? 'golf' : (expById.get(v.id) || [])[0] || v.type);
+  // In the first dozen, at most two of any one kind.
+  const recommended = [];
+  const rest = ranked.slice();
+  const seenLead = {};
+  while (rest.length) {
+    const prev = recommended.length ? leadOf(recommended[recommended.length - 1]) : null;
+    const early = recommended.length < 12;
+    let pick = early ? rest.slice(0, 24).findIndex((v) => leadOf(v) !== prev && (seenLead[leadOf(v)] || 0) < 2) : -1;
+    if (pick < 0) pick = rest.slice(0, 6).findIndex((v) => leadOf(v) !== prev);
+    if (pick < 0) pick = 0;
+    const v = rest.splice(pick, 1)[0];
+    seenLead[leadOf(v)] = (seenLead[leadOf(v)] || 0) + 1;
+    recommended.push(v);
+  }
+  const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
+  const venues = sort === 'az' ? all.slice().sort(byName)
+    : sort === 'town' ? all.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
+      : recommended;
+  const featsById = foodDrinkFeaturesByVenue(venues);
+  const featureTally = {};
+  for (const list of featsById.values()) for (const k of list) featureTally[k] = (featureTally[k] || 0) + 1;
+  // Only the features that mean something indoors.
+  const featureKeys = ['kid_friendly', 'great_groups', 'dog_friendly'].filter((k) => (featureTally[k] || 0) >= 5);
+  f.features = f.features.filter((k) => featureKeys.includes(k));
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
+  const pool = openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
+  const matching = filterFoodDrinkVenues(pool, f, expById, featsById);
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = foodDrinkChipCounts(pool, f, expById, featsById);
+  const openCount = filterFoodDrinkVenues(venues.filter((v) => openInfo.openIds.has(v.id)), f, expById, featsById).length;
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0 || openNow;
+  const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow };
+  const expLabel = Object.fromEntries(INDOOR_HUB_EXPERIENCES.map((e) => [e.slug, e.label]));
+  // "Rainy day:" stays on the cards that have a note (a brewery with bowling, an arena).
+  const cardNotes = new Map(all.filter((v) => String(notes.get(v.id) || '').trim()).map((v) => [v.id, String(notes.get(v.id)).trim()]));
+  const PHOTO_ORDER = ['theatre', 'spas', 'arts', 'games', 'family', 'golf'];
+  const photoKeyFor = (v) => {
+    const exps = expById.get(v.id) || [];
+    const lead = v.type === 'golf' ? 'golf' : PHOTO_ORDER.find((x) => exps.includes(x));
+    const key = lead === 'golf' ? 'simgolf' : lead;
+    return key ? `${key}-0` : 'indoorall-0';
+  };
+
+  const heading = 'Indoor & Rainy Day in the Okanagan';
+  const title = `${heading} | Okanagan Roam`;
+  const description = `${all.length} indoor things to do in the Okanagan for grey, wet or cold days \u2014 museums, galleries, theatres, escape rooms, bowling, climbing gyms, spas and indoor golf, with what's open now.`;
+  const canonical = 'https://okanaganroam.com/indoor';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Indoor & Rainy Day Spots', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+    })),
+  };
+  const payload = {};
+  for (const v of venues) {
+    payload[String(v.id)] = { c: expById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
+    const st = openInfo.byId.get(v.id);
+    if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+  }
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { cardNotes, cardNoteLabel: 'Rainy day:', photoKeyFor });
+  const selected = new Set(f.types);
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an indoor experience" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${INDOOR_HUB_EXPERIENCES.map((e) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${e.slug}" aria-pressed="${selected.has(e.slug) ? 'true' : 'false'}">${escapeHtml(e.label)}<span class="outdoor-activity-count">${counts.types[e.slug] || 0}</span></button>`).join('')}</div>`;
+  const nF = f.features.length, nR = f.regions.length;
+  const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
+      </div>
+    </div>`;
+  const controlsHtml = `<div class="fd-controls">
+    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
+  </div>`;
+  const expLinks = INDOOR_EXPERIENCES.map((e) => `<a href="/indoor/${e.slug}">${escapeHtml(e.label)} <span>${counts.types[e.slug] || 0}</span></a>`).join('\n      ');
+  const townCounts = {};
+  for (const v of venues) townCounts[v.region] = (townCounts[v.region] || 0) + 1;
+  const townLinks = Object.entries(townCounts).filter(([r]) => REGION_LABELS[r])
+    .sort((a, b) => b[1] - a[1] || REGION_LABELS[a[0]].localeCompare(REGION_LABELS[b[0]]))
+    .map(([r, n]) => `<a href="/${r}/${CATEGORY_SLUGS.indoor}">${escapeHtml(REGION_LABELS[r])} <span>${n}</span></a>`).join('\n      ');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES.indoor.src, golfTheme: true, beachTheme: all.some((v) => v.type === 'beach'), advisoryStyles: all.some((v) => advisoryNotes.has(v.id)), savedSidecar: true, noindex: all.length === 0 })}
+${renderOutdoorThemeStyles()}
+${renderFoodDrinkHubStyles()}
+${renderFoodDrinkOpenNowStyles()}
+${golfEngagementHeadHtml('indoor', true, 'hub')}
+<style id="indoor-hub">
+  body.indoor-hub-page .rainy-guide-link { margin: 0 0 14px; font-weight: 700; }
+  body.indoor-hub-page .rainy-guide-link a { color: var(--teal); }
+  body.indoor-hub-page .hub-links { margin: 26px 0 8px; }
+  body.indoor-hub-page .hub-links h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.indoor-hub-page .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.indoor-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.indoor-hub-page .hub-links a:hover { background: rgba(27,43,58,0.06); }
+  body.indoor-hub-page .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
+  body.indoor-hub-page .card-note-label { font-weight: 800; }
+</style>
+</head>
+<body class="golf-page outdoor-page fd-page indoor-page indoor-hub-page">
+${CATEGORY_BANNER_STYLE}
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Indoor & Rainy Day Spots' }])}
+  ${categoryHeroHtml(categoryBannerHtml('indoor'), `<h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.indoor)}</p>
+  <p class="rainy-guide-link"><a href="${RAINY_GUIDE_PATH}">Guide: a rainy day in the Okanagan &rarr;</a></p>`)}
+  ${indoorVenues.length ? '' : '<p class="indoor-coming-soon">More indoor spots are coming soon &mdash; museums, galleries, theatres, escape rooms, bowling and climbing gyms across the valley.</p>'}
+  ${foodDrinkSearchHtml().replace('Search food and drink', 'Search indoor things to do').replace('Search by name, place or dish...', 'Search escape room, climbing, a town...')}
+  ${chips}
+  ${controlsHtml}
+  <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
+  <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state, sort, INDOOR_SORTS)}
+  <p class="fd-search-note" id="fdSearchNote" hidden></p>
+  <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No places match that combination yet.</span> <a href="/indoor" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
+  <p class="fd-no-results-try">Try one word, like <a href="/indoor?types=games">escape rooms</a>, <a href="/indoor?types=family">family fun</a> or <a href="/indoor?types=arts">museums</a>.</p></div>
+  ${cardsHtml}
+  <p class="fd-open-note fd-open-note-end">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <section class="hub-links" aria-labelledby="indoorExperiencesHeading">
+    <h2 id="indoorExperiencesHeading">By experience</h2>
+    <nav aria-label="Indoor things to do by experience">
+      ${expLinks}
+    </nav>
+  </section>
+  <section class="hub-links" aria-labelledby="indoorTownsHeading">
+    <h2 id="indoorTownsHeading">By town</h2>
+    <nav aria-label="Indoor things to do by town">
+      ${townLinks}
+    </nav>
+  </section>
+  <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('indoor', true)}
+  ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'indoor', typeLabels: expLabel, searchLabels: { arts: 'museum gallery', family: 'family kids', games: 'games', spas: 'spa', theatre: 'theatre cinema', golf: 'indoor golf simulator' } })}
 </body>
 </html>`;
 }
@@ -26663,6 +26906,11 @@ const server = http.createServer(async (req, res) => {
       const venues = type === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(type);
       // /wineries (2026-10-14) runs on the Food & Drink directory engine:
       // search, Open now, Sort, regions and features, 48 at a time.
+      if (type === 'indoor' && !query.activity) {
+        const html = renderIndoorHubPage(venues, getIndoorGolfVenues(), getIndoorAlsoVenues(), getIndoorAlsoNotes(), { ...parseFoodDrinkFilterQuery(query), types: String(query.types || '').split(',').filter((t) => INDOOR_HUB_EXPERIENCES.some((a) => a.slug === t)), openNow: query.open === 'now', sort: INDOOR_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
       if (type === 'sport') {
         const html = renderSportsHubPage(venues, getSportsAlsoVenues(), getSportsAlsoNotes(), { ...parseFoodDrinkFilterQuery(query), types: String(query.types || '').split(',').filter((t) => SPORT_ACTIVITIES.some((a) => a.slug === t)), sort: SPORTS_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -27248,6 +27496,9 @@ module.exports = {
   renderFoodDrinkHubScriptHtml,
   renderWineriesHubPage,
   renderSportsHubPage,
+  renderIndoorHubPage,
+  indoorExperiencesOf,
+  INDOOR_HUB_EXPERIENCES,
   sportScaleScore,
   SPORTS_SORTS,
   FD_SORTS,
