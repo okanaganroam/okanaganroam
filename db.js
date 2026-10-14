@@ -561,6 +561,18 @@ if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(SPORTS_ALSO_COL
     .run(SPORTS_ALSO_COLLECTION_SLUG, 'sports_also', 'Also good for sport');
 }
 
+// --- Dog policy collection bootstrap (2026-10-14) -------------------------
+// Where a dog-friendly restaurant, café, brewery or winery actually lets dogs
+// go ("Patio only, on leash"), as the venue itself states it. Membership note
+// = the visitor-facing rule shown on the /dog-friendly card. Seeds NO members;
+// membership goes through POST /admin/collection-membership with kind
+// 'dog_policy'. Not a dog beach: beaches keep the 'dog_friendly' collection.
+const DOG_POLICY_COLLECTION_SLUG = 'dog-policy';
+if (!db.prepare('SELECT id FROM collections WHERE slug = ?').get(DOG_POLICY_COLLECTION_SLUG)) {
+  db.prepare('INSERT INTO collections (slug, kind, title, region) VALUES (?, ?, ?, NULL)')
+    .run(DOG_POLICY_COLLECTION_SLUG, 'dog_policy', 'Dog rules');
+}
+
 // --- Outdoor activity collections bootstrap (2026-09-20, Outdoors Phase 1) --
 // Eight activity kinds that classify an `outdoor` venue (and, later, any
 // existing venue such as a beach/park) by what a visitor can do there:
