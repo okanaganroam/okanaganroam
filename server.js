@@ -11963,9 +11963,10 @@ const categoryCardImage = (b) => ({ src: b.src.replace(/\/([^/]+)$/, '/thumbs/$1
 function categoryDirectoryEntries() {
   // Batch A (P-003): counts, not whole lists (see countVenueRows above).
   const has = (count) => count >= MIN_CATEGORY_VENUES;
-  const typeEntry = (type, href) => ({ label: CATEGORY_LABELS[type].plural, href, tagline: CATEGORY_TAGLINES[type] || null, ...(CATEGORY_BANNER_IMAGES[type] && !FOOD_DRINK_TYPES.includes(type) && type !== 'winery' ? { image: categoryCardImage(CATEGORY_BANNER_IMAGES[type]) } : {}) });
+  // Counts (2026-10-14): each card says how much is behind it.
+  const typeEntry = (type, href) => ({ label: CATEGORY_LABELS[type].plural, href, tagline: CATEGORY_TAGLINES[type] || null, count: countVenuesByCategory(type), noun: [CATEGORY_LABELS[type].singular, CATEGORY_LABELS[type].plural].map((w) => w.toLowerCase().replace(/^cafe/, 'caf\u00e9')), ...(CATEGORY_BANNER_IMAGES[type] && !FOOD_DRINK_TYPES.includes(type) && type !== 'winery' ? { image: categoryCardImage(CATEGORY_BANNER_IMAGES[type]) } : {}) });
   const foodDrink = has(countFoodDrinkHubVenues()) ? [
-    { label: 'All Food & Drink', href: '/food-drink', tagline: 'Every restaurant, cafe, pub, brewery, distillery and lounge in one place.' },
+    { label: 'All Food & Drink', href: '/food-drink', tagline: 'Every restaurant, café, pub, brewery, distillery and lounge in one place.', count: countFoodDrinkHubVenues() },
     ...FOOD_DRINK_TYPES.filter((t) => has(countVenuesByCategory(t))).map((t) => typeEntry(t, `/${CATEGORY_SLUGS[t]}`)),
   ] : [];
   if (has(countVenuesByCategory('winery'))) foodDrink.push(typeEntry('winery', `/${CATEGORY_SLUGS.winery}`));
@@ -11982,26 +11983,37 @@ function categoryDirectoryEntries() {
   const experiences = [];
   if (has(countVenuesByCategory('golf'))) experiences.push(typeEntry('golf', `/${CATEGORY_SLUGS.golf}`));
   if (has(countVenuesByCategory('beach'))) experiences.push(typeEntry('beach', `/${CATEGORY_SLUGS.beach}`));
-  if (has(countOutdoorLandingVenues())) experiences.push({ label: 'Outdoors', href: `/${CATEGORY_SLUGS.outdoor}`, tagline: 'Parks, trails, viewpoints and ski hills across the valley.', image: categoryCardImage(CATEGORY_BANNER_IMAGES.outdoor) });
+  if (has(countOutdoorLandingVenues())) experiences.push({ label: 'Outdoors', href: `/${CATEGORY_SLUGS.outdoor}`, tagline: 'Parks, trails, viewpoints and ski hills across the valley.', count: countOutdoorLandingVenues(), image: categoryCardImage(CATEGORY_BANNER_IMAGES.outdoor) });
   // Ski & Snow and Indoor & Rainy Day (2026-10-11): both pages always render
   // (never a 404), so both are always listed.
   experiences.push({ label: 'Ski & Snow', href: SKI_SNOW_PATH, tagline: 'Ski hills, Nordic trails, tube parks and après at Big White, SilverStar, Apex and Baldy.', image: categoryCardImage(SKI_SNOW_BANNER) });
-  experiences.push({ label: 'Indoor & Rainy Day', href: `/${CATEGORY_SLUGS.indoor}`, tagline: CATEGORY_TAGLINES.indoor, image: categoryCardImage(CATEGORY_BANNER_IMAGES.indoor) });
+  experiences.push({ label: 'Indoor & Rainy Day', href: `/${CATEGORY_SLUGS.indoor}`, tagline: CATEGORY_TAGLINES.indoor, count: countIndoorHubVenues() + getIndoorAlsoVenues().length, image: categoryCardImage(CATEGORY_BANNER_IMAGES.indoor) });
   // Tours & Experiences (2026-10-11): /tours always renders too.
-  experiences.push({ label: CATEGORY_LABELS.tour.plural, href: `/${CATEGORY_SLUGS.tour}`, tagline: CATEGORY_TAGLINES.tour, image: categoryCardImage(CATEGORY_BANNER_IMAGES.tour) });
+  experiences.push({ label: CATEGORY_LABELS.tour.plural, href: `/${CATEGORY_SLUGS.tour}`, tagline: CATEGORY_TAGLINES.tour, count: countToursHubVenues(), noun: ['tour or experience', 'tours and experiences'], image: categoryCardImage(CATEGORY_BANNER_IMAGES.tour) });
   // Sports & Recreation (2026-10-12): /sports always renders too.
-  experiences.push({ label: CATEGORY_LABELS.sport.plural, href: `/${CATEGORY_SLUGS.sport}`, tagline: CATEGORY_TAGLINES.sport, image: categoryCardImage(CATEGORY_BANNER_IMAGES.sport) });
+  experiences.push({ label: CATEGORY_LABELS.sport.plural, href: `/${CATEGORY_SLUGS.sport}`, tagline: CATEGORY_TAGLINES.sport, count: countSportsHubVenues(), noun: ['place to play', 'places to play'], image: categoryCardImage(CATEGORY_BANNER_IMAGES.sport) });
 
-  const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', image: categoryCardImage(WHATS_ON_BANNER) }];
-  if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios and trails where your dog belongs.', image: categoryCardImage(DOG_FRIENDLY_BANNER) });
-  if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The spots locals keep coming back to.', image: categoryCardImage(LOCAL_FAVOURITES_BANNER) });
-  if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Less crowds. More Okanagan.', image: categoryCardImage(HIDDEN_GEMS_BANNER) });
-  if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet corners away from the crowds.', image: categoryCardImage(SECRET_SPOTS_BANNER) });
+  // Discovery (2026-10-14): the three curated collections now say what sets
+  // each apart -- locals' regulars, places most visitors miss, and quiet
+  // outdoor spots -- instead of three ways of saying "away from the crowds".
+  const upcomingEvents = (() => { try { return getWhatsOnEvents().length; } catch (e) { return 0; } })();
+  const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', count: upcomingEvents, noun: ['event in the next 30 days', 'events in the next 30 days'], image: categoryCardImage(WHATS_ON_BANNER) }];
+  if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios, wineries and beaches where your dog is welcome.', count: countDogFriendlyHubVenues(), image: categoryCardImage(DOG_FRIENDLY_BANNER) });
+  if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The places Okanagan locals keep going back to.', count: countLocalFavouriteVenues(), image: categoryCardImage(LOCAL_FAVOURITES_BANNER) });
+  if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Small, under-the-radar places most visitors drive right past.', count: countHiddenGemCollectionVenues(), image: categoryCardImage(HIDDEN_GEMS_BANNER) });
+  if (has(countSecretSpotVenues())) discovery.push({ label: 'Secret Spots', href: '/secret-spots', tagline: 'Quiet beaches, trails and viewpoints off the usual routes.', count: countSecretSpotVenues(), image: categoryCardImage(SECRET_SPOTS_BANNER) });
+
+  // Plan (2026-10-14): the trip planner and the guides, which were not reachable from here.
+  const plan = [
+    { label: 'Build My Trip', href: '/trip', tagline: 'Tell us what you like and get a day-by-day Okanagan plan.', image: { src: '/images/trip-cta-fall.jpg', alt: '', pos: 50 } },
+    { label: 'Guides', href: '/guides', tagline: 'Local guides: patios, brunch, wineries for first-timers, rainy days and more.', image: { src: '/images/guides/thumbs/forest-walk.jpg', alt: '', pos: 50 } },
+  ];
 
   return [
     { label: 'Food & Drink', categories: foodDrink },
     { label: 'Experiences', categories: experiences },
     { label: 'Discovery', categories: discovery },
+    { label: 'Plan your trip', categories: plan },
   ].filter((g) => g.categories.length > 0);
 }
 
@@ -12009,6 +12021,23 @@ function categoryDirectoryEntries() {
 // stays the card's first child) and is moved above the text with order; the
 // name's link stretches over the whole card.
 const CATEGORY_PHOTO_GRID_STYLE = `<style id="category-photo-grid">
+  /* 2026-10-14: count line, site search, Browse by town. */
+  body.categories-page .category-photo-grid .category-count { margin: 0 18px 4px; font-family: 'Nunito', sans-serif; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; color: var(--teal, #2A6B67); }
+  body.categories-page .categories-search .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  body.categories-page .categories-search { display: flex; gap: 8px; max-width: 620px; margin: 4px 0 26px; }
+  body.categories-page .categories-search input { flex: 1; min-width: 0; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; padding: 12px 16px; min-height: 48px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: var(--paper); color: var(--ink); }
+  body.categories-page .categories-search input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  body.categories-page .categories-search button { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 0 22px; min-height: 48px; cursor: pointer; }
+  body.categories-page .categories-towns { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 34px; }
+  body.categories-page .categories-towns a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; min-height: 42px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.9rem; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.categories-page .categories-towns a:hover { background: rgba(27,43,58,0.06); }
+  body.categories-page .categories-towns a span { font-size: 0.76rem; opacity: 0.6; }
+  @media (max-width: 559px) {
+    body.categories-page .category-photo-grid .category-card:has(.category-count) { grid-template-rows: auto auto 1fr; }
+    body.categories-page .category-photo-grid .category-card:has(.category-count) .category-card-photo { grid-row: 1 / 4; }
+    body.categories-page .category-photo-grid .category-count { grid-column: 2; margin: 0 14px 2px; }
+    body.categories-page .categories-search button { padding: 0 16px; }
+  }
   body.categories-page .category-photo-grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 0 0 30px; }
   @media (min-width: 560px) { body.categories-page .category-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 900px) { body.categories-page .category-photo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -12034,9 +12063,21 @@ const CATEGORY_PHOTO_GRID_STYLE = `<style id="category-photo-grid">
   }
   @media (prefers-reduced-motion: reduce) { body.categories-page .category-photo-grid .category-card, body.categories-page .category-photo-grid .category-card-photo img { transition: none; transform: none !important; } }
 </style>`;
+// "585 places" on a card; Food & Drink types name themselves ("213 cafés").
+function categoryCountText(c) {
+  if (typeof c.count !== 'number' || c.count <= 0) return '';
+  const [one, many] = c.noun || ['place', 'places'];
+  return `${c.count.toLocaleString('en-CA')} ${c.count === 1 ? one : many}`;
+}
+// Places per town, for the "Browse by town" row (busiest first).
+function regionVenueCounts() {
+  return db.prepare('SELECT region, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY region').all()
+    .filter((r) => REGION_LABELS[r.region])
+    .sort((a, b) => b.n - a.n || REGION_LABELS[a.region].localeCompare(REGION_LABELS[b.region]));
+}
 function renderCategoriesPage(entries = categoryDirectoryEntries()) {
-  const title = 'Explore All Categories | Okanagan Roam';
-  const description = 'Browse every Okanagan Roam category, from restaurants, cafes and wineries to golf, beaches, the outdoors, events and hidden gems.';
+  const title = 'All Categories: Food, Wine, Outdoors & Events in the Okanagan | Okanagan Roam';
+  const description = 'Browse every Okanagan Roam category, from restaurants, cafés and wineries to golf, beaches, the outdoors, events and hidden gems, or search the whole site.';
   const canonical = 'https://okanaganroam.com/categories';
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -12050,7 +12091,8 @@ function renderCategoriesPage(entries = categoryDirectoryEntries()) {
   <ul class="card-grid${photos ? ' category-photo-grid' : ''}">
     ${g.categories.map((c) => `
       <li class="category-card">
-        <h2><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h2>${c.tagline ? `
+        <h2><a href="${escapeHtml(c.href)}">${escapeHtml(c.label === 'Cafes' ? 'Caf\u00e9s' : c.label)}</a></h2>${categoryCountText(c) ? `
+        <p class="category-count">${escapeHtml(categoryCountText(c))}</p>` : ''}${c.tagline ? `
         <p class="venue-meta">${escapeHtml(c.tagline)}</p>` : ''}${photos ? `
         <div class="category-card-photo"><img src="${c.image.src}" alt="" width="800" height="533" loading="lazy" decoding="async" style="object-position: 50% ${c.image.pos}%"></div>` : ''}
       </li>`).join('\n')}
@@ -12075,7 +12117,16 @@ ${renderGolfHeaderHtml()}
   ])}
   <h1>Explore All Categories</h1>
   <p class="subtitle">Everything Okanagan Roam covers, in one place. Pick a category to see the places, events and collections in it across the valley.</p>
+  <form class="categories-search" action="/browse" method="get" role="search">
+    <label class="visually-hidden" for="categoriesSearch">Search Okanagan Roam</label>
+    <input type="search" id="categoriesSearch" name="q" placeholder="Search places and events" autocomplete="off">
+    <button type="submit">Search</button>
+  </form>
   ${sections}
+  <h2 class="category-subsection-heading" id="categoriesTowns">Browse by town</h2>
+  <nav class="categories-towns" aria-labelledby="categoriesTowns">
+    ${regionVenueCounts().map((r) => `<a href="/${r.region}">${escapeHtml(REGION_LABELS[r.region])} <span>${r.n.toLocaleString('en-CA')}</span></a>`).join('\n    ')}
+  </nav>
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}

@@ -11395,7 +11395,16 @@ test('/categories: 200, each visitor-facing category once, linking to its own ex
     assert.doesNotMatch(href, /^\/browse/, `${href} must not send visitors to the search engine`);
     assert.equal((await fetch(`${base}${href}`)).status, 200, href);
   }
-  assert.doesNotMatch(html, /id="searchInput"|class="venue-card"|type="search"/, 'no search box, filters or venue listing');
+  assert.doesNotMatch(html, /id="searchInput"|class="venue-card"/, 'no filters or venue listing');
+  // 2026-10-14: one site search box (into /browse), a count on each card, and Browse by town.
+  assert.match(html, /<form class="categories-search" action="\/browse" method="get" role="search">[\s\S]*?<input type="search" id="categoriesSearch" name="q"/);
+  assert.match(html, /<p class="category-count">[\d,]+ (places|restaurants|wineries)<\/p>/);
+  const entries = app.categoryDirectoryEntries().flatMap((g) => g.categories);
+  const counted = entries.filter((c) => c.count > 0);
+  assert.equal((html.match(/<p class="category-count">/g) || []).length, counted.length, 'a count line for every card with a count');
+  const towns = html.slice(html.indexOf('<nav class="categories-towns"'));
+  assert.match(towns, /<a href="\/[a-z-]+">[^<]+ <span>\d[\d,]*<\/span><\/a>/, 'town links with place counts');
+  assert.match(html, /<title>All Categories: Food, Wine, Outdoors &amp; Events in the Okanagan \| Okanagan Roam<\/title>/);
   // Photos (2026-10-12): every Food & Drink card carries its page's banner photo as a lazy thumbnail.
   const fd = html.slice(html.indexOf('<ul class="card-grid category-photo-grid">'));
   assert.ok(html.includes('<ul class="card-grid category-photo-grid">'), 'Food & Drink is a photo grid');
