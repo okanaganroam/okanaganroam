@@ -18905,6 +18905,8 @@ test('My Trip: every page with the trip tray hides the floating button and gets 
   assert.equal(app.withTripNav(app.withTripNav('<div id="tripTray">x')), `${app.TRIP_NAV_SNIPPET}<div id="tripTray">x`, 'idempotent');
   assert.equal(app.withTripNav('<p>no tray</p>'), '<p>no tray</p>');
   assert.doesNotThrow(() => new Function(app.TRIP_NAV_SNIPPET.split('<script>')[1].split('</script>')[0]));
+}));
+
 // ---------- Wineries hub (2026-10-14) ----------
 test('Wineries hub: search, regions, winery features, Open now and Sort; best first; 48 cards; wine photos; town links', () => {
   const venues = app.getVenuesByCategory('winery');
@@ -18944,3 +18946,22 @@ test('Wineries hub: a filtered link renders filtered, unknown features drop out,
   assert.match(res, /<option value="rating" selected>/);
   assert.match(res, /id="fdOpenNow" data-fd-open-now aria-pressed="true"/);
 }));
+
+// ---------- Description rewrites (2026-10-14) ----------
+test('Description rewrites: every entry is complete, rating-free and guarded by the text it replaces', () => {
+  const data = require('../data/description-rewrites-2026-10.json');
+  assert.equal(data.venues.length, data.count);
+  const ids = new Set();
+  for (const v of data.venues) {
+    assert.ok(Number.isInteger(v.id) && !ids.has(v.id), `unique id ${v.id}`);
+    ids.add(v.id);
+    for (const k of ['region', 'slug', 'name', 'description', 'description_fr']) assert.ok(typeof v[k] === 'string' && v[k].trim(), `${v.id}: ${k}`);
+    assert.match(v.before_sha1, /^[0-9a-f]{40}$/);
+    assert.match(v.before_fr_sha1, /^[0-9a-f]{40}$/);
+    assert.doesNotMatch(v.description, /\b\d(?:\.\d)?\s*stars?\b|\bAt \d/, `${v.id}: no star rating`);
+    assert.doesNotMatch(v.description_fr, /étoiles?/, `${v.id}: no star rating (fr)`);
+  }
+  const script = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'apply-description-rewrites.js'), 'utf8');
+  assert.match(script, /sha1\(live\.description\) !== item\.before_sha1/, 'never overwrites an edited description');
+  assert.match(script, /description-rewrites-backup-/, 'backs up before writing');
+});
