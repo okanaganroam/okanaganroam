@@ -6937,24 +6937,27 @@ function renderHomeTopPicksHTML({ now = homepageNow() } = {}) {
   </div>
 </section>`;
 }
-// A one-line count of what the site lists, straight from the listings.
+// A one-line count of what the site lists, straight from the listings and What's On; each count links to its page.
 // app.js is frozen, so these modules carry both languages and show the one matching html[lang] (as the mood swipe cue does).
-const HOME_STATS_FR = Object.freeze({ 'home.stats.places': 'vrais lieux', 'home.stats.food': 'endroits où manger et boire', 'home.stats.wineries': 'vignobles', 'home.stats.beaches': 'plages', 'home.stats.outdoors': 'sentiers, parcs et points de vue' });
-function renderHomeStatsHTML() {
+function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   let counts = {};
   try { for (const r of db.prepare('SELECT type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY type').all()) counts[r.type] = r.n; } catch (e) { counts = {}; }
+  let events = 0;
+  try { events = getWhatsOnEvents(resolveWhatsOnWindow({}, now)).length; } catch (e) { events = 0; }
   const n = (types) => types.reduce((t, k) => t + (counts[k] || 0), 0);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (total < 100) return '';
   const fmt = (x) => Number(x).toLocaleString('en-CA');
   const items = [
-    [total, 'home.stats.places', 'real places'],
-    [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), 'home.stats.food', 'places to eat & drink'],
-    [n(['winery']), 'home.stats.wineries', 'wineries'],
-    [n(['beach']), 'home.stats.beaches', 'beaches'],
-    [n(['outdoor']), 'home.stats.outdoors', 'trails, parks & lookouts'],
+    [total, '/destinations', 'real places', 'vrais lieux'],
+    [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 30 days
+    [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), '/food-drink', 'places to eat & drink', 'endroits où manger et boire'],
+    [n(['winery']), '/wineries', 'wineries', 'vignobles'],
+    [n(['beach']), '/beaches', 'beaches', 'plages'],
+    [n(['golf']), '/golf', 'golf courses', 'terrains de golf'],
+    [n(['outdoor']), '/outdoors', 'trails, parks & lookouts', 'sentiers, parcs et points de vue'],
   ].filter(([v]) => v > 0);
-  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, key, label]) => `<li><strong>${fmt(v)}</strong> <span class="home-en">${label}</span><span class="home-fr" lang="fr">${HOME_STATS_FR[key]}</span></li>`).join('')}</ul>`;
+  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v)}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
 }
 function renderBuildTripCTAHTML({ now = homepageNow() } = {}) {
   const fall = isFallHeroSeason(now);
@@ -8449,6 +8452,8 @@ ${renderCanonicalFooterStyles()}
   .home-stats-wrap { padding-top: 14px; padding-bottom: 2px; }
   .home-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; list-style: none; margin: 0; padding: 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; color: rgba(42,32,25,0.72); }
   .home-stats strong { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.02rem; color: var(--ref-navy); margin-right: 2px; }
+  .home-stats a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s ease, color 0.15s ease; }
+  .home-stats a:hover, .home-stats a:focus-visible { color: var(--ref-navy); border-bottom-color: currentColor; }
   /* This Weekend + Top Picks: a row of four cards on desktop, a swipe row on phones (like the mood tiles). */
   .home-row .home-scroll-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .home-event-card, .home-pick-card { display: flex; flex-direction: column; background: #fff; border-radius: 12px; overflow: hidden; text-decoration: none; color: var(--ref-navy); box-shadow: 0 10px 22px -18px rgba(74,52,40,0.55); border: 1px solid rgba(42,32,25,0.06); transition: transform 0.18s ease, box-shadow 0.18s ease; }
@@ -8470,7 +8475,8 @@ ${renderCanonicalFooterStyles()}
   }
   @media (max-width: 640px) {
     .home-stats { gap: 4px 14px; font-size: 0.8rem; }
-    .home-stats li:nth-child(2), .home-stats li:nth-child(n+5) { display: none; }
+    /* Phones: places and upcoming events, on one line. */
+    .home-stats li:nth-child(n+3) { display: none; }
     /* "Explore All Okanagan Regions" sits under the heading, like the other sections' links, now the cards are a swipe row. */
     .explore-all-link-mobile { display: none; }
     .explore-all-link-heading { display: inline; }
@@ -23346,7 +23352,7 @@ const server = http.createServer(async (req, res) => {
         // HOME_TOP_PICKS=on shows it (for previews).
         const topPicks = /^(1|on|true|yes)$/i.test(process.env.HOME_TOP_PICKS || '') ? renderHomeTopPicksHTML({ now: homepageNow() }) : '';
         // The counts sit in a slim strip right under the hero.
-        const statsHtml = renderHomeStatsHTML();
+        const statsHtml = renderHomeStatsHTML({ now: homepageNow() });
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
         if (html.includes(heroToWizardAnchor)) {

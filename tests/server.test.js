@@ -18621,6 +18621,8 @@ test('Homepage: the counts strip, This Weekend and Top Picks render from real da
     assert.match(stats, /class="home-stats"/);
     for (const m of stats.matchAll(/<strong>([\d,]+)<\/strong>/g)) assert.ok(Number(m[1].replace(/,/g, '')) > 0);
     assert.match(stats, /class="home-fr" lang="fr">vrais lieux/);
+    // Every count links to its page.
+    assert.equal((stats.match(/<li>/g) || []).length, (stats.match(/<li><a href="\/[a-z-]+">/g) || []).length);
   }
   const picks = app.renderHomeTopPicksHTML({ now: new Date('2026-10-14T12:00:00-07:00') });
   if (picks) {
