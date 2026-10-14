@@ -1,0 +1,15 @@
+{
+  "reason": "Chulo Tapas & Bar reply to the 2026-10-14 outreach email (Christopher Royal): sent their own photos for the listing",
+  "batch_id": "venue-replies-2026-10-14-chulo",
+  "venues": [
+    {
+      "id": 141,
+      "name": "Chulo Tapas & Bar",
+      "region": "penticton",
+      "slug": "chulo-tapas-bar",
+      "source": "Email from Christopher Royal, info@chulotapasbar.com, 2026-10-14",
+      "expect": { "image_url": null },
+      "set": { "image_url": "/images/venues/chulo-tapas-bar-patio-evening.jpg" }
+    }
+  ]
+}
