@@ -17141,7 +17141,10 @@ function parseCuratedHubQuery(query, typeKeys, featureKeys) {
 // cardOpts, features (candidate keys), openNow, surface, search {label,
 // placeholder}, searchLabels, tryLinks [[href, text]], noun.
 function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
-  const typeKeys = new Set(cfg.types.map((t) => t.type));
+  // cfg.hiddenTypes: types a link may ask for (?types=restaurant) that have
+  // no visible chip; each is a hidden chip, so the page script keeps the filter.
+  const allTypes = [...cfg.types, ...(cfg.hiddenTypes || [])];
+  const typeKeys = new Set(allTypes.map((t) => t.type));
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   f.types = f.types.filter((t) => typeKeys.has(t));
   const sort = CURATED_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
@@ -17197,7 +17200,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {},
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${cfg.types.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length ? ' hidden' : ''}>${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
@@ -17210,7 +17213,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${cfg.openNow ? foodDrinkOpenNowToggleHtml(openNowOn, openCount) : ''}
   </div>`;
-  const typeLabels = Object.fromEntries(cfg.types.map((t) => [t.type, t.label]));
+  const typeLabels = Object.fromEntries(allTypes.map((t) => [t.type, t.label]));
   const tryHtml = (cfg.tryLinks || []).map(([href, text]) => `<a href="${href}">${escapeHtml(text)}</a>`).join(', ');
 
   return `<!DOCTYPE html>
@@ -17547,6 +17550,67 @@ function renderHiddenGemsPage(venues, filter = null, feature = null) {
     banner: HIDDEN_GEMS_BANNER,
     categoryContent: badge ? null : HIDDEN_GEMS_CATEGORY_CONTENT,
   }, venues, filter);
+}
+
+// Hidden Gems (2026-10-14) on the shared directory engine, like Local
+// Favourites and Secret Spots: six chips instead of eleven (the small Food &
+// Drink kinds share one), a photo per card, the "Why it's a gem:" line, the
+// Mixed order, Open now, and no Hidden Gem badge on every card. Links that
+// name one venue type (?types=restaurant, from Discovery Search) still work
+// through hidden chips, so the page shows exactly what the link asked for.
+const HIDDEN_GEM_GROUPS = [
+  { type: 'winery', label: 'Wineries', types: ['winery'] },
+  { type: 'food-drink', label: 'Food & Drink', types: ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery'] },
+  { type: 'parks', label: 'Parks & Trails', types: ['outdoor'] },
+  { type: 'beach', label: 'Beaches', types: ['beach'] },
+  { type: 'golf', label: 'Golf', types: ['golf'] },
+  { type: 'tours-indoor', label: 'Tours & Indoor', types: ['tour', 'indoor', 'sport'] },
+];
+const HIDDEN_GEM_GROUP_BY_TYPE = Object.fromEntries(HIDDEN_GEM_GROUPS.flatMap((g) => g.types.map((t) => [t, g.type])));
+function hiddenGemCats(v) {
+  const g = HIDDEN_GEM_GROUP_BY_TYPE[v.type];
+  return g && g !== v.type ? [g, v.type] : [v.type];
+}
+function hiddenGemTypeKeys(venues) {
+  const present = new Set(venues.map((v) => v.type));
+  const groups = HIDDEN_GEM_GROUPS.filter((g) => g.types.some((t) => present.has(t)));
+  const hidden = Object.keys(CATEGORY_SLUGS).filter((t) => present.has(t) && HIDDEN_GEM_GROUP_BY_TYPE[t] !== t && CATEGORY_LABELS[t]);
+  return { groups, hidden };
+}
+function renderHiddenGemsHubPage(venues, filter = null, feature = null, now = new Date()) {
+  const badge = feature ? BADGE_LABELS[feature] : null;
+  const name = badge ? `${badge.title} Hidden Gems` : 'Hidden Gems';
+  const path = feature ? `/hidden-gems/${feature.replace(/_/g, '-')}` : '/hidden-gems';
+  const { groups, hidden } = hiddenGemTypeKeys(venues);
+  const intro = `Cafés, wineries, trails, beaches and more that are easy to miss — each card says why it’s a gem.${badge ? ` This view shows only the ones with the ${badge.title} badge${feature === 'dog_friendly' ? ' or on the official dog-friendly beaches list' : ''}.` : ''}`;
+  const all = { banner: HIDDEN_GEMS_BANNER, heading: `${name} in the Okanagan`, intro };
+  return renderCuratedHubPage({
+    path,
+    name,
+    title: `${name} in the Okanagan | Okanagan Roam`,
+    description: `${venues.length} ${badge ? `${badge.adj} ` : ''}lesser-known restaurants, wineries, trails and beaches on Okanagan Roam's Hidden Gems list, across the Okanagan Valley.`,
+    bodyClass: 'hg-hub-page',
+    surface: 'hidden_gems',
+    types: groups.map((g) => ({ type: g.type, label: g.label })),
+    hiddenTypes: hidden.map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural })),
+    catsFor: hiddenGemCats,
+    photoKeyFor: (v) => curatedPhotoKey(v),
+    cardNotes: getPublicCollectionNotes('hidden_gem'),
+    cardNoteLabel: 'Why it’s a gem:',
+    cardOpts: { hideHiddenGemBadge: true },
+    features: badge ? [] : ['patio', 'dog_friendly', 'kid_friendly', 'lake_view'],
+    openNow: true,
+    search: { label: 'Search hidden gems', placeholder: 'Search by name, town or why it’s a gem...' },
+    tryLinks: [[`${path}?types=winery`, 'wineries'], [`${path}?types=parks`, 'trails'], [`${path}?types=beach`, 'beaches']],
+    categoryContent: badge ? { all } : {
+      all,
+      ...HIDDEN_GEMS_CATEGORY_CONTENT,
+      'food-drink': { banner: CATEGORY_BANNER_IMAGES.restaurant, heading: 'Hidden Gem Food & Drink in the Okanagan', intro: 'Small cafés, restaurants, pubs and taprooms off the main strips — the places you only hear about from someone who lives here.' },
+      parks: HIDDEN_GEMS_CATEGORY_CONTENT.outdoor,
+      'tours-indoor': { banner: CATEGORY_BANNER_IMAGES.tour, heading: 'Hidden Gem Tours & Indoor Spots in the Okanagan', intro: 'Small, locally run tours, museums and rainy-day finds most visitors walk right past.' },
+    },
+    afterHtml: `<p class="subtitle" style="margin-top:22px">Only after parks, waterfalls and quiet beaches? See <a href="/secret-spots">Secret Spots &rarr;</a></p>`,
+  }, venues, filter, now);
 }
 
 // ---------- What's On (2026-09-22): page shell at /whats-on ----------
@@ -27619,7 +27683,8 @@ const server = http.createServer(async (req, res) => {
       const feature = slug ? HIDDEN_GEM_FEATURE_BY_SLUG[slug] || null : null;
       const hgVenues = !slug || feature ? getHiddenGemCollectionVenues(feature) : [];
       if (hgVenues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderHiddenGemsPage(hgVenues, parseLocalFavouritesFilterQuery(query), feature);
+        const hgKeys = hiddenGemTypeKeys(hgVenues);
+        const html = renderHiddenGemsHubPage(hgVenues, parseCuratedHubQuery(query, new Set([...hgKeys.groups.map((g) => g.type), ...hgKeys.hidden]), new Set(['patio', 'dog_friendly', 'kid_friendly', 'lake_view'])), feature);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -28338,6 +28403,9 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  renderHiddenGemsHubPage,
+  hiddenGemCats,
+  HIDDEN_GEM_GROUPS,
   DESTINATION_TAGLINES,
   DESTINATION_GEO_ORDER,
   regionBannerPhoto,
