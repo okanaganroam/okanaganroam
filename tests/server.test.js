@@ -19204,3 +19204,24 @@ test('Curated hubs (2026-10-14): /local-favorites and /secret-spots run on the s
   const q = app.parseCuratedHubQuery({ types: 'falls,bogus,falls', regions: 'atlantis,kelowna', sort: 'rating', open: 'now' }, new Set(['falls']), new Set());
   assert.deepEqual(q, { types: ['falls'], features: [], regions: ['kelowna'], openNow: true, sort: 'recommended' });
 });
+
+test('/destinations (2026-10-14): a line on each place, north-to-south order, a "Not sure where to start?" box and an ItemList', () => {
+  const html = app.renderDestinationsPage();
+  const order = [...html.matchAll(/<li class="category-card">\s*<h2><a href="\/([a-z-]+)">/g)].map((m) => m[1]);
+  assert.ok(order.length > 0);
+  for (const r of order) assert.ok(app.DESTINATION_TAGLINES[r], `${r} has a tagline`);
+  assert.equal((html.match(/class="destination-tagline"/g) || []).length, order.length);
+  // Within each group the places run north to south.
+  for (const block of html.split('<h2 class="category-subsection-heading">').slice(1)) {
+    const regions = [...block.matchAll(/<h2><a href="\/([a-z-]+)">/g)].map((m) => m[1]);
+    const idx = regions.map((r) => app.DESTINATION_GEO_ORDER.indexOf(r));
+    assert.deepEqual(idx, idx.slice().sort((a, b) => a - b), regions.join(','));
+  }
+  assert.match(html, /<h2 id="destinationStartsHeading">Not sure where to start\?<\/h2>/);
+  assert.match(html, /places to eat, drink and explore<\/p>/);
+  assert.doesNotMatch(html, /verified venue/);
+  const blocks = html.split('<script type="application/ld+json">').slice(1).map((x) => JSON.parse(x.split('</script>')[0]));
+  const list = blocks.find((b) => b['@type'] === 'ItemList');
+  assert.ok(list, 'an ItemList of destinations');
+  assert.deepEqual(list.itemListElement.map((e) => e.url), order.map((r) => `https://okanaganroam.com/${r}`));
+});
