@@ -9352,6 +9352,54 @@ function golfFavTripButtonsHtml(venue, opts = {}) {
 // the overrides below only use tokens.css values and measurements lifted
 // from app.css / the homepage's discovery styles. Every rule is scoped to
 // body.golf-page, so no other page is affected.
+// Menus refresh (2026-10-14). The header comes from okanagan.html (frozen),
+// so the changes are made here, on every page that shows it:
+// - Discover: Destinations, Map (the /map page, not the old /browse?openMap=1
+//   hand-off), Guides, Local Favourites, Secret Spots, Dog-Friendly Finds,
+//   Browse & Search.
+// - Things to Do: the seven sections. The nine outdoor activities live on
+//   /outdoors, so the dropdown is no longer a 16-item list.
+// - Phones: each dropdown folds behind its heading (tap to open, using app.js's
+//   existing open/close), instead of one 1,770px list of every link.
+const NAV_DISCOVER_PANEL = `<div class="nav-dropdown-panel">
+          <a href="/destinations" data-i18n="nav.destinations">Destinations</a>
+          <a href="/map" data-i18n="nav.map">Map</a>
+          <a href="/guides">Guides</a>
+          <a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a>
+          <a href="/secret-spots">Secret Spots</a>
+          <a href="/dog-friendly" data-i18n="gems.dogFriendly.title">Dog-Friendly Finds</a>
+          <a href="/browse" data-i18n="nav.browseSearch">Browse &amp; Search</a>
+        </div>`;
+const NAV_THINGS_PANEL = `<div class="nav-dropdown-panel">
+          <a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a>
+          <a href="/beaches" data-i18n="mood.beaches.title">Beaches</a>
+          <a href="/golf" data-i18n="mood.golf.title">Golf</a>
+          <a href="/sports" data-i18n="tripv3.type.sport">Sports &amp; Recreation</a>
+          <a href="/tours" data-i18n="tripv3.type.tour">Tours &amp; Experiences</a>
+          <a href="/indoor" data-i18n="mood.indoor.title">Indoor &amp; Rainy Day</a>
+          <a href="/ski-snow" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a>
+        </div>`;
+const NAV_REFRESH_STYLE = `<style id="nav-refresh">
+@media (max-width: 940px) {
+  .nav-links .nav-dropdown > .nav-dropdown-panel { display: none; }
+  .nav-links .nav-dropdown.open > .nav-dropdown-panel { display: block; }
+  .nav-links .nav-dropdown > .nav-link-label { display: flex !important; justify-content: space-between; align-items: center; cursor: pointer; }
+  .nav-links .nav-dropdown > .nav-link-label .nav-link-caret { display: inline !important; transition: transform .15s; }
+  .nav-links .nav-dropdown.open > .nav-link-label .nav-link-caret { transform: rotate(180deg); }
+  .nav-links .nav-dropdown-panel a { padding: 12px 0 !important; }
+}
+</style>`;
+function withNavRefresh(headerHtml) {
+  if (!headerHtml || headerHtml.includes('<style id="nav-refresh">')) return headerHtml;
+  let out = String(headerHtml);
+  const panels = [...out.matchAll(/<div class="nav-dropdown-panel">[\s\S]*?<\/div>/g)];
+  const discover = panels.find((m) => m[0].includes('href="/destinations"'));
+  const things = panels.find((m) => m[0].includes('href="/outdoors"'));
+  if (discover) out = out.replace(discover[0], NAV_DISCOVER_PANEL);
+  if (things) out = out.replace(things[0], NAV_THINGS_PANEL);
+  // After everything else the fragment carries (other header rules sit right after </header>).
+  return `${out}\n${NAV_REFRESH_STYLE}`;
+}
 function renderGolfHeaderHtml() {
   if (!fs.existsSync(SITE_PATH)) {
     return siteHeader('https://okanaganroam.com/', 'Explore the full directory →');
@@ -9361,7 +9409,7 @@ function renderGolfHeaderHtml() {
   if (!headerHtml) {
     return siteHeader('https://okanaganroam.com/', 'Explore the full directory →');
   }
-  return withBuildMyTripPlacements(withFavoritesNavLink(headerHtml
+  return withNavRefresh(withBuildMyTripPlacements(withFavoritesNavLink(headerHtml
     .replace(/href="#moodCards"/g, 'href="/#moodCards"')
     .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
     .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
@@ -9371,9 +9419,10 @@ function renderGolfHeaderHtml() {
     .replace(/href="\/browse" data-i18n="mood\.golf\.title"/g, 'href="/golf" data-i18n="mood.golf.title"')
     // No i18n/search runtime on these pages: drop the two controls that
     // need app.js and turn the trip button into a real link to /trip.
-    .replace(/<button class="nav-search-btn"[\s\S]*?<\/button>\s*/, '')
+    // The search icon (2026-10-14) opens Browse & Search, instead of being dropped.
+    .replace(/<button class="nav-search-btn"[^>]*>([\s\S]*?)<\/button>/, '<a class="nav-search-btn" href="/browse" aria-label="Search all places">$1</a>')
     .replace(/<button class="lang-toggle"[\s\S]*?<\/button>\s*/, '')
-    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>')));
+    .replace(/<button class="app-btn" id="navTripBtn" type="button">([\s\S]*?)<\/button>/, '<a class="app-btn" id="navTripBtn" href="/trip">$1</a>'))));
 }
 
 // Stage 4.4 (2026-10-01): "Favorites" in the shared navigation (desktop links
@@ -12060,6 +12109,122 @@ function mapAreaPins() {
       + (regionPage ? `<div class="map-popup-more"><a href="/${region}">See everything in ${escapeHtml(label)} &rarr;</a></div>` : '');
     return { region, center: MAP_AREA_CENTERS[region], count: places.length, popup };
   });
+}
+// ---------- Places map (2026-10-14): /map ----------
+// One pin per place that has a map position (about 1,700 of 1,774), grouped
+// into numbered clusters that open as you zoom, with category chips, a name
+// search and a town picker. Each pin's popup names the place, its kind and
+// town, and links to its page. Replaces the ~20 town-centre pins (each capped
+// at 12 places) and the "Close map" button.
+const MAP_GROUPS = [
+  { key: 'food', label: 'Food & Drink', types: ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery'] },
+  { key: 'wine', label: 'Wineries', types: ['winery'] },
+  { key: 'beach', label: 'Beaches', types: ['beach'] },
+  { key: 'outdoor', label: 'Outdoors', types: ['outdoor'] },
+  { key: 'golf', label: 'Golf', types: ['golf'] },
+  { key: 'do', label: 'Tours, sports & indoor', types: ['tour', 'sport', 'indoor'] },
+];
+const MAP_GROUP_BY_TYPE = Object.fromEntries(MAP_GROUPS.flatMap((g) => g.types.map((t) => [t, g.key])));
+function mapPlaces() {
+  return db.prepare('SELECT id, name, region, type, slug, latitude, longitude FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+    .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)));
+}
+function renderPlacesMapPage(places = mapPlaces()) {
+  const title = 'Map of the Okanagan: Places to Eat, Drink and Explore | Okanagan Roam';
+  const description = `A map of ${places.length.toLocaleString('en-CA')} places across the Okanagan Valley: restaurants, wineries, beaches, trails, golf and more, from Enderby to Osoyoos.`;
+  const canonical = 'https://okanaganroam.com/map';
+  const typeLabel = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
+  const data = JSON.stringify({
+    p: places.map((v) => [Math.round(Number(v.latitude) * 1e5) / 1e5, Math.round(Number(v.longitude) * 1e5) / 1e5, v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`]),
+    g: MAP_GROUP_BY_TYPE, t: typeLabel, r: REGION_LABELS, c: MAP_AREA_CENTERS,
+  }).replace(/</g, '\\u003c');
+  const breadcrumb = breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Map', url: canonical }]);
+  const townOptions = VALID_REGIONS.filter((r) => MAP_AREA_CENTERS[r]).map((r) => `<option value="${r}">${escapeHtml(REGION_LABELS[r])}</option>`).join('');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css"/>
+${renderOutdoorThemeStyles()}
+${renderAnalyticsHeadHtml('hub')}
+<style>
+  body.map-page .pm-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 12px; }
+  body.map-page .pm-chip { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 700; font-size: 0.88rem; cursor: pointer; }
+  body.map-page .pm-chip[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: transparent; }
+  body.map-page .pm-search { flex: 1 1 220px; min-width: 0; min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); font: inherit; font-size: 0.95rem; }
+  body.map-page .pm-town { min-height: 42px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; font: inherit; font-size: 0.92rem; }
+  body.map-page .pm-count { font-weight: 700; opacity: 0.75; margin: 0 0 8px; }
+  body.map-page #okMap { height: min(70vh, 680px); min-height: 400px; border-radius: 16px; z-index: 0; }
+  body.map-page .pm-pop a { font-weight: 800; }
+  body.map-page .pm-pop small { display: block; opacity: 0.75; margin-top: 2px; }
+</style>
+</head>
+<body class="golf-page outdoor-page region-page map-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Map' }])}
+  <h1>Map of the Okanagan</h1>
+  <p class="subtitle">Every place on Okanagan Roam with a map position. Zoom in or pick a town, then tap a pin.</p>
+  <div class="pm-controls" role="group" aria-label="Show on the map">
+    <button type="button" class="pm-chip" data-pm-all aria-pressed="true">All</button>
+    ${MAP_GROUPS.map((g) => `<button type="button" class="pm-chip" data-pm-group="${g.key}" aria-pressed="false">${escapeHtml(g.label)}</button>`).join('\n    ')}
+  </div>
+  <div class="pm-controls">
+    <label class="visually-hidden" for="pmSearch">Search places on the map</label>
+    <input type="search" id="pmSearch" class="pm-search" placeholder="Search a place by name..." autocomplete="off">
+    <label class="visually-hidden" for="pmTown">Jump to a town</label>
+    <select id="pmTown" class="pm-town"><option value="">Jump to a town&hellip;</option>${townOptions}</select>
+  </div>
+  <p class="pm-count" id="pmCount" aria-live="polite">${places.length.toLocaleString('en-CA')} places</p>
+  <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
+  <p class="subtitle" style="margin-top:12px">Prefer a list? <a href="/browse">Browse &amp; Search every place</a> or <a href="/destinations">pick a destination</a>.</p>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script>
+(function(){
+  if (!window.L) return;
+  var D = ${data};
+  var map = L.map('okMap', { scrollWheelZoom: false }).setView([49.75, -119.5], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 18 }).addTo(map);
+  var layer = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 }) : L.layerGroup();
+  map.addLayer(layer);
+  function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var markers = D.p.map(function(p){
+    var m = L.marker([p[0], p[1]], { title: p[2] });
+    m.bindPopup('<div class="pm-pop"><a href="' + esc(p[5]) + '">' + esc(p[2]) + '</a><small>' + esc((D.t[p[3]] || '') + ' \\u00b7 ' + (D.r[p[4]] || '')) + '</small></div>');
+    return { m: m, g: D.g[p[3]], name: p[2].toLowerCase() };
+  });
+  var groups = {}, term = '';
+  var chips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-group]')), allChip = document.querySelector('[data-pm-all]');
+  var count = document.getElementById('pmCount');
+  function draw(){
+    var on = Object.keys(groups).filter(function(k){ return groups[k]; });
+    var shown = markers.filter(function(x){ return (!on.length || groups[x.g]) && (!term || x.name.indexOf(term) !== -1); });
+    layer.clearLayers();
+    if (layer.addLayers) layer.addLayers(shown.map(function(x){ return x.m; })); else shown.forEach(function(x){ layer.addLayer(x.m); });
+    count.textContent = shown.length.toLocaleString('en-CA') + (shown.length === 1 ? ' place' : ' places');
+    allChip.setAttribute('aria-pressed', on.length ? 'false' : 'true');
+    chips.forEach(function(c){ c.setAttribute('aria-pressed', groups[c.getAttribute('data-pm-group')] ? 'true' : 'false'); });
+    if (term && shown.length && shown.length <= 25) map.fitBounds(L.latLngBounds(shown.map(function(x){ return x.m.getLatLng(); })), { padding: [40, 40], maxZoom: 15 });
+  }
+  chips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-group'); groups[k] = !groups[k]; draw(); }); });
+  allChip.addEventListener('click', function(){ groups = {}; draw(); });
+  var timer = null;
+  document.getElementById('pmSearch').addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ term = v.trim().toLowerCase(); draw(); }, 200); });
+  document.getElementById('pmTown').addEventListener('change', function(e){ var c = D.c[e.target.value]; if (c) map.setView(c, 13); });
+  draw();
+  setTimeout(function(){ map.invalidateSize(); }, 100);
+})();
+</script>
+</body>
+</html>`;
 }
 function renderMapPage(pins = mapAreaPins()) {
   const title = 'Map of the Okanagan | Okanagan Roam';
@@ -21231,6 +21396,7 @@ function renderTripPlannerPage(v2 = false) {
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
       // Same dead-anchor fix as /browse: the logo goes home from here.
       .replace(/href="#top"/g, 'href="/"')));
+    headerHtml = withNavRefresh(headerHtml);
   }
 
   const regionOptions = VALID_REGIONS
@@ -21434,6 +21600,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
       .replace(/href="#exploreRegions"/g, 'href="/#exploreRegions"')
       .replace(/href="#top"/g, 'href="/"')));
+    headerHtml = withNavRefresh(headerHtml);
   }
   return tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
@@ -26535,6 +26702,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
         let html = withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))));
+        html = html.replace(/<header id="top">[\s\S]*?<\/header>/, (h) => withNavRefresh(h));
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
         // not just via the sitemap (which some crawlers deprioritize). The
@@ -26688,8 +26856,9 @@ const server = http.createServer(async (req, res) => {
 
     // GET /map (Stage 3.4): the map every "Map" control opens.
     if ((pathname === '/map' || pathname === '/map/') && method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' });
-      return res.end(renderMapPage());
+      // A real map of every place (2026-10-14), so it is indexable now.
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(renderPlacesMapPage());
     }
 
     // GET /favorites (Stage 4.4): the visitor's saved places and events, from
@@ -26762,6 +26931,7 @@ const server = http.createServer(async (req, res) => {
         // here removes a redundant, visually mismatched duplicate control
         // without touching any actual search behavior).
         html = html.replace('<body class="wizard-active">', '<body class="wizard-active page-browse">');
+        html = html.replace(/<header id="top">[\s\S]*?<\/header>/, (h) => withNavRefresh(h));
 
         // Stage 4.2 (2026-10-01): /browse is a compatibility directory in its
         // own right, not a copy of the homepage -- its own title and a
@@ -26950,6 +27120,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // About, Privacy and Terms (2026-10-14).
+        `  <url>\n    <loc>https://okanaganroam.com/map</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`,
         ...['/about', '/contact', '/privacy', '/terms'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>${p === '/about' || p === '/contact' ? '0.6' : '0.3'}</priority>\n  </url>`),
         // Editorial guides (2026-10-10).
         `  <url>\n    <loc>https://okanaganroam.com/guides</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -29553,6 +29724,9 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  renderPlacesMapPage,
+  mapPlaces,
+  withNavRefresh,
   browseRestPayload,
   renderOutdoorsHubPage,
   renderBeachesHubPage,
