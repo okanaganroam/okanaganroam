@@ -378,6 +378,7 @@ function renderStyles() {
   .t3-plan-head .t3-btn-ghost:hover { background: rgba(255,255,255,0.12); }
   .t3-plan-status { margin: 10px 0 0; font-size: 0.88rem; color: rgba(255,255,255,0.9); min-height: 1.2em; }
   .t3-edit-error { margin: 8px 0; padding: 8px 12px; border-radius: 10px; background: #FFF6E6; border: 1px solid rgba(181,69,43,0.45); color: #7A2E1B; font-size: 0.88rem; font-weight: 700; }
+  .t3-rain a { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
   .t3-details { margin-top: 12px; font-size: 0.84rem; color: rgba(255,255,255,0.8); }
   .t3-details summary { cursor: pointer; font-weight: 700; }
   .t3-details ul { margin: 8px 0 0; padding-left: 18px; }
@@ -477,6 +478,7 @@ function renderStyles() {
   .t3-act[aria-pressed="true"] { background: var(--ref-gold); border-color: var(--ref-gold); color: var(--ref-navy-deep); }
   .t3-removed { background: transparent; border: 1px dashed rgba(27,43,58,0.3); border-radius: 14px; padding: 14px 18px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   .t3-empty { background: #fff; border-radius: 14px; padding: 16px 18px; font-size: 0.92rem; }
+  .t3-free p { margin: 6px 0 0; } .t3-free a { color: var(--ref-navy); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
   .t3-section-title { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 22px 0 12px; color: var(--ref-navy); }
   .t3-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   /* Cards in a grid row line up: badges, details and buttons start at the same
@@ -619,6 +621,14 @@ function renderScript(d) {
   // own English and are only replaced in French; the plan's sentences
   // (headline, reasons, notes) are shown as the planner wrote them.
   function lang(){ return typeof getCurrentLang === 'function' ? getCurrentLang() : 'en'; }
+  function t3LooksFrench(text){
+    var words = String(text).toLowerCase().match(/[a-zàâçéèêëîïôûùüÿœ']+/g) || [];
+    var fr = { une:1, un:1, avec:1, et:1, pour:1, mon:1, ma:1, mes:1, nous:1, des:1, du:1, le:1, la:1, les:1, 'à':1, jours:1, 'journée':1, souper:1, 'dîner':1, 'déjeuner':1, 'randonnée':1, vignoble:1, vignobles:1, plage:1, plages:1, enfants:1, chien:1, semaine:1, fin:1, bon:1, bonne:1, sur:1, dans:1, voyage:1, 'café':1, 'cafés':1, restaurant:0 };
+    var en = { the:1, and:1, with:1, for:1, a:1, in:1, my:1, our:1, we:1, day:1, days:1, weekend:1, to:1, of:1 };
+    var f = 0, e = 0;
+    words.forEach(function(w){ if (fr[w]) f++; if (en[w]) e++; });
+    return f >= 2 && f > e;
+  }
   function tx(key, vars){
     var s = typeof t === 'function' ? t(key) : key;
     if (vars) Object.keys(vars).forEach(function(k){ s = s.split('{' + k + '}').join(String(vars[k])); });
@@ -964,7 +974,8 @@ function renderScript(d) {
     var kept = key && state.locks[key] === v.id;
     // The listed hours are shown once, as the fact line above the reasons.
     var why = (stop.why || []).filter(function(w){ return !(v.listedHours && /^Listed hours/.test(w)) && !/\(straight line\)/.test(w); }).slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
-    var cav = (stop.caveats || []).filter(function(c){ return !/No usable hours listed|Aucun horaire utilisable|No map location on file|emplacement.*carte/i.test(c); }).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
+    // A dated plan's timing ("Provisional visit 09:00–10:00 ...") is already in the timeline and the Before you go list.
+    var cav = (stop.caveats || []).filter(function(c){ return !/No usable hours listed|Aucun horaire utilisable|No map location on file|emplacement.*carte|^Provisional visit|^Visite provisoire/i.test(c); }).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
     var same = counts[v.name] > 1;
     var html = '<article class="t3-card' + (kept ? ' is-kept' : '') + '"' + cardAnchor + ' data-venue-id="' + esc(v.id) + '">'
       // Four groups (head / tags / body / actions) so that cards in the same
@@ -1048,6 +1059,13 @@ function renderScript(d) {
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
             + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+          return;
+        }
+        if ((s.freeEvening || []).length) {
+          // One dinner was asked for: this evening is free on purpose, with a couple of places in case they want to eat out.
+          var feFr = lang() === 'fr';
+          var feLinks = s.freeEvening.map(function(x){ var u = safeUrl(x.url); return u ? '<a href="' + esc(u) + '">' + esc(x.name) + '</a>' : esc(x.name); }).join(feFr ? ' ou ' : ' or ');
+          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty t3-free"><strong>' + (feFr ? 'Soirée libre' : 'Free evening') + '</strong><p>' + esc(feFr ? 'Vous avez demandé un seul souper, alors cette soirée reste libre. Si vous voulez sortir manger : ' : 'You asked for one dinner, so this evening is yours. If you’d like to eat out: ') + feLinks + '.</p></div></li>';
           return;
         }
         html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty">' + esc(tx('tripv3.noStop')) + '</div></li>';
@@ -1171,7 +1189,10 @@ function renderScript(d) {
     var planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';
     var hasStops = planKinds || (p.kind === 'outing' && p.outing) || (p.kind === 'itinerary' && p.itinerary && (p.itinerary.stops || []).length);
     var regen = hasStops ? tx('tripv3.regenPlan') : ((p.kind === 'recommendations' || p.kind === 'discover') && (p.recommendations || []).length ? tx('tripv3.showOthers') : null);
-    var notes = (p.notes || []).filter(function(n){ return (p.contextNotes || []).indexOf(n) === -1; });
+    // The rainy-day backups are shown up front with links, so their note is not repeated under "How this plan was made".
+    var rainNote = /^(?:If it rains:|S’il pleut :)/;
+    var notes = (p.notes || []).filter(function(n){ return (p.contextNotes || []).indexOf(n) === -1 && !((p.rainBackup || []).length && rainNote.test(n)); });
+    var rainHtml = (p.rainBackup || []).length ? '<p class="t3-expect t3-rain">' + esc(lang() === 'fr' ? 'S’il pleut : ' : 'If it rains: ') + p.rainBackup.map(function(v){ var u = safeUrl(v.url); return u ? '<a href="' + esc(u) + '">' + esc(v.name) + '</a>' : esc(v.name); }).join(lang() === 'fr' ? ' ou ' : ' or ') + esc(lang() === 'fr' ? ' — des options intérieures à proximité pour remplacer une plage ou une sortie en plein air.' : ' — indoor backups nearby, to swap in for a beach or outdoor stop.') + '</p>' : '';
     var html = understoodHtml(p)
       + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
       + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
@@ -1179,6 +1200,7 @@ function renderScript(d) {
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
       + (p.experience && p.experience.text ? '<p class="t3-expect">' + esc(p.experience.text) + '</p>' : '')
       + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
+      + rainHtml
       + '<div class="t3-plan-actions">'
       + (hasStops ? '<button type="button" class="t3-btn" data-t3-add-all aria-describedby="t3PlanStatus">' + esc(tx('tripv3.addAll')) + '</button>' : '')
       + (regen ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-regen>' + esc(regen) + '</button>' : '')
@@ -1555,6 +1577,8 @@ function renderScript(d) {
     if (!text) { setStatus(tx('tripv3.emptyRequest'), 'error'); input.focus(); return; }
     state = { text: text, seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null };
     tripMap.day = null;
+    // A request written in French is answered in French (the EN / FR switch can change it back).
+    if (lang() !== 'fr' && !document.documentElement.getAttribute('data-page-lang') && t3LooksFrench(text) && typeof setLanguage === 'function') setLanguage('fr');
     track('trip_plan_start', { input_method: fromExample ? 'example' : 'typed' });
     request({}, { requestType: 'initial' });
   });

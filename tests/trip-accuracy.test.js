@@ -94,7 +94,8 @@ test('B1 comma lists: each part is its own component; unused words are reported'
   assert.equal(trip.multi, true);
   assert.deepEqual(trip.components.map((c) => c.types), [['cafe'], ['beach'], ['winery'], ['restaurant']]);
   const walk = d.interpretTripComponents('brewery, pizza and a lake walk in Vernon', T);
-  assert.deepEqual(walk.leftoverTerms, ['lake', 'walk']);
+  assert.deepEqual(walk.leftoverTerms, [], 'a lake walk is a trail/park part by the lake (2026-10-14)');
+  assert.equal(walk.components.find((c) => c.types.includes('outdoor') || (c.activities || []).includes('hiking')).lake, true);
   assert.deepEqual(d.interpretTripComponents('rotary beach park oliver and a winery', T).components.length, 2, 'a multi-word place is still one part');
 });
 

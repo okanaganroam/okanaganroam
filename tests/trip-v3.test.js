@@ -249,7 +249,7 @@ test('V3 "understood": the request in visitor words, no venue named', () => {
   assert.deepEqual(uk.base.map((b) => b.slug), ['penticton']);
   const walk = 'brewery, pizza and a lake walk in Vernon';
   const wi = d.interpretDiscoveryQuery(walk, T);
-  assert.deepEqual(tp.buildUnderstood(wi, d.interpretTripComponents(walk, T, wi), LABELS, {}).notUsed, ['lake', 'walk']);
+  assert.deepEqual(tp.buildUnderstood(wi, d.interpretTripComponents(walk, T, wi), LABELS, {}).notUsed, [], 'a lake walk is a trail/park part by the lake (2026-10-14)');
 });
 
 test('V3 recommended searches are autumn-relevant in English and French', () => {

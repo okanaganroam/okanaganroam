@@ -3802,6 +3802,24 @@ function eventsAllowedByExclusions(events, excluded) {
   return events.filter((e) => !ds.isEventExcluded(e, excluded));
 }
 // Real, scheduled events from the What's On data for an events intent.
+const HOLIDAY_EVENT_WORDS = {
+  halloween: ['halloween', 'halloweenie', 'hallowine', 'hallows', 'haunted', 'haunting', 'haunt', 'spooky', 'spooktacular', 'ghost', 'ghosts', 'scream', 'screams', 'pumpkin', 'pumpkins', 'trick or treat', 'zombie', 'zombies', 'fright', 'costume'],
+  christmas: ['christmas', 'xmas', 'santa', 'carol', 'carols', 'festive', 'holiday lights', 'light up', 'winter wonderland', 'nutcracker', 'yuletide', 'noel'],
+  thanksgiving: ['thanksgiving', 'friendsgiving', 'harvest dinner'],
+  easter: ['easter', 'egg hunt'],
+  valentine: ['valentine', 'valentines', 'galentine', 'galentines'],
+  'new year': ['new year', 'new years', 'nye'],
+};
+function holidayEventTheme(text) {
+  const t = discoveryIntentModule().normalizeDiscoveryText(text || '');
+  if (/\bhalloween\b/.test(t)) return 'halloween';
+  if (/\b(?:christmas|xmas)\b/.test(t)) return 'christmas';
+  if (/\bthanksgiving\b/.test(t)) return 'thanksgiving';
+  if (/\beaster\b/.test(t)) return 'easter';
+  if (/\bvalentines?\b/.test(t)) return 'valentine';
+  if (/\bnew years?\b|\bnye\b/.test(t)) return 'new year';
+  return null;
+}
 function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(intent.when, now), now);
@@ -3812,6 +3830,17 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
       return intent.textTerms.every((t) => discoveryTextHas(text, t));
     });
   }
+  // A named holiday ("Halloween events", "Christmas markets") narrows the Holiday & Seasonal category to that holiday
+  // (2026-10-14: "Christmas events in Vernon" listed haunted houses).
+  const theme = intent.eventTheme && HOLIDAY_EVENT_WORDS[intent.eventTheme];
+  if (theme) {
+    events = events.filter((e) => {
+      const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
+      return theme.some((w) => discoveryTextHas(text, w));
+    });
+  }
+  // With kids, bar nights and winery events are left out unless they are also listed for families.
+  if (intent.eventKids || (intent.party && intent.party.kids)) events = events.filter((e) => (e.categories || []).includes('family-kids') || !(e.categories || []).some((c) => c === 'nightlife' || c === 'wineries-wine-events'));
   events = eventsAllowedByExclusions(events, intent.excluded);
   const items = events.slice(0, limit).map((e) => ({
     id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
@@ -4567,17 +4596,19 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     // plan.unsupported, V3 understood.notUsed).
     const appliedExclusions = appliedTripExclusions(plan, intent, taxonomy);
     if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
-    const result = tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).map((d) => d.region) });
+    const result = tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).flatMap((d) => d.regions || [d.region]) });
     if (requirements?.items.some(i=>i.kind==='transport')) {
       const consumed = requirementModule.consumedTerms(requirements);
       result.notUsed = result.notUsed.filter(u=>discoveryIntentModule().normalizeDiscoveryText(u).split(' ').every(w=>consumed.has(w)) === false);
     }
-    if (requirements?.startDate) {const endDate=(plan.days || []).at(-1)?.date || requirements.endDate || requirements.startDate;result.when = endDate!==requirements.startDate ? `${requirements.startDate} – ${endDate}` : requirements.startDate;result.season=null;}
+    if (requirements?.startDate) {const endDate=(plan.days || []).at(-1)?.date || requirements.endDate || requirements.startDate;const nice=(iso)=>{const d=new Date(`${iso}T12:00:00Z`);return Number.isFinite(d.getTime())?`${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()]}, ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]} ${d.getUTCDate()}`:iso;};result.when = endDate!==requirements.startDate ? `${nice(requirements.startDate)} – ${nice(endDate)}` : nice(requirements.startDate);result.season=null;}
     return result;
   };
   if (requirements && !trip.multi && !requirements.items.some(i=>['days','venue_kind','venue','type'].includes(i.kind)) && requirements.items.some(i=>i.kind==='event')) {
     intent.mode = 'events';
-    intent.eventCategories = [...new Set(requirements.items.filter(i=>i.kind==='event'&&i.value!=='any').map(i=>i.value))];
+    // A theme the interpreter read ("Halloween events" -> Holiday & Seasonal) is kept when the requirement is any event (2026-10-14).
+    const requiredCategories = [...new Set(requirements.items.filter(i=>i.kind==='event'&&i.value!=='any').map(i=>i.value))];
+    intent.eventCategories = requiredCategories.length ? requiredCategories : (intent.eventCategories || []);
     intent.features = (intent.features || []).filter(f=>f!=='live_music');
   }
   const addEventRecovery = (plan) => {
@@ -4627,7 +4658,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       return selectedNamedEvent ? sel.items.filter(e => e.id === selectedNamedEvent.id) : sel.items;
     });
     const plan = planner.planTrip({
-      intent, trip, tripEvents, requirements, budgetMode: overrides?.budgetMode,
+      intent, trip, tripEvents, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
       facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity')),
       labels: tripPlannerLabels(),
       seed,
@@ -4654,9 +4685,10 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     addEventRecovery(plan);
     return plan;
   }
+  if (intent.mode === 'events') { intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, requirements) : null;
   const plan = tripPlannerModule().planTrip({
-    intent, requirements, budgetMode: overrides?.budgetMode,
+    intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
     facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity')),
     labels: tripPlannerLabels(),
     seed,
