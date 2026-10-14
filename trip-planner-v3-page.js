@@ -478,6 +478,7 @@ function renderStyles() {
   .t3-act[aria-pressed="true"] { background: var(--ref-gold); border-color: var(--ref-gold); color: var(--ref-navy-deep); }
   .t3-removed { background: transparent; border: 1px dashed rgba(27,43,58,0.3); border-radius: 14px; padding: 14px 18px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   .t3-empty { background: #fff; border-radius: 14px; padding: 16px 18px; font-size: 0.92rem; }
+  .t3-free p { margin: 6px 0 0; } .t3-free a { color: var(--ref-navy); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
   .t3-section-title { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 22px 0 12px; color: var(--ref-navy); }
   .t3-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   /* Cards in a grid row line up: badges, details and buttons start at the same
@@ -1058,6 +1059,13 @@ function renderScript(d) {
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
             + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+          return;
+        }
+        if ((s.freeEvening || []).length) {
+          // One dinner was asked for: this evening is free on purpose, with a couple of places in case they want to eat out.
+          var feFr = lang() === 'fr';
+          var feLinks = s.freeEvening.map(function(x){ var u = safeUrl(x.url); return u ? '<a href="' + esc(u) + '">' + esc(x.name) + '</a>' : esc(x.name); }).join(feFr ? ' ou ' : ' or ');
+          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty t3-free"><strong>' + (feFr ? 'Soirée libre' : 'Free evening') + '</strong><p>' + esc(feFr ? 'Vous avez demandé un seul souper, alors cette soirée reste libre. Si vous voulez sortir manger : ' : 'You asked for one dinner, so this evening is yours. If you’d like to eat out: ') + feLinks + '.</p></div></li>';
           return;
         }
         html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty">' + esc(tx('tripv3.noStop')) + '</div></li>';

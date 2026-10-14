@@ -6,7 +6,7 @@ const SPORT_KINDS = {bmx:/\bbmx\b/,skatepark:/\bskate ?parks?\b/,disc_golf:/\bdi
 const KINDS = {
   challenging_hike: /\b(?:challenging|strenuous|steep|difficult)(?: \w+){0,2} (?:hikes?|hiking|trails?)\b/,
   easy_walk: /\b(?:easy|gentle|flat|short) (?:walk|walks|walking trail|walking path|hikes?|hiking trail)\b/,
-  walk: /\b(?:walk|walks|walking trails?|walking paths?|promenade)\b/,
+  walk: /\b(?:walk|walks|walking trails?|walking paths?|promenade|walkway|stroll|boardwalk|seawall)\b/,
   museum: /\bmuseums?\b/,
   gallery: /\b(?:galler(?:y|ies)|art warehouse|arts? centre|arts? center)\b/,
   escape: /\bescape rooms?\b/,
@@ -63,13 +63,13 @@ function inferPlannerKinds(v) {
       return String(v.description||v.textDesc||'').split(/[.;!]/).map(norm).some(c=>re.test(c)&&! /\b(?:near|nearby|no|not|without)\b/.test(c));
     }
     if (['walk','easy_walk'].includes(kind)) {
-      if (!['outdoor','beach'].includes(v.type) || !/\b(?:walks?|walking|promenade|path|trail|hikes?|hiking)\b/.test(text)) return false;
+      if (!['outdoor','beach'].includes(v.type) || !/\b(?:walks?|walking|promenade|path|trail|hikes?|hiking|walkway|stroll|boardwalk|seawall)\b/.test(text)) return false;
       if (/\b(?:no|not|without) (?:easy |flat |walking )?(?:walk|walks|path|trail)\b/.test(text)) return false;
       // Accommodation access and nearby trails are not walking experiences.
       if (/\b(?:rv|resort|campground|glamping)\b/.test(name)) return false;
       const clauses = String(v.description || v.textDesc || v.name || '').split(/[.;!]/).map(norm);
       return clauses.some(clause => {
-        const walk = /\b(?:walks?|walking|promenade|path|trail|boardwalk|hikes?|hiking)\b/.exec(clause);
+        const walk = /\b(?:walks?|walking|promenade|path|trail|boardwalk|hikes?|hiking|walkway|stroll|seawall)\b/.exec(clause);
         if (!walk || /\b(?:near|nearby|beside|from|close to|minutes from)\b.{0,65}$/.test(clause.slice(0,walk.index))) return false;
         if (kind === 'walk') return true;
         return /\b(?:easy|flat|paved|level|gentle)\b/.test(clause) && !/\b(?:steep|challenging|strenuous|pump tracks?|bike|cycling|riders|dirt jump)\b/.test(clause);

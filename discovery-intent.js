@@ -356,7 +356,7 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'two three four five six seven eight nine ten eleven twelve dozen '
   // Teens are read by the planner from the request itself (activities first, no bars).
   + 'teen teens teenager teenagers tween tweens adolescents '
-  + 'first ever highlights must musts favourite favorite favourites favorites').split(/\s+/));
+  + 'first ever highlights must musts favourite favorite favourites favorites along beside alongside').split(/\s+/));
 
 // ---------- polarity (Stage 3.1, 2026-09-29) ----------
 // A negation word that no phrase claims ("not", "no", "nothing", "without",

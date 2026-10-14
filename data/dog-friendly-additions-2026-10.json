@@ -1,0 +1,21 @@
+{
+  "checkedOn": "2026-10-14",
+  "why": "Build My Trip had no dog-friendly dinner spot in Osoyoos besides Backroads Brewing. Only places a published source lists as dog friendly are included; a place that is merely near a dog-friendly spot, or mentioned in one unsure forum comment, is not.",
+  "venues": [
+    {
+      "id": 230,
+      "region": "osoyoos",
+      "slug": "fugassa-italian-eatery",
+      "name": "Fügassa Italian Eatery",
+      "set": { "dog_friendly": true, "patio": true },
+      "evidence": "Watermark Beach Resort's Osoyoos restaurant guide tags it \"Dog-friendly patio · Italian eatery · Casual\". Listed hours include dinner Friday to Sunday.",
+      "sources": ["https://watermarkbeachresort.com/osoyoos/osoyoos-restaurants/"]
+    }
+  ],
+  "notAdded": [
+    { "name": "The Bear, The Fish, The Root & The Berry", "reason": "Named as dog friendly only in the same guide's FAQ, not in its own listing; call to confirm (250.495.4660) before adding." },
+    { "name": "15 Park Bistro", "reason": "Only one unsure Reddit comment (\"I think they can be on the grass on the patio?\"); call to confirm (250.495.5508)." },
+    { "name": "Convivia Bistro Cuisine", "reason": "One review mentions a pet-friendly policy; no published listing confirms it." },
+    { "name": "Spirit Beach Cantina", "reason": "No source found." }
+  ]
+}

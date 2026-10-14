@@ -1286,6 +1286,8 @@ function buildDays(facts, ctx, days, pinned) {
             if (nextPin && (kmBetween(v,nextPin)==null || kmBetween(v,nextPin)>distanceLimit)) continue;
           }
           if (daypart === 'morning' && activityMorning && DINING_TYPES.includes(v.type)) continue;
+          // "A nice dinner" (one meal asked for) is the evening; it is never spent on lunch.
+          if (ctx.requirements?.explicitMealCount === 1 && !hasExplicitMeals && v.type === 'restaurant' && daypart !== 'evening' && dayDayparts.includes('evening')) continue;
           if (lunchAsked && daypart === 'midday' && v.type !== 'restaurant') continue;
           if (lunchAsked && daypart === 'afternoon' && v.type === 'restaurant' && dayDayparts.includes('midday')) continue;
           if (scenicMorning(v) && daypart !== 'morning' && !focuses.some((f) => f.test(v))) continue;
@@ -1402,7 +1404,13 @@ function buildDays(facts, ctx, days, pinned) {
         if (walking && prev) warnings.push(`No nearby stop with verified coordinates fits the car-free plan within ${distanceLimit} km straight-line of ${prev.name} on day ${d}.`);
         // One dinner was asked for and it is already planned: the other evenings are free by request, not a failure.
         const dinnerCapped = daypart === 'evening' && Number.isInteger(ctx.requirements?.explicitMealCount) && (tripTypeCount.restaurant || 0) >= ctx.requirements.explicitMealCount;
-        if (dinnerCapped) { if (!warnings.some((w) => w.startsWith('You asked for one dinner'))) warnings.push('You asked for one dinner, so it is planned once and the other evenings are left free.'); }
+        if (dinnerCapped) {
+          if (!warnings.some((w) => w.startsWith('You asked for one dinner'))) warnings.push('You asked for one dinner, so it is planned once and the other evenings are left free.');
+          // The free evening still names a couple of dinner spots nearby, in case they'd like to eat out (2026-10-14).
+          const ideas = dayPool.filter((v) => v.type === 'restaurant' && !used.has(v.id) && !reserved.has(v.id) && slotFit(v, ctx, 'evening', d - 1, 'evening').ok)
+            .map((v) => ({ v, ...base.get(v.id) })).sort(compareScored).slice(0, 2);
+          if (ideas.length) stops[stops.length - 1].freeEvening = ideas.map((x) => ({ id: x.v.id, name: x.v.name, url: x.v.url }));
+        }
         else warnings.push(daypart === 'morning' && activityMorning ? `No matching activity fits the morning on day ${d}; that time is left free rather than adding a meal.` : `No suitable ${PLAN_DAYPART_LABELS[daypart].toLowerCase()} stop was found for day ${d}${region ? ` in ${regionLabel(ctx, region)}` : ''}.`);
         continue;
       }
@@ -2375,6 +2383,7 @@ function componentLabel(c, ctx) {
   if (c.kind === 'event') return c.event.noun;
   if (c.liveMusicFallback) return 'live music';
   if (c.rainyOption) return 'indoor activity';
+  if (c.lake) return 'lakeside walk';
   if (c.plannerKinds?.length) return listText(c.plannerKinds.map(k => tripRequirements.LABELS[k] || k));
   if (c.meal) return c.meal;
   if (c.generic) return c.kids ? 'family activities' : 'activities';
@@ -2398,6 +2407,7 @@ function venueNoun(stop) {
   return ITIN_VENUE_NOUN[stop.venue.type] || 'a stop';
 }
 function venueVerb(stop) {
+  if (stop.component.lake) return 'take a walk by the lake';
   if (stop.component.plannerKinds?.includes('easy_walk')) return 'enjoy an easy walk';
   if (stop.component.plannerKinds?.includes('walk')) return 'go for a walk';
   if (stop.component.liveMusicFallback) return 'catch some live music';
@@ -2894,7 +2904,8 @@ function planItinerary(input) {
     const daypart = pairWithEvent ? 'evening' : (c.daypart || (input.requirements && anchor ? ITIN_TYPE_DAYPART[c.types[0]] || 'afternoon' : null));
     const when = pairWithEvent ? { daypart: 'evening' } : trip.when ? { ...trip.when, ...(daypart ? { daypart } : {}) } : daypart ? { daypart } : null;
     const ci = {
-      regions, types: c.types, activities: c.activities || [], collections: c.collections || [], features: c.features || [],
+      // A walk by the lake can be a lakeside park, promenade or beach path that is listed as a walk (2026-10-14).
+      regions, types: c.lake ? [...new Set([...c.types, 'outdoor', 'beach'])] : c.types, activities: c.lake ? [] : c.activities || [], collections: c.collections || [], features: c.features || [],
       foodTerms: (c.cuisines || []).map((q) => ({ term: q, cuisine: q })), party: { dog: !!c.dog, kids: !!c.kids },
       occasion: ['dinner','supper'].includes(c.meal) ? trip.outingOccasion || null : null, when, superlative: false,
       // Stage 3.5: the request's exclusions hold for every part.
@@ -2906,6 +2917,7 @@ function planItinerary(input) {
     };
     const ctx = buildContext(ci, labels, { ...input, tripDate: input.requirements && anchor ? anchor.date : input.tripDate, startWeekday: (pairWithEvent || input.requirements) && anchor?.weekday ? anchor.weekday : input.startWeekday });
     if (c.plannerKinds || c.activities?.length || trip.explicitStops) ctx.plannerKinds = c.plannerKinds || [];
+    if (c.lake) ctx.plannerKinds = [...new Set([...(ctx.plannerKinds || []), 'walk', 'easy_walk'])];
     const scored = [];
     const closedByAdvisory = [];
     for (const v of facts) {
@@ -2947,10 +2959,12 @@ function planItinerary(input) {
           reasons.push({code:'event_travel',text:`Estimated ${travel.mode} travel to the event: ${travel.minMinutes}–${travel.maxMinutes} minutes; shorter transfers are preferred. Confirm the route.`,weight:-penalty});
         }else score-=12;
       }
+      if (c.lake && /\b(?:rentals?|water sports|rink|adventure company|tours?|charters?|golf)\b/.test(v.textName || '')) continue; // a business, not a walk
       if (c.lake) {
         // On the shore (by name or description) beats a lookout with a lake view.
-        const shore = /\b(?:lakeshore|lakeside|lakefront|beach|waterfront|promenade|marina|boardwalk|okanagan lake|skaha lake|kalamalka lake|wood lake|osoyoos lake)\b/.test(`${v.textName || ''} ${v.textDesc || ''}`);
-        const w = shore ? 30 : v.features.lake_view ? 10 : 0;
+        const SHORE = /\b(?:lakeshore|lakeside|lakefront|beach|waterfront|promenade|by the water|along the lake)\b/;
+        const onShore = v.type === 'beach' || SHORE.test(v.textName || ''), shore = onShore || SHORE.test(v.textDesc || '');
+        const w = onShore ? 45 : shore ? 25 : v.features.lake_view ? 10 : 0;
         if (w) { score += w; reasons.push({ code: 'lake', text: shore ? 'By the lake' : 'Has the Lake View badge', weight: w }); }
       }
       if (c.liveMusicFallback) reasons.push({ code: 'live_music', text: 'Has the verified Live Music badge', weight: 8 });
@@ -2959,6 +2973,8 @@ function planItinerary(input) {
       scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv });
     }
     scored.sort(compareScored);
+    // A walk by the lake is on the shore when the town has one listed.
+    if (c.lake) { const shore = scored.filter((x) => x.reasons.some((r) => r.code === 'lake' && r.text === 'By the lake')); if (shore.length) scored.splice(0, scored.length, ...shore); }
     const label = componentLabel(c, ctx);
     let pool = scored;
     if (community) {

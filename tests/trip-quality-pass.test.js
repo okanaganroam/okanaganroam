@@ -165,3 +165,16 @@ test('"a walk by the lake" keeps the lake on the walk instead of reporting it un
   assert.deepEqual(trip.leftoverTerms, []);
   assert.ok(trip.components.some((c) => c.lake));
 });
+
+test('a weekend with one dinner asked for leaves the other evening free, with places to eat if they want', () => {
+  const { p } = plan('A relaxed weekend in Penticton with a beach and a nice dinner');
+  const evenings = p.days.map((day) => day.stops.find((s) => s.daypart === 'evening'));
+  assert.equal(evenings.filter((s) => s && s.venue && s.venue.type === 'restaurant').length, 1);
+  const free = evenings.find((s) => s && !s.venue);
+  assert.ok(free && free.freeEvening && free.freeEvening.length >= 1, 'the free evening names a dinner spot or two');
+  assert.ok(free.freeEvening.every((x) => x.url && x.name));
+});
+
+test('lakeside walks: walkways and strolls count as walks', () => {
+  assert.ok(r.inferPlannerKinds({ type: 'outdoor', name: 'Pioneer Walkway Park', description: 'A short lakeside stroll in the middle of Osoyoos.' }).includes('walk'));
+});
