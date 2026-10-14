@@ -611,6 +611,10 @@ function scoreVenue(v, ctx) {
     if (v.price != null && v.price >= 3) add('good_dinner', 6, null);
     else if (v.price === 1) add('good_dinner_miss', -5, null);
   }
+  // A place our own advisory says may not be operating (receivership, for sale, "check it is open") is kept as an
+  // option but never put ahead of places that are open as usual (2026-10-14: an Osoyoos dog weekend picked a winery
+  // in court-ordered receivership).
+  if (v.advisory && v.advisory.note && ADVISORY_UNCERTAIN_RE.test(v.advisory.note)) add('advisory_uncertain', -30, null);
   // A campground or RV park is somewhere to stay, not a stop, unless camping was asked for.
   if (/\b(?:campground|campsite|rv park|rv resort|camping)\b/.test(v.textName || '') && !/\bcamp(?:ing|ground|site)?s?\b/.test(ctx.queryText || '')) add('campground', -25, null);
   // A vegetarian trip puts an all-vegetarian or vegan kitchen ahead of a menu that only has options.
@@ -2653,6 +2657,7 @@ const YEAR_ROUND_ACTIVITIES = ['hiking', 'nature', 'viewpoints'];
 // Beach words that ask for the water itself, not just the shore.
 const SWIM_PHRASES = ['swim', 'swimming', 'swimming spot', 'swimming spots', 'swim spot', 'lake day'];
 // An advisory note that clearly says a place is unavailable.
+const ADVISORY_UNCERTAIN_RE = /\b(?:receivership|for sale|check (?:that )?it is open|may be closed|may not be open|ownership change|uncertain)\b/i;
 const ADVISORY_CLOSED_RE = /\b(evacuation order|temporarily closed|closed until|closed for the season|is closed|are closed)\b/i;
 const ADVISORY_MAX_AGE_DAYS = 365;
 const DOG_NOTE_SEASONAL_RE = /\b(season|seasonal|seasonally|summer|winter|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i;

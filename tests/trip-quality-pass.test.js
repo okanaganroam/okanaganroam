@@ -178,3 +178,13 @@ test('a weekend with one dinner asked for leaves the other evening free, with pl
 test('lakeside walks: walkways and strolls count as walks', () => {
   assert.ok(r.inferPlannerKinds({ type: 'outdoor', name: 'Pioneer Walkway Park', description: 'A short lakeside stroll in the middle of Osoyoos.' }).includes('walk'));
 });
+
+test('a place whose advisory says it may not be operating is not picked over open places', () => {
+  const extra = facts.concat([{ ...facts.find((x) => x.name === 'Golden Mile Winery'), id: 999, name: 'Receivership Winery', rating: 4.9, reviews: 500, advisory: { note: 'The winery is in court-ordered receivership and the property is for sale; check it is open before visiting.' } }]);
+  const text = 'One day in Oliver with a winery';
+  const intent = d.interpretDiscoveryQuery(text, taxonomy), trip = d.interpretTripComponents(text, taxonomy, intent);
+  const requirements = r.extractTripRequirements({ text, intent, trip, taxonomy, referenceDate: '2026-10-14' });
+  const p = tp.planTrip({ intent, trip: trip.multi ? trip : null, requirements, facts: extra, labels, text, tripEvents: [] });
+  assert.ok(stops(p).some((s) => s.venue.type === 'winery'));
+  assert.ok(!stops(p).some((s) => s.venue.id === 999));
+});
