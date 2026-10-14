@@ -11203,10 +11203,16 @@ function destinationRegionEntries() {
 // Destination photos (2026-10-13): each /destinations card shows its town's photo, 3:2 (up to 800x533), from
 // public/images/regions/cards/<region>.jpg (real photos: the site's region photography, Big White's ski photo,
 // and photos Dayton supplied). A town without one yet shows its street map (OpenStreetMap, credited in the image).
+// Updated photos (2026-10-13): these towns use the newer photos from the homepage destination cards, each under a
+// new file name (images are cached, so a replaced photo always gets a new name).
+const DESTINATION_CARD_FILES = Object.freeze({
+  kelowna: 'kelowna-2', 'west-kelowna': 'west-kelowna-2', 'lake-country': 'lake-country-2',
+  naramata: 'naramata-2', penticton: 'penticton-2', vernon: 'vernon-2',
+});
 const destinationCardPhotoCache = new Map();
 function destinationCardPhoto(region) {
   if (destinationCardPhotoCache.has(region)) return destinationCardPhotoCache.get(region);
-  const photo = `/images/regions/cards/${region}.jpg`;
+  const photo = `/images/regions/cards/${DESTINATION_CARD_FILES[region] || region}.jpg`;
   const map = `/images/regions/maps/${region}-d.webp`;
   const out = fs.existsSync(path.join(__dirname, 'public', photo)) ? { src: photo, map: false }
     : fs.existsSync(path.join(__dirname, 'public', map)) ? { src: map, map: true } : null;
