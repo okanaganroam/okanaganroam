@@ -4512,7 +4512,8 @@ test('S6 #14-#18/#23: with fixture inventory the page is indexable and real even
   assert.match(lakeside, /<h2><a class="venue-card-link" href="\/kelowna\/events\/s6-lakeside-concert"><span class="venue-card-name">S6 Lakeside Concert<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a><\/h2>/, 'canonical detail URL, single link');
   assert.equal((lakeside.match(/<a /g) || []).length, 1);
   assert.match(lakeside, new RegExp(`<p class="venue-meta">Kelowna &middot; ${app.formatLocalDateShort(d1)} · 7 pm</p>`), 'region · date · time from the stored occurrence');
-  assert.match(lakeside, /<img class="whatson-event-img" src="\/images\/whats-on\/live-music\.webp"/);
+  // Every card has a photo since 2026-10-14: the event's own image when it has one.
+  assert.match(lakeside, /<img class="whatson-event-img whatson-event-photo" src="\/images\/whats-on\/live-music\.webp"/);
   assert.match(lakeside, /<span class="badge-chip whatson-category-chip">Live Music<\/span> <span class="badge-chip whatson-category-chip">Food &amp; Drink Events<\/span>/);
   assert.match(lakeside, /<div class="golf-desc" id="golf-desc-event-\d+"><p>Step 6 fixture description\./);
   assert.match(lakeside, /class="card-action fav-btn" data-fav-name="S6 Lakeside Concert"/);
@@ -4520,7 +4521,7 @@ test('S6 #14-#18/#23: with fixture inventory the page is indexable and real even
   assert.doesNotMatch(lakeside, /example\.com|tel:|Visit Website/, 'no website/phone on the card');
   const pumpkin = markup.match(/<li class="venue-card whatson-event-card"[^>]*data-venue-name="S6 Osoyoos Pumpkin Patch"[\s\S]*?<\/li>/)[0];
   assert.match(pumpkin, new RegExp(`Osoyoos &middot; ${app.formatLocalDateShort(d1, { weekday: false })} – ${app.formatLocalDateShort(d2, { weekday: false })}</p>`), 'all-day span: dates only, no time');
-  assert.doesNotMatch(pumpkin, /whatson-event-img/, 'no image -> no img tag');
+  assert.match(pumpkin, /<img class="whatson-event-img whatson-event-photo" src="\/images\/guides\/halloween-pumpkins-800\.jpg"/, 'no image of its own -> a photo for its kind of event');
   const festival = cards.find((c) => c.valley);
   assert.ok(festival, 'valley-wide card carries the flag for the client filter');
   assert.doesNotMatch(text, /source_url|event_confidence|batch_id|test-fixture-admin-token|\/api\/events/, 'no admin metadata, token or API references in the page');
@@ -19055,4 +19056,43 @@ test('Indoor research: every researched hours set passes the guarded validator, 
     assert.ok(v.description.trim() && v.description_fr.trim(), v.name);
     assert.doesNotMatch(v.description, /\b\d(?:\.\d)?\s*stars?\b/, v.name);
   }
+});
+
+// ---------- What's On 9/10 pass (2026-10-14) ----------
+test("What's On cards: template write-ups become a short summary + source line; Today/Tomorrow/On now; readable recurrence dates; no 12 am", () => {
+  const ev = { name: 'Candlelight: Vivaldi', categories: ['live-music'], description: "Candlelight: Vivaldi at Laurel Packinghouse Rentals, Kelowna — Oct 16, 2026, 6:30 pm. Admission: $50-$76 + taxes. Listed by Tourism Kelowna; confirm details with the organizer before you go." };
+  assert.deepEqual(app.whatsOnCardSummary(ev), { text: 'Live music at Laurel Packinghouse Rentals. Tickets $50–$76 + taxes.', source: 'Listed by Tourism Kelowna · confirm details before you go' });
+  const atName = { name: 'Live Music: Aretha at The Dream', categories: ['live-music'], description: 'Live Music: Aretha at The Dream at The Dream, Penticton — Oct 14, 2026, 12 am. Listed by Visit Penticton; confirm details with the organizer before you go.' };
+  assert.equal(app.whatsOnCardSummary(atName).text, 'Live music at The Dream.', 'a name containing " at " keeps the real venue');
+  const free = { name: 'Book Sale', categories: ['markets-fairs'], description: 'Book Sale at Parish Hall, Kelowna — Oct 14, 2026 to Oct 17, 2026. Admission: Free. Listed by Tourism Kelowna; confirm details with the organizer before you go.' };
+  assert.equal(app.whatsOnCardSummary(free).text, 'A market at Parish Hall. Free.');
+  const community = { name: 'Witches on the Water', categories: ['community-events'], description: 'Witches on the Water at 3996 Beach Avenue, Peachland on 2026-10-17, starting at 13:30. Listed by the community calendar; confirm details and availability with the organizer before attending.' };
+  assert.equal(app.whatsOnCardSummary(community).text, 'A community event at 3996 Beach Avenue.');
+  const own = { name: 'Gala', categories: [], description: 'A real, hand-written description.', attribution: null };
+  assert.deepEqual(app.whatsOnCardSummary(own), { text: 'A real, hand-written description.', source: '' });
+  const t = '2026-10-14';
+  assert.equal(app.whatsOnWhenText({ dateLabel: 'Wed Oct 14 + 3 more dates', startDate: t, endDate: t, occurrenceCount: 4 }, t), 'Today + 3 more dates');
+  assert.equal(app.whatsOnWhenText({ dateLabel: 'Thursdays until Dec 17 · next Thu Oct 15', startDate: '2026-10-15', endDate: '2026-10-15', occurrenceCount: 9 }, t), 'Thursdays until Dec 17 · tomorrow');
+  assert.equal(app.whatsOnWhenText({ dateLabel: 'Jun 13 – Oct 25', startDate: '2026-06-13', endDate: '2026-10-25', occurrenceCount: 1 }, t), 'On now · until Oct 25');
+  assert.deepEqual(['2026-10-14', '2026-10-15', '2026-10-18', '2026-10-24', '2026-11-20'].map((d) => app.whatsOnGroupOf({ startDate: d, endDate: d, occurrenceCount: 1 }, t).label), ['Today', 'Tomorrow', 'This week', 'Next week', 'Later in November']);
+  assert.equal(app.whatsOnGroupOf({ startDate: '2026-06-13', endDate: '2026-10-25', occurrenceCount: 1 }, t).label, 'On now');
+  const occ = (start_date, start_time) => ({ start_date, end_date: start_date, start_time, all_day: 0 });
+  assert.equal(app.whatsOnTimeLabel([occ('2026-10-14', '00:00')]), '', 'a stored 00:00 is "no time", not 12 am');
+  assert.equal(app.whatsOnTimeLabel([occ('2026-10-14', '19:30')]), '7:30 pm');
+  assert.equal(app.whatsOnDateLabel({ recurrence_rule: 'Home games 2026-09-25 to 2027-03-26' }, [occ('2026-10-14'), occ('2026-10-16')]), 'Home games Sep 25 to Mar 26, 2027 · next Wed Oct 14');
+});
+
+test("What's On page: soonest first under headings, every card a photo, 48 per page with Show more", async () => {
+  const html = app.renderWhatsOnPage(null, {});
+  assert.match(html, /<style id="whatson-list">/);
+  assert.match(html, /const PAGE = |var page = 1, busy = false, PAGE = 48;/);
+  assert.match(html, /<button type="button" class="whatson-show-more" id="whatsOnShowMore" hidden>Show more<\/button>/);
+  const heads = [...html.matchAll(/<li class="whatson-group-head" data-group="([^"]+)"/g)].map((m) => m[1]);
+  const order = ['today', 'tomorrow', 'week', 'ongoing', 'next-week'];
+  const seen = heads.filter((h) => order.includes(h));
+  assert.deepEqual(seen, order.filter((h) => seen.includes(h)), 'headings in time order');
+  const cards = html.match(/<li class="venue-card whatson-event-card"[^>]*>/g) || [];
+  const photos = html.match(/class="whatson-event-img whatson-event-photo"/g) || [];
+  assert.equal(photos.length, cards.length, 'one photo per card');
+  assert.doesNotMatch(html.replace(/<script[\s\S]*?<\/script>/g, ''), /confirm details with the organizer before you go\./, 'no template sentence on the cards');
 });
