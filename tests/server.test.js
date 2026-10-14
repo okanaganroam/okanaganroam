@@ -18503,10 +18503,10 @@ test('Destination photos (2026-10-13): every /destinations card shows its town p
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', m[2])), `${m[2]} exists`);
     assert.equal(Boolean(m[1]), m[2].includes('/maps/'), `${region}: map class only on maps`);
   }
-  for (const r of ['kelowna', 'penticton', 'okanagan-falls', 'kaleden', 'big-white']) {
-    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'regions', 'cards', `${r}.jpg`)), `${r} photo`);
+  for (const [r, f] of [['kelowna', 'kelowna-2'], ['penticton', 'penticton-2'], ['vernon', 'vernon-2'], ['okanagan-falls', 'okanagan-falls'], ['kaleden', 'kaleden'], ['big-white', 'big-white']]) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'regions', 'cards', `${f}.jpg`)), `${r} photo`);
     const card = cards.find((c) => c[1] === r);
-    if (card) assert.match(card[0], new RegExp(`src="/images/regions/cards/${r}\\.jpg"`), r);
+    if (card) assert.match(card[0], new RegExp(`src="/images/regions/cards/${f}\\.jpg"`), r);
   }
 });
 
