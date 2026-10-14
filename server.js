@@ -13663,6 +13663,11 @@ const FD_CARD_PHOTOS = Object.freeze({
   // Wineries (2026-10-14): Okanagan vineyard, autumn vines, two tastings and
   // the wine-country banner. No dog photo: the only one has a non-Okanagan
   // backdrop.
+  // Sports & Recreation (2026-10-14), keyed by activity, not venue type.
+  skate: ['/images/sports/activity-skate-800.jpg'],
+  bike: ['/images/sports/sports-800.jpg', '/images/trip-v3/stops/stop-cycling-480.jpg'],
+  disc: ['/images/sports/activity-disc-800.jpg'],
+  courts: ['/images/sports/activity-courts-800.jpg'],
   winery: ['/images/trip-v3/stops/stop-winery-480.jpg', '/images/trip-v3/stops/stop-winery-2-480.jpg', '/images/trip-v3/stops/stop-winery-3-480.jpg', '/images/food-drink/wineries-800.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg'],
 });
 const FD_CARD_DOG_PHOTOS = Object.freeze({
@@ -13931,11 +13936,11 @@ function foodDrinkSelectedTagsHtml(state = {}) {
   const any = t.length + f.length + r.length + o.length > 0;
   return `<div class="outdoor-selected" id="fdSelected"${any ? '' : ' hidden'}>${row('Types', t)}${row('Looking for', f)}${row('Regions', r)}${row('Hours', o)}${any ? '<button type="button" class="outdoor-selected-clear" id="fdSelectedClear">Clear all</button>' : ''}</div>`;
 }
-function foodDrinkResultBarHtml(summary, state, sort = null) {
+function foodDrinkResultBarHtml(summary, state, sort = null, sorts = FD_SORTS) {
   // Sort (hub only, 2026-10-14): a native select, so it is a phone's own
   // picker and keyboard-accessible with no extra code.
   const sortHtml = sort ? `
-    <label class="fd-sort"><span class="fd-sort-label">Sort</span> <select id="fdSort" class="fd-sort-select">${FD_SORTS.map((o) => `<option value="${o.key}"${o.key === sort ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select></label>` : '';
+    <label class="fd-sort"><span class="fd-sort-label">Sort</span> <select id="fdSort" class="fd-sort-select">${sorts.map((o) => `<option value="${o.key}"${o.key === sort ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select></label>` : '';
   return `<div class="fd-resultbar">
     <p class="fd-count" id="fdResultsSummary" aria-live="polite">${escapeHtml(summary)}</p>${sortHtml}
   </div>
@@ -14086,7 +14091,7 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
   const O = (code) => (opts.openNow && hoursModule ? code : '');
   const labels = {
     regions: { ...REGION_LABELS },
-    types: { ...FD_HUB_LABEL_BY_TYPE },
+    types: { ...FD_HUB_LABEL_BY_TYPE, ...(opts.typeLabels || {}) },
     features: { ...FD_HUB_LABEL_BY_FEATURE },
   };
   return `<script>
@@ -14128,6 +14133,7 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
     var name = function(c){ return (c.getAttribute('data-venue-name') || '').toLowerCase(); };
     cards.sort(function(a, b){
       if (key === 'az') return name(a).localeCompare(name(b));
+      if (key === 'town') return String(LABELS.regions[d(a).r] || '').localeCompare(String(LABELS.regions[d(b).r] || '')) || name(a).localeCompare(name(b));
       if (key === 'rating') return ((d(b).g || 0) - (d(a).g || 0)) || ((d(b).n || 0) - (d(a).n || 0)) || name(a).localeCompare(name(b));
       return ((d(a).o === undefined ? 1e9 : d(a).o) - (d(b).o === undefined ? 1e9 : d(b).o));
     });
@@ -14464,7 +14470,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
 // category pages so "Show more" works identically on both.
 const FD_HEART_SYMBOL = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="fdHeart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></symbol></svg>';
 const FD_HEART_USE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#fdHeart"/></svg>';
-function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion, openStatusById = null) {
+function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion, openStatusById = null, extra = {}) {
   const orderById = new Map(venues.map((v, i) => [v.id, i]));
   const venueById = new Map(venues.map((v) => [v.id, v]));
   // Card photo (2026-10-14): the venue's own photo when it has one, otherwise
@@ -14474,9 +14480,9 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     if (!v) return '';
     const own = String(v.image_url || '').trim();
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
-    return ` data-ph="${foodDrinkCardPhotoKey(v)}"`;
+    return ` data-ph="${extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v)}"`;
   };
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}) })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
   // Page weight (2026-10-14): the card markup is the same, minus its source
   // indentation, and the Favorite heart points at one shared <symbol>
@@ -15047,6 +15053,194 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('winery', true)}
   ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'wineries', noun: ['winery', 'wineries'] })}
+</body>
+</html>`;
+}
+
+// ---------- Sports & Recreation hub (2026-10-14): /sports on the Food & Drink engine ----------
+// /sports used to show 17 sport-type places first and the 36 "More places to
+// play" (the big trail networks, bike parks and court complexes) in a second
+// list under them, A-Z by town, with a count of 17 at the top. It is now one
+// list of all of them on the shared directory engine: activity chips (Skate
+// Parks & BMX, Mountain Biking, Disc Golf, Courts) as the type filter,
+// search, Regions, features, 48 at a time, an activity photo per card and a
+// "Play:" line on every card. None of these places carries a rating, so
+// "Biggest first" ranks by the size the listing itself states -- km of
+// trail, number of trails, courts or holes, a lift-served bike park -- and
+// never by an editorial flag. The activity pages (/sports/skate ...) and the
+// town pages stay linked under the list.
+const SPORTS_SORTS = [
+  { key: 'recommended', label: 'Biggest first' },
+  { key: 'town', label: 'By town' },
+  { key: 'az', label: 'A\u2013Z' },
+];
+const SPORTS_SORT_KEYS = new Set(SPORTS_SORTS.map((x) => x.key));
+function sportScaleScore(v, note) {
+  // The "Play:" note is always about the sport, so any km or trail count in
+  // it counts; the description also talks about drives and ski runs, so
+  // there only "N km of trail / singletrack" counts.
+  const play = String(note || '').toLowerCase();
+  const desc = `${v.name || ''} ${v.description || ''}`.toLowerCase();
+  const text = `${play} ${desc}`;
+  const nums = (src, re) => [...src.matchAll(re)].map((m) => Number(String(m[1]).replace(/,/g, ''))).filter((n) => Number.isFinite(n));
+  const max = (arr) => (arr.length ? Math.max(...arr) : 0);
+  let score = 0;
+  const km = Math.max(max(nums(play, /(\d[\d,]*(?:\.\d+)?)\+?\s*km\b/g)), max(nums(desc, /(\d[\d,]*(?:\.\d+)?)\+?\s*km(?:\s+of)?(?:\s+[a-z-]+){0,2}?\s+(?:singletrack|trails?|riding)\b/g)));
+  score += Math.min(km, 150) / 10;
+  score += Math.min(max(nums(text, /(\d{1,3})\+?\s+trails\b/g)), 110) / 10;
+  score += Math.min(max(nums(text, /(\d{1,2})\s*(?:-\s*)?(?:outdoor |covered |dedicated |permanently lined |lit )*(?:pickleball |tennis |beach volleyball |volleyball )?courts\b/g)), 20) * 0.5;
+  if (/\b18-hole\b/.test(play || text)) score += 2; else if (/\b9-hole\b/.test(play || text)) score += 1;
+  if (/lift-served|bike park/.test(play || text)) score += 3;
+  if (/pump track/.test(play || text)) score += 1;
+  if (/\bbowl\b/.test(play || text)) score += 0.5;
+  if (/\blit\b|lights/.test(play || text)) score += 0.5;
+  return score + Math.min(String(v.description || '').length, 1200) / 1200;
+}
+function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
+  const f = { types: [], features: [], regions: [], ...(filter || {}) };
+  const sort = SPORTS_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
+  const all = [...sportVenues, ...alsoVenues.filter((v) => !sportVenues.some((s) => s.id === v.id))];
+  const actsById = new Map(all.map((v) => [v.id, sportActivitiesOf(v, notes)]));
+  const scale = new Map(all.map((v) => [v.id, sportScaleScore(v, notes.get(v.id))]));
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
+  const recommended = all.slice().sort((a, b) => scale.get(b.id) - scale.get(a.id) || byName(a, b));
+  const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
+  const venues = sort === 'az' ? all.slice().sort(byName)
+    : sort === 'town' ? all.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
+      : recommended;
+  const featsById = foodDrinkFeaturesByVenue(venues);
+  const featureTally = {};
+  for (const list of featsById.values()) for (const k of list) featureTally[k] = (featureTally[k] || 0) + 1;
+  const featureKeys = FD_HUB_FEATURES.map((x) => x.key).filter((k) => (featureTally[k] || 0) >= 3);
+  f.features = f.features.filter((k) => featureKeys.includes(k));
+  const advisoryNotes = getAdvisoryNotes();
+  const matching = filterFoodDrinkVenues(venues, f, actsById, featsById);
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = foodDrinkChipCounts(venues, f, actsById, featsById);
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0;
+  const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow: false };
+  const actLabel = Object.fromEntries(SPORT_ACTIVITIES.map((a) => [a.slug, a.label]));
+  // "Play:" on every card: the listing's own note, else its activities.
+  const cardNotes = new Map(all.map((v) => [v.id, String(notes.get(v.id) || '').trim() || (actsById.get(v.id) || []).map((s) => actLabel[s]).join(' \u00b7 ')]));
+  // The photo follows whatever the "Play:" line names first ("Lift-served
+  // bike park ..., pump track" is a bike photo, not a skate one).
+  const leadActivity = (v) => {
+    const acts = actsById.get(v.id) || [];
+    const text = String(notes.get(v.id) || v.name || '');
+    let best = acts[0], at = Infinity;
+    for (const a of SPORT_ACTIVITIES) {
+      if (!acts.includes(a.slug)) continue;
+      const m = text.search(a.pattern);
+      if (m !== -1 && m < at) { at = m; best = a.slug; }
+    }
+    return best;
+  };
+  const photoKeyFor = (v) => {
+    const a = leadActivity(v);
+    const list = a && FD_CARD_PHOTOS[a];
+    return list ? `${a}-${(Number(v.id) || 0) % list.length}` : 'bike-0';
+  };
+
+  const heading = 'Sports & Recreation in the Okanagan';
+  const title = `${heading} | Okanagan Roam`;
+  const description = `${all.length} places to play across the Okanagan: skate parks and BMX tracks, mountain bike trail networks and bike parks, disc golf courses, and pickleball, tennis and beach volleyball courts.`;
+  const canonical = 'https://okanaganroam.com/sports';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Sports & Recreation', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+    })),
+  };
+  const payload = {};
+  for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, null, { cardNotes, cardNoteLabel: 'Play:', photoKeyFor });
+  const selected = new Set(f.types);
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)}<span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
+  const nF = f.features.length, nR = f.regions.length;
+  const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
+      </div>
+    </div>`;
+  const controlsHtml = `<div class="fd-controls">
+    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+  </div>`;
+  const activityLinks = SPORT_ACTIVITIES.map((a) => `<a href="/sports/${a.slug}">${escapeHtml(a.label)} <span>${counts.types[a.slug] || 0}</span></a>`).join('\n      ');
+  const townCounts = {};
+  for (const v of venues) townCounts[v.region] = (townCounts[v.region] || 0) + 1;
+  const townLinks = Object.entries(townCounts).filter(([r]) => REGION_LABELS[r])
+    .sort((a, b) => b[1] - a[1] || REGION_LABELS[a[0]].localeCompare(REGION_LABELS[b[0]]))
+    .map(([r, n]) => `<a href="/${r}/sports">${escapeHtml(REGION_LABELS[r])} <span>${n}</span></a>`).join('\n      ');
+  const banner = CATEGORY_BANNER_IMAGES.sport;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: banner.src, golfTheme: true, beachTheme: all.some((v) => v.type === 'beach'), advisoryStyles: all.some((v) => advisoryNotes.has(v.id)), savedSidecar: true, noindex: all.length === 0 })}
+${renderOutdoorThemeStyles()}
+${renderFoodDrinkHubStyles()}
+${golfEngagementHeadHtml('sport', true, 'hub')}
+<style id="sports-hub">
+  body.sports-hub-page .hub-links { margin: 26px 0 8px; }
+  body.sports-hub-page .hub-links h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.sports-hub-page .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.sports-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.sports-hub-page .hub-links a:hover { background: rgba(27,43,58,0.06); }
+  body.sports-hub-page .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
+  body.sports-hub-page .card-note-label { font-weight: 800; }
+</style>
+</head>
+<body class="golf-page outdoor-page fd-page sport-page sports-hub-page">
+${CATEGORY_BANNER_STYLE}
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Sports & Recreation' }])}
+  ${categoryHeroHtml(categoryBannerHtml('sport'), `<h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.sport)}</p>`)}
+  ${foodDrinkSearchHtml().replace('Search food and drink', 'Search places to play').replace('Search by name, place or dish...', 'Search pickleball, pump track, a town...')}
+  ${chips}
+  ${controlsHtml}
+  ${all.length ? '' : '<p class="sport-coming-soon">More sports and recreation spots are coming soon &mdash; skate parks, pump tracks, bike parks, disc golf courses and courts across the valley.</p>'}
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
+  <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered).replace(/places?$/, (m) => (m === 'place' ? 'place to play' : 'places to play')), state, sort, SPORTS_SORTS)}
+  <p class="fd-search-note" id="fdSearchNote" hidden></p>
+  <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No places match that combination yet.</span> <a href="/sports" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
+  <p class="fd-no-results-try">Try one word, like <a href="/sports?types=courts">pickleball</a>, <a href="/sports?types=skate">skate park</a> or <a href="/sports?types=bike">bike park</a>.</p></div>
+  ${cardsHtml}
+  <section class="hub-links" aria-labelledby="sportsActivitiesHeading">
+    <h2 id="sportsActivitiesHeading">By activity</h2>
+    <nav aria-label="Places to play by activity">
+      ${activityLinks}
+    </nav>
+  </section>
+  <section class="hub-links" aria-labelledby="sportsTownsHeading">
+    <h2 id="sportsTownsHeading">By town</h2>
+    <nav aria-label="Places to play by town">
+      ${townLinks}
+    </nav>
+  </section>
+  <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('sport', true)}
+  ${renderFoodDrinkHubScriptHtml({ openNow: false, surface: 'sports', noun: ['place to play', 'places to play'], typeLabels: actLabel })}
 </body>
 </html>`;
 }
@@ -26469,6 +26663,11 @@ const server = http.createServer(async (req, res) => {
       const venues = type === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(type);
       // /wineries (2026-10-14) runs on the Food & Drink directory engine:
       // search, Open now, Sort, regions and features, 48 at a time.
+      if (type === 'sport') {
+        const html = renderSportsHubPage(venues, getSportsAlsoVenues(), getSportsAlsoNotes(), { ...parseFoodDrinkFilterQuery(query), types: String(query.types || '').split(',').filter((t) => SPORT_ACTIVITIES.some((a) => a.slug === t)), sort: SPORTS_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
       if (type === 'winery' && venues.length >= MIN_CATEGORY_VENUES) {
         const html = renderWineriesHubPage(venues, { ...parseFoodDrinkFilterQuery(query), types: [], openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -27048,6 +27247,9 @@ module.exports = {
   renderFoodDrinkHubPage,
   renderFoodDrinkHubScriptHtml,
   renderWineriesHubPage,
+  renderSportsHubPage,
+  sportScaleScore,
+  SPORTS_SORTS,
   FD_SORTS,
   sortFoodDrinkVenues,
   foodDrinkRecommendedScore,

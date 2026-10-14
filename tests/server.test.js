@@ -17298,9 +17298,9 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.equal(empty.status, 200);
       assert.match(empty.text, /<h1>Sports &amp; Recreation in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="sport-coming-soon">More sports and recreation spots are coming soon/);
-      assert.match(empty.text, /<p class="hub-intro">Skate parks, pump tracks, BMX tracks, bike parks and mountain bike trail networks, disc golf courses, and pickleball, tennis and beach volleyball courts/);
-      assert.match(empty.text, /<body class="golf-page sport-page">/);
-      assert.match(empty.text, /Sport page theme \(2026-10-12\)/);
+      // One list on the directory engine since 2026-10-14.
+      assert.match(empty.text, /<p class="outdoor-intro fd-intro">Skate parks, pump tracks, BMX tracks, bike parks and mountain bike trail networks, disc golf courses, and pickleball, tennis and beach volleyball courts/);
+      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page sport-page sports-hub-page">/);
       assert.match(empty.text, /<meta name="robots" content="noindex/, 'nothing listed yet: noindex');
       assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/sports\/sports\.jpg"/);
       assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
@@ -17314,7 +17314,7 @@ test('Sports & Recreation: /sports renders with zero sport venues (coming soon, 
       assert.match(hub.text, /href="\/penticton\/sports\/sport-test-skate-park"/);
       assert.doesNotMatch(hub.text, /class="sport-coming-soon"/);
       assert.doesNotMatch(hub.text, /noindex/);
-      assert.match(hub.text, /1 verified sports &amp; recreation spot across the Okanagan Valley\./, 'a countable noun, singular for one');
+      assert.match(hub.text, /id="fdResultsSummary" aria-live="polite">1 place to play</, 'singular for one');
       const region = await WINTER_GET(base, '/penticton/sports');
       assert.equal(region.status, 200);
       assert.match(region.text, /1 verified sports &amp; recreation spot in Penticton\./);
@@ -17365,19 +17365,19 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       assert.equal(app.countSportsHubVenues(), 2);
       const hub = await WINTER_GET(base, '/sports');
       assert.equal(hub.status, 200);
-      assert.match(hub.text, /<h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play<\/h2>/);
-      assert.match(hub.text, /<p class="sport-also-lead">Parks with skate parks, courts and bike trails/);
-      assert.match(hub.text, /class="sport-coming-soon"/, 'still no sport venues of its own');
+      // One list since 2026-10-14: tagged places sit with the rest, counted.
+      assert.match(hub.text, /id="fdResultsSummary" aria-live="polite">2 places to play</);
+      assert.doesNotMatch(hub.text, /class="sport-coming-soon"/, 'tagged places count as places to play');
       assert.match(hub.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/, 'a park links to its outdoors page');
       assert.match(hub.text, /href="\/vernon\/golf\/sports-also-disc-golf-club"/, 'a golf course links to its golf page');
       assert.doesNotMatch(hub.text, /noindex/);
-      // The membership note is shown on that card only, labelled "Play:".
+      // The membership note is that card's "Play:" line; a card without one names its activities.
       assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Play:<\/span> Skate park and four tennis courts<\/p>/);
-      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
+      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Play:<\/span> Disc Golf<\/p>/);
       assert.doesNotMatch(hub.text, /Rainy day:|Experience:<\/span>/);
       // The card script wires every type on /sports, and descriptions clamp to 3 lines.
       assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="golf"\][^)]*\[data-venue-category="outdoor"\]/);
-      assert.match(hub.text, /body\.golf-page\.sport-page \.golf-desc\.is-clamped p \{ -webkit-line-clamp: 3;/);
+      assert.match(hub.text, /body\.fd-page \.card-grid > li\.venue-card\[data-ph\] \.golf-desc p \{ display: -webkit-box; -webkit-line-clamp: 3;/);
       // Their own pages and types are untouched; /tours does not list them.
       assert.equal((await WINTER_GET(base, '/kelowna/outdoors/sports-also-city-park')).status, 200);
       assert.equal(app.getVenue(park.id).type, 'outdoor');
@@ -17404,8 +17404,9 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
         assert.match(kel2.text, /<p class="subtitle">1 verified sports &amp; recreation spot in Kelowna\.<\/p>/);
         assert.match(kel2.text, /href="\/kelowna\/sports\/sports-also-test-skate-park"[\s\S]*id="sportsAlsoHeading"/, 'its own venues first, then More places to play');
         const hub2 = await WINTER_GET(base, '/sports');
-        assert.match(hub2.text, /<p class="subtitle">1 verified sports &amp; recreation spot across the Okanagan Valley\.<\/p>/);
-        assert.match(hub2.text, /<a href="\/vernon\/sports">Vernon<\/a>/, 'the region selector offers a region that only has tagged venues');
+        // One list since 2026-10-14: its own venue and the two tagged places.
+        assert.match(hub2.text, /id="fdResultsSummary" aria-live="polite">3 places to play</);
+        assert.match(hub2.text, /<a href="\/vernon\/sports">Vernon <span>1<\/span><\/a>/, 'the town links offer a region that only has tagged venues');
       } finally {
         db.prepare('DELETE FROM venues WHERE id = ?').run(own.id);
       }
@@ -18964,4 +18965,29 @@ test('Description rewrites: every entry is complete, rating-free and guarded by 
   const script = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'apply-description-rewrites.js'), 'utf8');
   assert.match(script, /sha1\(live\.description\) !== item\.before_sha1/, 'never overwrites an edited description');
   assert.match(script, /description-rewrites-backup-/, 'backs up before writing');
+});
+
+// ---------- Sports & Recreation hub (2026-10-14) ----------
+test('Sports hub: one list, activity chips, Biggest first from the stated size, a Play line and activity photo on every card', () => {
+  assert.ok(app.sportScaleScore({ name: 'A', description: '' }, 'MTB network: 107 trails, 150+ km singletrack') > app.sportScaleScore({ name: 'B', description: 'A small skate park.' }, 'Skate park'));
+  assert.ok(app.sportScaleScore({ name: 'Resort', description: 'A short 30-minute drive, 33 km from town, with 80 runs.' }, '9-hole disc golf course') < app.sportScaleScore({ name: 'X', description: '' }, 'Freeride MTB network: 65 trails, 68+ km'), 'a drive or ski runs are not trail');
+  const own = { id: 9001, name: 'Fixture Skate Park', region: 'kelowna', type: 'sport', slug: 'fixture-skate-park', description: 'A small concrete skate park.' };
+  const big = { id: 9002, name: 'Fixture Trail Network', region: 'vernon', type: 'outdoor', slug: 'fixture-trail-network', description: 'Trails above town.' };
+  const notes = new Map([[9002, 'MTB network: 60 trails, 70 km singletrack']]);
+  const html = app.renderSportsHubPage([own], [big], notes, { types: [], features: [], regions: [] });
+  assert.match(html, /id="fdResultsSummary" aria-live="polite">2 places to play</);
+  assert.ok(html.indexOf('data-venue-name="Fixture Trail Network"') < html.indexOf('data-venue-name="Fixture Skate Park"'), 'biggest first');
+  assert.match(html, /<span class="card-note-label">Play:<\/span> MTB network: 60 trails, 70 km singletrack/);
+  assert.match(html, /<span class="card-note-label">Play:<\/span> Skate Parks &amp; BMX/);
+  assert.match(html, /data-venue-id="9002"[^>]*data-ph="bike-\d"/);
+  assert.match(html, /data-venue-id="9001"[^>]*data-ph="skate-0"/);
+  for (const k of ['skate', 'bike', 'disc', 'courts']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
+  assert.match(html, /data-fd-type="skate" aria-pressed="false">Skate Parks &amp; BMX<span class="outdoor-activity-count">1<\/span>/);
+  assert.match(html, /<option value="recommended" selected>Biggest first<\/option><option value="town">By town<\/option>/);
+  assert.match(html, /if \(key === 'town'\)/, 'the page can sort by town');
+  assert.match(html, /<a href="\/sports\/bike">Mountain Biking <span>1<\/span><\/a>/, 'activity pages stay linked');
+  assert.match(html, /"bike":"Mountain Biking"/, 'search knows the activity names');
+  const filtered = app.renderSportsHubPage([own], [big], notes, { types: ['bike'], features: [], regions: [], sort: 'town' });
+  assert.match(filtered, /id="fdResultsSummary" aria-live="polite">1 of 2 places to play</);
+  assert.match(filtered, /<option value="town" selected>/);
 });
