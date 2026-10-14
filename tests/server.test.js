@@ -18473,10 +18473,10 @@ test('Guide photos of their own (2026-10-13): each guide-<name> banner has its 1
   }
 });
 
-test('Fall destination cards (2026-10-13): Sep-Nov a destination with a fall photo shows it; other months and other towns are unchanged', () => {
+test('Fall destination cards (2026-10-13): Sep-Nov all six destination cards show their fall photos; other months are unchanged', () => {
   const srcOf = (html, region) => (html.match(new RegExp(`<a class="region-card" href="/${region}">\\s*<img class="region-card-img" src="([^"]+)" width="(\\d+)" height="(\\d+)"`)) || []).slice(1);
   const at = (iso) => app.renderExploreRegionsHTML({ now: new Date(`${iso}T19:00:00Z`) });
-  assert.deepEqual(Object.keys(app.FALL_EXPLORE_REGION_PHOTOS).sort(), ['kelowna', 'lake-country', 'naramata', 'penticton', 'west-kelowna']);
+  assert.deepEqual(Object.keys(app.FALL_EXPLORE_REGION_PHOTOS).sort(), ['kelowna', 'lake-country', 'naramata', 'penticton', 'vernon', 'west-kelowna']);
   const summer = app.renderExploreRegionsHTML({ now: SUMMER_NOW });
   for (const iso of ['2026-09-01', '2026-10-13', '2026-11-30']) {
     const html = at(iso);
@@ -18484,7 +18484,6 @@ test('Fall destination cards (2026-10-13): Sep-Nov a destination with a fall pho
       assert.deepEqual(srcOf(html, region), [src, '960', '375'], `${iso} ${region}`);
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), `${src} exists`);
     }
-    assert.deepEqual(srcOf(html, 'vernon'), srcOf(summer, 'vernon'), 'Vernon keeps its photo');
   }
   for (const iso of ['2026-07-15', '2026-08-31', '2026-12-01', '2027-03-01']) assert.equal(at(iso), summer, `${iso} unchanged`);
   assert.doesNotMatch(summer, /-explore-fall\.jpg/);

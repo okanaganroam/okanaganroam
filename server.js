@@ -6628,6 +6628,7 @@ const FALL_EXPLORE_REGION_PHOTOS = Object.freeze({
   'lake-country': '/images/regions/lake-country-explore-fall.jpg', // supplied by Dayton (2026-10-13): aerial of Wood Lake and orchards in fall colour
   penticton: '/images/regions/penticton-explore-fall.jpg', // supplied by Dayton (2026-10-13): aerial of the SS Sicamous and Okanagan Beach
   naramata: '/images/regions/naramata-explore-fall.jpg', // supplied by Dayton (2026-10-13): the Naramata Bench above Okanagan Lake in early fall
+  vernon: '/images/regions/vernon-explore-fall.jpg', // supplied by Dayton (2026-10-13): downtown Vernon's tree-lined main street in fall
 });
 function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
   // Zero database queries — a curated subset of the existing, authoritative
