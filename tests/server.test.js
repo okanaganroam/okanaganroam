@@ -2265,18 +2265,21 @@ test('Reference redesign: Explore the Okanagan arrow icon is a plain glyph, not 
 
 test('Explore All Okanagan Regions: renders exactly twice (heading copy + mobile-grid copy), both plain .discover-heading-link links to /destinations, no bordered-tile treatment', () => {
   const html = app.renderExploreRegionsHTML();
-  const matches = Array.from(html.matchAll(/<a class="discover-heading-link explore-all-link explore-all-link-(heading|mobile)" href="([^"]*)" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>/g));
-  assert.equal(matches.length, 2, 'expected exactly two "Explore All Okanagan Regions" links (a heading copy and a mobile-grid copy), both using the shared .discover-heading-link component');
-  const variants = matches.map((m) => m[1]).sort();
+  // 2026-10-14 (Dayton): "Explore All Okanagan Regions →" read as "swipe for a few more"; it is now a "See all N
+  // destinations" button in the heading, and the phone swipe row ends with a card to the same page.
+  const matches = Array.from(html.matchAll(/<a class="(discover-heading-link home-see-all explore-all-link explore-all-link-heading|home-row-end explore-all-link-mobile)" href="([^"]*)"><span class="home-row-end-text">|<a class="(discover-heading-link home-see-all explore-all-link explore-all-link-heading)" href="([^"]*)">/g)).map((m) => [m[1] || m[3], m[2] || m[4]]);
+  assert.equal(matches.length, 2, 'a heading button and a phone row-end card');
+  const variants = matches.map((m) => (/heading/.test(m[0]) ? 'heading' : 'mobile')).sort();
   assert.deepEqual(variants, ['heading', 'mobile'], 'expected one heading-copy and one mobile-copy instance');
-  matches.forEach((m) => assert.equal(m[2], '/destinations', 'retargeted from /browse to /destinations (2026-09-25)'));
+  assert.equal((html.match(/See all \d+ destinations/g) || []).length, 2);
+  matches.forEach((m) => assert.equal(m[1], '/destinations', 'retargeted from /browse to /destinations (2026-09-25)'));
   assert.doesNotMatch(html, /region-card-all/, 'the old bordered-tile treatment must be fully gone');
   const headingPos = html.indexOf('<h2 data-i18n="explore.heading">Explore by Destination</h2>');
   assert.ok(headingPos !== -1, 'expected the section heading to be i18n-wired');
   const headingLinkPos = html.indexOf('explore-all-link-heading');
   const gridPos = html.indexOf('class="region-card-grid"');
   assert.ok(headingPos < headingLinkPos && headingLinkPos < gridPos, 'expected the heading-copy link inside the heading row, before the card grid starts');
-  assert.match(html, /<div class="discover-heading discover-heading-split">\s*<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>\s*<a class="discover-heading-link explore-all-link explore-all-link-heading" href="\/destinations" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>\s*<\/div>/, 'expected the same heading-row pattern used by Hidden Gems/Mood Cards');
+  assert.match(html, /<div class="discover-heading discover-heading-split">\s*<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>\s*<a class="discover-heading-link home-see-all explore-all-link explore-all-link-heading" href="\/destinations"><span class="home-en">See all \d+ destinations<\/span><span class="home-fr" lang="fr">Voir les \d+ destinations<\/span><\/a>\s*<\/div>/, 'the heading row holds the See all button');
 });
 
 test('Explore All Okanagan Regions: the destination-card grid contains the unchanged 6 real cards in their original order (still one aligned row at 480px+), plus the mobile-only copy of the link positioned AFTER Vernon (the last card)', () => {
@@ -2771,8 +2774,8 @@ test('Hidden Gems: section heading and all 3 editorial card titles/blurbs are i1
 test('Explore by Destination: section heading and both copies of "Explore All Okanagan Regions" are i18n-wired', () => {
   const html = app.renderExploreRegionsHTML();
   assert.match(html, /<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>/);
-  const linkMatches = html.match(/data-i18n="explore\.allRegions"/g) || [];
-  assert.equal(linkMatches.length, 2, 'expected both the heading-row and mobile-grid copies to be i18n-wired');
+  // Both copies carry English and French (shown by html[lang]; app.js is frozen).
+  assert.equal((html.match(/<span class="home-fr" lang="fr">Voir les \d+ destinations<\/span>/g) || []).length, 2, 'both copies are in both languages');
 });
 
 test('Build Your Perfect Okanagan Trip: entire visible/accessible section is i18n-wired', () => {
@@ -5489,8 +5492,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   const homepageGemLinks = [...homepageBody.matchAll(/class="hidden-gem-card" href="([^"]+)"/g)].map((m) => m[1]);
   assert.equal(homepageGemLinks.length, 3, 'the three Hidden Gems editorial cards render');
   assert.deepEqual(homepageGemLinks, ['/dog-friendly', '/local-favorites', '/secret-spots'], 'each card links to its dedicated Hidden Gems destination');
-  assert.match(homepageBody, /discover-heading-link" href="\/hidden-gems"[^>]*>View all hidden gems/, '"View all hidden gems" must link to the dedicated \/hidden-gems page');
-  assert.match(homepageBody, /discover-heading-link" href="\/categories"[^>]*>Explore all categories/, '"Explore all categories" must link to the dedicated \/categories page');
+  assert.match(homepageBody, /home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems/, '"See all hidden gems" must link to the dedicated \/hidden-gems page');
+  assert.match(homepageBody, /home-see-all" href="\/categories"><span class="home-en">See all categories/, '"See all categories" must link to the dedicated \/categories page');
   assert.match(homepageBody, /Browse &amp; Search<\/a>/, 'header dropdown "Browse & Search" label must still read the same');
   const headerBrowseLink = homepageBody.match(/<a href="([^"]*)"[^>]*>Browse &amp; Search<\/a>/);
   assert.ok(headerBrowseLink && headerBrowseLink[1] === '/browse', 'header "Browse & Search" link must point at /browse now that the wizard lives there');
@@ -9763,7 +9766,7 @@ test('Dog Friendly Finds: the homepage Hidden Gems card now opens /dog-friendly,
   assert.equal(app.HIDDEN_GEM_EDITORIAL_CARDS[0].blurb, 'Patios and trails where your dog belongs.');
   assert.match(section, /<span data-i18n="gems.dogFriendly.title">Dog-Friendly Finds<\/span>/);
   assert.match(section, /id="hiddenGems"/);
-  assert.match(rendered, /class="discover-heading-link" href="\/hidden-gems" data-i18n="gems.viewAll"/);
+  assert.match(rendered, /class="discover-heading-link home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems<\/span>/);
   assert.equal((section.match(/class="hidden-gem-card"/g) || []).length, 3);
   // The dog_friendly boolean the frozen homepage's SEO counts are built from
   // is NOT touched by any of this.
@@ -11395,8 +11398,11 @@ test('/categories: 200, each visitor-facing category once, linking to its own ex
 test('Homepage heading links: "View all hidden gems" -> /hidden-gems, "Explore all categories" -> /categories', () => {
   const gems = app.renderHiddenGemsHomepageHTML();
   const mood = app.renderMoodCardsHTML({ now: SUMMER_NOW });
-  assert.match(gems, /<a class="discover-heading-link" href="\/hidden-gems" data-i18n="gems\.viewAll">View all hidden gems &rarr;<\/a>/);
-  assert.match(mood, /<a class="discover-heading-link" href="\/categories" data-i18n="mood\.exploreAll">Explore all categories &rarr;<\/a>/);
+  // 2026-10-14 (Dayton): "View all … →" beside a swipe row read as "swipe for more"; these are now "See all" buttons
+  // that say where they go, in both languages.
+  assert.match(gems, /<a class="discover-heading-link home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems<\/span><span class="home-fr" lang="fr">Voir tous les trésors cachés<\/span><\/a>/);
+  assert.match(mood, /<a class="discover-heading-link home-see-all" href="\/categories"><span class="home-en">See all categories<\/span><span class="home-fr" lang="fr">Voir toutes les catégories<\/span><\/a>/);
+  assert.match(mood, /<a class="home-row-end" href="\/categories">/, 'the phone swipe row ends with a card to the same page');
 });
 
 test('Destination routes: region and region/category pages still respond as before', () => withDiscoveryServer(async (base) => {
@@ -15540,11 +15546,10 @@ test('Mobile polish: the phone header button has no arrow (desktop keeps it); th
   assert.match(home, /\.mood-card \{ flex: 0 0 calc\(\(100% \+ var\(--mood-pad\) - 2 \* var\(--mood-gap\)\) \/ 2\.25\); scroll-snap-align: start;/);
   assert.match(home, /margin-right: calc\(-1 \* var\(--mood-pad\)\); padding-right: var\(--mood-pad\);/);
   assert.ok(home.includes('.mood-card-grid::-webkit-scrollbar { display: none; }') && !/mood-card-grid[^}]*(animation|scroll-behavior)/.test(home), 'no motion or auto-scroll');
-  // The cue: one decorative, translated span in the heading row, hidden except at the carousel breakpoint.
-  assert.equal(count(home, 'class="mood-swipe-cue"'), 1);
-  assert.ok(home.includes('<span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>'));
-  assert.ok(home.includes('html[lang="fr"] .mood-swipe-fr { display: inline; }') && home.includes('html[lang="fr"] .mood-swipe-en { display: none; }'), 'French by page language, no change to the frozen app.js');
-  assert.match(home, /\.mood-swipe-cue \{ display: none; \}/);
+  // The "Swipe to explore" cue was removed (2026-10-14, Dayton): beside "Explore all categories →" it read as a second
+  // link; the third card peeking in at the edge shows the row scrolls, as on the other swipe rows.
+  assert.equal(count(home, 'class="mood-swipe-cue"'), 0);
+  assert.ok(!home.includes('Swipe to explore'));
   assert.match(home, /\.mood-card-indoor \.mood-card-title, \.mood-card-sports \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day and Sports & Recreation titles are a step smaller');
   assert.match(home, /\.mood-card-title \{[^}]*line-height: 1\.15; text-wrap: balance; \}/, 'tile titles wrap as even, tight lines');
   assert.match(home, /@media \(max-width: 640px\) \{[^@]*\.mood-season-link \{ display: none; \}/, 'the seasonal guide link is hidden on phones so the heading stays two rows');
@@ -18612,4 +18617,39 @@ test('Event batches: an entry\'s reviewed_duplicates clears the fuzzy duplicate 
   } finally {
     cleanup();
   }
+});
+
+// ==== Homepage polish (2026-10-14): real content up front ====================
+test('Homepage: the counts strip, This Weekend and Top Picks render from real data, in both languages, and the order is hero, counts, mood, weekend, picks, gems, destinations, trip', async () => {
+  const stats = app.renderHomeStatsHTML();
+  if (stats) {
+    assert.match(stats, /class="home-stats"/);
+    for (const m of stats.matchAll(/<strong>([\d,]+)<\/strong>/g)) assert.ok(Number(m[1].replace(/,/g, '')) > 0);
+    assert.match(stats, /class="home-fr" lang="fr">vrais lieux/);
+    // Every count links to its page.
+    assert.equal((stats.match(/<li>/g) || []).length, (stats.match(/<li><a href="\/[a-z-]+">/g) || []).length);
+  }
+  const picks = app.renderHomeTopPicksHTML({ now: new Date('2026-10-14T12:00:00-07:00') });
+  if (picks) {
+    assert.match(picks, /Top Picks This Fall/);
+    assert.match(picks, /href="\/local-favorites"/);
+    for (const m of picks.matchAll(/class="home-pick-card" href="([^"]+)"/g)) assert.match(m[1], /^\/[a-z-]+\/[a-z-]+\/[a-z0-9-]+$/);
+  }
+  assert.equal(typeof app.renderHomeThisWeekendHTML(), 'string');
+  await withDiscoveryServer(async (base) => {
+    const html = await (await fetch(`${base}/`)).text();
+    const order = ['id="heroScenic"', 'id="moodCards"', 'id="hiddenGems"', 'id="exploreRegions"'].map((m) => html.indexOf(m));
+    assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), 'existing sections keep their order');
+    for (const id of ['thisWeekend', 'topPicks']) if (html.includes(`id="${id}"`)) assert.ok(html.indexOf(`id="${id}"`) > html.indexOf('id="moodCards"') && html.indexOf(`id="${id}"`) < html.indexOf('id="hiddenGems"'), id);
+    assert.ok(html.includes('html[lang="fr"] .home-fr { display: inline; }'), 'the language switch shows the French text');
+  });
+});
+
+test('Homepage events: a Halloween event gets the pumpkin photo (not the Christmas-lights holiday photo), hockey the rink, and two cards never share a photo', () => {
+  const used = new Set();
+  assert.equal(app.homeEventImage({ name: 'Haunted Houses of Pleasant Valley Rd', categories: ['holiday-seasonal'] }, used), '/images/guides/halloween-pumpkins-800.jpg');
+  assert.equal(app.homeEventImage({ name: 'Kelowna Rockets Home Games', categories: ['sports-recreation'] }, used), '/images/whats-on/sports-recreation-800.jpg');
+  const second = app.homeEventImage({ name: 'Another game night', categories: ['sports-recreation'] }, used);
+  assert.notEqual(second, '/images/whats-on/sports-recreation-800.jpg');
+  for (const url of used) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', url)), url);
 });

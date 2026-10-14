@@ -6598,7 +6598,7 @@ function renderHiddenGemsHomepageHTML({ now = homepageNow() } = {}) {
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
       <h2><span data-i18n="gems.heading">Hidden Gems</span> <span class="discover-subtitle" data-i18n="gems.subtitle">Less crowds. More Okanagan.</span></h2>
-      <a class="discover-heading-link" href="/hidden-gems" data-i18n="gems.viewAll">View all hidden gems &rarr;</a>
+      ${homeSeeAllLink('/hidden-gems', 'See all hidden gems', 'Voir tous les trésors cachés')}
     </div>
     <div class="discover-grid hidden-gem-grid">${cards}</div>
   </div>
@@ -6743,8 +6743,10 @@ function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
   // section heading, previously had no i18n key at all.
   // Retargeted 2026-09-25 from /browse to /destinations (every region, then
   // that region's page). Only the href changed.
-  const exploreAllHeadingLink = '<a class="discover-heading-link explore-all-link explore-all-link-heading" href="/destinations" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
-  const exploreAllMobileLink = '<a class="discover-heading-link explore-all-link explore-all-link-mobile" href="/destinations" data-i18n="explore.allRegions">Explore All Okanagan Regions &rarr;</a>';
+  const regionCount = Object.keys(REGION_LABELS).length;
+  const exploreAllHeadingLink = homeSeeAllLink('/destinations', `See all ${regionCount} destinations`, `Voir les ${regionCount} destinations`, 'explore-all-link explore-all-link-heading');
+  // The last card of the phone swipe row (it was a link placed between the cards when they stacked).
+  const exploreAllMobileLink = homeRowEndCard('/destinations', `See all ${regionCount} destinations`, `Voir les ${regionCount} destinations`).replace('class="home-row-end"', 'class="home-row-end explore-all-link-mobile"');
   cardHtml.push(exploreAllMobileLink);
   const cards = cardHtml.join('\n');
 
@@ -6817,6 +6819,160 @@ function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
 // an SVG drawn from OpenStreetMap lake and river outlines with every destination at its real coordinates
 // (data/trip-cta-map.svg, inlined so its town names are real text; all year), replacing the old illustration whose labels were out of place.
 const TRIP_CTA_MAP_SVG = (() => { try { return fs.readFileSync(path.join(__dirname, 'data', 'trip-cta-map.svg'), 'utf8').trim(); } catch (e) { return null; } })();
+// "See all" links (2026-10-14): beside a swipe row, "Explore all →" read as "swipe for a few more". These say where
+// they go -- the full page, with its count where there is one -- and look like buttons. A last card in each phone swipe
+// row leads to the same page.
+function homeSeeAllLink(href, en, fr, extraClass = '') {
+  return `<a class="discover-heading-link home-see-all${extraClass ? ` ${extraClass}` : ''}" href="${href}"><span class="home-en">${en}</span><span class="home-fr" lang="fr">${fr}</span></a>`;
+}
+function homeRowEndCard(href, en, fr) {
+  return `<a class="home-row-end" href="${href}"><span class="home-row-end-text"><span class="home-en">${en}</span><span class="home-fr" lang="fr">${fr}</span></span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>`;
+}
+function homeCountText(n) { return Number(n || 0).toLocaleString('en-CA'); }
+// ---------- Homepage: real content up front (2026-10-14) ----------
+// The homepage used to show only doors (mood tiles, hidden gems, destinations): a first-time visitor saw none of the
+// places or events the site knows. These three modules show a little of it, in the same card style, each linking to
+// the full page. Nothing is invented: events come from What's On, places from the Local Favourites list, counts from
+// the listings.
+const HOME_EVENT_IMAGES = Object.freeze({
+  'arts-culture': '/images/whats-on/arts-culture-800.jpg', 'community-events': '/images/whats-on/community-events-800.jpg',
+  'events-festivals': '/images/whats-on/events-festivals-800.jpg', 'family-kids': '/images/whats-on/family-kids-800.jpg',
+  'food-drink-events': '/images/whats-on/food-drink-events-800.jpg', 'holiday-seasonal': '/images/whats-on/holiday-seasonal-800.jpg',
+  'markets-fairs': '/images/whats-on/markets-fairs-800.jpg', nightlife: '/images/whats-on/nightlife-800.jpg',
+  'sports-recreation': '/images/whats-on/sports-recreation-800.jpg', 'wineries-wine-events': '/images/whats-on/wineries-wine-events-800.jpg',
+  'workshops-classes': '/images/whats-on/workshops-pottery-wheel-800.jpg', 'live-music': '/images/whats-on/live-music.webp',
+});
+// The event's own image, else a photo for its kind of event; a Halloween event gets the pumpkin photo (the holiday
+// photo is Christmas lights), and two cards in the row never share a photo.
+function homeEventImage(e, used = new Set()) {
+  if (e.image && /^\/(?!\/)/.test(e.image)) return e.image;
+  const text = `${e.name || ''} ${e.description || ''}`.toLowerCase();
+  const options = [];
+  if (/hallowe|haunt|spook|pumpkin|ghost|fright|scream/.test(text)) options.push('/images/guides/halloween-pumpkins-800.jpg');
+  if (/\bhockey\b|\brockets\b|\bvees\b|\bvipers\b|\bwhl\b|\bbchl\b/.test(text)) options.push('/images/whats-on/sports-recreation-800.jpg'); // a hockey rink
+  else if (/pickleball|tennis|badminton/.test(text)) options.push('/images/sports/activity-courts-800.jpg');
+  for (const c of e.categories || []) if (HOME_EVENT_IMAGES[c] && !(c === 'holiday-seasonal' && options.length)) options.push(HOME_EVENT_IMAGES[c]);
+  options.push('/images/whats-on/events-festivals-800.jpg', '/images/whats-on/community-events-800.jpg', '/images/whats-on/whats-on-800.jpg');
+  const pick = options.find((o) => !used.has(o)) || options[0];
+  used.add(pick);
+  return pick;
+}
+function homeArrowSvg() {
+  return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+}
+function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
+  let events = [];
+  try {
+    // This weekend; from Monday to Wednesday the coming weekend is still days away, so the next seven days are used.
+    const weekend = resolveWhatsOnWindow({ when: 'this-weekend' }, now);
+    const week = resolveWhatsOnWindow({ from: todayLocal(now), to: addLocalDays(todayLocal(now), 6) }, now);
+    const pick = (list) => list.filter((e) => {
+      const span = (Date.parse(`${e.endDate}T12:00:00Z`) - Date.parse(`${e.startDate}T12:00:00Z`)) / 86400000;
+      return e.name && !(span > 14); // a months-long exhibition is not "this weekend"
+    });
+    events = pick(getWhatsOnEvents(weekend));
+    if (events.length < 4) events = events.concat(pick(getWhatsOnEvents(week)).filter((e) => !events.some((x) => x.id === e.id)));
+  } catch (e) { events = []; }
+  // Spread across towns and kinds of event.
+  const chosen = [];
+  for (const e of events) {
+    if (chosen.length >= 4) break;
+    if (chosen.some((c) => c.region === e.region && (c.categories || [])[0] === (e.categories || [])[0])) continue;
+    chosen.push(e);
+  }
+  for (const e of events) { if (chosen.length >= 4) break; if (!chosen.includes(e)) chosen.push(e); }
+  if (chosen.length < 2) return '';
+  let total = 0;
+  try { total = getWhatsOnEvents(resolveWhatsOnWindow({}, now)).length; } catch (e) { total = 0; }
+  const usedImages = new Set();
+  const cards = chosen.map((e) => `<a class="home-event-card" href="${escapeHtml(discoveryEventUrl(e))}">
+      <span class="home-event-media"><img src="${escapeHtml(homeEventImage(e, usedImages))}" alt="" width="800" height="533" loading="lazy" decoding="async"></span>
+      <span class="home-event-body">
+        <span class="home-event-date">${escapeHtml(e.dateLabel || '')}${e.time ? ` · ${escapeHtml(e.time)}` : ''}</span>
+        <span class="home-event-name">${escapeHtml(e.name)}</span>
+        <span class="home-event-place">${escapeHtml(e.valleyWide ? 'Across the Okanagan' : (REGION_LABELS[e.region] || ''))}</span>
+      </span>
+    </a>`).join('');
+  return `
+<section class="discover-section home-row" id="thisWeekend">
+  <div class="wrap-wide">
+    <div class="discover-heading discover-heading-split">
+      <h2><span class="home-en">This Weekend in the Okanagan</span><span class="home-fr" lang="fr">Cette fin de semaine dans l’Okanagan</span></h2>
+      ${homeSeeAllLink('/whats-on', `See all ${homeCountText(total)} events`, `Voir les ${homeCountText(total)} événements`)}
+    </div>
+    <div class="home-scroll-row">${cards}${homeRowEndCard('/whats-on', `See all ${homeCountText(total)} events`, `Voir les ${homeCountText(total)} événements`)}</div>
+  </div>
+</section>`;
+}
+// Top picks: four well-reviewed Local Favourites, one of each kind of stop; which four rotates weekly.
+const HOME_PICK_TYPES = Object.freeze([
+  { type: 'winery', photo: '/images/trip-v3/stops/stop-winery-2-480.jpg' },
+  { type: 'restaurant', photo: '/images/trip-v3/stops/stop-restaurant-2-480.jpg' },
+  { type: 'outdoor', photo: '/images/trip-v3/stops/stop-hiking-2-480.jpg' },
+  { type: 'cafe', photo: '/images/trip-v3/stops/stop-cafe-480.jpg' },
+]);
+function renderHomeTopPicksHTML({ now = homepageNow() } = {}) {
+  let favs = [];
+  try {
+    const ids = getCollectionVenueIds('local_favorite');
+    favs = [...ids].map((id) => getVenue(id)).filter((v) => v && !v.redirect_to && v.slug && CATEGORY_SLUGS[v.type] && REGION_LABELS[v.region]);
+  } catch (e) { favs = []; }
+  const week = Math.floor(Date.parse(`${todayLocal(now)}T12:00:00Z`) / (7 * 86400000));
+  const score = (v) => (Number(v.rating) || 4.3) * 2 + Math.log10(1 + (Number(v.reviews) || 0));
+  const usedRegions = new Set();
+  const picks = [];
+  HOME_PICK_TYPES.forEach(({ type, photo }, k) => {
+    const pool = favs.filter((v) => v.type === type && (!v.rating || Number(v.rating) >= 4.5)).sort((a, b) => score(b) - score(a) || a.id - b.id).slice(0, 8);
+    if (!pool.length) return;
+    const fresh = pool.filter((v) => !usedRegions.has(v.region));
+    const list = fresh.length ? fresh : pool;
+    const v = list[(week + k) % list.length];
+    usedRegions.add(v.region);
+    picks.push({ v, photo });
+  });
+  if (picks.length < 2) return '';
+  const cards = picks.map(({ v, photo }) => `<a class="home-pick-card" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${escapeHtml(v.slug)}">
+      <span class="home-event-media"><img src="${photo}" alt="" width="480" height="320" loading="lazy" decoding="async"></span>
+      <span class="home-event-body">
+        <span class="home-event-date"><span class="home-en">${escapeHtml(CATEGORY_LABELS[v.type].singular)}</span><span class="home-fr" lang="fr">${escapeHtml(v.type === 'outdoor' ? 'Lieu de plein air' : ((CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular))}</span> · ${escapeHtml(REGION_LABELS[v.region])}</span>
+        <span class="home-event-name">${escapeHtml(v.name)}</span>
+        <span class="home-event-place">${v.rating ? `<span class="home-pick-star" aria-hidden="true">★</span> ${escapeHtml(String(v.rating))}${v.reviews ? ` (${Number(v.reviews).toLocaleString('en-CA')})` : ''} · ` : ''}<span class="home-en">Local Favourite</span><span class="home-fr" lang="fr">Coup de cœur local</span></span>
+      </span>
+    </a>`).join('');
+  const fall = isFallHeroSeason(now);
+  return `
+<section class="discover-section home-row" id="topPicks">
+  <div class="wrap-wide">
+    <div class="discover-heading discover-heading-split">
+      <h2><span class="home-en">${fall ? 'Top Picks This Fall' : 'Top Picks Right Now'}</span><span class="home-fr" lang="fr">${fall ? 'Nos coups de cœur cet automne' : 'Nos coups de cœur du moment'}</span> <span class="discover-subtitle"><span class="home-en">Local favourites, rated by visitors.</span><span class="home-fr" lang="fr">Des favoris locaux, notés par les visiteurs.</span></span></h2>
+      ${homeSeeAllLink('/local-favorites', 'See all local favourites', 'Voir tous les favoris locaux')}
+    </div>
+    <div class="home-scroll-row">${cards}</div>
+  </div>
+</section>`;
+}
+// A one-line count of what the site lists, straight from the listings and What's On; each count links to its page.
+// app.js is frozen, so these modules carry both languages and show the one matching html[lang] (as the mood swipe cue does).
+function renderHomeStatsHTML({ now = homepageNow() } = {}) {
+  let counts = {};
+  try { for (const r of db.prepare('SELECT type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY type').all()) counts[r.type] = r.n; } catch (e) { counts = {}; }
+  let events = 0;
+  try { events = getWhatsOnEvents(resolveWhatsOnWindow({}, now)).length; } catch (e) { events = 0; }
+  const n = (types) => types.reduce((t, k) => t + (counts[k] || 0), 0);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  if (total < 100) return '';
+  const fmt = (x) => Number(x).toLocaleString('en-CA');
+  const items = [
+    [total, '/destinations', 'real places', 'vrais lieux'],
+    [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 30 days
+    [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), '/food-drink', 'places to eat & drink', 'endroits où manger et boire'],
+    [n(['winery']), '/wineries', 'wineries', 'vignobles'],
+    [n(['beach']), '/beaches', 'beaches', 'plages'],
+    [n(['golf']), '/golf', 'golf courses', 'terrains de golf'],
+    [n(['outdoor']), '/outdoors', 'trails, parks & lookouts', 'sentiers, parcs et points de vue'],
+  ].filter(([v]) => v > 0);
+  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v)}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
+}
 function renderBuildTripCTAHTML({ now = homepageNow() } = {}) {
   const fall = isFallHeroSeason(now);
   const photo = fall ? '<img class="trip-cta-img" src="/images/trip-cta-fall.jpg" width="1600" height="656" alt="" loading="lazy">'
@@ -7037,12 +7193,11 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
 <section class="discover-section mood-section" id="moodCards">
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
-      <h2 data-i18n="mood.heading">What are you in the mood for?</h2>
-      <a class="discover-heading-link" href="/categories" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>${seasonalLink ? `
+      <h2 data-i18n="mood.heading">What are you in the mood for?</h2>${seasonalLink ? `
       <a class="discover-heading-link mood-season-link" href="${seasonalLink.href}">${escapeHtml(seasonalLink.label)} &rarr;</a>` : ''}
-      <span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>
+      ${homeSeeAllLink('/categories', 'See all categories', 'Voir toutes les catégories')}
     </div>
-    <div class="mood-card-grid">${cardsHtml}</div>
+    <div class="mood-card-grid">${cardsHtml}${homeRowEndCard('/categories', 'See all categories', 'Voir toutes les catégories')}</div>
   </div>
 </section>`;
 }
@@ -8175,6 +8330,8 @@ function renderHomepageDiscoveryStyles() {
      right edge of the screen so the third card is visibly cut by the screen edge rather than by the page margin, and the cards are
      sized so 2 cards + 2 gaps + a quarter of the third fill the width from the left margin to the screen edge. The last card
      ends one page margin short of the edge. */
+  /* The phone swipe cue was removed (2026-10-14): beside "Explore all categories" it read as a second link, and the
+     third card peeking in at the edge already shows the row scrolls, as on the other swipe rows. */
   .mood-swipe-cue { display: none; }
   /* app.js (frozen) has no key for the cue, so the French text is swapped by the page language (html[lang]) instead. */
   .mood-swipe-fr { display: none; }
@@ -8210,7 +8367,9 @@ function renderHomepageDiscoveryStyles() {
      as a hard rectangle. */
   .trip-cta-section { padding: 8px 0 36px; }
   .trip-cta-inner {
-    position: relative; background: var(--ref-navy-deep); border-radius: 20px; overflow: hidden;
+    /* Square corners (2026-10-14): the band runs the full width of the screen, so it meets the page edges straight
+       instead of curving in at them. */
+    position: relative; background: var(--ref-navy-deep); border-radius: 0; overflow: hidden;
     display: flex; align-items: flex-end; min-height: 400px;
   }
   .trip-cta-visual { position: absolute; inset: 0; z-index: 0; }
@@ -8273,7 +8432,7 @@ function renderHomepageDiscoveryStyles() {
        card. .trip-cta-inner's own base background (--ref-navy-deep,
        unconditional, not part of this media query) shows through
        cleanly now that the photo layer covering it is gone. */
-    .trip-cta-inner { min-height: 0; border-radius: 16px; padding-top: 0; }
+    .trip-cta-inner { min-height: 0; border-radius: 0; padding-top: 0; }
     .trip-cta-visual, .trip-cta-map { display: none; }
     .trip-cta-content { max-width: 100%; width: 100%; padding: 24px; background: rgba(16,27,36,0.94); }
   }
@@ -8305,6 +8464,60 @@ function renderHomepageDiscoveryStyles() {
     font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: rgba(27,43,58,0.72); margin: 0;
   }
 ${renderCanonicalFooterStyles()}
+  /* ---- Homepage polish (2026-10-14) ---- */
+  /* Counts strip under the hero. */
+  .home-stats-wrap { padding-top: 14px; padding-bottom: 2px; }
+  .home-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; list-style: none; margin: 0; padding: 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; color: rgba(42,32,25,0.72); }
+  .home-stats strong { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.02rem; color: var(--ref-navy); margin-right: 2px; }
+  .home-stats a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s ease, color 0.15s ease; }
+  .home-stats a:hover, .home-stats a:focus-visible { color: var(--ref-navy); border-bottom-color: currentColor; }
+  /* This Weekend + Top Picks: a row of four cards on desktop, a swipe row on phones (like the mood tiles). */
+  .home-row .home-scroll-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .home-event-card, .home-pick-card { display: flex; flex-direction: column; background: #fff; border-radius: 12px; overflow: hidden; text-decoration: none; color: var(--ref-navy); box-shadow: 0 10px 22px -18px rgba(74,52,40,0.55); border: 1px solid rgba(42,32,25,0.06); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+  .home-event-card:hover, .home-pick-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
+  .home-event-media { display: block; aspect-ratio: 16 / 9; background: #E8E3D3; overflow: hidden; }
+  .home-event-media img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .home-event-body { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px 13px; }
+  .home-event-date { font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #8A5A1F; }
+  .home-event-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .home-event-place { font-family: 'Nunito', sans-serif; font-size: 0.82rem; color: rgba(42,32,25,0.68); }
+  .home-pick-star { color: var(--ref-gold, #C9A227); }
+  /* "See all" links look like small buttons that open a page; the row-end card shows on phone swipe rows only. */
+  .discover-heading-link.home-see-all { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; background: #fff; font-size: 0.82rem; font-weight: 800; color: var(--ref-navy); text-decoration: none; white-space: nowrap; box-sizing: border-box; }
+  .discover-heading-link.home-see-all:hover { border-color: var(--ref-navy); color: var(--ref-navy); }
+  .mood-season-link { margin-left: auto; margin-right: 6px; }
+  .home-row-end { display: none; }
+  .home-fr { display: none; }
+  html[lang="fr"] .home-fr { display: inline; }
+  html[lang="fr"] .home-en { display: none; }
+  /* The footer's content lines up with the page's 24px side margin (it sat flush against the left edge on desktop). */
+  .home-footer-top { padding-left: 24px; padding-right: 24px; box-sizing: border-box; }
+  @media (max-width: 900px) {
+    .home-row .home-scroll-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .home-stats { gap: 4px 14px; font-size: 0.8rem; }
+    /* Phones: places and upcoming events, on one line. */
+    .home-stats li:nth-child(n+3) { display: none; }
+    /* The destinations "See all" button sits under the heading like the other sections' (and the row ends with a card). */
+    .explore-all-link-heading { display: inline-flex; }
+    .home-row .home-scroll-row, .region-card-grid {
+      --row-gap: 12px; --row-pad: 24px;
+      display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: var(--row-gap); padding-bottom: 4px;
+      margin-right: calc(-1 * var(--row-pad)); padding-right: var(--row-pad); scrollbar-width: none;
+    }
+    .home-row .home-scroll-row::-webkit-scrollbar, .region-card-grid::-webkit-scrollbar { display: none; }
+    .home-event-card, .home-pick-card { flex: 0 0 72%; scroll-snap-align: start; }
+    .home-row-end { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 0 0 44%; scroll-snap-align: start; min-height: 120px; padding: 12px; border-radius: 12px; background: var(--ref-navy, #1B2B3A); color: #fff; text-decoration: none; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.9rem; text-align: center; box-sizing: border-box; }
+    .mood-card-grid > .home-row-end { flex: 0 0 calc((100% + var(--mood-pad) - 2 * var(--mood-gap)) / 2.25); aspect-ratio: 1.59 / 1; min-height: 0; }
+    .region-card-grid > .home-row-end { flex: 0 0 44%; min-height: 0; }
+    /* Destinations: a swipe row of six instead of six tall stacked cards. */
+    .region-card { flex: 0 0 62%; scroll-snap-align: start; }
+    /* Hidden Gems: shorter cards. */
+    .hidden-gem-card { aspect-ratio: 2.9 / 1; }
+    /* Hero search: inside the page's side margin, not edge to edge. */
+    .hero-search-box { margin-left: 16px; margin-right: 16px; max-width: calc(100% - 32px); box-sizing: border-box; }
+  }
 </style>`;
 }
 
@@ -23158,12 +23371,18 @@ const server = http.createServer(async (req, res) => {
         const hiddenGemsSection = renderHiddenGemsHomepageHTML({ now: homepageNow() });
         const exploreRegions = renderExploreRegionsHTML({ now: homepageNow() });
         const buildTripSection = renderBuildTripCTAHTML({ now: homepageNow() });
+        const thisWeekend = renderHomeThisWeekendHTML({ now: homepageNow() });
+        // Top Picks is off for now (2026-10-14): it needs real venue photos, and it may become a paid featured spot.
+        // HOME_TOP_PICKS=on shows it (for previews).
+        const topPicks = /^(1|on|true|yes)$/i.test(process.env.HOME_TOP_PICKS || '') ? renderHomeTopPicksHTML({ now: homepageNow() }) : '';
+        // The counts sit in a slim strip right under the hero.
+        const statsHtml = renderHomeStatsHTML({ now: homepageNow() });
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${discoveryStyles}\n${moodCards}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${discoveryStyles}\n${statsHtml ? `<div class="home-stats-wrap wrap-wide">${statsHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
@@ -26127,6 +26346,10 @@ module.exports = {
   tripPlannerV3ActiveFor,
   renderTripPlannerV3Page,
   TRIP_V3_REGION_IMAGES,
+  renderHomeThisWeekendHTML,
+  renderHomeTopPicksHTML,
+  renderHomeStatsHTML,
+  homeEventImage,
   tripV3MapHeaders,
   APP_JS_SRC,
   appJsSrcFor,
