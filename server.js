@@ -22605,10 +22605,15 @@ const VENUE_SUBMISSION_TEXT_FIELDS = {
   contact_name: { label: 'Your name', required: true, min: 2, max: 100 },
   address: { label: 'Address', max: 200 },
   cuisine: { label: 'Cuisine', max: 80 },
+  // Listing form extras (2026-10-14): free text for the reviewer.
+  hours_text: { label: 'Opening hours', max: 300, multiline: true },
+  happy_hour_text: { label: 'Happy hour', max: 150 },
 };
+const VENUE_SUBMISSION_ROLES = { owner: 'Owner', manager: 'Manager', staff: 'Staff', marketing: 'Marketing', other: 'Other' };
 const VENUE_SUBMISSION_KEYS = new Set([
   'name', 'type', 'region', 'description', 'contact_name', 'contact_email', 'consent',
   'address', 'website', 'phone', 'cuisine', 'amenities', 'company_website', 'started_at',
+  'hours_text', 'happy_hour_text', 'social_url', 'submitter_role',
 ]);
 
 // Swapped out by the test suite so tests never send real email.
@@ -22732,7 +22737,7 @@ function validateVenueSubmission(body, { partial = false } = {}) {
       continue;
     }
     if (typeof body[key] !== 'string') { errors[key] = `${rule.label} must be text.`; continue; }
-    const value = cleanSubmissionText(body[key], { multiline: key === 'description' });
+    const value = cleanSubmissionText(body[key], { multiline: key === 'description' || !!rule.multiline });
     if (!value && rule.required) { errors[key] = `Please enter the ${rule.label.toLowerCase()}.`; continue; }
     if (rule.min && value.length < rule.min) { errors[key] = `${rule.label} needs at least ${rule.min} characters.`; continue; }
     if (value.length > rule.max) { errors[key] = `${rule.label} can be at most ${rule.max} characters.`; continue; }
@@ -22762,6 +22767,17 @@ function validateVenueSubmission(body, { partial = false } = {}) {
     const website = typeof body.website === 'string' && body.website.length <= 300 ? normalizeSubmissionWebsite(body.website) : null;
     if (!website) errors.website = 'Please enter a valid website address, like https://example.com.';
     else data.website = website;
+  }
+
+  if (present('social_url')) {
+    const social = typeof body.social_url === 'string' && body.social_url.length <= 300 ? normalizeSubmissionWebsite(body.social_url) : null;
+    if (!social) errors.social_url = 'Please enter a valid link, like https://instagram.com/yourbusiness.';
+    else data.social_url = social;
+  }
+
+  if (present('submitter_role')) {
+    if (!VENUE_SUBMISSION_ROLES[body.submitter_role]) errors.submitter_role = 'Please choose one of the listed roles.';
+    else data.submitter_role = body.submitter_role;
   }
 
   if (present('phone')) {
@@ -22835,6 +22851,10 @@ function buildVenueSubmissionEmail(sub) {
   if (sub.phone) payload['Phone'] = sub.phone;
   if (sub.cuisine) payload['Cuisine'] = sub.cuisine;
   if (sub.amenities.length) payload['Amenities / features (as claimed)'] = sub.amenities.map((a) => BADGE_LABELS[a].title).join(', ');
+  if (sub.hours_text) payload['Opening hours (as given)'] = sub.hours_text;
+  if (sub.happy_hour_text) payload['Happy hour (as given)'] = sub.happy_hour_text;
+  if (sub.social_url) payload['Instagram / Facebook'] = sub.social_url;
+  if (sub.submitter_role) payload['Submitter role'] = VENUE_SUBMISSION_ROLES[sub.submitter_role] || sub.submitter_role;
   const existing = findExistingVenuesForSubmission(sub.name, sub.region);
   if (existing.length) payload['Possible existing listing'] = existing.map((v) => `${v.name} (venue #${v.id}, ${v.type})`).join('; ');
   payload['How to review'] = `Approve or reject submission #${sub.id} with the admin token: GET /admin/venue-submissions, then POST /admin/venue-submissions/${sub.id}/approve or /reject.`;
@@ -22942,15 +22962,17 @@ async function handleVenueSubmission(req, res) {
   const info = db.prepare(
     `INSERT INTO venue_submissions
        (name, type, region, description, address, website, phone, cuisine, amenities,
-        contact_name, contact_email, consent, consent_version, ip_hash, user_agent)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+        contact_name, contact_email, consent, consent_version, ip_hash, user_agent,
+        hours_text, happy_hour_text, social_url, submitter_role)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     data.name, data.type, data.region, data.description,
     data.address || null, data.website || null, data.phone || null, data.cuisine || null,
     JSON.stringify(data.amenities || []), data.contact_name, data.contact_email,
     VENUE_SUBMISSION_CONSENT_VERSION,
     crypto.createHash('sha256').update(`okanagan-roam-venue-submission:${ip}`).digest('hex'),
-    String(req.headers['user-agent'] || '').slice(0, 300) || null
+    String(req.headers['user-agent'] || '').slice(0, 300) || null,
+    data.hours_text || null, data.happy_hour_text || null, data.social_url || null, data.submitter_role || null
   );
   const id = Number(info.lastInsertRowid);
   await notifyVenueSubmission(id);
@@ -24565,6 +24587,18 @@ function renderTermsPage() {
   });
 }
 
+function venueLookup(q, region) {
+  const term = String(q || '').normalize('NFC').trim().slice(0, 60);
+  if (term.length < 2) return [];
+  const r = typeof region === 'string' && REGION_LABELS[region] ? region : null;
+  const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
+    .all(...[like, ...(r ? [r] : []), `${term}%`]);
+  return rows.filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]).map((v) => ({
+    name: v.name, region: REGION_LABELS[v.region], type: CATEGORY_LABELS[v.type].singular,
+    url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+  }));
+}
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
   const description = 'Own a restaurant, winery, cafe, brewery or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
@@ -24613,6 +24647,18 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   }
 </style>
 </head>
+<style id="listing-forms-extra">
+  body.list-venue-page .lyv-panel, body.list-event-page .lyv-panel { max-width: 908px; margin: 0 auto 22px; padding: 18px 22px; border-radius: 16px; background: var(--paper, #fffaf2); box-shadow: 0 10px 24px -20px rgba(74,52,40,0.5); }
+  body.list-venue-page .lyv-panel h2, body.list-event-page .lyv-panel h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 6px; }
+  body.list-venue-page .lyv-includes ul { margin: 6px 0 0; padding-left: 1.2em; }
+  body.list-venue-page .lyv-includes li { margin: 0 0 4px; line-height: 1.5; }
+  body.list-venue-page .lyv-lookup-input { width: 100%; font: inherit; font-size: 1rem; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; margin-top: 8px; }
+  body.list-venue-page .lyv-lookup-results { list-style: none; margin: 10px 0 0; padding: 0; }
+  body.list-venue-page .lyv-lookup-results li { padding: 8px 0; border-top: 1px solid rgba(74,52,40,0.1); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  body.list-venue-page .lyv-lookup-results a { font-weight: 800; }
+  body.list-venue-page .lyv-correct { margin-left: auto; font: inherit; font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; background: var(--sand-deep, #ece3d3); color: var(--ink); }
+  body.list-venue-page .lyv-photos-note { margin: -4px 0 18px; }
+</style>
 <body class="golf-page list-venue-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -24624,15 +24670,30 @@ ${renderGolfHeaderHtml()}
   ])}
   <section class="list-venue" id="list-your-venue">
     <div class="list-venue-head">
-      <span class="eyebrow">For business owners</span>
+      <span class="eyebrow">Free for every Okanagan business</span>
       <h1>List Your Venue on Okanagan Roam</h1>
-      <p>Own a restaurant, winery, cafe, brewery or other place visitors should know about? Tell us about it below. Every submission is reviewed by a person before anything appears on Okanagan Roam.</p>
+      <p>Own a restaurant, winery, caf&eacute;, brewery or other place visitors should know about? Listing it is free. Tell us about it below &mdash; every submission is reviewed by a person before anything appears on Okanagan Roam.</p>
+    </div>
+    <div class="lyv-panel lyv-lookup">
+      <h2>Already listed? Find your venue</h2>
+      <p class="lyv-hint">More than 1,700 Okanagan places are already on the site. Search for yours to see your listing or ask us to correct it, instead of sending a new one.</p>
+      <input type="search" id="lyvLookup" class="lyv-lookup-input" aria-label="Search for your venue" placeholder="Start typing your business name..." autocomplete="off" maxlength="60">
+      <ul class="lyv-lookup-results" id="lyvLookupResults" aria-live="polite"></ul>
     </div>
     <ol class="lyv-steps">
       <li><strong>Send your details.</strong> It takes about five minutes.</li>
       <li><strong>We review them.</strong> We check the details and may email you with questions.</li>
       <li><strong>Your listing goes live</strong> once it is approved. Nothing is published before then.</li>
     </ol>
+    <div class="lyv-panel lyv-includes">
+      <h2>What your free listing includes</h2>
+      <ul>
+        <li>Your own page with your hours, location, features and a link to your website</li>
+        <li>A spot on the map, in Food &amp; Drink or the right category, and in visitors&rsquo; trip plans</li>
+        <li>An Open now status from your hours, so visitors know when to come</li>
+        <li>A free &ldquo;Featured on Okanagan Roam&rdquo; badge for your own website</li>
+      </ul>
+    </div>
     <form class="venue-form" id="lyvForm" novalidate>
       <p class="lyv-section-label">About the venue</p>
       <div class="form-row full">
@@ -24653,6 +24714,10 @@ ${renderGolfHeaderHtml()}
         ${field('lyvPhone', 'Phone', '<input type="tel" id="lyvPhone" name="phone" maxlength="40" autocomplete="tel">')}
         ${field('lyvCuisine', 'Cuisine (if applicable)', '<input type="text" id="lyvCuisine" name="cuisine" maxlength="80" placeholder="e.g. Italian, Thai, Farm-to-table">')}
       </div>
+      <div class="form-row">
+        ${field('lyvHours', 'Opening hours', '<textarea id="lyvHours" name="hours_text" maxlength="300" rows="3" placeholder="e.g. Mon&ndash;Thu 11am&ndash;9pm, Fri&ndash;Sat 11am&ndash;10pm, Sun closed"></textarea>', '<p class="lyv-hint">Seasonal hours? Tell us those too.</p>')}
+        ${field('lyvSocial', 'Instagram or Facebook', '<input type="url" id="lyvSocial" name="social_url" maxlength="300" placeholder="https://instagram.com/yourbusiness">')}
+      </div>
       <div class="form-row full">
         <div class="form-field">
           <label id="lyvAmenitiesLabel">Features that genuinely apply</label>
@@ -24661,10 +24726,17 @@ ${renderGolfHeaderHtml()}
           </div>
         </div>
       </div>
+      <div class="form-row full" id="lyvHappyHourRow" hidden>
+        ${field('lyvHappyHour', 'Happy hour days and times', '<input type="text" id="lyvHappyHour" name="happy_hour_text" maxlength="150" placeholder="e.g. Mon&ndash;Fri 3&ndash;6pm">')}
+      </div>
+      <p class="lyv-hint lyv-photos-note">Have photos? Email 1&ndash;5 of your own (wide shots work best) to <a href="mailto:okanaganroam@gmail.com">okanaganroam@gmail.com</a> with your venue name, and tell us who to credit.</p>
       <p class="lyv-section-label">Your contact details</p>
       <div class="form-row">
         ${field('lyvContactName', 'Your name *', '<input type="text" id="lyvContactName" name="contact_name" required minlength="2" maxlength="100" autocomplete="name">')}
         ${field('lyvContactEmail', 'Your email *', '<input type="email" id="lyvContactEmail" name="contact_email" required maxlength="254" autocomplete="email">')}
+      </div>
+      <div class="form-row">
+        ${field('lyvRole', 'Your role', `<select id="lyvRole" name="submitter_role"><option value="">Select one</option>${Object.entries(VENUE_SUBMISSION_ROLES).map(([k, l]) => option(k, l)).join('')}</select>`)}
       </div>
       <div class="lyv-hp" aria-hidden="true">
         <label for="lyvCompanyWebsite">Leave this field empty</label>
@@ -24672,7 +24744,7 @@ ${renderGolfHeaderHtml()}
       </div>
       <div class="form-row full">
         <div class="form-field">
-          <label class="lyv-consent"><input type="checkbox" id="lyvConsent" name="consent" required> <span>${escapeHtml(VENUE_SUBMISSION_CONSENT_TEXT)} *</span></label>
+          <label class="lyv-consent"><input type="checkbox" id="lyvConsent" name="consent" required> <span>${escapeHtml(VENUE_SUBMISSION_CONSENT_TEXT)} * <a href="/privacy">Privacy Policy</a></span></label>
           <p class="lyv-error" id="lyvConsentError" hidden></p>
         </div>
       </div>
@@ -24691,7 +24763,42 @@ ${renderGolfHeaderHtml()}
   var form = document.getElementById('lyvForm');
   if (!form || !window.fetch) return;
   var startedAt = Date.now();
-  var fields = { name: 'lyvName', type: 'lyvType', region: 'lyvRegion', description: 'lyvDescription', address: 'lyvAddress', website: 'lyvWebsite', phone: 'lyvPhone', cuisine: 'lyvCuisine', contact_name: 'lyvContactName', contact_email: 'lyvContactEmail', consent: 'lyvConsent' };
+  var fields = { name: 'lyvName', type: 'lyvType', region: 'lyvRegion', description: 'lyvDescription', address: 'lyvAddress', website: 'lyvWebsite', phone: 'lyvPhone', cuisine: 'lyvCuisine', hours_text: 'lyvHours', social_url: 'lyvSocial', happy_hour_text: 'lyvHappyHour', contact_name: 'lyvContactName', contact_email: 'lyvContactEmail', submitter_role: 'lyvRole', consent: 'lyvConsent' };
+  // Happy hour times appear once Happy Hour is ticked.
+  var hhBox = form.querySelector('input[name="amenities"][value="happy_hour"]'), hhRow = document.getElementById('lyvHappyHourRow');
+  if (hhBox && hhRow) { var syncHH = function(){ hhRow.hidden = !hhBox.checked; }; hhBox.addEventListener('change', syncHH); syncHH(); }
+  // Already listed? Search the live venues; each result links to its page
+  // and can open the Contact form with a correction note started.
+  (function(){
+    var input = document.getElementById('lyvLookup'), list = document.getElementById('lyvLookupResults');
+    if (!input || !list) return;
+    var timer = null, seq = 0;
+    function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    input.addEventListener('input', function(){
+      clearTimeout(timer);
+      var q = input.value.trim();
+      if (q.length < 2) { list.innerHTML = ''; return; }
+      timer = setTimeout(function(){
+        var mine = ++seq;
+        fetch('/api/venue-lookup?q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(d){
+          if (mine !== seq) return;
+          var v = (d && d.venues) || [];
+          list.innerHTML = v.length ? v.map(function(x){
+            return '<li><a href="' + esc(x.url) + '">' + esc(x.name) + '</a> <span class="lyv-hint">' + esc(x.type) + ' &middot; ' + esc(x.region) + '</span> <button type="button" class="lyv-correct" data-name="' + esc(x.name) + '" data-url="https://okanaganroam.com' + esc(x.url) + '">Request a correction</button></li>';
+          }).join('') : '<li class="lyv-hint">No match yet. If your venue is new to us, use the form below.</li>';
+        }).catch(function(){});
+      }, 250);
+    });
+    list.addEventListener('click', function(e){
+      var b = e.target.closest && e.target.closest('.lyv-correct');
+      if (!b) return;
+      var msg = document.getElementById('contactMessage');
+      if (msg) msg.value = 'Correction for ' + b.getAttribute('data-name') + ' (' + b.getAttribute('data-url') + '):\\n';
+      var opener = document.querySelector('[data-contact-open]');
+      if (opener) opener.click();
+      if (msg) setTimeout(function(){ msg.focus(); msg.setSelectionRange(msg.value.length, msg.value.length); }, 50);
+    });
+  })();
   var desc = document.getElementById('lyvDescription');
   var count = document.getElementById('lyvDescriptionCount');
   var formError = document.getElementById('lyvFormError');
@@ -24732,10 +24839,11 @@ ${renderGolfHeaderHtml()}
     e.preventDefault();
     clearErrors();
     var payload = { started_at: startedAt, company_website: document.getElementById('lyvCompanyWebsite').value, consent: document.getElementById('lyvConsent').checked, amenities: [] };
-    ['name', 'type', 'region', 'description', 'address', 'website', 'phone', 'cuisine', 'contact_name', 'contact_email'].forEach(function(key){
+    ['name', 'type', 'region', 'description', 'address', 'website', 'phone', 'cuisine', 'hours_text', 'social_url', 'contact_name', 'contact_email', 'submitter_role'].forEach(function(key){
       var value = document.getElementById(fields[key]).value.trim();
       if (value) payload[key] = value;
     });
+    if (hhBox && hhBox.checked) { var hh = document.getElementById('lyvHappyHour').value.trim(); if (hh) payload.happy_hour_text = hh; }
     Array.prototype.forEach.call(form.querySelectorAll('input[name="amenities"]:checked'), function(box){ payload.amenities.push(box.value); });
     button.disabled = true;
     button.textContent = 'Submitting...';
@@ -24802,7 +24910,7 @@ const EVENT_SUBMISSION_TEXT_FIELDS = {
 const EVENT_SUBMISSION_KEYS = new Set([
   'name', 'description', 'categories', 'region', 'venue_name', 'start_date', 'end_date', 'start_time', 'end_time',
   'all_day', 'event_url', 'organizer_name', 'schedule_notes', 'contact_name', 'contact_email', 'consent',
-  'company_website', 'started_at',
+  'company_website', 'started_at', 'price_text', 'image_link',
 ]);
 
 const eventSubmissionAttempts = new Map(); // ip -> [timestamps]; independent of venueSubmissionAttempts
@@ -24851,12 +24959,26 @@ function validateEventSubmission(body, now = new Date()) {
   else if (!EVENT_SUBMISSION_REGIONS.includes(body.region)) errors.region = 'Please choose one of the listed regions.';
   else data.region = body.region;
 
+  // The link is optional (2026-10-14): many community events only have a
+  // Facebook event or a poster. Without one it is stored as ''.
   if (!present('event_url')) {
-    errors.event_url = 'Please enter the event website or ticket link.';
+    data.event_url = '';
   } else {
     const url = typeof body.event_url === 'string' && body.event_url.length <= 500 ? normalizeSubmissionWebsite(body.event_url) : null;
     if (!url) errors.event_url = 'Please enter a valid website or ticket link, like https://example.com/event.';
     else data.event_url = url;
+  }
+
+  if (present('price_text')) {
+    const price = typeof body.price_text === 'string' ? cleanSubmissionText(body.price_text) : '';
+    if (!price || price.length > 80) errors.price_text = 'Please keep the price to 80 characters, like Free or $25 in advance.';
+    else data.price_text = price;
+  }
+
+  if (present('image_link')) {
+    const img = typeof body.image_link === 'string' && body.image_link.length <= 500 ? normalizeSubmissionWebsite(body.image_link) : null;
+    if (!img) errors.image_link = 'Please enter a valid link to the poster or photo, like https://example.com/poster.jpg.';
+    else data.image_link = img;
   }
 
   if (!present('contact_email')) {
@@ -24937,7 +25059,7 @@ function eventSubmissionOccurrence(sub) {
 // (read-only; shown to the reviewer, never blocks the organizer).
 function findExistingEventsForSubmission(sub) {
   return findDuplicateEventCandidates({
-    name: sub.name, region: sub.region, venue_name_text: sub.venue_name, source_url: sub.event_url,
+    name: sub.name, region: sub.region, venue_name_text: sub.venue_name, source_url: sub.event_url || null,
     occurrences: [eventSubmissionOccurrence(sub)],
   });
 }
@@ -24979,12 +25101,14 @@ function buildEventSubmissionEmail(sub) {
     'Venue / location': sub.venue_name,
     'Categories': sub.categories.map((k) => WHATSON_CATEGORY_BY_KEY[k].label).join(', '),
     'Description': sub.description,
-    'Event website / tickets': sub.event_url,
+    'Event website / tickets': sub.event_url || '(none given)',
     'Organizer': sub.organizer_name,
     'Contact name': sub.contact_name,
     'Contact email': sub.contact_email,
   };
   if (sub.schedule_notes) payload['Other dates / schedule notes (not published)'] = sub.schedule_notes;
+  if (sub.price_text) payload['Price (as given)'] = sub.price_text;
+  if (sub.image_link) payload['Poster / photo link (not published automatically)'] = sub.image_link;
   const existing = findExistingEventsForSubmission(sub);
   if (existing.length) payload['Possible existing event'] = existing.map((e) => `${e.name} (event #${e.event_id}, ${e.rule})`).join('; ');
   payload['How to review'] = `Approve or reject submission #${sub.id} with the admin token: GET /admin/event-submissions, then POST /admin/event-submissions/${sub.id}/approve or /reject.`;
@@ -25063,15 +25187,17 @@ async function handleEventSubmission(req, res) {
   const info = db.prepare(
     `INSERT INTO event_submissions
        (name, region, categories, description, venue_name, start_date, end_date, start_time, end_time, all_day, ends_next_day,
-        event_url, organizer_name, schedule_notes, contact_name, contact_email, consent, consent_version, ip_hash, user_agent)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+        event_url, organizer_name, schedule_notes, contact_name, contact_email, consent, consent_version, ip_hash, user_agent,
+        price_text, image_link)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`
   ).run(
     data.name, data.region, JSON.stringify(data.categories), data.description, data.venue_name,
     data.start_date, data.end_date, data.start_time, data.end_time, data.all_day, data.ends_next_day,
     data.event_url, data.organizer_name, data.schedule_notes || null, data.contact_name, data.contact_email,
     EVENT_SUBMISSION_CONSENT_VERSION,
     crypto.createHash('sha256').update(`okanagan-roam-event-submission:${ip}`).digest('hex'),
-    String(req.headers['user-agent'] || '').slice(0, 300) || null
+    String(req.headers['user-agent'] || '').slice(0, 300) || null,
+    data.price_text || null, data.image_link || null
   );
   const id = Number(info.lastInsertRowid);
   await notifyEventSubmission(id);
@@ -25135,14 +25261,15 @@ function approveEventSubmission(id, body, now = new Date()) {
     name: final.name,
     region: sub.region,
     description: final.description,
-    website: sub.event_url,
+    website: sub.event_url || null,
     categories: final.categories,
     occurrences: [eventSubmissionOccurrence(sub)],
     status: 'scheduled',
     event_confidence: 'medium',
     source_type: body.source_type || 'official_organizer',
     source_name: sub.organizer_name,
-    source_url: sub.event_url,
+    // No link given: the provenance is the organizer's own submission.
+    source_url: sub.event_url || `https://okanaganroam.com/list-an-event#submission-${sub.id}`,
   };
   if (body.venue_id !== undefined) data.venue_id = body.venue_id;
   else data.venue_name_text = sub.venue_name;
@@ -25441,13 +25568,13 @@ ${renderGolfHeaderHtml()}
   ])}
   <section class="list-venue" id="list-an-event">
     <div class="list-venue-head">
-      <span class="eyebrow">For event organizers</span>
+      <span class="eyebrow">Free for every Okanagan event</span>
       <h1>List an Event on Okanagan Roam</h1>
-      <p>Organizing a festival, concert, market, tasting or community event in the Okanagan? Tell us about it below. Every submission is reviewed by a person before anything appears on What&rsquo;s On.</p>
+      <p>Organizing a festival, concert, market, tasting or community event in the Okanagan? Listing it on What&rsquo;s On is free. Tell us about it below &mdash; every submission is reviewed by a person before anything appears.</p>
     </div>
     <ol class="lyv-steps">
       <li><strong>Send your event.</strong> It takes about five minutes.</li>
-      <li><strong>We review it.</strong> We check the details and may email you with questions.</li>
+      <li><strong>We review it</strong>, usually within a day. We check the details and may email you with questions.</li>
       <li><strong>It goes live on What&rsquo;s On</strong> once it is approved. Nothing is published before then.</li>
     </ol>
     <form class="venue-form" id="laeForm" novalidate>
@@ -25469,7 +25596,7 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-section-label">Where</p>
       <div class="form-row">
         ${field('laeRegion', 'Region *', `<select id="laeRegion" name="region" required><option value="">Select one</option>${regionOptions}</select>`)}
-        ${field('laeVenueName', 'Venue or location *', '<input type="text" id="laeVenueName" name="venue_name" required minlength="2" maxlength="120" placeholder="e.g. Kelowna Community Theatre">')}
+        ${field('laeVenueName', 'Venue or location *', '<input type="text" id="laeVenueName" name="venue_name" required minlength="2" maxlength="120" placeholder="e.g. Kelowna Community Theatre" list="laeVenueList" autocomplete="off"><datalist id="laeVenueList"></datalist>', '<p class="lyv-hint">Start typing and pick your venue if it is listed.</p>')}
       </div>
       <p class="lyv-section-label">When (Okanagan time)</p>
       <div class="form-row">
@@ -25490,8 +25617,12 @@ ${renderGolfHeaderHtml()}
       </div>
       <p class="lyv-section-label">Details</p>
       <div class="form-row">
-        ${field('laeEventUrl', 'Event website or ticket link *', '<input type="url" id="laeEventUrl" name="event_url" required maxlength="500" placeholder="https://" autocomplete="url">')}
+        ${field('laeEventUrl', 'Event website or ticket link', '<input type="url" id="laeEventUrl" name="event_url" maxlength="500" placeholder="https://" autocomplete="url">', '<p class="lyv-hint">A Facebook event page is fine. No link? Leave it blank.</p>')}
         ${field('laeOrganizerName', 'Organizer *', '<input type="text" id="laeOrganizerName" name="organizer_name" required minlength="2" maxlength="120" autocomplete="organization">')}
+      </div>
+      <div class="form-row">
+        ${field('laePrice', 'Price', '<input type="text" id="laePrice" name="price_text" maxlength="80" placeholder="e.g. Free, or $25 in advance">')}
+        ${field('laeImage', 'Poster or photo link', '<input type="url" id="laeImage" name="image_link" maxlength="500" placeholder="https://">', '<p class="lyv-hint">Optional. We check every image before using it.</p>')}
       </div>
       <p class="lyv-section-label">Your contact details</p>
       <div class="form-row">
@@ -25504,7 +25635,7 @@ ${renderGolfHeaderHtml()}
       </div>
       <div class="form-row full">
         <div class="form-field">
-          <label class="lyv-consent"><input type="checkbox" id="laeConsent" name="consent" required> <span>${escapeHtml(EVENT_SUBMISSION_CONSENT_TEXT)} *</span></label>
+          <label class="lyv-consent"><input type="checkbox" id="laeConsent" name="consent" required> <span>${escapeHtml(EVENT_SUBMISSION_CONSENT_TEXT)} * <a href="/privacy">Privacy Policy</a></span></label>
           <p class="lyv-error" id="laeConsentError" hidden></p>
         </div>
       </div>
@@ -25523,7 +25654,26 @@ ${renderGolfHeaderHtml()}
   var form = document.getElementById('laeForm');
   if (!form || !window.fetch) return;
   var startedAt = Date.now();
-  var fields = { name: 'laeName', categories: 'laeCategories', description: 'laeDescription', region: 'laeRegion', venue_name: 'laeVenueName', start_date: 'laeStartDate', end_date: 'laeEndDate', start_time: 'laeStartTime', end_time: 'laeEndTime', schedule_notes: 'laeScheduleNotes', event_url: 'laeEventUrl', organizer_name: 'laeOrganizerName', contact_name: 'laeContactName', contact_email: 'laeContactEmail', consent: 'laeConsent' };
+  var fields = { name: 'laeName', categories: 'laeCategories', description: 'laeDescription', region: 'laeRegion', venue_name: 'laeVenueName', start_date: 'laeStartDate', end_date: 'laeEndDate', start_time: 'laeStartTime', end_time: 'laeEndTime', schedule_notes: 'laeScheduleNotes', event_url: 'laeEventUrl', organizer_name: 'laeOrganizerName', price_text: 'laePrice', image_link: 'laeImage', contact_name: 'laeContactName', contact_email: 'laeContactEmail', consent: 'laeConsent' };
+  // Venue suggestions from the live venues, in the chosen region.
+  (function(){
+    var input = document.getElementById('laeVenueName'), dl = document.getElementById('laeVenueList'), region = document.getElementById('laeRegion');
+    if (!input || !dl) return;
+    var timer = null, seq = 0;
+    input.addEventListener('input', function(){
+      clearTimeout(timer);
+      var q = input.value.trim();
+      if (q.length < 2) return;
+      timer = setTimeout(function(){
+        var mine = ++seq;
+        fetch('/api/venue-lookup?q=' + encodeURIComponent(q) + (region && region.value ? '&region=' + encodeURIComponent(region.value) : '')).then(function(r){ return r.json(); }).then(function(d){
+          if (mine !== seq) return;
+          dl.innerHTML = '';
+          ((d && d.venues) || []).forEach(function(v){ var o = document.createElement('option'); o.value = v.name; o.label = v.type + ' \u00b7 ' + v.region; dl.appendChild(o); });
+        }).catch(function(){});
+      }, 250);
+    });
+  })();
   var desc = document.getElementById('laeDescription');
   var count = document.getElementById('laeDescriptionCount');
   var allDay = document.getElementById('laeAllDay');
@@ -25574,7 +25724,7 @@ ${renderGolfHeaderHtml()}
     e.preventDefault();
     clearErrors();
     var payload = { started_at: startedAt, company_website: document.getElementById('laeCompanyWebsite').value, consent: document.getElementById('laeConsent').checked, all_day: allDay.checked, categories: [] };
-    ['name', 'description', 'region', 'venue_name', 'start_date', 'end_date', 'start_time', 'end_time', 'schedule_notes', 'event_url', 'organizer_name', 'contact_name', 'contact_email'].forEach(function(key){
+    ['name', 'description', 'region', 'venue_name', 'start_date', 'end_date', 'start_time', 'end_time', 'schedule_notes', 'event_url', 'organizer_name', 'price_text', 'image_link', 'contact_name', 'contact_email'].forEach(function(key){
       var value = document.getElementById(fields[key]).value.trim();
       if (value) payload[key] = value;
     });
@@ -27271,6 +27421,12 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/venues' && method === 'GET') {
       return sendJSON(res, 200, listVenues(query));
     }
+    // GET /api/venue-lookup?q=&region= (2026-10-14): up to 8 live venues
+    // whose name contains q, for the List Your Venue "already listed?" search
+    // and the List an Event venue suggestions. Names and page links only.
+    if (pathname === '/api/venue-lookup' && method === 'GET') {
+      return sendJSON(res, 200, { venues: venueLookup(query.q, query.region) });
+    }
 
     // GET /api/saved/resolve?items=venue:571,event:256@466&name=<legacy name>
     // (Stage 4.3): read-only lookup of saved-item identities for the future
@@ -28583,6 +28739,7 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  venueLookup,
   renderAboutPage,
   renderPrivacyPage,
   renderTermsPage,

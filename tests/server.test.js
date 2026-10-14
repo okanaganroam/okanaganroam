@@ -12040,7 +12040,8 @@ test('List an Event: the page renders the form with the 12 What\'s On categories
   assert.equal(res.status, 200);
   const html = await res.text();
   assert.match(html, /<h1>List an Event on Okanagan Roam<\/h1>/);
-  assert.match(html, /reviewed by a person before anything appears on What&rsquo;s On/);
+  assert.match(html, /Listing it on What&rsquo;s On is free/);
+  assert.match(html, /reviewed by a person before anything appears/);
   assert.match(html, /<header id="top">/);
   assert.equal((html.match(/name="categories" value="/g) || []).length, 12);
   for (const c of app.WHATSON_CATEGORIES) assert.match(html, new RegExp(`name="categories" value="${c.key}"`));
@@ -12090,8 +12091,9 @@ test('List an Event: validation rejects missing, invalid and out-of-scope input 
   const before = laeSubmissionCount();
   const tablesBefore = laeEventTables();
   const cases = [
+    // The event link is optional (2026-10-14).
     [{ name: undefined, description: undefined, categories: undefined, region: undefined, venue_name: undefined, start_date: undefined, start_time: undefined, event_url: undefined, organizer_name: undefined, contact_name: undefined, contact_email: undefined, consent: undefined },
-      ['name', 'description', 'categories', 'region', 'venue_name', 'start_date', 'start_time', 'event_url', 'organizer_name', 'contact_name', 'contact_email', 'consent']],
+      ['name', 'description', 'categories', 'region', 'venue_name', 'start_date', 'start_time', 'organizer_name', 'contact_name', 'contact_email', 'consent']],
     [{ categories: [] }, ['categories']],
     [{ categories: ['live-music', 'nightlife', 'arts-culture', 'family-kids'] }, ['categories']],
     [{ categories: ['raves'] }, ['categories']],
@@ -19268,4 +19270,54 @@ test('Footer (2026-10-14): About, Privacy and Terms pages exist, are linked from
   assert.match(footer, /<a href="\/destinations">See all destinations &rarr;<\/a>/);
   const sitemap = await (await fetch(base + '/sitemap.xml')).text();
   for (const p of ['/about', '/privacy', '/terms']) assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com${p}</loc>`));
+}));
+
+// ---------- Listing forms, 2026-10-14 ----------
+test('Listing forms (2026-10-14): venue extras are stored and emailed; an event needs no link, keeps its price and poster link, and approves with the submission as its source', () => laeWithTransport(() => withDiscoveryServer(async (base) => {
+  // Venue: hours, happy hour, social link and role reach the reviewer.
+  app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+  const vres = await lyvPost(base, lyvValid({ name: 'Extras Test Bistro', hours_text: 'Mon-Fri 11am-9pm\nSat-Sun 10am-10pm', happy_hour_text: 'Mon-Fri 3-6pm', social_url: 'instagram.com/extrastest', submitter_role: 'owner' }));
+  assert.equal(vres.status, 201);
+  const v = db.prepare('SELECT hours_text, happy_hour_text, social_url, submitter_role FROM venue_submissions WHERE id = ?').get((await vres.json()).id);
+  assert.deepEqual({ ...v }, { hours_text: 'Mon-Fri 11am-9pm\nSat-Sun 10am-10pm', happy_hour_text: 'Mon-Fri 3-6pm', social_url: 'https://instagram.com/extrastest', submitter_role: 'owner' });
+  const vmail = lyvSent[lyvSent.length - 1];
+  assert.equal(vmail['Happy hour (as given)'], 'Mon-Fri 3-6pm');
+  assert.equal(vmail['Submitter role'], 'Owner');
+  assert.equal((await lyvPost(base, lyvValid({ name: 'Bad Role Cafe', submitter_role: 'ceo' }))).status, 400);
+  assert.equal((await lyvPost(base, lyvValid({ name: 'Bad Social Cafe', social_url: 'not a link' }))).status, 400);
+  app.setVenueSubmissionTransport(async (payload) => { laeSent.push(payload); });
+
+  // Event with no link, a price and a poster link.
+  const eres = await laePost(base, laeValid({ name: 'No Link Community Market', event_url: undefined, price_text: 'Free', image_link: 'posters.example.com/market.jpg' }));
+  assert.equal(eres.status, 201);
+  const created = await eres.json();
+  const sub = app.getEventSubmission(created.id);
+  assert.equal(sub.event_url, '');
+  assert.equal(sub.price_text, 'Free');
+  assert.equal(sub.image_link, 'https://posters.example.com/market.jpg');
+  const email = laeSent[laeSent.length - 1];
+  assert.equal(email['Event website / tickets'], '(none given)');
+  assert.equal(email['Price (as given)'], 'Free');
+  const ok = await laeAdmin(base, `/admin/event-submissions/${created.id}/approve`, { reviewer: 'test-admin' });
+  assert.equal(ok.status, 200);
+  const event = db.prepare('SELECT source_url, website, image_url FROM events WHERE id = ?').get((await ok.json()).event.id);
+  assert.equal(event.source_url, `https://okanaganroam.com/list-an-event#submission-${created.id}`);
+  assert.equal(event.website, null);
+  assert.equal(event.image_url, null, 'a poster link is never published automatically');
+})));
+
+test('Venue lookup (2026-10-14): name search for the listing forms, at most 8, page links only, safe with LIKE characters', () => withDiscoveryServer(async (base) => {
+  assert.deepEqual(app.venueLookup('a'), [], 'two characters minimum');
+  assert.deepEqual(app.venueLookup('%%'), [], 'LIKE wildcards are matched literally');
+  const any = db.prepare("SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL LIMIT 1").get();
+  const hits = app.venueLookup(any.name.slice(0, 6));
+  assert.ok(hits.length >= 1 && hits.length <= 8);
+  for (const h of hits) assert.deepEqual(Object.keys(h).sort(), ['name', 'region', 'type', 'url']);
+  const res = await fetch(`${base}/api/venue-lookup?q=${encodeURIComponent(any.name.slice(0, 6))}&region=${any.region}`);
+  assert.equal(res.status, 200);
+  assert.ok((await res.json()).venues.every((h) => h.region === app.REGION_LABELS[any.region]));
+  const page = await (await fetch(`${base}/list-your-venue`)).text();
+  assert.match(page, /Already listed\? Find your venue/);
+  assert.match(page, /Free for every Okanagan business/);
+  assert.match(page, /<a href="\/privacy">Privacy Policy<\/a>/);
 }));
