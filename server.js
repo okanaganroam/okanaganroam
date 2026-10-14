@@ -28372,7 +28372,32 @@ function importEventBatches(dir = path.join(__dirname, 'data', 'event-batches'))
   return out;
 }
 
+// Clean shutdown (2026-10-14). Railway stops the old container with SIGTERM
+// each time a new deploy goes live. Without a handler Node dies on the
+// signal, npm reports "command failed / signal SIGTERM", and Railway emails
+// a "Deployment crashed" alert for a deploy that worked. Here the server
+// stops taking new connections, lets requests in flight finish (at most 8
+// seconds), closes the database and exits 0.
+function installShutdownHandlers() {
+  let stopping = false;
+  const stop = (signal) => {
+    if (stopping) return;
+    stopping = true;
+    console.log(`[shutdown] ${signal} received, closing`);
+    const finish = () => {
+      try { db.close(); } catch (e) { /* already closed */ }
+      process.exit(0);
+    };
+    setTimeout(finish, 8000).unref();
+    server.close(finish);
+    if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections();
+  };
+  process.once('SIGTERM', () => stop('SIGTERM'));
+  process.once('SIGINT', () => stop('SIGINT'));
+}
+
 function startServer() {
+  installShutdownHandlers();
   server.listen(PORT, () => {
     console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
 
