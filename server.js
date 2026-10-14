@@ -3122,12 +3122,17 @@ function whatsOnDateLabel(event, occsInWindow) {
     if (first.start_date === first.end_date) return formatLocalDateShort(first.start_date);
     return `${formatLocalDateShort(first.start_date, { weekday: false })} – ${formatLocalDateShort(first.end_date, { weekday: false })}`;
   }
-  const rule = event.recurrence_rule ? event.recurrence_rule.trim() : '';
+  // Dates written into the recurrence text ("Home games 2026-09-25 to
+  // 2027-03-26") read as "Sep 25 to Mar 26, 2027" (2026-10-14).
+  const firstYear = first.start_date.slice(0, 4);
+  const rule = event.recurrence_rule ? event.recurrence_rule.trim().replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (m, y, mo, d) => `${MONTH_SHORT[Number(mo) - 1]} ${Number(d)}${y === firstYear ? '' : `, ${y}`}`) : '';
   const next = formatLocalDateShort(first.start_date);
   return rule ? `${rule} · next ${next}` : `${next} + ${occsInWindow.length - 1} more date${occsInWindow.length - 1 === 1 ? '' : 's'}`;
 }
 function whatsOnTimeLabel(occsInWindow) {
-  const times = [...new Set(occsInWindow.filter((o) => o.all_day !== 1).map((o) => o.start_time || ''))];
+  // A start of exactly 00:00 is how imported listings store "no time given",
+  // so it shows no time rather than "12 am" (2026-10-14).
+  const times = [...new Set(occsInWindow.filter((o) => o.all_day !== 1).map((o) => (o.start_time === '00:00' ? '' : (o.start_time || ''))))];
   if (!times.length || (times.length === 1 && times[0] === '')) return '';
   if (times.length > 1) return 'Times vary';
   return formatLocalTime(times[0]);
@@ -17177,20 +17182,83 @@ function savedOccurrenceAttrs(o) {
   return ` data-occurrence-id="${o.id}" data-occurrence-date="${escapeHtml(o.start_date)}"${o.start_time ? ` data-occurrence-time="${escapeHtml(o.start_time)}"` : ''}`;
 }
 
-function whatsOnEventCardHtml(ev) {
+// The calendar-import template ("X at Venue, Town — Oct 15, 2026, 7:30 pm.
+// Admission: $30. Listed by Tourism Kelowna; confirm details with the
+// organizer before you go.") repeats the title, town and date the card
+// already shows. On the card it becomes what it actually says -- the kind of
+// event, where, and the price -- with the source on its own small line; the
+// event's page keeps the full text (2026-10-14).
+const WHATSON_KIND_PHRASE = {
+  'live-music': 'Live music', 'arts-culture': 'Arts and culture', 'food-drink-events': 'A food and drink event', 'wineries-wine-events': 'A wine event',
+  nightlife: 'A night out', 'markets-fairs': 'A market', 'family-kids': 'A family event', 'workshops-classes': 'A workshop', 'sports-recreation': 'Sport',
+  'holiday-seasonal': 'A seasonal event', 'community-events': 'A community event', 'events-festivals': 'An event',
+};
+// After the event's own name: "<venue>, <town> \u2014 <dates>. [Admission: X.]
+// Listed by <source>; confirm details with the organizer before you go."
+const WHATSON_TEMPLATE_RE = /^(.*), ([^,\u2014]+?) \u2014 [^\u2014]*?\.(?: Admission: (.+?)\.)? Listed by (.+?); confirm details with the organizer before you go\.?\s*$/;
+function whatsOnCardSummary(ev) {
+  const text = String(ev.description || '').trim();
+  const lead = `${ev.name} at `;
+  const rest = text.startsWith(lead) ? text.slice(lead.length) : null;
+  let m = rest ? rest.match(WHATSON_TEMPLATE_RE) : null;
+  // The community-calendar wording: "<place>, <town> on 2026-10-17, starting
+  // at 13:30. Listed by the community calendar; confirm details and
+  // availability with the organizer before attending."
+  if (!m && rest) {
+    const c = rest.match(/^(.*), ([^,]+?) on \d{4}-\d{2}-\d{2}(?:, starting at \d{1,2}:\d{2})?\. Listed by (.+?); confirm details[^.]*\.?\s*$/);
+    if (c) m = [c[0], c[1], c[2], null, c[3]];
+  }
+  if (!m) return { text, source: ev.attribution ? `Listed by ${ev.attribution}` : '' };
+  const [, rawVenue, , admission, source] = m;
+  const venue = /^various locations$/i.test(rawVenue.trim()) ? 'various locations' : rawVenue;
+  const kind = WHATSON_KIND_PHRASE[(ev.categories || []).find((k) => WHATSON_KIND_PHRASE[k])] || 'An event';
+  const priceText = !admission ? '' : /^free\b/i.test(admission.trim()) ? ' Free.' : ` Tickets ${admission.trim().replace(/(\d)-(\$?\d)/g, '$1\u2013$2')}.`;
+  return { text: `${kind} at ${venue.trim()}.${priceText}`, source: `Listed by ${source.trim()} \u00b7 confirm details before you go` };
+}
+// Today / Tomorrow / "On now until ..." wording for a card, from the
+// Okanagan date the page is rendered on.
+function whatsOnWhenText(ev, today) {
+  const span = ev.startDate && ev.endDate ? (Date.parse(`${ev.endDate}T12:00:00Z`) - Date.parse(`${ev.startDate}T12:00:00Z`)) / 86400000 : 0;
+  if (ev.occurrenceCount === 1 && span >= 7 && ev.startDate <= today) return `On now \u00b7 until ${formatLocalDateShort(ev.endDate, { weekday: false })}`;
+  let label = ev.dateLabel || '';
+  const word = ev.startDate === today ? 'today' : ev.startDate === addLocalDays(today, 1) ? 'tomorrow' : null;
+  if (!word) return label;
+  const d = formatLocalDateShort(ev.startDate);
+  // "Thursdays until Dec 17 · next Wed Oct 14" -> "... · today"; "Wed Oct 14 + 3 more dates" -> "Today + 3 more dates".
+  if (label.includes(`next ${d}`)) return label.replace(`next ${d}`, word);
+  return label.replace(d, word.charAt(0).toUpperCase() + word.slice(1));
+}
+// Which heading a card sits under: Today, Tomorrow, This week, On now
+// (exhibitions and season-long events), Next week, then by month.
+function whatsOnGroupOf(ev, today) {
+  const span = ev.startDate && ev.endDate ? (Date.parse(`${ev.endDate}T12:00:00Z`) - Date.parse(`${ev.startDate}T12:00:00Z`)) / 86400000 : 0;
+  if (ev.occurrenceCount === 1 && span >= 7 && ev.startDate <= today) return { key: 'ongoing', label: 'On now', rank: 3 };
+  const next = ev.startDate < today ? today : ev.startDate;
+  const days = Math.round((Date.parse(`${next}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000);
+  if (days <= 0) return { key: 'today', label: 'Today', rank: 0 };
+  if (days === 1) return { key: 'tomorrow', label: 'Tomorrow', rank: 1 };
+  if (days <= 6) return { key: 'week', label: 'This week', rank: 2 };
+  if (days <= 13) return { key: 'next-week', label: 'Next week', rank: 4 };
+  const [y, mo] = next.split('-').map(Number);
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return { key: `m-${y}-${mo}`, label: `Later in ${MONTHS[mo - 1]}`, rank: 5 + (y * 12 + mo) / 100000 };
+}
+function whatsOnEventCardHtml(ev, todayArg = null) {
+  // Only a real YYYY-MM-DD turns on the dated card (so .map() indexes never do).
+  const today = typeof todayArg === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(todayArg) ? todayArg : null;
   const href = `/${ev.region}/events/${ev.slug}`;
-  const when = [ev.dateLabel, ev.time].filter(Boolean).join(' · ');
+  const when = [today ? whatsOnWhenText(ev, today) : ev.dateLabel, ev.time].filter(Boolean).join(' · ');
   const meta = [REGION_LABELS[ev.region] ? escapeHtml(REGION_LABELS[ev.region]) : null, when ? escapeHtml(when) : null].filter(Boolean).join(' &middot; ');
   const chips = (ev.categories || []).filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="badge-chip whatson-category-chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
   const descId = `golf-desc-event-${ev.id}`;
   const tripQuery = `${ev.name}, ${REGION_LABELS[ev.region] || ev.region}, Okanagan Valley, BC`;
   return `
       <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''}${savedOccurrenceAttrs(ev.firstOccurrence)} data-surface="whatson_card">
-        ${ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : ''}
+        ${today ? `<img class="whatson-event-img whatson-event-photo" src="${escapeHtml(homeEventImage(ev))}" alt="" loading="lazy" width="800" height="450">` : (ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : '')}
         <h2><a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(ev.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>
         <p class="venue-meta">${meta}</p>
-        ${ev.description ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(ev.description)}</p></div>
-        <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>` : ''}
+        ${today ? (() => { const sum = whatsOnCardSummary(ev); return `${sum.text ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(sum.text)}</p></div>` : ''}${sum.source ? `\n        <p class="whatson-source">${escapeHtml(sum.source)}</p>` : ''}`; })() : (ev.description ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(ev.description)}</p></div>
+        <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>` : '')}
         <p class="chips">${chips}</p>
         <div class="card-actions">
           <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(ev.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(ev.name)}">${APP_FAV_LABEL_HTML}</button>
@@ -17385,7 +17453,12 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
                  meta ? meta.textContent : '', desc ? desc.textContent : ''];
     card.__wo = parts.join(' ').toLowerCase();
   });
-  function cardMatchesSearch(card){ return !searchTerm || (card.__wo || '').indexOf(searchTerm) !== -1; }
+  // Every word, in any order ("jazz kelowna"), 2026-10-14.
+  function cardMatchesSearch(card){
+    if (!searchTerm) return true;
+    var text = card.__wo || '';
+    return searchTerm.split(/\\s+/).filter(Boolean).every(function(w){ return text.indexOf(w) !== -1; });
+  }
   function cardMatches(d, regions, categories){ return matches(d.valley ? [] : regions, categories, d.region, d.cats); }
   var allRegionKeys = Object.keys(LABELS.regions);
   function updateChipCounts(regions, categories){
@@ -17667,6 +17740,62 @@ const WHATSON_CATEGORY_BANNERS = Object.freeze({
   'workshops-classes': { src: '/images/whats-on/workshops-pottery-wheel.jpg', alt: 'Hands shaping clay on a potter\u2019s wheel', pos: 50 },
   'community-events': { src: '/images/whats-on/community-events.jpg', alt: 'Neighbours chatting at a community gathering in a park', pos: 40 },
 });
+// Headings and paging for the What's On list (2026-10-14): after every
+// filter change (the filter script toggles each card's hidden attribute),
+// only the first WHATSON_PAGE_SIZE visible events stay shown -- the rest wait
+// behind "Show more" -- and a heading shows only when one of its events is
+// visible. Runs on its own, so the filter script's contract is unchanged.
+const WHATSON_PAGE_SIZE = 48;
+const WHATSON_LIST_STYLE = `<style id="whatson-list">
+  /* Group headings span the whole grid. */
+  body.whatson-page #whatsOnResults > .whatson-group-head { grid-column: 1 / -1; list-style: none; margin: 18px 0 2px; padding: 0; border: 0; background: none; box-shadow: none; }
+  body.whatson-page #whatsOnResults > .whatson-group-head:first-child { margin-top: 0; }
+  body.whatson-page #whatsOnResults > .whatson-group-head h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.2rem; margin: 0; color: var(--ink); }
+  body.whatson-page #whatsOnResults > .whatson-group-head h3::before { content: ""; display: block; width: 20px; height: 2px; background: var(--teal); margin-bottom: 6px; }
+  body.whatson-page #whatsOnResults > .whatson-paged { display: none !important; }
+  /* A photo across the top of each card, edge to edge. */
+  body.whatson-page .whatson-event-card { position: relative; }
+  body.whatson-page .whatson-event-card > .whatson-event-photo { display: block; width: calc(100% + 40px); max-width: none; height: 110px; aspect-ratio: auto; object-fit: cover; margin: -18px -20px 12px; border-radius: 13px 13px 0 0; background: #2A6B67; }
+  @supports (grid-template-rows: subgrid) { @media (min-width: 900px) { body.whatson-page .card-grid > .whatson-event-card { grid-row: span 11; } body.whatson-page .card-grid > .whatson-event-card > .whatson-event-photo { grid-row: 1; } body.whatson-page .card-grid > .whatson-event-card > h2 { grid-row: 2; } body.whatson-page .card-grid > .whatson-event-card > .venue-meta { grid-row: 3; } body.whatson-page .card-grid > .whatson-event-card > .golf-desc { grid-row: 5; } body.whatson-page .card-grid > .whatson-event-card > .whatson-source { grid-row: 6; } body.whatson-page .card-grid > .whatson-event-card > .chips { grid-row: 9; } body.whatson-page .card-grid > .whatson-event-card > .card-actions { grid-row: 10; } } }
+  @media (min-width: 1180px) { body.whatson-page .card-grid { grid-template-columns: repeat(3, 1fr); } }
+  /* The short summary needs no Read more; the source is a quiet line. */
+  body.whatson-page .card-grid > .venue-card.whatson-event-card .golf-desc { min-height: 0; }
+  body.whatson-page .whatson-event-card .golf-desc p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 4px; }
+  body.whatson-page .whatson-event-card .desc-toggle { display: none !important; }
+  body.whatson-page .whatson-source { margin: 0 0 6px; font-family: 'Nunito', sans-serif; font-size: 0.76rem; color: var(--ink); opacity: 0.6; }
+  body.whatson-page .whatson-more-row { display: flex; justify-content: center; margin: 22px 0 8px; }
+  body.whatson-page .whatson-show-more { font-family: 'Nunito', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 12px 26px; min-height: 48px; cursor: pointer; }
+  body.whatson-page .whatson-show-more[hidden] { display: none; }
+  @media (max-width: 640px) { body.whatson-page .whatson-event-card > .whatson-event-photo { height: 96px; margin: -18px -20px 10px; } }
+</style>`;
+const WHATSON_LIST_SCRIPT = `<script>
+(function(){
+  var list = document.getElementById('whatsOnResults'), more = document.getElementById('whatsOnShowMore');
+  if (!list) return;
+  var page = 1, busy = false, PAGE = ${WHATSON_PAGE_SIZE};
+  function layout(){
+    busy = true;
+    var shown = 0, total = 0, visibleGroups = {};
+    Array.prototype.forEach.call(list.querySelectorAll('.whatson-event-card'), function(card){
+      if (card.hidden) { card.classList.remove('whatson-paged'); return; }
+      total++;
+      var over = total > page * PAGE;
+      card.classList.toggle('whatson-paged', over);
+      if (!over) { shown++; visibleGroups[card.getAttribute('data-group')] = true; }
+    });
+    Array.prototype.forEach.call(list.querySelectorAll('.whatson-group-head'), function(h){ h.classList.toggle('whatson-paged', !visibleGroups[h.getAttribute('data-group')]); });
+    if (more) { more.hidden = shown >= total; more.textContent = 'Show more (' + shown + ' of ' + total + ')'; }
+    busy = false;
+  }
+  if (more) more.addEventListener('click', function(){ page += 1; layout(); });
+  var pending = false;
+  try {
+    new MutationObserver(function(){ if (busy || pending) return; pending = true; requestAnimationFrame(function(){ pending = false; page = 1; layout(); }); })
+      .observe(list, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  } catch (e) {}
+  layout();
+})();
+</script>`;
 function renderWhatsOnPage(filter = null, opts = {}) {
   // opts.scope ({ category } or { region }) renders a scoped page (see whatsOnScopeFromPath): it pre-selects that chip unless the
   // query picks its own, and defaults to the scope's 90-day window unless the query sets dates.
@@ -17727,9 +17856,26 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // hidden) so a shared pre-filtered URL can still reveal the rest when a
   // chip is unselected -- the client script only shows/hides cards.
   const matchingIds = new Set(matching.map((e) => e.id));
+  // Soonest first, under headings (2026-10-14): Today, Tomorrow, This week,
+  // On now (exhibitions and season-long events, closing soonest first), Next
+  // week, then by month. A months-long exhibition no longer leads the list
+  // ahead of tonight's shows. Headings are list items the filter script never
+  // touches; the page script hides a heading whose events are all filtered out.
+  const today = todayLocal(opts.now || new Date());
+  const grouped = events.map((e, i) => ({ e, i, g: whatsOnGroupOf(e, today) }))
+    .sort((a, b) => a.g.rank - b.g.rank || (a.g.key === 'ongoing' ? String(a.e.endDate).localeCompare(String(b.e.endDate)) : 0) || a.i - b.i);
+  let lastGroup = null;
+  const listHtml = grouped.map(({ e, g }) => {
+    const card = matchingIds.has(e.id) ? whatsOnEventCardHtml(e, today) : whatsOnEventCardHtml(e, today).replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden');
+    const head = g.key !== lastGroup ? `\n      <li class="whatson-group-head" data-group="${g.key}" aria-hidden="false"><h3>${escapeHtml(g.label)}</h3></li>` : '';
+    lastGroup = g.key;
+    return head + card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`);
+  }).join('');
   const cardsHtml = events.length
-    ? `<ul class="card-grid" id="whatsOnResults"${matching.length ? '' : ' hidden'}>${events.map((e) => (matchingIds.has(e.id) ? whatsOnEventCardHtml(e) : whatsOnEventCardHtml(e).replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden'))).join('')}
-  </ul>`
+    ? `<ul class="card-grid" id="whatsOnResults"${matching.length ? '' : ' hidden'}>${listHtml}
+  </ul>
+  <div class="whatson-more-row"><button type="button" class="whatson-show-more" id="whatsOnShowMore" hidden>Show more</button></div>
+  ${WHATSON_LIST_SCRIPT}`
     : `<ul class="card-grid" id="whatsOnResults" hidden></ul>`;
   // Body classes: `golf-page` is the site's themed category-page namespace
   // (Golf, Beaches and Outdoors all carry it -- see themedBodyClassAttr): it
@@ -17745,6 +17891,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
 ${renderWhatsOnStyles()}
+${WHATSON_LIST_STYLE}
 ${CATEGORY_BANNER_STYLE}
 ${renderAnalyticsHeadHtml('hub')}
 </head>
@@ -17794,7 +17941,7 @@ ${renderGolfHeaderHtml()}
   </section>
   ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
     <h2 class="category-subsection-heading" id="whatsOnComingUpHeading">Coming up after the weekend</h2>
-    <ul class="card-grid">${comingUp.map(whatsOnEventCardHtml).join('')}</ul>
+    <ul class="card-grid">${comingUp.map((e) => whatsOnEventCardHtml(e)).join('')}</ul>
   </section>` : ''}
   ${scope ? whatsOnRelatedGuidesHtml(whatsOnRelatedGuides(scopeList.length ? scopeList : comingUp)) : ''}
   ${whatsOnBrowseLinksHtml(live, scope ? basePath : null)}
@@ -27539,6 +27686,9 @@ module.exports = {
   whatsOnCategoryTileHtml,
   whatsOnCategoryGridHtml,
   whatsOnEventCardHtml,
+  whatsOnCardSummary,
+  whatsOnWhenText,
+  whatsOnGroupOf,
   whatsOnSelectedTagsHtml,
   whatsOnSummaryText,
   renderWhatsOnStyles,
