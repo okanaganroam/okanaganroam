@@ -8921,7 +8921,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.doesNotMatch(markup.slice(0, markup.indexOf('<li class="venue-card"')), /<h2[^>]*class="category-subsection-heading"/, 'no visible step headings above the results');
   assert.match(markup, /<h2 class="visually-hidden" id="fdResultsTop">Results<\/h2>/, 'the Results heading is screen-reader only');
   // Sort (2026-10-14): the one dropdown is the native Sort select in the result bar.
-  assert.equal((markup.match(/<select/g) || []).length, 1, 'one dropdown control');
+  assert.equal((markup.replace(/<dialog[\s\S]*?<\/dialog>/g, '').match(/<select/g) || []).length, 1, 'one dropdown control (the footer Contact dialog has its own topic select)');
   assert.match(markup, /<div class="fd-resultbar">[\s\S]*?<select id="fdSort" class="fd-sort-select"><option value="recommended" selected>Recommended<\/option><option value="rating">Top rated<\/option><option value="az">A\u2013Z<\/option><\/select>/, 'the Sort control sits in the result bar');
 
   // Venue types: All + the five, with counts, and NO wineries.
@@ -11957,8 +11957,9 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
     assert.ok(footer, `${page} renders the shared footer`);
     assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly About Okanagan Roam / List your venue / List an Event / Contact`);
-    assert.equal((footer[0].match(/href="\/list-your-venue"/g) || []).length, 1, page);
-    assert.equal((footer[0].match(/href="\/list-an-event"/g) || []).length, 1, `${page}: exactly one List an Event link`);
+    const footerLinks = footer[0].replace(/<dialog[\s\S]*?<\/dialog>|<script[\s\S]*?<\/script>/g, '');
+    assert.equal((footerLinks.match(/href="\/list-your-venue"/g) || []).length, 1, page);
+    assert.equal((footerLinks.match(/href="\/list-an-event"/g) || []).length, 1, `${page}: exactly one List an Event link`);
     assert.equal((footer[0].match(/>List an Event</g) || []).length, 1, page);
     assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
     // Explore and Regions are <details> that fold on phones (2026-10-14).
@@ -14521,9 +14522,9 @@ test('Stage 3.4: "App coming soon" opens the existing app teaser on every page; 
     assert.equal((html.match(/id="appTeaserDialog"/g) || []).length, 1, `${p}: exactly one teaser dialog`);
     assert.ok(!html.includes('href="/browse#app"'), `${p}: no link to the bottom of /browse`);
     const dialog = html.match(/<dialog class="app-teaser-dialog"[\s\S]*?<\/dialog>/)[0];
-    assert.ok(dialog.includes('This directory is becoming the Okanagan Roam app'));
-    assert.ok(dialog.includes('isn\'t available to download yet'));
-    assert.doesNotMatch(dialog, /<a\s/, 'store badges are not links; no download URL');
+    assert.ok(dialog.includes('The Okanagan Roam app is on its way'));
+    assert.ok(dialog.includes('Be the first to know when it launches'), 'says it is not out yet (2026-10-14 wording)');
+    assert.doesNotMatch(dialog, /App Store|Google Play/, 'no store badges for an app that is not out');
     assert.doesNotMatch(dialog, /apps\.apple\.com|play\.google\.com/);
   }
 }));
@@ -16049,7 +16050,7 @@ test('Contact: the footer Contact is a button that opens one native dialog on ev
     const html = await res.text();
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/)[0];
     assert.match(footer, /<li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/button><\/li>/, page);
-    assert.doesNotMatch(footer, /mailto:/, `${page}: no mailto in the footer`);
+    assert.doesNotMatch(footer.replace(/<dialog[\s\S]*?<\/dialog>/g, ''), /mailto:/, `${page}: no mailto link in the footer itself (the dialog shows the address as an alternative)`);
     assert.equal((html.match(/id="contactDialog"/g) || []).length, 1, `${page}: exactly one Contact dialog`);
     const dialog = html.match(/<dialog class="app-teaser-dialog contact-dialog"[\s\S]*?<\/dialog>/)[0];
     assert.match(dialog, /aria-labelledby="contactTitle"/); assert.match(dialog, /<h2 id="contactTitle">Get in touch<\/h2>/);
@@ -18384,7 +18385,7 @@ test('French place pages (2026-10-13): /fr/... renders the place in French, pair
   assert.deepEqual(ld.find((b) => b['@type'] === 'BreadcrumbList').itemListElement[0].name, 'Accueil');
   assert.equal(ld.find((b) => b['@type'] !== 'BreadcrumbList').description, app.getVenue(venue.id).description_fr);
   const text = frVisibleText(page.text);
-  for (const phrase of FR_PAGE_ENGLISH_PHRASES) assert.ok(!text.includes(phrase), `no English "${phrase}" on the French page: …${text.slice(Math.max(0, text.indexOf(phrase) - 80), text.indexOf(phrase) + 60)}…`);
+  for (const phrase of FR_PAGE_ENGLISH_PHRASES) assert.ok(!text.replace(/iPhone/g, '').includes(phrase), `no English "${phrase}" on the French page: …${text.slice(Math.max(0, text.indexOf(phrase) - 80), text.indexOf(phrase) + 60)}…`);
   // The English page names its twin and offers the switch.
   const en = await s5get('/kelowna/restaurants/test-trattoria');
   assert.match(en.text, /<html lang="en" data-page-lang="en">/);
@@ -18422,7 +18423,7 @@ test('French place pages (2026-10-13): every place type in the data renders with
     if (!app.venueHasFrench(venue)) continue;
     const html = app.renderVenuePage(venue, [], [], [], { lang: 'fr' });
     const text = frVisibleText(html);
-    for (const phrase of FR_PAGE_ENGLISH_PHRASES) assert.ok(!text.includes(phrase), `${type}: no English "${phrase}": …${text.slice(Math.max(0, text.indexOf(phrase) - 80), text.indexOf(phrase) + 60)}…`);
+    for (const phrase of FR_PAGE_ENGLISH_PHRASES) assert.ok(!text.replace(/iPhone/g, '').includes(phrase), `${type}: no English "${phrase}": …${text.slice(Math.max(0, text.indexOf(phrase) - 80), text.indexOf(phrase) + 60)}…`);
     assert.match(html, /<html lang="fr" data-page-lang="fr">/, type);
   }
 }));
@@ -19320,4 +19321,36 @@ test('Venue lookup (2026-10-14): name search for the listing forms, at most 8, p
   assert.match(page, /Already listed\? Find your venue/);
   assert.match(page, /Free for every Okanagan business/);
   assert.match(page, /<a href="\/privacy">Privacy Policy<\/a>/);
+}));
+
+test('Contact (2026-10-14): topics, the app launch sign-up with only an email, and the /contact page', () => withDiscoveryServer(async (base) => {
+  contactReset();
+  const ok = await contactPost(base, contactValid({ topic: 'correction' }));
+  assert.equal(ok.status, 201);
+  assert.equal(contactSent[0].Topic, 'Correct a listing');
+  assert.match(contactSent[0]._subject, /^\[Contact: Correct a listing\] Message from Sam Visitor$/);
+  assert.equal((await contactPost(base, contactValid({ topic: 'bogus' }))).status, 400, 'unknown topics are refused');
+  const plain = await contactPost(base, contactValid());
+  assert.equal(plain.status, 201, 'a message without a topic still works');
+  // App launch: an email is enough.
+  const app1 = await contactPost(base, { email: 'early@example.com', topic: 'app_launch', company_website: '', started_at: Date.now() - 10000 });
+  assert.equal(app1.status, 201);
+  const p = contactSent[contactSent.length - 1];
+  assert.equal(p._subject, '[App launch list] early@example.com');
+  assert.equal(p.Message, 'Please email me when the Okanagan Roam app launches.');
+  assert.equal((await contactPost(base, { email: 'not-an-email', topic: 'app_launch', company_website: '', started_at: Date.now() - 10000 })).status, 400);
+  // The page and the dialogs.
+  const page = await fetch(`${base}/contact`);
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /<h1>Contact Okanagan Roam<\/h1>/);
+  assert.match(html, /mailto:info@okanaganroam\.com/);
+  assert.match(html, /data-contact-topic="correction"/);
+  assert.match(html, /<select id="contactTopic" name="topic">/);
+  assert.doesNotMatch(html.match(/<select id="contactTopic"[\s\S]*?<\/select>/)[0], /app_launch/, 'the launch list is not a contact topic');
+  const teaser = html.match(/<dialog class="app-teaser-dialog" id="appTeaserDialog"[\s\S]*?<\/dialog>/)[0];
+  assert.match(teaser, /The Okanagan Roam app is on its way/);
+  assert.match(teaser, /id="appSignupForm"/);
+  assert.doesNotMatch(teaser, /App Store|Google Play|now in your pocket/, 'no store buttons that do nothing, no claim the app exists');
+  assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/contact<\/loc>/);
 }));

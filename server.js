@@ -7426,13 +7426,22 @@ function renderAppTeaserDialogHtml() {
     <div class="app-teaser-dialog-inner">
       <button type="button" class="app-teaser-dialog-close" data-app-teaser-close aria-label="Close">&times;</button>
       <span class="app-teaser-dialog-eyebrow">Coming soon</span>
-      <h2 id="appTeaserTitle">This directory is becoming the Okanagan Roam app</h2>
-      <p>Same friendly filters, same directory, now in your pocket, including a live "happy hour now" check for wherever you happen to be standing.</p>
-      <div class="app-teaser-dialog-stores">
-        <span class="app-teaser-dialog-store">📱 App Store</span>
-        <span class="app-teaser-dialog-store">▶ Google Play</span>
+      <h2 id="appTeaserTitle">The Okanagan Roam app is on its way</h2>
+      <p>We&rsquo;re building an app version of Okanagan Roam for iPhone and Android: the same places, guides and trip planner, made for your phone. Be the first to know when it launches.</p>
+      <form class="app-teaser-signup" id="appSignupForm" novalidate>
+        <label for="appSignupEmail">Your email</label>
+        <div class="app-teaser-signup-row">
+          <input type="email" id="appSignupEmail" name="email" required maxlength="254" autocomplete="email" placeholder="you@example.com">
+          <button type="submit" class="contact-submit">Notify me</button>
+        </div>
+        <p class="contact-field-error" id="appSignupError" role="alert" hidden></p>
+        <p class="app-teaser-dialog-note">One email when the app launches. Nothing else. <a href="/privacy">Privacy</a></p>
+      </form>
+      <p class="app-teaser-thanks" id="appSignupThanks" role="status" tabindex="-1" hidden>Thanks! We&rsquo;ll email you when the app launches.</p>
+      <div class="app-teaser-homescreen">
+        <strong>In the meantime, save it to your home screen</strong>
+        <p>On iPhone, tap Share, then Add to Home Screen. On Android, tap the browser menu, then Add to Home screen.</p>
       </div>
-      <p class="app-teaser-dialog-note">The app isn't available to download yet.</p>
     </div>
   </dialog>
   <script>
@@ -7445,10 +7454,29 @@ function renderAppTeaserDialogHtml() {
       if (!t || !t.closest) return;
       if (t.closest('[data-app-teaser-open]')) {
         e.preventDefault();
+        openedAt = Date.now();
         if (typeof d.showModal === 'function') { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
         return;
       }
       if (t.closest('[data-app-teaser-close]') || t === d) close();
+    });
+    // Launch sign-up: one email to the site inbox through /api/contact.
+    var openedAt = Date.now();
+    var sf = document.getElementById('appSignupForm'), se = document.getElementById('appSignupEmail'), serr = document.getElementById('appSignupError'), sthanks = document.getElementById('appSignupThanks');
+    if (sf && window.fetch) sf.addEventListener('submit', function(e){
+      e.preventDefault();
+      var email = se.value.trim(), btn = sf.querySelector('button');
+      serr.hidden = true;
+      if (!${SUBMISSION_EMAIL_PATTERN.toString()}.test(email)) { serr.textContent = 'Please enter a valid email address, like name@example.com.'; serr.hidden = false; se.focus(); return; }
+      btn.disabled = true;
+      fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ email: email, topic: 'app_launch', started_at: openedAt, company_website: '' }) })
+        .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(b){ return { status: r.status, body: b }; }); })
+        .then(function(r){
+          if (r.body.ok && r.status === 201) { sf.hidden = true; sthanks.hidden = false; sthanks.focus(); return; }
+          serr.textContent = r.body.error || 'Sorry, something went wrong. Please try again.'; serr.hidden = false;
+        })
+        .catch(function(){ serr.textContent = 'Sorry, we could not reach Okanagan Roam. Please try again.'; serr.hidden = false; })
+        .then(function(){ btn.disabled = false; });
     });
   })();
   </script>`;
@@ -7478,16 +7506,19 @@ function renderContactDialogHtml() {
         <form id="contactForm" novalidate>
           ${field('contactName', 'Your name', '<input type="text" id="contactName" name="name" required minlength="2" maxlength="100" autocomplete="name" autofocus>')}
           ${field('contactEmail', 'Your email', '<input type="email" id="contactEmail" name="email" required maxlength="254" autocomplete="email">')}
+          ${field('contactTopic', 'What&rsquo;s this about?', `<select id="contactTopic" name="topic">${Object.entries(CONTACT_TOPICS).filter(([k]) => k !== 'app_launch').map(([k, l]) => `<option value="${k}">${escapeHtml(l)}</option>`).join('')}</select>`)}
+          <p class="contact-topic-hint" id="contactTopicHint" hidden></p>
           ${field('contactMessage', 'Your message', '<textarea id="contactMessage" name="message" required minlength="10" maxlength="2000" rows="5" placeholder="What would you like to tell us?"></textarea>')}
           <div class="contact-hp" aria-hidden="true"><label>Leave this empty <input type="text" id="contactCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off"></label></div>
           <p class="contact-form-error" id="contactFormError" role="alert" hidden></p>
           <button type="submit" class="contact-submit">Send message</button>
+          <p class="contact-alt">Prefer email? <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>. ${CONTACT_REPLY_NOTE} <a href="/privacy">Privacy</a></p>
         </form>
       </div>
       <div id="contactSuccess" hidden>
         <span class="app-teaser-dialog-eyebrow">Message sent</span>
         <h2 id="contactSuccessTitle" tabindex="-1">Thank you!</h2>
-        <p>Okanagan Roam received your message. We will reply by email as soon as we can.</p>
+        <p>Okanagan Roam received your message. ${CONTACT_REPLY_NOTE}</p>
         <button type="button" class="contact-submit" data-contact-close>Close</button>
       </div>
     </div>
@@ -7501,7 +7532,12 @@ function renderContactDialogHtml() {
     var success = document.getElementById('contactSuccess');
     var formError = document.getElementById('contactFormError');
     var button = form.querySelector('button[type="submit"]');
-    var fields = { name: 'contactName', email: 'contactEmail', message: 'contactMessage' };
+    var fields = { name: 'contactName', email: 'contactEmail', message: 'contactMessage', topic: 'contactTopic' };
+    // Adding a venue or an event has its own form; say so as soon as it is picked.
+    var topic = document.getElementById('contactTopic'), topicHint = document.getElementById('contactTopicHint');
+    var TOPIC_HINTS = { venue: 'Quickest: use the <a href="/list-your-venue">List your venue</a> form. It sends us everything we need.', event: 'Quickest: use the <a href="/list-an-event">List an event</a> form. It sends us everything we need.', correction: 'Tell us the place and what needs fixing. A link to its page helps.' };
+    function syncTopic(){ var h = TOPIC_HINTS[topic.value]; topicHint.hidden = !h; topicHint.innerHTML = h || ''; }
+    topic.addEventListener('change', syncTopic);
     var EMAIL = ${SUBMISSION_EMAIL_PATTERN.toString()};
     var startedAt = Date.now();
     var downOnBackdrop = false;
@@ -7543,6 +7579,9 @@ function renderContactDialogHtml() {
       if (t.closest('[data-contact-open]')) {
         e.preventDefault();
         startedAt = Date.now();
+        var want = t.closest('[data-contact-open]').getAttribute('data-contact-topic');
+        if (want && topic.querySelector('option[value="' + want + '"]')) topic.value = want;
+        syncTopic();
         if (typeof d.showModal === 'function') { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
         return;
       }
@@ -7565,7 +7604,7 @@ function renderContactDialogHtml() {
       };
       var errors = validate(values);
       if (Object.keys(errors).length) { showErrors(errors); return; }
-      var payload = { name: values.name, email: values.email, message: values.message, started_at: startedAt, company_website: document.getElementById('contactCompanyWebsite').value };
+      var payload = { name: values.name, email: values.email, message: values.message, topic: topic.value, started_at: startedAt, company_website: document.getElementById('contactCompanyWebsite').value };
       button.disabled = true;
       button.setAttribute('aria-busy', 'true');
       button.textContent = 'Sending...';
@@ -7658,6 +7697,26 @@ function renderCanonicalFooterStyles() {
   .contact-submit:focus-visible { outline: 2px solid var(--ref-cream, #F5F3ED); outline-offset: 3px; }
   .contact-submit[disabled] { opacity: 0.65; cursor: progress; }
   @media (max-width: 480px) { .contact-dialog .app-teaser-dialog-inner { padding: 30px 20px 22px; } .contact-submit { width: 100%; } }
+  /* Contact topic and app launch sign-up (2026-10-14). */
+  .contact-dialog select {
+    display: block; width: 100%; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem;
+    color: var(--ref-cream, #F5F3ED); background: rgba(255,252,246,0.08); border: 1px solid rgba(255,252,246,0.3); border-radius: 12px;
+  }
+  .contact-dialog select option { color: #16233a; }
+  .contact-topic-hint { margin: -6px 0 14px; font-size: 0.88rem; line-height: 1.45; color: rgba(245,243,237,0.8); }
+  dialog.app-teaser-dialog .contact-topic-hint a, dialog.app-teaser-dialog .contact-alt a, dialog.app-teaser-dialog .app-teaser-dialog-note a { color: var(--ref-gold, #E0A94E); text-decoration: underline; }
+  .contact-alt { margin: 14px 0 0; font-size: 0.85rem; line-height: 1.5; color: rgba(245,243,237,0.7); }
+  .app-teaser-signup { margin: 14px 0 6px; }
+  .app-teaser-signup label { display: block; font-size: 0.88rem; font-weight: 700; margin: 0 0 6px; color: var(--ref-cream, #F5F3ED); }
+  .app-teaser-signup-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .app-teaser-signup-row input { flex: 1 1 200px; min-width: 0; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; color: var(--ref-cream, #F5F3ED); background: rgba(255,252,246,0.08); border: 1px solid rgba(255,252,246,0.3); border-radius: 12px; }
+  .app-teaser-signup-row input::placeholder { color: rgba(245,243,237,0.5); }
+  .app-teaser-signup .app-teaser-dialog-note { margin-top: 8px; }
+  .app-teaser-thanks { margin: 14px 0; font-weight: 800; color: var(--ref-gold, #E0A94E); }
+  .app-teaser-thanks:focus { outline: none; }
+  .app-teaser-thanks[hidden], .app-teaser-dialog [hidden] { display: none; }
+  .app-teaser-homescreen { margin: 18px 0 0; padding: 14px 16px; border-radius: 12px; background: rgba(255,252,246,0.06); font-size: 0.9rem; line-height: 1.5; color: rgba(245,243,237,0.85); }
+  .app-teaser-homescreen p { margin: 4px 0 0; }
   /* Homepage footer redesign (2026-09-17, revised again same day): full-
      width navy band using the same --ref-navy/--ref-gold/--ref-cream
      system as the header/hero, replacing the old footer's --ink/--sand
@@ -11046,6 +11105,24 @@ ${favTrip ? golfFavTripScriptBody(venue.type) : ''}
 </script>`;
 }
 
+// Save to home screen (2026-10-14): a web app manifest and an Apple touch
+// icon, so a phone that adds Okanagan Roam to its home screen shows the
+// logo and opens the site full screen.
+const HOME_SCREEN_HEAD_LINKS = '<link rel="manifest" href="/site.webmanifest">\n<link rel="apple-touch-icon" href="/images/icons/okanagan-roam-apple-touch-180.png">\n<meta name="theme-color" content="#1F5C5C">';
+const SITE_WEBMANIFEST = JSON.stringify({
+  name: 'Okanagan Roam',
+  short_name: 'Okanagan Roam',
+  description: 'A free, local guide to the Okanagan Valley: places to eat, drink and explore, events and trip plans.',
+  start_url: '/',
+  scope: '/',
+  display: 'standalone',
+  background_color: '#F5EDDD',
+  theme_color: '#1F5C5C',
+  icons: [
+    { src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192', type: 'image/png' },
+    { src: '/images/icons/okanagan-roam-icon-512.png', sizes: '512x512', type: 'image/png' },
+  ],
+});
 function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // golfTheme (2026-09-19): Golf pages also load the homepage stylesheet
   // (before the inline SEO CSS, so existing SEO rules still win ties) and
@@ -11067,6 +11144,7 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   const ogImage = shareImage ? (/^https?:\/\//.test(shareImage) ? shareImage : `https://okanaganroam.com${shareImage}`) : 'https://okanaganroam.com/og-image.png';
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${HOME_SCREEN_HEAD_LINKS}
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
 ${canonical === null ? '' : `<link rel="canonical" href="${canonical}">\n`}${alternates ? alternates.map((a) => `<link rel="alternate" hreflang="${a.hreflang}" href="${a.href}">\n`).join('') : ''}${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">${locale ? `\n<meta property="og:locale" content="${locale}">` : ''}
@@ -18799,6 +18877,23 @@ const FR_STATIC_TEXT = {
   'See all destinations &rarr;': 'Voir toutes les destinations \u2192',
   'Privacy': 'Confidentialit\u00e9',
   'Terms': 'Conditions',
+  // Contact topics and the app teaser (2026-10-14).
+  'What&rsquo;s this about?': 'Quel est le sujet?',
+  'General question': 'Question g\u00e9n\u00e9rale',
+  'Correct a listing': 'Corriger une fiche',
+  'Add my venue': 'Ajouter mon \u00e9tablissement',
+  'Add my event': 'Ajouter mon \u00e9v\u00e9nement',
+  'Press or media': 'Presse ou m\u00e9dias',
+  'Partnership': 'Partenariat',
+  'The Okanagan Roam app is on its way': 'L\u2019application Okanagan Roam s\u2019en vient',
+  'We&rsquo;re building an app version of Okanagan Roam for iPhone and Android: the same places, guides and trip planner, made for your phone. Be the first to know when it launches.': 'Nous cr\u00e9ons une application Okanagan Roam pour iPhone et Android : les m\u00eames lieux, guides et planificateur de voyage, pens\u00e9s pour votre t\u00e9l\u00e9phone. Soyez parmi les premiers inform\u00e9s de son lancement.',
+  'Notify me': 'Me pr\u00e9venir',
+  'One email when the app launches. Nothing else.': 'Un seul courriel au lancement de l\u2019application. Rien d\u2019autre.',
+  'Thanks! We&rsquo;ll email you when the app launches.': 'Merci! Nous vous \u00e9crirons au lancement de l\u2019application.',
+  'In the meantime, save it to your home screen': 'D\u2019ici l\u00e0, ajoutez-le \u00e0 votre \u00e9cran d\u2019accueil',
+  'On iPhone, tap Share, then Add to Home Screen. On Android, tap the browser menu, then Add to Home screen.': 'Sur iPhone, touchez Partager, puis Sur l\u2019\u00e9cran d\u2019accueil. Sur Android, ouvrez le menu du navigateur, puis Ajouter \u00e0 l\u2019\u00e9cran d\u2019accueil.',
+  'Your email': 'Votre courriel',
+  'Prefer email?': 'Vous pr\u00e9f\u00e9rez le courriel?',
 };
 const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
 function localizeStaticFr(html) {
@@ -24484,6 +24579,7 @@ ${banner ? CATEGORY_BANNER_STYLE : ''}
   body.info-page .info-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
   body.info-page .info-cta a, body.info-page .info-cta button { display: inline-block; padding: 10px 18px; border-radius: 999px; font: inherit; font-weight: 800; font-size: 0.95rem; text-decoration: none; border: 0; cursor: pointer; background: var(--ref-navy, #1B2B3A); color: #fff; }
   body.info-page .info-cta a.secondary { background: var(--sand-deep, #ece3d3); color: var(--ink); }
+  body.info-page .info-link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--teal-deep); text-decoration: underline; cursor: pointer; }
 </style>
 </head>
 <body class="golf-page info-page">
@@ -24528,6 +24624,27 @@ function renderAboutPage() {
     <p>If your business is missing, a detail is out of date or you have photos to share, we would love to hear from you. Event organizers can send their events for the What&rsquo;s On calendar, free.</p>
     <p class="info-cta"><a href="/list-your-venue">List your venue</a><a href="/list-an-event">List an event</a><button type="button" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog">Say hello</button></p>
     <p class="info-updated">Okanagan Roam &middot; Kelowna, British Columbia &middot; <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a></p>`,
+  });
+}
+function renderContactPage() {
+  return renderInfoPage({
+    path: '/contact',
+    name: 'Contact',
+    title: 'Contact Okanagan Roam',
+    description: 'Get in touch with Okanagan Roam: questions, listing corrections, new venues and events, press and partnerships. Email info@okanaganroam.com.',
+    heading: 'Contact Okanagan Roam',
+    lead: `Questions, ideas, a correction or just a hello &mdash; we read every message. ${CONTACT_REPLY_NOTE}`,
+    bodyHtml: `<p class="info-cta"><button type="button" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog">Send us a message</button><a class="secondary" href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a></p>
+    <h2>Quickest ways to get it done</h2>
+    <ul>
+      <li><strong>Own a business?</strong> <a href="/list-your-venue">List your venue</a> for free, or find your listing there and request a correction.</li>
+      <li><strong>Running an event?</strong> <a href="/list-an-event">List your event</a> on What&rsquo;s On, free.</li>
+      <li><strong>Spotted something wrong?</strong> <button type="button" class="info-link-btn" data-contact-open data-contact-topic="correction" aria-haspopup="dialog" aria-controls="contactDialog">Tell us what to fix</button>, with a link to the page if you can.</li>
+      <li><strong>Press or partnerships?</strong> <button type="button" class="info-link-btn" data-contact-open data-contact-topic="press" aria-haspopup="dialog" aria-controls="contactDialog">Send us a note</button> or email <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</li>
+    </ul>
+    <h2>Follow along</h2>
+    <p><a href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener">Instagram</a> &middot; <a href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener">Facebook</a> &middot; <a href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener">TikTok</a></p>
+    <p class="info-updated">Okanagan Roam &middot; Kelowna, British Columbia &middot; <a href="/about">About us</a> &middot; <a href="/privacy">Privacy</a></p>`,
   });
 }
 function renderPrivacyPage() {
@@ -24797,7 +24914,9 @@ ${renderGolfHeaderHtml()}
       var msg = document.getElementById('contactMessage');
       if (msg) msg.value = 'Correction for ' + b.getAttribute('data-name') + ' (' + b.getAttribute('data-url') + '):\\n';
       var opener = document.querySelector('[data-contact-open]');
+      var tp = document.getElementById('contactTopic'); if (tp) tp.value = 'correction';
       if (opener) opener.click();
+      if (tp) { tp.value = 'correction'; tp.dispatchEvent(new Event('change')); }
       if (msg) setTimeout(function(){ msg.focus(); msg.setSelectionRange(msg.value.length, msg.value.length); }, 50);
     });
   })();
@@ -25347,7 +25466,19 @@ const CONTACT_RATE_LIMIT = 5; // messages per IP ...
 const CONTACT_RATE_WINDOW_MS = 60 * 60 * 1000; // ... per hour
 const CONTACT_GLOBAL_LIMIT = 100; // messages from everyone, per rolling 24 hours
 const CONTACT_GLOBAL_WINDOW_MS = 24 * 60 * 60 * 1000;
-const CONTACT_KEYS = new Set(['name', 'email', 'message', 'company_website', 'started_at']);
+const CONTACT_KEYS = new Set(['name', 'email', 'message', 'company_website', 'started_at', 'topic']);
+// What a message is about (2026-10-14). 'app_launch' is the app teaser's
+// "tell me when it launches" sign-up: only the email is needed.
+const CONTACT_TOPICS = Object.freeze({
+  general: 'General question',
+  correction: 'Correct a listing',
+  venue: 'Add my venue',
+  event: 'Add my event',
+  press: 'Press or media',
+  partnership: 'Partnership',
+  app_launch: 'App launch list',
+});
+const CONTACT_REPLY_NOTE = 'We usually reply within a couple of days.';
 const CONTACT_FALLBACK_NOTE = 'email us at info@okanaganroam.com';
 
 async function sendContactViaFormSubmit(payload) {
@@ -25407,6 +25538,15 @@ function validateContactMessage(body) {
   const errors = {};
   const data = {};
   const text = (key) => (typeof body[key] === 'string' ? body[key] : null);
+  if (body.topic !== undefined && body.topic !== '') {
+    if (typeof body.topic !== 'string' || !CONTACT_TOPICS[body.topic]) errors.topic = 'Please choose one of the listed topics.';
+    else data.topic = body.topic;
+  }
+  // The app launch sign-up needs only an email address.
+  if (data.topic === 'app_launch') {
+    if (text('name') === null || !text('name').trim()) body = { ...body, name: 'App launch sign-up' };
+    if (text('message') === null || !text('message').trim()) body = { ...body, message: 'Please email me when the Okanagan Roam app launches.' };
+  }
 
   const rawName = text('name');
   if (rawName === null || !rawName.trim()) errors.name = 'Please enter your name.';
@@ -25440,10 +25580,11 @@ function validateContactMessage(body) {
 
 function buildContactEmail(data, now = new Date()) {
   return {
-    _subject: `[Contact] Message from ${data.name}`,
+    _subject: data.topic === 'app_launch' ? `[App launch list] ${data.email}` : `[Contact${data.topic ? `: ${CONTACT_TOPICS[data.topic]}` : ''}] Message from ${data.name}`,
     _template: 'table',
     _captcha: 'false',
     _replyto: data.email,
+    ...(data.topic ? { 'Topic': CONTACT_TOPICS[data.topic] } : {}),
     'Name': data.name,
     'Email': data.email,
     'Message': data.message,
@@ -25904,7 +26045,7 @@ const server = http.createServer(async (req, res) => {
         html = html
           .replace('<section class="hero-scenic" id="heroScenic">', '<section class="hero-scenic hero-scenic-home" id="heroScenic">')
           .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
-          .replace('</head>', `${HOME_HERO_STYLE}\n</head>`);
+          .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`);
 
         // Anything still pointing at the now-removed sections (the header's
         // "Browse & Search" dropdown link and every homepage module's own
@@ -26215,7 +26356,7 @@ const server = http.createServer(async (req, res) => {
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // About, Privacy and Terms (2026-10-14).
-        ...['/about', '/privacy', '/terms'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>${p === '/about' ? '0.6' : '0.3'}</priority>\n  </url>`),
+        ...['/about', '/contact', '/privacy', '/terms'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>${p === '/about' || p === '/contact' ? '0.6' : '0.3'}</priority>\n  </url>`),
         // Editorial guides (2026-10-10).
         `  <url>\n    <loc>https://okanaganroam.com/guides</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...Object.keys(FILE_GUIDES).filter((p) => !guideIsThin(FILE_GUIDES[p])).map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
@@ -27917,8 +28058,12 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderSkiGuidePage());
     }
+    if (pathname === '/site.webmanifest' && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
+      return res.end(SITE_WEBMANIFEST);
+    }
     // About, Privacy and Terms (2026-10-14), linked from the footer.
-    const infoPage = { '/about': renderAboutPage, '/privacy': renderPrivacyPage, '/terms': renderTermsPage }[pathname.replace(/\/$/, '')];
+    const infoPage = { '/about': renderAboutPage, '/contact': renderContactPage, '/privacy': renderPrivacyPage, '/terms': renderTermsPage }[pathname.replace(/\/$/, '')];
     if (infoPage && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(infoPage());
@@ -28766,6 +28911,8 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  renderContactPage,
+  CONTACT_TOPICS,
   venueLookup,
   renderAboutPage,
   renderPrivacyPage,
