@@ -7256,10 +7256,11 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
 // which slices this array [0,2)/[2,4) rather than flowing it through a
 // CSS multi-column auto-balance).
 const FOOTER_REGION_GROUPS = [
-  { labelKey: 'wizard.central', label: 'Central', regions: ['kelowna', 'west-kelowna', 'peachland', 'lake-country'] },
-  { labelKey: 'wizard.south', label: 'South', regions: ['naramata', 'penticton', 'kaleden', 'okanagan-falls', 'summerland', 'oliver', 'osoyoos'] },
-  { labelKey: 'wizard.north', label: 'North', regions: ['vernon', 'coldstream', 'lumby', 'armstrong', 'enderby'] },
-  { labelKey: 'wizard.skiResorts', label: 'Ski resorts', regions: ['big-white', 'silverstar', 'apex', 'baldy'] },
+  // North to south within each group (2026-10-14), as on /destinations.
+  { labelKey: 'wizard.central', label: 'Central', regions: ['lake-country', 'kelowna', 'west-kelowna', 'peachland'] },
+  { labelKey: 'wizard.south', label: 'South', regions: ['summerland', 'naramata', 'penticton', 'kaleden', 'okanagan-falls', 'oliver', 'osoyoos'] },
+  { labelKey: 'wizard.north', label: 'North', regions: ['enderby', 'armstrong', 'vernon', 'coldstream', 'lumby'] },
+  { labelKey: 'wizard.skiResorts', label: 'Ski resorts', regions: ['silverstar', 'big-white', 'apex', 'baldy'] },
 ];
 
 // Homepage footer redesign (2026-09-17, revised again same day): replaces
@@ -7347,11 +7348,11 @@ function renderHomeFooterHTML(fromBrowse) {
       <p class="home-footer-tagline" data-i18n="homeFooter.taglineFull">Okanagan Valley, British Columbia</p>
     </div>
     <div class="home-footer-cols">
-      <div class="home-footer-col">
-        <h4 data-i18n="homeFooter.explore">Explore</h4>
+      <details class="home-footer-col home-footer-fold" open>
+        <summary><h4 data-i18n="homeFooter.explore">Explore</h4></summary>
         <ul>
-          <li><a href="/food-drink" data-i18n="homeFooter.foodDrinks">Food &amp; Drinks</a></li>
-          <li><a href="${wineHref}" data-i18n="mood.wine.title">Wine</a></li>
+          <li><a href="/food-drink" data-i18n="mood.foodDrink.title">Food &amp; Drink</a></li>
+          <li><a href="${wineHref}" data-i18n="wizard.wineries">Wineries</a></li>
           <li><a href="/beaches" data-i18n="mood.beaches.title">Beaches</a></li>
           <li><a href="${golfHref}" data-i18n="mood.golf.title">Golf</a></li>
           <li><a href="/whats-on" data-i18n="mood.whatsOn.title">What&rsquo;s On</a></li>
@@ -7361,25 +7362,29 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="/indoor" data-i18n="mood.indoor.title">Indoor &amp; Rainy Day</a></li>
           <li><a href="${SKI_SNOW_PATH}" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a></li>
           <li><a href="/hidden-gems" data-i18n="gems.heading">Hidden Gems</a></li>
+          <li><a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a></li>
+          <li><a href="/dog-friendly">Dog Friendly Finds</a></li>
+          <li><a href="/secret-spots">Secret Spots</a></li>
           <li><a href="/guides">Guides</a></li>
         </ul>
-      </div>
+      </details>
       <div class="home-footer-col">
         <h4 data-i18n="footer.about">About</h4>
         <ul>
-          <li><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></li>
+          <li><a href="/about">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
           <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
         </ul>
       </div>
-      <div class="home-footer-col home-footer-col-regions">
-        <h4 data-i18n="footer.regions">Regions</h4>
+      <details class="home-footer-col home-footer-col-regions home-footer-fold" open>
+        <summary><h4 data-i18n="footer.regions">Regions</h4></summary>
         <div class="home-footer-region-groups">
           <div class="home-footer-region-subcol">${regionSubcol1}</div>
           <div class="home-footer-region-subcol">${regionSubcol2}</div>
         </div>
-      </div>
+        <p class="home-footer-all-regions"><a href="/destinations">See all destinations &rarr;</a></p>
+      </details>
       <div class="home-footer-col">
         <h4 data-i18n="homeFooter.socialMedia">Social Media</h4>
         <div class="home-footer-social-row">
@@ -7397,8 +7402,13 @@ function renderHomeFooterHTML(fromBrowse) {
     </div>
   </div>
   <div class="wrap-wide home-footer-bottom">
+    <p class="home-footer-legal"><a href="/privacy">Privacy</a><span aria-hidden="true"> &middot; </span><a href="/terms">Terms</a><span aria-hidden="true"> &middot; </span><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></p>
     <p class="home-footer-copyright" data-i18n="homeFooter.copyright">&copy; 2026 Okanagan Roam. Built for the whole crew, dog included.</p>
   </div>
+  <script>
+  // Phones (2026-10-14): Explore and Regions start folded, tap to open.
+  (function(){ try { if (window.matchMedia('(max-width: 560px)').matches) document.querySelectorAll('.home-footer-fold').forEach(function(d){ d.removeAttribute('open'); }); } catch (e) {} })();
+  </script>
   ${renderAppTeaserDialogHtml()}
   ${renderContactDialogHtml()}
 </footer>`;
@@ -7814,6 +7824,16 @@ function renderCanonicalFooterStyles() {
   }
   .home-footer-social-icon:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
   .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 16px 0 24px; }
+  /* Footer refresh (2026-10-14): Privacy, Terms and the app teaser in a
+     bottom row; Explore and Regions are <details> that stay open (and
+     unclickable) on desktop and fold on phones. */
+  .home-footer-legal { font-family: 'Nunito', sans-serif; font-size: 0.84rem; text-align: center; margin: 0 0 8px; color: rgba(245,243,237,0.55); }
+  .home-footer-legal a, .home-footer-legal .home-footer-link-btn { color: rgba(245,243,237,0.78); text-decoration: none; font-size: 0.84rem; }
+  .home-footer-legal a:hover, .home-footer-legal .home-footer-link-btn:hover { color: var(--ref-gold); }
+  .home-footer-fold > summary { list-style: none; cursor: default; pointer-events: none; }
+  .home-footer-fold > summary::-webkit-details-marker { display: none; }
+  .home-footer-all-regions { margin: 14px 0 0; }
+  .home-footer-all-regions a { font-weight: 700; }
   .home-footer-copyright { font-family: 'Nunito', sans-serif; font-size: 0.8rem; color: rgba(245,243,237,0.55); text-align: center; margin: 0; }
 
   /* Trip 0 button redesign, homepage-only (2026-09-17): #tripTray/
@@ -7970,6 +7990,16 @@ function renderCanonicalFooterStyles() {
        real resting scroll position -- 104px had far more margin than
        was actually needed. */
     .home-footer-bottom { padding-bottom: 56px; }
+    /* Phones: Explore and Regions fold behind their headings, and every
+       link is a full-size tap target. */
+    .home-footer-fold > summary { pointer-events: auto; cursor: pointer; padding: 6px 0; }
+    .home-footer-fold > summary h4 { margin-bottom: 0; }
+    .home-footer-fold > summary h4::after { content: ' +'; }
+    .home-footer-fold[open] > summary h4::after { content: ' −'; }
+    .home-footer-fold[open] > summary { margin-bottom: 8px; }
+    .home-footer-col ul, .home-footer-region-group ul { gap: 0; }
+    .home-footer-col a, .home-footer-region-group a, .home-footer-col .home-footer-link-btn { display: inline-block; padding: 11px 8px; }
+    .home-footer-legal a, .home-footer-legal .home-footer-link-btn { display: inline-block; padding: 9px 4px; }
   }`;
 }
 
@@ -18762,6 +18792,13 @@ const FR_STATIC_TEXT = {
   'Thank you!': 'Merci!',
   'Okanagan Roam received your message. We will reply by email as soon as we can.': 'Okanagan Roam a bien re\u00e7u votre message. Nous vous r\u00e9pondrons par courriel d\u00e8s que possible.',
   'Close': 'Fermer',
+  // Footer additions (2026-10-14).
+  'Dog Friendly Finds': 'Trouvailles pour chiens',
+  'Secret Spots': 'Coins secrets',
+  'About Okanagan Roam': '\u00c0 propos d\u2019Okanagan Roam',
+  'See all destinations &rarr;': 'Voir toutes les destinations \u2192',
+  'Privacy': 'Confidentialit\u00e9',
+  'Terms': 'Conditions',
 };
 const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
 function localizeStaticFr(html) {
@@ -24393,6 +24430,141 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+// ---------- About, Privacy and Terms (2026-10-14) ----------
+// Three plain pages linked from the footer. The About page tells the site's
+// story without naming its owner; the Privacy Policy describes only what the
+// site really does (the contact form relay, venue/event submissions, Google
+// Analytics, data kept in the visitor's own browser, and the services that
+// deliver the pages); the Terms are short and in plain English.
+const INFO_PAGE_UPDATED = 'October 14, 2026';
+const INFO_CONTACT_EMAIL = 'okanaganroam@gmail.com';
+function renderInfoPage({ path, name, title, description, heading, lead, bodyHtml, banner = null }) {
+  const canonical = `https://okanaganroam.com${path}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name, url: canonical },
+  ]);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, ...(banner ? { shareImage: banner.src } : {}) })}
+${banner ? CATEGORY_BANNER_STYLE : ''}
+<style>
+  body.info-page .info-body { max-width: 72ch; padding: 0 0 48px; }
+  body.info-page .info-lead { font-size: 1.12rem; line-height: 1.6; margin: 0 0 22px; }
+  body.info-page .info-body h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem; margin: 30px 0 8px; }
+  body.info-page .info-body p, body.info-page .info-body li { font-size: 1rem; line-height: 1.65; }
+  body.info-page .info-body ul { padding-left: 1.2em; }
+  body.info-page .info-body li { margin: 0 0 6px; }
+  body.info-page .info-updated { font-size: 0.86rem; opacity: 0.7; margin-top: 30px; }
+  body.info-page .info-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+  body.info-page .info-cta a, body.info-page .info-cta button { display: inline-block; padding: 10px 18px; border-radius: 999px; font: inherit; font-weight: 800; font-size: 0.95rem; text-decoration: none; border: 0; cursor: pointer; background: var(--ref-navy, #1B2B3A); color: #fff; }
+  body.info-page .info-cta a.secondary { background: var(--sand-deep, #ece3d3); color: var(--ink); }
+</style>
+</head>
+<body class="golf-page info-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name }])}
+  ${categoryHeroHtml(banner ? `<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="667" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>` : '', `<h1>${escapeHtml(heading)}</h1>`)}
+  <div class="info-body">
+    ${lead ? `<p class="info-lead">${lead}</p>` : ''}
+    ${bodyHtml}
+  </div>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+function renderAboutPage() {
+  return renderInfoPage({
+    path: '/about',
+    name: 'About',
+    title: 'About Okanagan Roam | A Local Guide to the Okanagan Valley',
+    description: 'Okanagan Roam is a free, locally run guide to the Okanagan Valley, made in Kelowna: restaurants, wineries, beaches, trails and events from Enderby to Osoyoos in one place.',
+    heading: 'About Okanagan Roam',
+    banner: { src: REGION_SHARE_IMAGES.kelowna, alt: 'Kelowna and Okanagan Lake from above', pos: 50 },
+    lead: 'Okanagan Roam is a free, locally run guide to the Okanagan Valley &mdash; the restaurants, wineries, beaches, trails, hidden corners and events worth knowing about, from Enderby to Osoyoos, all in one place.',
+    bodyHtml: `<h2>Made here, by a local</h2>
+    <p>I was born and raised in Kelowna, and Okanagan Roam began with a simple love for this valley. For the people behind its caf&eacute;s, wineries and family-run businesses. For the lakes, orchards and mountains that never get old. For the quiet trails where you can still spot an osprey over the water or a bighorn sheep on the hillside.</p>
+    <p>The Okanagan is truly one of the best places in the world. It deserves a guide that does it justice.</p>
+    <h2>Why it exists</h2>
+    <p>Planning a day here used to mean a dozen open tabs: one for hours, one for a patio, another for what&rsquo;s on tonight, and a map to tie it all together. Okanagan Roam brings it into one place. Find a lakeside lunch, a winery for the afternoon, a beach the kids will love and something happening tonight, then build your whole trip as you go.</p>
+    <p>Whether you&rsquo;re here for a weekend or you&rsquo;ve lived here all your life, the goal is the same: make it easy to see the very best the Okanagan has to offer.</p>
+    <h2>How places get on the site</h2>
+    <ul>
+      <li><strong>Every listing is free.</strong> Restaurants, wineries, caf&eacute;s, parks and events are listed at no cost.</li>
+      <li><strong>Details are checked.</strong> Hours, addresses and features come from official sources &mdash; the business&rsquo;s own website, its Google listing or the business itself &mdash; and get updated when they change.</li>
+      <li><strong>Picks have a reason.</strong> Hidden Gems, Local Favourites and the guides are chosen by hand, and every card says why it made the list.</li>
+    </ul>
+    <h2>Run a business or an event?</h2>
+    <p>If your business is missing, a detail is out of date or you have photos to share, we would love to hear from you. Event organizers can send their events for the What&rsquo;s On calendar, free.</p>
+    <p class="info-cta"><a href="/list-your-venue">List your venue</a><a href="/list-an-event">List an event</a><button type="button" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog">Say hello</button></p>
+    <p class="info-updated">Okanagan Roam &middot; Kelowna, British Columbia &middot; <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a></p>`,
+  });
+}
+function renderPrivacyPage() {
+  return renderInfoPage({
+    path: '/privacy',
+    name: 'Privacy Policy',
+    title: 'Privacy Policy | Okanagan Roam',
+    description: 'How Okanagan Roam handles personal information: what we collect through the contact form and listing forms, analytics, and what stays in your own browser.',
+    heading: 'Privacy Policy',
+    lead: 'Okanagan Roam is a small, locally run website. We collect as little personal information as we can, we never sell it, and this page explains exactly what happens to it.',
+    bodyHtml: `<h2>What we collect, and why</h2>
+    <ul>
+      <li><strong>Contact form.</strong> When you send us a message, we receive your name, email address and message so we can reply. The form is delivered to our inbox through FormSubmit, an email relay service.</li>
+      <li><strong>List your venue and List an event.</strong> These forms ask for business or event details and a contact name and email (and a phone number if you choose to give one). We keep them so we can review the listing and follow up with you.</li>
+      <li><strong>Spam protection.</strong> To limit abuse, we briefly use your IP address to cap how many messages can be sent, and we store only a scrambled (hashed) version of it with listing submissions.</li>
+      <li><strong>Emails to businesses.</strong> We may contact businesses at their publicly listed email address about their free listing. Reply &ldquo;unsubscribe&rdquo; and we won&rsquo;t email you again.</li>
+    </ul>
+    <h2>Analytics</h2>
+    <p>We use Google Analytics to understand how the site is used in general &mdash; which pages are popular, roughly where visitors come from and what devices they use. Google Analytics uses cookies to do this. We use the reports to improve the site, not to identify you. You can learn more in <a href="https://policies.google.com/technologies/partner-sites" rel="noopener" target="_blank">how Google uses information from sites that use its services</a>, or install the <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener" target="_blank">Google Analytics opt-out add-on</a>.</p>
+    <h2>Saved in your own browser</h2>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email.</p>
+    <h2>Services that help run the site</h2>
+    <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
+    <h2>What we never do</h2>
+    <p>We don&rsquo;t sell, rent or trade personal information, and we don&rsquo;t use it for anything other than the reasons above.</p>
+    <h2>How long we keep it, and your choices</h2>
+    <p>We keep messages and submissions only as long as we need them to reply, review a listing and keep it accurate. You can ask to see, correct or delete the personal information we hold about you at any time by emailing <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>. We handle personal information in line with Canada&rsquo;s privacy law (PIPEDA). If you have a concern we can&rsquo;t resolve, you can contact the <a href="https://www.priv.gc.ca/" rel="noopener" target="_blank">Office of the Privacy Commissioner of Canada</a>.</p>
+    <h2>Changes</h2>
+    <p>If we change how we handle personal information, we will update this page and the date below.</p>
+    <p class="info-updated">Last updated ${INFO_PAGE_UPDATED}.</p>`,
+  });
+}
+function renderTermsPage() {
+  return renderInfoPage({
+    path: '/terms',
+    name: 'Terms of Use',
+    title: 'Terms of Use | Okanagan Roam',
+    description: 'The terms for using Okanagan Roam, a free guide to the Okanagan Valley: listings, submissions, photos and links, in plain English.',
+    heading: 'Terms of Use',
+    lead: 'Okanagan Roam is free to use. By using the site, you agree to these terms. We have kept them short and in plain English.',
+    bodyHtml: `<h2>Information on the site</h2>
+    <p>We work hard to keep listings accurate, but hours, prices, menus, dog rules, events and other details can change without notice. Please check with the business or organizer before you go, especially for anything time-sensitive. The site is a guide, not a guarantee.</p>
+    <h2>Listings and picks</h2>
+    <p>Listings are free. Hidden Gems, Local Favourites and other collections are our own editorial picks. Business owners can ask us to correct or update their listing at any time.</p>
+    <h2>Things you send us</h2>
+    <p>When you send us a listing, an event, photos or other content, you confirm that the information is accurate and that you have the right to share it. You allow Okanagan Roam to publish it on the site and on our social media, with credit where you ask for it. We may edit submissions for length and clarity, and we may decline any submission.</p>
+    <h2>Our content</h2>
+    <p>The text, design and guides on Okanagan Roam are ours. You are welcome to share links to any page, but please don&rsquo;t copy large parts of the site. Photos belong to their owners and are used with permission or under their licence.</p>
+    <h2>Links to other websites</h2>
+    <p>We link to businesses, maps and other websites to help you plan. We are not responsible for their content, prices or policies.</p>
+    <h2>Getting out there safely</h2>
+    <p>Trails, beaches, lakes and backcountry areas carry natural risks. Follow posted rules, leash laws and fire bans, check conditions before you go, and use your own judgment. You are responsible for your own safety.</p>
+    <h2>Limits of our responsibility</h2>
+    <p>Okanagan Roam is provided &ldquo;as is&rdquo;. To the extent the law allows, we are not liable for any loss or damage that comes from using the site or relying on its information.</p>
+    <h2>Changes, and the law that applies</h2>
+    <p>We may update these terms from time to time; the date below shows the latest version. These terms are governed by the laws of British Columbia and the laws of Canada that apply there.</p>
+    <p>Questions? Email <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</p>
+    <p class="info-updated">Last updated ${INFO_PAGE_UPDATED}.</p>`,
+  });
+}
+
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
   const description = 'Own a restaurant, winery, cafe, brewery or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
@@ -25890,6 +26062,8 @@ const server = http.createServer(async (req, res) => {
           ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
           : []),
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        // About, Privacy and Terms (2026-10-14).
+        ...['/about', '/privacy', '/terms'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>${p === '/about' ? '0.6' : '0.3'}</priority>\n  </url>`),
         // Editorial guides (2026-10-10).
         `  <url>\n    <loc>https://okanaganroam.com/guides</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         ...Object.keys(FILE_GUIDES).filter((p) => !guideIsThin(FILE_GUIDES[p])).map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
@@ -27585,6 +27759,12 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderSkiGuidePage());
     }
+    // About, Privacy and Terms (2026-10-14), linked from the footer.
+    const infoPage = { '/about': renderAboutPage, '/privacy': renderPrivacyPage, '/terms': renderTermsPage }[pathname.replace(/\/$/, '')];
+    if (infoPage && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(infoPage());
+    }
     if ((pathname === '/list-your-venue' || pathname === '/list-your-venue/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderListYourVenuePage());
@@ -28403,6 +28583,9 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  renderAboutPage,
+  renderPrivacyPage,
+  renderTermsPage,
   renderHiddenGemsHubPage,
   hiddenGemCats,
   HIDDEN_GEM_GROUPS,
