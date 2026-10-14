@@ -544,9 +544,9 @@ function valueHeadline(vi) {
 function golfCardValueHtml(detail, today = todayIso()) {
   const vi = computeValueIndex(detail, today);
   if (!vi) return '';
-  return vi.available
-    ? `<p class="golf-value">${esc(valueHeadline(vi))}</p>`
-    : '<p class="golf-value golf-value-none">Value index unavailable</p>';
+  // A list card without an index shows nothing (2026-10-14) rather than
+  // "Value index unavailable"; the course page still says so.
+  return vi.available ? `<p class="golf-value">${esc(valueHeadline(vi))}</p>` : '';
 }
 
 function golfValueSectionHtml(detail, today = todayIso()) {

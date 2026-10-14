@@ -12570,25 +12570,43 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   };
   // Season-only notices render as a compact tag on list cards (2026-10-11).
   const seasonTags = seasonOnlyStates();
-  const cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
+  let cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
 
   if (type !== 'golf') {
     return `<ul class="card-grid">
     ${cardHtml(venues)}
   </ul>`;
   }
+  // Golf card photos (2026-10-14): the course's own photo, or a golf
+  // photo, on every course card instead of the lake illustration.
+  const golfPhoto = (html) => html.replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => {
+    const v = venues.find((x) => x.id === Number(id));
+    const own = v ? String(v.image_url || '').trim() : '';
+    const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v || { id: Number(id), type: 'golf' }, isIndoorGolfVenue(v || {}) ? null : 'golf')) || '';
+    return src ? `${m} data-card-ph style="--card-ph:url('${escapeHtml(src)}')"` : m;
+  });
+  const cardHtmlBase = cardHtml;
+  cardHtml = (list) => golfPhoto(cardHtmlBase(list));
 
   const isPractice = (v) => !!(golfData && golfData.isPracticeFacility(golfDetails.get(`${v.region}/${v.slug}`)));
   const listedCourses = venues.filter((v) => !isIndoorGolfVenue(v) && !isPractice(v));
   const practice = venues.filter((v) => !isIndoorGolfVenue(v) && isPractice(v));
   const indoor = venues.filter((v) => isIndoorGolfVenue(v));
   const sort = golfOpts.sort || 'recommended';
-  const courses = golfData ? golfData.sortGolfCourses(listedCourses, golfDetails, sort, golfOpts.today) : listedCourses;
+  // Recommended (2026-10-14): rating weighted by review count, as on Food &
+  // Drink, instead of town A-Z (which opened on a 9-hole executive course).
+  const ranked = sort === 'recommended'
+    ? listedCourses.slice().sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || String(a.name).localeCompare(String(b.name)))
+    : listedCourses;
+  const courses = golfData ? golfData.sortGolfCourses(ranked, golfDetails, sort, golfOpts.today) : ranked;
   const sortNav = (golfData && golfOpts.basePath && listedCourses.length > 1 && golfData.hasSortablePrices(listedCourses, golfDetails, golfOpts.today))
     ? '\n  ' + golfData.golfSortNavHtml(golfOpts.basePath, sort)
     : '';
   const prefix = headingPrefix ? `${escapeHtml(headingPrefix)} ` : '';
-  let html = '';
+  let html = `<style id="golf-card-photos">
+  li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
+  li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
+</style>`;
   if (courses.length) {
     html += `<h2 class="category-subsection-heading">${prefix}Golf Courses</h2>${sortNav}
   <ul class="card-grid">
@@ -14106,6 +14124,20 @@ const FD_CARD_PHOTOS = Object.freeze({
   tour: ['/images/trip-v3/stops/stop-tour-480.jpg', '/images/trip-v3/stops/stop-tour-lake-480.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg', '/images/trip-v3/stops/stop-tour-farm-480.jpg'],
   sport: ['/images/trip-v3/stops/stop-sport-480.jpg'],
   winter: ['/images/trip-v3/stops/stop-ski-480.jpg', '/images/trip-v3/stops/stop-winter-480.jpg', '/images/ski-snow/thumbs/ski-snow.jpg'],
+  // Outdoors, Tours and Ski & Snow sections (2026-10-14), by activity.
+  viewpoint: ['/images/trip-v3/stops/stop-viewpoints-480.jpg', '/images/outdoors/activity-viewpoints-800.jpg'],
+  cycling: ['/images/trip-v3/stops/stop-cycling-480.jpg', '/images/outdoors/activity-cycling-800.jpg'],
+  adventure: ['/images/trip-v3/stops/stop-adventure-480.jpg', '/images/outdoors/activity-adventure-800.jpg'],
+  fishing: ['/images/outdoors/activity-fishing-800.jpg'],
+  camping: ['/images/outdoors/activity-camping-800.jpg'],
+  water: ['/images/trip-v3/stops/stop-water-480.jpg', '/images/outdoors/activity-water-800.jpg'],
+  tourwine: ['/images/trip-v3/stops/stop-tour-wine-480.jpg', '/images/tours/activity-wine-800.jpg'],
+  tourlake: ['/images/trip-v3/stops/stop-tour-lake-480.jpg', '/images/tours/activity-lake-800.jpg'],
+  tourbike: ['/images/trip-v3/stops/stop-tour-bike-480.jpg', '/images/tours/activity-bike-800.jpg'],
+  tourfarm: ['/images/trip-v3/stops/stop-tour-farm-480.jpg', '/images/tours/activity-farm-800.jpg'],
+  touradventure: ['/images/tours/activity-adventure-800.jpg'],
+  tourwinter: ['/images/tours/activity-winter-800.jpg'],
+  tourculture: ['/images/tours/activity-culture-800.jpg'],
   // Dog Friendly Finds (2026-10-14): dog beaches and dog-friendly parks.
   dogbeach: ['/images/trip-v3/stops/stop-dog-outdoor-480.jpg', '/images/trip-v3/stops/stop-beach-480.jpg', '/images/trip-v3/stops/stop-beach-2-480.jpg', '/images/beaches/beaches-800.jpg'],
   dogoutdoor: ['/images/trip-v3/stops/stop-hiking-480.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg', '/images/trip-v3/stops/stop-outdoor-480.jpg', '/images/trip-v3/stops/stop-viewpoints-480.jpg', '/images/outdoors/activity-hiking-800.jpg'],
@@ -17302,7 +17334,11 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const openNowOn = !!cfg.openNow && !!f.openNow;
   const catsById = new Map(venues.map((v) => [v.id, cfg.catsFor(v)]));
   const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
-  const mixed = curatedMixedOrder(venues, (v) => (catsById.get(v.id) || [])[0] || v.type, now);
+  // cfg.pinFirst(v) (2026-10-14): places that always open the Mixed order
+  // (the four ski resorts on Ski & Snow), in their own given order.
+  const pinned = cfg.pinFirst ? venues.filter(cfg.pinFirst).sort((a, b) => cfg.pinFirst(a) - cfg.pinFirst(b)) : [];
+  const pinnedIds = new Set(pinned.map((v) => v.id));
+  const mixed = [...pinned, ...curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now)];
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -17323,9 +17359,12 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow: openNowOn };
   const content = (f.types.length === 1 && cfg.categoryContent[f.types[0]]) || cfg.categoryContent.all;
 
-  const canonical = `https://okanaganroam.com${cfg.path}`;
+  const canonical = `https://okanaganroam.com${cfg.canonicalPath || cfg.path}`;
+  // cfg.crumbs (2026-10-14): [{ name, href }] between Home and this page, e.g. the town.
+  const crumbs = cfg.crumbs || [];
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
+    ...crumbs.map((c) => ({ name: c.name, url: `https://okanaganroam.com${c.href}` })),
     { name: cfg.name, url: canonical },
   ]);
   const itemList = {
@@ -17333,7 +17372,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     '@type': 'ItemList',
     name: cfg.title,
     description: cfg.description,
-    itemListElement: list.map((v, i) => ({
+    itemListElement: (cfg.schemaFilter ? list.filter(cfg.schemaFilter) : list).map((v, i) => ({
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
@@ -17351,7 +17390,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {},
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length ? ' hidden' : ''}>${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
@@ -17359,8 +17398,9 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
+  // A one-town page (cfg.region) has no Regions control.
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
+    ${cfg.region ? '' : pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
     ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${cfg.openNow ? foodDrinkOpenNowToggleHtml(openNowOn, openCount) : ''}
   </div>`;
@@ -17375,6 +17415,7 @@ ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
 ${golfEngagementHeadHtml(cfg.surface, true, 'hub')}
+${cfg.extraHead || ''}
 <style id="curated-hub">
   body.curated-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
   body.curated-hub-page .card-note-label { font-weight: 800; }
@@ -17386,7 +17427,7 @@ ${CATEGORY_BANNER_STYLE}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
-  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: cfg.name }])}
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, ...crumbs, { name: cfg.name }])}
   ${categoryHeroHtml(`<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
@@ -17404,7 +17445,8 @@ ${renderGolfHeaderHtml()}
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
   </script>`, `<h1>${escapeHtml(content.heading)}</h1>
-  <p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>`)}
+  <p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>${cfg.heroExtraHtml || ''}`)}
+  ${cfg.leadHtml || ''}
   ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
   ${chips}
   ${controlsHtml}
@@ -17516,6 +17558,201 @@ function renderSecretSpotsHubPage(venues, filter = null, now = new Date()) {
       wildlife: { banner: { src: '/images/outdoors/activity-nature.jpg', alt: 'Spotted Lake in the hills near Osoyoos', pos: 50 }, heading: 'Wetlands & Wildlife Spots in the Okanagan', intro: 'Ponds, marshes, grasslands and bird sanctuaries \u2014 bring binoculars.' },
     },
     afterHtml: outsideCount ? `<p class="subtitle" style="margin-top:22px">Looking for caf\u00e9s, breweries and other under-the-radar places? See all <a href="/hidden-gems">Hidden Gems &rarr;</a></p>` : '',
+  }, venues, filter, now);
+}
+
+// ---------- Outdoors, Beaches, Tours and Ski & Snow on the shared engine (2026-10-14) ----------
+//
+// The last section pages on the old card list move to renderCuratedHubPage,
+// like Hidden Gems: a photo per card, short blurbs, 48 at a time, search,
+// Regions and features, the Mixed order (never by rating), By town and A-Z.
+// Each also renders for one town (/kelowna/beaches, /kelowna/outdoors,
+// /kelowna/tours): the same page scoped to the town, without the Regions
+// control, with the town's other categories as tabs.
+function sectionTownCfg(region, slug, name, typeKey) {
+  if (!region) return {};
+  const label = REGION_LABELS[region];
+  return {
+    region,
+    path: `/${region}/${slug}`,
+    crumbs: [{ name: label, href: `/${region}` }],
+    leadHtml: regionCategoryTabsHtml(region, getRegionCategoryCounts(region), typeKey),
+    title: `${name} in ${label}, BC | Okanagan Roam`,
+    townHeading: `${name} in ${label}`,
+    townLabel: label,
+  };
+}
+const OUTDOOR_PHOTO_SET = Object.freeze({ hiking: 'park', viewpoints: 'viewpoint', nature: 'wetland', cycling: 'cycling', winter: 'winter', adventure: 'adventure', fishing: 'fishing', camping: 'camping', water: 'water' });
+// venue id -> live activity slugs, in display order (one query).
+function outdoorActivitiesByVenue(venues) {
+  const ids = venues.map((v) => v.id);
+  const map = new Map(ids.map((id) => [id, []]));
+  if (!ids.length) return map;
+  const live = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities());
+  const kindToSlug = Object.fromEntries(live.map((a) => [a.kind, a.slug]));
+  const rows = db.prepare(`SELECT ci.content_id AS id, c.kind AS kind FROM collection_items ci JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue' AND c.kind IN (${live.map(() => '?').join(', ') || "''"})`).all(...live.map((a) => a.kind));
+  for (const r of rows) if (map.has(r.id) && kindToSlug[r.kind] && !map.get(r.id).includes(kindToSlug[r.kind])) map.get(r.id).push(kindToSlug[r.kind]);
+  const order = live.map((a) => a.slug);
+  for (const list of map.values()) list.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  return map;
+}
+function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date()) {
+  const live = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities());
+  const acts = outdoorActivitiesByVenue(venues);
+  const activity = opts.activity ? OUTDOOR_ACTIVITY_BY_SLUG[opts.activity] : null;
+  const town = sectionTownCfg(opts.region, 'outdoors', 'Outdoor Destinations', 'outdoor');
+  const f = { types: [], features: [], regions: [], ...(filter || {}) };
+  if (activity && !f.types.length) f.types = [activity.slug];
+  const allContent = { banner: CATEGORY_BANNER_IMAGES.outdoor, heading: town.townHeading || 'Outdoor Adventures', intro: town.townLabel ? `Parks, trails, viewpoints and nature spots in and around ${town.townLabel}.` : 'Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs — the Okanagan’s outdoors run the length of the valley.' };
+  const content = { all: allContent };
+  for (const a of live) if (OUTDOOR_ACTIVITY_BANNERS[a.slug]) content[a.slug] = { banner: OUTDOOR_ACTIVITY_BANNERS[a.slug], heading: `${a.label} in ${town.region ? REGION_LABELS[town.region] : 'the Okanagan'}`, intro: a.blurb };
+  return renderCuratedHubPage({
+    path: activity ? `/outdoors/${activity.slug}` : '/outdoors',
+    name: activity ? activity.label : 'Outdoors',
+    crumbs: activity ? [{ name: 'Outdoors', href: '/outdoors' }] : [],
+    title: activity ? `${activity.label} in the Okanagan | Okanagan Roam` : 'Outdoor Adventures in the Okanagan | Okanagan Roam',
+    description: activity ? `${activity.blurb} ${acts.size ? [...acts.values()].filter((x) => x.includes(activity.slug)).length : 0} spots across the Okanagan Valley.` : `${venues.length} outdoor destinations across the Okanagan Valley: hiking, viewpoints, nature, cycling, winter, adventure, fishing, camping and water, from Enderby to Osoyoos.`,
+    bodyClass: 'outdoors-hub-page',
+    surface: 'outdoors',
+    types: live.map((a) => ({ type: a.slug, label: a.label })),
+    catsFor: (v) => acts.get(v.id) || [],
+    photoKeyFor: (v) => curatedPhotoKey(v, v.type === 'beach' ? 'beach' : OUTDOOR_PHOTO_SET[(acts.get(v.id) || [])[0]] || 'park'),
+    cardNotes: getDogFriendlyNotes(),
+    cardNoteLabel: 'Dogs:',
+    features: ['dog_friendly', 'kid_friendly', 'lake_view'],
+    openNow: false,
+    search: { label: 'Search outdoor destinations', placeholder: 'Search by name, town, trail or lake...' },
+    searchLabels: { hiking: 'hike trail walk', viewpoints: 'lookout view summit', nature: 'wildlife birds park', cycling: 'bike', winter: 'ski snow', water: 'paddle swim boat lake' },
+    tryLinks: [['/outdoors/hiking', 'hiking'], ['/outdoors/viewpoints', 'viewpoints'], ['/outdoors/cycling', 'cycling']],
+    schemaFilter: activity ? (v) => (acts.get(v.id) || []).includes(activity.slug) : null,
+    categoryContent: content,
+    ...town,
+    ...(activity ? {} : {}),
+  }, venues, f, now);
+}
+// ?types=, ?regions=, ?features=, ?sort= for these sections, plus each
+// page's older single-choice parameter (?activities= on Outdoors,
+// ?activity= on Tours), so existing links keep their filter.
+function parseSectionQuery(query, typeKeys, featureKeys, legacyKey = null) {
+  const q = { ...(query || {}) };
+  if (legacyKey && q[legacyKey] && !q.types) q.types = q[legacyKey];
+  return parseCuratedHubQuery(q, typeKeys, featureKeys);
+}
+const SECTION_FEATURES = new Set(['dog_friendly', 'kid_friendly', 'lake_view', 'great_groups']);
+const BEACH_KINDS = [{ type: 'dog', label: 'Dog beaches' }, { type: 'quiet', label: 'Quieter beaches' }];
+function renderBeachesHubPage(venues, filter = null, opts = {}, now = new Date()) {
+  const dogIds = getCollectionVenueIds(DOG_FRIENDLY_COLLECTION_KIND);
+  const gemIds = getCollectionVenueIds('hidden_gem');
+  const town = sectionTownCfg(opts.region, 'beaches', 'Beaches', 'beach');
+  return renderCuratedHubPage({
+    path: '/beaches',
+    name: 'Beaches',
+    title: 'Beaches in the Okanagan | Okanagan Roam',
+    description: `${venues.length} beaches and lakeside parks across the Okanagan Valley, from Kalamalka and Okanagan Lake to Skaha and Osoyoos, with dog beaches and their rules.`,
+    bodyClass: 'beaches-hub-page',
+    surface: 'beaches',
+    types: BEACH_KINDS,
+    catsFor: (v) => [...(dogIds.has(v.id) ? ['dog'] : []), ...(gemIds.has(v.id) ? ['quiet'] : [])],
+    photoKeyFor: (v) => curatedPhotoKey(v, 'beach'),
+    cardNotes: getDogFriendlyNotes(),
+    cardNoteLabel: 'Dogs:',
+    cardOpts: { dogNoteInline: true, hideDogBadges: true },
+    features: ['kid_friendly', 'dog_friendly', 'lake_view', 'great_groups'],
+    openNow: false,
+    search: { label: 'Search beaches', placeholder: 'Search by name, town or lake...' },
+    searchLabels: { dog: 'dog off-leash', quiet: 'quiet hidden secret' },
+    tryLinks: [['/beaches?types=dog', 'dog beaches'], ['/beaches?features=kid_friendly', 'family beaches']],
+    categoryContent: {
+      all: { banner: CATEGORY_BANNER_IMAGES.beach, heading: town.townHeading || 'Beaches in the Okanagan', intro: town.townLabel ? `Beaches and lakeside parks in ${town.townLabel}, with dog beaches and their rules.` : 'Find your place to swim, relax and soak up the Okanagan sun, with beaches and lakeside parks from the North Okanagan to Osoyoos.' },
+      dog: { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Beaches in the Okanagan', intro: 'Every designated dog beach, each with the official on-leash or off-leash rule.' },
+      quiet: SECRET_SPOTS_CATEGORY_CONTENT.beach,
+    },
+    ...town,
+  }, venues, filter, now);
+}
+function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, now = new Date()) {
+  const ids = new Set(venues.map((v) => v.id));
+  const all = [...venues, ...alsoVenues.filter((v) => !ids.has(v.id))];
+  const town = sectionTownCfg(opts.region, 'tours', 'Tours & Experiences', 'tour');
+  const activity = opts.activity ? TOUR_ACTIVITIES.find((a) => a.slug === opts.activity) : null;
+  if (activity) {
+    filter = { types: [], features: [], regions: [], ...(filter || {}) };
+    if (!filter.types.length) filter.types = [activity.slug];
+  }
+  const content = { all: { banner: CATEGORY_BANNER_IMAGES.tour, heading: town.townHeading || 'Tours & Experiences in the Okanagan', intro: town.townLabel ? `Tours and experiences in and from ${town.townLabel}, booked with local operators.` : 'Wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more — Okanagan experiences booked with local operators.' } };
+  for (const a of TOUR_ACTIVITIES) content[a.slug] = { banner: a.banner, heading: a.heading || `${a.label} in the Okanagan`, intro: a.intro || a.blurb || content.all.intro };
+  return renderCuratedHubPage({
+    path: activity ? `/tours/${activity.slug}` : '/tours',
+    name: activity ? activity.label : 'Tours & Experiences',
+    crumbs: activity ? [{ name: 'Tours & Experiences', href: '/tours' }] : [],
+    schemaFilter: activity ? (v) => tourActivityOf(v) === activity.slug : null,
+    title: activity ? `${activity.heading || `${activity.label} in the Okanagan`} | Okanagan Roam` : 'Tours & Experiences in the Okanagan | Okanagan Roam',
+    description: `${all.length} tours and experiences in the Okanagan: wine tours, lake cruises, guided hikes, bike tours, farm visits, sleigh rides and more, booked with local operators.`,
+    bodyClass: 'tours-hub-page',
+    surface: 'tours',
+    types: TOUR_ACTIVITIES.map((a) => ({ type: a.slug, label: a.label })),
+    catsFor: (v) => { const a = tourActivityOf(v); return a ? [a] : []; },
+    photoKeyFor: (v) => { const a = tourActivityOf(v); return curatedPhotoKey(v, a ? `tour${a}` : 'tour'); },
+    cardNotes: getToursAlsoNotes(),
+    cardNoteLabel: 'Experience:',
+    features: ['kid_friendly', 'dog_friendly', 'great_groups'],
+    openNow: false,
+    search: { label: 'Search tours and experiences', placeholder: 'Search by name, town or activity...' },
+    tryLinks: [['/tours?types=wine', 'wine tours'], ['/tours?types=lake', 'boats'], ['/tours?types=bike', 'bike tours']],
+    categoryContent: content,
+    heroExtraHtml: venues.length ? '' : '\n  <p class="tour-coming-soon">More tours and experiences are coming soon. <a href="/list-your-venue">Run tours? List them free.</a></p>',
+    ...town,
+  }, all, filter, now);
+}
+const SKI_KINDS = [
+  { type: 'resort', label: 'Ski resorts', re: /\b(ski resort|mountain resort)\b/i },
+  { type: 'nordic', label: 'Nordic & cross-country', re: /nordic|cross-country|\bxc\b/i },
+  { type: 'snowshoe', label: 'Snowshoeing', re: /snowshoe/i },
+  { type: 'tubing', label: 'Tube parks', re: /tube park|tubing/i },
+  { type: 'skating', label: 'Skating', re: /skat|rink|shinny/i },
+  { type: 'sleigh', label: 'Sleigh rides & dog sledding', re: /sleigh|dog sled|kennels/i },
+  { type: 'snowmobile', label: 'Snowmobiling', re: /snowmobil|sled tour|snowcat/i },
+];
+const SKI_RESORT_ORDER = ['silverstar', 'big-white', 'apex', 'baldy'];
+function skiKinds(v) {
+  const out = SKI_KINDS.filter((k) => k.re.test(v.name || '')).map((k) => k.type);
+  return out.length ? out : ['other'];
+}
+function renderSkiSnowHubPage(venues, eats, filter = null, now = new Date()) {
+  const isResort = (v) => skiKinds(v).includes('resort') && SKI_RESORT_REGIONS.has(v.region);
+  const eatsByResort = SKI_RESORT_ORDER.map((r) => ({ r, list: eats.filter((v) => v.region === r) })).filter((x) => x.list.length);
+  const eatsHtml = eatsByResort.length ? `<section class="ski-snow-eats" aria-labelledby="skiSnowEatsHeading">
+  <h2 class="category-subsection-heading" id="skiSnowEatsHeading">Apr&egrave;s &amp; village eats</h2>
+  ${eatsByResort.map((x) => `<p class="ski-snow-eats-line"><strong>${escapeHtml(REGION_LABELS[x.r])}:</strong> ${x.list.map((v) => `<a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>`).join(', ')}</p>`).join('\n  ')}
+  </section>` : '';
+  return renderCuratedHubPage({
+    path: SKI_SNOW_PATH,
+    name: 'Ski & Snow',
+    title: 'Ski & Snow in the Okanagan | Okanagan Roam',
+    description: 'Big White, SilverStar, Apex and Baldy ski resorts, plus Nordic trails, tube parks, snowshoeing, skating, sleigh rides and après-ski eats in the Okanagan.',
+    bodyClass: 'ski-hub-page',
+    surface: 'ski_snow',
+    types: SKI_KINDS.map((k) => ({ type: k.type, label: k.label })),
+    catsFor: skiKinds,
+    pinFirst: (v) => (isResort(v) ? SKI_RESORT_ORDER.indexOf(v.region) + 1 : 0),
+    photoKeyFor: (v) => curatedPhotoKey(v, 'winter'),
+    cardNotes: getToursAlsoNotes(),
+    cardNoteLabel: 'Experience:',
+    features: ['kid_friendly', 'dog_friendly'],
+    openNow: false,
+    search: { label: 'Search ski and snow spots', placeholder: 'Search by name, resort or activity...' },
+    tryLinks: [['/ski-snow?types=resort', 'ski resorts'], ['/ski-snow?types=nordic', 'Nordic trails'], ['/ski-snow?types=tubing', 'tube parks']],
+    leadHtml: `<div class="ski-snow-links">
+    <a class="ski-snow-link" href="${SKI_GUIDE_PATH}"><span class="ski-snow-link-title">Ski season guide &rarr;</span><span class="ski-snow-link-text">Big White and SilverStar: lifts, passes, where to stay and how to get there.</span></a>
+    <a class="ski-snow-link" href="/outdoors/winter"><span class="ski-snow-link-title">Winter outdoors &rarr;</span><span class="ski-snow-link-text">Snowshoe trails, Nordic centres and winter walks across the valley.</span></a>
+  </div>`,
+    extraHead: renderSkiSnowStyles().replace(/body\.lf-page/g, 'body.ski-hub-page') + '<style>body.ski-hub-page .ski-snow-eats-line { margin: 0 0 8px; line-height: 1.6; }</style>',
+    categoryContent: {
+      all: { banner: SKI_SNOW_BANNER, heading: 'Ski & Snow in the Okanagan', intro: 'Four ski hills, Nordic trails, tube parks, skating, sleigh rides and dog sledding — everything for a snow day in the Okanagan, with where to eat when the lifts close.' },
+      resort: { banner: SKI_SNOW_REGION_CONTENT['big-white'].banner, heading: 'Okanagan Ski Resorts', intro: 'Big White, SilverStar, Apex and Baldy — four ski hills, each with its own feel, from the valley’s biggest village to a small, uncrowded local favourite.' },
+    },
+    afterHtml: eatsHtml,
   }, venues, filter, now);
 }
 
@@ -28433,7 +28670,7 @@ const server = http.createServer(async (req, res) => {
     // Always 200, even with an empty winter collection (see renderSkiSnowPage).
     if ((pathname === SKI_SNOW_PATH || pathname === `${SKI_SNOW_PATH}/`) && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(renderSkiSnowPage(getSkiSnowVenues(), getSkiSnowEatVenues(), parseLocalFavouritesFilterQuery(query)));
+      return res.end(renderSkiSnowHubPage(getSkiSnowVenues(), getSkiSnowEatVenues(), parseSectionQuery(query, new Set(SKI_KINDS.map((k) => k.type)), SECTION_FEATURES)));
     }
 
     // GET /categories -- All Categories (2026-09-26), the destination for the
@@ -28495,7 +28732,8 @@ const server = http.createServer(async (req, res) => {
       if (activity) {
         const venues = getOutdoorActivityVenues(activity);
         if (venues.length >= MIN_ACTIVITY_VENUES) {
-          const html = renderOutdoorActivityPage(activity, venues);
+          // The activity page is the Outdoors directory with this activity chosen (2026-10-14).
+          const html = renderOutdoorsHubPage(getOutdoorLandingVenues(), parseSectionQuery(query, new Set(listLiveOutdoorActivities().map((a) => a.slug)), SECTION_FEATURES), { activity: activity.slug });
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
@@ -28610,6 +28848,11 @@ const server = http.createServer(async (req, res) => {
           return res.end(render404Page(pathname));
         }
         const type = activityHubType;
+        if (type === 'tour') {
+          const html = renderToursSectionPage(getVenuesByCategory('tour'), getToursAlsoVenues(), parseSectionQuery(query, new Set(TOUR_ACTIVITIES.map((a) => a.slug)), SECTION_FEATURES), { activity: slug });
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
         const html = renderCategoryAllRegionsPage(type, getVenuesByCategory(type), null, {
           indoorActivity: type === 'indoor' ? slug : undefined,
           indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined,
@@ -28631,6 +28874,22 @@ const server = http.createServer(async (req, res) => {
       const type = SLUG_TO_TYPE[categorySlug];
       if (REGION_LABELS[region] && type) {
         const venues = getVenuesByRegionCategory(region, type);
+        // Town Beaches, Outdoors and Tours (2026-10-14): the section page scoped to the town.
+        if ((type === 'beach' || type === 'outdoor') && venues.length >= MIN_CATEGORY_VENUES) {
+          const html = type === 'beach'
+            ? renderBeachesHubPage(venues, { ...parseSectionQuery(query, new Set(BEACH_KINDS.map((k) => k.type)), SECTION_FEATURES), regions: [] }, { region })
+            : renderOutdoorsHubPage(venues, { ...parseSectionQuery(query, new Set(listLiveOutdoorActivities().map((a) => a.slug)), SECTION_FEATURES, 'activities'), regions: [] }, { region });
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
+        if (type === 'tour') {
+          const also = getToursAlsoVenues().filter((v) => v.region === region);
+          if (venues.length + also.length >= MIN_CATEGORY_VENUES) {
+            const html = renderToursSectionPage(venues, also, { ...parseSectionQuery(query, new Set(TOUR_ACTIVITIES.map((a) => a.slug)), SECTION_FEATURES, 'activity'), regions: [] }, { region });
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            return res.end(html);
+          }
+        }
         // /:region/sports also renders for a region whose only places to play
         // are tagged sports_also venues (2026-10-12).
         const sportsAlso = type === 'sport' ? getSportsAlsoVenues().filter((v) => v.region === region) : [];
@@ -28686,6 +28945,22 @@ const server = http.createServer(async (req, res) => {
       }
       if (type === 'sport') {
         const html = renderSportsHubPage(venues, getSportsAlsoVenues(), getSportsAlsoNotes(), { ...parseFoodDrinkFilterQuery(query), types: String(query.types || '').split(',').filter((t) => SPORT_ACTIVITIES.some((a) => a.slug === t)), sort: SPORTS_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      // Outdoors, Beaches and Tours (2026-10-14) on the shared engine.
+      if (type === 'outdoor' && venues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderOutdoorsHubPage(venues, parseSectionQuery(query, new Set(listLiveOutdoorActivities().map((a) => a.slug)), SECTION_FEATURES, 'activities'));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      if (type === 'beach' && venues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderBeachesHubPage(venues, parseSectionQuery(query, new Set(BEACH_KINDS.map((k) => k.type)), SECTION_FEATURES));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+      if (type === 'tour') {
+        const html = renderToursSectionPage(venues, getToursAlsoVenues(), parseSectionQuery(query, new Set(TOUR_ACTIVITIES.map((a) => a.slug)), SECTION_FEATURES, 'activity'));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -29200,6 +29475,12 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  renderOutdoorsHubPage,
+  renderBeachesHubPage,
+  renderToursSectionPage,
+  renderSkiSnowHubPage,
+  skiKinds,
+  outdoorActivitiesByVenue,
   renderMyTripPage,
   tripStopsFor,
   renderContactPage,

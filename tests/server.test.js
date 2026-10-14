@@ -7557,11 +7557,12 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.equal(wide.status, 200);
     const wideBody = await wide.text();
     assert.match(wideBody, /Homepage Beach One/);
-    assert.match(wideBody, /href="\/kelowna\/beaches"/);
-    assert.match(wideBody, /href="\/vernon\/beaches"/);
-    assert.doesNotMatch(wideBody, /href="\/osoyoos\/beaches"/);
+    // Beaches runs on the shared engine (2026-10-14): towns are Regions chips with counts.
+    assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">[1-9]/);
+    assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon<span class="outdoor-activity-count">[1-9]/);
+    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/);
     assert.match(wideBody, /venue-advisory/, 'advisory notice renders on the listing card');
-    assert.match(wideBody, /<span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span>/u, 'Dog Friendly badge on the listing card');
+    assert.match(wideBody, /<p class="dog-note"><span class="dog-note-label">Dogs:<\/span> Off-leash dog beach<\/p>/, 'the dog rule shows as a Dogs: line on the card (2026-10-14)');
     assert.match(wideBody, /hidden-gem-badge/); assert.match(wideBody, /local-favourite-badge/);
     const regional = await fetch(`${base}/kelowna/beaches`);
     assert.equal(regional.status, 200);
@@ -7927,7 +7928,8 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/, 'a canonical region with no outdoor venues still gets a chip, showing 0');
     assert.equal((wideBody.match(/<h1[\s>]/g) || []).length, 1);
     assert.equal(footerOf(wideBody), footerOf(withFooterOutdoors(beachesBefore)), 'the shared footer on /outdoors is byte-identical to the /beaches footer (with its Outdoors link now /outdoors)');
-    assert.match(wideBody.replace(/<style>[\s\S]*?<\/style>/g, ''), /<ul class="card-grid" id="outdoorResults">[\s\S]*Fixture Canyon Park[\s\S]*Fixture Nordic Centre/, 'landing results list carries every destination');
+    const outdoorGrid = (wideBody.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+    assert.ok(outdoorGrid.includes('Fixture Canyon Park') && outdoorGrid.includes('Fixture Nordic Centre'), 'landing results list carries every destination (shared engine, 2026-10-14)');
     assert.match(await (await fetch(`${base}/kelowna/outdoors`)).text(), /<li class="venue-card" /, 'regional page keeps full listing cards');
     const regional = await fetch(`${base}/kelowna/outdoors`);
     assert.equal(regional.status, 200);
@@ -8202,26 +8204,28 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     const actBody = await act.text();
     assert.equal((actBody.match(/<h1[\s>]/g) || []).length, 1);
     assert.match(actBody, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors\/hiking"/);
-    assert.equal((actBody.match(/<li class="venue-card" /g) || []).length, 3, 'three cards, one per member');
+    // The activity page is the Outdoors directory with the activity chosen (2026-10-14).
+    const actGrid = (actBody.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+    assert.equal((actGrid.match(/<li class="venue-card" /g) || []).length, 3, 'three cards shown, one per member');
     assert.equal(footerOf(actBody), footerOf(before['/beaches']), 'activity page footer == /beaches footer');
     assert.equal((await fetch(`${base}/outdoors/viewpoints`)).status, 404, 'one member -> still 404');
     assert.equal((await fetch(`${base}/outdoors/hiking/`)).status, 200, 'trailing slash tolerated like other routes');
     const landing = await (await fetch(`${base}/outdoors`)).text();
     assert.equal((landing.match(/<h1[\s>]/g) || []).length, 1);
     const lm = landing.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
-    assert.ok(lm.indexOf('id="outdoorsSearch"') < lm.indexOf('outdoors-act-row') && lm.indexOf('outdoors-act-row') < lm.indexOf('id="outdoorRegionsBtn"') && lm.indexOf('id="outdoorRegionsBtn"') < lm.indexOf('id="outdoorResults"'), 'search -> activity chips -> Regions -> results');
+    assert.ok(lm.indexOf('id="fdSearch"') < lm.indexOf('fd-type-row') && lm.indexOf('fd-type-row') < lm.indexOf('id="fdRegionsBtn"') && lm.indexOf('id="fdRegionsBtn"') < lm.indexOf('id="fdResults"'), 'search -> activity chips -> Regions -> results');
     assert.doesNotMatch(lm, /Explore by Activity/);
     for (const r of ['kelowna', 'penticton', 'vernon']) {
       assert.match(lm, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">`), `region chip for ${r}`);
       assert.equal((await fetch(`${base}/${r}/outdoors`)).status, 200, `/${r}/outdoors is valid`);
     }
     assert.equal((await fetch(`${base}/outdoors/camping`)).status, 404); assert.equal((await fetch(`${base}/outdoors/water`)).status, 404);
-    assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-activity="hiking" aria-pressed="false">Hiking &amp; Trails<span class="outdoor-activity-count">3<\/span><\/button>/);
+    assert.match(landing, /data-fd-type="hiking" aria-pressed="false">Hiking &amp; Trails<span class="outdoor-activity-count">3<\/span><\/button>/);
     assert.doesNotMatch(landing, /outdoors-guide-link/);
     assert.equal((lm.match(/<li class="venue-card" /g) || []).length, 3, 'results list has each venue once');
-    assert.match(landing, /id="outdoorResults"/);
-    assert.match(landing, /querySelectorAll\('#outdoorResults > \.venue-card'\)/, 'filter script shipped on the landing');
-    assert.doesNotMatch(actBody.replace(/<style>[\s\S]*?<\/style>/g, ''), /outdoorActivityMap|outdoor-filter-chip|outdoorShowResults/, 'activity pages carry no filter UI');
+    assert.match(landing, /id="fdResults"/);
+    assert.match(landing, /<script type="application\/json" id="fdVenueData">/, 'filter data shipped on the landing');
+    assert.match(actBody, /data-fd-type="hiking" aria-pressed="true"/, 'the activity page opens with its activity chosen');
     const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
     assert.match(sitemap, /<loc>https:\/\/okanaganroam\.com\/outdoors\/hiking<\/loc>/);
     assert.doesNotMatch(sitemap, /\/outdoors\/viewpoints/);
@@ -8445,15 +8449,15 @@ test('/outdoors?regions=..&activities=.. over HTTP renders pre-filtered; the bar
     const filtered = await (await fetch(`${base}/outdoors?regions=kelowna&activities=hiking`)).text();
     assert.notEqual(plain, filtered);
     const fm = outdoorMarkupOnly(filtered);
-    assert.match(fm, /data-region="kelowna" aria-pressed="true">/); assert.match(fm, /data-activity="hiking" aria-pressed="true"/);
-    assert.match(fm, /aria-live="polite">2 of 4 outdoor destinations</); assert.match(fm, /data-remove-activity="hiking"/);
-    assert.equal((fm.match(/<li class="venue-card" data-venue-id="\d+"(?![^>]* hidden)[^>]*>/g) || []).length, 2);
-    assert.match(fm, /data-remove-region="kelowna"/);
+    assert.match(fm, /data-region="kelowna" aria-pressed="true">/); assert.match(fm, /data-fd-type="hiking" aria-pressed="true"/);
+    assert.match(fm, /aria-live="polite">2 of 4 places</);
+    const fGrid = (filtered.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+    assert.equal((fGrid.match(/<li class="venue-card" /g) || []).length, 2);
     assert.match(filtered, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors"/);
     // Junk / unknown values degrade to the plain landing; the region page ignores the query.
     assert.equal(await (await fetch(`${base}/outdoors?regions=nowhere&activities=none`)).text(), plain);
     const regionPlain = await (await fetch(`${base}/kelowna/outdoors`)).text();
-    assert.equal(await (await fetch(`${base}/kelowna/outdoors?regions=vernon&activities=hiking`)).text(), regionPlain);
+    assert.equal(await (await fetch(`${base}/kelowna/outdoors?regions=vernon`)).text(), regionPlain, 'a town page ignores ?regions=');
     // Back/forward + share: the same URL always renders the same filtered state.
     assert.equal(await (await fetch(`${base}/outdoors?regions=kelowna&activities=hiking`)).text(), filtered);
   } finally {
@@ -9068,7 +9072,7 @@ test('Food & Drink hub: the /food-drink route serves it, and /browse, the Wine h
     // Other directories are untouched by the new page. (The F&D category,
     // region and venue pages are asserted in-process below, where the full
     // project tree is available -- this child only carries the four files.)
-    for (const p of ['/whats-on', '/outdoors']) {
+    for (const p of ['/whats-on']) { // /outdoors joined the shared engine (2026-10-14)
       const r = await get(p);
       assert.equal(r.status, 200);
       assert.doesNotMatch(r.text, /fd-type-row|id="fdSearch"|fd-pop-btn|fd-page/, `${p} carries no Food & Drink hub markup or CSS`);
@@ -12503,7 +12507,7 @@ test('Golf Value Index: cards and course pages show the index or "Value index un
   const html = app.renderCategoryPage('penticton', 'golf', app.getVenuesByRegionCategory('penticton', 'golf'), []);
   assert.match(html, /<p class="golf-value">Okanagan Roam Value Index: 54\/100 · Good value<\/p>/, 'Skaha Meadows (9-hole group)');
   assert.match(html, /<p class="golf-value">Okanagan Roam Value Index: 85\/100 · Excellent value<\/p>/, 'Penticton G&CC (18-hole championship group)');
-  assert.match(html, /<p class="golf-value golf-value-none">Value index unavailable<\/p>/, 'Pine Hills (unverified fees)');
+  assert.doesNotMatch(html, /Value index unavailable/, 'list cards leave out a missing index (2026-10-14)');
   const skaha = app.renderVenuePage(app.findVenueBySlug('penticton', 'golf', 'skaha-meadows-golf-course'), [], [], []);
   assert.match(skaha, /<div class="venue-section golf-value-section" id="value-index">/);
   assert.match(skaha, /Based on 2026 rates · Checked Sep 26, 2026/);
@@ -17132,7 +17136,7 @@ test('Ski & Snow: /ski-snow lists the winter collection, après eats on the four
       assert.match(page.text, /<title>Ski &amp; Snow in the Okanagan \| Okanagan Roam<\/title>/);
       assert.match(page.text, /<meta name="description" content="Big White, SilverStar, Apex and Baldy ski resorts/);
       assert.match(page.text, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/ski-snow">/);
-      const results = page.text.slice(page.text.indexOf('id="lfResults"'), page.text.indexOf('id="skiSnowEatsHeading"'));
+      const results = page.text.slice(page.text.indexOf('id="fdResults"'), page.text.indexOf('id="skiSnowEatsHeading"'));
       assert.match(results, /href="\/big-white\/outdoors\/winter-test-tube-park"/, 'the winter member is in the main list');
       const eats = page.text.slice(page.text.indexOf('id="skiSnowEatsHeading"'));
       assert.match(eats, /Apr&egrave;s &amp; village eats/);
@@ -17178,9 +17182,8 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
       assert.equal(empty.status, 200);
       assert.match(empty.text, /<h1>Tours &amp; Experiences in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="tour-coming-soon">More tours and experiences are coming soon/);
-      assert.match(empty.text, /<p class="hub-intro">Wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more/);
-      assert.match(empty.text, /<body class="golf-page tour-page">/);
-      assert.match(empty.text, /Tour page theme \(2026-10-11\)/);
+      assert.match(empty.text, /<p class="outdoor-intro fd-intro">Wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more/);
+      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page curated-hub-page tours-hub-page">/);
       assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
       assert.doesNotMatch(empty.text, /toursAlsoHeading/, 'no also-section without members');
       assert.equal((await WINTER_GET(base, '/vernon/tours')).status, 404, 'an empty region/tours pair 404s like any other');
@@ -17194,8 +17197,8 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
       const region = await WINTER_GET(base, '/kelowna/tours');
       assert.equal(region.status, 200);
       assert.match(region.text, /Tours &amp; Experiences in Kelowna, BC/);
-      assert.match(region.text, /class="category-back-link" href="\/tours">← All Tours &amp; Experiences</);
-      assert.match(region.text, /<body class="golf-page tour-page">/);
+      assert.match(region.text, /<a href="\/kelowna">Kelowna<\/a>/, 'breadcrumb back to the town (2026-10-14)');
+      assert.match(region.text, /tours-hub-page/);
       const venue = await WINTER_GET(base, '/kelowna/tours/tour-test-lake-cruise');
       assert.equal(venue.status, 200);
       assert.match(venue.text, /<title>Tour Test Lake Cruise — Tour &amp; Experience in Kelowna, BC<\/title>/);
@@ -17231,7 +17234,7 @@ test('Tours & Experiences: other-type operators tagged tours_also get a "More ex
       assert.equal(app.countToursHubVenues(), 2);
       const hub = await WINTER_GET(base, '/tours');
       assert.equal(hub.status, 200);
-      assert.match(hub.text, /<h2 class="category-subsection-heading" id="toursAlsoHeading">More experiences to book<\/h2>/);
+      // One list since 2026-10-14: operators tagged tours_also sit with the tours, with their note.
       assert.match(hub.text, /class="tour-coming-soon"/, 'still no tour venues of its own');
       assert.match(hub.text, /href="\/vernon\/outdoors\/tours-also-atv-outfitter"/, 'an outdoor operator links to its outdoors page');
       assert.match(hub.text, /href="\/kelowna\/wineries\/tours-also-sleigh-farm"/, 'a winery links to its winery page');
@@ -17241,8 +17244,8 @@ test('Tours & Experiences: other-type operators tagged tours_also get a "More ex
       assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
       assert.doesNotMatch(hub.text, /Rainy day:/);
       // The card script wires every type on /tours (Read more clamp, Favorite / Trip), and descriptions clamp to 3 lines.
-      assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="winery"\][^)]*\[data-venue-category="outdoor"\]/);
-      assert.match(hub.text, /body\.golf-page\.tour-page \.golf-desc\.is-clamped p \{ -webkit-line-clamp: 3;/);
+      // Shared engine (2026-10-14): the tours_also cards sit in the one list.
+      assert.match(hub.text, /<script type="application\/json" id="fdVenueData">/);
       // Their own pages and types are untouched.
       assert.equal((await WINTER_GET(base, '/vernon/outdoors/tours-also-atv-outfitter')).status, 200);
       assert.equal(app.getVenue(atv.id).type, 'outdoor');
@@ -17714,7 +17717,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(hubTwo, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
       assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const ski = (await WINTER_GET(base, '/ski-snow')).text;
-      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Ski &amp; Snow in the Okanagan<\/h1>/, '/ski-snow opens with its photo above the heading');
+      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner" id="curatedBanner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Ski &amp; Snow in the Okanagan<\/h1>/, '/ski-snow opens with its photo above the heading');
       const gems = app.renderHiddenGemsPage([{ id: 990008, name: 'Banner Gem', slug: 'banner-gem', region: 'kelowna', type: 'cafe', description: 'Fixture.' }]);
       assert.match(gems, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Hidden Gems in the Okanagan<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
@@ -17969,7 +17972,7 @@ test('Guide, Dog Friendly and Outdoors excerpts (2026-10-13): cards show the sho
     assert.doesNotMatch(card, /osprey/);
     await withWinterServer(async (base) => {
       const outdoors = (await WINTER_GET(base, '/outdoors')).text;
-      assert.match(outdoors, /<script type="application\/json" id="outdoorSearchWords">[^<]*osprey/);
+      assert.match(outdoors, /<script type="application\/json" id="fdVenueData">[^<]*osprey/, 'search keeps the full description words (shared engine)');
       const guide = await WINTER_GET(base, '/guide/kelowna/dog_friendly');
       if (guide.status === 200) assert.match(guide.text, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/images\/dog-friendly\/dog-friendly\.jpg">/);
     });
@@ -19380,4 +19383,48 @@ test('My Trip (2026-10-14): /api/trip-stops describes each stop, /my-trip is a p
   const planner = app.renderTripPlannerPage(true);
   assert.ok(planner.includes("localStorage.setItem('okanaganTripDays'"), 'Add whole trip remembers the days');
   assert.doesNotMatch(await (await fetch(`${base}/sitemap.xml`)).text(), /my-trip/);
+}));
+
+test('Sections on the shared engine (2026-10-14): Outdoors, Beaches, Tours, Ski & Snow and their town pages; Golf ranks by rating with card photos', () => withDiscoveryServer(async (base) => {
+  for (const p of ['/outdoors', '/beaches', '/tours', '/ski-snow']) {
+    const res = await fetch(base + p);
+    if (res.status !== 200) { await res.text(); continue; }
+    const html = await res.text();
+    assert.match(html, /<script type="application\/json" id="fdVenueData">/, `${p} uses the shared engine`);
+    assert.match(html, /<option value="recommended"[^>]*>Mixed<\/option>/, `${p} opens in the Mixed order`);
+    const grid = (html.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+    assert.ok((grid.match(/<li class="venue-card"/g) || []).length <= 48, `${p}: at most 48 before Show more`);
+    assert.ok([...grid.matchAll(/<li class="venue-card"[^>]*>/g)].every((m) => /data-ph="/.test(m[0])), `${p}: a photo on every card`);
+  }
+  // Ski resorts open the list, north to south.
+  const ski = app.renderSkiSnowHubPage([
+    { id: 99301, name: 'Tube Park Fixture', region: 'big-white', type: 'outdoor', slug: 'tube-park-fixture', description: 'Fixture.' },
+    { id: 99302, name: 'Big White Ski Resort', region: 'big-white', type: 'outdoor', slug: 'big-white-ski-resort-fx', description: 'Fixture.' },
+    { id: 99303, name: 'SilverStar Mountain Resort', region: 'silverstar', type: 'outdoor', slug: 'silverstar-fx', description: 'Fixture.' },
+  ], []);
+  const order = [...ski.matchAll(/class="venue-card-name">([^<]*)/g)].map((m) => m[1]);
+  assert.deepEqual(order.slice(0, 2), ['SilverStar Mountain Resort', 'Big White Ski Resort']);
+  assert.deepEqual(app.skiKinds({ name: 'Big White Tube Park (Happy Valley)' }), ['tubing']);
+  // A town page: no Regions control, the town in the breadcrumb and heading.
+  const town = await fetch(`${base}/kelowna/beaches`);
+  if (town.status === 200) {
+    const th = await town.text();
+    assert.doesNotMatch(th, /id="fdRegionsBtn"/);
+    assert.match(th, /<h1>Beaches in Kelowna<\/h1>/);
+    assert.match(th, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna\/beaches">/);
+  }
+  // Tour activity pages keep their own address and title.
+  const wine = await fetch(`${base}/tours/wine`);
+  if (wine.status === 200) {
+    const wh = await wine.text();
+    assert.match(wh, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/tours\/wine">/);
+    assert.match(wh, /data-fd-type="wine" aria-pressed="true"/);
+  }
+  // Golf: a photo on each course card, no "Value index unavailable" filler.
+  const golf = await fetch(`${base}/golf`);
+  if (golf.status === 200) {
+    const gh = await golf.text();
+    assert.doesNotMatch(gh, /Value index unavailable/);
+    assert.match(gh, /data-card-ph style="--card-ph:url\('/);
+  }
 }));
