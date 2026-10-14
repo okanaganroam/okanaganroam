@@ -1,0 +1,174 @@
+{
+ "reason": "Dog rule from the venue's own website",
+ "batch_id": "dog-policies-2026-10",
+ "venues": [
+  {
+   "id": 912,
+   "name": "Train Station Pub",
+   "region": "kelowna",
+   "slug": "train-station-pub",
+   "note": "Dog-friendly patio in warmer months",
+   "source_url": "https://www.trainstationpub.com/about"
+  },
+  {
+   "id": 672,
+   "name": "The Canadian Brewhouse & Grill (Kelowna)",
+   "region": "kelowna",
+   "slug": "the-canadian-brewhouse-grill-kelowna",
+   "note": "Patio only, on leash; dogs not allowed inside",
+   "source_url": "https://thecanadianbrewhouse.com/pooches-on-the-patio/"
+  },
+  {
+   "id": 1045,
+   "name": "Turtle Bay Pub",
+   "region": "lake-country",
+   "slug": "turtle-bay-pub",
+   "note": "Patio only, on leash; keep dogs clear of the walkway",
+   "source_url": "http://turtlebaypub.com/"
+  },
+  {
+   "id": 826,
+   "name": "Crown & Thieves",
+   "region": "west-kelowna",
+   "slug": "crown-thieves",
+   "note": "Dogs welcome in the picnic area; not in the tasting room",
+   "source_url": "https://crownthieves.com/pages/visit"
+  },
+  {
+   "id": 954,
+   "name": "Kelly O Bryan's Restaurant",
+   "region": "vernon",
+   "slug": "kelly-o-bryan-s-restaurant",
+   "note": "Pet-friendly covered, heated patio",
+   "source_url": "https://www.kobcob.com/locations/vernon/"
+  },
+  {
+   "id": 852,
+   "name": "Mocojo Winery",
+   "region": "naramata",
+   "slug": "mocojo-winery",
+   "note": "Leashed, well-behaved dogs on the patio only; not in the tasting room",
+   "source_url": "https://www.mocojowines.com/wine-tasting"
+  },
+  {
+   "id": 881,
+   "name": "Vasanti Estate Winery",
+   "region": "oliver",
+   "slug": "vasanti-estate-winery",
+   "note": "Dogs welcome on the patio and in the picnic area during tastings",
+   "source_url": "https://vasantiwines.com/faq/"
+  },
+  {
+   "id": 823,
+   "name": "Chain Reaction Winery",
+   "region": "naramata",
+   "slug": "chain-reaction-winery",
+   "note": "Leashed dogs welcome on the patio",
+   "source_url": "https://www.chainreactionwine.com/reservation/"
+  },
+  {
+   "id": 1012,
+   "name": "The Restaurant at Poplar Grove",
+   "region": "penticton",
+   "slug": "the-restaurant-at-poplar-grove-1012",
+   "note": "Not allowed inside; leashed dogs can be tied at a post by the patio",
+   "source_url": "https://www.poplargrove.ca/reservations/"
+  },
+  {
+   "id": 981,
+   "name": "Cue's Game Room",
+   "region": "penticton",
+   "slug": "cue-s-game-room",
+   "note": "Well-behaved dogs welcome on the patio; dog menu available",
+   "source_url": "https://cuesgameroom.ca/"
+  },
+  {
+   "id": 522,
+   "name": "Porter's",
+   "region": "kelowna",
+   "slug": "porter-s",
+   "note": "Dog-friendly patio",
+   "source_url": "https://porterskelowna.com/"
+  },
+  {
+   "id": 1008,
+   "name": "Highway 97 Brewing",
+   "region": "penticton",
+   "slug": "highway-97-brewing",
+   "note": "Dogs welcome",
+   "source_url": "https://hwy97brewery.com/"
+  },
+  {
+   "id": 1014,
+   "name": "Bench Patio Bistro",
+   "region": "naramata",
+   "slug": "bench-patio-bistro",
+   "note": "Pets welcome at the patio bistro",
+   "source_url": "https://www.bench1775.com/visit/bench-patio-bistro/"
+  },
+  {
+   "id": 93,
+   "name": "Branding Iron Pub",
+   "region": "armstrong",
+   "slug": "branding-iron-pub",
+   "note": "Patio only, on leash",
+   "source_url": "https://www.brandingironpub.ca/"
+  },
+  {
+   "id": 1037,
+   "name": "Kitchen @ Ve Oh Lay Acres Honey Wine & Farm",
+   "region": "summerland",
+   "slug": "kitchen-ve-oh-lay-acres-honey-wine-farm",
+   "note": "Dogs welcome on leash",
+   "source_url": "https://www.veohlayacres.com/1414-2/"
+  },
+  {
+   "id": 866,
+   "name": "Roche Wines",
+   "region": "penticton",
+   "slug": "roche-wines",
+   "note": "Well-behaved dogs welcome on the patio",
+   "source_url": "https://www.rterroir.ca/visit"
+  },
+  {
+   "id": 464,
+   "name": "One14 Coffee Co.",
+   "region": "penticton",
+   "slug": "one14-coffee-co",
+   "note": "Dogs welcome in the hallway seating area; pup parking while you order inside",
+   "source_url": "https://www.one14coffeeco.com/faq"
+  },
+  {
+   "id": 822,
+   "name": "Castoro de Oro Estate Winery",
+   "region": "oliver",
+   "slug": "castoro-de-oro-estate-winery",
+   "note": "Pets welcome on leash",
+   "source_url": "https://www.castorodeorowinery.com/about/"
+  },
+  {
+   "id": 861,
+   "name": "Pipe Dreams Vineyard & Winery",
+   "region": "oliver",
+   "slug": "pipe-dreams-vineyard-winery",
+   "note": "Pets welcome during your visit",
+   "source_url": "https://www.pipedreamswinery.com/Visit-Us"
+  },
+  {
+   "id": 910,
+   "name": "The Galley Lakeside Cafe",
+   "region": "kelowna",
+   "slug": "the-galley-lakeside-cafe",
+   "note": "Dog-friendly heated waterfront patio",
+   "source_url": "https://kelownayachtclub.com/thegalley/"
+  },
+  {
+   "id": 851,
+   "name": "Mayhem Wines",
+   "region": "okanagan-falls",
+   "slug": "mayhem-wines",
+   "note": "Dog-friendly, on leash",
+   "source_url": "https://mayhemwines.com/collections/book-a-tasting"
+  }
+ ]
+}

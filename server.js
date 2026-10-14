@@ -4759,6 +4759,10 @@ const TOURS_ALSO_COLLECTION_KIND = 'tours_also';
 // skate park or courts, a ski hill's summer bike park, a golf course with
 // disc golf), listed in their own section of the /sports hub (db.js bootstrap).
 const SPORTS_ALSO_COLLECTION_KIND = 'sports_also';
+// Dog rules (2026-10-14): where a dog-friendly venue lets dogs go, as the
+// venue itself states it ("Patio only, on leash"), shown as a "Dogs:" line on
+// the /dog-friendly card (db.js bootstrap). Dog beaches keep 'dog_friendly'.
+const DOG_POLICY_COLLECTION_KIND = 'dog_policy';
 // Outdoor activity tags (2026-09-20): eight collection kinds bootstrapped
 // in db.js (activity_hiking ... activity_adventure) that classify an
 // outdoor destination by what a visitor can do there. Like the two
@@ -4795,7 +4799,7 @@ const FD_CATEGORY_COLLECTION_KINDS = Object.values(FD_CATEGORY_KIND_BY_TYPE);
 // would surface as Build My Trip `discovery` options the moment the first
 // membership row exists, because that list is queried live from
 // collections.kind rather than hardcoded.
-const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, INDOOR_ALSO_COLLECTION_KIND, TOURS_ALSO_COLLECTION_KIND, SPORTS_ALSO_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS, ...FD_CATEGORY_COLLECTION_KINDS]);
+const NON_DISCOVERY_COLLECTION_KINDS = new Set([ADVISORY_COLLECTION_KIND, DOG_FRIENDLY_COLLECTION_KIND, DOG_POLICY_COLLECTION_KIND, INDOOR_ALSO_COLLECTION_KIND, TOURS_ALSO_COLLECTION_KIND, SPORTS_ALSO_COLLECTION_KIND, ...ACTIVITY_COLLECTION_KINDS, ...FD_CATEGORY_COLLECTION_KINDS]);
 
 // venue id -> Set of SECONDARY Food & Drink category types, for a given set
 // of venue ids, in ONE query (never per-venue: listVenues serves up to 2000
@@ -9333,7 +9337,9 @@ function descExcerpt(text, max = 170) {
     out = next;
     if (out.length >= 60) break;
   }
-  if (out) return out;
+  // A punchy opener like "Bring the dog." is too thin to stand alone on a
+  // card, so a first sentence under 40 characters falls through to the cut.
+  if (out.length >= 40) return out;
   const cut = t.slice(0, max);
   return cut.slice(0, cut.lastIndexOf(' ') > 80 ? cut.lastIndexOf(' ') : max).replace(/[,;:\s\u2014-]+$/, '') + '\u2026';
 }
@@ -11144,7 +11150,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 5 } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 5, hideDogBadges = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -11206,7 +11212,7 @@ function venueCardHtml(venue, opts = {}) {
   const showBadge = isHiddenGem && !venue.redirect_to;
   const showLocalFavourite = isLocalFavourite && !venue.redirect_to;
   const showDogFriendly = dogFriendlyNote !== null && dogFriendlyNote !== undefined && !venue.redirect_to;
-  const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
+  const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly && !hideDogBadges ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
   const dogNoteHtml = (dogNoteInline && showDogFriendly && String(dogFriendlyNote || '').trim())
     ? `\n        <p class="dog-note"><span class="dog-note-label">Dogs:</span> ${escapeHtml(String(dogFriendlyNote).trim())}</p>`
     : '';
@@ -11221,7 +11227,7 @@ function venueCardHtml(venue, opts = {}) {
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${seasonTag ? seasonTagHtml(seasonTag) : advisoryNoticeHtml(advisoryNote)}`
     : '';
-  const chipsHtml = `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly }), themed ? maxChips : 0)}</p>`;
+  const chipsHtml = `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), themed ? maxChips : 0)}</p>`;
   // Themed listing cards (2026-10-12) always have the same eight parts in the
   // same order -- name, meta, fee slot, description slot, notice slot, notes
   // slot, badges, buttons -- with empty slots rendered as empty elements, so
@@ -13732,6 +13738,9 @@ const FD_CARD_PHOTOS = Object.freeze({
   bike: ['/images/sports/sports-800.jpg', '/images/trip-v3/stops/stop-cycling-480.jpg'],
   disc: ['/images/sports/activity-disc-800.jpg'],
   courts: ['/images/sports/activity-courts-800.jpg'],
+  // Dog Friendly Finds (2026-10-14): dog beaches and dog-friendly parks.
+  dogbeach: ['/images/trip-v3/stops/stop-dog-outdoor-480.jpg', '/images/trip-v3/stops/stop-beach-480.jpg', '/images/trip-v3/stops/stop-beach-2-480.jpg', '/images/beaches/beaches-800.jpg'],
+  dogoutdoor: ['/images/trip-v3/stops/stop-hiking-480.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg', '/images/trip-v3/stops/stop-outdoor-480.jpg', '/images/trip-v3/stops/stop-viewpoints-480.jpg', '/images/outdoors/activity-hiking-800.jpg'],
   winery: ['/images/trip-v3/stops/stop-winery-480.jpg', '/images/trip-v3/stops/stop-winery-2-480.jpg', '/images/trip-v3/stops/stop-winery-3-480.jpg', '/images/food-drink/wineries-800.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg'],
 });
 const FD_CARD_DOG_PHOTOS = Object.freeze({
@@ -14555,7 +14564,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
     return ` data-ph="${extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v)}"`;
   };
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}) })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
   // Page weight (2026-10-14): the card markup is the same, minus its source
   // indentation, and the Favorite heart points at one shared <symbol>
@@ -15586,7 +15595,11 @@ const DOG_HUB_TYPES = [
   { type: 'distillery', label: 'Distilleries' },
   { type: 'winery', label: 'Wineries' },
   { type: DOG_BEACH_TYPE_KEY, label: 'Dog Beaches' },
+  // Parks & Trails (2026-10-14): the dog-friendly parks, trails and other
+  // outdoor places, which had no chip of their own.
+  { type: 'outdoors', label: 'Parks & Trails' },
 ];
+const DOG_HUB_OUTDOOR_TYPES = new Set(['outdoor', 'beach', 'sport', 'golf', 'tour']);
 const DOG_HUB_TYPE_KEYS = new Set(DOG_HUB_TYPES.map((t) => t.type));
 // The venues.type values a card on this page can have, for the engagement
 // script's holder selector. 'dog-beach' is a hub-only grouping key, not a
@@ -15640,6 +15653,7 @@ function dogHubCategoriesByVenue(venues, beachIds) {
       const fd = (v.fd_categories && v.fd_categories.length) ? v.fd_categories : [];
       for (const t of fd) if (DOG_HUB_TYPE_KEYS.has(t) && !cats.includes(t)) cats.push(t);
       if (DOG_HUB_TYPE_KEYS.has(v.type) && !cats.includes(v.type)) cats.push(v.type);
+      if (DOG_HUB_OUTDOOR_TYPES.has(v.type) && !cats.includes(DOG_BEACH_TYPE_KEY) && !cats.includes('outdoors')) cats.push('outdoors');
     }
     map.set(v.id, cats);
   }
@@ -16061,23 +16075,98 @@ function renderDogHubScriptHtml() {
 // Favorite / Add to Trip) so the engagement contract is identical -- list
 // cards carry ONLY Favorite and Add to Trip; Website / Directions / Call stay
 // on the venue detail pages, which are untouched.
-function renderDogHubPage(venues, filter = null) {
-  const f = filter || { types: [], features: [], regions: [] };
+// Dog Friendly Finds (2026-10-14) runs on the shared directory engine, like
+// /indoor and /sports: type chips (now with Parks & Trails), search, Regions,
+// features, Open now, a sort, 48 at a time and a photo per card -- a dog
+// photo for restaurants, cafés, pubs, lounges, breweries and distilleries,
+// a beach or trail photo outdoors -- instead of all 421 cards with one
+// painted picture. Every card says where dogs can go when we know it: the
+// official rule for the dog beaches and, for other places, the venue's own
+// stated rule from the 'dog_policy' collection. The "Dog-Friendly" badge is
+// left off the cards, since everything on this page is dog-friendly.
+// venue id -> the dog rule ("Patio only, on leash") from the dog_policy collection.
+function getDogPolicyNotes() {
+  const rows = db.prepare(`
+    SELECT ci.content_id AS id, ci.note FROM collection_items ci
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND ci.note IS NOT NULL AND trim(ci.note) != ''
+  `).all(DOG_POLICY_COLLECTION_KIND);
+  return new Map(rows.map((r) => [r.id, r.note]));
+}
+const DOG_SORTS = [
+  { key: 'recommended', label: 'Recommended' },
+  { key: 'town', label: 'By town' },
+  { key: 'az', label: 'A\u2013Z' },
+];
+const DOG_SORT_KEYS = new Set(DOG_SORTS.map((x) => x.key));
+// Recommended: the Food & Drink ranking (rating weighted by review count),
+// with a nudge for places that tell you where your dog can go, since that is
+// the question this page answers. Never an editorial flag.
+function dogRecommendedScore(v, hasRule) {
+  const base = DOG_HUB_OUTDOOR_TYPES.has(v.type) ? 3.95 + (String(v.description || '').length >= 120 ? 0.04 : 0) : foodDrinkRecommendedScore(v);
+  return base + (hasRule ? 0.12 : 0);
+}
+function dogCardPhotoKey(v, isBeach) {
+  const id = Number(v.id) || 0;
+  if (isBeach) return `dogbeach-${id % FD_CARD_PHOTOS.dogbeach.length}`;
+  if (DOG_HUB_OUTDOOR_TYPES.has(v.type)) return v.type === 'beach' ? `dogbeach-${id % FD_CARD_PHOTOS.dogbeach.length}` : `dogoutdoor-${id % FD_CARD_PHOTOS.dogoutdoor.length}`;
+  if (v.type === 'winery') return `winery-${id % FD_CARD_PHOTOS.winery.length}`;
+  const t = FD_CARD_PHOTOS[v.type] ? v.type : 'restaurant';
+  // Every other card shows a dog at a table of that kind, so a run of
+  // restaurants does not repeat one picture.
+  if (FD_CARD_DOG_PHOTOS[t] && id % 2 === 0) return `${t}-dog`;
+  return foodDrinkCardPhotoKey({ ...v, dog_friendly: 0 });
+}
+function renderDogHubPage(venues, filter = null, now = new Date()) {
+  const f = { types: [], features: [], regions: [], ...(filter || {}) };
+  const sort = DOG_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
+  const openNow = !!f.openNow;
   const beachIds = getCollectionVenueIds(DOG_FRIENDLY_COLLECTION_KIND);
-  const dogNotes = getDogFriendlyNotes();
+  const policyNotes = getDogPolicyNotes();
   const catsById = dogHubCategoriesByVenue(venues, beachIds);
-  const featsById = dogHubFeaturesByVenue(venues);
-  const matching = filterDogVenues(venues, f, catsById, featsById);
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
+  const score = new Map(venues.map((v) => [v.id, dogRecommendedScore(v, beachIds.has(v.id) || policyNotes.has(v.id))]));
+  const ranked = venues.slice().sort((a, b) => score.get(b.id) - score.get(a.id) || byName(a, b));
+  // A mixed first screen: in the first dozen, at most two of any one kind and
+  // never two of a kind back to back, so it doesn't open on ten wineries.
+  const leadOf = (v) => (catsById.get(v.id) || [])[0] || v.type;
+  const recommended = [];
+  const rest = ranked.slice();
+  const seenLead = {};
+  while (rest.length) {
+    const prev = recommended.length ? leadOf(recommended[recommended.length - 1]) : null;
+    let pick = recommended.length < 12 ? rest.slice(0, 30).findIndex((v) => leadOf(v) !== prev && (seenLead[leadOf(v)] || 0) < 2) : -1;
+    if (pick < 0) pick = rest.slice(0, 6).findIndex((v) => leadOf(v) !== prev);
+    if (pick < 0) pick = 0;
+    const v = rest.splice(pick, 1)[0];
+    seenLead[leadOf(v)] = (seenLead[leadOf(v)] || 0) + 1;
+    recommended.push(v);
+  }
+  const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
+  const list = sort === 'az' ? venues.slice().sort(byName)
+    : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
+      : recommended;
+  const featsById = foodDrinkFeaturesByVenue(list);
+  for (const [id, fs] of featsById) featsById.set(id, fs.filter((k) => k !== 'dog_friendly'));
+  const featureTally = {};
+  for (const fs of featsById.values()) for (const k of fs) featureTally[k] = (featureTally[k] || 0) + 1;
+  const featureKeys = ['patio', 'lake_view', 'kid_friendly', 'great_groups', 'live_music', 'vegetarian'].filter((k) => (featureTally[k] || 0) >= 5);
+  f.features = f.features.filter((k) => featureKeys.includes(k));
+  f.types = f.types.filter((t) => DOG_HUB_TYPE_KEYS.has(t));
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(list, advisoryNotes, now, { requireVerified: false });
+  const pool = openNow ? list.filter((v) => openInfo.openIds.has(v.id)) : list;
+  const matching = filterFoodDrinkVenues(pool, f, catsById, featsById);
   const matchIds = new Set(matching.map((v) => v.id));
-  const counts = dogChipCounts(venues, f, catsById, featsById);
-  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0;
-  const state = { types: f.types, features: f.features, regions: f.regions, counts };
+  const counts = foodDrinkChipCounts(pool, f, catsById, featsById);
+  const openCount = filterFoodDrinkVenues(list.filter((v) => openInfo.openIds.has(v.id)), f, catsById, featsById).length;
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0 || openNow;
+  const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow };
   const beachCount = venues.filter((v) => beachIds.has(v.id)).length;
-
-  const heading = 'Dog Friendly Finds';
   const dogContent = (f.types.length === 1 && DOG_CATEGORY_CONTENT[f.types[0]]) || DOG_CATEGORY_CONTENT.all;
-  const title = `Dog Friendly Finds in the Okanagan | Okanagan Roam`;
-  const description = `${venues.length} dog-friendly places across the Okanagan Valley: patios, cafés and tasting rooms, plus ${beachCount} designated dog beaches.`;
+
+  const title = 'Dog Friendly Finds in the Okanagan | Okanagan Roam';
+  const description = `${venues.length} dog-friendly places across the Okanagan Valley: patios, caf\u00e9s, taprooms, tasting rooms, parks and trails, plus ${beachCount} designated dog beaches, with where your dog can go.`;
   const canonical = 'https://okanaganroam.com/dog-friendly';
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -16088,38 +16177,60 @@ function renderDogHubPage(venues, filter = null) {
     '@type': 'ItemList',
     name: title,
     description,
-    itemListElement: venues.map((v, i) => ({
+    itemListElement: list.map((v, i) => ({
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
       item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
     })),
   };
-  // id -> { c: types, f: features, r: region } for the client script.
   const payload = {};
-  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description) };
-
-  const advisoryNotes = getAdvisoryNotes();
-  // Every card is rendered into the list server-side and simply hidden when
-  // it does not match -- the /food-drink <template> + "Show more" machinery
-  // is deliberately NOT reused. That page had 850 cards costing 2-3s of
-  // style+layout; this one is an order of magnitude smaller, closer to
-  // /outdoors (196 cards, fast), so batching would add moving parts and cost
-  // the page its "everything is in the HTML" simplicity for no measured win.
-  const cardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, dogNotes, { showRegion: true, themed: true, excerpt: true, dogNoteInline: true, appLabels: true })
-    .replace('<ul class="card-grid">', `<ul class="card-grid" id="dogResults"${matching.length === 0 ? ' hidden' : ''}>`)
-    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card"${matchIds.has(Number(id)) ? '' : ' hidden'} data-venue-id="${id}"`);
+  for (const v of list) {
+    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${policyNotes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
+    const st = openInfo.byId.get(v.id);
+    if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+  }
+  // Beaches carry their rule as the dog-beach note (dogNoteInline); every
+  // other place with a stated rule gets the same "Dogs:" line.
+  const cardNotes = new Map([...policyNotes].filter(([id]) => !beachIds.has(id)));
+  const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, openInfo.byId, {
+    cardNotes, cardNoteLabel: 'Dogs:', photoKeyFor: (v) => dogCardPhotoKey(v, beachIds.has(v.id)),
+    cardOpts: { dogNoteInline: true, hideDogBadges: true },
+  });
+  const selected = new Set(f.types);
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${DOG_HUB_TYPES.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const nF = f.features.length, nR = f.regions.length;
+  const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
+      </div>
+    </div>`;
+  const controlsHtml = `<div class="fd-controls">
+    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
+  </div>`;
+  const typeLabels = Object.fromEntries(DOG_HUB_TYPES.map((t) => [t.type, t.label]));
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: dogContent.banner.src, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: dogContent.banner.src, golfTheme: true, beachTheme: list.some((v) => v.type === 'beach'), advisoryStyles: list.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
-${renderDogHubStyles()}
-${CATEGORY_BANNER_STYLE}
+${renderFoodDrinkHubStyles()}
+${renderFoodDrinkOpenNowStyles()}
 ${golfEngagementHeadHtml('dog', true, 'hub')}
+<style id="dog-hub">
+  body.dog-hub-page .dog-note, body.dog-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
+  body.dog-hub-page .dog-note-label, body.dog-hub-page .card-note-label { font-weight: 800; }
+  body.dog-hub-page .dog-rule-intro { margin: 0 0 14px; font-size: 0.9rem; opacity: 0.75; }
+  body.dog-hub-page .dog-guides { margin: 26px 0 8px; }
+  body.dog-hub-page .dog-guides h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+</style>
 </head>
-<body class="golf-page outdoor-page dog-page">
+<body class="golf-page outdoor-page fd-page dog-page dog-hub-page">
+${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
@@ -16132,7 +16243,7 @@ ${renderGolfHeaderHtml()}
     var box = document.getElementById('dogBanner'); if (!box) return;
     var img = box.querySelector('img');
     var sync = function(){
-      var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-dog-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-dog-type'); });
+      var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-fd-type'); });
       var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
       if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
@@ -16144,22 +16255,27 @@ ${renderGolfHeaderHtml()}
   </script>`, `<h1>${escapeHtml(dogContent.heading)}</h1>
   <p class="outdoor-intro fd-intro">${escapeHtml(dogContent.intro)}</p>
   <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Guide: dog-friendly Kelowna, with the dog rules for each place &rarr;</a></p>`)}
-  ${dogSearchHtml()}
-  ${dogTypeChipsHtml(state)}
-  ${dogFilterBarHtml(venues, state)}
-  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="dogResultsTop">
-  <h2 class="visually-hidden" id="dogResultsTop">Results</h2>
-  ${dogResultBarHtml(dogSummaryText(matching.length, venues.length, filtered), state)}
-  <p class="fd-no-results" id="dogNoResults"${matching.length === 0 ? '' : ' hidden'}>No dog-friendly places match that combination yet. <a href="/dog-friendly" id="dogNoResultsClear">Clear the filters</a> to see everything.</p>
+  ${foodDrinkSearchHtml().replace('Search food and drink', 'Search dog friendly places').replace('Search by name, place or dish...', 'Search by name, town, beach or trail...')}
+  ${chips}
+  ${controlsHtml}
+  <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
+  <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, DOG_SORTS)}
+  <p class="dog-rule-intro">Where we know the rule, each card says where your dog can go, from the venue's own site or the city's official dog-beach list. Rules can change, so check with the place before you go.</p>
+  <p class="fd-search-note" id="fdSearchNote" hidden></p>
+  <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No dog-friendly places match that combination yet.</span> <a href="/dog-friendly" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
+  <p class="fd-no-results-try">Try one word, like <a href="/dog-friendly?types=dog-beach">dog beaches</a>, <a href="/dog-friendly?types=brewery">breweries</a> or <a href="/dog-friendly?types=outdoors">trails</a>.</p></div>
   ${cardsHtml}
-  <script type="application/json" id="dogVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  <p class="fd-open-note fd-open-note-end">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
   </section>
   ${dogRegionGuideLinksHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('dog', true)}
-  ${renderDogHubScriptHtml()}
+  ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'dog', typeLabels, searchLabels: { 'dog-beach': 'dog beach off-leash', outdoors: 'park trail hike walk' } })}
 </body>
 </html>`;
 }
@@ -17752,7 +17868,8 @@ const DOG_CATEGORY_CONTENT = Object.freeze({
   cocktail: { banner: { src: '/images/dog-friendly/dog-cocktail.jpg', alt: 'A golden retriever sitting between leather stools at a stylish bar', pos: 60 }, heading: 'Dog-Friendly Cocktail Lounges in the Okanagan', intro: 'Cocktail bars and lounges that welcome dogs \u2014 for an evening out that the whole family, furry members included, can enjoy.' },
   brewery: { banner: { src: '/images/dog-friendly/dog-brewery-spaniel.jpg', alt: 'A spaniel with its paws on the bar beside the beer taps', pos: 45 }, heading: 'Dog-Friendly Breweries in the Okanagan', intro: 'Taprooms and brewery patios that welcome dogs \u2014 craft beer, good company, and a water bowl never far away.' },
   distillery: { banner: { src: '/images/dog-friendly/dog-distillery.jpg', alt: 'A bottle of craft spirits and a tasting glass beside a dog', pos: 70 }, heading: 'Dog-Friendly Distilleries in the Okanagan', intro: 'Craft distilleries and tasting rooms where your dog is welcome to come along while you sample small-batch spirits.' },
-  winery: { banner: { src: '/images/dog-friendly/dog-winery-lab.jpg', alt: 'A happy black Labrador sitting in a vineyard', pos: 30 }, heading: 'Dog-Friendly Wineries in the Okanagan', intro: 'Wineries and tasting rooms that welcome dogs \u2014 sip your way through wine country with your four-legged co-pilot.' },
+  winery: { banner: { src: '/images/food-drink/wineries.jpg', alt: 'Vineyard rows above Okanagan Lake in Naramata', pos: 40 }, heading: 'Dog-Friendly Wineries in the Okanagan', intro: 'Wineries and tasting rooms that welcome dogs \u2014 sip your way through wine country with your four-legged co-pilot.' },
+  outdoors: { banner: { src: '/images/outdoors/activity-hiking.jpg', alt: 'The Myra Canyon trail winding along a forested canyon above Kelowna', pos: 50 }, heading: 'Dog-Friendly Parks & Trails in the Okanagan', intro: 'Parks, trails, lookouts and open spaces where your dog can come along \u2014 most trails need a leash, so check the rule on each card before you let them run.' },
   'dog-beach': { banner: DOG_FRIENDLY_BANNER, heading: 'Dog Beaches in the Okanagan', intro: 'Every designated dog beach in the valley, each with the official on-leash or off-leash rule that actually applies when you get there.' },
 });
 const WHATS_ON_BANNER = Object.freeze({ src: '/images/whats-on/whats-on.jpg', alt: 'A festival crowd with hands raised under bright stage lights', pos: 40 });
@@ -26863,7 +26980,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/dog-friendly' && method === 'GET') {
       const dogVenues = getDogFriendlyHubVenues();
       if (dogVenues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderDogHubPage(dogVenues, parseDogFilterQuery(query));
+        const html = renderDogHubPage(dogVenues, { ...parseDogFilterQuery(query), openNow: query.open === 'now', sort: DOG_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -27737,6 +27854,11 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  getDogPolicyNotes,
+  dogCardPhotoKey,
+  DOG_SORTS,
+  DOG_POLICY_COLLECTION_KIND,
+  DOG_HUB_OUTDOOR_TYPES,
   getLocalFavouriteVenues,
   localFavouriteTypesPresent,
   localFavouriteFilterMatches,
@@ -27822,6 +27944,7 @@ module.exports = {
   parseFoodDrinkFilterQuery,
   foodDrinkFilterMatches,
   filterFoodDrinkVenues,
+  foodDrinkFeaturesByVenue,
   foodDrinkChipCounts,
   foodDrinkSummaryText,
   foodDrinkTypeChipsHtml,
