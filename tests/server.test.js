@@ -19139,3 +19139,45 @@ test('Event descriptions: every entry is complete, guarded by the text it replac
   assert.match(script, /sha1\(live\.description\) !== item\.before_sha1/, 'never overwrites an edited description');
   assert.match(script, /event-descriptions-backup-/, 'backs up before writing');
 });
+
+// Local Favourites and Secret Spots (2026-10-14) on the shared directory engine.
+test('Curated hubs (2026-10-14): /local-favorites and /secret-spots run on the shared directory engine with photos, notes and a Mixed order', async () => {
+  const lf = await s5get('/local-favorites');
+  const ss = await s5get('/secret-spots');
+  for (const [page, name] of [[lf, 'local-favorites'], [ss, 'secret-spots']]) {
+    if (page.status !== 200) continue; // the fixture may hold too few members for the page
+    assert.match(page.text, /<script type="application\/json" id="fdVenueData">/, `${name} uses the shared engine`);
+    assert.match(page.text, /<option value="recommended"[^>]*>Mixed<\/option>/, `${name} defaults to the Mixed order`);
+    assert.doesNotMatch(page.text, /Top rated/, `${name} is never ranked by rating`);
+    const grid = (page.text.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+    assert.ok((grid.match(/<li class="venue-card"/g) || []).length <= 48, 'at most 48 cards before Show more');
+    assert.ok([...grid.matchAll(/<li class="venue-card"[^>]*>/g)].every((m) => /data-ph="/.test(m[0])), 'every card has a photo');
+  }
+  if (lf.status === 200) assert.doesNotMatch(lf.text, /class="chip local-favourite-badge"/, 'no Local Favourite badge on every card');
+  if (ss.status === 200) assert.doesNotMatch(ss.text, /class="chip hidden-gem-badge"/, 'no Hidden Gem badge on every card');
+
+  // Mixed spreads each kind through the list, stays put within a day, and
+  // never depends on rating.
+  const vs = [];
+  for (let i = 1; i <= 30; i += 1) vs.push({ id: i, name: `V${i}`, type: i <= 20 ? 'restaurant' : 'cafe', rating: i });
+  const day = new Date('2026-10-14T12:00:00-08:00');
+  const a = app.curatedMixedOrder(vs, (v) => v.type, day);
+  assert.equal(a.length, 30);
+  assert.deepEqual(a.map((v) => v.id), app.curatedMixedOrder(vs, (v) => v.type, new Date('2026-10-14T20:00:00-08:00')).map((v) => v.id), 'same order all day');
+  assert.notDeepEqual(a.map((v) => v.id), app.curatedMixedOrder(vs, (v) => v.type, new Date('2026-10-15T12:00:00-08:00')).map((v) => v.id), 'a new order the next day');
+  assert.ok(a.slice(0, 6).some((v) => v.type === 'cafe'), 'the smaller kind shows up on the first screen');
+  assert.deepEqual(app.curatedMixedOrder(vs.map((v) => ({ ...v, rating: 31 - v.rating })), (v) => v.type, day).map((v) => v.id), a.map((v) => v.id), 'rating plays no part');
+
+  // Secret Spots kinds, read from the place's own name.
+  assert.deepEqual(app.secretSpotKinds({ type: 'beach', name: 'Sarsons Beach Park' }), ['beach']);
+  assert.deepEqual(app.secretSpotKinds({ type: 'outdoor', name: 'Hardy Falls Regional Park' }), ['falls']);
+  assert.deepEqual(app.secretSpotKinds({ type: 'outdoor', name: 'BX Creek Trail & BX Falls' }), ['parks', 'falls']);
+  assert.deepEqual(app.secretSpotKinds({ type: 'outdoor', name: 'Kasugai Garden' }), ['gardens']);
+  assert.deepEqual(app.secretSpotKinds({ type: 'outdoor', name: 'Maude-Roxby Wetland (Bird Sanctuary)' }), ['wildlife']);
+  assert.deepEqual(app.secretSpotKinds({ type: 'outdoor', name: 'Hidden Lake Recreation Site' }), ['parks'], 'anything else is a park');
+  assert.equal(app.SECRET_SPOT_KINDS.length, 5);
+
+  // Query parsing degrades instead of erroring.
+  const q = app.parseCuratedHubQuery({ types: 'falls,bogus,falls', regions: 'atlantis,kelowna', sort: 'rating', open: 'now' }, new Set(['falls']), new Set());
+  assert.deepEqual(q, { types: ['falls'], features: [], regions: ['kelowna'], openNow: true, sort: 'recommended' });
+});

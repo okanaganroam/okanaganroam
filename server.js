@@ -11150,7 +11150,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 5, hideDogBadges = false } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 5, hideDogBadges = false, hideHiddenGemBadge = false, hideLocalFavouriteBadge = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -11209,8 +11209,10 @@ function venueCardHtml(venue, opts = {}) {
   // if a caller ever passed isHiddenGem=true for one by mistake — the
   // bulk/targeted lookups already exclude these, but this keeps the
   // guarantee local to the render function itself, not just its callers.
-  const showBadge = isHiddenGem && !venue.redirect_to;
-  const showLocalFavourite = isLocalFavourite && !venue.redirect_to;
+  // hideHiddenGemBadge / hideLocalFavouriteBadge (2026-10-14): /secret-spots
+  // and /local-favorites leave off the badge every card on them would carry.
+  const showBadge = isHiddenGem && !venue.redirect_to && !hideHiddenGemBadge;
+  const showLocalFavourite = isLocalFavourite && !venue.redirect_to && !hideLocalFavouriteBadge;
   const showDogFriendly = dogFriendlyNote !== null && dogFriendlyNote !== undefined && !venue.redirect_to;
   const editorialChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (showDogFriendly && !hideDogBadges ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : '');
   const dogNoteHtml = (dogNoteInline && showDogFriendly && String(dogFriendlyNote || '').trim())
@@ -13738,6 +13740,16 @@ const FD_CARD_PHOTOS = Object.freeze({
   bike: ['/images/sports/sports-800.jpg', '/images/trip-v3/stops/stop-cycling-480.jpg'],
   disc: ['/images/sports/activity-disc-800.jpg'],
   courts: ['/images/sports/activity-courts-800.jpg'],
+  // Local Favourites and Secret Spots (2026-10-14): golf, beaches, parks,
+  // tours and the Secret Spots kinds of place.
+  golf: ['/images/trip-v3/stops/stop-golf-480.jpg', '/images/golf/golf-courses-800.jpg'],
+  beach: ['/images/trip-v3/stops/stop-beach-480.jpg', '/images/trip-v3/stops/stop-beach-2-480.jpg', '/images/beaches/beaches-800.jpg'],
+  park: ['/images/trip-v3/stops/stop-hiking-480.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg', '/images/trip-v3/stops/stop-hiking-3-480.jpg', '/images/trip-v3/stops/stop-outdoor-480.jpg', '/images/trip-v3/stops/stop-viewpoints-480.jpg'],
+  canyon: ['/images/outdoors/activity-hiking-800.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg'],
+  heritage: ['/images/tours/activity-culture-800.jpg'],
+  wetland: ['/images/trip-v3/stops/stop-outdoor-2-480.jpg', '/images/outdoors/activity-nature-800.jpg'],
+  tour: ['/images/trip-v3/stops/stop-tour-480.jpg', '/images/trip-v3/stops/stop-tour-lake-480.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg', '/images/trip-v3/stops/stop-tour-farm-480.jpg'],
+  sport: ['/images/trip-v3/stops/stop-sport-480.jpg'],
   // Dog Friendly Finds (2026-10-14): dog beaches and dog-friendly parks.
   dogbeach: ['/images/trip-v3/stops/stop-dog-outdoor-480.jpg', '/images/trip-v3/stops/stop-beach-480.jpg', '/images/trip-v3/stops/stop-beach-2-480.jpg', '/images/beaches/beaches-800.jpg'],
   dogoutdoor: ['/images/trip-v3/stops/stop-hiking-480.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg', '/images/trip-v3/stops/stop-outdoor-480.jpg', '/images/trip-v3/stops/stop-viewpoints-480.jpg', '/images/outdoors/activity-hiking-800.jpg'],
@@ -16879,6 +16891,273 @@ function renderSecretSpotsPage(venues, filter = null) {
     banner: SECRET_SPOTS_BANNER,
     categoryContent: SECRET_SPOTS_CATEGORY_CONTENT,
   }, venues, filter);
+}
+
+// ---------- Local Favourites and Secret Spots on the shared engine (2026-10-14) ----------
+//
+// Both pages run on the /food-drink, /indoor and /dog-friendly directory
+// engine: type chips, search, Regions, features, a sort, 48 cards at a time
+// and a photo per card, with each place's "Local pick:" / "Why it's a gem:"
+// line kept. They are curated lists, not rankings, so the default order is
+// "Mixed": the kinds of place spread evenly through the list, in an order
+// that changes each day, never by rating or popularity. The badge every
+// card would carry (Local Favourite / Hidden Gem) is left off.
+const CURATED_SORTS = [
+  { key: 'recommended', label: 'Mixed' },
+  { key: 'town', label: 'By town' },
+  { key: 'az', label: 'A\u2013Z' },
+];
+const CURATED_SORT_KEYS = new Set(CURATED_SORTS.map((x) => x.key));
+// Each kind spread evenly through the list (item i of n sits at (i + 0.5) / n),
+// shuffled within its kind by a hash of the venue id and the Okanagan date.
+function curatedMixedOrder(venues, leadOf, now = new Date()) {
+  const day = Math.floor((now.getTime() - 8 * 3600000) / 86400000);
+  const h = (id) => { let x = (Math.imul(Number(id) || 0, 2654435761) + Math.imul(day, 40503)) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return x >>> 0; };
+  const groups = new Map();
+  for (const v of venues) { const k = leadOf(v); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(v); }
+  const pos = new Map();
+  for (const list of groups.values()) {
+    list.sort((a, b) => h(a.id) - h(b.id));
+    list.forEach((v, i) => pos.set(v.id, (i + 0.5) / list.length));
+  }
+  return venues.slice().sort((a, b) => pos.get(a.id) - pos.get(b.id) || h(a.id) - h(b.id));
+}
+function parseCuratedHubQuery(query, typeKeys, featureKeys) {
+  const split = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : '').split(',').map((x) => x.trim()).filter(Boolean);
+  const types = [], features = [], regions = [];
+  for (const t of split(query && query.types)) if (typeKeys.has(t) && !types.includes(t)) types.push(t);
+  for (const f of split(query && query.features)) if (featureKeys.has(f) && !features.includes(f)) features.push(f);
+  for (const r of split(query && query.regions)) if (REGION_LABELS[r] && !regions.includes(r)) regions.push(r);
+  return { types, features, regions, openNow: !!(query && query.open === 'now'), sort: query && CURATED_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' };
+}
+// cfg: path, name (breadcrumb), title, description, banner, categoryContent
+// ({type: {banner, heading, intro}} plus all), types [{type, label}],
+// catsFor(v) -> type keys, photoKeyFor(v), cardNotes, cardNoteLabel,
+// cardOpts, features (candidate keys), openNow, surface, search {label,
+// placeholder}, searchLabels, tryLinks [[href, text]], noun.
+function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
+  const typeKeys = new Set(cfg.types.map((t) => t.type));
+  const f = { types: [], features: [], regions: [], ...(filter || {}) };
+  f.types = f.types.filter((t) => typeKeys.has(t));
+  const sort = CURATED_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
+  const openNowOn = !!cfg.openNow && !!f.openNow;
+  const catsById = new Map(venues.map((v) => [v.id, cfg.catsFor(v)]));
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
+  const mixed = curatedMixedOrder(venues, (v) => (catsById.get(v.id) || [])[0] || v.type, now);
+  const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
+  const list = sort === 'az' ? venues.slice().sort(byName)
+    : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
+      : mixed;
+  const featsById = foodDrinkFeaturesByVenue(list);
+  const featureTally = {};
+  for (const fs of featsById.values()) for (const k of fs) featureTally[k] = (featureTally[k] || 0) + 1;
+  const featureKeys = (cfg.features || []).filter((k) => (featureTally[k] || 0) >= 3);
+  f.features = f.features.filter((k) => featureKeys.includes(k));
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(list, advisoryNotes, now, { requireVerified: false });
+  const pool = openNowOn ? list.filter((v) => openInfo.openIds.has(v.id)) : list;
+  const matching = filterFoodDrinkVenues(pool, f, catsById, featsById);
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = foodDrinkChipCounts(pool, f, catsById, featsById);
+  const openCount = cfg.openNow ? filterFoodDrinkVenues(list.filter((v) => openInfo.openIds.has(v.id)), f, catsById, featsById).length : 0;
+  const filtered = f.types.length > 0 || f.features.length > 0 || f.regions.length > 0 || openNowOn;
+  const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow: openNowOn };
+  const content = (f.types.length === 1 && cfg.categoryContent[f.types[0]]) || cfg.categoryContent.all;
+
+  const canonical = `https://okanaganroam.com${cfg.path}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: cfg.name, url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: cfg.title,
+    description: cfg.description,
+    itemListElement: list.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+    })),
+  };
+  const notes = cfg.cardNotes || new Map();
+  const payload = {};
+  for (const v of list) {
+    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: mixedRank.get(v.id) };
+    const st = openInfo.byId.get(v.id);
+    if (cfg.openNow && st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+  }
+  const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, cfg.openNow ? openInfo.byId : null, {
+    cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {},
+  });
+  const selected = new Set(f.types);
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${cfg.types.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const nF = f.features.length, nR = f.regions.length;
+  const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
+      </div>
+    </div>`;
+  const controlsHtml = `<div class="fd-controls">
+    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${cfg.openNow ? foodDrinkOpenNowToggleHtml(openNowOn, openCount) : ''}
+  </div>`;
+  const typeLabels = Object.fromEntries(cfg.types.map((t) => [t.type, t.label]));
+  const tryHtml = (cfg.tryLinks || []).map(([href, text]) => `<a href="${href}">${escapeHtml(text)}</a>`).join(', ');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(cfg.title, cfg.description, canonical, [breadcrumb, itemList], { shareImage: content.banner.src, golfTheme: true, beachTheme: list.some((v) => v.type === 'beach'), advisoryStyles: list.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${renderOutdoorThemeStyles()}
+${renderFoodDrinkHubStyles()}
+${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
+${golfEngagementHeadHtml(cfg.surface, true, 'hub')}
+<style id="curated-hub">
+  body.curated-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
+  body.curated-hub-page .card-note-label { font-weight: 800; }
+</style>
+</head>
+<body class="golf-page outdoor-page fd-page curated-hub-page ${cfg.bodyClass}">
+${CATEGORY_BANNER_STYLE}
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: cfg.name }])}
+  ${categoryHeroHtml(`<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high"></div>
+  <script>
+  (function(){
+    var c = ${JSON.stringify(cfg.categoryContent).replace(/</g, '\\u003c')};
+    var box = document.getElementById('curatedBanner'); if (!box) return;
+    var img = box.querySelector('img');
+    var sync = function(){
+      var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-fd-type'); });
+      var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
+      if (h && h.textContent !== t.heading) h.textContent = t.heading;
+      if (p && p.textContent !== t.intro) p.textContent = t.intro;
+    };
+    try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
+  })();
+  </script>`, `<h1>${escapeHtml(content.heading)}</h1>
+  <p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>`)}
+  ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
+  ${chips}
+  ${controlsHtml}
+  ${cfg.openNow ? `<p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>` : ''}
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
+  <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, CURATED_SORTS)}
+  <p class="fd-search-note" id="fdSearchNote" hidden></p>
+  <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">Nothing matches that combination yet.</span> <a href="${cfg.path}" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
+  ${tryHtml ? `<p class="fd-no-results-try">Try one word, like ${tryHtml}.</p>` : ''}</div>
+  ${cardsHtml}
+  <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  ${cfg.afterHtml || ''}
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml(cfg.surface, true)}
+  ${renderFoodDrinkHubScriptHtml({ openNow: !!cfg.openNow, surface: cfg.surface, typeLabels, searchLabels: cfg.searchLabels || {} })}
+</body>
+</html>`;
+}
+// The photo for a curated card by venue type: Food & Drink types use their
+// own example photos, everything else the matching outdoor/golf/tour set.
+const CURATED_PHOTO_SET_BY_TYPE = Object.freeze({ golf: 'golf', beach: 'beach', outdoor: 'park', tour: 'tour', sport: 'sport', winery: 'winery' });
+function curatedPhotoKey(v, set = null) {
+  const id = Number(v.id) || 0;
+  const k = set || CURATED_PHOTO_SET_BY_TYPE[v.type];
+  if (k && FD_CARD_PHOTOS[k]) return `${k}-${id % FD_CARD_PHOTOS[k].length}`;
+  if (v.type === 'indoor') return 'indoorall-0';
+  return foodDrinkCardPhotoKey({ ...v, dog_friendly: 0 });
+}
+const LOCAL_FAVOURITES_TYPE_LABELS = Object.freeze({ cafe: 'Caf\u00e9s', outdoor: 'Parks & Trails', indoor: 'Indoor', tour: 'Tours' });
+const LOCAL_FAVOURITES_FEATURES = ['patio', 'dog_friendly', 'kid_friendly', 'lake_view', 'great_groups', 'live_music'];
+function renderLocalFavouritesHubPage(venues, filter = null, now = new Date()) {
+  const types = localFavouriteTypesPresent(venues).map((t) => ({ type: t, label: LOCAL_FAVOURITES_TYPE_LABELS[t] || CATEGORY_LABELS[t].plural }));
+  return renderCuratedHubPage({
+    path: '/local-favorites',
+    name: 'Local Favourites',
+    title: 'Local Favourites in the Okanagan | Okanagan Roam',
+    description: `${venues.length} places across the Okanagan with real local roots \u2014 independent restaurants, caf\u00e9s and pubs, plus parks, trails and beaches locals love.`,
+    bodyClass: 'lf-hub-page',
+    surface: 'local_favourites',
+    types,
+    catsFor: (v) => [v.type],
+    photoKeyFor: (v) => curatedPhotoKey(v),
+    cardNotes: getPublicCollectionNotes('local_favorite'),
+    cardNoteLabel: 'Local pick:',
+    cardOpts: { hideLocalFavouriteBadge: true },
+    features: LOCAL_FAVOURITES_FEATURES,
+    openNow: true,
+    search: { label: 'Search local favourites', placeholder: 'Search by name, town or what locals love...' },
+    tryLinks: [['/local-favorites?types=cafe', 'caf\u00e9s'], ['/local-favorites?types=brewery', 'breweries'], ['/local-favorites?types=outdoor', 'parks']],
+    categoryContent: {
+      all: { banner: LOCAL_FAVOURITES_BANNER, heading: 'Local Favourites in the Okanagan', intro: 'The caf\u00e9s, pubs, restaurants, parks and beaches people who live here love and recommend. Each one is here for a real local connection, not for ratings, and each card says why.' },
+      ...LOCAL_FAVOURITES_CATEGORY_CONTENT,
+    },
+  }, venues, filter, now);
+}
+// Secret Spots kinds (2026-10-14): a place can be more than one (a canyon
+// trail is a hike and a waterfall). Matched on the name, which for these
+// curated parks says what they are; any park that matches nothing is a park.
+const SECRET_SPOT_KINDS = [
+  { type: 'beach', label: 'Beaches' },
+  { type: 'parks', label: 'Parks & Hikes' },
+  { type: 'falls', label: 'Waterfalls & Canyons' },
+  { type: 'gardens', label: 'Gardens & Heritage' },
+  { type: 'wildlife', label: 'Wetlands & Wildlife' },
+];
+const SECRET_SPOT_KIND_KEYS = new Set(SECRET_SPOT_KINDS.map((k) => k.type));
+function secretSpotKinds(v) {
+  if (v.type === 'beach') return ['beach'];
+  const n = String(v.name || '');
+  const out = [];
+  if (/\b(falls|waterfall|canyon)\b/i.test(n)) out.push('falls');
+  if (/\b(garden|gardens|heritage|historic|mission)\b/i.test(n)) out.push('gardens');
+  if (/\b(pond|wetland|bird|sanctuary|interpretive|oxbows?|ecological|grasslands?)\b/i.test(n)) out.push('wildlife');
+  if (!out.length || /\b(trail|trails|peak|mountain|ridge|greenway)\b/i.test(n)) out.unshift('parks');
+  return out;
+}
+const SECRET_SPOT_PHOTO_SET = Object.freeze({ beach: 'beach', parks: 'park', falls: 'canyon', gardens: 'heritage', wildlife: 'wetland' });
+function renderSecretSpotsHubPage(venues, filter = null, now = new Date()) {
+  const outsideCount = countHiddenGemsOutsideSecretSpots();
+  return renderCuratedHubPage({
+    path: '/secret-spots',
+    name: 'Secret Spots',
+    title: 'Secret Spots in the Okanagan | Okanagan Roam',
+    description: `${venues.length} tucked-away parks, gardens, waterfalls and quieter beaches across the Okanagan Valley \u2014 easy to miss and worth seeking out.`,
+    bodyClass: 'ss-hub-page',
+    surface: 'secret_spots',
+    types: SECRET_SPOT_KINDS,
+    catsFor: secretSpotKinds,
+    // The most specific kind picks the photo: a waterfall trail shows the canyon.
+    photoKeyFor: (v) => { const k = secretSpotKinds(v); return curatedPhotoKey(v, SECRET_SPOT_PHOTO_SET[k.find((x) => x !== 'parks') || k[0]]); },
+    cardNotes: getPublicCollectionNotes('hidden_gem'),
+    cardNoteLabel: 'Why it\u2019s a gem:',
+    cardOpts: { hideHiddenGemBadge: true },
+    features: ['dog_friendly', 'kid_friendly', 'lake_view'],
+    openNow: false,
+    search: { label: 'Search secret spots', placeholder: 'Search by name, town, waterfall or trail...' },
+    searchLabels: { falls: 'waterfall canyon falls', wildlife: 'birds wetland wildlife pond', gardens: 'garden heritage history', parks: 'park hike trail viewpoint' },
+    tryLinks: [['/secret-spots?types=beach', 'beaches'], ['/secret-spots?types=falls', 'waterfalls'], ['/secret-spots?types=gardens', 'gardens']],
+    categoryContent: {
+      all: { banner: SECRET_SPOTS_BANNER, heading: 'Secret Spots in the Okanagan', intro: 'Tucked-away parks, gardens, waterfalls and quieter beaches \u2014 the places worth seeking out once you have seen the famous ones. Each card says why it\u2019s a gem.' },
+      beach: SECRET_SPOTS_CATEGORY_CONTENT.beach,
+      parks: { banner: CATEGORY_BANNER_IMAGES.outdoor, heading: 'Secret Parks & Hikes in the Okanagan', intro: 'Quiet trails, hilltop parks and lookouts away from the busiest routes.' },
+      falls: { banner: { src: '/images/outdoors/activity-hiking.jpg', alt: 'The Myra Canyon trail winding along a forested canyon above Kelowna', pos: 50 }, heading: 'Waterfalls & Canyons in the Okanagan', intro: 'Short walks to waterfalls and creek canyons, most of them a few minutes from town.' },
+      gardens: { banner: { src: '/images/tours/activity-culture.jpg', alt: 'A vintage steam train on the Kettle Valley line in Summerland', pos: 50 }, heading: 'Gardens & Heritage Sites in the Okanagan', intro: 'Japanese gardens, ornamental gardens and the valley\u2019s pioneer and heritage sites.' },
+      wildlife: { banner: { src: '/images/outdoors/activity-nature.jpg', alt: 'Spotted Lake in the hills near Osoyoos', pos: 50 }, heading: 'Wetlands & Wildlife Spots in the Okanagan', intro: 'Ponds, marshes, grasslands and bird sanctuaries \u2014 bring binoculars.' },
+    },
+    afterHtml: outsideCount ? `<p class="subtitle" style="margin-top:22px">Looking for caf\u00e9s, breweries and other under-the-radar places? See all <a href="/hidden-gems">Hidden Gems &rarr;</a></p>` : '',
+  }, venues, filter, now);
 }
 
 // ---------- Ski & Snow (2026-10-11): the page at /ski-snow ----------
@@ -26994,7 +27273,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/local-favorites' && method === 'GET') {
       const lfVenues = getLocalFavouriteVenues();
       if (lfVenues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderLocalFavouritesPage(lfVenues, parseLocalFavouritesFilterQuery(query));
+        const html = renderLocalFavouritesHubPage(lfVenues, parseCuratedHubQuery(query, new Set(localFavouriteTypesPresent(lfVenues)), new Set(LOCAL_FAVOURITES_FEATURES)));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -27148,7 +27427,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/secret-spots' && method === 'GET') {
       const ssVenues = getSecretSpotVenues();
       if (ssVenues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderSecretSpotsPage(ssVenues, parseLocalFavouritesFilterQuery(query));
+        const html = renderSecretSpotsHubPage(ssVenues, parseCuratedHubQuery(query, SECRET_SPOT_KIND_KEYS, new Set(['dog_friendly', 'kid_friendly', 'lake_view'])));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -27854,6 +28133,15 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  renderLocalFavouritesHubPage,
+  renderSecretSpotsHubPage,
+  renderCuratedHubPage,
+  curatedMixedOrder,
+  parseCuratedHubQuery,
+  secretSpotKinds,
+  curatedPhotoKey,
+  CURATED_SORTS,
+  SECRET_SPOT_KINDS,
   getDogPolicyNotes,
   dogCardPhotoKey,
   DOG_SORTS,
