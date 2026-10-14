@@ -8352,7 +8352,9 @@ function renderHomepageDiscoveryStyles() {
      as a hard rectangle. */
   .trip-cta-section { padding: 8px 0 36px; }
   .trip-cta-inner {
-    position: relative; background: var(--ref-navy-deep); border-radius: 20px; overflow: hidden;
+    /* Square corners (2026-10-14): the band runs the full width of the screen, so it meets the page edges straight
+       instead of curving in at them. */
+    position: relative; background: var(--ref-navy-deep); border-radius: 0; overflow: hidden;
     display: flex; align-items: flex-end; min-height: 400px;
   }
   .trip-cta-visual { position: absolute; inset: 0; z-index: 0; }
@@ -8415,7 +8417,7 @@ function renderHomepageDiscoveryStyles() {
        card. .trip-cta-inner's own base background (--ref-navy-deep,
        unconditional, not part of this media query) shows through
        cleanly now that the photo layer covering it is gone. */
-    .trip-cta-inner { min-height: 0; border-radius: 16px; padding-top: 0; }
+    .trip-cta-inner { min-height: 0; border-radius: 0; padding-top: 0; }
     .trip-cta-visual, .trip-cta-map { display: none; }
     .trip-cta-content { max-width: 100%; width: 100%; padding: 24px; background: rgba(16,27,36,0.94); }
   }
