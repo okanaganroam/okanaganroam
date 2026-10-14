@@ -6749,7 +6749,10 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/);
     assert.ok(html.indexOf(`<script src="${app.APP_JS_SRC}">`) < html.lastIndexOf('<script>'), 'app.js loads before the Golf engagement script');
     assert.match(html, /body\.golf-page \.venue-card \.card-links \{ display: none; \}/);
-    assert.doesNotMatch(html, /getElementById\('navHamburger'\)/, 'no duplicate nav handlers alongside app.js');
+    // My Trip (2026-10-14) reads the menu button to place its count badge, but
+    // only app.js listens to it.
+    const navScripts = html.split(/<script[^>]*>/).filter((part) => part.includes("getElementById('navHamburger')"));
+    assert.ok(navScripts.every((part) => !/(?:hamburger|burger|getElementById\('navHamburger'\))\.addEventListener/.test(part.split('</script>')[0])), 'no duplicate nav handlers alongside app.js');
   }
   // Batch 4A (2026-09-27): Food & Drink VENUE pages now use the themed shell
   // (see the Batch 4A tests); their listings do not. Stage 4.1: nor do winery
@@ -18881,3 +18884,20 @@ test('Venue page picks: related ranks by review-weighted rating with the same cu
   assert.match(html, /<div class="related-card related-card-brewery has-photo">\s*<img class="related-photo" src="\/images\/[^"]+" alt="" loading="lazy" width="480" height="270">/);
   assert.match(html, /<div class="related-meta">[^<]*400 m /);
 });
+
+// ---------- My Trip in the header (2026-10-14) ----------
+test('My Trip: every page with the trip tray hides the floating button and gets the header item, once, before the tray', () => withDiscoveryServer(async (base) => {
+  for (const p of ['/', '/browse', '/food-drink', '/kelowna/restaurants/test-trattoria', '/kelowna/golf/test-golf-course', '/trip', '/whats-on', '/favorites', '/kelowna', '/golf']) {
+    const html = await (await fetch(`${base}${p}`)).text();
+    if (!html.includes('<div id="tripTray">')) continue;
+    assert.equal((html.match(/<style id="trip-nav">/g) || []).length, 1, `${p}: one snippet`);
+    assert.ok(html.indexOf('<style id="trip-nav">') < html.indexOf('<div id="tripTray">'), `${p}: before the tray`);
+    assert.match(html, /<button id="tripTrayToggle">/, `${p}: the toggle stays in the page for app.js`);
+  }
+  assert.match(app.TRIP_NAV_SNIPPET, /html\.trip-nav-on #tripTrayToggle \{ display: none !important; \}/);
+  assert.match(app.TRIP_NAV_SNIPPET, /e\.stopPropagation\(\);[\s\S]*toggle\.click\(\);/, 'opens the tray through app.js');
+  assert.match(app.TRIP_NAV_SNIPPET, /My Trip<\/span><span class="nav-mytrip-fr" lang="fr">Mon voyage/);
+  assert.equal(app.withTripNav(app.withTripNav('<div id="tripTray">x')), `${app.TRIP_NAV_SNIPPET}<div id="tripTray">x`, 'idempotent');
+  assert.equal(app.withTripNav('<p>no tray</p>'), '<p>no tray</p>');
+  assert.doesNotThrow(() => new Function(app.TRIP_NAV_SNIPPET.split('<script>')[1].split('</script>')[0]));
+}));

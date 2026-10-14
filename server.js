@@ -9537,7 +9537,84 @@ function renderEngagementControlStyles() {
 function renderGolfTripTrayHtml() {
   if (!fs.existsSync(SITE_PATH)) return '';
   const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
-  return extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+  return withTripNav(extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '');
+}
+
+// My Trip in the header (2026-10-14). The floating "Trip 0 \u2192" button sat over
+// page content on phones, so it is hidden and the same tray opens from a
+// "My Trip" item in the header menu instead (with the stop count, also shown
+// on the phone menu button). The tray markup and app.js (frozen) are
+// unchanged: the floating toggle stays in the page, hidden, because app.js's
+// tray module -- which also runs every Add to trip button -- needs it, and
+// the header item opens the tray by pressing it. Placed just before the tray
+// on every page that has one (withTripNav), including the homepage and
+// /browse, whose source file is frozen.
+const TRIP_NAV_SNIPPET = `<style id="trip-nav">
+html.trip-nav-on #tripTrayToggle { display: none !important; }
+html.trip-nav-on #tripTray { top: 70px; bottom: auto; right: 16px; left: auto; }
+html.trip-nav-on #tripTrayPanel { position: static; width: min(320px, calc(100vw - 32px)); max-height: min(70vh, 520px); }
+.nav-links-mytrip { list-style: none; }
+.nav-mytrip-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+.nav-mytrip-btn:focus-visible { outline: 2px solid var(--ref-gold, #E0A94E); outline-offset: 3px; border-radius: 6px; }
+.nav-mytrip-count, .nav-hamburger-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: var(--ref-navy, #1B2B3A); font-size: 0.72rem; font-weight: 800; line-height: 1; }
+.nav-mytrip-fr { display: none; }
+html[lang="fr"] .nav-mytrip-fr { display: inline; }
+html[lang="fr"] .nav-mytrip-en { display: none; }
+#navHamburger { position: relative; }
+#navHamburger .nav-hamburger-count { position: absolute; top: -2px; right: -8px; left: auto; bottom: auto; display: inline-flex; width: auto; min-width: 18px; height: 18px; margin: 0; padding: 0 5px; transform: none; opacity: 1; font-style: normal; font-size: 0.66rem; pointer-events: none; }
+#navHamburger .nav-hamburger-count[hidden] { display: none; }
+@media (max-width: 940px) {
+  .nav-links .nav-links-mytrip { order: -1; border-top: 0; padding: 4px 20px 6px; }
+  .nav-links .nav-mytrip-btn { width: 100%; justify-content: space-between; min-height: 48px; padding: 0 18px; border: 1px solid rgba(27,43,58,0.2); border-radius: 12px; font-weight: 800; color: var(--ref-navy, #1B2B3A); }
+  .nav-links .nav-mytrip-label { margin-right: auto; }
+}
+.nav-hamburger-count[hidden] { display: none; }
+@media (min-width: 941px) { #navHamburger .nav-hamburger-count { display: none; } }
+@media (min-width: 941px) and (max-width: 1099px) { .nav-mytrip-label { display: none; } }
+</style>
+<script>
+(function(){
+  function init(){
+    var tray = document.getElementById('tripTray'), toggle = document.getElementById('tripTrayToggle'), panel = document.getElementById('tripTrayPanel');
+    var count = document.getElementById('tripTrayCount'), links = document.getElementById('navLinks'), burger = document.getElementById('navHamburger');
+    if (!tray || !toggle || !panel || !links || document.querySelector('.nav-links-mytrip')) return;
+    document.documentElement.classList.add('trip-nav-on');
+    var li = document.createElement('li');
+    li.className = 'nav-links-mytrip';
+    li.innerHTML = '<button type="button" class="nav-mytrip-btn" aria-controls="tripTrayPanel" aria-expanded="false"><span aria-hidden="true">\u{1F9F3}</span> <span class="nav-mytrip-label"><span class="nav-mytrip-en">My Trip</span><span class="nav-mytrip-fr" lang="fr">Mon voyage</span></span> <span class="nav-mytrip-count">0</span></button>';
+    // Right after Build My Trip: on phones that pair leads the menu.
+    var tripLi = links.querySelector('.nav-links-trip');
+    links.insertBefore(li, tripLi ? tripLi.nextSibling : null);
+    var btn = li.querySelector('button'), navCount = li.querySelector('.nav-mytrip-count');
+    var badge = null;
+    if (burger) { badge = document.createElement('b'); badge.className = 'nav-hamburger-count'; badge.setAttribute('aria-hidden', 'true'); badge.hidden = true; burger.appendChild(badge); }
+    function sync(){
+      var n = count ? (parseInt(count.textContent, 10) || 0) : 0;
+      navCount.textContent = String(n);
+      btn.setAttribute('aria-label', (document.documentElement.lang === 'fr' ? 'Mon voyage : ' : 'My Trip: ') + n + (document.documentElement.lang === 'fr' ? (n === 1 ? ' arr\u00eat' : ' arr\u00eats') : (n === 1 ? ' stop' : ' stops')));
+      btn.setAttribute('aria-expanded', panel.classList.contains('open') ? 'true' : 'false');
+      if (badge) { badge.textContent = String(n); badge.hidden = n === 0; }
+    }
+    btn.addEventListener('click', function(e){
+      // The tray's own outside-click rule would close it again as this click
+      // bubbles, so it stops here; pressing the hidden toggle opens or closes
+      // the tray through app.js exactly as the floating button did.
+      e.stopPropagation();
+      if (links.classList.contains('open')) { links.classList.remove('open'); if (burger) burger.setAttribute('aria-expanded', 'false'); }
+      toggle.click();
+      sync();
+    });
+    if (count && window.MutationObserver) new MutationObserver(sync).observe(count, { childList: true, characterData: true, subtree: true });
+    if (window.MutationObserver) new MutationObserver(sync).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    sync();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+`;
+function withTripNav(html) {
+  if (!html || !html.includes('<div id="tripTray">') || html.includes('<style id="trip-nav">')) return html;
+  return html.replace('<div id="tripTray">', `${TRIP_NAV_SNIPPET}<div id="tripTray">`);
 }
 
 // app.js cache busting (2026-10-05): every page loads /scripts/app.js with
@@ -19164,7 +19241,7 @@ function renderTripPlannerPage(v2 = false) {
   let headerHtml = '';
   if (fs.existsSync(SITE_PATH)) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
-    tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+    tripTrayHtml = withTripNav(extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '');
     headerHtml = extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '';
     headerHtml = withBuildMyTripPlacements(withFavoritesNavLink(headerHtml
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
@@ -19369,7 +19446,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
   let headerHtml = '';
   if (fs.existsSync(SITE_PATH)) {
     const rawHtml = fs.readFileSync(SITE_PATH, 'utf8');
-    tripTrayHtml = extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '';
+    tripTrayHtml = withTripNav(extractHtmlFragment(rawHtml, '<div id="tripTray">', '\n\n<!-- Header rebuilt', false) || '');
     headerHtml = withBuildMyTripPlacements(withFavoritesNavLink((extractHtmlFragment(rawHtml, '<header id="top">', '</header>', true) || '')
       .replace(/href="#moodCards"/g, 'href="/#moodCards"')
       .replace(/href="#hiddenGems"/g, 'href="/#hiddenGems"')
@@ -23838,7 +23915,7 @@ const server = http.createServer(async (req, res) => {
     // of always rendering underneath the new homepage. See /browse below.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
-        let html = withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')));
+        let html = withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))));
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
         // not just via the sitemap (which some crawlers deprioritize). The
@@ -24049,7 +24126,7 @@ const server = http.createServer(async (req, res) => {
         // No venues to list (an empty database): fall back to the wizard page.
       }
       if (fs.existsSync(SITE_PATH)) {
-        let html = withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')));
+        let html = withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))));
 
         // /browse redesign harmonization pass (2026-09-18): marks this
         // response so page-scoped CSS can tell it apart from / (same
@@ -26937,6 +27014,8 @@ module.exports = {
   withFavoritesNavLink,
   withoutFavoritesNavLink,
   FAVORITES_NAV_ITEM,
+  TRIP_NAV_SNIPPET,
+  withTripNav,
   FAVORITES_NAV_STYLE,
   BROWSE_HEAD_EXTRAS,
   mapAreaPins,
