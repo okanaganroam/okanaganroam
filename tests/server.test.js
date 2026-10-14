@@ -19128,3 +19128,23 @@ test('Event page: photo, status line, short summary, Tickets / directions / cale
   assert.match(await cal.text(), /SUMMARY:Test Future Festival/);
   assert.equal((await fetch(`${base}/kelowna/events/no-such-event/calendar.ics`)).status, 404);
 }));
+
+// ---------- Event descriptions (2026-10-14) ----------
+test('Event descriptions: every entry is complete, guarded by the text it replaces, and free of the import template', () => {
+  const data = require('../data/event-descriptions-2026-10.json');
+  assert.ok(data.reason && data.batch_id);
+  assert.equal(data.events.length, data.count);
+  const ids = new Set();
+  for (const e of data.events) {
+    assert.ok(Number.isInteger(e.id) && !ids.has(e.id), `unique id ${e.id}`);
+    ids.add(e.id);
+    assert.match(e.before_sha1, /^[0-9a-f]{40}$/);
+    assert.ok(e.region && e.slug && e.description.trim(), e.name);
+    assert.doesNotMatch(e.description, /Listed by|confirm details with the organizer|\b202[5-9]\b/, e.name);
+    const words = e.description.split(/\s+/).length;
+    assert.ok(words >= 10 && words <= 95, `${e.name}: ${words} words`);
+  }
+  const script = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'apply-event-descriptions.js'), 'utf8');
+  assert.match(script, /sha1\(live\.description\) !== item\.before_sha1/, 'never overwrites an edited description');
+  assert.match(script, /event-descriptions-backup-/, 'backs up before writing');
+});
