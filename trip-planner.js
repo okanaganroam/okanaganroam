@@ -604,6 +604,13 @@ function scoreVenue(v, ctx) {
     if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textName, w))) add('rainy_attraction', 5, 'A good rainy-day pick');
     if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w))) add('rainy_niche', -10, null);
   }
+  // "A hike with a view": a trail with the Lake View badge before one without.
+  if (ctx.lake && ctx.activities.has('hiking') && v.type === 'outdoor' && v.features.lake_view && (v.activities || []).includes('hiking')) add('hike_view', 15, 'A trail with a lake view');
+  // "Good restaurants", "fine dining", or a couple's trip: a proper dinner spot before a quick or budget one.
+  if (v.type === 'restaurant' && !ctx.budget && /\b(?:good|great|nice|best|fine|excellent|amazing|special) (?:restaurants?|food|dinners?|dining|meals?)\b|\bfine dining\b|\bfoodies?\b|\bcouple\b/.test(q)) {
+    if (v.price != null && v.price >= 3) add('good_dinner', 6, null);
+    else if (v.price === 1) add('good_dinner_miss', -5, null);
+  }
   // A campground or RV park is somewhere to stay, not a stop, unless camping was asked for.
   if (/\b(?:campground|campsite|rv park|rv resort|camping)\b/.test(v.textName || '') && !/\bcamp(?:ing|ground|site)?s?\b/.test(ctx.queryText || '')) add('campground', -25, null);
   // A vegetarian trip puts an all-vegetarian or vegan kitchen ahead of a menu that only has options.
@@ -1122,6 +1129,8 @@ function buildDays(facts, ctx, days, pinned) {
   const onceEvening = new Set(ctx.requirements?.onceEvening || []);
   const tripFoodCount = {};
   const tripCuisines = new Set();
+  const oneHike = days > 1 && /\b(?:one|a single|1) (?:easy |short |good |great |scenic |little |nice )?(?:hike|walk|trail)\b/.test(ctx.requirements?.text || ctx.queryText || '');
+  let tripHikes = 0;
   const warnings = [];
   const out = [];
   // Step 1 (2026-09-29): day themes ("one relaxed day with a lake
@@ -1302,6 +1311,8 @@ function buildDays(facts, ctx, days, pinned) {
           if (v.type === 'restaurant' && v.textCuisine && tripCuisines.has(v.textCuisine) && !vFocus.length) score -= 10;
           // A two-town day moves along the valley: the first town early, the second later.
           if (regionList.length > 1 && v.region === regionList[Math.round(dayDayparts.indexOf(daypart) * (regionList.length - 1) / Math.max(1, dayDayparts.length - 1))]) score += 15;
+          // "One easy hike" on a longer trip is one hike; other mornings go to something else (2026-10-14).
+          if (oneHike && tripHikes >= 1 && v.type === 'outdoor' && (v.activities || []).includes('hiking')) score -= 40;
           // A family's evening is dinner, not a brewery or a show (2026-10-14).
           if (daypart === 'evening' && ctx.kids && v.type !== 'restaurant' && !vFocus.some((f) => !f.key.startsWith('food:'))) score -= 40;
           // A day with nothing particular asked for keeps its afternoon for something to do; lunch is not a stop unless asked.
@@ -1373,6 +1384,7 @@ function buildDays(facts, ctx, days, pinned) {
       tripTypeCount[v.type] = (tripTypeCount[v.type] || 0) + 1;
       for (const f of focuses) if (f.test(v) && f.key.startsWith('food:') && !met.has(f.key)) tripFoodCount[f.key] = (tripFoodCount[f.key] || 0) + 1;
       if (v.type === 'restaurant' && v.textCuisine) tripCuisines.add(v.textCuisine);
+      if (v.type === 'outdoor' && (v.activities || []).includes('hiking')) tripHikes += 1;
       for (const f of focuses) if (f.test(v)) { met.add(f.key); if (f.key.startsWith('food:') && onceTerms.has(f.key.slice(5))) onceUsed.add(f.key); }
       if (thTest && thTest(v)) themeMet = true;
       stops.push({ daypart, label: PLAN_DAYPART_LABELS[daypart], ...stopFrom(v, chosen, regionReason(v, ctx), ctx) });
@@ -1398,11 +1410,28 @@ function buildDays(facts, ctx, days, pinned) {
   }
   // A focus that never appeared anywhere in the trip is reported honestly.
   for (const f of focuses) {
-    if (!out.some((day) => day.stops.some((s) => s.venue && f.test(byId.get(s.venue.id))))) warnings.push(`Nothing matching ${focusText(ctx, f.key)} was available${ctx.regions.length ? ` in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))}` : ''}.`);
+    if (out.some((day) => day.stops.some((s) => s.venue && f.test(byId.get(s.venue.id))))) continue;
+    // 2026-10-14: name the closest place that has it, one or two towns along the valley, instead of only saying no.
+    const near = nearbyFocusVenue(facts, ctx, f);
+    if (near) warnings.push(`Nothing matching ${focusText(ctx, f.key)} is listed in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))}; the closest is ${near.name} in ${regionLabel(ctx, near.region)}.`);
+    else warnings.push(`Nothing matching ${focusText(ctx, f.key)} was available${ctx.regions.length ? ` in ${listText(ctx.regions.map((r) => regionLabel(ctx, r)))}` : ''}.`);
   }
   return { days: out, warnings, dayparts };
 }
 
+function nearbyFocusVenue(facts, ctx, f) {
+  if (!ctx.regions.length || !f.key.startsWith('food:')) return null;
+  const at = (r) => ROUTE_CORRIDOR.indexOf(ROUTE_CORRIDOR.includes(r) ? r : ROUTE_OFF_CORRIDOR[r]);
+  const here = ctx.regions.map(at).filter((i) => i >= 0);
+  if (!here.length) return null;
+  const gap = (v) => Math.min(...here.map((i) => Math.abs(at(v.region) - i)));
+  const term = f.key.slice(5), dish = DISH_WORDS_RE.test(term);
+  // How well it matches: in its name or cuisine beats a passing mention in its description.
+  const fit = (v) => { const m = foodMatch(v, { term, cuisine: null }) || {}; return (m.inName ? 3 : 0) + (m.inCui || m.cuisine ? 2 : 0) + (m.inDesc ? 1 : 0); };
+  const options = facts.filter((v) => !ctx.regions.includes(v.region) && at(v.region) >= 0 && gap(v) <= 2 && f.test(v) && (!dish || (['cafe', 'restaurant'].includes(v.type) && fit(v) >= 2)) && eligible(v, { ...ctx, regions: [] }, false));
+  options.sort((a, b) => gap(a) - gap(b) || fit(b) - fit(a) || (Number(b.rating) || 0) - (Number(a.rating) || 0));
+  return options[0] || null;
+}
 function focusText(ctx, key) {
   if (key.startsWith('kind:')) return tripRequirements.LABELS[key.slice(5)] || key.slice(5);
   const [kind, value] = key.split(':');

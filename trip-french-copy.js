@@ -8,7 +8,7 @@ function t3FrenchText(value){
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';
  const phrases=[
  ['An Okanagan Roam Local Favourite','Un coup de cœur local d’Okanagan Roam'],['One of Okanagan Roam’s Hidden Gems','L’un des trésors cachés d’Okanagan Roam'],
- ['A fun pick for teenagers','Une activité amusante pour les ados'],['Indoor fun for kids','Du plaisir à l’intérieur pour les enfants'],['A good rainy-day pick','Un bon choix pour un jour de pluie'],['An all-vegetarian or vegan kitchen','Une cuisine entièrement végétarienne ou végane'],['A good walk with your dog','Une belle promenade avec votre chien'],['A guided food tour','Une visite gourmande guidée'],
+ ['A trail with a lake view','Un sentier avec vue sur le lac'],['A fun pick for teenagers','Une activité amusante pour les ados'],['Indoor fun for kids','Du plaisir à l’intérieur pour les enfants'],['A good rainy-day pick','Un bon choix pour un jour de pluie'],['An all-vegetarian or vegan kitchen','Une cuisine entièrement végétarienne ou végane'],['A good walk with your dog','Une belle promenade avec votre chien'],['A guided food tour','Une visite gourmande guidée'],
  ['Has the Kid-Friendly badge','Possède le badge Adapté aux enfants'],
  ['A restaurant suits a date night','Un restaurant convient à une soirée en amoureux'],
  ['Indoor kinds of places come first.','Les lieux intérieurs sont proposés en priorité.'],
@@ -100,6 +100,7 @@ function t3FrenchText(value){
  text=text.replace(/Used instead of (.+) because its timing could not be verified\./g,'Choisi à la place de $1, dont l’horaire n’a pas pu être vérifié.');
  text=text.replace(/Used instead of (.+) because its listed hours do not fit the estimated sequence\./g,'Choisi à la place de $1, dont les horaires indiqués ne conviennent pas à la séquence estimée.');
  text=text.replace(/No suitable (morning|afternoon|evening) stop was found for day (\d+)( in (.+))?\./g,(_,part,day,where,town)=>'Aucun arrêt approprié '+({morning:'le matin',afternoon:'l’après-midi',evening:'le soir'}[part])+' du jour '+day+(town?' à '+town:'')+'.');
+ text=text.replace(/^Nothing matching (.+) is listed in (.+); the closest is (.+) in (.+)\.$/,(_,w,t,n,c)=>'Aucune option correspondant à '+w+' n’est répertoriée à '+t.replace(/ and (?!.* and )/,' et ')+'; la plus proche est '+n+' à '+c+'.');
  text=text.replace(/Nothing matching (.+) was available( in (.+))?\./g,(_,what,where,town)=>'Aucune option correspondant à '+what+(town?' à '+town:'')+' n’était disponible.');
  text=text.replace(/(Morning|Afternoon|Evening) on day (\d+) is kept free for the event’s listed duration\./g,(_,part,day)=>({Morning:'Le matin',Afternoon:'L’après-midi',Evening:'Le soir'}[part])+' du jour '+day+' reste libre pour la durée indiquée de l’événement.');
  text=text.replace('Reserved for the listed event time.','Réservé pour l’horaire indiqué de l’événement.');
