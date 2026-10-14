@@ -464,16 +464,33 @@ function renderStyles() {
   .t3-address { margin: 0 0 6px; font-size: 0.84rem; color: rgba(27,43,58,0.72); }
   .t3-facts { margin: 0 0 8px; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
   .t3-star { color: var(--ref-gold); }
+  .t3-sched { padding: 0; }
+  .t3-sched > summary { list-style: none; cursor: pointer; padding: 12px 16px; min-height: 44px; display: flex; align-items: center; gap: 8px; }
+  .t3-sched > summary::-webkit-details-marker { display: none; }
+  .t3-sched > summary::before { content: '\\25B8'; font-size: 0.8rem; transition: transform 0.15s; }
+  .t3-sched[open] > summary::before { transform: rotate(90deg); }
+  .t3-sched > summary h3 { margin: 0; font-size: 0.95rem; }
+  .t3-sched > div, .t3-sched > p { padding: 0 16px; } .t3-sched > p { padding-bottom: 12px; }
   .t3-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
   .t3-badges li { background: rgba(42,107,103,0.1); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font-size: 0.76rem; font-weight: 800; }
+  .t3-badges li.is-more { background: none; padding: 0; }
+  .t3-badge-more { background: none; border: 1px dashed rgba(42,107,103,0.45); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 0.76rem; font-weight: 800; cursor: pointer; min-height: 28px; }
   .t3-badges li.is-collection { background: rgba(201,162,39,0.16); color: #6B5410; }
   .t3-hours { margin: 0 0 8px; font-size: 0.84rem; color: rgba(27,43,58,0.8); }
   .t3-why { margin: 0 0 6px; padding-left: 18px; font-size: 0.88rem; line-height: 1.5; }
   .t3-caveats { margin: 0 0 8px; padding: 8px 12px; list-style: none; background: #FFF6E6; border-radius: 10px; font-size: 0.82rem; color: #5B4212; }
   .t3-caveats li + li { margin-top: 4px; }
   .t3-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(27,43,58,0.08); }
-  .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 40px; }
-  .t3-act { background: transparent; border: 1px solid rgba(27,43,58,0.2); color: var(--ref-navy); border-radius: 999px; padding: 7px 13px; min-height: 40px; font-size: 0.8rem; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 44px; }
+  .t3-card.is-swapped { box-shadow: 0 0 0 3px var(--ref-gold, #C9A227); transition: box-shadow 0.4s; }
+  .t3-swap-note { margin: 0 0 6px; font-size: 0.78rem; font-weight: 800; color: #6B5410; }
+  .t3-more { position: relative; display: inline-block; }
+  .t3-more > summary { list-style: none; display: inline-flex; align-items: center; white-space: nowrap; box-sizing: border-box; }
+  .t3-more > summary::-webkit-details-marker { display: none; }
+  .t3-more > summary::after { content: ' \\25BE'; margin-left: 4px; }
+  .t3-more-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 20; display: flex; flex-direction: column; gap: 6px; min-width: 168px; padding: 8px; background: #fff; border: 1px solid rgba(27,43,58,0.15); border-radius: 12px; box-shadow: 0 12px 28px -12px rgba(27,43,58,0.45); }
+  .t3-more-menu > * { justify-content: flex-start; width: 100%; }
+  .t3-act { background: transparent; border: 1px solid rgba(27,43,58,0.2); color: var(--ref-navy); border-radius: 999px; padding: 7px 13px; min-height: 44px; font-size: 0.8rem; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
   .t3-act:hover { background: rgba(27,43,58,0.06); }
   .t3-act[aria-pressed="true"] { background: var(--ref-gold); border-color: var(--ref-gold); color: var(--ref-navy-deep); }
   .t3-removed { background: transparent; border: 1px dashed rgba(27,43,58,0.3); border-radius: 14px; padding: 14px 18px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -518,6 +535,13 @@ function renderStyles() {
     .t3-how-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
+    /* Phone: a stop's four actions sit on one row (2026-10-14). */
+    .t3-plan .t3-actions { display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 6px; }
+    .t3-plan .t3-actions > button, .t3-plan .t3-actions > a, .t3-plan .t3-actions .t3-more > summary { justify-content: center; text-align: center; padding: 6px 4px; font-size: 0.78rem; line-height: 1.15; width: 100%; box-sizing: border-box; }
+    .t3-plan .t3-actions .t3-more { display: block; }
+    .t3-plan .t3-actions .t3-more > summary { display: flex; align-items: center; min-height: 44px; }
+    .t3-plan .t3-actions .t3-more > summary::after { margin-left: 2px; }
+    .t3-dh-frame { height: 100px; }
     .t3 .t3-wrap { padding: 0 16px; }
     .t3-hero-inner { padding-top: 20px; padding-bottom: 30px; }
     .t3-crumb { margin-bottom: 16px; }
@@ -962,8 +986,21 @@ function renderScript(d) {
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
   function whenLabel(s){ return DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; }
   function badgesHtml(v){
-    var items = (v.badges || []).map(function(b){ return '<li>' + esc(BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; })
-      .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }));
+    // The badges that answer the request come first: the party's (dog, kids), then Okanagan Roam's own lists.
+    var party = ((state.last && state.last.understood && state.last.understood.party) || []).join(' ');
+    var wanted = function(b){ return (/dog/.test(party) && b.key === 'dog_friendly') || (/kid/.test(party) && b.key === 'kid_friendly') ? 0 : 1; };
+    var badges = (v.badges || []).slice().sort(function(a, b){ return wanted(a) - wanted(b); });
+    var lead = badges.filter(function(b){ return wanted(b) === 0; }), rest = badges.filter(function(b){ return wanted(b) === 1; });
+    var badgeLi = function(b){ return '<li>' + esc(BADGE_FR_EXTRA[b.key] ? (lang() === 'fr' ? BADGE_FR_EXTRA[b.key] : b.label) : frLabel(BADGE_KEYS[b.key], b.label)) + '</li>'; };
+    var items = lead.map(badgeLi)
+      .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }))
+      .concat(rest.map(badgeLi));
+    // Three badges show; the rest open with "+N more", so a card stays short on a phone (2026-10-14).
+    if (items.length > 4) {
+      var extra = items.length - 3;
+      items = items.slice(0, 3).concat(items.slice(3).map(function(li){ return li.replace('<li', '<li hidden data-t3-badge-extra'); }))
+        .concat('<li class="is-more"><button type="button" class="t3-badge-more" data-t3-badges-more aria-expanded="false">' + esc(lang() === 'fr' ? '+' + extra + ' de plus' : '+' + extra + ' more') + '</button></li>');
+    }
     return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
   }
   function cardHtml(stop, key, opts){
@@ -995,15 +1032,21 @@ function renderScript(d) {
       + '</div>'
       + '<div class="t3-actions">'
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + '>Add to trip</button>'
-      + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>';
+    var favHtml = '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>';
+    var detailsHtml = url ? '<a class="t3-act" href="' + esc(url) + '">' + esc(tx('tripv3.viewDetails')) + '</a>' : '';
     if (key) {
-      html += '<button type="button" class="t3-act" data-t3-keep="' + esc(key) + '" aria-pressed="' + (kept ? 'true' : 'false') + '" aria-label="' + esc(tx('tripv3.keepLabel', { name: v.name })) + '">' + esc(kept ? tx('tripv3.kept') : tx('tripv3.keep')) + '</button>'
-        + '<button type="button" class="t3-act" data-t3-swap="' + esc(key) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>'
-        + '<button type="button" class="t3-act" data-t3-remove="' + esc(key) + '" aria-label="' + esc(tx('tripv3.removeLabel', { name: v.name })) + '">' + esc(tx('tripv3.remove')) + '</button>';
-    } else if (opts.swapId) {
-      html += '<button type="button" class="t3-act" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>';
+      // A plan stop: the everyday actions show; Keep, Favorite and View details sit under "More" (2026-10-14).
+      var keepHtml = '<button type="button" class="t3-act" data-t3-keep="' + esc(key) + '" aria-pressed="' + (kept ? 'true' : 'false') + '" aria-label="' + esc(tx('tripv3.keepLabel', { name: v.name })) + '">' + esc(kept ? tx('tripv3.kept') : tx('tripv3.keep')) + '</button>';
+      html += '<button type="button" class="t3-act" data-t3-swap="' + esc(key) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>'
+        + '<button type="button" class="t3-act" data-t3-remove="' + esc(key) + '" aria-label="' + esc(tx('tripv3.removeLabel', { name: v.name })) + '">' + esc(tx('tripv3.remove')) + '</button>'
+        + (kept ? keepHtml : '')
+        + '<details class="t3-more"><summary class="t3-act" aria-label="' + esc(lang() === 'fr' ? 'Plus d’options pour ' + v.name : 'More options for ' + v.name) + '">' + esc(lang() === 'fr' ? 'Plus' : 'More') + '</summary><div class="t3-more-menu">'
+        + (kept ? '' : keepHtml) + favHtml + detailsHtml + '</div></details>';
+      return html + '</div></article>';
     }
-    if (url) html += '<a class="t3-act" href="' + esc(url) + '">' + esc(tx('tripv3.viewDetails')) + '</a>';
+    html += favHtml;
+    if (opts.swapId) html += '<button type="button" class="t3-act" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>';
+    html += detailsHtml;
     return html + '</div></article>';
   }
   // The planner's fixed occasion and party labels (trip-planner.js).
@@ -1244,7 +1287,9 @@ function renderScript(d) {
     if(['itinerary','outing','multi_day','day_plan'].indexOf(p.kind)!==-1){
       var timingFr=lang()==='fr',selectedDate=state.overrides.startDate||(p.schedule||[])[0]?.date||'',selectedMinutes=state.overrides.startMinutes;
       var timeValue=selectedMinutes!==undefined?String(Math.floor(selectedMinutes/60)).padStart(2,'0')+':'+String(selectedMinutes%60).padStart(2,'0'):'';
-      html+='<section class="t3-warnings" aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><h3>'+(timingFr?'Ajuster votre horaire':'Adjust your schedule')+'</h3><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale de l’Okanagan. Les événements conservent leurs heures indiquées.':'Okanagan local time. Events keep their listed times.')+'</p></section>';
+      // Closed until a date or time is set, so the plan's stops come first on a phone (2026-10-14).
+      var schedOpen=!!(state.overrides.startDate||selectedMinutes!==undefined);
+      html+='<details class="t3-warnings t3-sched"'+(schedOpen?' open':'')+' aria-label="'+(timingFr?'Date et départ':'Date and departure')+'"><summary><h3>'+(timingFr?'Choisir les dates et l’heure de départ':'Set your dates & start time')+'</h3></summary><div style="display:flex;flex-wrap:wrap;gap:1rem"><label>'+(timingFr?'Date de départ':'Trip start date')+'<br><input type="date" data-t3-override="startDate" aria-label="'+(timingFr?'Date de départ':'Trip start date')+'" value="'+esc(selectedDate)+'"></label><label>'+(timingFr?'Heure de départ':'Start time')+'<br><input type="time" data-t3-override="startMinutes" aria-label="'+(timingFr?'Heure de départ':'Start time')+'" value="'+esc(timeValue)+'"></label></div><p>'+(timingFr?'Heure locale de l’Okanagan. Les événements conservent leurs heures indiquées.':'Okanagan local time. Events keep their listed times.')+'</p></details>';
     }
     if(p.shortWalkRepairs && !Object.keys(state.removed).length){
       var swFr=lang()==='fr';
@@ -1325,7 +1370,9 @@ function renderScript(d) {
     if (window.__syncTripButtons) window.__syncTripButtons();
     refreshAddAll();
     if (focus) {
-      resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // On a phone the plan itself comes into view (what we understood stays just above it).
+      var scrollTarget = (window.matchMedia && window.matchMedia('(max-width: 640px)').matches && resultEl.querySelector('.t3-plan')) || resultEl;
+      scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
       var t = document.getElementById('t3Headline');
       if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
     }
@@ -1410,10 +1457,24 @@ function renderScript(d) {
   window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganTrip') refreshAddAll(); });
 
   // ---- interactions ----
+  // An open "More" menu closes when you click elsewhere or press Escape.
+  document.addEventListener('click', function(e){
+    Array.prototype.forEach.call(document.querySelectorAll('details.t3-more[open]'), function(d){ if (!d.contains(e.target) || (e.target.closest && e.target.closest('.t3-more-menu > *'))) d.removeAttribute('open'); });
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape') return;
+    Array.prototype.forEach.call(document.querySelectorAll('details.t3-more[open]'), function(d){ d.removeAttribute('open'); var sm = d.querySelector('summary'); if (sm) sm.focus(); });
+  });
   resultEl.addEventListener('click', function(e){
     var t = e.target.closest ? e.target : null;
     if (!t) return;
     var b;
+    if ((b=t.closest('[data-t3-badges-more]'))) {
+      var list=b.closest('.t3-badges');
+      Array.prototype.forEach.call(list.querySelectorAll('[data-t3-badge-extra]'),function(li){ li.hidden=false; });
+      b.parentNode.parentNode.removeChild(b.parentNode);
+      return;
+    }
     if ((b=t.closest('[data-t3-event-date]'))) {
       var eventDate=b.getAttribute('data-t3-event-date');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate || '')) return;
@@ -1523,7 +1584,27 @@ function renderScript(d) {
       if (ss && state.exclude.indexOf(ss.venue.id) === -1) state.exclude.push(ss.venue.id);
       delete state.locks[sk];
       delete state.removed[sk];
-      request({ pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
+      var oldName = ss && ss.venue ? ss.venue.name : null;
+      var swapped = request({ pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
+      // Say what changed and show where: "Swapped Lachi for Poplar Grove", with the new card briefly highlighted.
+      if (swapped && swapped.then) swapped.then(function(){
+        var ns = stopAt(sk);
+        if (!ns || !ns.venue || ns.venue.name === oldName) return;
+        var fr = lang() === 'fr';
+        announce(oldName ? (fr ? oldName + ' a été remplacé par ' + ns.venue.name + '.' : 'Swapped ' + oldName + ' for ' + ns.venue.name + '.') : (fr ? 'Nouvelle suggestion : ' + ns.venue.name + '.' : 'New suggestion: ' + ns.venue.name + '.'));
+        var nb = resultEl.querySelector('[data-t3-swap="' + sk + '"]');
+        var card = nb && nb.closest('.t3-card');
+        if (card) {
+          var note = document.createElement('p');
+          note.className = 't3-swap-note';
+          note.textContent = oldName ? (fr ? 'Remplace ' + oldName : 'Replaces ' + oldName) : (fr ? 'Nouvelle suggestion' : 'New suggestion');
+          card.insertBefore(note, card.firstChild);
+          card.classList.add('is-swapped');
+          try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+          try { nb.focus({ preventScroll: true }); } catch (e) {}
+          setTimeout(function(){ card.classList.remove('is-swapped'); }, 2400);
+        }
+      });
       return;
     }
     if ((b = t.closest('[data-t3-swap-id]'))) {

@@ -54,6 +54,12 @@ function sportsVenueInterpretationText(text,taxonomy){
  }
  return changed?clean.trim():text;
 }
+// "Pizza one night", "sushi once": a food asked for one time; onceEvening are the ones asked for at night.
+function onceFoods(normalizedText){
+  const onceTerms=[...String(normalizedText||'').matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|day|dinner|lunch|meal|time)\b|\b([a-z]{3,})\s+once\b/g)].map(m=>m[1]||m[2]).filter(w=>!/^(?:just|only|for|and|with|the|out|day|night|trip)$/.test(w));
+  const onceEvening=[...String(normalizedText||'').matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|dinner)\b/g)].map(m=>m[1]).filter(w=>onceTerms.includes(w));
+  return {onceTerms,onceEvening};
+}
 function inferPlannerKinds(v) {
   const text = norm([v.name,v.description,v.textName,v.textDesc].filter(Boolean).join(' '));
   const name = norm(v.name);
@@ -287,8 +293,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   }
   // 2026-10-14: "pizza one night", "sushi once" -- that food is wanted on one meal, not every day (a 3-day family trip
   // planned pizza for all three dinners). The word just before the frequency phrase is kept; the planner uses it once.
-  const onceTerms=[...normalizedText.matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|day|dinner|lunch|meal|time)\b|\b([a-z]{3,})\s+once\b/g)].map(m=>m[1]||m[2]).filter(w=>!/^(?:just|only|for|and|with|the|out|day|night|trip)$/.test(w));
-  const onceEvening=[...normalizedText.matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|dinner)\b/g)].map(m=>m[1]).filter(w=>onceTerms.includes(w));
+  const {onceTerms,onceEvening}=onceFoods(normalizedText);
   return {onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null};
 }
 // Words covered by verified requirement grammar must not also become
@@ -669,4 +674,4 @@ function sparseDayRecovery(plan,requirements){
  const safe=last>0&&last<days.length&&!requirements?.endDate&&!(requirements?.items||[]).some(i=>i.kind==='event'||requirementDay(i,requirements.startDate)>last||i.kind==='venue'&&i.strength==='must'&&!retained.has(i.value));
  return {days:gaps.map(d=>d.day),shorterDays:safe?last:null,region:gaps.every(d=>d.region===gaps[0].region)?gaps[0].region:null};
 }
-module.exports={namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

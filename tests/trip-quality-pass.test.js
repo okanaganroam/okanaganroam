@@ -188,3 +188,25 @@ test('a place whose advisory says it may not be operating is not picked over ope
   assert.ok(stops(p).some((s) => s.venue.type === 'winery'));
   assert.ok(!stops(p).some((s) => s.venue.id === 999));
 });
+
+test('a place outside the Okanagan is named as not covered, not searched for', () => {
+  const i = d.interpretDiscoveryQuery('Weekend in Vancouver', taxonomy);
+  assert.ok(!(i.textTerms || []).includes('vancouver'));
+  assert.ok(i.unsupported.includes('Vancouver'));
+  const { p } = plan('Weekend in Vancouver');
+  assert.match(p.contextNotes[0], /only covers the Okanagan Valley, so Vancouver isn’t included/);
+});
+
+test('"pizza one night" is a dinner even when nothing else in the request needs checking', () => {
+  const { p } = plan('2 days in Penticton, beach and pizza one night');
+  const pizza = stops(p).filter((s) => /pizz/i.test(s.venue.name));
+  assert.equal(pizza.length, 1);
+  assert.equal(pizza[0].daypart, 'evening');
+});
+
+test('the trip page loads, with the phone-friendly card controls in its script', () => {
+  const page = require('../trip-planner-v3-page.js'); // a syntax slip here silently falls back to the old page
+  assert.equal(typeof page.renderTripPlannerV3Page, 'function');
+  const src = require('node:fs').readFileSync(require.resolve('../trip-planner-v3-page.js'), 'utf8');
+  for (const marker of ['data-t3-badges-more', 't3-more-menu', 't3-sched', 'is-swapped', 'Swapped ']) assert.ok(src.includes(marker), `missing ${marker}`);
+});

@@ -111,6 +111,7 @@ function kmBetween(a, b) { return hasCoords(a) && hasCoords(b) ? haversineKm(a.l
 // retrieval module (discovery-search.js) -- the same functions, unchanged.
 // Stage 3.5 (2026-09-29): so do the visitor's exclusions ("not in Kelowna",
 // "no wineries", "nothing fancy"), applied exactly as /search applies them.
+const { OUTSIDE_PLACE_NAMES } = require('./discovery-intent.js');
 const { textHas, foodMatch, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, withoutConceptStrays } = require('./discovery-search.js');
 // Deterministic per-(seed, venue) jitter in [0, 1): regeneration variety
 // without randomness.
@@ -1135,9 +1136,10 @@ function buildDays(facts, ctx, days, pinned) {
   // never take a venue that another kept slot is holding.
   const reserved = new Set(pinned ? Object.values(pinned) : []);
   const tripTypeCount = {};
-  const onceTerms = new Set(ctx.requirements?.onceTerms || []);
+  const onceInfo = ctx.requirements ? ctx.requirements : tripRequirements.onceFoods(ctx.queryText);
+  const onceTerms = new Set(onceInfo.onceTerms || []);
   const onceUsed = new Set();
-  const onceEvening = new Set(ctx.requirements?.onceEvening || []);
+  const onceEvening = new Set(onceInfo.onceEvening || []);
   const tripFoodCount = {};
   const tripCuisines = new Set();
   const oneHike = days > 1 && /\b(?:one|a single|1) (?:easy |short |good |great |scenic |little |nice )?(?:hike|walk|trail)\b/.test(ctx.requirements?.text || ctx.queryText || '');
@@ -2175,11 +2177,15 @@ function planTripCore(input) {
     unsupported: (intent && intent.unsupported) || [],
     needs: (intent && intent.needs) || [],
   };
-  if (ctx.kids && !ctx.occasion) result.notes.push(ctx.requirements ? 'Because you mentioned kids, places with the verified Kid-Friendly badge come first. Check age suitability and booking requirements with each venue.' : 'Because you mentioned kids, family-friendly places come first, including beaches and parks listed for nature, viewpoints, water, hiking or adventure. Kid-Friendly is the badge Okanagan Roam verifies.');
+  // A place outside the Okanagan is said plainly, up front (2026-10-14: "a weekend in Vancouver" quietly became Kelowna).
+  const outside = (result.unsupported || []).filter((u) => OUTSIDE_PLACE_NAMES.includes(u));
+  const outsideNote = outside.length ? `Okanagan Roam only covers the Okanagan Valley, so ${listText(outside)} ${outside.length > 1 ? 'aren’t' : 'isn’t'} included. Here are ideas in the Okanagan instead; name a town such as Kelowna, Penticton or Vernon to choose where.` : null;
+  if (outsideNote) result.notes.unshift(outsideNote);
+  if (ctx.kids && !ctx.occasion) result.notes.push(ctx.requirements ? 'Because you mentioned kids, kid-friendly places come first. Check ages and bookings with each place.' : 'Because you mentioned kids, kid-friendly places, parks and beaches come first. Kid-Friendly is the badge Okanagan Roam verifies.');
   // Build My Trip Phase 2 (2026-09-27): the notes about what the visitor asked
   // for (occasion, kids) that /trip shows up front; every other note is
   // secondary detail. The same strings stay in `notes`.
-  result.contextNotes = heuristics.filter((h) => h.field === 'occasion').map(visitorNote)
+  result.contextNotes = (outsideNote ? [outsideNote] : []).concat(heuristics.filter((h) => h.field === 'occasion').map(visitorNote))
     .concat(ctx.kids && !ctx.occasion ? [result.notes[result.notes.length - 1]] : []);
   if (kind === 'unknown' || kind === 'navigate') {
     result.summary = buildSummary('unknown', ctx, null);
