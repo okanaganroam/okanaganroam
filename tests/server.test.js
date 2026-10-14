@@ -2791,7 +2791,8 @@ test('Build Your Perfect Okanagan Trip: entire visible/accessible section is i18
 test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beaches, Hidden Gems, social aria-labels, copyright, logo aria-label) are all now i18n-wired', () => {
   const html = app.renderHomeFooterHTML();
   assert.match(html, /class="home-footer-tagline" data-i18n="homeFooter\.taglineFull"/);
-  assert.match(html, /data-i18n="homeFooter\.foodDrinks">Food &amp; Drinks</);
+  assert.match(html, /data-i18n="mood\.foodDrink\.title">Food &amp; Drink</);
+  assert.match(html, /data-i18n="wizard\.wineries">Wineries</);
   assert.match(html, /data-i18n="mood\.beaches\.title">Beaches</);
   assert.match(html, /data-i18n="gems\.heading">Hidden Gems</);
   assert.match(html, /data-i18n-aria="homeFooter\.instagramAria"/);
@@ -2812,23 +2813,21 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
 // Columbia"). The old global footer{padding} leak is also fixed here
 // (.home-footer now explicitly overrides it to padding:0).
 
-test('Home footer: Explore column has exactly the 11 approved items, in order, each with a real href (no invented routes)', () => {
+test('Home footer: Explore column lists the site\'s sections, in order, each with a real href (no invented routes)', () => {
   const html = app.renderHomeFooterHTML();
-  const exploreMatch = html.match(/<h4 data-i18n="homeFooter\.explore">Explore<\/h4>\s*<ul>([\s\S]*?)<\/ul>/);
+  const exploreMatch = html.match(/<summary><h4 data-i18n="homeFooter\.explore">Explore<\/h4><\/summary>\s*<ul>([\s\S]*?)<\/ul>/);
   assert.ok(exploreMatch, 'expected to find the Explore column');
   const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
     .map((m) => ({ href: m[1], text: m[2] }));
-  assert.equal(items.length, 12, 'expected exactly 12 Explore links (the four 2026-10 categories added before Hidden Gems, then Guides)');
-  assert.equal(items[0].text, 'Food &amp; Drinks');
-  assert.equal(items[0].href, '/food-drink', 'Food & Drinks points at the dedicated hub, matching the mood card and the Wine link below it');
-  assert.ok(items[1].href === '/wineries', `Wine href unexpected: ${items[1].href}`);
-  assert.equal(items[2].href, '/beaches', 'footer Beaches goes to the Okanagan-wide /beaches page, matching the header (2026-09-25)');
-  assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href must be /browse (no golf venues) or the Okanagan-wide /golf listing, never a single region: ${items[3].href}`);
+  assert.equal(items[0].text, 'Food &amp; Drink', 'same name as the header and the Food & Drink page (2026-10-14)');
+  assert.equal(items[0].href, '/food-drink');
+  assert.equal(items[1].text, 'Wineries');
+  assert.equal(items[1].href, '/wineries');
+  assert.equal(items[2].href, '/beaches');
+  assert.ok(items[3].href === '/browse' || items[3].href === '/golf', `Golf href: ${items[3].href}`);
   assert.equal(items[4].href, '/whats-on');
-  assert.equal(items[5].href, '/outdoors', 'footer Outdoors link matches the Outdoors mood card once outdoor venues exist (2026-09-20)');
-  assert.deepEqual(items.slice(6, 10).map((i) => i.href), ['/sports', '/tours', '/indoor', '/ski-snow'], 'the 2026-10 categories, matching the header (2026-10-12)');
-  assert.equal(items[10].href, '/hidden-gems', 'footer Hidden Gems goes to the full /hidden-gems page, matching the header (2026-09-25)');
-  assert.equal(items[11].href, '/guides', 'footer Guides goes to the /guides index (2026-10-13)');
+  assert.equal(items[5].href, '/outdoors');
+  assert.deepEqual(items.slice(6).map((i) => i.href), ['/sports', '/tours', '/indoor', '/ski-snow', '/hidden-gems', '/local-favorites', '/dog-friendly', '/secret-spots', '/guides']);
 });
 
 test('Home footer: Regions column lists ALL 20 real regions (none omitted), each a real /:region link', () => {
@@ -2844,8 +2843,8 @@ test('Home footer: Regions renders as two explicit subcolumns -- Central+South, 
   const html = app.renderHomeFooterHTML();
   const groupLabels = Array.from(html.matchAll(/<h5 data-i18n="(wizard\.[a-zA-Z]+)">([^<]*)<\/h5>/g)).map((m) => m[2]);
   assert.deepEqual(groupLabels, ['Central', 'South', 'North', 'Ski resorts']);
-  const subcolMatch = html.match(/<div class="home-footer-region-groups">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="home-footer-col">/);
-  assert.ok(subcolMatch, 'expected the region-groups wrapper immediately followed by the Social Media column');
+  const subcolMatch = html.match(/<div class="home-footer-region-groups">([\s\S]*?)<\/div>\s*<p class="home-footer-all-regions">/);
+  assert.ok(subcolMatch, 'expected the region-groups wrapper, then the See all destinations link');
   const subcolHtml = subcolMatch[1];
   const subcolPositions = Array.from(subcolHtml.matchAll(/home-footer-region-subcol/g)).length;
   assert.equal(subcolPositions, 2, 'expected exactly 2 region subcolumns');
@@ -9303,8 +9302,9 @@ test('Outdoor region chips use the complete canonical region list (REGION_LABELS
   assert.deepEqual([...canonical].sort(), Object.keys(app.REGION_LABELS).sort(), 'exactly the canonical regions, none missing, none invented');
   assert.deepEqual(canonical, app.FOOTER_REGION_GROUPS.flatMap((g) => g.regions), 'site order: Central, South, North, Ski resorts');
   assert.equal(canonical.length, 20);
-  assert.deepEqual(canonical.slice(0, 4), ['kelowna', 'west-kelowna', 'peachland', 'lake-country']);
-  assert.deepEqual(canonical.slice(-4), ['big-white', 'silverstar', 'apex', 'baldy']);
+  // North to south within each group (2026-10-14).
+  assert.deepEqual(canonical.slice(0, 4), ['lake-country', 'kelowna', 'west-kelowna', 'peachland']);
+  assert.deepEqual(canonical.slice(-4), ['silverstar', 'big-white', 'apex', 'baldy']);
   const rows = app.getVenuesByCategory('outdoor');
   const chips = app.renderOutdoorRegionFilterChips(rows);
   const rendered = [...chips.matchAll(/data-region="([a-z-]+)" aria-pressed="false">([^<]+)<span class="outdoor-activity-count">(\d+)<\/span>/g)].map((m) => [m[1], m[2], Number(m[3])]);
@@ -11943,7 +11943,7 @@ test('List Your Venue: the staging table is additive and the old /browse form is
 
 const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
         <ul>
-          <li><button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button></li>
+          <li><a href="/about">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
           <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
@@ -11956,12 +11956,13 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     const html = await res.text();
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
     assert.ok(footer, `${page} renders the shared footer`);
-    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly App coming soon / List your venue / List an Event / Contact`);
+    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly About Okanagan Roam / List your venue / List an Event / Contact`);
     assert.equal((footer[0].match(/href="\/list-your-venue"/g) || []).length, 1, page);
     assert.equal((footer[0].match(/href="\/list-an-event"/g) || []).length, 1, `${page}: exactly one List an Event link`);
     assert.equal((footer[0].match(/>List an Event</g) || []).length, 1, page);
     assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
-    const cols = footer[0].match(/<div class="home-footer-col(?: home-footer-col-regions)?">\s*<h4 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
+    // Explore and Regions are <details> that fold on phones (2026-10-14).
+    const cols = footer[0].match(/<(?:div|details) class="home-footer-col(?: home-footer-col-regions)?(?: home-footer-fold)?"(?: open)?>\s*(?:<summary>)?<h4 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
     assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions', 'homeFooter.socialMedia'], `${page}: same four columns in the same order`);
     // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
     const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
@@ -19248,3 +19249,23 @@ test('Hidden Gems (2026-10-14): six chips, a hidden chip per single type so link
   assert.match(html, /<a href="\/secret-spots">Secret Spots &rarr;<\/a>/);
   assert.doesNotMatch(html, /listed alphabetically/);
 });
+
+test('Footer (2026-10-14): About, Privacy and Terms pages exist, are linked from every footer and listed in the sitemap', () => withDiscoveryServer(async (base) => {
+  for (const p of ['/about', '/privacy', '/terms']) {
+    const res = await fetch(base + p);
+    assert.equal(res.status, 200, p);
+    const html = await res.text();
+    assert.match(html, new RegExp(`<link rel="canonical" href="https://okanaganroam\\.com${p}">`));
+  }
+  const about = app.renderAboutPage();
+  assert.match(about, /born and raised in Kelowna/);
+  assert.doesNotMatch(about, /PO Box/i, 'the PO box stays off the website');
+  const privacy = app.renderPrivacyPage();
+  for (const w of ['Google Analytics', 'FormSubmit', 'PIPEDA', 'okanaganroam@gmail.com']) assert.ok(privacy.includes(w), `privacy mentions ${w}`);
+  const footer = app.renderHomeFooterHTML();
+  assert.match(footer, /<a href="\/privacy">Privacy<\/a>/);
+  assert.match(footer, /<a href="\/terms">Terms<\/a>/);
+  assert.match(footer, /<a href="\/destinations">See all destinations &rarr;<\/a>/);
+  const sitemap = await (await fetch(base + '/sitemap.xml')).text();
+  for (const p of ['/about', '/privacy', '/terms']) assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com${p}</loc>`));
+}));
