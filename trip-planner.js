@@ -2181,7 +2181,7 @@ function planTripCore(input) {
   const outside = (result.unsupported || []).filter((u) => OUTSIDE_PLACE_NAMES.includes(u));
   const outsideNote = outside.length ? `Okanagan Roam only covers the Okanagan Valley, so ${listText(outside)} ${outside.length > 1 ? 'aren’t' : 'isn’t'} included. Here are ideas in the Okanagan instead; name a town such as Kelowna, Penticton or Vernon to choose where.` : null;
   if (outsideNote) result.notes.unshift(outsideNote);
-  if (ctx.kids && !ctx.occasion) result.notes.push(ctx.requirements ? 'Because you mentioned kids, places with the verified Kid-Friendly badge come first. Check age suitability and booking requirements with each venue.' : 'Because you mentioned kids, family-friendly places come first, including beaches and parks listed for nature, viewpoints, water, hiking or adventure. Kid-Friendly is the badge Okanagan Roam verifies.');
+  if (ctx.kids && !ctx.occasion) result.notes.push(ctx.requirements ? 'Because you mentioned kids, kid-friendly places come first. Check ages and bookings with each place.' : 'Because you mentioned kids, kid-friendly places, parks and beaches come first. Kid-Friendly is the badge Okanagan Roam verifies.');
   // Build My Trip Phase 2 (2026-09-27): the notes about what the visitor asked
   // for (occasion, kids) that /trip shows up front; every other note is
   // secondary detail. The same strings stay in `notes`.
