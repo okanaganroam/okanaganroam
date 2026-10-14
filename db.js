@@ -709,6 +709,17 @@ CREATE TABLE IF NOT EXISTS event_submissions (
 CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(status, submitted_at);
 `);
 
+// Listing form extras (2026-10-14): optional fields the List Your Venue and
+// List an Event forms now ask for. Kept for the reviewer (shown in the
+// notification email and the admin list); none is published automatically.
+for (const [table, cols] of [
+  ['venue_submissions', ['hours_text TEXT', 'happy_hour_text TEXT', 'social_url TEXT', 'submitter_role TEXT']],
+  ['event_submissions', ['price_text TEXT', 'image_link TEXT']],
+]) {
+  const have = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
+  for (const col of cols) if (!have.has(col.split(' ')[0])) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
+}
+
 // --- Golf course data (2026-09-26) -----------------------------------------
 // Additive golf_* tables (verified green fees, course profiles, links to
 // official course maps), rebuilt from data/golf-course-data.json only when
