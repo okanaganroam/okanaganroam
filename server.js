@@ -13660,6 +13660,10 @@ const FD_CARD_PHOTOS = Object.freeze({
   cocktail: ['/images/trip-v3/stops/stop-cocktail-480.jpg', '/images/trip-v3/stops/stop-cocktail-2-480.jpg', '/images/food-drink/cocktail-lounges-800.jpg'],
   brewery: ['/images/trip-v3/stops/stop-brewery-480.jpg', '/images/food-drink/breweries-800.jpg'],
   distillery: ['/images/trip-v3/stops/stop-distillery-480.jpg', '/images/food-drink/distilleries-800.jpg'],
+  // Wineries (2026-10-14): Okanagan vineyard, autumn vines, two tastings and
+  // the wine-country banner. No dog photo: the only one has a non-Okanagan
+  // backdrop.
+  winery: ['/images/trip-v3/stops/stop-winery-480.jpg', '/images/trip-v3/stops/stop-winery-2-480.jpg', '/images/trip-v3/stops/stop-winery-3-480.jpg', '/images/food-drink/wineries-800.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg'],
 });
 const FD_CARD_DOG_PHOTOS = Object.freeze({
   restaurant: '/images/trip-v3/stops/stop-dog-restaurant-480.jpg', cafe: '/images/trip-v3/stops/stop-dog-cafe-480.jpg',
@@ -14131,7 +14135,7 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
   ${renderFilterChangeClientSrc(opts.surface || 'food_drink')}
   function activeFilterCount(){ return pressed(typeChips, 'data-fd-type').length + pressed(featureChips, 'data-fd-feature').length + pressed(regionChips, 'data-region').length + (typeof openOn !== 'undefined' && openOn ? 1 : 0); }
   ${FD_HUB_FILTER_CLIENT_PREDICATE_SRC}
-  ${FD_HUB_SUMMARY_CLIENT_SRC}
+  ${opts.noun ? FD_HUB_SUMMARY_CLIENT_SRC.replace("'place' : 'places'", `${JSON.stringify(opts.noun[0])} : ${JSON.stringify(opts.noun[1])}`) : FD_HUB_SUMMARY_CLIENT_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
 ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser reads
   // hours exactly as the server does, on the America/Vancouver clock.
@@ -14903,6 +14907,146 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
   ${renderFoodDrinkHubScriptHtml({ openNow: true })}
+</body>
+</html>`;
+}
+
+// ---------- Wineries hub (2026-10-14): /wineries on the Food & Drink engine ----------
+// The Wineries page listed all 201 wineries at once, A-Z by town (so the
+// first cards were Armstrong's and Enderby's single wineries and Oliver's 49
+// sat halfway down), with only a row of town links to narrow it. It now
+// uses the same building blocks as /food-drink -- search, Recommended / Top
+// rated / A-Z, the Regions popover, "What are you looking for?" with the
+// features wineries actually carry, Open now from stored hours, 48 cards at
+// a time and an example wine photo per card -- with no venue-type chips.
+// The town pages (/oliver/wineries ...) stay linked from a "Wineries by
+// town" row under the list.
+const WINE_HUB_MIN_FEATURE = 5;
+function renderWineriesHubPage(venues, filter = null, now = new Date()) {
+  const f = { types: [], features: [], regions: [], ...(filter || {}), types: [] };
+  const sort = FD_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
+  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended').map((v, i) => [v.id, i]));
+  venues = sortFoodDrinkVenues(venues, sort);
+  const openNow = !!f.openNow;
+  const catsById = new Map(venues.map((v) => [v.id, ['winery']]));
+  const featsById = foodDrinkFeaturesByVenue(venues);
+  // Only the features at least a handful of wineries carry.
+  const featureTally = {};
+  for (const list of featsById.values()) for (const k of list) featureTally[k] = (featureTally[k] || 0) + 1;
+  const featureKeys = FD_HUB_FEATURES.map((x) => x.key).filter((k) => (featureTally[k] || 0) >= WINE_HUB_MIN_FEATURE);
+  f.features = f.features.filter((k) => featureKeys.includes(k));
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
+  const pool = openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
+  const matching = filterFoodDrinkVenues(pool, f, catsById, featsById);
+  const matchIds = new Set(matching.map((v) => v.id));
+  const counts = foodDrinkChipCounts(pool, f, catsById, featsById);
+  const openCount = filterFoodDrinkVenues(venues.filter((v) => openInfo.openIds.has(v.id)), f, catsById, featsById).length;
+  const filtered = f.features.length > 0 || f.regions.length > 0 || openNow;
+  const state = { types: [], features: f.features, regions: f.regions, counts, openNow };
+
+  const heading = 'Wineries in the Okanagan';
+  const title = `${heading} | Okanagan Roam`;
+  const description = `${venues.length} verified wineries across the Okanagan Valley \u2014 search, see which are open now, and filter by town, patio, dog-friendly and lake view.`;
+  const canonical = 'https://okanaganroam.com/wineries';
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Wineries', url: canonical },
+  ]);
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    description,
+    itemListElement: venues.map((v, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+    })),
+  };
+  const payload = {};
+  for (const v of venues) {
+    payload[String(v.id)] = { c: ['winery'], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description), o: recommendedRank.get(v.id) };
+    if (Number(v.rating)) payload[String(v.id)].g = Number(v.rating);
+    if (Number(v.reviews)) payload[String(v.id)].n = Number(v.reviews);
+    const st = openInfo.byId.get(v.id);
+    if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+  }
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId);
+  const nF = f.features.length, nR = f.regions.length;
+  const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
+      <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+        <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
+      </div>
+    </div>`;
+  const controlsHtml = `<div class="fd-controls">
+    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
+    ${pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys))}
+    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
+  </div>`;
+  // The town pages, busiest first, for visitors and crawlers alike.
+  const townCounts = {};
+  for (const v of venues) townCounts[v.region] = (townCounts[v.region] || 0) + 1;
+  const townLinks = Object.entries(townCounts).filter(([r]) => REGION_LABELS[r])
+    .sort((a, b) => b[1] - a[1] || REGION_LABELS[a[0]].localeCompare(REGION_LABELS[b[0]]))
+    .map(([r, n]) => `<a href="/${r}/wineries">${escapeHtml(REGION_LABELS[r])} <span>${n}</span></a>`).join('\n      ');
+  const wineTry = featureKeys.includes('patio') ? `<a href="/wineries?features=patio">patio</a>, ` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES.winery.src, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${renderOutdoorThemeStyles()}
+${renderFoodDrinkHubStyles()}
+${renderFoodDrinkOpenNowStyles()}
+${golfEngagementHeadHtml('winery', true, 'hub')}
+<style id="wine-hub">
+  body.wine-hub-page .wine-guide-link { margin: 0 0 14px; font-weight: 700; }
+  body.wine-hub-page .wine-guide-link a { color: var(--teal); }
+  body.wine-hub-page .wine-towns { margin: 26px 0 8px; }
+  body.wine-hub-page .wine-towns h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.wine-hub-page .wine-towns nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.wine-hub-page .wine-towns a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.wine-hub-page .wine-towns a:hover { background: rgba(27,43,58,0.06); }
+  body.wine-hub-page .wine-towns a span { font-size: 0.74rem; opacity: 0.6; }
+</style>
+</head>
+<body class="golf-page outdoor-page fd-page winery-page wine-hub-page">
+${CATEGORY_BANNER_STYLE}
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Wineries' }])}
+  ${categoryHeroHtml(categoryBannerHtml('winery'), `<h1>${escapeHtml(heading)}</h1>
+  <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.winery)}</p>
+  <p class="wine-guide-link"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a></p>`)}
+  ${foodDrinkSearchHtml().replace('Search food and drink', 'Search wineries').replace('Search by name, place or dish...', 'Search by name, town or wine...')}
+  ${controlsHtml}
+  <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
+  <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered).replace(/places?$/, (m) => (m === 'place' ? 'winery' : 'wineries')), state, sort)}
+  <p class="fd-search-note" id="fdSearchNote" hidden></p>
+  <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">No wineries match that combination yet.</span> <a href="/wineries" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
+  <p class="fd-no-results-try">Try one word, like ${wineTry}<a href="/wineries?regions=oliver">Oliver</a> or <a href="/wineries?regions=naramata">Naramata</a>.</p></div>
+  ${cardsHtml}
+  <p class="fd-open-note fd-open-note-end">${escapeHtml(FD_OPEN_NOTE)}</p>
+  <section class="wine-towns" aria-labelledby="wineTownsHeading">
+    <h2 id="wineTownsHeading">Wineries by town</h2>
+    <nav aria-label="Wineries by town">
+      ${townLinks}
+    </nav>
+  </section>
+  <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
+  </section>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+  ${golfCardEngagementScriptHtml('winery', true)}
+  ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'wineries', noun: ['winery', 'wineries'] })}
 </body>
 </html>`;
 }
@@ -26323,6 +26467,13 @@ const server = http.createServer(async (req, res) => {
       // venues plus allowlisted-type activity members); every other
       // category lists its own type.
       const venues = type === 'outdoor' ? getOutdoorLandingVenues() : getVenuesByCategory(type);
+      // /wineries (2026-10-14) runs on the Food & Drink directory engine:
+      // search, Open now, Sort, regions and features, 48 at a time.
+      if (type === 'winery' && venues.length >= MIN_CATEGORY_VENUES) {
+        const html = renderWineriesHubPage(venues, { ...parseFoodDrinkFilterQuery(query), types: [], openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
       // /indoor always renders (2026-10-11): with no indoor venues yet it
       // still lists the indoor golf simulators and a "coming soon" line.
       // /tours too (2026-10-11): with no tour venues it shows the tagged
@@ -26896,6 +27047,7 @@ module.exports = {
   foodDrinkFilterBarHtml,
   renderFoodDrinkHubPage,
   renderFoodDrinkHubScriptHtml,
+  renderWineriesHubPage,
   FD_SORTS,
   sortFoodDrinkVenues,
   foodDrinkRecommendedScore,

@@ -9068,11 +9068,16 @@ test('Food & Drink hub: the /food-drink route serves it, and /browse, the Wine h
     // Other directories are untouched by the new page. (The F&D category,
     // region and venue pages are asserted in-process below, where the full
     // project tree is available -- this child only carries the four files.)
-    for (const p of ['/whats-on', '/outdoors', '/wineries']) {
+    for (const p of ['/whats-on', '/outdoors']) {
       const r = await get(p);
       assert.equal(r.status, 200);
       assert.doesNotMatch(r.text, /fd-type-row|id="fdSearch"|fd-pop-btn|fd-page/, `${p} carries no Food & Drink hub markup or CSS`);
     }
+    // /wineries runs on the same engine since 2026-10-14, without the venue-type chips.
+    const wine = await get('/wineries');
+    assert.equal(wine.status, 200);
+    assert.match(wine.text, /id="fdSearch"/);
+    assert.doesNotMatch(wine.text, /class="fd-type-row"/, '/wineries has no Food & Drink type chips');
     // The sitemap lists the hub exactly once.
     const sm = await get('/sitemap.xml');
     assert.equal((sm.text.match(/<loc>https:\/\/okanaganroam\.com\/food-drink<\/loc>/g) || []).length, 1, 'sitemapped once');
@@ -18900,4 +18905,42 @@ test('My Trip: every page with the trip tray hides the floating button and gets 
   assert.equal(app.withTripNav(app.withTripNav('<div id="tripTray">x')), `${app.TRIP_NAV_SNIPPET}<div id="tripTray">x`, 'idempotent');
   assert.equal(app.withTripNav('<p>no tray</p>'), '<p>no tray</p>');
   assert.doesNotThrow(() => new Function(app.TRIP_NAV_SNIPPET.split('<script>')[1].split('</script>')[0]));
+// ---------- Wineries hub (2026-10-14) ----------
+test('Wineries hub: search, regions, winery features, Open now and Sort; best first; 48 cards; wine photos; town links', () => {
+  const venues = app.getVenuesByCategory('winery');
+  const html = app.renderWineriesHubPage(venues, { types: [], features: [], regions: [] });
+  assert.match(html, /<title>Wineries in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/wineries">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page winery-page wine-hub-page">/);
+  assert.match(html, /placeholder="Search by name, town or wine\.\.\."/);
+  assert.match(html, /id="fdRegionsBtn"/);
+  assert.match(html, /id="fdFeaturesBtn"/);
+  assert.match(html, /id="fdOpenNow"/);
+  assert.match(html, /<select id="fdSort"/);
+  assert.doesNotMatch(html, /class="fd-type-row"|data-fd-type=/, 'no venue-type chips');
+  assert.match(html, /id="fdResultsSummary" aria-live="polite">\d+ wineries?</);
+  assert.match(html, /var noun = total === 1 \? "winery" : "wineries";/, 'the live count says wineries');
+  const first = html.match(/data-venue-id="(\d+)"/)[1];
+  const best = app.sortFoodDrinkVenues(venues, 'recommended')[0];
+  assert.equal(Number(first), best.id, 'Recommended first');
+  const live = html.slice(html.indexOf('id="fdResults"'), html.indexOf('<template id="fdRest">'));
+  assert.equal((live.match(/<li class="venue-card"/g) || []).length, Math.min(app.FD_PAGE_SIZE, venues.length));
+  for (const src of app.FD_CARD_PHOTOS.winery) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
+  assert.ok((html.match(/data-ph="winery-\d"/g) || []).length > 0, 'wine photos on the cards');
+  assert.match(html, /<h2 id="wineTownsHeading">Wineries by town<\/h2>/);
+  for (const r of new Set(venues.map((v) => v.region))) assert.match(html, new RegExp(`<a href="/${r}/wineries">`), r);
+  assert.match(html, /<a href="\/guides\/okanagan-wineries-first-timers">New to wine country\?/);
+});
+
+test('Wineries hub: a filtered link renders filtered, unknown features drop out, and ?sort / ?open=now are honoured', () => withDiscoveryServer(async (base) => {
+  const venues = app.getVenuesByCategory('winery');
+  const region = venues[0].region;
+  const html = app.renderWineriesHubPage(venues, { types: ['restaurant'], features: ['sports_tv_nonexistent'], regions: [region], sort: 'az' });
+  assert.match(html, new RegExp(`data-region="${region}" aria-pressed="true"`));
+  assert.match(html, /<option value="az" selected>/);
+  const n = venues.filter((v) => v.region === region).length;
+  assert.match(html, new RegExp(`id="fdResultsSummary" aria-live="polite">${n} of ${venues.length} wineries?<`));
+  const res = await (await fetch(`${base}/wineries?sort=rating&open=now`)).text();
+  assert.match(res, /<option value="rating" selected>/);
+  assert.match(res, /id="fdOpenNow" data-fd-open-now aria-pressed="true"/);
 }));
