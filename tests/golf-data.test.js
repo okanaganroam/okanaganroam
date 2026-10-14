@@ -336,7 +336,7 @@ test('value index: unavailable without a published current rate or a known par; 
   assert.deepEqual(vi('osoyoos/osoyoos-golf-club-park-meadows', '2027-05-01'), { available: false }, 'last season’s rates are not a current value assessment');
   assert.equal(vi('kelowna/kelowna-driving-range-mini-golf'), null);
   assert.equal(golf.computeValueIndex(undefined, TODAY), null);
-  assert.equal(golf.golfCardValueHtml(detailOf(db, 'vernon/rise-golf-course'), TODAY), '<p class="golf-value golf-value-none">Value index unavailable</p>');
+  assert.equal(golf.golfCardValueHtml(detailOf(db, 'vernon/rise-golf-course'), TODAY), '', 'a list card leaves out a missing index (2026-10-14)');
   assert.equal(golf.golfCardValueHtml(detailOf(db, 'kelowna/kelowna-driving-range-mini-golf'), TODAY), '');
   const rated = Object.keys(REAL.courses).filter((k) => { const x = vi(k); return x && x.available; });
   assert.equal(rated.length, 22);
