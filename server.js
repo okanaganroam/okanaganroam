@@ -11193,6 +11193,46 @@ function destinationRegionEntries() {
   }
   return entries;
 }
+// Destination photos (2026-10-13): each /destinations card shows its town's photo, 3:2 (up to 800x533), from
+// public/images/regions/cards/<region>.jpg (real photos: the site's region photography, Big White's ski photo,
+// and photos Dayton supplied). A town without one yet shows its street map (OpenStreetMap, credited in the image).
+const destinationCardPhotoCache = new Map();
+function destinationCardPhoto(region) {
+  if (destinationCardPhotoCache.has(region)) return destinationCardPhotoCache.get(region);
+  const photo = `/images/regions/cards/${region}.jpg`;
+  const map = `/images/regions/maps/${region}-d.webp`;
+  const out = fs.existsSync(path.join(__dirname, 'public', photo)) ? { src: photo, map: false }
+    : fs.existsSync(path.join(__dirname, 'public', map)) ? { src: map, map: true } : null;
+  destinationCardPhotoCache.set(region, out);
+  return out;
+}
+// Same card treatment as /categories (Dayton, 2026-10-13): 4 across on desktop, a 3:2 photo above the name.
+const DESTINATION_PHOTO_GRID_STYLE = `<style id="destination-photo-grid">
+  body.destinations-page .destination-photo-grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 0 0 30px; }
+  @media (min-width: 560px) { body.destinations-page .destination-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 900px) { body.destinations-page .destination-photo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  body.destinations-page .destination-photo-grid .category-card { position: relative; display: flex; flex-direction: column; margin: 0; padding: 0; overflow: hidden; border-radius: 16px; }
+  body.destinations-page .destination-photo-grid .category-card:hover { transform: translateY(-3px); box-shadow: 0 18px 32px -22px rgba(74,52,40,0.55); }
+  body.destinations-page .destination-photo-grid .destination-card-photo { order: -1; aspect-ratio: 3 / 2; overflow: hidden; background: #2A6B67; }
+  body.destinations-page .destination-photo-grid .destination-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.35s ease; }
+  body.destinations-page .destination-photo-grid .category-card:hover .destination-card-photo img { transform: scale(1.04); }
+  body.destinations-page .destination-photo-grid .category-card h2 { margin: 16px 18px 4px; font-size: 1.15rem; }
+  body.destinations-page .destination-photo-grid .category-card h2 a::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+  body.destinations-page .destination-photo-grid .category-card h2 a:hover { text-decoration: none; }
+  body.destinations-page .destination-photo-grid .category-card:hover h2 a { color: var(--plum); }
+  body.destinations-page .destination-photo-grid .category-card h2 a:focus-visible { outline: none; }
+  body.destinations-page .destination-photo-grid .category-card:has(a:focus-visible) { outline: 3px solid var(--plum); outline-offset: 2px; }
+  body.destinations-page .destination-photo-grid .venue-meta { margin: 0 18px 18px; line-height: 1.45; }
+  /* Phones: a compact row -- small photo on the left, name and tagline beside it. */
+  @media (max-width: 559px) {
+    body.destinations-page .destination-photo-grid { gap: 12px; }
+    body.destinations-page .destination-photo-grid .category-card { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto 1fr; border-radius: 14px; }
+    body.destinations-page .destination-photo-grid .destination-card-photo { grid-column: 1; grid-row: 1 / 3; aspect-ratio: auto; min-height: 96px; }
+    body.destinations-page .destination-photo-grid .category-card h2 { grid-column: 2; margin: 14px 14px 2px; font-size: 1.05rem; }
+    body.destinations-page .destination-photo-grid .venue-meta { grid-column: 2; margin: 0 14px 14px; font-size: 0.84rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { body.destinations-page .destination-photo-grid .category-card, body.destinations-page .destination-photo-grid .destination-card-photo img { transition: none; transform: none !important; } }
+</style>`;
 function renderDestinationsPage(entries = destinationRegionEntries()) {
   const title = 'Okanagan Destinations | Okanagan Roam';
   const description = 'Pick an Okanagan destination, from Enderby to Osoyoos and the ski hills, and find its restaurants, wineries, beaches and events.';
@@ -11202,18 +11242,23 @@ function renderDestinationsPage(entries = destinationRegionEntries()) {
     { name: 'Destinations', url: canonical },
   ]);
   const sections = entries.map((g) => `<h2 class="category-subsection-heading">${escapeHtml(g.label)}</h2>
-  <ul class="card-grid">
-    ${g.regions.map((r) => `
+  <ul class="card-grid destination-photo-grid">
+    ${g.regions.map((r) => {
+      const photo = destinationCardPhoto(r.region);
+      return `
       <li class="category-card">
         <h2><a href="/${r.region}">${escapeHtml(r.label)}</a></h2>
-        <p class="venue-meta">${r.venues} verified venue${r.venues === 1 ? '' : 's'} across ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}</p>
-      </li>`).join('\n')}
+        <p class="venue-meta">${r.venues} verified venue${r.venues === 1 ? '' : 's'} across ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}</p>${photo ? `
+        <div class="destination-card-photo${photo.map ? ' destination-card-map' : ''}"><img src="${photo.src}" alt="" width="800" height="533" loading="lazy" decoding="async"></div>` : ''}
+      </li>`;
+    }).join('\n')}
   </ul>`).join('\n  ');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { shareImage: '/images/okanagan-valley-sunset-hero.webp', golfTheme: true })}
 ${renderOutdoorThemeStyles()}
+${DESTINATION_PHOTO_GRID_STYLE}
 ${golfEngagementHeadHtml('fd', true, 'hub')}
 </head>
 <body class="golf-page outdoor-page region-page destinations-page">

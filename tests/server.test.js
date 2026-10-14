@@ -18489,6 +18489,23 @@ test('Fall destination cards (2026-10-13): Sep-Nov all six destination cards sho
   assert.doesNotMatch(summer, /-explore-fall\.jpg/);
 });
 
+test('Destination photos (2026-10-13): every /destinations card shows its town photo (3:2, like /categories) or, until one exists, its street map', () => {
+  const html = app.renderDestinationsPage();
+  const cards = Array.from(html.matchAll(/<li class="category-card">\s*<h2><a href="\/([a-z-]+)">[\s\S]*?<\/li>/g));
+  assert.ok(cards.length >= 1, 'destination cards render');
+  for (const [card, region] of cards) {
+    const m = card.match(/<div class="destination-card-photo( destination-card-map)?"><img src="([^"]+)" alt="" width="800" height="533" loading="lazy"/);
+    assert.ok(m, `${region} has a photo or map`);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', m[2])), `${m[2]} exists`);
+    assert.equal(Boolean(m[1]), m[2].includes('/maps/'), `${region}: map class only on maps`);
+  }
+  for (const r of ['kelowna', 'penticton', 'okanagan-falls', 'kaleden', 'big-white']) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'regions', 'cards', `${r}.jpg`)), `${r} photo`);
+    const card = cards.find((c) => c[1] === r);
+    if (card) assert.match(card[0], new RegExp(`src="/images/regions/cards/${r}\\.jpg"`), r);
+  }
+});
+
 test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
   const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });
