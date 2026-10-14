@@ -10096,7 +10096,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved Tours & Experiences change (2026-10-11): tripv3.type.tour added to TRANSLATIONS (en and fr) only.
   // Approved Sports & Recreation change (2026-10-12): tripv3.type.sport added to TRANSLATIONS (en and fr) only.
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
-  assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106', 'public/scripts/app.js (planner copy, 2026-10-13)');
+  assert.equal(md5('public/scripts/app.js'), 'b626b1e3c733937879b09e330a9c9901', 'public/scripts/app.js (planner copy, 2026-10-13)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11924,7 +11924,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106');
+  assert.equal(md5('public/scripts/app.js'), 'b626b1e3c733937879b09e330a9c9901');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16158,7 +16158,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106');
+  assert.equal(md5('public/scripts/app.js'), 'b626b1e3c733937879b09e330a9c9901');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16251,7 +16251,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), 'b626b1e3c733937879b09e330a9c9901', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -18414,6 +18414,7 @@ test('Fall hero text (2026-10-13): Sep-Nov the homepage hero headline and leads 
   const fall = app.seasonalHeroText(html, new Date('2026-10-13T19:00:00Z'));
   assert.match(fall, /<h1 class="hero-title" data-i18n="hero\.headlineFall">Fall in the Okanagan<\/h1>/);
   assert.match(fall, /data-i18n="hero\.leadFall">Okanagan Roam is your guide to fall in the Okanagan Valley/);
+  assert.doesNotMatch(fall, /ski season/, 'the fall lead no longer mentions ski season (2026-10-13)');
   assert.match(fall, /data-i18n="hero\.leadMobileFall">Explore harvest wineries, cozy food, fall hikes and events across the Okanagan\.</);
   for (const iso of ['2026-07-15', '2026-08-31', '2026-12-01', '2027-03-01']) assert.equal(app.seasonalHeroText(html, new Date(`${iso}T19:00:00Z`)), html, `${iso} unchanged`);
   assert.equal(app.isFallHeroSeason(new Date('2026-09-01T08:00:00Z')), true, 'Sep 1 in the Okanagan');
