@@ -8,7 +8,7 @@
   },
   "scripts": {
     "seed": "node --no-warnings seed.js",
-    "start": "node --no-warnings server.js",
+    "start": "exec node --no-warnings server.js",
     "extract": "python3 extract.py && npm run seed",
     "test": "node --no-warnings --test"
   },
