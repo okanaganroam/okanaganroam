@@ -11458,25 +11458,18 @@ test('Destination routes: region and region/category pages still respond as befo
 // One shared header (okanagan.html <header id="top">) used by /, /browse,
 // /trip and every themed page. Exact items, order, URLs and i18n keys.
 const HEADER_SPEC = [
+  // Menus refresh (2026-10-14): Map is the /map page; Guides and Secret Spots
+  // (no i18n keys, so not parsed here) sit between Map and Dog-Friendly Finds.
   { label: 'Discover', key: 'nav.discover', items: [
     ['/destinations', 'nav.destinations', 'Destinations'],
-    ['/dog-friendly', 'gems.dogFriendly.title', 'Dog-Friendly Finds'],
+    ['/map', 'nav.map', 'Map'],
     ['/local-favorites', 'gems.localFavourites.title', 'Local Favourites'],
+    ['/dog-friendly', 'gems.dogFriendly.title', 'Dog-Friendly Finds'],
     ['/browse', 'nav.browseSearch', 'Browse &amp; Search'],
-    ['/browse?openMap=1', 'nav.map', 'Map'],
   ] },
   { href: '/hidden-gems', key: 'gems.heading', label: 'Hidden Gems' },
   { label: 'Things to Do', key: 'nav.thingsToDo', items: [
     ['/outdoors', 'mood.outdoors.title', 'Outdoors'],
-    ['/outdoors/hiking', 'nav.outdoor.hiking', 'Hiking &amp; Trails'],
-    ['/outdoors/viewpoints', 'nav.outdoor.viewpoints', 'Viewpoints'],
-    ['/outdoors/nature', 'nav.outdoor.nature', 'Nature &amp; Wildlife'],
-    ['/outdoors/cycling', 'nav.outdoor.cycling', 'Cycling &amp; Biking'],
-    ['/outdoors/winter', 'nav.outdoor.winter', 'Winter'],
-    ['/outdoors/adventure', 'nav.outdoor.adventure', 'Adventure'],
-    ['/outdoors/fishing', 'nav.outdoor.fishing', 'Fishing'],
-    ['/outdoors/camping', 'nav.outdoor.camping', 'Camping'],
-    ['/outdoors/water', 'nav.outdoor.water', 'Water Activities'],
     ['/beaches', 'mood.beaches.title', 'Beaches'],
     ['/golf', 'mood.golf.title', 'Golf'],
     ['/sports', 'tripv3.type.sport', 'Sports &amp; Recreation'],
@@ -11535,11 +11528,12 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
     assert.match(nav.header, /id="navTripBtn"/, `${name}: Build My Trip button`);
     // Map keeps its id and href (okanagan.html is frozen); Stage 3.4: the
     // server answers /browse?openMap=1 with the map page (/map).
-    assert.match(nav.header, /<a href="\/browse\?openMap=1" id="navMapLink" data-i18n="nav\.map">Map<\/a>/, name);
-    // No duplicates; Hidden Gems top-level only; no Secret Spots, no top-level Golf/Map.
+    assert.match(nav.header, /<a href="\/map" data-i18n="nav\.map">Map<\/a>/, name); // straight to /map (2026-10-14)
+    // No duplicates; Hidden Gems top-level only; no top-level Golf/Map. Secret
+    // Spots joined Discover in the menus refresh (2026-10-14).
     const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1]));
     assert.equal(new Set(hrefs).size, hrefs.length, `${name}: no duplicate navigation targets`);
-    assert.doesNotMatch(nav.header, /secret-spots|#hiddenGems|#exploreRegions|#moodCards|#mapPanel|\/kelowna\//, `${name}: no stale targets`);
+    assert.doesNotMatch(nav.header, /#hiddenGems|#exploreRegions|#moodCards|#mapPanel|\/kelowna\//, `${name}: no stale targets`);
   }
 }));
 
@@ -14482,40 +14476,38 @@ test('Stage 3.4: /api/discover gains an additive presentation block built only f
   assert.equal(events.presentation.status, 'events');
 });
 
-test('Stage 3.4: Map opens the map page -- on screen, with a visible close control -- from every Map control', () => withDiscoveryServer(async (base) => {
+test('Map (2026-10-14): /map shows a pin per place with a map position, category chips, search and a town picker; every Map link lands there', () => withDiscoveryServer(async (base) => {
   const r = await fetch(`${base}/map`);
   const html = await r.text();
   assert.equal(r.status, 200);
-  assert.equal(r.headers.get('x-robots-tag'), 'noindex');
-  assert.match(html, /<meta name="robots" content="noindex">/);
-  assert.match(html, /<div class="map-panel open">\s*<div id="okMap"/, 'the map panel is open from the start');
-  assert.match(html, /<a class="map-page-close" href="\/" data-map-close>&times; Close map<\/a>/);
-  assert.equal((html.match(/"c":\[/g) || []).length, app.mapAreaPins().length);
-  assert.ok(app.mapAreaPins().length >= 1);
-  for (const pin of app.mapAreaPins()) assert.ok(Array.isArray(pin.center) && pin.center.length === 2 && app.REGION_LABELS[pin.region], pin.region);
-  assert.ok(html.includes('leaflet.min.js'));
-  // The header's Map link and the old deep link both land on /map (okanagan.html stays frozen).
+  assert.doesNotMatch(html, /<meta name="robots" content="noindex">/, 'a real map of places is indexable');
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/map">/);
+  assert.doesNotMatch(html, /Close map/);
+  const places = app.mapPlaces();
+  assert.match(html, new RegExp(`id="pmCount" aria-live="polite">${places.length.toLocaleString('en-CA')} place`));
+  assert.ok(html.includes('leaflet.markercluster.min.js'));
+  for (const g of ['food', 'wine', 'beach', 'outdoor', 'golf', 'do']) assert.match(html, new RegExp(`data-pm-group="${g}"`));
+  assert.match(html, /<select id="pmTown"/);
   const legacy = await fetch(`${base}/browse?openMap=1`, { redirect: 'manual' });
   assert.equal(legacy.status, 302); assert.equal(legacy.headers.get('location'), '/map'); await legacy.text();
-  for (const p of ['/', '/browse', '/trip', '/kelowna/restaurants/test-trattoria']) {
+  for (const p of ['/', '/trip', '/kelowna/restaurants/test-trattoria']) {
     const h = await (await fetch(base + p)).text();
-    assert.match(h, /href="\/browse\?openMap=1" id="navMapLink"/, p);
+    assert.match(h, /<a href="\/map" data-i18n="nav\.map">Map<\/a>/, `${p}: the header Map link goes straight to /map`);
   }
-  // app.js stays frozen: its Map handlers send pages without the in-page map
-  // to /browse?openMap=1, which the server now answers with /map; on /browse
-  // itself the in-page map opens and its "Close the map view" toggle is no
-  // longer hidden while the map is open.
-  // (2026-10-05: the in-page map belongs to the wizard page, /browse/classic;
-  // the hub-style /browse has a Map link to /map instead.)
-  const browse = await (await fetch(`${base}/browse/classic`)).text();
-  assert.ok(browse.includes("var mapOpen = !!D.querySelector('#mapPanel.open');"));
-  assert.match(await (await fetch(`${base}/browse`)).text(), /<a class="fd-pop-btn bh-map-link" id="bhMapLink" href="\/map">/, 'the hub-style /browse links to /map');
-  assert.ok(browse.includes("toHide[i].style.display = mapOpen ? '' : 'none';"));
-  assert.ok(browse.includes('if (mapOpen && !window.__roamMapShown && toHide[0]) {'), 'the opened map is brought on screen');
-  // A venue page's "View on map" is still Google Maps, in a new tab.
+  assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/map<\/loc>/);
   const venue = await (await fetch(`${base}/kelowna/restaurants/test-trattoria`)).text();
   assert.match(venue, /<a class="map-link" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=[^"]+" rel="nofollow noopener" target="_blank"/);
 }));
+
+test('Menus (2026-10-14): Things to Do is the seven sections, Discover adds Guides and Secret Spots, the search icon opens Browse, and phone menus fold', () => {
+  const h = app.renderGolfHeaderHtml();
+  assert.match(h, /<a href="\/secret-spots">Secret Spots<\/a>/);
+  assert.match(h, /<a href="\/guides">Guides<\/a>/);
+  assert.doesNotMatch(h, /href="\/outdoors\/hiking"/, 'outdoor activities live on /outdoors, not in the menu');
+  assert.match(h, /<a class="nav-search-btn" href="\/browse" aria-label="Search all places">/);
+  assert.match(h, /<style id="nav-refresh">[\s\S]*\.nav-links \.nav-dropdown > \.nav-dropdown-panel \{ display: none; \}/);
+  assert.equal(app.withNavRefresh(h), h, 'applying it twice changes nothing');
+});
 
 test('Stage 3.4: "App coming soon" opens the existing app teaser on every page; no app is implied', () => withDiscoveryServer(async (base) => {
   for (const p of ['/', '/browse', '/trip', '/kelowna', '/kelowna/restaurants/test-trattoria', '/destinations', '/map']) {
