@@ -1,0 +1,56 @@
+{
+ "note": "2026-10-14: five Sports & Recreation places whose description did not mention the sport they are listed for. Each adds that sport from the place's own sports_also note (already on the site); nothing else changes.",
+ "count": 5,
+ "venues": [
+  {
+   "id": 1553,
+   "region": "kelowna",
+   "slug": "parkinson-recreation-centre",
+   "name": "Parkinson Recreation Centre",
+   "before_sha1": "32bcad02463433e9e46139cd9f98ff89143dbdcc",
+   "before_fr_sha1": "e027ced10317165c8a075f6bef879a62f11fa0a1",
+   "description": "The City of Kelowna's main recreation centre, close to downtown, has an indoor pool for drop-in public swims plus gymnasiums and a fitness centre, so it's a handy, low-cost rainy-day swim. Outside, the Basil Meikle courts add 12 outdoor pickleball courts and 6 tennis courts.",
+   "description_fr": "Le principal centre récréatif de la Ville de Kelowna, près du centre-ville, compte une piscine intérieure pour les bains libres, des gymnases et un centre de conditionnement physique : une option de baignade pratique et peu coûteuse les jours de pluie. À l'extérieur, les terrains Basil Meikle ajoutent 12 terrains de pickleball et 6 terrains de tennis."
+  },
+  {
+   "id": 1655,
+   "region": "lake-country",
+   "slug": "beasley-park",
+   "name": "Beasley Park",
+   "before_sha1": "33402d6a0683da1653e6a8fbbbd5065440df20e1",
+   "before_fr_sha1": "78fa5ff17cee9148c8c5dfa66b551b15c99f911f",
+   "description": "Beasley Park sits at the south end of Wood Lake on Woodsdale Road, right next door to Reiswig Regional Park, and the District counts it among Lake Country's favourite beaches. There's a gazebo for shade, a beach for swimming and beach volleyball courts, making it an easy family stop. Leave the dog at home in summer: dogs aren't allowed from April 1 to September 30.",
+   "description_fr": "Le parc Beasley se trouve à l'extrémité sud du lac Wood, sur Woodsdale Road, juste à côté du parc régional Reiswig, et le district le compte parmi les plages préférées de Lake Country. On y trouve un gazebo pour l'ombre, une plage pour la baignade et des terrains de volleyball de plage, ce qui en fait un arrêt facile en famille. Laissez le chien à la maison en été : les chiens n'y sont pas admis du 1er avril au 30 septembre."
+  },
+  {
+   "id": 1715,
+   "region": "west-kelowna",
+   "slug": "memorial-park-annette-beaudreau-amphitheatre",
+   "name": "Memorial Park & Annette Beaudreau Amphitheatre",
+   "before_sha1": "abf3c7bdb4cd737687ff9fd7bbadf2aec45c5bd5",
+   "before_fr_sha1": "9ba062736073ad29c3279d2279e7d2f9007fe973",
+   "description": "Memorial Park sits beside the Johnson Bentley Aquatic Centre in Westbank and is home to the Annette Beaudreau Amphitheatre. On summer Friday evenings it hosts the free Music in the Park concert series, with Okanagan Lake as the backdrop, and it's also the base for Westside Daze. The park also has a skate park, with advanced and beginner bowls plus a street section.",
+   "description_fr": "Le Memorial Park se trouve à côté du Johnson Bentley Aquatic Centre, à Westbank, et abrite l'amphithéâtre Annette Beaudreau. Les vendredis soirs d'été, il accueille la série de concerts gratuits Music in the Park, avec le lac Okanagan en toile de fond, et c'est aussi le cœur de Westside Daze. Le parc compte aussi un planchodrome, avec des bols pour avancés et pour débutants et une section street."
+  },
+  {
+   "id": 1234,
+   "region": "apex",
+   "slug": "apex-mountain-resort",
+   "name": "Apex Mountain Resort",
+   "before_sha1": "ccfad2a7f269a717e2c45690273143752d03211a",
+   "before_fr_sha1": "315b4782d4e3ec04e831957c6b950cbd03327ac0",
+   "description": "Apex is Penticton's home mountain, a short 30-minute drive from town — 33 km, and 23 km from Penticton Airport — with 2,000 vertical feet and 1,112 skiable acres of north-east-facing terrain that catches the region's dry champagne powder, about 500 cm of it a year. Its 85 runs break down as 11 novice, 27 intermediate and 43 advanced, served by a high-speed quad, a triple chair, a T-bar and a magic carpet, and four terrain parks step up from the kids' Little Nuggets through Okanagan and Prospector to the big-feature Claim Jumper. Friday and Saturday nights are Apex's signature: from 4 to 9 pm the T-bar and Magic Carpet run under lights for night skiing on the Okanagan Run and the lit Okanagan Terrain Park, the tube park glows for night tubing, the skating loop is open late from its new Skate Shack, and the Gunbarrel Saloon — voted Canada's best après-ski bar ten times running — sits at the bottom of the run; Friday nights come with half-price lift tickets and rentals. Off the slopes, the Tim Hortons Tube Park and the kilometre-long Adventure Skating Loop through the trees each have their own page on Okanagan Roam, and Nickel Plate Nordic Centre is 6.5 km further up the road. When you arrive, take a left at the Y for the main parking lot; a winter shuttle runs from Penticton on weekends. The ski area operates in winter only; outside ski season, a free 9-hole alpine disc golf course is laid out by the ski hill parking lot.",
+   "description_fr": "Apex est la montagne de Penticton, à seulement 30 minutes de route de la ville (33 km, et 23 km de l'aéroport de Penticton), avec 2 000 pieds de dénivelé et 1 112 acres de terrain skiable orienté nord-est, qui reçoit la poudreuse sèche « champagne » de la région, environ 500 cm par année. Ses 85 pistes se répartissent en 11 pour débutants, 27 intermédiaires et 43 avancées, desservies par un quadruple débrayable, un télésiège triple, un téléski en T et un tapis magique, et quatre parcs à neige montent en difficulté, du Little Nuggets pour les enfants à l'Okanagan et au Prospector, jusqu'au Claim Jumper et ses grands modules. Les vendredis et samedis soir sont la signature d'Apex : de 16 h à 21 h, le téléski en T et le tapis magique fonctionnent sous les lumières pour le ski de soirée sur la piste Okanagan et dans le parc à neige Okanagan éclairé, le parc de glissade sur tube s'illumine pour la glissade de soirée, la boucle de patinage reste ouverte tard depuis sa nouvelle Skate Shack, et le Gunbarrel Saloon, élu dix fois de suite meilleur bar d'après-ski au Canada, attend au bas de la piste; le vendredi soir, billets de remontée et location sont à moitié prix. Hors des pistes, le parc de glissade Tim Hortons Tube Park et la boucle de patinage Adventure Skating Loop, longue d'un kilomètre à travers les arbres, ont chacun leur propre page sur Okanagan Roam, et le Nickel Plate Nordic Centre se trouve 6,5 km plus haut sur la route. À votre arrivée, prenez à gauche à l'embranchement en Y pour le stationnement principal; une navette d'hiver part de Penticton les fins de semaine. Le domaine skiable est ouvert l'hiver seulement; hors saison de ski, un parcours de disc golf alpin gratuit de 9 trous est aménagé près du stationnement de la montagne."
+  },
+  {
+   "id": 1274,
+   "region": "penticton",
+   "slug": "three-blind-mice-trail-network",
+   "name": "Three Blind Mice Trail Network",
+   "before_sha1": "15e88884c92c1d64496c2f4f3128bb9667c514a6",
+   "before_fr_sha1": "f06676925aff788842c639afee10a3d7ab5d7bee",
+   "description": "The Three Blind Mice trail network spreads across the benchland above Penticton toward Naramata, overlooking Okanagan Lake, and is the South Okanagan’s best-known mountain-bike area: Visit Penticton counts more than 80 trails, and trail-mapping sites chart over 100 of them, winding through ponderosa pine, rock bluffs and grassland from intermediate singletrack to expert technical lines. The core of the network is a City of Penticton natural park at 1400 Riddle Road, and the Penticton and Area Cycling Association looks after the trails. Riders commonly start from the Poplar Grove parking area off Naramata Road; parking costs are not published. Close by, beside the KVR Trail at 1194 Poplar Grove Road, the City’s asphalt pump track gives riders of all ages a loop of rollers and berms to practise on. Trail signage is limited, so carry a trail app, and note that no official e-bike or dog rules are published for the network. Beside the bike trails, the Penticton Disc Golf Club's 18-hole disc golf course is another way to explore the benchland.",
+   "description_fr": "Le réseau de sentiers Three Blind Mice s'étend sur les terrasses qui dominent Penticton en direction de Naramata, avec vue sur le lac Okanagan; c'est le secteur de vélo de montagne le plus connu du sud de l'Okanagan. Visit Penticton y recense plus de 80 sentiers, et les sites de cartographie en répertorient plus de 100, qui serpentent parmi les pins ponderosa, les escarpements rocheux et les prairies, des pistes simples de niveau intermédiaire aux tracés techniques pour experts. Le cœur du réseau est un parc naturel de la Ville de Penticton situé au 1400 Riddle Road, et la Penticton and Area Cycling Association entretient les sentiers. Les cyclistes partent généralement du stationnement de Poplar Grove, en bordure de Naramata Road; les tarifs de stationnement ne sont pas publiés. Tout près, à côté du sentier KVR au 1194 Poplar Grove Road, la piste à rouleaux (pump track) asphaltée de la Ville offre aux cyclistes de tous âges une boucle de bosses et de virages relevés pour s'exercer. La signalisation est limitée : munissez-vous d'une application de sentiers, et notez qu'aucune règle officielle sur les vélos électriques ou les chiens n'est publiée pour le réseau. À côté des sentiers de vélo, le parcours de disc golf de 18 trous du Penticton Disc Golf Club offre une autre façon d'explorer les terrasses."
+  }
+ ]
+}
