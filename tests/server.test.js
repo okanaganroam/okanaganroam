@@ -2265,18 +2265,21 @@ test('Reference redesign: Explore the Okanagan arrow icon is a plain glyph, not 
 
 test('Explore All Okanagan Regions: renders exactly twice (heading copy + mobile-grid copy), both plain .discover-heading-link links to /destinations, no bordered-tile treatment', () => {
   const html = app.renderExploreRegionsHTML();
-  const matches = Array.from(html.matchAll(/<a class="discover-heading-link explore-all-link explore-all-link-(heading|mobile)" href="([^"]*)" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>/g));
-  assert.equal(matches.length, 2, 'expected exactly two "Explore All Okanagan Regions" links (a heading copy and a mobile-grid copy), both using the shared .discover-heading-link component');
-  const variants = matches.map((m) => m[1]).sort();
+  // 2026-10-14 (Dayton): "Explore All Okanagan Regions →" read as "swipe for a few more"; it is now a "See all N
+  // destinations" button in the heading, and the phone swipe row ends with a card to the same page.
+  const matches = Array.from(html.matchAll(/<a class="(discover-heading-link home-see-all explore-all-link explore-all-link-heading|home-row-end explore-all-link-mobile)" href="([^"]*)"><span class="home-row-end-text">|<a class="(discover-heading-link home-see-all explore-all-link explore-all-link-heading)" href="([^"]*)">/g)).map((m) => [m[1] || m[3], m[2] || m[4]]);
+  assert.equal(matches.length, 2, 'a heading button and a phone row-end card');
+  const variants = matches.map((m) => (/heading/.test(m[0]) ? 'heading' : 'mobile')).sort();
   assert.deepEqual(variants, ['heading', 'mobile'], 'expected one heading-copy and one mobile-copy instance');
-  matches.forEach((m) => assert.equal(m[2], '/destinations', 'retargeted from /browse to /destinations (2026-09-25)'));
+  assert.equal((html.match(/See all \d+ destinations/g) || []).length, 2);
+  matches.forEach((m) => assert.equal(m[1], '/destinations', 'retargeted from /browse to /destinations (2026-09-25)'));
   assert.doesNotMatch(html, /region-card-all/, 'the old bordered-tile treatment must be fully gone');
   const headingPos = html.indexOf('<h2 data-i18n="explore.heading">Explore by Destination</h2>');
   assert.ok(headingPos !== -1, 'expected the section heading to be i18n-wired');
   const headingLinkPos = html.indexOf('explore-all-link-heading');
   const gridPos = html.indexOf('class="region-card-grid"');
   assert.ok(headingPos < headingLinkPos && headingLinkPos < gridPos, 'expected the heading-copy link inside the heading row, before the card grid starts');
-  assert.match(html, /<div class="discover-heading discover-heading-split">\s*<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>\s*<a class="discover-heading-link explore-all-link explore-all-link-heading" href="\/destinations" data-i18n="explore\.allRegions">Explore All Okanagan Regions &rarr;<\/a>\s*<\/div>/, 'expected the same heading-row pattern used by Hidden Gems/Mood Cards');
+  assert.match(html, /<div class="discover-heading discover-heading-split">\s*<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>\s*<a class="discover-heading-link home-see-all explore-all-link explore-all-link-heading" href="\/destinations"><span class="home-en">See all \d+ destinations<\/span><span class="home-fr" lang="fr">Voir les \d+ destinations<\/span><\/a>\s*<\/div>/, 'the heading row holds the See all button');
 });
 
 test('Explore All Okanagan Regions: the destination-card grid contains the unchanged 6 real cards in their original order (still one aligned row at 480px+), plus the mobile-only copy of the link positioned AFTER Vernon (the last card)', () => {
@@ -2771,8 +2774,8 @@ test('Hidden Gems: section heading and all 3 editorial card titles/blurbs are i1
 test('Explore by Destination: section heading and both copies of "Explore All Okanagan Regions" are i18n-wired', () => {
   const html = app.renderExploreRegionsHTML();
   assert.match(html, /<h2 data-i18n="explore\.heading">Explore by Destination<\/h2>/);
-  const linkMatches = html.match(/data-i18n="explore\.allRegions"/g) || [];
-  assert.equal(linkMatches.length, 2, 'expected both the heading-row and mobile-grid copies to be i18n-wired');
+  // Both copies carry English and French (shown by html[lang]; app.js is frozen).
+  assert.equal((html.match(/<span class="home-fr" lang="fr">Voir les \d+ destinations<\/span>/g) || []).length, 2, 'both copies are in both languages');
 });
 
 test('Build Your Perfect Okanagan Trip: entire visible/accessible section is i18n-wired', () => {
@@ -5489,8 +5492,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   const homepageGemLinks = [...homepageBody.matchAll(/class="hidden-gem-card" href="([^"]+)"/g)].map((m) => m[1]);
   assert.equal(homepageGemLinks.length, 3, 'the three Hidden Gems editorial cards render');
   assert.deepEqual(homepageGemLinks, ['/dog-friendly', '/local-favorites', '/secret-spots'], 'each card links to its dedicated Hidden Gems destination');
-  assert.match(homepageBody, /discover-heading-link" href="\/hidden-gems"[^>]*>View all hidden gems/, '"View all hidden gems" must link to the dedicated \/hidden-gems page');
-  assert.match(homepageBody, /discover-heading-link" href="\/categories"[^>]*>Explore all categories/, '"Explore all categories" must link to the dedicated \/categories page');
+  assert.match(homepageBody, /home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems/, '"See all hidden gems" must link to the dedicated \/hidden-gems page');
+  assert.match(homepageBody, /home-see-all" href="\/categories"><span class="home-en">See all categories/, '"See all categories" must link to the dedicated \/categories page');
   assert.match(homepageBody, /Browse &amp; Search<\/a>/, 'header dropdown "Browse & Search" label must still read the same');
   const headerBrowseLink = homepageBody.match(/<a href="([^"]*)"[^>]*>Browse &amp; Search<\/a>/);
   assert.ok(headerBrowseLink && headerBrowseLink[1] === '/browse', 'header "Browse & Search" link must point at /browse now that the wizard lives there');
@@ -9763,7 +9766,7 @@ test('Dog Friendly Finds: the homepage Hidden Gems card now opens /dog-friendly,
   assert.equal(app.HIDDEN_GEM_EDITORIAL_CARDS[0].blurb, 'Patios and trails where your dog belongs.');
   assert.match(section, /<span data-i18n="gems.dogFriendly.title">Dog-Friendly Finds<\/span>/);
   assert.match(section, /id="hiddenGems"/);
-  assert.match(rendered, /class="discover-heading-link" href="\/hidden-gems" data-i18n="gems.viewAll"/);
+  assert.match(rendered, /class="discover-heading-link home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems<\/span>/);
   assert.equal((section.match(/class="hidden-gem-card"/g) || []).length, 3);
   // The dog_friendly boolean the frozen homepage's SEO counts are built from
   // is NOT touched by any of this.
@@ -11395,8 +11398,11 @@ test('/categories: 200, each visitor-facing category once, linking to its own ex
 test('Homepage heading links: "View all hidden gems" -> /hidden-gems, "Explore all categories" -> /categories', () => {
   const gems = app.renderHiddenGemsHomepageHTML();
   const mood = app.renderMoodCardsHTML({ now: SUMMER_NOW });
-  assert.match(gems, /<a class="discover-heading-link" href="\/hidden-gems" data-i18n="gems\.viewAll">View all hidden gems &rarr;<\/a>/);
-  assert.match(mood, /<a class="discover-heading-link" href="\/categories" data-i18n="mood\.exploreAll">Explore all categories &rarr;<\/a>/);
+  // 2026-10-14 (Dayton): "View all … →" beside a swipe row read as "swipe for more"; these are now "See all" buttons
+  // that say where they go, in both languages.
+  assert.match(gems, /<a class="discover-heading-link home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems<\/span><span class="home-fr" lang="fr">Voir tous les trésors cachés<\/span><\/a>/);
+  assert.match(mood, /<a class="discover-heading-link home-see-all" href="\/categories"><span class="home-en">See all categories<\/span><span class="home-fr" lang="fr">Voir toutes les catégories<\/span><\/a>/);
+  assert.match(mood, /<a class="home-row-end" href="\/categories">/, 'the phone swipe row ends with a card to the same page');
 });
 
 test('Destination routes: region and region/category pages still respond as before', () => withDiscoveryServer(async (base) => {
