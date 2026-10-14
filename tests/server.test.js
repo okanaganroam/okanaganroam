@@ -10096,7 +10096,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved Tours & Experiences change (2026-10-11): tripv3.type.tour added to TRANSLATIONS (en and fr) only.
   // Approved Sports & Recreation change (2026-10-12): tripv3.type.sport added to TRANSLATIONS (en and fr) only.
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
-  assert.equal(md5('public/scripts/app.js'), '96b52962bf346312c4d39a216a910d12', 'public/scripts/app.js (planner copy, 2026-10-13)');
+  assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106', 'public/scripts/app.js (planner copy, 2026-10-13)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11924,7 +11924,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '96b52962bf346312c4d39a216a910d12');
+  assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -15520,7 +15520,7 @@ test('Mobile polish: the phone header button has no arrow (desktop keeps it); th
   assert.ok(home.includes('<span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>'));
   assert.ok(home.includes('html[lang="fr"] .mood-swipe-fr { display: inline; }') && home.includes('html[lang="fr"] .mood-swipe-en { display: none; }'), 'French by page language, no change to the frozen app.js');
   assert.match(home, /\.mood-swipe-cue \{ display: none; \}/);
-  assert.match(home, /\.mood-card-indoor \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day title is a step smaller');
+  assert.match(home, /\.mood-card-indoor \.mood-card-title, \.mood-card-sports \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day and Sports & Recreation titles are a step smaller');
   assert.match(home, /\.mood-card-title \{[^}]*line-height: 1\.15; text-wrap: balance; \}/, 'tile titles wrap as even, tight lines');
   assert.match(home, /@media \(max-width: 640px\) \{[^@]*\.mood-season-link \{ display: none; \}/, 'the seasonal guide link is hidden on phones so the heading stays two rows');
 }))));
@@ -16158,7 +16158,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '96b52962bf346312c4d39a216a910d12');
+  assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16251,7 +16251,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '96b52962bf346312c4d39a216a910d12', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), '0ca68b68559cbc61001db50a2f279106', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -16838,10 +16838,10 @@ const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); re
 const winterMood = (iso) => app.renderMoodCardsHTML({ now: new Date(`${iso}T19:00:00Z`) });
 const moodKeys = (html) => Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
 
-test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Ski & Snow and Golf -> Indoor in place; Apr-Sep is the summer set', () => {
+test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Sports & Recreation (Ski & Snow is off for now) and Golf -> Indoor in place; Apr-Sep is the summer set', () => {
   for (const iso of ['2026-10-01', '2026-10-31', '2026-11-15', '2027-02-01', '2027-03-31', '2026-12-31', '2027-01-01']) {
     assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), true, iso);
-    assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'ski-snow', 'indoor', 'whats-on', 'outdoors'], iso);
+    assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'sports', 'indoor', 'whats-on', 'outdoors'], iso);
   }
   for (const iso of ['2027-04-01', '2026-09-30', '2026-07-15']) {
     assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), false, iso);
@@ -16865,9 +16865,10 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Ski & Snow and Golf -> Indoo
 
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   const html = winterMood('2027-02-01');
-  assert.match(html, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">\s*<img class="mood-card-img" src="\/images\/mood\/ski-snow-powder\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.match(html, /<a class="mood-card mood-card-sports" href="\/sports">\s*<img class="mood-card-img" src="\/images\/mood\/sports-rec\.jpg" width="640" height="403" alt="" loading="lazy">/);
   assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
-  assert.match(html, /class="mood-card-title" data-i18n="mood\.skiSnow\.title">Ski &amp; Snow</);
+  assert.match(html, /class="mood-card-title" data-i18n="mood\.sports\.title">Sports &amp; Recreation</);
+  assert.doesNotMatch(html, /mood-card-ski-snow/, 'Ski & Snow is off the homepage for now');
   assert.match(html, /class="mood-card-title" data-i18n="mood\.indoor\.title">Indoor &amp; Rainy Day</);
   assert.doesNotMatch(html, /mood-card-beaches|mood-card-golf/);
   // The other four cards are untouched.
@@ -16878,7 +16879,7 @@ test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   }
   assert.equal((html.match(/class="mood-card-title" data-i18n=/g) || []).length, 6);
   // Both images exist on disk.
-  for (const f of ['ski-snow.jpg', 'indoor.jpg']) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'mood', f)), f);
+  for (const f of ['ski-snow-powder.jpg', 'sports-rec.jpg', 'indoor.jpg']) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'mood', f)), f);
   // The indoor card keeps its gradient fallback rule, scoped to that card only.
   assert.match(app.renderHomepageDiscoveryStyles(), /\.mood-card-indoor \{ background: linear-gradient\(/);
 });
@@ -16888,8 +16889,10 @@ test('Seasonal mood tiles: app.js has English and French titles for both winter 
   const en = src.slice(0, src.indexOf("    'mood.beaches.title': 'Plages',"));
   const fr = src.slice(src.indexOf("    'mood.beaches.title': 'Plages',"));
   assert.match(en, /'mood\.skiSnow\.title': 'Ski & Snow'/);
+  assert.match(en, /'mood\.sports\.title': 'Sports & Recreation'/);
   assert.match(en, /'mood\.indoor\.title': 'Indoor & Rainy Day'/);
   assert.match(fr, /'mood\.skiSnow\.title': 'Ski et neige'/);
+  assert.match(fr, /'mood\.sports\.title': 'Sports et loisirs'/);
   assert.match(fr, /'mood\.indoor\.title': 'Int\\u00e9rieur et pluie'/);
 });
 
@@ -16901,15 +16904,15 @@ test('Seasonal mood tiles: "/" honours OKR_TODAY_OVERRIDE (test-only), never in 
       const summer = await WINTER_GET(base, '/');
       assert.equal(summer.status, 200);
       assert.match(summer.text, /mood-card mood-card-beaches/);
-      assert.doesNotMatch(summer.text, /mood-card mood-card-ski-snow/);
+      assert.doesNotMatch(summer.text, /mood-card mood-card-sports/);
       // Dec 15: winter tiles, and past the Sep-Nov fall hero text, so only the tiles (and season link) differ.
       process.env.OKR_TODAY_OVERRIDE = '2026-12-15';
       const winter = await WINTER_GET(base, '/');
-      assert.match(winter.text, /<a class="mood-card mood-card-ski-snow" href="\/ski-snow">/);
+      assert.match(winter.text, /<a class="mood-card mood-card-sports" href="\/sports">/);
       assert.match(winter.text, /<a class="mood-card mood-card-indoor" href="\/indoor">/);
       assert.doesNotMatch(winter.text, /mood-card mood-card-beaches|mood-card mood-card-golf/);
       // Only the two swapped cards differ between the seasons.
-      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|ski-snow|indoor)"[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
+      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|sports|indoor)"[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
       assert.equal(strip(winter.text), strip(summer.text));
     });
     process.env.OKR_TODAY_OVERRIDE = '2027-02-30';
@@ -18431,7 +18434,7 @@ test('Fall tile photos (2026-10-13): Sep-Nov the Food & Drink, Wine, What\'s On 
     }
   }
   // October and November keep the winter swaps (Ski & Snow, Indoor) alongside the fall photos.
-  assert.deepEqual(moodKeys(winterMood('2026-10-13')), ['food-drink', 'wine', 'ski-snow', 'indoor', 'whats-on', 'outdoors']);
+  assert.deepEqual(moodKeys(winterMood('2026-10-13')), ['food-drink', 'wine', 'sports', 'indoor', 'whats-on', 'outdoors']);
   const summer = { 'food-drink': '/images/mood/eat.webp', wine: '/images/mood/drink.webp', 'whats-on': '/images/mood/whats-on.webp', outdoors: '/images/mood/explore.webp' };
   for (const iso of ['2026-07-15', '2026-08-31', '2026-12-01', '2027-03-01']) {
     for (const [key, src] of Object.entries(summer)) assert.equal(srcOf(winterMood(iso), key), src, `${iso} ${key}`);

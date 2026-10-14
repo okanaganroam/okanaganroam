@@ -47,6 +47,7 @@ var TRANSLATIONS = {
     // Winter homepage tiles (2026-10-11, Nov-Mar): Ski & Snow and Indoor &
     // Rainy Day take the Beaches and Golf slots (renderMoodCardsHTML).
     'mood.skiSnow.title': 'Ski & Snow',
+    'mood.sports.title': 'Sports & Recreation',
     'mood.indoor.title': 'Indoor & Rainy Day',
     'mood.exploreAll': 'Explore all categories \u2192',
     'gems.heading': 'Hidden Gems',
@@ -524,6 +525,7 @@ var TRANSLATIONS = {
     'mood.foodDrink.title': 'Manger et boire',
     'mood.beaches.title': 'Plages',
     'mood.skiSnow.title': 'Ski et neige',
+    'mood.sports.title': 'Sports et loisirs',
     'mood.indoor.title': 'Int\u00e9rieur et pluie',
     'mood.exploreAll': 'Voir toutes les cat\u00e9gories \u2192',
     'gems.heading': 'Tr\u00e9sors cach\u00e9s',
