@@ -656,6 +656,27 @@ const KIDS_ADULT_WORDS = ['meadery', 'cidery', 'winery', 'brewery', 'distillery'
 const ALCOHOL_SETTING_WORDS = ['winery', 'vineyard', 'vineyards', 'brewery', 'brewpub', 'taproom', 'wine bar', 'tasting room', 'estate winery'];
 const INDOOR_VISITOR_KINDS = ['museum', 'gallery', 'theatre', 'bowling', 'arcade', 'climbing', 'escape'];
 const INDOOR_NICHE_WORDS = ['casino', 'gaming', 'fitness', 'gym', 'yoga', 'pilates', 'dance studio', 'martial arts', 'parkour', 'recording studio', 'studios', 'crossfit'];
+// The category photo for a stop card: by type, refined by what the place is listed for (2026-10-14).
+function stopPhoto(v) {
+  const kinds = v.plannerKinds || tripRequirements.inferPlannerKinds(v);
+  const acts = v.activities || [];
+  const name = `${v.textName || ''} ${v.textDesc || ''}`;
+  let key = v.type;
+  if (v.type === 'outdoor') {
+    key = /\bski\b|ski resort|mountain resort|snowshoe/.test(name) ? 'ski' : acts.includes('winter') ? 'winter' : acts.includes('hiking') ? 'hiking'
+      : acts.includes('viewpoints') ? 'viewpoints' : acts.includes('water') || /\b(?:kayak|paddle|boat|sup)\b/.test(name) ? 'water'
+      : acts.includes('cycling') ? 'cycling' : acts.includes('adventure') ? 'adventure' : 'outdoor';
+  } else if (v.type === 'indoor') {
+    key = kinds.includes('spa') ? 'spa' : kinds.some((k) => ['museum', 'gallery'].includes(k)) ? 'arts' : kinds.includes('theatre') ? 'theatre'
+      : kinds.some((k) => ['bowling', 'arcade', 'escape', 'climbing'].includes(k)) ? 'games' : /\b(?:kids|children|family|play)\b/.test(name) ? 'family' : 'indoor';
+  } else if (v.type === 'tour') {
+    key = kinds.includes('wine_tour') || /\bwine\b/.test(name) ? 'tour-wine' : kinds.includes('boat_tour') || /\b(?:boat|cruise|lake)\b/.test(name) ? 'tour-lake'
+      : /\b(?:farm|orchard|u pick|fruit)\b/.test(name) ? 'tour-farm' : /\b(?:bike|cycling|e bike)\b/.test(name) ? 'tour-bike' : 'tour';
+  }
+  if (v.type === 'restaurant' && /\b(?:ramen|pho|noodles?|udon)\b/.test(`${name} ${v.textCuisine || ''}`)) key = 'restaurant-noodle';
+  return STOP_PHOTO_KEYS.has(key) ? `/images/trip-v3/stops/stop-${key}-480.jpg` : null;
+}
+const STOP_PHOTO_KEYS = new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery', 'beach', 'golf', 'outdoor', 'hiking', 'viewpoints', 'water', 'cycling', 'adventure', 'winter', 'indoor', 'arts', 'family', 'games', 'spa', 'theatre', 'tour', 'tour-wine', 'tour-lake', 'tour-farm', 'tour-bike', 'sport', 'ski', 'restaurant-noodle']);
 function isDogTrip(ctx) { return !!(ctx.dog || ctx.features.includes('dog_friendly') || (ctx.requirements?.items || []).some((i) => i.kind === 'feature' && i.value === 'dog_friendly')); }
 function indoorAppeal(v, ctx, add) {
   if (v.type !== 'indoor') return;
@@ -718,6 +739,8 @@ function publicVenue(v, ctx) {
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
     rating: v.rating, reviews: v.reviews, price: v.price, address: v.address || null,
+    // A photo of the kind of place (Okanagan Roam's category photos), never presented as the venue itself.
+    photo: stopPhoto(v),
     latitude: hasCoords(v) ? v.lat : null, longitude: hasCoords(v) ? v.lng : null,
     // Build My Trip V3 (Step 2, 2026-09-29), additive: stored facts a stop
     // card can show as they are -- the verified badge columns that are set

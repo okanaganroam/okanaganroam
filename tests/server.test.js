@@ -13654,7 +13654,7 @@ test('Stage 5G: V3 whole-trip map -- collapsed, loaded on demand, attributed, ke
   // render(): the map slot only in day plans; the map is detached before the
   // result is rewritten and placed back after.
   const renderFn = js.slice(js.indexOf('function render(focus)'), js.indexOf('// ---- My Trip (tray)'));
-  assert.ok(renderFn.includes("if (planKinds && days().length) {\n      html += '<div class=\"t3-map-slot\" data-t3-map-slot></div>';"));
+  assert.ok(renderFn.includes("if (planKinds && days().length) {\n      html += '<div class=\"t3-tools\">' + schedHtml + '<div class=\"t3-map-slot\" data-t3-map-slot></div></div>';"));
   assert.equal(renderFn.split('data-t3-map-slot').length, 2, 'one slot');
   const i = (s) => renderFn.indexOf(s);
   assert.ok(i('detachMap();') > 0 && i('detachMap();') < i('resultEl.innerHTML = html;') && i('resultEl.innerHTML = html;') < i('placeMap();'));
@@ -13907,7 +13907,7 @@ test('map day headers: the page uses static <picture> maps with both credits as 
   // The whole-trip interactive map and "Map this day" are unchanged.
   assert.ok(page.includes('function loadLeaflet') && page.includes('L.tileLayer(MAP_TILES') && page.includes('tripMap'));
   assert.ok(page.includes('data-t3-map-day') && page.includes("esc(tx('tripv3.mapDay'))") && page.includes('data-t3-regen-day') && page.includes('data-t3-add-day'));
-  assert.ok(page.includes("var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml("), 'a region without a map keeps the existing photo header');
+  assert.ok(page.includes("var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets && firstInRegion ? mapHeadHtml("), 'a region without a map, or a later day in the same town, keeps the photo header');
   // The served images are real WebP, and nothing else carries any of it.
   const res = await fetch(`${base}${mh.penticton.assets.desktop.src}`);
   assert.equal(res.status, 200); assert.equal(res.headers.get('content-type'), 'image/webp');

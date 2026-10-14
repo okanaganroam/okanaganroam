@@ -210,3 +210,11 @@ test('the trip page loads, with the phone-friendly card controls in its script',
   const src = require('node:fs').readFileSync(require.resolve('../trip-planner-v3-page.js'), 'utf8');
   for (const marker of ['data-t3-badges-more', 't3-more-menu', 't3-sched', 'is-swapped', 'Swapped ']) assert.ok(src.includes(marker), `missing ${marker}`);
 });
+
+test('every inline script on the trip page is valid JavaScript (the page code lives in a template string, where a stray backslash breaks it)', () => {
+  const v3 = require('../trip-planner-v3-page.js');
+  const html = v3.renderTripPlannerV3Page({ esc: (s) => String(s), title: '', description: '', canonical: '', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', analyticsHead: '', regions: [], regionImages: {}, preview: false });
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)(?![^>]*ld\+json)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(scripts.length > 0);
+  for (const code of scripts) assert.doesNotThrow(() => new Function(code), 'a page script has a syntax error');
+});
