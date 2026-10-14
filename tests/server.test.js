@@ -16199,7 +16199,7 @@ test('Contact: a provider failure returns a generic 502 with no provider detail,
   assert.equal(res.status, 502); assert.equal(body.ok, false);
   const wire = JSON.stringify(body);
   assert.doesNotMatch(wire, /FormSubmit|exploded|secret-detail|formsubmit|500/i);
-  assert.match(body.error, /try again/); assert.match(body.error, /okanaganroam@gmail\.com/);
+  assert.match(body.error, /try again/); assert.match(body.error, /info@okanaganroam\.com/);
   const log = logged.join('\n');
   assert.match(log, /\[contact\] relay failed: FormSubmit HTTP 500/);
   assert.doesNotMatch(log, /sam@example\.com|Sam Visitor|private message|exploded|secret-detail/, 'no visitor data and no provider body in the log');
@@ -19263,7 +19263,7 @@ test('Footer (2026-10-14): About, Privacy and Terms pages exist, are linked from
   assert.match(about, /born and raised in Kelowna/);
   assert.doesNotMatch(about, /PO Box/i, 'the PO box stays off the website');
   const privacy = app.renderPrivacyPage();
-  for (const w of ['Google Analytics', 'FormSubmit', 'PIPEDA', 'okanaganroam@gmail.com']) assert.ok(privacy.includes(w), `privacy mentions ${w}`);
+  for (const w of ['Google Analytics', 'FormSubmit', 'PIPEDA', 'info@okanaganroam.com']) assert.ok(privacy.includes(w), `privacy mentions ${w}`);
   const footer = app.renderHomeFooterHTML();
   assert.match(footer, /<a href="\/privacy">Privacy<\/a>/);
   assert.match(footer, /<a href="\/terms">Terms<\/a>/);

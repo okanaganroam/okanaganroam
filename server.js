@@ -7579,11 +7579,11 @@ function renderContactDialogHtml() {
             return;
           }
           if (r.body.errors) showErrors(r.body.errors);
-          formError.textContent = r.body.error || 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+          formError.textContent = r.body.error || 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
           formError.hidden = false;
         })
         .catch(function(){
-          formError.textContent = 'Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at okanaganroam@gmail.com.';
+          formError.textContent = 'Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at info@okanaganroam.com.';
           formError.hidden = false;
         })
         .then(function(){ button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = 'Send message'; });
@@ -22581,6 +22581,8 @@ body.page-browse #venueGrid .fav-btn:focus-visible { outline: 2px solid var(--am
 // instead of silently losing the submission. No API key or SMTP secret is
 // involved.
 
+// Where submissions and contact messages are delivered (FormSubmit). The
+// address shown to visitors is info@okanaganroam.com (2026-10-14).
 const VENUE_SUBMISSION_NOTIFY_EMAIL = 'okanaganroam@gmail.com';
 const VENUE_SUBMISSION_NOTIFY_URL = `https://formsubmit.co/ajax/${VENUE_SUBMISSION_NOTIFY_EMAIL}`;
 const VENUE_SUBMISSION_MAX_BODY_BYTES = 16 * 1024;
@@ -22907,13 +22909,13 @@ function sendSubmissionResponse(res, status, data, close = false) {
 }
 
 async function handleVenueSubmission(req, res) {
-  const generic = 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+  const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) {
     return sendSubmissionResponse(res, 403, { ok: false, error: 'Submissions are only accepted from the Okanagan Roam website.' });
   }
   const ip = requestClientIp(req);
   if (venueSubmissionRateLimited(ip)) {
-    return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions from your connection. Please try again in an hour, or email us at okanaganroam@gmail.com.' });
+    return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions from your connection. Please try again in an hour, or email us at info@okanaganroam.com.' });
   }
   if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) {
     return sendSubmissionResponse(res, 415, { ok: false, error: generic });
@@ -24459,7 +24461,7 @@ ${renderGolfHeaderHtml()}
 // Analytics, data kept in the visitor's own browser, and the services that
 // deliver the pages); the Terms are short and in plain English.
 const INFO_PAGE_UPDATED = 'October 14, 2026';
-const INFO_CONTACT_EMAIL = 'okanaganroam@gmail.com';
+const INFO_CONTACT_EMAIL = 'info@okanaganroam.com';
 function renderInfoPage({ path, name, title, description, heading, lead, bodyHtml, banner = null }) {
   const canonical = `https://okanaganroam.com${path}`;
   const breadcrumb = breadcrumbListSchema([
@@ -24729,7 +24731,7 @@ ${renderGolfHeaderHtml()}
       <div class="form-row full" id="lyvHappyHourRow" hidden>
         ${field('lyvHappyHour', 'Happy hour days and times', '<input type="text" id="lyvHappyHour" name="happy_hour_text" maxlength="150" placeholder="e.g. Mon&ndash;Fri 3&ndash;6pm">')}
       </div>
-      <p class="lyv-hint lyv-photos-note">Have photos? Email 1&ndash;5 of your own (wide shots work best) to <a href="mailto:okanaganroam@gmail.com">okanaganroam@gmail.com</a> with your venue name, and tell us who to credit.</p>
+      <p class="lyv-hint lyv-photos-note">Have photos? Email 1&ndash;5 of your own (wide shots work best) to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> with your venue name, and tell us who to credit.</p>
       <p class="lyv-section-label">Your contact details</p>
       <div class="form-row">
         ${field('lyvContactName', 'Your name *', '<input type="text" id="lyvContactName" name="contact_name" required minlength="2" maxlength="100" autocomplete="name">')}
@@ -24753,7 +24755,7 @@ ${renderGolfHeaderHtml()}
       <div class="lyv-form-error" id="lyvFormError" role="alert"></div>
     </form>
     <div class="venue-form form-success" id="lyvSuccess" role="status" tabindex="-1"></div>
-    <noscript><p class="form-note">This form needs JavaScript. You can also email your venue details to <a href="mailto:okanaganroam@gmail.com">okanaganroam@gmail.com</a>.</p></noscript>
+    <noscript><p class="form-note">This form needs JavaScript. You can also email your venue details to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p></noscript>
   </section>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -24860,9 +24862,9 @@ ${renderGolfHeaderHtml()}
           return;
         }
         if (r.body.errors) showErrors(r.body.errors);
-        showFormError(r.body.error || 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.');
+        showFormError(r.body.error || 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.');
       })
-      .catch(function(){ showFormError('Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at okanaganroam@gmail.com.'); })
+      .catch(function(){ showFormError('Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at info@okanaganroam.com.'); })
       .then(function(){ button.disabled = false; button.textContent = 'Submit for review'; });
   });
 })();
@@ -25133,13 +25135,13 @@ async function notifyEventSubmission(id) {
 }
 
 async function handleEventSubmission(req, res) {
-  const generic = 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+  const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) {
     return sendSubmissionResponse(res, 403, { ok: false, error: 'Submissions are only accepted from the Okanagan Roam website.' });
   }
   const ip = requestClientIp(req);
   if (eventSubmissionRateLimited(ip)) {
-    return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions from your connection. Please try again in an hour, or email us at okanaganroam@gmail.com.' });
+    return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions from your connection. Please try again in an hour, or email us at info@okanaganroam.com.' });
   }
   if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) {
     return sendSubmissionResponse(res, 415, { ok: false, error: generic });
@@ -25346,7 +25348,7 @@ const CONTACT_RATE_WINDOW_MS = 60 * 60 * 1000; // ... per hour
 const CONTACT_GLOBAL_LIMIT = 100; // messages from everyone, per rolling 24 hours
 const CONTACT_GLOBAL_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CONTACT_KEYS = new Set(['name', 'email', 'message', 'company_website', 'started_at']);
-const CONTACT_FALLBACK_NOTE = 'email us at okanaganroam@gmail.com';
+const CONTACT_FALLBACK_NOTE = 'email us at info@okanaganroam.com';
 
 async function sendContactViaFormSubmit(payload) {
   const res = await fetch(VENUE_SUBMISSION_NOTIFY_URL, {
@@ -25644,7 +25646,7 @@ ${renderGolfHeaderHtml()}
       <div class="lyv-form-error" id="laeFormError" role="alert"></div>
     </form>
     <div class="venue-form form-success" id="laeSuccess" role="status" tabindex="-1"></div>
-    <noscript><p class="form-note">This form needs JavaScript. You can also email your event details to <a href="mailto:okanaganroam@gmail.com">okanaganroam@gmail.com</a>.</p></noscript>
+    <noscript><p class="form-note">This form needs JavaScript. You can also email your event details to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p></noscript>
   </section>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -25745,10 +25747,10 @@ ${renderGolfHeaderHtml()}
           return;
         }
         if (r.body.errors) showErrors(r.body.errors);
-        formError.textContent = r.body.error || 'Sorry, something went wrong. Please try again, or email us at okanaganroam@gmail.com.';
+        formError.textContent = r.body.error || 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
         formError.classList.add('show');
       })
-      .catch(function(){ formError.textContent = 'Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at okanaganroam@gmail.com.'; formError.classList.add('show'); })
+      .catch(function(){ formError.textContent = 'Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at info@okanaganroam.com.'; formError.classList.add('show'); })
       .then(function(){ button.disabled = false; button.textContent = 'Submit for review'; });
   });
 })();
