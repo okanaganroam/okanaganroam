@@ -7182,7 +7182,6 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
       <h2 data-i18n="mood.heading">What are you in the mood for?</h2>
       <a class="discover-heading-link" href="/categories" data-i18n="mood.exploreAll">Explore all categories &rarr;</a>${seasonalLink ? `
       <a class="discover-heading-link mood-season-link" href="${seasonalLink.href}">${escapeHtml(seasonalLink.label)} &rarr;</a>` : ''}
-      <span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>
     </div>
     <div class="mood-card-grid">${cardsHtml}</div>
   </div>
@@ -8317,6 +8316,8 @@ function renderHomepageDiscoveryStyles() {
      right edge of the screen so the third card is visibly cut by the screen edge rather than by the page margin, and the cards are
      sized so 2 cards + 2 gaps + a quarter of the third fill the width from the left margin to the screen edge. The last card
      ends one page margin short of the edge. */
+  /* The phone swipe cue was removed (2026-10-14): beside "Explore all categories" it read as a second link, and the
+     third card peeking in at the edge already shows the row scrolls, as on the other swipe rows. */
   .mood-swipe-cue { display: none; }
   /* app.js (frozen) has no key for the cue, so the French text is swapped by the page language (html[lang]) instead. */
   .mood-swipe-fr { display: none; }

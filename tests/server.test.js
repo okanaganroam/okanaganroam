@@ -15540,11 +15540,10 @@ test('Mobile polish: the phone header button has no arrow (desktop keeps it); th
   assert.match(home, /\.mood-card \{ flex: 0 0 calc\(\(100% \+ var\(--mood-pad\) - 2 \* var\(--mood-gap\)\) \/ 2\.25\); scroll-snap-align: start;/);
   assert.match(home, /margin-right: calc\(-1 \* var\(--mood-pad\)\); padding-right: var\(--mood-pad\);/);
   assert.ok(home.includes('.mood-card-grid::-webkit-scrollbar { display: none; }') && !/mood-card-grid[^}]*(animation|scroll-behavior)/.test(home), 'no motion or auto-scroll');
-  // The cue: one decorative, translated span in the heading row, hidden except at the carousel breakpoint.
-  assert.equal(count(home, 'class="mood-swipe-cue"'), 1);
-  assert.ok(home.includes('<span class="mood-swipe-cue" aria-hidden="true"><span class="mood-swipe-en">Swipe to explore &rarr;</span><span class="mood-swipe-fr" lang="fr">Glissez pour explorer &rarr;</span></span>'));
-  assert.ok(home.includes('html[lang="fr"] .mood-swipe-fr { display: inline; }') && home.includes('html[lang="fr"] .mood-swipe-en { display: none; }'), 'French by page language, no change to the frozen app.js');
-  assert.match(home, /\.mood-swipe-cue \{ display: none; \}/);
+  // The "Swipe to explore" cue was removed (2026-10-14, Dayton): beside "Explore all categories →" it read as a second
+  // link; the third card peeking in at the edge shows the row scrolls, as on the other swipe rows.
+  assert.equal(count(home, 'class="mood-swipe-cue"'), 0);
+  assert.ok(!home.includes('Swipe to explore'));
   assert.match(home, /\.mood-card-indoor \.mood-card-title, \.mood-card-sports \.mood-card-title \{ font-size: 0\.84rem; \}/, 'the long Indoor & Rainy Day and Sports & Recreation titles are a step smaller');
   assert.match(home, /\.mood-card-title \{[^}]*line-height: 1\.15; text-wrap: balance; \}/, 'tile titles wrap as even, tight lines');
   assert.match(home, /@media \(max-width: 640px\) \{[^@]*\.mood-season-link \{ display: none; \}/, 'the seasonal guide link is hidden on phones so the heading stays two rows');
