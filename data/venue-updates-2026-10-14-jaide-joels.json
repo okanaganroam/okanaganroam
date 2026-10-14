@@ -1,0 +1,15 @@
+{
+  "reason": "Jaide & Joel's Baking Co. reply to the 2026-10-14 outreach email (Jaide Hatfield Murga, CEO): listing confirmed correct, phone number and photos supplied (credit: Jaide & Joel's Baking Co.)",
+  "batch_id": "venue-replies-2026-10-14-jaide-joels",
+  "venues": [
+    {
+      "id": 1649,
+      "name": "Jaide & Joel's Baking Co.",
+      "region": "kelowna",
+      "slug": "jaide-joel-s-baking-co",
+      "source": "Email from Jaide Hatfield Murga (CEO), info@jaideandjoelsbakingco.com, 2026-10-14",
+      "expect": { "phone": null, "image_url": null },
+      "set": { "phone": "+1 250-609-1995", "image_url": "/images/venues/jaide-joels-cheese-loaves.jpg" }
+    }
+  ]
+}
