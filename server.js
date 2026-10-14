@@ -22024,7 +22024,7 @@ const BROWSE_PAGE_SIZE = 75;
 const BROWSE_HUB_TYPE_ORDER = ['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', 'golf', 'beach', 'outdoor', 'indoor', 'tour', 'sport'];
 const BROWSE_PRICES = [{ value: '1', label: '$' }, { value: '2', label: '$$' }, { value: '3', label: '$$$' }];
 const BROWSE_SORTS = [
-  { value: '', label: 'Featured order' },
+  { value: '', label: 'Recommended' },
   { value: 'rating', label: 'Highest rated' },
   { value: 'name', label: 'A\u2013Z' },
 ];
@@ -22330,10 +22330,24 @@ function renderBrowseHubStyles() {
 // The card list: the first BROWSE_PAGE_SIZE matching cards in the list, every
 // other card in an inert <template> (see the incremental-rendering note in
 // renderFoodDrinkHubPage). The card HTML is the shared server card, split.
-function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, openStatusById, orderById) {
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true })
-    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"`);
-  let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1).map((x) => '<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, ''));
+function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, openStatusById, orderById, opts = {}) {
+  // Lighter cards (2026-10-14), as on Food & Drink: a short blurb instead of
+  // the full description, a photo (the venue's own, or one for its kind of
+  // place), one shared heart <symbol>, and no Favorite / Add to trip row on
+  // the cards waiting in the template (the page script builds it when a card
+  // is shown). The page was 5.5 MB with every card in full.
+  const venueById = new Map(venues.map((v) => [v.id, v]));
+  const photoAttr = (id) => {
+    const v = venueById.get(Number(id));
+    if (!v) return '';
+    const own = String(v.image_url || '').trim();
+    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
+    return ` data-ph="${curatedPhotoKey(v)}"`;
+  };
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true })
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
+  let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1)
+    .map((x) => ('<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, '')).replace(/\n\s+/g, '\n').split(APP_FAV_HEART_OUTLINE).join(FD_HEART_USE));
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
@@ -22345,13 +22359,15 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   for (const chunk of cardChunks) {
     const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
     if (matchIds.has(id) && firstBatch.length < BROWSE_PAGE_SIZE) firstBatch.push(chunk);
-    else deferred.push(chunk);
+    else deferred.push(chunk.replace(/<div class="card-actions">[\s\S]*?<\/div>/, '<div class="card-actions" data-fd-lazy></div>'));
   }
-  return `<ul class="card-grid" id="bhResults"${firstBatch.length === 0 ? ' hidden' : ''}>
+  if (opts.restOnly) return deferred.join('\n');
+  const rest = opts.restSrc ? `<template id="bhRest" data-src="${opts.restSrc}"></template>` : `<template id="bhRest">${deferred.join('\n')}</template>`;
+  return `${FD_HEART_SYMBOL}<ul class="card-grid" id="bhResults"${firstBatch.length === 0 ? ' hidden' : ''}>
     ${firstBatch.join('\n')}
   </ul>
   <div class="fd-more-row"><button type="button" class="fd-show-more" id="bhShowMore"${matchCount > firstBatch.length ? '' : ' hidden'}>Show more</button></div>
-  <template id="bhRest">${deferred.join('\n')}</template>`;
+  ${rest}`;
 }
 
 // The inline script: the Food & Drink hub's interaction contract (chips,
@@ -22368,11 +22384,14 @@ function renderBrowseHubScriptHtml() {
   };
   return `<script>
 (function(){
+function bhStart(){
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
   var FEATURE_CHIP = ${JSON.stringify(BROWSE_FEATURE_CHIP)};
   var NEAR_ME = ${JSON.stringify(BROWSE_NEAR_ME_COORDS)};
   var dataEl = document.getElementById('bhVenueData');
   var DATA = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
+  // Search words for every place arrive with the rest of the cards (2026-10-14).
+  if (window.__bhWords) Object.keys(window.__bhWords).forEach(function(id){ if (DATA[id]) DATA[id].k = window.__bhWords[id]; });
   var typeChips = Array.prototype.slice.call(document.querySelectorAll('[data-bh-type]'));
   var featureChips = Array.prototype.slice.call(document.querySelectorAll('[data-bh-feature]'));
   var regionChips = Array.prototype.slice.call(document.querySelectorAll('[data-region]'));
@@ -22452,11 +22471,27 @@ function renderBrowseHubScriptHtml() {
     var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
                  d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
                  d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
-                 d.cu || '', meta ? meta.textContent : '', desc ? desc.textContent : '', d.n || ''];
+                 d.cu || '', meta ? meta.textContent : '', desc ? desc.textContent : '', d.n || '', d.k || ''];
     card.__bh = parts.join(' ').toLowerCase();
   });
   function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
   function dataOf(card){ return DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '', cu: '', p: 0, rt: 0 }; }
+  // The Favorite / Add to trip row of a card that waited in the template (2026-10-14).
+  var HEART_USE = ${JSON.stringify(FD_HEART_USE)};
+  function bhFillActions(card){
+    var box = card.querySelector('.card-actions[data-fd-lazy]'); if (!box) return;
+    var name = card.getAttribute('data-venue-name') || '', region = card.getAttribute('data-venue-region') || '', id = card.getAttribute('data-venue-id');
+    var fav = document.createElement('button');
+    fav.type = 'button'; fav.className = 'card-action fav-btn';
+    fav.setAttribute('data-fav-name', name); fav.setAttribute('aria-pressed', 'false'); fav.setAttribute('aria-label', 'Favorite ' + name);
+    fav.innerHTML = HEART_USE + ' Favorite';
+    var trip = document.createElement('button');
+    trip.type = 'button'; trip.className = 'card-action trip-btn';
+    trip.setAttribute('data-trip-name', name); trip.setAttribute('data-trip-query', name + ', ' + (LABELS.regions[region] || region) + ', Okanagan Valley, BC');
+    trip.setAttribute('data-trip-region', region); trip.setAttribute('data-trip-ref', 'venue:' + id); trip.setAttribute('aria-pressed', 'false'); trip.setAttribute('aria-label', 'Add ' + name + ' to trip');
+    trip.textContent = '\u{1F9F3} Add to trip';
+    box.appendChild(fav); box.appendChild(trip); box.removeAttribute('data-fd-lazy');
+  }
   function sortCards(){
     ordered = cards.slice();
     if (sortKey === 'rating') ordered.sort(function(a, b){ var x = dataOf(a).rt || -1, y = dataOf(b).rt || -1; return y - x || Number(a.getAttribute('data-bh-i')) - Number(b.getAttribute('data-bh-i')); });
@@ -22533,6 +22568,7 @@ function renderBrowseHubScriptHtml() {
     var visible = matches.slice(0, page * PAGE_SIZE);
     if (results) {
       var fresh = visible.filter(function(c){ return c.parentNode !== results; });
+      fresh.forEach(bhFillActions);
       results.replaceChildren.apply(results, visible);
       if (fresh.length && window.__ogWireVenueCards) window.__ogWireVenueCards(fresh);
     }
@@ -22735,10 +22771,44 @@ function renderBrowseHubScriptHtml() {
   apply('replace');
   // A link that arrives with ?q= ran the wizard's search (and its event).
   if (hadQuery && searchTerm && window.trackEvent) window.trackEvent('search', { search_term: searchTerm });
+}
+  // Only the first page of cards comes with the page (2026-10-14); every
+  // other card and the search words load from /browse/cards.json right after
+  // it appears, and the filters start once they are in.
+  var tplEl = document.getElementById('bhRest'), src = tplEl && tplEl.getAttribute('data-src');
+  if (!src || !window.fetch) { bhStart(); return; }
+  fetch(src).then(function(r){ return r.json(); }).then(function(d){
+    var have = {};
+    Array.prototype.forEach.call(document.querySelectorAll('#bhResults > .venue-card'), function(c){ have[c.getAttribute('data-venue-id')] = 1; });
+    var t = document.createElement('template'); t.innerHTML = d.html || '';
+    Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) tplEl.content.appendChild(c); });
+    window.__bhWords = d.k || {};
+  }).catch(function(){}).then(bhStart);
 })();
 </script>`;
 }
 
+function browseRecommendedOrder(venues) {
+  return venues.slice().sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || String(a.name).localeCompare(String(b.name)));
+}
+// /browse/cards.json (2026-10-14): every card (Favorite / Add to trip built on
+// show) and every place's search words. The page asks for it with a version
+// that changes whenever the listing changes, so a cached copy never mixes
+// with a newer page.
+function browseRestPayload(venues, now = new Date()) {
+  const recommended = browseRecommendedOrder(venues);
+  const orderById = new Map(recommended.map((v, i) => [v.id, i]));
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
+  const html = browseBatchedCardsHtml(recommended, new Set(), 0, advisoryNotes, openInfo.byId, orderById, { restOnly: true });
+  const k = {};
+  for (const v of venues) { const w = descSearchWords(v.description || ''); if (w) k[String(v.id)] = w; }
+  return { html, k };
+}
+function browseRestVersion(venues, now = new Date()) {
+  const sig = venues.map((v) => `${v.id}:${v.updated_at || ''}`).join(',') + `|${todayLocal(now)}`;
+  return crypto.createHash('md5').update(sig).digest('hex').slice(0, 12);
+}
 function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   const cuisines = browseCuisines(venues);
   const f = filter || parseBrowseHubQuery({}, cuisines);
@@ -22783,10 +22853,14 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   }
   // Sort the server-rendered list the same way the page script will (stable
   // against the A-Z order the venues arrive in), so ?sort= has no reorder jump.
-  let listVenues = venues;
-  if (f.sort === 'rating') listVenues = venues.slice().sort((a, b) => ((Number(b.rating) || -1) - (Number(a.rating) || -1)));
-  const orderById = new Map(venues.map((v, i) => [v.id, i]));
-  const cardsHtml = browseBatchedCardsHtml(listVenues, matchIds, matching.length, advisoryNotes, openInfo.byId, orderById);
+  // Recommended (2026-10-14) is the default order: rating weighted by review
+  // count, as on Food & Drink (it was A-Z, opening on "13th Street Viewpoint").
+  const recommended = browseRecommendedOrder(venues);
+  let listVenues = recommended;
+  if (f.sort === 'rating') listVenues = recommended.slice().sort((a, b) => ((Number(b.rating) || -1) - (Number(a.rating) || -1)));
+  if (f.sort === 'name') listVenues = venues;
+  const orderById = new Map(recommended.map((v, i) => [v.id, i]));
+  const cardsHtml = browseBatchedCardsHtml(listVenues, matchIds, matching.length, advisoryNotes, openInfo.byId, orderById, { restSrc: `/browse/cards.json?v=${browseRestVersion(venues, now)}` });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -26630,6 +26704,10 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
 
+    if (pathname === '/browse/cards.json' && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=600' });
+      return res.end(JSON.stringify(browseRestPayload(getBrowseHubVenues())));
+    }
     // /browse (2026-10-05) is the hub-style all-venue directory
     // (renderBrowseHubPage). The previous wizard page -- okanagan.html with the
     // swaps below -- is still served, unchanged, at /browse/classic (noindex).
@@ -29475,6 +29553,7 @@ module.exports = {
   dogChipCounts,
   dogSummaryText,
   renderDogHubPage,
+  browseRestPayload,
   renderOutdoorsHubPage,
   renderBeachesHubPage,
   renderToursSectionPage,
