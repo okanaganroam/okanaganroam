@@ -8912,8 +8912,9 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.equal((markup.replace(/<div class="category-banner" id="fdBanner"[^>]*><img [^>]*><\/div>/, '').match(/<img/g) || []).length, 0, 'no images above or among the controls besides the category banner');
   assert.doesNotMatch(markup.slice(0, markup.indexOf('<li class="venue-card"')), /<h2[^>]*class="category-subsection-heading"/, 'no visible step headings above the results');
   assert.match(markup, /<h2 class="visually-hidden" id="fdResultsTop">Results<\/h2>/, 'the Results heading is screen-reader only');
-  assert.doesNotMatch(markup, /<select/, 'no dropdown controls');
-  assert.doesNotMatch(markup, /id="fdSort"|data-fd-sort/, 'no Sort control');
+  // Sort (2026-10-14): the one dropdown is the native Sort select in the result bar.
+  assert.equal((markup.match(/<select/g) || []).length, 1, 'one dropdown control');
+  assert.match(markup, /<div class="fd-resultbar">[\s\S]*?<select id="fdSort" class="fd-sort-select"><option value="recommended" selected>Recommended<\/option><option value="rating">Top rated<\/option><option value="az">A\u2013Z<\/option><\/select>/, 'the Sort control sits in the result bar');
 
   // Venue types: All + the five, with counts, and NO wineries.
   assert.deepEqual([...markup.matchAll(/data-fd-type="([a-z]+)"/g)].map((m) => m[1]), app.FD_HUB_TYPES.map((t) => t.type));
@@ -18652,4 +18653,139 @@ test('Homepage events: a Halloween event gets the pumpkin photo (not the Christm
   const second = app.homeEventImage({ name: 'Another game night', categories: ['sports-recreation'] }, used);
   assert.notEqual(second, '/images/whats-on/sports-recreation-800.jpg');
   for (const url of used) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', url)), url);
+});
+
+// ---------- Food & Drink 10/10 pass (2026-10-14) ----------
+test('Food & Drink sort: Recommended weighs rating by review count, ignores editorial flags; Top rated and A-Z are plain', () => {
+  const mk = (id, name, rating, reviews, extra = {}) => ({ id, name, rating, reviews, hours: '{}', description: 'x'.repeat(150), ...extra });
+  const list = [mk(1, 'Few Reviews', 5.0, 10), mk(2, 'Proven', 4.7, 900), mk(3, 'Unrated', null, null), mk(4, '14th Ave', 4.2, 50)];
+  assert.deepEqual(app.sortFoodDrinkVenues(list, 'recommended').map((v) => v.id), [2, 1, 4, 3]);
+  assert.deepEqual(app.sortFoodDrinkVenues(list, 'rating').map((v) => v.id), [1, 2, 4, 3]);
+  assert.deepEqual(app.sortFoodDrinkVenues(list, 'az').map((v) => v.name), ['14th Ave', 'Few Reviews', 'Proven', 'Unrated']);
+  // Local Favourite / Hidden Gem never change the score: no featured placement by the back door.
+  assert.equal(app.foodDrinkRecommendedScore(mk(5, 'A', 4.5, 100)), app.foodDrinkRecommendedScore(mk(5, 'A', 4.5, 100, { local_favorite: 1, hidden_gem: 1 })));
+  assert.deepEqual(app.FD_SORTS.map((s) => s.key), ['recommended', 'rating', 'az']);
+});
+
+test('Food & Drink hub: ?sort= picks the order, the page script can re-sort, and unknown values fall back to Recommended', async () => {
+  const venues = app.getFoodDrinkHubVenues();
+  const names = (html) => [...html.matchAll(/data-venue-name="([^"]*)"/g)].map((m) => m[1]);
+  const az = app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [], sort: 'az' });
+  const azNames = names(az);
+  assert.deepEqual(azNames.slice(0, 5), [...azNames].slice(0, 5).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })));
+  assert.match(az, /<option value="az" selected>/);
+  const rec = app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] });
+  assert.match(rec, /<option value="recommended" selected>/);
+  const payload = JSON.parse(rec.match(/id="fdVenueData">([\s\S]*?)<\/script>/)[1].replace(/\\u003c/g, '<'));
+  const firstId = rec.match(/<li class="venue-card" data-fd-i="0" data-venue-id="(\d+)"/)[1];
+  assert.equal(payload[firstId].o, 0, 'the first card is Recommended #1');
+  await withDiscoveryServer(async (base) => {
+    const res = await fetch(`${base}/food-drink?sort=bogus`);
+    assert.match(await res.text(), /<option value="recommended" selected>/);
+    const az2 = await (await fetch(`${base}/food-drink?sort=az`)).text();
+    assert.match(az2, /<option value="az" selected>/);
+  });
+});
+
+test('Food & Drink payload hours: the compact string expands back to exactly what hours.js reads', () => {
+  const hours = require('../hours.js');
+  const samples = [
+    { mon: [['11:00', '23:00']], tue: [['11:00', '23:00']], wed: [['11:00', '23:00']], thu: [['11:00', '23:00']], fri: [['11:00', '23:00']], sat: [['11:00', '23:00']], sun: [['11:00', '23:00']] },
+    { mon: null, tue: [['11:30', '19:00']], wed: [], thu: [['7:00', '11:00'], ['17:00', '2:00']], fri: [['11:30', '19:00']], sat: [['11:30', '22:00']] },
+  ];
+  for (const venue of app.getFoodDrinkHubVenues()) if (venue.hours) { try { samples.push(JSON.parse(venue.hours)); } catch (e) { /* not JSON */ } }
+  for (const h of samples) {
+    const packed = app.compactFoodDrinkHours(h);
+    assert.deepEqual(hours.parseHours(app.expandFoodDrinkHours(packed)), hours.parseHours(h), JSON.stringify(h));
+  }
+  assert.equal(app.compactFoodDrinkHours(samples[0]), '11:00-23:00', 'seven equal days pack to one');
+  assert.equal(app.compactFoodDrinkHours(samples[1]), 'x|11:30-19:00|x|7:00-11:00,17:00-2:00|11:30-19:00|11:30-22:00|?');
+  const odd = { mon: 'by appointment' };
+  assert.equal(app.compactFoodDrinkHours(odd), odd, 'anything unusual ships unchanged');
+});
+
+test('Food & Drink cards: an example photo of the place type on every hub card, real files only, and a venue photo wins', () => {
+  const all = [...Object.values(app.FD_CARD_PHOTOS).flat(), ...Object.values(app.FD_CARD_DOG_PHOTOS), '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg'];
+  for (const src of all) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
+  const venues = app.getFoodDrinkHubVenues();
+  const html = app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] });
+  const cards = html.match(/<li class="venue-card"[^>]*>/g) || [];
+  assert.equal(cards.length, venues.length);
+  assert.ok(cards.every((c) => /data-ph="[a-z]+(?:-(?:\d|dog))?"/.test(c)), 'every card names its photo');
+  for (const key of new Set(cards.map((c) => c.match(/data-ph="([^"]+)"/)[1]))) assert.ok(html.includes(`li.venue-card[data-ph="${key}"]{--fd-ph:url(`), key);
+  assert.equal(app.foodDrinkCardPhotoKey({ id: 7, type: 'restaurant', cuisine: 'Ramen' }), 'noodle');
+  assert.equal(app.foodDrinkCardPhotoKey({ id: 9, type: 'pub', dog_friendly: 1 }), 'pub-dog');
+  assert.equal(app.foodDrinkCardPhotoKey({ id: 10, type: 'pub', dog_friendly: 1 }), 'pub-0');
+  const own = app.renderFoodDrinkHubPage([{ ...venues[0], image_url: '/images/food-drink/cafes-800.jpg' }, ...venues.slice(1)], { types: [], features: [], regions: [] });
+  assert.match(own, new RegExp(`data-venue-id="${venues[0].id}" data-ph="own" style="--fd-ph:url\\('/images/food-drink/cafes-800.jpg'\\)"`));
+  const bad = app.renderFoodDrinkHubPage([{ ...venues[0], image_url: "javascript:alert('x')" }, ...venues.slice(1)], { types: [], features: [], regions: [] });
+  assert.doesNotMatch(bad, /javascript:alert/, 'only https or /images/ photos are used');
+  // The lake illustration is switched off only on cards that carry a photo key.
+  assert.match(html, /body\.fd-page li\.venue-card\[data-ph\]:not\(\.whatson-event-card\) \{ background-image: none !important;/);
+});
+
+test('Food & Drink page weight: template cards ship an empty action row that the script rebuilds identically', () => {
+  const venues = app.getFoodDrinkHubVenues();
+  const html = app.renderFoodDrinkHubPage(venues, { types: [], features: [], regions: [] });
+  const live = html.slice(html.indexOf('id="fdResults"'), html.indexOf('<template id="fdRest">'));
+  const rest = html.slice(html.indexOf('<template id="fdRest">'));
+  assert.equal((live.match(/class="card-action fav-btn"/g) || []).length, Math.min(app.FD_PAGE_SIZE, venues.length), 'shown cards keep server buttons');
+  assert.equal((rest.match(/class="card-action fav-btn"/g) || []).length, 0);
+  assert.equal((rest.match(/<div class="card-actions" data-fd-lazy><\/div>/g) || []).length, Math.max(0, venues.length - app.FD_PAGE_SIZE));
+  assert.equal((html.match(/<symbol id="fdHeart"/g) || []).length, 1, 'one shared heart');
+  // Rebuild one template card's buttons with the page's own function and compare to the server markup.
+  const script = html.match(/<script>\s*\(function\(\)\{\s*var LABELS[\s\S]*?<\/script>/)[0];
+  const fnSrc = script.slice(script.indexOf('var HEART_USE'), script.indexOf('box.removeAttribute(\'data-fd-lazy\');\n  }') + 'box.removeAttribute(\'data-fd-lazy\');\n  }'.length);
+  const labels = JSON.parse(script.match(/var LABELS = (\{[\s\S]*?\});\n/)[1]);
+  const el = () => ({ attrs: {}, kids: [], setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; }, appendChild(c) { this.kids.push(c); } });
+  const venue = venues.find((v) => v.region === 'kelowna') || venues[0];
+  const box = el(); box.attrs['data-fd-lazy'] = '';
+  const card = { getAttribute: (k) => ({ 'data-venue-name': venue.name, 'data-venue-region': venue.region, 'data-venue-id': String(venue.id) })[k], querySelector: () => box };
+  const vm = require('node:vm');
+  const ctx = { LABELS: labels, document: { createElement: el }, card };
+  vm.runInNewContext(`${fnSrc}; fdFillActions(card);`, ctx);
+  const [fav, trip] = box.kids;
+  assert.equal(fav.className, 'card-action fav-btn');
+  assert.deepEqual(fav.attrs, { 'data-fav-name': venue.name, 'aria-pressed': 'false', 'aria-label': `Favorite ${venue.name}` });
+  assert.equal(fav.innerHTML, `${app.FD_HEART_USE} Favorite`);
+  assert.equal(trip.className, 'card-action trip-btn');
+  assert.deepEqual(trip.attrs, { 'data-trip-name': venue.name, 'data-trip-query': `${venue.name}, ${labels.regions[venue.region]}, Okanagan Valley, BC`, 'data-trip-region': venue.region, 'data-trip-ref': `venue:${venue.id}`, 'aria-pressed': 'false', 'aria-label': `Add ${venue.name} to trip` });
+  assert.equal(trip.textContent, '\u{1F9F3} Add to trip');
+  assert.ok(!('data-fd-lazy' in box.attrs));
+});
+
+test('Food & Drink search: every word in any order, plurals, accents, synonyms, and a typo is corrected', () => {
+  const html = app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), { types: [], features: [], regions: [] });
+  const script = html.match(/<script>\s*\(function\(\)\{\s*var LABELS[\s\S]*?<\/script>/)[0];
+  assert.doesNotThrow(() => new Function(script.replace(/^<script>|<\/script>$/g, '')), 'the page script parses');
+  const src = script.slice(script.indexOf('  // Folded text is lower case'), script.indexOf('  var searchNote'));
+  const vm = require('node:vm');
+  const texts = ['Kelowna Restaurants Patio The best tacos in town', 'Penticton Cafes Coffee and croissants', 'Kelowna Cafes Sushi bar', 'Vernon Breweries Craft beer and a taco truck', 'Kelowna Restaurants Open early breakfast', "Earls Kitchen + Bar Kelowna Restaurants", 'Kelowna Cafés crème brûlée'];
+  const ctx = {};
+  vm.runInNewContext(`${src}; var cards = ${JSON.stringify(texts)}.map(function(t){ return { __fd: fdFold(t) }; }); function hitsRaw(q){ searchPlan = fdPlan(q); return cards.map(function(c, i){ return fdSearchHit(c) ? i : -1; }).filter(function(i){ return i >= 0; }); } this.hits = function(q){ return JSON.stringify(hitsRaw(q)); }; this.plan = function(q){ return fdPlan(q); };`, ctx);
+  const H = (q) => JSON.parse(ctx.hits(q));
+  assert.deepEqual(H('kelowna patio'), [0]);
+  assert.deepEqual(H('patio kelowna'), [0], 'any order');
+  assert.deepEqual(H('penticton coffee'), [1]);
+  assert.deepEqual(H('coffee'), [1, 2, 6], 'coffee reaches cafés');
+  assert.deepEqual(H('beer vernon'), [3]);
+  assert.deepEqual(H('taco'), [0, 3]);
+  assert.deepEqual(H('tacos'), [0, 3], 'plural reaches the singular');
+  assert.deepEqual(H("earl's"), [5], 'apostrophes ignored, and "earl" never matches "early"');
+  assert.deepEqual(H('creme brulee'), [6], 'accents ignored');
+  assert.deepEqual(H('the best sushi in kelowna'), [2], 'filler words ignored');
+  assert.equal(ctx.plan('sushii').corrected, 'sushi');
+  assert.deepEqual(H('sushii'), [2]);
+  assert.equal(ctx.plan('zzzzqqq').corrected, null);
+  assert.deepEqual(H('zzzzqqq'), []);
+});
+
+test('Food & Drink phone layout and empty state: one row of controls, a short label, and a no-results message that names the search', () => {
+  const html = app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), { types: [], features: [], regions: [] });
+  assert.match(html, /<span class="fd-pop-long">What are you looking for\?<\/span><span class="fd-pop-short">Filters<\/span>/);
+  assert.match(html, /<div class="fd-no-results" id="fdNoResults" hidden><p><span id="fdNoResultsText">No places match that combination yet\.<\/span> <a href="\/food-drink" id="fdNoResultsClear">Clear the filters<\/a>/);
+  assert.match(html, /<p class="fd-search-note" id="fdSearchNote" hidden><\/p>/);
+  assert.match(html, /<p class="fd-open-note fd-open-note-end">/, 'the open-now note sits under the list');
+  assert.match(html, /@media \(max-width: 640px\) \{\n    body\.fd-page \.category-banner \{ aspect-ratio: 5 \/ 2;/);
+  assert.match(html, /@media \(min-width: 1180px\) \{ body\.fd-page \.card-grid:has\(> li\.venue-card\[data-ph\]\) \{ grid-template-columns: repeat\(3, 1fr\); \} \}/);
 });
