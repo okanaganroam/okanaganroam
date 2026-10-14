@@ -15835,7 +15835,7 @@ test('Browse hub: the page script\'s filter predicate is the server\'s (checked 
 
 test('Browse hub: the page script keeps /browse\'s GA4 events (names and parameters) and the hub\'s filter_change; no venue_impression stream', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
   const html = await (await fetch(`${base}/browse`)).text();
-  const script = html.slice(html.lastIndexOf('<script>\n(function(){\n  var LABELS'), html.lastIndexOf('</script>'));
+  const script = html.slice(html.lastIndexOf('<script>\n(function(){\nfunction bhStart(){\n  var LABELS'), html.lastIndexOf('</script>'));
   assert.ok(script.length > 5000, 'the page script is present');
   // The wizard's events, with their parameters.
   assert.ok(script.includes("window.trackEvent('select_venue_type', { venue_type: value })"));
@@ -15855,7 +15855,9 @@ test('Browse hub: the page script keeps /browse\'s GA4 events (names and paramet
   assert.ok(html.includes("track('description_expand'") || html.includes("'description_expand'"), 'Read more events are the hub\'s own');
   // Favorite / Add to Trip still come from app.js (add_to_favorites / add_to_trip) and the card script (venue_favorite).
   assert.match(html, /<button type="button" class="card-action fav-btn"/); assert.match(html, /<button type="button" class="card-action trip-btn"/);
-  assert.doesNotMatch(script, /fetch\(|XMLHttpRequest|sendBeacon/, 'no network of its own');
+  // Its only request is the rest of its own cards, from this site (2026-10-14).
+  assert.doesNotMatch(script, /XMLHttpRequest|sendBeacon/, 'no network of its own');
+  assert.deepEqual(script.match(/fetch\([^)]*\)/g), ['fetch(src)'], 'the one fetch is the cards file named in the page');
   assert.doesNotMatch(script, /MutationObserver/, 'no body-wide observer');
   assert.equal((script.match(/setInterval\(/g) || []).length, 1, 'one 60-second clock tick, like the other hubs');
 })));
@@ -15930,7 +15932,7 @@ test('Browse hub: the whole card opens the venue page through one title link (no
   assert.match(html, /body\.browse-page #bhResults > \.venue-card \.card-actions,[\s\S]*?\{ position: relative; z-index: 1; \}/);
   assert.match(html, /a\.venue-card-link:focus-visible::after \{ outline: 3px solid var\(--teal\)/);
   // Navigation is the browser's own: the page script never navigates on card clicks.
-  const script = html.slice(html.lastIndexOf('<script>\n(function(){\n  var LABELS'), html.lastIndexOf('</script>'));
+  const script = html.slice(html.lastIndexOf('<script>\n(function(){\nfunction bhStart(){\n  var LABELS'), html.lastIndexOf('</script>'));
   assert.doesNotMatch(script, /location\.(href|assign)\s*=|location\.assign\(|window\.open\(/, 'no card-click navigation script');
   // The overlay is Browse-only: the other hubs keep their cards exactly as they were.
   const fd = await (await fetch(`${base}/food-drink`)).text();
@@ -19427,4 +19429,22 @@ test('Sections on the shared engine (2026-10-14): Outdoors, Beaches, Tours, Ski 
     assert.doesNotMatch(gh, /Value index unavailable/);
     assert.match(gh, /data-card-ph style="--card-ph:url\('/);
   }
+}));
+
+
+test('Browse (2026-10-14): only the first page of cards ships with /browse; the rest and the search words come from /browse/cards.json', () => withDiscoveryServer(async (base) => {
+  const html = await (await fetch(`${base}/browse`)).text();
+  const m = html.match(/<template id="bhRest" data-src="(\/browse\/cards\.json\?v=[0-9a-f]{12})"><\/template>/);
+  assert.ok(m, 'the template points at the rest of the cards');
+  assert.doesNotMatch(html.match(/<script type="application\/json" id="bhVenueData">([\s\S]*?)<\/script>/)[1], /"k":/, 'search words are not in the page');
+  const grid = (html.match(/<ul class="card-grid" id="bhResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
+  assert.ok([...grid.matchAll(/<li class="venue-card"[^>]*>/g)].every((x) => /data-ph="/.test(x[0])), 'a photo on every card');
+  const rest = await fetch(base + m[1]);
+  assert.equal(rest.status, 200);
+  const data = await rest.json();
+  const venues = app.getBrowseHubVenues();
+  assert.equal((data.html.match(/<li class="venue-card"/g) || []).length, venues.length, 'every place is in the rest');
+  assert.ok(!/<button type="button" class="card-action/.test(data.html), 'buttons are built when a card is shown');
+  assert.ok(Object.keys(data.k).length > 0, 'search words for the places');
+  assert.match(html, /<option value=""[^>]*>Recommended<\/option>/);
 }));
