@@ -7,7 +7,7 @@ const { beachPhotoForVenue, BEACH_PHOTO_MANIFEST } = require('../beach-photo-fal
 test('verified beach photos are local fallbacks and never replace a supplied venue photo', () => {
   assert.equal(
     beachPhotoForVenue({ type: 'beach', region: 'Penticton', slug: 'three-mile-beach', image_url: null }),
-    '/images/beaches/venues/penticton-three-mile-beach.jpg?v=beach-photo-1',
+    '/images/beaches/venues/penticton-three-mile-beach.jpg?v=beach-photo-2',
   );
   assert.equal(
     beachPhotoForVenue({ type: 'beach', region: 'Penticton', slug: 'three-mile-beach', image_url: 'https://example.com/owner-photo.jpg' }),
