@@ -21674,7 +21674,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const themedShell = usesThemedVenueShell(venue.type);
   const themedHeroTitle = themedShell && !venue.image_url;
   const heroPhoto = themedHeroTitle ? venueHeroPhoto(venue) : null;
-  const photoCredit = venue.image_url ? ownerPhotoCreditFor(venue.image_url) : null;
+  const photoCredit = venue.image_url ? (ownerPhotoCreditFor(venue.image_url) || require('./data/venue-photo-credits.json')[venue.image_url]) : null;
   const imageHtml = venue.image_url
     ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>${photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : ''}`
     : themedHeroTitle

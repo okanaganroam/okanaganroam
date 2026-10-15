@@ -1,0 +1,54 @@
+{
+  "reason": "Owner-authorized venue-submitted photo publication; preserve original email/Drive permission records.",
+  "batch_id": "venue-photos-2026-10-15",
+  "venues": [
+    {
+      "id": 819,
+      "name": "Blue Mountain Vineyard and Cellars",
+      "region": "okanagan-falls",
+      "slug": "blue-mountain-vineyard-and-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blue-mountain-outdoor-tasting.jpg"
+      }
+    },
+    {
+      "id": 308,
+      "name": "JoieFarm Winery",
+      "region": "naramata",
+      "slug": "joiefarm-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/joiefarm-tasting-room.jpg"
+      }
+    },
+    {
+      "id": 1627,
+      "name": "Marmalade Bakery",
+      "region": "penticton",
+      "slug": "marmalade-bakery",
+      "expect": {
+        "image_url": "https://lh3.googleusercontent.com/d/1Ho_cKkCoYu16xjqsMKjoRd_kTlIK8Gxh"
+      },
+      "set": {
+        "image_url": "/images/venues/marmalade-bakery-cupcakes.jpg"
+      }
+    },
+    {
+      "id": 526,
+      "name": "Priest Creek Family Estate Winery",
+      "region": "kelowna",
+      "slug": "priest-creek-family-estate-winery",
+      "expect": {
+        "image_url": "https://lh3.googleusercontent.com/d/1udkmbYJcoLni0KhX8eJyea0og_cJLSR2"
+      },
+      "set": {
+        "image_url": "/images/venues/priest-creek-winery-exterior.jpg"
+      }
+    }
+  ]
+}
