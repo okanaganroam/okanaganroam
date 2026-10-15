@@ -3767,6 +3767,29 @@ test('S4 #5: public event reads need no auth and ignore a wrong bearer', async (
   assert.equal((await s4request('GET', '/api/events/999999')).status, 404);
 });
 
+test('sports listings show a matched local photo on the valley hub, region category, and API', async () => {
+  const result = db.prepare(`INSERT INTO venues (name, region, type, description, slug)
+    VALUES (?, ?, ?, ?, ?)`).run(
+    'Crawford Trails – Myra-Bellevue Provincial Park', 'kelowna', 'sport', 'Fixture sports photo.', 'sports-photo-fixture',
+  );
+  try {
+    const api = await s4request('GET', '/api/venues?region=kelowna&type=sport');
+    assert.equal(api.status, 200);
+    const venue = api.json.venues.find((item) => item.id === Number(result.lastInsertRowid));
+    assert.equal(venue?.image_url, '/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-1');
+
+    const hub = await s4request('GET', '/sports');
+    assert.equal(hub.status, 200);
+    assert.match(hub.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-1'\)"/);
+
+    const region = await s4request('GET', '/kelowna/sports');
+    assert.equal(region.status, 200);
+    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-1'\)"/);
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(Number(result.lastInsertRowid));
+  }
+});
+
 test('S4 #6-#9: today / this-weekend / this-week / this-month windows come from the Okanagan local date', async () => {
   const today = app.todayLocal();
   for (const when of ['today', 'this-weekend', 'this-week', 'this-month']) {

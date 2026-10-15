@@ -7,6 +7,7 @@ const db = require('./db');
 // Beach photo fallbacks; optional like french-text, so an isolated copy of server.js + db.js (the fail-closed tests)
 // still starts, keeping each venue's own image.
 const { beachPhotoForVenue } = (() => { try { return require('./beach-photo-fallbacks'); } catch (e) { return { beachPhotoForVenue: (v) => v.image_url }; } })();
+const { sportsPhotoForVenue } = (() => { try { return require('./sports-photo-fallbacks'); } catch (e) { return { sportsPhotoForVenue: (v) => v.image_url }; } })();
 // Golf course data (2026-09-26): verified green fees, course profiles and
 // links to official course maps -- golf pages only. Guarded like db.js so a
 // copy of the app without golf-data.js renders exactly as before.
@@ -201,6 +202,9 @@ function rowToVenue(row) {
   // Exact-place beach photography stays local and is only a fallback; an
   // image supplied on the venue record always takes precedence.
   v.image_url = beachPhotoForVenue(v);
+  // Sports/recreation photography is also a per-listing local fallback;
+  // existing venue-provided images still take precedence.
+  v.image_url = sportsPhotoForVenue(v);
   for (const f of BOOL_FIELDS) {
     v[f] = !!row[f];
   }
@@ -14340,6 +14344,23 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   // Season-only notices render as a compact tag on list cards (2026-10-11).
   const seasonTags = seasonOnlyStates();
   let cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
+
+  if (type === 'sport') {
+    const photoById = new Map(venues.map((v) => [v.id, String(v.image_url || '').trim()]));
+    const addPhotos = (html) => html.replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (match, id) => {
+      const src = photoById.get(Number(id)) || '';
+      return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(src)
+        ? `${match} data-card-ph style="--card-ph:url('${escapeHtml(src)}')"`
+        : match;
+    });
+    return `<style id="sport-card-photos">
+  li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
+  li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
+</style>
+  <ul class="card-grid">
+    ${addPhotos(cardHtml(venues))}
+  </ul>`;
+  }
 
   if (type !== 'golf') {
     return `<ul class="card-grid">
