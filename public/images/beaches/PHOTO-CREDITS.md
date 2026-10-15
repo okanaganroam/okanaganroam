@@ -90,8 +90,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/coldstream-kal-beach.jpg`
 
 ## 18. Rotary Beach Park (Oliver) — READY
-- Source: www.ehcanadatravel.com
-- [Source page](https://www.ehcanadatravel.com/british-columbia/okanagan/oliver/parks-trails/4667-rotary-beach-park-1.html) · [Original image](https://www.ehcanadatravel.com/images/sobipro/entries/4667/img_rotary-beach-oliver.jpg)
+- Source: Exploratory Glory
+- [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/rotary-beach-tuc-el-nuit-lake-oliver-bc) · [Original image](https://images.squarespace-cdn.com/content/5adf25b575f9ee4695083a1a/1602674339798-CZ0T00ROATGE9YTC9UJW/IMG_7088.jpeg?content-type=image%2Fjpeg&format=2500w)
 - Local file: `/images/beaches/venues/oliver-rotary-beach-park.jpg`
 
 ## 19. Osoyoos Lake Regional Park — READY
@@ -110,8 +110,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/lake-country-kaloya-regional-park.jpg`
 
 ## 22. Christie Memorial Park — READY
-- Source: www.flickr.com
-- [Source page](https://www.flickr.com/photos/23870098@N04/52122818946) · [Original image](https://live.staticflickr.com/65535/52122818946_ae253aa0d1.jpg)
+- Source: Exploratory Glory
+- [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/christie-memorial-park-okanagan-falls-bc) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1602893599214-1Q41I8XIWTSZD8Y2I9PN/Christie-Memorial-Park-Okanagan-Falls-BC.jpeg?format=2500w)
 - Local file: `/images/beaches/venues/okanagan-falls-christie-memorial-park.jpg`
 
 ## 23. Coral Beach Park — READY
@@ -140,8 +140,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/osoyoos-cottonwood-park.jpg`
 
 ## 28. Fintry Provincial Park — READY
-- Source: www.fintry.ca
-- [Source page](https://www.fintry.ca/fintryprovincialpark) · [Original image](https://static.wixstatic.com/media/820cd4_9efb87bd61ce42c69220820badda1530~mv2.png/v1/fill/w_300,h_180,al_c,q_85,enc_avif,quality_auto/820cd4_9efb87bd61ce42c69220820badda1530~mv2.png)
+- Source: Exploratory Glory
+- [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/fintry-provincial-park-okanagan) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1648618908521-3F84H9J5C2TGK5KXEQ0L/IMG_7344.jpeg?format=2500w)
 - Local file: `/images/beaches/venues/west-kelowna-fintry-provincial-park.jpg`
 
 ## 29. Antlers Beach Regional Park — READY
