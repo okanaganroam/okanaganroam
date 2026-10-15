@@ -756,6 +756,8 @@ const FR_TEXT = {
   'April {0} to close': 'Du {0} avril à la fermeture',
   // 404 page.
   'We couldn’t find that page': 'Page introuvable',
+  'Page Not Found | Okanagan Roam': 'Page introuvable | Okanagan Roam',
+  'We couldn\'t find a venue or page at that address.': 'Nous n’avons trouvé aucun lieu ni aucune page à cette adresse.',
   'The place or page may have moved, or the address has a typo. Search for it, or pick up from one of these.': 'Le lieu ou la page a peut-être changé d’adresse, ou l’adresse contient une coquille. Faites une recherche ou repartez de l’une de ces pages.',
   'Search Okanagan Roam': 'Rechercher dans Okanagan Roam',
   'Search a place, town or what you feel like': 'Rechercher un lieu, une ville ou une envie',
