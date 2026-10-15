@@ -28954,17 +28954,19 @@ function ownerPhotoCreditFor(imageUrl) {
   return row ? row.credit : null;
 }
 
-function buildOwnerPhotoEmail(venue, photos) {
+function buildOwnerPhotoEmail(venue, photos, live = false) {
   return {
-    _subject: `[PENDING REVIEW] ${photos.length} photo${photos.length === 1 ? '' : 's'} from ${venue.name}`,
+    _subject: `${live ? '[LIVE]' : '[PENDING REVIEW]'} ${photos.length} photo${photos.length === 1 ? '' : 's'} from ${venue.name}`,
     _template: 'table',
     _captcha: 'false',
-    'Status': 'PENDING REVIEW. These photos are not on the site until approved.',
+    'Status': live
+      ? 'LIVE NOW. Uploaded by a signed-in owner, so these went live without review. To take one down: node scripts/owner-portal.js photo-remove <id> "reason".'
+      : 'PENDING REVIEW. These photos are not on the site until approved.',
     'Venue': `${venue.name} (venue #${venue.id})`,
     'Listing': venueListingUrl(venue),
     'Photos': photos.map((p) => `#${p.id}: ${ownerPhotoPreviewUrl(p.preview_key)}`).join('\n'),
     'Credit': photos[0].credit,
-    'How to review': 'node scripts/owner-portal.js photos, then photo-approve <id> [--main] or photo-reject <id> "reason".',
+    'How to review': live ? 'node scripts/owner-portal.js photos approved, then photo-remove <id> "reason" for any that should come down.' : 'node scripts/owner-portal.js photos, then photo-approve <id> [--main] or photo-reject <id> "reason".',
   };
 }
 
@@ -29023,16 +29025,25 @@ async function handleOwnerPhotoUpload(req, res, token) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`).run(venue.id, file, previewKey, dims.width, dims.height, buf.length, credit, contactName,
     crypto.createHash('sha256').update(`okanagan-roam-owner-photo:${ip}`).digest('hex')).lastInsertRowid);
   db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
+  // Signed-in owners (who first came in through Dayton's emailed link and set a
+  // password) publish straight away; link-only uploads wait for review. Either
+  // way the notification goes out, and photo-remove takes any photo down.
+  const live = typeof token === 'function';
+  let main = false;
+  if (live) {
+    const r = approveOwnerPhoto(id, `owner:${found.account ? found.account.email : 'session'}`, {});
+    main = !!(r.ok && r.main);
+  }
   if (body.notify === true) {
     // One email per upload batch: the browser sets notify on the last photo.
-    const recent = db.prepare("SELECT id, preview_key, credit FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND submitted_at >= datetime('now', '-1 hour') ORDER BY id").all(venue.id);
+    const recent = db.prepare(`SELECT id, preview_key, credit FROM owner_photos WHERE venue_id = ? AND status = ? AND submitted_at >= datetime('now', '-1 hour') ORDER BY id`).all(venue.id, live ? 'approved' : 'pending');
     try {
-      await venueSubmissionTransport(buildOwnerPhotoEmail(venue, recent.length ? recent : [{ id, preview_key: previewKey, credit }]));
+      await venueSubmissionTransport(buildOwnerPhotoEmail(venue, recent.length ? recent : [{ id, preview_key: previewKey, credit }], live));
     } catch (err) {
       console.error(`[owner-photos] notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
     }
   }
-  return sendSubmissionResponse(res, 201, { ok: true, id, preview: `/owner-photos/preview/${previewKey}.jpg` });
+  return sendSubmissionResponse(res, 201, { ok: true, id, live, main, preview: `/owner-photos/preview/${previewKey}.jpg` });
 }
 
 function listOwnerPhotos(status = 'pending') {
@@ -29082,6 +29093,27 @@ function rejectOwnerPhoto(id, reviewer, reason) {
     .run(reviewer, String(reason || '').slice(0, 300) || null, id);
   try { fs.unlinkSync(ownerPhotoPath(p.file)); } catch (err) { /* already gone */ }
   return { ok: true };
+}
+
+// Takes a photo off the site (approved or pending): if it is the venue's
+// main photo, the listing goes back to its example photo. The file is deleted.
+function removeOwnerPhoto(id, reviewer, reason) {
+  const p = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(id);
+  if (!p) return { ok: false, reason: 'not_found' };
+  if (p.status === 'rejected') return { ok: false, reason: 'not_pending', status: p.status };
+  const url = `/images/owner/${p.file}`;
+  const venue = db.prepare('SELECT id, image_url FROM venues WHERE id = ?').get(p.venue_id);
+  let wasMain = false;
+  if (venue && venue.image_url === url) {
+    updateVenue(venue.id, { image_url: null });
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'image_url', ?, NULL, 'admin', ?, 'high', ?, 0, ?)`).run(venue.id, url, `removed owner photo #${id}`, `owner-photo-${id}`, reviewer);
+    wasMain = true;
+  }
+  db.prepare("UPDATE owner_photos SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
+    .run(reviewer, String(reason || 'removed').slice(0, 300), id);
+  try { fs.unlinkSync(ownerPhotoPath(p.file)); } catch (err) { /* already gone */ }
+  return { ok: true, was_main: wasMain };
 }
 
 function sendOwnerPhotoFile(res, file, headers) {
@@ -29572,8 +29604,8 @@ ${renderGolfHeaderHtml()}
     </form>
     <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them shortly. You can come back to this page any time to send more.</div>
     <h2 id="photos" style="margin-top:44px">Photos</h2>
-    <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. We review every photo; the best one can become the main photo on your page, credited to you.</p>
-    ${(() => { const ph = ownerPhotosForVenue(venue.id); return ph.length ? `<div class="op-photos">${ph.map((p) => `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${p.status === 'approved' ? 'Approved' : 'Waiting for review'}</figcaption></figure>`).join('')}</div>` : ''; })()}
+    <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. ${found.account ? 'Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.' : 'We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.'}</p>
+    ${(() => { const ph = ownerPhotosForVenue(venue.id); return ph.length ? `<div class="op-photos">${ph.map((p) => `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${p.status === 'approved' ? 'Live' : 'Waiting for review'}</figcaption></figure>`).join('')}</div>` : ''; })()}
     <form class="venue-form" id="ofForm" novalidate>
       <div class="form-row full"><div class="form-field">
         <label for="ofFiles">Choose photos</label>
@@ -29752,7 +29784,7 @@ ${renderGolfHeaderHtml()}
     var credit = document.getElementById('ofCredit').value;
     var btn = document.getElementById('ofSubmit'); btn.disabled = true;
     var progress = document.getElementById('ofProgress');
-    var sent = 0, problems = [];
+    var sent = 0, liveCount = 0, problems = [];
     var chain = Promise.resolve();
     files.forEach(function(file, i){
       chain = chain.then(function(){
@@ -29762,7 +29794,7 @@ ${renderGolfHeaderHtml()}
             body: JSON.stringify({ image: dataUrl, credit: credit, rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
             .then(function(r){ return r.json(); })
             .then(function(j){
-              if (j && j.ok) { sent++; return; }
+              if (j && j.ok) { sent++; if (j.live) liveCount++; return; }
               var errs = (j && j.errors) || {};
               if (errs.credit) show('ofCreditError', errs.credit);
               problems.push(file.name + ': ' + (errs.image || errs.credit || (j && j.error) || 'could not upload'));
@@ -29772,7 +29804,7 @@ ${renderGolfHeaderHtml()}
     });
     chain.then(function(){
       btn.disabled = false;
-      progress.textContent = sent ? sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded. Thanks! We will review them shortly.' : '';
+      progress.textContent = !sent ? '' : liveCount ? sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded and live on your page. Thanks!' : sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded. Thanks! We will review them shortly.';
       if (problems.length) show('ofFormError', problems.join(' '));
       if (sent) { document.getElementById('ofFiles').value = ''; }
     }).catch(function(){ btn.disabled = false; show('ofFormError', 'Could not upload. Please check your connection and try again.'); });
@@ -30714,7 +30746,7 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { status, photos: listOwnerPhotos(status) });
     }
     {
-      const m = /^\/admin\/owner-photos\/(\d+)\/(approve|reject)$/.exec(pathname);
+      const m = /^\/admin\/owner-photos\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!requireAdminToken(req, res)) return;
         let body;
@@ -30722,7 +30754,8 @@ const server = http.createServer(async (req, res) => {
         const reviewer = validateReviewer(body && body.reviewer);
         if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
         const id = Number(m[1]);
-        const r = m[2] === 'approve' ? approveOwnerPhoto(id, reviewer, { main: typeof body.main === 'boolean' ? body.main : undefined }) : rejectOwnerPhoto(id, reviewer, body.reason);
+        const r = m[2] === 'approve' ? approveOwnerPhoto(id, reviewer, { main: typeof body.main === 'boolean' ? body.main : undefined })
+          : m[2] === 'remove' ? removeOwnerPhoto(id, reviewer, body.reason) : rejectOwnerPhoto(id, reviewer, body.reason);
         if (!r.ok) return sendJSON(res, { not_found: 404, not_pending: 409, venue_unavailable: 409, file_missing: 410 }[r.reason] || 400, { error: r.reason, status: r.status });
         return sendJSON(res, 200, { id, ...r });
       }
@@ -33159,6 +33192,7 @@ module.exports = {
   jpegDimensions,
   approveOwnerPhoto,
   rejectOwnerPhoto,
+  removeOwnerPhoto,
   listOwnerPhotos,
   hashOwnerPassword,
   checkOwnerPassword,
