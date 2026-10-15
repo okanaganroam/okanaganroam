@@ -12166,6 +12166,18 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-quick .pm-chip { box-shadow: 0 1px 6px rgba(27,43,58,0.2); border-color: transparent; }
   body.map-page .pm-quick .pm-chip[aria-pressed="true"] { box-shadow: 0 1px 6px rgba(27,43,58,0.35); }
   body.map-page .pm-quick-clear[hidden] { display: none; }
+  /* Walking (or driving) directions: a next-turn banner replaces the search, and the map follows the visitor. */
+  body.map-page .pm-navbar { display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 14px; border-radius: 18px; background: #14532D; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+  body.map-page .pm-navbar[hidden] { display: none; }
+  body.map-page .pm-stage.is-nav .pm-searchbar, body.map-page .pm-stage.is-nav .pm-quick { display: none; }
+  body.map-page .pm-nav-arrow { flex: none; width: 44px; font-size: 2.3rem; line-height: 1; text-align: center; }
+  body.map-page .pm-nav-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+  body.map-page .pm-nav-text em { font-style: normal; font-size: 0.82rem; opacity: 0.85; }
+  body.map-page .pm-nav-text strong { font-size: 1.1rem; line-height: 1.25; }
+  body.map-page .pm-nav-text span { font-size: 1rem; font-weight: 800; color: #BBF7D0; }
+  body.map-page .pm-nav-text small { font-size: 0.8rem; opacity: 0.85; }
+  body.map-page .pm-nav-end { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255,255,255,0.16); color: #fff; font-size: 1.1rem; cursor: pointer; }
+  body.map-page .pm-stage.is-nav:not(.is-following) .pm-locate { box-shadow: 0 0 0 5px rgba(29,78,216,0.35), 0 2px 10px rgba(27,43,58,0.3); }
   body.map-page .pm-toast { display: table; max-width: 100%; margin: 4px 0 0; padding: 10px 14px; border-radius: 14px; background: var(--ref-navy, #1B2B3A); color: #fff; font-size: 0.88rem; font-weight: 700; line-height: 1.35; box-shadow: 0 2px 10px rgba(0,0,0,0.25); cursor: pointer; }
   body.map-page .pm-toast:empty, body.map-page .pm-toast[hidden] { display: none; }
   body.map-page .pm-locate { position: absolute; z-index: 600; right: 12px; bottom: calc(var(--pm-sheet-h) + 14px); width: 54px; height: 54px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: #fff; color: #1D4ED8; box-shadow: 0 2px 10px rgba(27,43,58,0.3); cursor: pointer; transition: bottom 0.25s ease; }
@@ -12289,7 +12301,10 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   .pm-pin-do span { background: #6D28D9; }
   .pm-pin-event span { background: #DB2777; border-radius: 4px; transform: rotate(45deg); }
   .pm-me { background: none; border: 0; }
-  .pm-me span { display: block; width: 18px; height: 18px; margin: 2px; border-radius: 50%; background: #1D4ED8; border: 3px solid #fff; box-shadow: 0 0 0 0 rgba(29,78,216,0.5); animation: pm-pulse 2s infinite; }
+  .pm-me .pm-me-arrow { position: absolute; left: -19px; top: -19px; width: 60px; height: 60px; display: none; pointer-events: none; }
+  .pm-me.has-heading .pm-me-arrow { display: block; }
+  .pm-me .pm-me-arrow svg { display: block; }
+  .pm-me span { position: relative; display: block; width: 18px; height: 18px; margin: 2px; border-radius: 50%; background: #1D4ED8; border: 3px solid #fff; box-shadow: 0 0 0 0 rgba(29,78,216,0.5); animation: pm-pulse 2s infinite; }
   @keyframes pm-pulse { 0% { box-shadow: 0 0 0 0 rgba(29,78,216,0.5); } 70% { box-shadow: 0 0 0 14px rgba(29,78,216,0); } 100% { box-shadow: 0 0 0 0 rgba(29,78,216,0); } }
   @media (prefers-reduced-motion: reduce) { .pm-me span { animation: none; } }
 </style>`;
@@ -12299,7 +12314,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     walk: 'À pied', drive: 'En voiture', bike: 'À vélo', to: 'Vers', endRoute: 'Terminer', howGo: 'Comment y aller', routing: 'Calcul de l’itinéraire…',
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'pour le guidage vocal en voiture.', routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
-    stepsBtn: function(t){ return 'Étapes · ' + t; },
+    stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
@@ -12323,7 +12338,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     walk: 'Walk', drive: 'Drive', bike: 'Bike', to: 'To', endRoute: 'End', howGo: 'How are you getting there?', routing: 'Working out the route…',
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'for spoken directions while driving.', routeNeedsLocation: 'Share your location to get directions.',
-    stepsBtn: function(t){ return 'Steps · ' + t; },
+    stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
@@ -12462,7 +12477,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   statusEl.addEventListener('click', function(){ setStatus(''); });
   // Room taken by the search bar and the list, so fitted pins land where they can be seen.
   function pad(){
-    var st = stage.getBoundingClientRect(), fl = floatEl.getBoundingClientRect(), sh = sheet.getBoundingClientRect();
+    // The top of the clear map is below the banner, or the search and chips (not a passing message).
+    var topEl = stage.classList.contains('is-nav') ? $('pmNavbar') : $('pmPlaceFilters').hidden ? floatEl.querySelector('.pm-searchbar') : $('pmPlaceFilters');
+    var st = stage.getBoundingClientRect(), fl = topEl.getBoundingClientRect(), sh = sheet.getBoundingClientRect();
     if (WIDE.matches) return { paddingTopLeft: [Math.round(sh.right - st.left) + 24, 24], paddingBottomRight: [70, 24] };
     // The sheet may still be sliding, so use the height it is heading for.
     var state = sheet.getAttribute('data-state'), H = st.height, sheetPx = state === 'full' ? H - 124 : state === 'half' ? H * 0.52 : 150;
@@ -12562,13 +12579,15 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function durText(sec){ var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
   function startRoute(x){
     if (!MB) return false;
+    // Asked for during the tap itself (iPhone only allows the compass prompt then).
+    if (!me || !me.pin) startCompass();
     if (!me) { pendingRoute = x; if (!watching) nearBtn.click(); setStatus(T.routeNeedsLocation); return true; }
     if (route && route.line) map.removeLayer(route.line);
     route = { x: x, mode: distKm(me.lat, me.lng, x.lat, x.lng) < 1.5 ? 'walking' : 'driving', step: 0, at: 0 };
     map.closePopup();
     render(false);
+    if (me.pin) setSheet('half');
     fetchRoute();
-    setSheet('half');
     return true;
   }
   function fetchRoute(){
@@ -12585,15 +12604,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       r.path = rt.geometry.coordinates.map(function(c){ return [c[1], c[0]]; });
       if (r.line) map.removeLayer(r.line);
       r.line = L.polyline(r.path, { color: '#1D4ED8', weight: 6, opacity: 0.85 }).addTo(map);
-      if (!r.fitted) { map.stop(); fitTo(r.line.getBounds(), 17); r.fitted = true; }
+      var first = !r.fitted; r.fitted = true;
       drawRoute();
+      // With the visitor's real location: zoom in on them and follow as they go. From a pin: show the whole route.
+      if (first) { map.stop(); if (!me.pin) startNav(); else fitTo(r.line.getBounds(), 17); }
       track('map_directions', { kind: 'route', mode: r.mode, on_site: true });
     }).catch(function(){ if (route !== r) return; r.loading = false; r.error = true; drawRoute(); });
   }
   function drawRoute(){
     var r = route;
     routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
-    if (!r) { routeEl.innerHTML = ''; return; }
+    if (!r) { routeEl.innerHTML = ''; drawNav(); return; }
     var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2><button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(T.endRoute) + '</button></div>';
     html += '<div class="pm-modes" role="group" aria-label="' + esc(T.howGo) + '">' + MODES.map(function(m){ return '<button type="button" class="pm-mode" data-mode="' + m[0] + '" aria-pressed="' + (r.mode === m[0]) + '">' + esc(m[1]) + '</button>'; }).join('') + '</div>';
     if (r.arrived) html += '<p class="pm-route-sum is-arrived">' + esc(T.arrived) + '</p>';
@@ -12605,8 +12626,79 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     }
     html += '<p class="pm-route-alt"><a href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
     routeEl.innerHTML = html;
+    drawNav();
   }
-  function endRoute(){ if (route && route.line) map.removeLayer(route.line); route = null; drawRoute(); render(false); }
+  function endRoute(){
+    if (route && route.line) map.removeLayer(route.line);
+    route = null; follow = false; stage.classList.remove('is-following'); keepAwake(false); stopCompass();
+    drawRoute(); render(false);
+  }
+  // ---- Following the visitor along the route ----
+  var navbar = $('pmNavbar'), follow = false, wakeLock = null, followZoom = 18, waitingZoom = false;
+  function navZoom(){ return route && route.mode === 'driving' ? 16 : route && route.mode === 'cycling' ? 17 : 18; }
+  // Put a point in the middle of the part of the map that isn't covered by the banner or the list.
+  function centerOn(ll, z){
+    // A move that arrives mid-zoom waits for the zoom to finish (or it would land off-centre).
+    if (map._animatingZoom) { if (!waitingZoom) { waitingZoom = true; map.once('zoomend', function(){ waitingZoom = false; if (follow && me) centerOn([me.lat, me.lng], followZoom); }); } return; }
+    var p = pad(), dx = (p.paddingTopLeft[0] - p.paddingBottomRight[0]) / 2, dy = (p.paddingTopLeft[1] - p.paddingBottomRight[1]) / 2;
+    map.setView(map.unproject(map.project(ll, z).subtract([dx, dy]), z), z, { animate: true });
+  }
+  // The zoom the map keeps while following: set when directions start, changed only by the visitor's own pinch.
+  var userZoom = false;
+  ['wheel', 'dblclick'].forEach(function(t){ mapEl.addEventListener(t, function(){ userZoom = true; }, { passive: true }); });
+  mapEl.addEventListener('touchstart', function(e){ if (e.touches.length > 1) userZoom = true; }, { passive: true });
+  mapEl.addEventListener('click', function(e){ if (e.target.closest && e.target.closest('.leaflet-control-zoom')) userZoom = true; });
+  map.on('zoomend', function(){ if (userZoom) { userZoom = false; if (follow) followZoom = map.getZoom(); } });
+  function startFollow(zoom){ if (!me || me.pin) return; if (zoom) followZoom = zoom; follow = true; stage.classList.add('is-following'); centerOn([me.lat, me.lng], followZoom); }
+  function startNav(){ setSheet('peek'); keepAwake(true); startFollow(navZoom()); }
+  // Dragging the map to look around stops following; the locate button starts it again.
+  map.on('dragstart', function(){ if (!follow) return; follow = false; stage.classList.remove('is-following'); setStatus(T.followOff); });
+  // The screen stays on while directions are open (where the browser allows it).
+  function keepAwake(on){
+    try {
+      if (on && !wakeLock && navigator.wakeLock) navigator.wakeLock.request('screen').then(function(l){ wakeLock = l; l.addEventListener('release', function(){ wakeLock = null; }); }).catch(function(){});
+      else if (!on && wakeLock) { wakeLock.release(); wakeLock = null; }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden && route && route.data && me && !me.pin) keepAwake(true); });
+  var ARROWS = { left: '↰', right: '↱', 'slight left': '↖', 'slight right': '↗', 'sharp left': '↰', 'sharp right': '↱', uturn: '↶', straight: '↑' };
+  function arrowFor(st){ var m = st && st.maneuver || {}; if (m.type === 'arrive') return '⚑'; if (m.type === 'roundabout' || m.type === 'rotary') return '⟳'; return ARROWS[m.modifier] || '↑'; }
+  // The next turn, how far to it, and the time and distance left.
+  function drawNav(){
+    var r = route, on = !!(r && r.data && me && !me.pin);
+    stage.classList.toggle('is-nav', on); navbar.hidden = !on;
+    if (!on) { navbar.innerHTML = ''; return; }
+    var end = '<button type="button" class="pm-nav-end" id="pmNavEnd" aria-label="' + esc(T.endRoute) + '">✕</button>';
+    if (r.arrived) { navbar.innerHTML = '<span class="pm-nav-arrow" aria-hidden="true">⚑</span><div class="pm-nav-text"><strong>' + esc(T.arrived) + '</strong><small>' + esc(r.x.name) + '</small></div>' + end; return; }
+    var cur = r.steps[r.step], next = r.steps[r.step + 1], tgt = next && next.maneuver ? next.maneuver.location : [r.x.lng, r.x.lat];
+    var toNext = distKm(me.lat, me.lng, tgt[1], tgt[0]), left = toNext + r.steps.slice(r.step + 1).reduce(function(a, st){ return a + (st.distance || 0) / 1000; }, 0);
+    var eta = r.data.distance ? r.data.duration * Math.min(1, left * 1000 / r.data.distance) : 0;
+    var cap = r.step === 0 && cur && next && cur.maneuver ? '<em>' + esc(cur.maneuver.instruction || '') + '</em>' : '';
+    navbar.innerHTML = '<span class="pm-nav-arrow" aria-hidden="true">' + arrowFor(next || cur) + '</span><div class="pm-nav-text">' + cap + '<strong>' + esc((next || cur).maneuver.instruction || '') + '</strong>'
+      + (next ? '<span>' + esc(T.inDist(T.km(toNext))) + '</span>' : '') + '<small>' + esc(durText(eta) + ' · ' + T.km(left)) + '</small></div>' + end;
+  }
+  navbar.addEventListener('click', function(e){ if (e.target.closest('#pmNavEnd')) endRoute(); });
+  // Which way the visitor faces: the phone's compass (asked for on iPhone when they tap Directions), or their
+  // direction of travel. It only turns the arrow on their dot; nothing is sent anywhere.
+  var heading = null, compassOn = false, compassSeen = false;
+  function paintHeading(){
+    var el = meMarker && meMarker.getElement(); if (!el) return;
+    el.classList.toggle('has-heading', heading != null);
+    var a = el.querySelector('.pm-me-arrow'); if (a && heading != null) a.style.transform = 'rotate(' + Math.round(heading) + 'deg)';
+  }
+  function setHeading(h){ if (h == null || isNaN(h)) return; heading = ((h % 360) + 360) % 360; paintHeading(); }
+  function onOrient(e){
+    var h = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute && e.alpha != null ? 360 - e.alpha : null);
+    if (h == null) return;
+    compassSeen = true; setHeading(h + ((screen.orientation && screen.orientation.angle) || window.orientation || 0));
+  }
+  function startCompass(){
+    if (compassOn || !window.DeviceOrientationEvent) return;
+    var go = function(){ compassOn = true; window.addEventListener('deviceorientationabsolute', onOrient); window.addEventListener('deviceorientation', onOrient); };
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(function(st){ if (st === 'granted') go(); }).catch(function(){});
+    else go();
+  }
+  function stopCompass(){ compassOn = false; compassSeen = false; window.removeEventListener('deviceorientationabsolute', onOrient); window.removeEventListener('deviceorientation', onOrient); heading = null; paintHeading(); }
   routeEl.addEventListener('click', function(e){
     if (e.target.id === 'pmRouteEnd') { endRoute(); return; }
     var m = e.target.closest('[data-mode]');
@@ -12625,7 +12717,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function drawMe(){
     var ll = [me.lat, me.lng];
     if (!meMarker) {
-      meMarker = L.marker(ll, { icon: L.divIcon({ className: 'pm-me', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }), keyboard: false, interactive: false, zIndexOffset: 1000 }).addTo(map);
+      meMarker = L.marker(ll, { icon: L.divIcon({ className: 'pm-me', html: '<i class="pm-me-arrow"><svg viewBox="0 0 60 60" width="60" height="60" aria-hidden="true"><path d="M30 30 L15 5 Q30 -1 45 5 Z" fill="#1D4ED8" fill-opacity="0.35"/><path d="M30 3 L38 15 L22 15 Z" fill="#1D4ED8" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></i><span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }), keyboard: false, interactive: false, zIndexOffset: 1000 }).addTo(map);
+      paintHeading();
       meCircle = L.circle(ll, { radius: me.acc, color: '#1D4ED8', weight: 1, fillColor: '#3B82F6', fillOpacity: 0.12, interactive: false }).addTo(map);
     } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(me.acc); }
   }
@@ -12647,7 +12740,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.min(pos.coords.accuracy || 50, 2000) };
     drawMe();
     if (pendingRoute) { var pr = pendingRoute; pendingRoute = null; if (first) { radiusKm = pickRadius(8); located(); render(false); } startRoute(pr); return; }
-    if (route) { followRoute(); return; }
+    if (!compassSeen && pos.coords.heading != null && pos.coords.speed > 0.7) setHeading(pos.coords.heading);
+    if (route) { followRoute(); if (follow) centerOn([me.lat, me.lng], followZoom); drawNav(); return; }
     if (first) {
       radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8); located();
       if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
@@ -12667,7 +12761,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function startWatch(){
     if (!navigator.geolocation) { setStatus(T.unsupported); return; }
     watching = true;
-    watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 });
+    watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
   }
   function stopWatch(){ if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); watchId = null; }
   // The round button finds the visitor, then brings the map back to them; turning location off is in Filters.
@@ -12680,7 +12774,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     places.forEach(function(p){ p.d = null; }); render(false);
   }
   nearBtn.addEventListener('click', function(){
-    if (me && !me.pin) { if (route && route.line) fitTo(route.line.getBounds(), 17); else render(true); return; }
+    if (me && !me.pin) { if (route && route.data) startFollow(); else render(true); return; }
     setPinMode(false);
     if (watching) return;
     nearLabel.textContent = T.finding; nearBtn.classList.add('is-finding'); startWatch();
@@ -12996,6 +13090,7 @@ ${renderGolfHeaderHtml()}
         })()}
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
       </div>
+      <div class="pm-navbar" id="pmNavbar" hidden aria-live="polite"></div>
       <p class="pm-toast" id="pmStatus" role="status" aria-live="polite"></p>
     </div>
     <button type="button" class="pm-locate" id="pmNear" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="visually-hidden" id="pmNearLabel">Near me</span></button>

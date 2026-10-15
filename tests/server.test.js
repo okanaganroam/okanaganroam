@@ -19551,6 +19551,13 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   assert.match(src, /var OK_BOUNDS = L\.latLngBounds\(\[48\.95, -120\.2\], \[50\.8, -118\.25\]\);\s*map\.setMaxBounds\(/);
   assert.match(src, /if \(!OK_BOUNDS\.pad\(0\.1\)\.contains\(\[pos\.coords\.latitude, pos\.coords\.longitude\]\)\)/, 'Near me outside the Okanagan asks for a pin');
   assert.match(src, /map\.on\('contextmenu', function\(e\)\{ dropPin\(e\.latlng, true\); \}\);/);
+  // Directions from the visitor's real location: zoom in on them, follow them, a next-turn banner, the screen kept on.
+  assert.match(html, /<div class="pm-navbar" id="pmNavbar" hidden aria-live="polite"><\/div>/);
+  assert.match(src, /if \(first\) \{ map\.stop\(\); if \(!me\.pin\) startNav\(\); else fitTo\(r\.line\.getBounds\(\), 17\); \}/);
+  assert.match(src, /if \(route\) \{ followRoute\(\); if \(follow\) centerOn\(\[me\.lat, me\.lng\], followZoom\); drawNav\(\); return; \}/);
+  assert.match(src, /map\.on\('dragstart', function\(\)\{ if \(!follow\) return; follow = false;/, 'looking around stops following');
+  assert.match(src, /navigator\.wakeLock\.request\('screen'\)/);
+  assert.match(src, /DeviceOrientationEvent\.requestPermission\(\)/);
   for (const p of data.p) assert.ok(p[0] >= 48.95 && p[0] <= 50.8 && p[1] >= -120.2 && p[1] <= -118.25, `${p[2]} is inside the map limits`);
   assert.match(fr, /id="pmNearLabel">Près de moi</);
 }));
