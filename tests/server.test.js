@@ -19518,10 +19518,16 @@ test('What\'s On town pages: only that town (and valley-wide) events, a change-t
 // ---- Near-me map (2026-10-14) ---------------------------------------------------------------------
 test('Near-me map: Near me, Places/Events, Open now and Directions; the location is never sent anywhere', () => withDiscoveryServer(async (base) => {
   const html = await (await fetch(`${base}/map`)).text();
-  assert.match(html, /<button type="button" class="pm-near" id="pmNear" aria-pressed="false">/);
+  // Full-screen map app: search and quick chips float on the map, a round locate button, the list in a bottom sheet, the rest behind Filters.
+  assert.match(html, /<div class="pm-stage" id="pmStage">\s*<div id="okMap"/);
+  assert.match(html, /<button type="button" class="pm-locate" id="pmNear" aria-pressed="false">/);
+  assert.match(html, /<section class="pm-sheet" id="pmSheet" data-state="peek"/);
+  assert.match(html, /id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"/);
+  assert.match(html, /<div class="pm-panel" id="pmPanel" hidden/);
+  assert.match(html, /<h1 class="visually-hidden">Map of the Okanagan<\/h1>/);
   assert.match(html, /id="pmTabPlaces" aria-selected="true"/);
   assert.match(html, /id="pmTabEvents" aria-selected="false"/);
-  assert.match(html, /id="pmOpen" aria-pressed="false"/);
+  assert.equal((html.match(/data-pm-open aria-pressed="false"/g) || []).length, 2, 'Open now as a quick chip and in Filters');
   assert.match(html, /Your location stays on your phone/);
   const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
   assert.match(src, /navigator\.geolocation\.watchPosition\(onPos, onErr/, 'location only after Near me, watched while the page is open');
@@ -19539,7 +19545,8 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   }
   assert.ok(Array.isArray(data.e));
   const fr = await (await fetch(`${base}/fr/map`)).text();
-  assert.match(fr, /<h1>Carte de l’Okanagan<\/h1>/);
+  assert.match(fr, /<h1 class="visually-hidden">Carte de l’Okanagan<\/h1>/);
+  assert.match(fr, /<h2 id="pmPanelTitle">Filtres<\/h2>/);
   assert.match(fr, /id="pmNearLabel">Près de moi</);
 }));
 
