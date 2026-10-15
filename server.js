@@ -9460,6 +9460,30 @@ const NAV_REFRESH_STYLE = `<style id="nav-refresh">
 }
 @keyframes live-glow { 0%, 100% { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(225,29,72,0.5); } 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 7px rgba(225,29,72,0); } }
 @media (prefers-reduced-motion: reduce) { .live-dot::after, #navHamburger::before { animation: none; } }
+/* Narrower computer screens (941-1600px): Roam Now made the menu wider, so the menu words never wrap onto two lines and
+   the header tightens a little instead -- My Trip shows as its icon and count, then (941-1280px) smaller words, a
+   smaller logo and a compact EN / FR, so Build My Trip always stays on screen (English and French). */
+@media (min-width: 941px) {
+  #navLinks > li > a, #navLinks .nav-link-label, #navLinks .nav-mytrip-btn { white-space: nowrap; }
+}
+@media (min-width: 941px) and (max-width: 1600px) {
+  #navLinks .nav-mytrip-en, #navLinks .nav-mytrip-fr { display: none !important; }
+  header#top .app-btn svg { display: none !important; }
+  header#top .nav { gap: 12px !important; }
+  #navLinks { gap: 10px !important; }
+}
+@media (min-width: 941px) and (max-width: 1280px) {
+  header#top .nav { gap: 8px !important; padding-left: 16px !important; padding-right: 16px !important; }
+  #navLinks { gap: 6px !important; }
+  #navLinks > li > a, #navLinks .nav-link-label, #navLinks .nav-mytrip-btn { font-size: 0.84rem !important; }
+  header#top .logo-wordmark { font-size: 1rem !important; }
+  header#top .logo-icon-badge { display: none !important; }
+  header#top .lang-toggle { padding: 5px 6px !important; font-size: 0.74rem !important; }
+  header#top .app-btn { padding-left: 12px !important; padding-right: 12px !important; font-size: 0.84rem !important; }
+  html[lang="fr"] #navLinks > li > a, html[lang="fr"] #navLinks .nav-link-label { font-size: 0.8rem !important; }
+  html[lang="fr"] header#top .app-btn { font-size: 0.78rem !important; padding-left: 10px !important; padding-right: 10px !important; }
+  html[lang="fr"] #navLinks { gap: 5px !important; }
+}
 @media (max-width: 940px) {
   .nav-links .nav-dropdown > .nav-dropdown-panel { display: none; }
   .nav-links .nav-dropdown.open > .nav-dropdown-panel { display: block; }
