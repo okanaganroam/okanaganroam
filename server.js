@@ -5262,6 +5262,45 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     throw err;
   }
 }
+// Cuisine correction (2026-10-15): a guarded, audited write of the listed
+// cuisine, for fixing a wrong label (CedarCreek showed "German"). null clears it.
+function guardedCuisineUpdate(id, expectedCurrent, cuisine, meta) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  let next = null;
+  if (cuisine !== null) {
+    if (typeof cuisine !== 'string' || !cuisine.trim() || cuisine.trim().length > 40 || /[<>\n]/.test(cuisine)) {
+      return { ok: false, reason: 'invalid_cuisine', detail: 'cuisine must be a short label (1-40 characters), or null to clear it' };
+    }
+    next = cuisine.trim();
+  }
+  const existing = db.prepare('SELECT id, redirect_to, cuisine FROM venues WHERE id = ?').get(id);
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  const expected = expectedCurrent === undefined ? null : expectedCurrent;
+  if (existing.cuisine === next && expected === next) return { ok: true, changed: false, cuisine: next };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const info = db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND redirect_to IS NULL AND cuisine IS ?').run(next, id, expected);
+    if (info.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'mismatch', live: { cuisine: existing.cuisine } };
+    }
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'cuisine', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)`).run(id, existing.cuisine, next, m.reason.trim(), m.batch_id.trim());
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changed: true, cuisine: next };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
 function guardedSeasonUpdate(id, season, meta, now = new Date()) {
   const m = meta || {};
   if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
@@ -30108,6 +30147,45 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, venue: { happy_hour_times: result.happy_hour_times, happy_hour_source: result.happy_hour_source, happy_hour_checked_at: result.happy_hour_checked_at } });
     }
 
+    if (pathname === '/admin/set-cuisine' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Set-cuisine endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      const ALLOWED_SET_CUISINE_KEYS = ['id', 'expected_current', 'cuisine', 'reason', 'batch_id'];
+      const unexpectedCuisineKeys = Object.keys(body).filter((k) => !ALLOWED_SET_CUISINE_KEYS.includes(k));
+      if (unexpectedCuisineKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedCuisineKeys.join(', ')}` });
+      }
+      if (!Number.isInteger(body.id) || body.id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (!('cuisine' in body) || !('expected_current' in body)) {
+        return sendJSON(res, 400, { error: 'expected_current and cuisine are required (null clears the cuisine).' });
+      }
+      let result;
+      try {
+        result = guardedCuisineUpdate(body.id, body.expected_current, body.cuisine, { reason: body.reason, batch_id: body.batch_id });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Cuisine update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      return sendJSON(res, 200, { id: body.id, changed: result.changed, cuisine: result.cuisine });
+    }
+
     if (pathname === '/admin/set-season' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Set-season endpoint is not configured.' });
@@ -31616,6 +31694,7 @@ module.exports = {
   validateSeason,
   guardedSeasonUpdate,
   guardedHappyHourUpdate,
+  guardedCuisineUpdate,
   getSeasonStates,
   breadcrumbListSchema,
   FALL_MOOD_IMAGES,

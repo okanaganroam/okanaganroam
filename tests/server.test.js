@@ -16719,6 +16719,43 @@ test('POST /admin/set-season: auth, validation and a write, on a private server 
   }
 });
 
+// ---- Cuisine correction (2026-10-15) ----------
+test('POST /admin/set-cuisine: auth, validation, a guarded write and clearing', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Cuisine Fixture Winery', type: 'winery', hours: SEASON_WEEK, slug: 'cuisine-fixture-winery' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'cuisine-fixture-winery');
+  db.prepare('UPDATE venues SET cuisine = ? WHERE id = ?').run('German', v.id);
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const post = async (body, token = process.env.ENRICHMENT_ADMIN_TOKEN) => {
+    const res = await fetch(`${base}/admin/set-cuisine`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  const clear = { id: v.id, expected_current: 'German', cuisine: null, reason: 'wrong label', batch_id: 'cuisine-test' };
+  try {
+    assert.equal((await post(clear, 'wrong')).status, 401);
+    assert.equal((await post({ ...clear, extra: 1 })).status, 400);
+    assert.equal((await post({ id: v.id, cuisine: null, reason: 'x', batch_id: 'y' })).status, 400, 'expected_current is required');
+    assert.equal((await post({ ...clear, cuisine: '<b>x</b>' })).status, 400);
+    assert.equal((await post({ ...clear, reason: '' })).status, 400);
+    assert.equal((await post({ ...clear, id: 999999999 })).status, 404);
+    const stale = await post({ ...clear, expected_current: 'Italian' });
+    assert.equal(stale.status, 409);
+    assert.equal(stale.body.live.cuisine, 'German');
+    const ok = await post(clear);
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.changed, true);
+    assert.equal(db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(v.id).cuisine, null);
+    const log = db.prepare("SELECT old_value, new_value FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'cuisine'").get(v.id);
+    assert.deepEqual({ ...log }, { old_value: 'German', new_value: null });
+    assert.equal((await post({ ...clear, expected_current: null, cuisine: 'Fine dining' })).body.cuisine, 'Fine dining');
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
 // ---- Happy hour times (2026-10-14) ----------
 test('Happy hour times: guarded write, the admin route, and Happy hour now on the map', async () => {
   const http = require('node:http');
