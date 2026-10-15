@@ -14470,7 +14470,8 @@ test('Map (2026-10-14): /map shows a pin per place with a map position, category
   assert.doesNotMatch(html, /Close map/);
   assert.match(html, /<h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;<\/h2>/, 'places load from /map/data.json');
   assert.ok(html.includes('leaflet.markercluster.min.js'));
-  for (const g of ['food', 'wine', 'beach', 'outdoor', 'golf', 'do']) assert.match(html, new RegExp(`data-pm-group="${g}"`));
+  for (const k of ['drinks', 'food', 'coffee', 'wine', 'beach', 'outdoor', 'golf', 'do']) assert.match(html, new RegExp(`data-pm-kind="${k}"`));
+  for (const f of ['patio', 'dogs', 'happy', 'music', 'lake', 'kids']) assert.match(html, new RegExp(`data-pm-feat="${f}"`));
   assert.match(html, /<select id="pmTown"/);
   const legacy = await fetch(`${base}/browse?openMap=1`, { redirect: 'manual' });
   assert.equal(legacy.status, 302); assert.equal(legacy.headers.get('location'), '/map'); await legacy.text();
@@ -19563,3 +19564,26 @@ test('Near-me map: an event is pinned through its venue link, or an exact one-pl
     for (const id of ids) { db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id); db.prepare('DELETE FROM events WHERE id = ?').run(id); }
   }
 });
+
+test('Near-me map: patio, dogs and the rest ship as feature bits; plain words become filters; the home page and the app icon lead to Near me', () => withDiscoveryServer(async (base) => {
+  const data = JSON.parse(app.mapLiveData().json);
+  const rows = db.prepare('SELECT name, patio, dog_friendly FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL').all();
+  const byName = new Map(rows.map((r) => [r.name, r]));
+  for (const p of data.p) {
+    const v = byName.get(p[2]);
+    if (!v) continue;
+    assert.equal(!!(p[7] & 1), Number(v.patio) === 1, `${p[2]} patio`);
+    assert.equal(!!(p[7] & 2), Number(v.dog_friendly) === 1, `${p[2]} dogs`);
+    if (p[8]) assert.ok(p[7] & 2, 'a dog rule only on a dog-friendly place');
+  }
+  const html = await (await fetch(`${base}/map`)).text();
+  const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
+  assert.match(src, /patio: 'patio patios outside/, 'patio words');
+  assert.match(src, /dogs: 'dog dogs pup/, 'dog words');
+  assert.match(src, /history\.replaceState\(null, '', location\.pathname \+ \(q \? '\?' \+ q : ''\)/, 'filters in the address, never the location');
+  assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
+  const home = await (await fetch(`${base}/`)).text();
+  assert.match(home, /<a class="hero-near-me" href="\/map#near-me">/);
+  const manifest = await (await fetch(`${base}/site.webmanifest`)).json();
+  assert.equal(manifest.shortcuts[0].url, '/map#near-me');
+}));
