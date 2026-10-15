@@ -14468,8 +14468,7 @@ test('Map (2026-10-14): /map shows a pin per place with a map position, category
   assert.doesNotMatch(html, /<meta name="robots" content="noindex">/, 'a real map of places is indexable');
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/map">/);
   assert.doesNotMatch(html, /Close map/);
-  const places = app.mapPlaces();
-  assert.match(html, new RegExp(`id="pmCount" aria-live="polite">${places.length.toLocaleString('en-CA')} place`));
+  assert.match(html, /<h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;<\/h2>/, 'places load from /map/data.json');
   assert.ok(html.includes('leaflet.markercluster.min.js'));
   for (const g of ['food', 'wine', 'beach', 'outdoor', 'golf', 'do']) assert.match(html, new RegExp(`data-pm-group="${g}"`));
   assert.match(html, /<select id="pmTown"/);
@@ -19513,4 +19512,54 @@ test('What\'s On town pages: only that town (and valley-wide) events, a change-t
   if (html.includes('id="whatsOnTownsBtn"')) assert.match(html, /<ul class="whatson-town-links">\s*<li><a href="\/whats-on">All of the Okanagan<\/a><\/li>/);
   const all = app.renderWhatsOnPage(null);
   assert.match(all, /id="whatsOnRegionsBtn"/, 'the valley page keeps its Regions chips');
+});
+
+// ---- Near-me map (2026-10-14) ---------------------------------------------------------------------
+test('Near-me map: Near me, Places/Events, Open now and Directions; the location is never sent anywhere', () => withDiscoveryServer(async (base) => {
+  const html = await (await fetch(`${base}/map`)).text();
+  assert.match(html, /<button type="button" class="pm-near" id="pmNear" aria-pressed="false">/);
+  assert.match(html, /id="pmTabPlaces" aria-selected="true"/);
+  assert.match(html, /id="pmTabEvents" aria-selected="false"/);
+  assert.match(html, /id="pmOpen" aria-pressed="false"/);
+  assert.match(html, /Your location stays on your phone/);
+  const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
+  assert.match(src, /navigator\.geolocation\.watchPosition\(onPos, onErr/, 'location only after Near me, watched while the page is open');
+  assert.match(src, /document\.addEventListener\('visibilitychange'/, 'no location updates in the background');
+  assert.doesNotMatch(src, /fetch\([^)]*me\.|localStorage|sessionStorage|document\.cookie/, 'the position is never sent, stored or put in an address');
+  assert.match(src, /https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=/);
+  assert.match(src, /https:\/\/maps\.apple\.com\/\?daddr=/);
+  const conf = JSON.parse(src.match(/var CONF = (\{[\s\S]*?\});\n/)[1]);
+  assert.match(conf.src, /^\/map\/data\.json\?v=[0-9a-f]{12}$/);
+  const data = await (await fetch(base + conf.src)).json();
+  assert.ok(Array.isArray(data.p) && data.p.length === app.mapPlaces().length, 'every place with a map position');
+  for (const p of data.p) {
+    assert.ok(Number.isFinite(p[0]) && Number.isFinite(p[1]) && !(p[0] === 0 && p[1] === 0));
+    assert.match(p[5], /^\/[a-z-]+\/[a-z-]+\/[a-z0-9-]+$/);
+  }
+  assert.ok(Array.isArray(data.e));
+  const fr = await (await fetch(`${base}/fr/map`)).text();
+  assert.match(fr, /<h1>Carte de l’Okanagan<\/h1>/);
+  assert.match(fr, /id="pmNearLabel">Près de moi</);
+}));
+
+test('Near-me map: an event is pinned through its venue link, or an exact one-place name match in its town, never a guess', () => {
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const today = app.todayLocal ? app.todayLocal() : new Date().toISOString().slice(0, 10);
+  const ins = (name, slug, venueId, venueText) => {
+    const id = db.prepare("INSERT INTO events (name, slug, region, start_datetime, venue_id, venue_name_text, status, type) VALUES (?, ?, 'kelowna', ?, ?, ?, 'scheduled', 'event')").run(name, slug, `${today}T19:00`, venueId, venueText).lastInsertRowid;
+    db.prepare("INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, status) VALUES (?, ?, ?, '19:00', 'scheduled')").run(id, today, today);
+    return id;
+  };
+  const ids = [ins('Map Test Linked', 'map-test-linked', v.id, null), ins('Map Test Named', 'map-test-named', null, `${v.name}, Kelowna`), ins('Map Test Unknown', 'map-test-unknown', null, 'Somewhere Not Listed')];
+  try {
+    const rows = app.mapEventsData();
+    const by = (n) => rows.find((r) => r[0] === n);
+    assert.equal(by('Map Test Linked')[4], Math.round(Number(v.latitude) * 1e5) / 1e5, 'linked: at its venue');
+    assert.equal(by('Map Test Named')[3], v.name, 'named exactly: at that place');
+    assert.ok(by('Map Test Named')[4] != null);
+    assert.equal(by('Map Test Unknown')[4], null, 'not listed: no pin');
+    assert.equal(by('Map Test Unknown')[1], '/kelowna/events/map-test-unknown');
+  } finally {
+    for (const id of ids) { db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id); db.prepare('DELETE FROM events WHERE id = ?').run(id); }
+  }
 });
