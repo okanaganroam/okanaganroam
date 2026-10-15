@@ -13253,6 +13253,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
   }
   searchEl.addEventListener('keydown', function(e){ if (e.key !== 'Enter') return; e.preventDefault(); runSearch(searchEl.value); });
+  // The search hint cycles through real examples the search understands (each fits beside the microphone on a phone),
+  // and stops while the visitor is typing or the box has words in it.
+  var HINTS = FR ? ['Ex. « terrasse chiens OK »', 'Ex. « glace près de moi »', 'Ex. « sushi à Penticton »', 'Ex. « happy hour »', 'Ex. « brunch demain »', 'Ex. « vignobles à Oliver »', 'Ex. « pizza et bière »', 'Ex. « végane près de moi »']
+    : ['Try “dog-friendly patio”', 'Try “ice cream near me”', 'Try “sushi in Penticton”', 'Try “happy hour now”', 'Try “brunch tomorrow”', 'Try “cheap eats open late”', 'Try “wineries in Oliver”', 'Try “live music tonight”', 'Try “pizza and craft beer”', 'Try “vegan food near me”'];
+  var hintAt = 0;
+  setInterval(function(){ if (document.hidden || searchEl.value || document.activeElement === searchEl) return; hintAt = (hintAt + 1) % HINTS.length; searchEl.placeholder = HINTS[hintAt]; }, 3500);
   // ---- Search by voice: the browser's own speech service types what the visitor says, then it is searched ----
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition, micBtn = $('pmMic'), rec = null, listening = false;
   if (SR && micBtn) {
@@ -13528,7 +13534,7 @@ ${renderGolfHeaderHtml()}
       <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
-        <input type="search" id="pmSearch" class="pm-search" placeholder="Try “patio drinks dog”" autocomplete="off" enterkeyhint="search">
+        <input type="search" id="pmSearch" class="pm-search" placeholder="Try “dog-friendly patio”" autocomplete="off" enterkeyhint="search">
         <button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
         <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="visually-hidden">Filters</span><span class="pm-badge" id="pmBadge" hidden></span></button>
       </div>
