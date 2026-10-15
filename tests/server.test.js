@@ -14693,7 +14693,8 @@ for (const flag of ['on', undefined]) {
     }
     // The homepage keeps its own title and canonical.
     const home = await stage42Head(base, '/');
-    assert.deepEqual(home.titles, ['<title>Okanagan Roam, Find Wineries, Lounges & Restaurants Worth the Drive</title>']);
+    // Refreshed 2026-10-15 (Dayton): the home title names Roam Now's "what's open near you".
+    assert.deepEqual(home.titles, ['<title>Okanagan Roam: Restaurants, Wineries &amp; What’s Open Near You</title>']);
     assert.deepEqual(home.canonicals, ['<link rel="canonical" href="https://okanaganroam.com/">']);
   })));
 }
@@ -14726,11 +14727,14 @@ test('SEO-2: homepage descriptions match the approved text; share image is a 120
   assert.deepEqual(metaAll(hubHtml, 'name', 'twitter:image'), ['https://okanaganroam.com/og-image.png'], '/browse: twitter:image absolute, unchanged URL');
   assert.deepEqual(metaAll(hubHtml, 'property', 'og:image:width'), ['1200'], '/browse');
   assert.deepEqual(metaAll(hubHtml, 'property', 'og:image:height'), ['630'], '/browse');
+  // The home page's description was refreshed on 2026-10-15 (Dayton); /browse/classic keeps the SEO-2 text.
+  const HOME_DESCRIPTION = 'Find what’s open near you in BC’s Okanagan: 1,700+ restaurants, wineries, beaches and trails, live happy hours, this week’s events and a free trip planner.';
   for (const path of ['/', '/browse/classic']) {
     const html = await (await fetch(`${base}${path}`)).text();
-    assert.deepEqual(metaAll(html, 'name', 'description'), [SEO2_DESCRIPTION], `${path}: one meta description, the approved one`);
-    assert.deepEqual(metaAll(html, 'property', 'og:description'), [SEO2_DESCRIPTION], `${path}: og:description matches`);
-    assert.deepEqual(metaAll(html, 'name', 'twitter:description'), [SEO2_DESCRIPTION], `${path}: twitter:description matches`);
+    const want = path === '/' ? HOME_DESCRIPTION : SEO2_DESCRIPTION;
+    assert.deepEqual(metaAll(html, 'name', 'description'), [want], `${path}: one meta description, the approved one`);
+    assert.deepEqual(metaAll(html, 'property', 'og:description'), [want], `${path}: og:description matches`);
+    assert.deepEqual(metaAll(html, 'name', 'twitter:description'), [want], `${path}: twitter:description matches`);
     assert.deepEqual(metaAll(html, 'property', 'og:image'), ['https://okanaganroam.com/og-image.png'], `${path}: og:image absolute, unchanged URL`);
     assert.deepEqual(metaAll(html, 'name', 'twitter:image'), ['https://okanaganroam.com/og-image.png'], `${path}: twitter:image absolute, unchanged URL`);
     assert.deepEqual(metaAll(html, 'property', 'og:image:width'), ['1200'], path);

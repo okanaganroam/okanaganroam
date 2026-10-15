@@ -9247,6 +9247,20 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
 // previous analytics rather than breaking).
 const HOMEPAGE_GA4_LOADER_TAG = `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}"></script>\n`;
 const HOMEPAGE_GA4_CONFIG_LINES = `  gtag('js', new Date());\n  gtag('config', '${GA4_MEASUREMENT_ID}');\n`;
+// Home page title and description (2026-10-15, refreshed with Roam Now): okanagan.html is frozen, so the home route swaps
+// its title, description and social-preview text for these. /browse keeps its own.
+const HOME_TITLE = 'Okanagan Roam: Restaurants, Wineries & What\u2019s Open Near You';
+const HOME_DESCRIPTION = 'Find what\u2019s open near you in BC\u2019s Okanagan: 1,700+ restaurants, wineries, beaches and trails, live happy hours, this week\u2019s events and a free trip planner.';
+function withHomeMeta(html) {
+  const t = escapeHtml(HOME_TITLE), d = escapeHtml(HOME_DESCRIPTION);
+  return String(html)
+    .replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`)
+    .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${d}">`)
+    .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${t}">`)
+    .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${d}">`)
+    .replace(/<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${t}">`)
+    .replace(/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${d}">`);
+}
 // The site icon tag (2026-10-15): real files Google can fetch, replacing the inline-data icon in okanagan.html and the
 // templates that copied it.
 const FAVICON_LINKS = '<link rel="icon" href="/favicon.ico" sizes="48x48">\n<link rel="icon" type="image/svg+xml" href="/favicon.svg">\n<link rel="icon" type="image/png" sizes="192x192" href="/images/icons/okanagan-roam-icon-192.png">';
@@ -28730,7 +28744,7 @@ const server = http.createServer(async (req, res) => {
     // of always rendering underneath the new homepage. See /browse below.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
-        let html = withFaviconFiles(withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')))));
+        let html = withHomeMeta(withFaviconFiles(withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))))));
         html = html.replace(/<header id="top">[\s\S]*?<\/header>/, (h) => withNavRefresh(h));
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
