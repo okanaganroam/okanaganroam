@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
-const { beachPhotoForVenue } = require('./beach-photo-fallbacks');
+// Beach photo fallbacks; optional like french-text, so an isolated copy of server.js + db.js (the fail-closed tests)
+// still starts, keeping each venue's own image.
+const { beachPhotoForVenue } = (() => { try { return require('./beach-photo-fallbacks'); } catch (e) { return { beachPhotoForVenue: (v) => v.image_url }; } })();
 // Golf course data (2026-09-26): verified green fees, course profiles and
 // links to official course maps -- golf pages only. Guarded like db.js so a
 // copy of the app without golf-data.js renders exactly as before.
@@ -12231,6 +12233,11 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-search { flex: 1 1 auto; min-width: 0; height: 100%; padding: 0 8px; border: 0; background: transparent; font: inherit; font-size: 1rem; color: var(--ink); outline: none; }
   body.map-page .pm-search::-webkit-search-cancel-button { cursor: pointer; }
   body.map-page .pm-filters-btn { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border: 0; border-radius: 50%; background: rgba(27,43,58,0.07); color: var(--ref-navy, #1B2B3A); cursor: pointer; }
+  body.map-page .pm-mic { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border: 0; border-radius: 50%; background: transparent; color: #1D4ED8; cursor: pointer; }
+  body.map-page .pm-mic[hidden] { display: none; }
+  body.map-page .pm-mic.is-listening { background: #E11D48; color: #fff; animation: pm-mic 1.4s ease-in-out infinite; }
+  @keyframes pm-mic { 0%, 100% { box-shadow: 0 0 0 0 rgba(225,29,72,0.45); } 50% { box-shadow: 0 0 0 8px rgba(225,29,72,0); } }
+  @media (prefers-reduced-motion: reduce) { body.map-page .pm-mic.is-listening { animation: none; } }
   body.map-page .pm-filters-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
   body.map-page .pm-badge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #1D4ED8; color: #fff; font-size: 0.7rem; font-weight: 800; line-height: 18px; text-align: center; }
   body.map-page .pm-badge[hidden] { display: none; }
@@ -12395,7 +12402,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
-    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
+    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
+    micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
@@ -12419,7 +12427,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
-    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
+    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
+    micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
@@ -12450,7 +12459,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 15 ? 18 : z >= 13 ? 32 : 48; }, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
-  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
+  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
   var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-open]')), topBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-top]')), tagHolder = document.getElementById('pmTagChips'), activeEl = $('pmActive'), searchEl = $('pmSearch');
@@ -12583,29 +12592,56 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function matchesPlace(p){
     var tk = onTags();
     // What it serves: all of them (or, when no place has all, any of them).
-    if (tk.length) { var hits = tk.filter(function(k){ return p.tg.indexOf(TAGIX[k]) !== -1; }).length; if (tagAny ? !hits : hits < tk.length) return false; }
+    if (tk.length) { var hits = tk.filter(function(k){ return p.tg.indexOf(TAGIX[k]) !== -1; }).length; if (tagAny || tagOr ? !hits : hits < tk.length) return false; }
     // A cocktail lounge counts for "dinner and cocktails" through the cocktail tag, even though it isn't a restaurant.
     if (anyOn(kinds) && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; }) && !tk.some(function(k){ return CONF.tg[TAGIX[k]].t.indexOf(p.type) !== -1; })) return false;
     if (topOnly && !(p.r >= 4.5)) return false;
+    // The rest of a sentence: a town, a price, a time it must be open, and what to leave out.
+    if (town && p.region !== town) return false;
+    if (price === 'cheap' && !(p.pr && p.pr <= 1)) return false;
+    if (price === 'afford' && !(p.pr && p.pr <= 2)) return false;
+    if (price === 'fancy' && !(p.pr >= 3)) return false;
+    if ((atMin != null || atDay) && !openAt(p, atMin, atDay)) return false;
+    if (notTypes[p.type]) return false;
+    for (var nk in notTags) if (notTags[nk] && p.tg.indexOf(TAGIX[nk]) !== -1) return false;
+    for (var nn in notKinds) if (notKinds[nn] && CONF.k[nn].indexOf(p.type) !== -1) return false;
+    for (var nf in notFeats) if (notFeats[nf] && (p.f & CONF.f[nf])) return false;
     for (var k in feats) if (feats[k] && (k === 'happy' && hhKnown ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
     return !term || term.split(' ').every(function(w){ return p.key.indexOf(w) !== -1; });
   }
   var isOpen = function(p){ return p.st && p.st.state === 'open' ? 0 : 1; };
+  // Open at a given time today ("open at 9 PM"), from the listed hours; unknown hours never count.
+  var WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  function dayKey(d){ var c = okanaganClock(new Date()); return d === '+1' ? WEEK[(WEEK.indexOf(c.weekday) + 1) % 7] : d || c.weekday; }
+  // Open at a time today, or on a day ("tomorrow at 10", "Saturday"), from the listed hours; unknown hours never count.
+  function openAt(p, min, day){
+    var key = min + '|' + (day || '');
+    if (p._atK === key) return p._at;
+    p._atK = key; p._at = false;
+    if (p.h) {
+      try {
+        var parsed = parseHours(expandFoodDrinkHours(p.h)), wd = dayKey(day);
+        if (min != null) p._at = statusAt(parsed, { weekday: wd, minutes: Math.min(1439, min), date: okanaganClock(new Date()).date }).state === 'open';
+        else p._at = !!(parsed.days[wd] && parsed.days[wd].status === 'open');
+      } catch (e) {}
+    }
+    return p._at;
+  }
   function render(fit){
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
     var items, onMap;
     if (me) { places.forEach(function(p){ p.d = distKm(me.lat, me.lng, p.lat, p.lng); }); events.forEach(function(e){ e.d = e.lat == null ? null : distKm(me.lat, me.lng, e.lat, e.lng); }); }
     if (tab === 'places') {
-      onMap = places.filter(function(p){ return matchesPlace(p) && (!me || !radiusKm || p.d <= radiusKm); });
+      onMap = places.filter(function(p){ return matchesPlace(p) && (!me || !radiusKm || town || p.d <= radiusKm); });
       // Open places first, then the closest.
       if (me) items = onMap.slice().sort(function(a, b){ return isOpen(a) - isOpen(b) || a.d - b.d; });
       else {
         var b = map.getBounds();
-        items = map.getZoom() >= 12 || term || anyOn(kinds) || anyOn(feats) ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : [];
+        items = town ? onMap.slice().sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : map.getZoom() >= 12 || term || anyOn(kinds) || anyOn(feats) ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : [];
       }
       var filtering = anyOn(kinds) || anyOn(feats) || openOnly || term;
-      countEl.textContent = me ? T.placesNear(items.length, radiusKm) : (items.length || map.getZoom() >= 12 || filtering ? T.placesHere(items.length) : T.zoomHint);
+      countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (items.length || map.getZoom() >= 12 || filtering ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, tomorrow: 2, week: 3 };
@@ -12624,7 +12660,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     listItems = items;
     drawList();
     // Near me opens on the closest dozen places (individual pins, not bubbles); the list still covers the whole distance.
-    if (fit && me) {
+    if (fit && town && tab === 'places' && onMap.length) {
+      map.stop();
+      fitTo(L.latLngBounds(onMap.slice(0, 40).map(function(p){ return [p.lat, p.lng]; })), 16);
+    }
+    else if (fit && me) {
       var close = (tab === 'places' ? items : onMap).filter(function(x){ return x.lat != null; }).slice(0, 12).map(function(x){ return [x.lat, x.lng]; });
       map.stop();
       if (close.length) fitTo(L.latLngBounds(close.concat([[me.lat, me.lng]])), 17);
@@ -12894,7 +12934,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (!compassSeen && pos.coords.heading != null && pos.coords.speed > 0.7) setHeading(pos.coords.heading);
     if (route) { followRoute(); if (follow) centerOn([me.lat, me.lng], followZoom); drawNav(); return; }
     if (first) {
-      radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8); located();
+      if (!radiusFixed) radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8); located();
       if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
       track('map_near_me', { radius_km: radiusKm });
       render(true);
@@ -12963,16 +13003,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   map.on('contextmenu', function(e){ dropPin(e.latlng, true); });
   // No location updates while the page is in the background.
   document.addEventListener('visibilitychange', function(){ if (!watching) return; if (document.hidden) stopWatch(); else if (watchId == null) startWatch(); });
-  radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); limit = 25; render(true); });
+  radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); radiusFixed = true; limit = 25; render(true); });
   function syncChips(){
     kindChips.forEach(function(c){ c.setAttribute('aria-pressed', kinds[c.getAttribute('data-pm-kind')] ? 'true' : 'false'); });
     featChips.forEach(function(c){ c.setAttribute('aria-pressed', feats[c.getAttribute('data-pm-feat')] ? 'true' : 'false'); });
     openBtns.forEach(function(c){ c.setAttribute('aria-pressed', openOnly ? 'true' : 'false'); });
     topBtns.forEach(function(c){ c.setAttribute('aria-pressed', topOnly ? 'true' : 'false'); });
     var tk = onTags();
-    tagHolder.innerHTML = tk.map(function(k){ var t = CONF.tg[TAGIX[k]]; return '<button type="button" class="pm-chip pm-tagchip" data-pm-tag="' + k + '" aria-pressed="true" aria-label="' + esc(T.removeTag + ' ' + (FR ? t.fr : t.en)) + '"><span aria-hidden="true">' + t.i + '</span> ' + esc(FR ? t.fr : t.en) + ' <b aria-hidden="true">✕</b></button>'; }).join('');
+    var xs = extras();
+    tagHolder.innerHTML = xs.map(function(x){ return '<button type="button" class="pm-chip pm-tagchip" data-pm-x="' + esc(x.id) + '" aria-pressed="true" aria-label="' + esc(T.removeTag + ' ' + x.label) + '"><span aria-hidden="true">' + x.icon + '</span> ' + esc(x.label) + ' <b aria-hidden="true">✕</b></button>'; }).join('');
     var label = function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); }, uniq = function(a){ return a.filter(function(v, i){ return a.indexOf(v) === i; }); };
-    var parts = uniq([].concat(tk.map(function(k){ var t = CONF.tg[TAGIX[k]]; return t.i + ' ' + (FR ? t.fr : t.en); }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
+    var parts = uniq([].concat(xs.map(function(x){ return x.icon + ' ' + x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
     badge.hidden = !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
@@ -12985,29 +13026,61 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     activeEl.innerHTML = parts.length ? esc(parts.join(' · ')) + ' <button type="button" class="pm-clear" id="pmClear">' + esc(T.clear) + '</button>' + (navigator.share || (navigator.clipboard && navigator.clipboard.writeText) ? ' <button type="button" class="pm-share" id="pmShare">' + esc(T.share) + '</button>' : '') : '';
     // The search lives in the address (never the location), so it can be bookmarked or shared.
     try {
-      var f = [].concat(Object.keys(kinds).filter(function(k){ return kinds[k]; }), Object.keys(feats).filter(function(k){ return feats[k]; }), openOnly ? ['open'] : [], topOnly ? ['top'] : [], tk.map(function(k){ return 't.' + k; }));
+      var f = [].concat(Object.keys(kinds).filter(function(k){ return kinds[k]; }), Object.keys(feats).filter(function(k){ return feats[k]; }), openOnly ? ['open'] : [], topOnly ? ['top'] : [], tk.map(function(k){ return 't.' + k; }),
+        town ? ['in.' + town] : [], price ? ['p.' + price] : [], atMin != null ? ['at.' + atMin + (atUntil ? 'u' : '')] : [], atDay ? ['on.' + atDay] : [], tagOr ? ['or'] : [], on(notTypes).map(function(k){ return 'x.y.' + k; }),
+        on(notTags).map(function(k){ return 'x.t.' + k; }), on(notKinds).map(function(k){ return 'x.k.' + k; }), on(notFeats).map(function(k){ return 'x.f.' + k; }));
       var q = (f.length ? 'f=' + f.join(',') : '') + (term ? (f.length ? '&' : '') + 'q=' + encodeURIComponent(term) : '');
       history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + (tab === 'events' ? '#events' : ''));
     } catch (e) {}
   }
   // With location on, a narrower search widens the distance by itself rather than coming up empty.
+  var lastTown = '';
   function changed(){
+    if (town !== lastTown) { lastTown = town; if (town && CONF.c[town]) map.setView(CONF.c[town], 13); }
     tagAny = false;
     if (onTags().length > 1 && !places.some(matchesPlace)) { tagAny = true; setStatus(T.anyOf); }
-    if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly) && !places.some(matchesPlace)) { setStatus(T.ignored(term)); term = ''; searchEl.value = ''; }
+    if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || town || price || atMin != null || atDay) && !places.some(matchesPlace)) { setStatus(T.ignored(term)); term = ''; searchEl.value = ''; }
     syncChips(); limit = 25;
-    if (me && radiusKm) {
+    if (me && radiusKm && !radiusFixed && !town) {
       var n = places.filter(function(p){ return matchesPlace(p) && p.d <= radiusKm; }).length;
       if (n < 3) { var r = pickRadius(3); if (r !== radiusKm) { radiusKm = r; radiusSel.value = String(r); setStatus(r ? T.widened(r) : T.widenedAny); } }
     }
-    render(!!me);
+    render(!!me || !!town);
   }
   kindChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-kind'); kinds[k] = !kinds[k]; track('map_filter', { filter: k, on: kinds[k] }); changed(); }); });
   featChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-feat'); feats[k] = !feats[k]; track('map_filter', { filter: k, on: feats[k] }); changed(); }); });
   openBtns.forEach(function(c){ c.addEventListener('click', function(){ openOnly = !openOnly; track('map_filter', { filter: 'open', on: openOnly }); changed(); }); });
   topBtns.forEach(function(c){ c.addEventListener('click', function(){ topOnly = !topOnly; track('map_filter', { filter: 'top', on: topOnly }); changed(); }); });
-  tagHolder.addEventListener('click', function(e){ var b = e.target.closest('[data-pm-tag]'); if (!b) return; delete tags[b.getAttribute('data-pm-tag')]; changed(); });
-  function clearAll(){ kinds = {}; feats = {}; tags = {}; topOnly = false; openOnly = false; term = ''; searchEl.value = ''; changed(); }
+  tagHolder.addEventListener('click', function(e){
+    var b = e.target.closest('[data-pm-x]'); if (!b) return;
+    var id = b.getAttribute('data-pm-x'), part = id.split(':');
+    if (part[0] === 'tag') delete tags[part[1]];
+    else if (part[0] === 'town') town = '';
+    else if (part[0] === 'price') price = '';
+    else if (part[0] === 'at') { atMin = null; atDay = ''; atUntil = false; }
+    else if (part[0] === 'noty') delete notTypes[part[1]];
+    else if (part[0] === 'nott') delete notTags[part[1]];
+    else if (part[0] === 'notk') delete notKinds[part[1]];
+    else if (part[0] === 'notf') delete notFeats[part[1]];
+    liveBase = null; changed();
+  });
+  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; liveBase = null; searchEl.value = ''; changed(); }
+  function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
+  function kindLabel(k){ var c = kindChips.filter(function(x){ return x.getAttribute('data-pm-kind') === k; })[0]; return c ? c.textContent.replace(/^\\s+|\\s+$/g, '').replace(/^\\S+\\s+/, '') : k; }
+  function featLabel(k){ return T.feat[k] || k; }
+  function tagLabel(k){ var t = CONF.tg[TAGIX[k]]; return FR ? t.fr : t.en; }
+  // Chips for what a sentence asked for that has no button of its own: what it serves, a town, a price, a time, and "no ...".
+  function extras(){
+    var out = onTags().map(function(k){ return { id: 'tag:' + k, icon: CONF.tg[TAGIX[k]].i, label: tagLabel(k) }; });
+    if (town) out.push({ id: 'town', icon: '📍', label: T.inTown(CONF.r[town] || town) });
+    if (price) out.push({ id: 'price', icon: price === 'fancy' ? '💎' : '💲', label: T.priceLbl[price] });
+    if (atMin != null || atDay) out.push({ id: 'at', icon: '🕘', label: T.openAt(atMin != null ? clockText(atUntil ? atMin + 1 : atMin) : '', atDay === '+1' ? T.tomorrowW : atDay ? T.days[atDay] : '', atUntil) });
+    on(notTypes).forEach(function(k){ out.push({ id: 'noty:' + k, icon: '🚫', label: T.notLbl(String(TYPES[k] || k).toLowerCase()) }); });
+    on(notTags).forEach(function(k){ out.push({ id: 'nott:' + k, icon: '🚫', label: T.notLbl(tagLabel(k).toLowerCase()) }); });
+    on(notKinds).forEach(function(k){ out.push({ id: 'notk:' + k, icon: '🚫', label: T.notLbl(kindLabel(k).toLowerCase()) }); });
+    on(notFeats).forEach(function(k){ out.push({ id: 'notf:' + k, icon: '🚫', label: T.notLbl(featLabel(k).toLowerCase()) }); });
+    return out;
+  }
   quickClear.addEventListener('click', clearAll);
   activeEl.addEventListener('click', function(e){
     if (e.target.id === 'pmClear') clearAll();
@@ -13055,51 +13128,130 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var alts = t.s.split('|').sort(function(a, b){ return b.length - a.length; });
     return [new RegExp(' (' + alts.join('|') + ')(?= )', 'g'), ' #' + i + ' '];
   });
+  // Towns by name, longest first ("west kelowna" before "kelowna").
+  var TOWN_RX = Object.keys(CONF.r).map(function(k){ return [CONF.r[k].toLowerCase(), k]; }).concat([['ok falls', 'okanagan-falls'], ['silver star', 'silverstar']])
+    .sort(function(a, b){ return b[0].length - a[0].length; }).map(function(t){ return [new RegExp(' (?:in |at |near |around |à |a )?' + t[0] + '(?= )', 'g'), ' @' + t[1] + ' ']; });
+  // A time on today's clock, from "9pm", "9:30 pm", "21h", "midnight", or "9" after at/until/after (PM unless a morning word).
+  function toMin(h, m, ap, morning){
+    h = Number(h); m = Number(m || 0);
+    if (h > 24 || m > 59) return null;
+    if (ap) { ap = ap.charAt(0); if (ap === 'p' && h < 12) h += 12; if (ap === 'a' && h === 12) h = 0; }
+    else if (h >= 1 && h <= 11 && !morning) h += 12;
+    return Math.min(1439, h * 60 + m);
+  }
   function parseWords(v){
-    var t = ' ' + String(v).toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿœ'’ -]/g, ' ') + ' ';
+    var raw = ' ' + String(v).toLowerCase().replace(/[’]/g, '\\'') + ' ', nowMin = okanaganClock(new Date()).minutes;
+    var morning = /breakfast|brunch|coffee|morning|matin|déjeuner|cafe|café/.test(raw);
+    // Group size: "for 8 people", "party of 10", "table for 6".
+    raw = raw.replace(/(?:for|party of|group of|table for|pour)\\s*(\\d{1,2})\\s*(?:people|persons|of us|friends|guys|adults|personnes|amis)?(?=[\\s,.!?])/g, function(m0, n){ return Number(n) >= 6 ? ' groups ' : ' '; });
+    // Distance: "within 2 km", "within 500 m", "10 minute walk", "walking distance", "short drive".
+    raw = raw.replace(/(?:within|under|less than|à moins de)\\s*(\\d+(?:[.,]\\d+)?)\\s*(km|kms|kilometres?|kilometers?|m|metres?|meters?)\\b/g, function(m0, n, u){ var k = Number(String(n).replace(',', '.')); if (u.charAt(0) === 'm' && u.indexOf('k') === -1) k = k / 1000; return ' ~r:' + Math.max(0.3, k) + ' nearme '; });
+    raw = raw.replace(/(\\d+)\\s*(?:min|mins|minute|minutes)\\s*(?:walk|walking|à pied)/g, function(m0, n){ return ' ~r:' + Math.max(0.5, Math.round(Number(n) * 0.08 * 10) / 10) + ' nearme '; });
+    raw = raw.replace(/walking distance|walkable|short walk|à distance de marche/g, ' ~r:1 nearme ').replace(/short drive|quick drive|courte distance en voiture/g, ' ~r:10 nearme ');
+    // Price: "cheap eats", "affordable", "fancy", "fine dining".
+    raw = raw.replace(/cheap eats|\\bcheap\\b|\\bbudget\\b|inexpensive|bon marché|pas cher|pas chère/g, ' $cheap ')
+      .replace(/not too expensive|not expensive|affordable|reasonably priced|reasonable|mid[ -]?range|moderately priced|abordable/g, ' $afford ')
+      .replace(/fine dining|special occasion|high[ -]end|\\bfancy\\b|upscale|splurge|classy|haut de gamme|gastronomique/g, ' $fancy ');
+    // Time: "open at 9pm", "until midnight", "after 10", "around 8:30", "21h", "tonight".
+    raw = raw.replace(/\\b(?:open |opened |ouvert )?(at|after|around|by|until|till|til|past|à|vers|jusqu'à|jusqu'a|après)\\s*(midnight|minuit|noon|midi|(\\d{1,2})(?:[:h.](\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?|h)?)(?=[\\s,.!?])/g, function(m0, prep, all, h, mm, ap){
+      var min = /midnight|minuit/.test(all) ? 1439 : /noon|midi/.test(all) ? 720 : toMin(h, mm, ap === 'h' ? null : ap, morning || ap === 'h');
+      if (ap === 'h') min = Math.min(1439, Number(h) * 60 + Number(mm || 0));
+      if (min == null) return m0;
+      if (/until|till|til|jusqu/.test(prep)) return ' ^until:' + min + ' ';
+      return ' ^at:' + min + ' ';
+    });
+    raw = raw.replace(/\\b(\\d{1,2})(?::(\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?)(?=[\\s,.!?])/g, function(m0, h, mm, ap){ var min = toMin(h, mm, ap, morning); return min == null ? m0 : ' ^at:' + min + ' '; });
+    raw = raw.replace(/\\btonight\\b|ce soir/g, nowMin < 20 * 60 ? ' ^at:1200 ' : ' ');
+    raw = raw.replace(/\\btomorrow\\b|\\bdemain\\b/g, ' ^on:+1 ');
+    raw = raw.replace(/\\b(?:on |this |ce )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)s?\\b/g, function(m0, d){ var i = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday','lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'].indexOf(d) % 7; return ' ^on:' + WEEK[i] + ' '; });
+    var t = raw.replace(/[^a-z0-9àâçéèêëîïôûùüÿœ'’ ~:.$^@+-]/g, ' ').replace(/\\.(?!\\d)/g, ' ');
     PHRASES.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
-    t = t.replace(/-/g, ' ').replace(/\\s+/g, ' ');
+    t = ' ' + t.replace(/-/g, ' ').replace(/\\s+/g, ' ') + ' ';
     TAG_RX.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
+    TOWN_RX.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
     return t.split(/\\s+/).filter(Boolean);
   }
-  function hasWords(v){ return parseWords(v).some(function(w){ return WORD_TO[w] || w.charAt(0) === '#'; }); }
+  function special(w){ var c = w.charAt(0); return c === '#' || c === '@' || c === '$' || c === '^' || w.indexOf('~r:') === 0; }
+  function hasWords(v){ return parseWords(v).some(function(w){ return WORD_TO[w] || special(w); }); }
   var wantNear = false;
-  // While typing, what the words turned on is undone before the next read, so changing the words changes the filters.
-  var live = null;
-  function undoLive(){
-    if (!live) return;
-    live.kinds.forEach(function(k){ delete kinds[k]; }); live.feats.forEach(function(k){ delete feats[k]; }); live.tags.forEach(function(k){ delete tags[k]; });
-    if (live.open) openOnly = false; if (live.top) topOnly = false;
-    live = null;
+  // While typing, the words are read on top of the filters as they were before typing began, so changing the words
+  // changes the filters; Search (or the microphone) keeps them.
+  var liveBase = null;
+  function snapshot(){
+    var c = function(o){ var x = {}; for (var k in o) if (o[k]) x[k] = true; return x; };
+    return { kinds: c(kinds), feats: c(feats), tags: c(tags), notTags: c(notTags), notKinds: c(notKinds), notFeats: c(notFeats), notTypes: c(notTypes), openOnly: openOnly, topOnly: topOnly, town: town, price: price, atMin: atMin, atDay: atDay, atUntil: atUntil, tagOr: tagOr, radiusKm: radiusKm, radiusFixed: radiusFixed };
   }
-  function mark(set, k){ var o = set === 'kinds' ? kinds : set === 'feats' ? feats : tags; if (!o[k]) { o[k] = true; if (live) live[set].push(k); } }
+  function restore(b){
+    kinds = b.kinds; feats = b.feats; tags = b.tags; notTags = b.notTags; notKinds = b.notKinds; notFeats = b.notFeats;
+    notTypes = b.notTypes; openOnly = b.openOnly; topOnly = b.topOnly; town = b.town; price = b.price; atMin = b.atMin; atDay = b.atDay; atUntil = b.atUntil; tagOr = b.tagOr; radiusKm = b.radiusKm; radiusFixed = b.radiusFixed;
+  }
+  var NEG = ' no not without except avoid never nothing sans pas ni aucun aucune ';
+  // After "no", these leave out one kind of place, not the whole group ("drinks, no pubs").
+  var NEG_TYPE = { pub: 'pub', pubs: 'pub', brewery: 'brewery', breweries: 'brewery', brew: 'brewery', winery: 'winery', wineries: 'winery', cafe: 'cafe', cafes: 'cafe', 'café': 'cafe', restaurant: 'restaurant', restaurants: 'restaurant', distillery: 'distillery', distilleries: 'distillery', lounge: 'cocktail', lounges: 'cocktail' };
   function readSearch(v, typing){
-    undoLive();
-    if (typing) live = { kinds: [], feats: [], tags: [], open: false, top: false };
-    var left = [];
-    parseWords(v).forEach(function(w){
+    if (typing) { if (!liveBase) liveBase = snapshot(); restore(JSON.parse(JSON.stringify(liveBase))); }
+    else if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; }
+    var left = [], neg = false, toks = parseWords(v), ors = toks.indexOf('or') !== -1 || toks.indexOf('ou') !== -1;
+    toks.forEach(function(w){
+      if (NEG.indexOf(' ' + w + ' ') !== -1) { neg = true; return; }
       var k = WORD_TO[w];
-      if (w.charAt(0) === '#' && CONF.tg[Number(w.slice(1))]) mark('tags', CONF.tg[Number(w.slice(1))].k);
+      if (w.charAt(0) === '#' && CONF.tg[Number(w.slice(1))]) { var tk = CONF.tg[Number(w.slice(1))].k; if (neg) notTags[tk] = true; else tags[tk] = true; }
+      else if (w.charAt(0) === '@' && CONF.r[w.slice(1)]) town = w.slice(1);
+      else if (w.charAt(0) === '$' && T.priceLbl[w.slice(1)]) price = w.slice(1);
+      else if (w.indexOf('^at:') === 0) { atMin = Number(w.slice(4)); atUntil = false; }
+      else if (w.indexOf('^until:') === 0) { atMin = Math.max(0, Number(w.slice(7)) - 1); atUntil = true; }
+      else if (w.indexOf('^on:') === 0) atDay = w.slice(4);
+      else if (neg && NEG_TYPE[w]) notTypes[NEG_TYPE[w]] = true;
+      else if (w.indexOf('~r:') === 0) { var km = Number(w.slice(3)); if (km > 0) { radiusKm = km; radiusFixed = true; wantNear = true; radiusSel.value = String([1, 5, 10, 25].filter(function(o){ return o >= km; })[0] || 0); } }
       else if (k === 'nearme') wantNear = true;
-      else if (k === 'top') { if (!topOnly) { topOnly = true; if (live) live.top = true; } }
-      else if (k === 'open') { if (!openOnly) { openOnly = true; if (live) live.open = true; } }
-      else if (k && CONF.k[k]) mark('kinds', k);
-      else if (k && CONF.f[k]) mark('feats', k);
-      else if (STOP.indexOf(' ' + w.replace('’', '\\'') + ' ') === -1) left.push(w);
+      else if (k === 'top') topOnly = true;
+      else if (k === 'open') openOnly = true;
+      else if (k && CONF.k[k]) { if (neg) notKinds[k] = true; else kinds[k] = true; }
+      else if (k && CONF.f[k]) { if (neg) notFeats[k] = true; else feats[k] = true; }
+      else if (STOP.indexOf(' ' + w.replace('’', '\\'') + ' ') !== -1) return;
+      else left.push(w);
+      neg = false;
     });
+    if (ors && onTags().length > 1) tagOr = true;
+    // "Open on Saturday" or "open at 9" is about then, not now (unless "now" is said too).
+    if ((atMin != null || atDay) && toks.indexOf('now') === -1 && toks.indexOf('maintenant') === -1 && !(liveBase && liveBase.openOnly)) openOnly = false;
     term = left.join(' ');
   }
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { undoLive(); term = v.trim().toLowerCase(); changed(); } }, 450); });
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } term = v.trim().toLowerCase(); changed(); } }, 450); });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
-  searchEl.addEventListener('keydown', function(e){
-    if (e.key !== 'Enter') return;
-    e.preventDefault(); clearTimeout(timer); wantNear = false; readSearch(searchEl.value, false); live = null; searchEl.value = term; searchEl.blur();
-    track('map_search', { words: searchEl.value ? 1 : 0 }); changed();
-    if (wantNear && !me && !watching) nearBtn.click();
+  function runSearch(v, how){
+    clearTimeout(timer); wantNear = false; readSearch(v, false); searchEl.value = term; searchEl.blur();
+    track('map_search', { words: searchEl.value ? 1 : 0, how: how || 'typed' }); changed();
+    if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
-  });
+  }
+  searchEl.addEventListener('keydown', function(e){ if (e.key !== 'Enter') return; e.preventDefault(); runSearch(searchEl.value); });
+  // ---- Search by voice: the browser's own speech service types what the visitor says, then it is searched ----
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, micBtn = $('pmMic'), rec = null, listening = false;
+  if (SR && micBtn) {
+    micBtn.hidden = false;
+    var stopMic = function(){ listening = false; micBtn.setAttribute('aria-pressed', 'false'); micBtn.setAttribute('aria-label', T.micLabel); micBtn.classList.remove('is-listening'); };
+    micBtn.addEventListener('click', function(){
+      if (listening && rec) { rec.stop(); return; }
+      try {
+        rec = new SR(); rec.lang = FR ? 'fr-CA' : 'en-CA'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+        var heard = '', done = false;
+        rec.onresult = function(ev){
+          var said = '', final = false;
+          for (var i = 0; i < ev.results.length; i++) { said += ev.results[i][0].transcript; if (ev.results[i].isFinal) final = true; }
+          heard = said; searchEl.value = said;
+          if (final && !done) { done = true; setStatus(''); runSearch(said, 'voice'); }
+        };
+        rec.onerror = function(ev){ stopMic(); setStatus(ev.error === 'not-allowed' || ev.error === 'service-not-allowed' ? T.micDenied : ev.error === 'no-speech' ? T.micNone : T.micFail); };
+        rec.onend = function(){ stopMic(); if (heard && !done) { done = true; setStatus(''); runSearch(heard, 'voice'); } };
+        rec.start(); listening = true; searchEl.value = '';
+        micBtn.setAttribute('aria-pressed', 'true'); micBtn.setAttribute('aria-label', T.micStop); micBtn.classList.add('is-listening');
+        setStatus(T.listening, 10000); track('map_voice_search', {});
+      } catch (err) { stopMic(); setStatus(T.micFail); }
+    });
+  }
   $('pmTown').addEventListener('change', function(e){ var c = CONF.c[e.target.value]; if (c) { closePanel(); map.setView(c, 13); } });
   function setTab(t){
     tab = t; limit = 25;
@@ -13116,7 +13268,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
       places.push(p);
     });
@@ -13131,7 +13283,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (!hhKnown) featChips.forEach(function(c){ if (c.getAttribute('data-pm-feat') === 'happy') c.lastChild.textContent = ' ' + T.feat.happy; });
     try {
       var qs = new URLSearchParams(location.search);
-      (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
+      (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k === 'or') tagOr = true;
+        else if (k.indexOf('in.') === 0 && CONF.r[k.slice(3)]) town = k.slice(3); else if (/^p\\.(cheap|afford|fancy)$/.test(k)) price = k.slice(2); else if (/^at\\.\\d+u?$/.test(k)) { atMin = parseInt(k.slice(3), 10); atUntil = /u$/.test(k); } else if (/^on\\.(\\+1|mon|tue|wed|thu|fri|sat|sun)$/.test(k)) atDay = k.slice(3); else if (k.indexOf('x.y.') === 0 && TYPES[k.slice(4)]) notTypes[k.slice(4)] = true;
+        else if (k.indexOf('x.t.') === 0 && TAGIX[k.slice(4)] != null) notTags[k.slice(4)] = true; else if (k.indexOf('x.k.') === 0 && CONF.k[k.slice(4)]) notKinds[k.slice(4)] = true; else if (k.indexOf('x.f.') === 0 && CONF.f[k.slice(4)]) notFeats[k.slice(4)] = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
       if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = term; }
     } catch (e) {}
     syncChips();
@@ -13154,7 +13308,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
-const MAP_DATA_FORMAT = 5;
+const MAP_DATA_FORMAT = 6;
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -13245,7 +13399,7 @@ function mapPlaceTags(v) {
   return MAP_TAGS.reduce((out, t, i) => (t.types.includes(v.type) || t.find.test(text) ? out.concat(i) : out), []);
 }
 function mapPlacesData(now = new Date()) {
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description, happy_hour_times FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description, happy_hour_times, price FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const dogNotes = getDogPolicyNotes();
@@ -13257,7 +13411,9 @@ function mapPlacesData(now = new Date()) {
       // [9] rating x10 (0 when none); [10] what it serves or is good for, as MAP_TAGS positions.
       Number(v.rating) > 0 ? Math.round(Number(v.rating) * 10) : 0, mapPlaceTags(v),
       // [11] happy hour times (researched, compact like the hours), or 0; none while the place has a closure notice.
-      v.happy_hour_times && !(st && st.reason === 'advisory') ? mapHappyHourTimes(v.happy_hour_times) : 0];
+      v.happy_hour_times && !(st && st.reason === 'advisory') ? mapHappyHourTimes(v.happy_hour_times) : 0,
+      // [12] price level 1-4 ($ to $$$$), or 0 when not listed.
+      Number(v.price) >= 1 && Number(v.price) <= 4 ? Number(v.price) : 0];
   });
 }
 // Events in the next week, one entry each (its next date):
@@ -13348,6 +13504,7 @@ ${renderGolfHeaderHtml()}
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
         <input type="search" id="pmSearch" class="pm-search" placeholder="Try “patio drinks dog” or a name" autocomplete="off" enterkeyhint="search">
+        <button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
         <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="visually-hidden">Filters</span><span class="pm-badge" id="pmBadge" hidden></span></button>
       </div>
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
@@ -13383,6 +13540,7 @@ ${renderGolfHeaderHtml()}
         <button type="button" class="pm-more" id="pmMore" hidden>Show more</button>
         <noscript><p>The map needs JavaScript. <a href="/browse">Browse &amp; Search every place</a> instead.</p></noscript>
         <p class="pm-privacy">Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved. When you ask for directions, your starting point and the destination go to Mapbox to work out the route. Map tiles come from OpenStreetMap. Opening hours come from each place’s listing and can change; check before you go.</p>
+        <p class="pm-privacy">If you search by voice, your browser’s own speech service turns what you say into text (in Chrome that is Google; on an iPhone, Apple). Okanagan Roam never receives the recording, only the words, the same as typing.</p>
       </div>
     </section>
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="false" aria-labelledby="pmPanelTitle">
@@ -27188,6 +27346,8 @@ function renderPrivacyPage() {
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
     <p>The map asks for your location only when you tap the locate button (Near me). Your browser keeps it on your device to sort what’s near you; it is never sent to Okanagan Roam, saved, or put in a link. When you ask for directions on the map, your starting point and the destination are sent to Mapbox, which works out the route. Opening a place in Google Maps or Apple Maps hands the destination to that app.</p>
+    <h2>Searching by voice</h2>
+    <p>The microphone on the map is used only when you tap it. Your browser’s own speech service turns what you say into text (in Chrome that is Google; on an iPhone, Apple), and the map searches those words the same way as typed ones. Okanagan Roam never receives the recording.</p>
     <h2>What we never do</h2>
     <p>We don&rsquo;t sell, rent or trade personal information, and we don&rsquo;t use it for anything other than the reasons above.</p>
     <h2>How long we keep it, and your choices</h2>

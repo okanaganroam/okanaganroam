@@ -19668,7 +19668,7 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   assert.match(src, /\[\/gluten\[ -\]\?free/, 'gluten free is one filter');
   assert.match(src, /\[\/\(dog\|pet\)\[ -\]\?friendly\/g, ' dogs '\]/, 'dog friendly is Dogs OK');
   assert.match(src, /close \?\(by\|to \(me\|us\|here\)\|to\)\|near \?by\|near \(me\|us\|here\)/, 'close by, close to me and near me find the visitor');
-  assert.match(src, /if \(wantNear && !me && !watching\) nearBtn\.click\(\);/);
+  assert.match(src, /if \(wantNear && !me && !watching && !town\) nearBtn\.click\(\);/);
   // What a place serves, from its name, cuisine and description: "great ice cream close to me", "dinner and great cocktails".
   const tagKeys = conf0.tg.map((t) => t.k);
   for (const k of ['icecream', 'cocktail', 'sushi', 'pizza', 'brunch']) assert.ok(tagKeys.includes(k), k);
@@ -19684,6 +19684,17 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   }
   assert.match(src, /top: 'great best top amazing/, '"great" and "best" mean Top rated');
   assert.match(html, /data-pm-top aria-pressed="false"><span aria-hidden="true">⭐<\/span> Top rated/);
+  // Complex sentences (2026-10-14): a town, a distance, a price, a time or day, "no ...", "or", a group size.
+  for (const [rx, what] of [[/var TOWN_RX = Object\.keys\(CONF\.r\)/, 'towns'], [/\(\?:within\|under\|less than\|à moins de\)/, 'distance'], [/cheap eats\|/, 'price'],
+    [/\^until:/, 'until a time'], [/\\btomorrow\\b\|\\bdemain\\b/, 'tomorrow'], [/var NEG = ' no not without except/, 'no ...'], [/party of\|group of\|table for/, 'group size'], [/if \(ors && onTags\(\)\.length > 1\) tagOr = true;/, 'or']]) {
+    assert.match(src, rx, what);
+  }
+  assert.match(src, /if \(\(atMin != null \|\| atDay\) && !openAt\(p, atMin, atDay\)\) return false;/, 'open at a time uses the listed hours');
+  // Search by voice: the browser's speech service, a microphone button that shows only where it works, and the privacy note.
+  assert.match(html, /<button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice">/);
+  assert.match(src, /var SR = window\.SpeechRecognition \|\| window\.webkitSpeechRecognition/);
+  assert.match(src, /runSearch\(said, 'voice'\)/);
+  assert.match(html, /If you search by voice, your browser’s own speech service turns what you say into text/);
   assert.match(src, /history\.replaceState\(null, '', location\.pathname \+ \(q \? '\?' \+ q : ''\)/, 'filters in the address, never the location');
   assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
   const home = await (await fetch(`${base}/`)).text();
