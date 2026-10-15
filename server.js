@@ -12927,8 +12927,13 @@ ${renderGolfHeaderHtml()}
       </div>
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
-        ${MAP_MUST_HAVES.slice(0, 2).map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n        ')}
-        ${MAP_KINDS.slice(0, 3).map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n        ')}
+        ${(() => {
+          // Every filter in one row: Happy hour first, then Patio and Dogs OK, the kinds of place, then the other must-haves.
+          const feat = (f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`;
+          const kind = (k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`;
+          const first = ['happy', 'patio', 'dogs'];
+          return [...first.map((key) => MAP_MUST_HAVES.find((f) => f.key === key)).map(feat), ...MAP_KINDS.map(kind), ...MAP_MUST_HAVES.filter((f) => !first.includes(f.key)).map(feat)].join('\n        ');
+        })()}
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
       </div>
       <p class="pm-toast" id="pmStatus" role="status" aria-live="polite"></p>

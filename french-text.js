@@ -778,7 +778,7 @@ const FR_TEXT = {
   'What are you after?': 'Que cherchez-vous?',
   'Must have': 'Incontournables',
   'Drinks': 'Un verre', 'Food': 'Manger', 'Coffee': 'Café', 'Things to do': 'À faire',
-  'Dogs OK': 'Chiens OK', 'Kids welcome': 'Enfants bienvenus',
+  'Dogs OK': 'Chiens OK', 'Kids welcome': 'Enfants bienvenus', 'Lake view': 'Vue sur le lac',
   'Town…': 'Ville…', '1 km': '1 km', '5 km': '5 km', '10 km': '10 km', '25 km': '25 km', 'Any': 'Toutes',
   'What the pins mean': 'Ce que signifient les repères',
   'Filters': 'Filtres', 'Done': 'Terminé', 'Go to a town': 'Aller à une ville', 'Turn off my location': 'Désactiver ma position',
