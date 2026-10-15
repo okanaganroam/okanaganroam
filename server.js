@@ -9369,7 +9369,7 @@ function golfFavTripButtonsHtml(venue, opts = {}) {
 //   existing open/close), instead of one 1,770px list of every link.
 const NAV_DISCOVER_PANEL = `<div class="nav-dropdown-panel">
           <a href="/destinations" data-i18n="nav.destinations">Destinations</a>
-          <a href="/map" data-i18n="nav.map">Map</a>
+          <a href="/map">Roam Now</a>
           <a href="/guides">Guides</a>
           <a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a>
           <a href="/secret-spots">Secret Spots</a>
@@ -11224,7 +11224,7 @@ const SITE_WEBMANIFEST = JSON.stringify({
   ],
   // Long-press the home-screen icon (Android): straight to what's open nearby.
   shortcuts: [
-    { name: 'What’s open near me', short_name: 'Near me', url: '/map#near-me', icons: [{ src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192' }] },
+    { name: 'Roam Now: what’s open near me', short_name: 'Roam Now', url: '/map#near-me', icons: [{ src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192' }] },
     { name: 'What’s on this week', short_name: 'What’s on', url: '/map#events', icons: [{ src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192' }] },
   ],
 });
@@ -12946,7 +12946,7 @@ function mapLiveData(now = new Date()) {
 }
 function renderPlacesMapPage(placeCount = null, now = new Date()) {
   const count = placeCount == null ? mapPlaces().length : placeCount;
-  const title = 'Map of the Okanagan: What’s Open Near You | Okanagan Roam';
+  const title = 'Roam Now: Okanagan Map of What’s Open Near You | Okanagan Roam';
   const description = `Find what’s open near you in the Okanagan: ${count.toLocaleString('en-CA')} restaurants, wineries, beaches, trails and more on one map, with directions and what’s on this week.`;
   const canonical = 'https://okanaganroam.com/map';
   const typeEn = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
@@ -12956,7 +12956,7 @@ function renderPlacesMapPage(placeCount = null, now = new Date()) {
     // Directions on our own map (2026-10-14): a public Mapbox token (pk.), locked to okanaganroam.com in Mapbox. Without
     // one, Directions opens Google or Apple Maps as before.
     mb: /^pk\.[A-Za-z0-9._-]+$/.test(String(process.env.MAPBOX_TOKEN || '')) ? process.env.MAPBOX_TOKEN : '' }).replace(/</g, '\\u003c');
-  const breadcrumb = breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Map', url: canonical }]);
+  const breadcrumb = breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Roam Now', url: canonical }]);
   const townOptions = VALID_REGIONS.filter((r) => MAP_AREA_CENTERS[r]).map((r) => `<option value="${r}">${escapeHtml(REGION_LABELS[r])}</option>`).join('');
   return `<!DOCTYPE html>
 <html lang="en">
@@ -12974,7 +12974,7 @@ ${MAP_PAGE_STYLE}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
   <main class="pm-app">
-  <h1 class="visually-hidden">Map of the Okanagan</h1>
+  <h1 class="visually-hidden">Roam Now: map of what’s open near you in the Okanagan</h1>
   <p class="visually-hidden">Find what’s open near you, get directions, and see what’s on.</p>
   <div class="pm-stage" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
@@ -23798,7 +23798,7 @@ function browseFilterBarHtml(venues, cuisines, state = {}, openCount = 0) {
     ${pop('bhMore', 'Cuisine &amp; price', '\ud83c\udf7d\ufe0f', nM || '', browseCuisinePriceHtml(cuisines, state))}
     <button type="button" class="fd-pop-btn fd-open-toggle" id="bhOpenNow" aria-pressed="${state.openNow ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">\ud83d\udd52</span> Open now<span class="outdoor-activity-count" id="bhOpenNowCount">${openCount}</span></button>
     <button type="button" class="fd-pop-btn bh-fav-toggle" id="bhFavOnly" aria-pressed="${state.fav ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">\u2665</span> My favourites</button>
-    <a class="fd-pop-btn bh-map-link" id="bhMapLink" href="/map"><span class="fd-pop-icon" aria-hidden="true">\ud83d\uddfa\ufe0f</span> Map</a>
+    <a class="fd-pop-btn bh-map-link" id="bhMapLink" href="/map"><span class="fd-pop-icon" aria-hidden="true">\ud83d\udccd</span> Roam Now</a>
   </div>`;
 }
 function browseSelectedTagsHtml(state = {}) {
@@ -28207,7 +28207,7 @@ const server = http.createServer(async (req, res) => {
           .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
           .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`)
           // The near-me map, one tap from the home page (2026-10-14).
-          .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span aria-hidden="true">&#128205;</span> What’s open near me</a>');
+          .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span aria-hidden="true">&#128205;</span> Roam Now: what’s open near me</a>');
 
         // Anything still pointing at the now-removed sections (the header's
         // "Browse & Search" dropdown link and every homepage module's own

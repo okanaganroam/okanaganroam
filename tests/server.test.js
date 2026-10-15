@@ -5392,7 +5392,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(headerHtml, /<span data-i18n="nav\.discover">Discover<\/span>/, '"Discover" dropdown label must be i18n-wired');
   assert.match(headerHtml, /<span data-i18n="nav\.thingsToDo">Things to Do<\/span>/, '"Things to Do" dropdown label must be i18n-wired');
   assert.match(headerHtml, /<span data-i18n="mood\.foodDrink\.title">Food &amp; Drink<\/span>/, '"Food & Drink" dropdown label must reuse the mood card key');
-  assert.match(headerHtml, /data-i18n="nav\.map">Map<\/a>/, '"Map" link must be i18n-wired');
+  assert.match(headerHtml, /<a href="\/map">Roam Now<\/a>/, 'the map is called Roam Now (2026-10-14), a name app.js must not overwrite');
   assert.match(headerHtml, /data-i18n-aria="search\.button"/, 'search icon aria-label must be i18n-wired');
   assert.match(headerHtml, /data-i18n-aria="nav\.switchLanguage"/, 'language toggle aria-label must be i18n-wired');
   assert.match(headerHtml, /<span data-i18n="trip\.buildMyTrip">Build My Trip<\/span>/, 'header "Build My Trip" CTA must reuse the shared trip.buildMyTrip key');
@@ -11447,7 +11447,6 @@ const HEADER_SPEC = [
   // (no i18n keys, so not parsed here) sit between Map and Dog-Friendly Finds.
   { label: 'Discover', key: 'nav.discover', items: [
     ['/destinations', 'nav.destinations', 'Destinations'],
-    ['/map', 'nav.map', 'Map'],
     ['/local-favorites', 'gems.localFavourites.title', 'Local Favourites'],
     ['/dog-friendly', 'gems.dogFriendly.title', 'Dog-Friendly Finds'],
     ['/browse', 'nav.browseSearch', 'Browse &amp; Search'],
@@ -11513,7 +11512,7 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
     assert.match(nav.header, /id="navTripBtn"/, `${name}: Build My Trip button`);
     // Map keeps its id and href (okanagan.html is frozen); Stage 3.4: the
     // server answers /browse?openMap=1 with the map page (/map).
-    assert.match(nav.header, /<a href="\/map" data-i18n="nav\.map">Map<\/a>/, name); // straight to /map (2026-10-14)
+    assert.match(nav.header, /<a href="\/map">Roam Now<\/a>/, name); // straight to /map (2026-10-14)
     // No duplicates; Hidden Gems top-level only; no top-level Golf/Map. Secret
     // Spots joined Discover in the menus refresh (2026-10-14).
     const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1]));
@@ -14477,7 +14476,7 @@ test('Map (2026-10-14): /map shows a pin per place with a map position, category
   assert.equal(legacy.status, 302); assert.equal(legacy.headers.get('location'), '/map'); await legacy.text();
   for (const p of ['/', '/trip', '/kelowna/restaurants/test-trattoria']) {
     const h = await (await fetch(base + p)).text();
-    assert.match(h, /<a href="\/map" data-i18n="nav\.map">Map<\/a>/, `${p}: the header Map link goes straight to /map`);
+    assert.match(h, /<a href="\/map">Roam Now<\/a>/, `${p}: the header Map link goes straight to /map`);
   }
   assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/map<\/loc>/);
   const venue = await (await fetch(`${base}/kelowna/restaurants/test-trattoria`)).text();
@@ -19524,7 +19523,7 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   assert.match(html, /<section class="pm-sheet" id="pmSheet" data-state="peek"/);
   assert.match(html, /id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"/);
   assert.match(html, /<div class="pm-panel" id="pmPanel" hidden/);
-  assert.match(html, /<h1 class="visually-hidden">Map of the Okanagan<\/h1>/);
+  assert.match(html, /<h1 class="visually-hidden">Roam Now: map of what’s open near you in the Okanagan<\/h1>/);
   assert.match(html, /id="pmTabPlaces" aria-selected="true"/);
   assert.match(html, /id="pmTabEvents" aria-selected="false"/);
   assert.equal((html.match(/data-pm-open aria-pressed="false"/g) || []).length, 2, 'Open now as a quick chip and in Filters');
@@ -19545,7 +19544,7 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   }
   assert.ok(Array.isArray(data.e));
   const fr = await (await fetch(`${base}/fr/map`)).text();
-  assert.match(fr, /<h1 class="visually-hidden">Carte de l’Okanagan<\/h1>/);
+  assert.match(fr, /<h1 class="visually-hidden">Roam Now : carte de ce qui est ouvert près de vous dans l’Okanagan<\/h1>/);
   assert.match(fr, /<h2 id="pmPanelTitle">Filtres<\/h2>/);
   // The Okanagan only, and a pin to drop for visitors who are elsewhere (or without location).
   assert.match(html, /<button type="button" class="pm-pinbtn" id="pmPinBtn" aria-pressed="false">/);
