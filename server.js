@@ -12135,15 +12135,401 @@ function mapPlaces() {
   return db.prepare('SELECT id, name, region, type, slug, latitude, longitude FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)));
 }
-function renderPlacesMapPage(places = mapPlaces()) {
-  const title = 'Map of the Okanagan: Places to Eat, Drink and Explore | Okanagan Roam';
-  const description = `A map of ${places.length.toLocaleString('en-CA')} places across the Okanagan Valley: restaurants, wineries, beaches, trails, golf and more, from Enderby to Osoyoos.`;
+const MAP_PAGE_STYLE = `<style id="near-me-map">
+  body.map-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  body.map-page .pm-lead { margin-bottom: 12px; }
+  body.map-page .pm-top { display: flex; gap: 8px; align-items: center; margin: 4px 0 8px; }
+  body.map-page .pm-sep { flex: none; width: 1px; height: 26px; background: rgba(27,43,58,0.2); }
+  body.map-page .pm-chip-select { flex: none; }
+  body.map-page .pm-row { flex-wrap: nowrap; }
+  body.map-page .pm-town { flex: 0 0 auto; width: 118px; }
+  @media (max-width: 480px) { body.map-page .pm-lead { font-size: 0.95rem; margin-bottom: 8px; } body.map-page .pm-near { padding: 0 16px; } body.map-page .pm-tab { padding: 0 13px; } }
+  body.map-page .pm-near { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px; background: #1D4ED8; color: #fff; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: 0 2px 8px rgba(29,78,216,0.3); }
+  body.map-page .pm-near:hover { background: #1E40AF; }
+  body.map-page .pm-near[aria-pressed="true"] { background: #fff; color: #1D4ED8; box-shadow: inset 0 0 0 2px #1D4ED8; }
+  body.map-page .pm-tabs { flex: none; display: inline-flex; padding: 4px; border-radius: 999px; background: rgba(27,43,58,0.08); }
+  body.map-page .pm-tab { min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.92rem; cursor: pointer; }
+  body.map-page .pm-tab[aria-selected="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
+  body.map-page .pm-status { margin: 0 0 10px; font-size: 0.9rem; font-weight: 700; color: #1E3A8A; }
+  body.map-page .pm-status:empty { display: none; }
+  body.map-page .pm-filters[hidden] { display: none; }
+  body.map-page .pm-chips, body.map-page .pm-row { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; }
+  body.map-page .pm-chips { overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  body.map-page .pm-chip { flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  body.map-page .pm-chip[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: transparent; }
+  body.map-page .pm-search { flex: 1 1 auto; min-width: 0; width: 100%; min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); font: inherit; font-size: 0.95rem; background: #fff; }
+  body.map-page .pm-select { min-height: 42px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; font: inherit; font-size: 0.92rem; }
+  body.map-page .pm-select[hidden] { display: none; }
+  body.map-page .pm-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  body.map-page .pm-dot.is-open, body.map-page .pm-st.is-open .pm-dot { background: #16A34A; }
+  body.map-page .pm-st.is-closed .pm-dot { background: transparent; box-shadow: inset 0 0 0 2px #B45309; }
+  body.map-page .pm-layout { display: grid; gap: 14px; margin-top: 4px; }
+  body.map-page .pm-map-wrap { position: relative; }
+  body.map-page #okMap { height: 52vh; min-height: 300px; max-height: 560px; border-radius: 16px; z-index: 0; }
+  @media (min-width: 900px) {
+    body.map-page .pm-layout { grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); align-items: start; }
+    body.map-page .pm-map-wrap { position: sticky; top: 84px; }
+    body.map-page #okMap { height: calc(100vh - 120px); max-height: 760px; }
+    body.map-page .pm-results { max-height: calc(100vh - 120px); overflow-y: auto; padding-right: 4px; }
+  }
+  body.map-page .pm-count { font-family: 'Nunito', sans-serif; font-size: 1rem; font-weight: 800; margin: 2px 0 10px; }
+  body.map-page .pm-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  body.map-page .pm-group h3 { margin: 10px 0 0; font-size: 0.95rem; text-transform: none; }
+  body.map-page .pm-item { background: #fff; border-radius: 14px; box-shadow: 0 1px 3px rgba(27,43,58,0.12); overflow: hidden; }
+  body.map-page .pm-item-main { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 12px 14px 8px; border: 0; background: transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+  body.map-page .pm-item-main:hover .pm-name { text-decoration: underline; }
+  body.map-page .pm-name { font-weight: 800; font-size: 1rem; color: var(--ref-navy, #1B2B3A); }
+  body.map-page .pm-meta { font-size: 0.86rem; opacity: 0.75; }
+  body.map-page .pm-meta em { font-style: normal; opacity: 0.85; }
+  body.map-page .pm-when { font-size: 0.88rem; font-weight: 800; color: #9D174D; }
+  body.map-page .pm-st { display: inline-flex; align-items: center; gap: 6px; font-size: 0.86rem; font-weight: 700; }
+  body.map-page .pm-st.is-open { color: #166534; }
+  body.map-page .pm-st.is-closed { color: #92400E; }
+  body.map-page .pm-acts { display: flex; gap: 8px; padding: 0 14px 12px; }
+  body.map-page .pm-dir, body.map-page .pm-link { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 999px; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
+  body.map-page .pm-dir { background: #1D4ED8; color: #fff; }
+  body.map-page .pm-dir:hover { background: #1E40AF; color: #fff; }
+  body.map-page .pm-link { border: 1px solid rgba(27,43,58,0.25); color: var(--ink); }
+  body.map-page .pm-empty { padding: 14px; border-radius: 12px; background: rgba(27,43,58,0.05); font-size: 0.92rem; }
+  body.map-page .pm-more { margin: 12px auto 4px; display: block; min-height: 42px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+  body.map-page .pm-more[hidden] { display: none; }
+  body.map-page .pm-privacy { margin: 16px 0 0; font-size: 0.8rem; line-height: 1.45; opacity: 0.7; max-width: 72ch; }
+  body.map-page .pm-pop a { font-weight: 800; }
+  body.map-page .pm-pop small { display: block; opacity: 0.75; margin: 2px 0 4px; }
+  body.map-page .pm-pop .pm-st { display: flex; margin: 0 0 6px; }
+  body.map-page .pm-pop a.pm-pop-dir { display: inline-block; margin-top: 2px; padding: 6px 12px; border-radius: 999px; background: #1D4ED8; color: #fff; text-decoration: none; }
+  /* Pins: one colour per kind of place; events in pink. */
+  .pm-pin { background: none; border: 0; }
+  .pm-pin span { display: block; width: 16px; height: 16px; margin: 2px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.35); background: #475569; }
+  .pm-pin-food span { background: #C2410C; }
+  .pm-pin-wine span { background: #7B2D4F; }
+  .pm-pin-beach span { background: #0E7490; }
+  .pm-pin-outdoor span { background: #2F7D4F; }
+  .pm-pin-golf span { background: #65A30D; }
+  .pm-pin-do span { background: #6D28D9; }
+  .pm-pin-event span { background: #DB2777; border-radius: 4px; transform: rotate(45deg); }
+  .pm-me { background: none; border: 0; }
+  .pm-me span { display: block; width: 18px; height: 18px; margin: 2px; border-radius: 50%; background: #1D4ED8; border: 3px solid #fff; box-shadow: 0 0 0 0 rgba(29,78,216,0.5); animation: pm-pulse 2s infinite; }
+  @keyframes pm-pulse { 0% { box-shadow: 0 0 0 0 rgba(29,78,216,0.5); } 70% { box-shadow: 0 0 0 14px rgba(29,78,216,0); } 100% { box-shadow: 0 0 0 0 rgba(29,78,216,0); } }
+  @media (prefers-reduced-motion: reduce) { .pm-me span { animation: none; } }
+</style>`;
+const MAP_PAGE_SCRIPT = `  if (!window.L) return;
+  var FR = document.documentElement.lang === 'fr';
+  var T = FR ? {
+    nearMe: 'Près de moi', stop: 'Arrêter', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.',
+    denied: 'La localisation est désactivée pour ce site. Vous pouvez quand même parcourir la carte, ou l’activer dans les réglages de votre navigateur.',
+    failed: 'Impossible de trouver votre position pour l’instant. Réessayez dans un endroit dégagé, ou parcourez la carte.', unsupported: 'Ce navigateur ne peut pas partager votre position.',
+    loading: 'Chargement de la carte…', loadFailed: 'La carte n’a pas pu se charger. Rechargez la page pour réessayer.',
+    placesNear: function(n, r){ return n + (n === 1 ? ' lieu' : ' lieux') + (r ? ' à moins de ' + r + ' km' : ' autour de vous'); },
+    placesHere: function(n){ return n + (n === 1 ? ' lieu' : ' lieux') + ' dans cette zone de la carte'; },
+    openSuffix: ' ouverts', eventsCount: function(n){ return n + (n === 1 ? ' événement' : ' événements') + ' cette semaine'; },
+    eventsNear: function(n, r){ return n + (n === 1 ? ' événement' : ' événements') + (r ? ' à moins de ' + r + ' km' : ' près de vous') + ' cette semaine'; },
+    zoomHint: 'Touchez « Près de moi » ou zoomez sur la carte pour voir les lieux à proximité.',
+    none: 'Rien ne correspond ici. Essayez une plus grande distance ou retirez un filtre.', noEvents: 'Aucun événement cette semaine ici. Essayez une plus grande distance.',
+    directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
+    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
+  } : {
+    nearMe: 'Near me', stop: 'Stop', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.',
+    denied: 'Location is turned off for this site. You can still browse the map, or turn location on in your browser settings.',
+    failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or browse the map.', unsupported: 'This browser can’t share your location.',
+    loading: 'Loading the map…', loadFailed: 'The map couldn’t load. Reload the page to try again.',
+    placesNear: function(n, r){ return n + (n === 1 ? ' place' : ' places') + (r ? ' within ' + r + ' km' : ' near you'); },
+    placesHere: function(n){ return n + (n === 1 ? ' place' : ' places') + ' in this part of the map'; },
+    openSuffix: ' open', eventsCount: function(n){ return n + (n === 1 ? ' event' : ' events') + ' this week'; },
+    eventsNear: function(n, r){ return n + (n === 1 ? ' event' : ' events') + (r ? ' within ' + r + ' km' : ' near you') + ' this week'; },
+    zoomHint: 'Tap Near me, or zoom into the map, to see what’s close by.',
+    none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
+    directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
+    today: 'Today', until: 'until', onNow: 'On now', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
+  };
+  var TYPES = CONF.t[FR ? 'fr' : 'en'];
+  var mapEl = document.getElementById('okMap');
+  var map = L.map(mapEl, { scrollWheelZoom: false }).setView([49.75, -119.5], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
+  var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, chunkedLoading: true }) : L.layerGroup();
+  map.addLayer(cluster);
+  var places = [], events = [], tab = 'places', groups = {}, openOnly = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
+  var $ = function(id){ return document.getElementById(id); };
+  var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
+  var chips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-group]')), allChip = document.querySelector('[data-pm-all]'), openBtn = $('pmOpen');
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params || {}); } catch (e) {} }
+  var IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function dirUrl(lat, lng, name){ return IOS ? 'https://maps.apple.com/?daddr=' + lat + ',' + lng + '&q=' + encodeURIComponent(name) : 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng; }
+  function distKm(lat1, lng1, lat2, lng2){ var R = 6371, r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLng = (lng2 - lng1) * r; var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLng / 2) * Math.sin(dLng / 2); return 2 * R * Math.asin(Math.sqrt(a)); }
+  function icon(kind){ return L.divIcon({ className: 'pm-pin pm-pin-' + kind, html: '<span></span>', iconSize: [20, 20], iconAnchor: [10, 10], popupAnchor: [0, -8] }); }
+  var ICONS = {};
+  function iconFor(kind){ return ICONS[kind] || (ICONS[kind] = icon(kind)); }
+  // Opening status, from the listed hours on the Okanagan clock (same rules as the hub pages).
+  function statusOf(p){
+    if (!p.h) return null;
+    try { var clock = okanaganClock(new Date()); var l = hoursStatusLabel(statusAt(parseHours(expandFoodDrinkHours(p.h)), clock), clock); return l.state === 'unknown' ? null : l; } catch (e) { return null; }
+  }
+  function refreshStatus(){ places.forEach(function(p){ p.st = statusOf(p); }); }
+  // Dates on the Okanagan calendar.
+  function okToday(){
+    var now = new Date();
+    if (now.getTime() >= Date.UTC(2026, 10, 1, 9, 0)) return new Date(now.getTime() - 7 * 3600000).toISOString().slice(0, 10);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  }
+  function addDays(d, n){ var x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+  function mins(t){ if (!t) return null; var p = t.split(':'); return Number(p[0]) * 60 + Number(p[1]); }
+  function timeText(t){ var m = mins(t); if (m == null) return ''; var h = Math.floor(m / 60), mm = m % 60, pad = (mm < 10 ? '0' : '') + mm; if (FR) return h + ' h' + (mm ? ' ' + pad : ''); return (h % 12 || 12) + (mm ? ':' + pad : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
+  function dayText(d){ return new Date(d + 'T12:00:00Z').toLocaleDateString(FR ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); }
+  function eventGroup(e, today, nowMin){
+    if (e.sd > today) return e.sd === addDays(today, 1) ? 'tomorrow' : 'week';
+    if (e.ed < today) return null;
+    var sm = mins(e.st), em = mins(e.et);
+    if (e.sd === today && sm != null && nowMin < sm) return 'later';
+    if (e.ed === today && em != null && sm != null && em > sm && nowMin >= em) return null;
+    if (e.sd === today && e.ed === today && sm != null && em == null && nowMin >= sm + 180) return null;
+    return 'now';
+  }
+  function whenText(e, g){
+    var times = e.st ? timeText(e.st) + (e.et ? '–' + timeText(e.et) : '') : '';
+    if (g === 'now') return e.ed > e.sd ? T.onNow + ' · ' + T.until + ' ' + dayText(e.ed) : T.onNow + (times ? ' · ' + times : '');
+    if (g === 'later') return T.today + ' · ' + times;
+    if (g === 'tomorrow') return T.tomorrow + (times ? ' · ' + times : '');
+    return dayText(e.sd) + (times ? ' · ' + times : '');
+  }
+  function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + esc(st.text) + '</span>' : ''; }
+  function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (me ? ' · ' + T.km(p.d) : '')); }
+  function popupFor(p){ return '<div class="pm-pop"><a href="' + esc(p.url) + '">' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" href="' + esc(dirUrl(p.lat, p.lng, p.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  function popupForEvent(e){ return '<div class="pm-pop"><a href="' + esc(e.url) + '">' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" href="' + esc(dirUrl(e.lat, e.lng, e.venue || e.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  function setStatus(text){ statusEl.textContent = text || ''; statusEl.hidden = !text; }
+  function matchesPlace(p){ return (!Object.keys(groups).some(function(k){ return groups[k]; }) || groups[p.g]) && (!term || p.key.indexOf(term) !== -1) && (!openOnly || (p.st && p.st.state === 'open')); }
+  function render(fit){
+    var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
+    var items, onMap;
+    if (me) { places.forEach(function(p){ p.d = distKm(me.lat, me.lng, p.lat, p.lng); }); events.forEach(function(e){ e.d = e.lat == null ? null : distKm(me.lat, me.lng, e.lat, e.lng); }); }
+    if (tab === 'places') {
+      onMap = places.filter(function(p){ return matchesPlace(p) && (!me || !radiusKm || p.d <= radiusKm); });
+      if (me) items = onMap.slice().sort(function(a, b){ return a.d - b.d; });
+      else {
+        var b = map.getBounds();
+        items = map.getZoom() >= 12 || term ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : [];
+      }
+      countEl.textContent = me ? T.placesNear(items.length, radiusKm) : (items.length || map.getZoom() >= 12 || term ? T.placesHere(items.length) : T.zoomHint);
+    } else {
+      events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
+      var order = { now: 0, later: 1, tomorrow: 2, week: 3 };
+      // An event without a pin counts as near when its town centre is within the distance.
+      var nearTown = function(e){ var c = CONF.c[e.region]; return c && distKm(me.lat, me.lng, c[0], c[1]) <= radiusKm; };
+      items = events.filter(function(e){ return e.g && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
+        .sort(function(a, b){ return order[a.g] - order[b.g] || (a.sd < b.sd ? -1 : a.sd > b.sd ? 1 : 0) || ((a.st || '') < (b.st || '') ? -1 : (a.st || '') > (b.st || '') ? 1 : 0) || (me && a.d != null && b.d != null ? a.d - b.d : 0); });
+      onMap = items.filter(function(e){ return e.lat != null; });
+      countEl.textContent = me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
+    }
+    cluster.clearLayers();
+    var layers = onMap.map(function(x){ return x.m; }).filter(Boolean);
+    if (cluster.addLayers) cluster.addLayers(layers); else layers.forEach(function(m){ cluster.addLayer(m); });
+    listItems = items;
+    drawList();
+    if (fit && me && radiusKm) map.fitBounds(L.latLng(me.lat, me.lng).toBounds(radiusKm * 2000), { padding: [20, 20] });
+    else if (fit && term && tab === 'places' && onMap.length && onMap.length <= 25) map.fitBounds(L.latLngBounds(onMap.map(function(p){ return [p.lat, p.lng]; })), { padding: [40, 40], maxZoom: 16 });
+    lastRender = me ? { lat: me.lat, lng: me.lng } : null;
+  }
+  function drawList(){
+    var html = '', lastGroup = null;
+    listItems.slice(0, limit).forEach(function(x, i){
+      if (tab === 'places') {
+        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + '</button>'
+          + '<div class="pm-acts"><a class="pm-dir" data-dir="place" href="' + esc(dirUrl(x.lat, x.lng, x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
+      } else {
+        if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
+        var where = [x.venue, CONF.r[x.region], x.d != null && me ? T.km(x.d) : ''].filter(Boolean).join(' · ');
+        html += '<li class="pm-item pm-event"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span><span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></button>'
+          + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
+      }
+    });
+    if (!listItems.length && (me || tab === 'events' || map.getZoom() >= 12 || term)) html = '<li class="pm-empty">' + esc(tab === 'places' ? T.none : T.noEvents) + '</li>';
+    listEl.innerHTML = html;
+    moreBtn.hidden = listItems.length <= limit;
+    moreBtn.textContent = T.more;
+  }
+  function focusItem(x){
+    if (x.lat == null || !x.m) return;
+    if (window.innerWidth < 900) mapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (cluster.zoomToShowLayer) cluster.zoomToShowLayer(x.m, function(){ x.m.openPopup(); });
+    else { map.setView([x.lat, x.lng], Math.max(map.getZoom(), 15)); x.m.openPopup(); }
+  }
+  listEl.addEventListener('click', function(e){
+    var b = e.target.closest('.pm-item-main');
+    if (b) { focusItem(listItems[Number(b.getAttribute('data-i'))]); return; }
+  });
+  document.addEventListener('click', function(e){ var d = e.target.closest && e.target.closest('[data-dir]'); if (d) track('map_directions', { kind: d.getAttribute('data-dir'), located: !!me }); });
+  moreBtn.addEventListener('click', function(){ limit += 25; drawList(); });
+  // Where the visitor is: only after they tap Near me, kept in this page only.
+  function drawMe(){
+    var ll = [me.lat, me.lng];
+    if (!meMarker) {
+      meMarker = L.marker(ll, { icon: L.divIcon({ className: 'pm-me', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }), keyboard: false, interactive: false, zIndexOffset: 1000 }).addTo(map);
+      meCircle = L.circle(ll, { radius: me.acc, color: '#1D4ED8', weight: 1, fillColor: '#3B82F6', fillOpacity: 0.12, interactive: false }).addTo(map);
+    } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(me.acc); }
+  }
+  function pickRadius(){
+    var counts = [1, 5, 10, 25].map(function(r){ return { r: r, n: places.filter(function(p){ return matchesPlace(p) && distKm(me.lat, me.lng, p.lat, p.lng) <= r; }).length }; });
+    var pick = counts.filter(function(c){ return c.n >= 8; })[0];
+    return pick ? pick.r : 0;
+  }
+  function onPos(pos){
+    var first = !me;
+    me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.min(pos.coords.accuracy || 50, 2000) };
+    drawMe();
+    if (first) {
+      radiusKm = pickRadius(); radiusSel.value = String(radiusKm); radiusSel.hidden = false;
+      nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.stop; setStatus(T.near);
+      track('map_near_me', { radius_km: radiusKm });
+      render(true);
+      if (!radiusKm) map.setView([me.lat, me.lng], 12);
+    } else if (!lastRender || distKm(lastRender.lat, lastRender.lng, me.lat, me.lng) > 0.15) render(false);
+  }
+  function onErr(err){
+    stopWatch();
+    if (!me) { nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; }
+    setStatus(err && err.code === 1 ? T.denied : T.failed);
+  }
+  function startWatch(){
+    if (!navigator.geolocation) { setStatus(T.unsupported); return; }
+    watching = true;
+    watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 });
+  }
+  function stopWatch(){ if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); watchId = null; }
+  nearBtn.addEventListener('click', function(){
+    if (watching || me) {
+      watching = false; stopWatch(); me = null;
+      if (meMarker) { map.removeLayer(meMarker); map.removeLayer(meCircle); meMarker = meCircle = null; }
+      nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; radiusSel.hidden = true; setStatus('');
+      places.forEach(function(p){ p.d = null; }); render(false); return;
+    }
+    nearLabel.textContent = T.finding; startWatch();
+  });
+  // No location updates while the page is in the background.
+  document.addEventListener('visibilitychange', function(){ if (!watching) return; if (document.hidden) stopWatch(); else if (watchId == null) startWatch(); });
+  radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); limit = 25; render(true); });
+  chips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-group'); groups[k] = !groups[k]; syncChips(); limit = 25; render(false); }); });
+  allChip.addEventListener('click', function(){ groups = {}; syncChips(); limit = 25; render(false); });
+  function syncChips(){ var any = false; chips.forEach(function(c){ var on = !!groups[c.getAttribute('data-pm-group')]; any = any || on; c.setAttribute('aria-pressed', on ? 'true' : 'false'); }); allChip.setAttribute('aria-pressed', any ? 'false' : 'true'); }
+  openBtn.addEventListener('click', function(){ openOnly = !openOnly; openBtn.setAttribute('aria-pressed', openOnly ? 'true' : 'false'); limit = 25; render(false); });
+  var timer = null;
+  $('pmSearch').addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ term = v.trim().toLowerCase(); limit = 25; render(true); }, 200); });
+  $('pmTown').addEventListener('change', function(e){ var c = CONF.c[e.target.value]; if (c) map.setView(c, 13); });
+  function setTab(t){
+    tab = t; limit = 25;
+    $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
+    $('pmTabEvents').setAttribute('aria-selected', t === 'events' ? 'true' : 'false');
+    $('pmPlaceFilters').hidden = t !== 'places';
+    render(false);
+  }
+  $('pmTabPlaces').addEventListener('click', function(){ setTab('places'); });
+  $('pmTabEvents').addEventListener('click', function(){ setTab('events'); });
+  var moveTimer = null;
+  map.on('moveend', function(){ if (me || tab !== 'places') return; clearTimeout(moveTimer); moveTimer = setTimeout(function(){ render(false); }, 150); });
+  countEl.textContent = T.loading;
+  fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
+    places = d.p.map(function(a){
+      var p = { lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
+      return p;
+    });
+    events = d.e.map(function(a){
+      var e = { name: a[0], url: a[1], region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], d: null };
+      if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(function(){ return popupForEvent(e); });
+      return e;
+    });
+    refreshStatus();
+    render(false);
+    if (location.hash === '#near-me') nearBtn.click();
+  }).catch(function(){ countEl.textContent = T.loadFailed; });
+  // Opening times move on: refresh every minute.
+  setInterval(function(){ refreshStatus(); if (!document.hidden) { var y = window.scrollY; render(false); window.scrollTo(0, y); } }, 60000);
+  setTimeout(function(){ map.invalidateSize(); }, 100);`;
+// ---------- Near-me map (2026-10-14): /map ----------
+// The map is built for a phone in the visitor's hand: "Near me" shows where they
+// are and lists the closest places first, each with today's opening status (the
+// same hours.js status as the hub pages; no status when hours aren't listed) and
+// a Directions button that opens Google Maps (Apple Maps on iPhone). An Events
+// tab lists what's on now, later today, tomorrow and this week, pinned at the
+// venue when the event is linked to one. The visitor's location stays in their
+// browser: it is never sent to Okanagan Roam, stored, or put in an address.
+// The places, hours and events load from /map/data.json, versioned so a
+// browser keeps it until something changes.
+const MAP_EVENT_DAYS = 7;
+let mapDataCache = null;
+function mapDataVersion(now = new Date()) {
+  const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
+  const e = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM events').get();
+  const o = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM event_occurrences').get();
+  return crypto.createHash('md5').update(`${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}`).digest('hex').slice(0, 12);
+}
+const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
+// Places: [lat, lng, name, type, region, url, hours or 0]. Hours ship only for a
+// place that has them and no current closure notice (as the hub pages).
+function mapPlacesData(now = new Date()) {
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+    .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
+  const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
+  return venues.map((v) => {
+    const st = open.byId.get(v.id);
+    return [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0];
+  });
+}
+// Events in the next week, one entry each (its next date):
+// [name, url, region, venue name, lat, lng, startDate, startTime, endDate, endTime, allDay].
+// lat/lng only through the event's own venue link; an event without one is listed, never pinned.
+function mapEventsData(now = new Date()) {
+  const today = todayLocal(now);
+  const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.venue_id, e.venue_name_text, o.start_date, o.end_date, o.start_time, o.end_time, o.all_day
+    FROM event_occurrences o JOIN events e ON e.id = o.event_id
+    WHERE e.status = 'scheduled' AND o.status = 'scheduled' AND o.end_date >= ? AND o.start_date <= ?
+    ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, addLocalDays(today, MAP_EVENT_DAYS));
+  const seen = new Set();
+  const venueQ = db.prepare('SELECT name, latitude, longitude, redirect_to FROM venues WHERE id = ?');
+  // An event without a venue link is pinned only when its venue text names exactly one listed place in the same
+  // town ("Cannery Brewing", or "Gray Monk Estate Winery, Lake Country"); anything else is listed without a pin.
+  const byName = new Map();
+  for (const v of db.prepare('SELECT name, region, latitude, longitude FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()) {
+    const k = `${v.region}|${String(v.name).trim().toLowerCase()}`;
+    byName.set(k, byName.has(k) ? null : v);
+  }
+  const nameMatch = (text, region) => {
+    const t = String(text || '').trim().toLowerCase();
+    if (!t) return null;
+    const town = (REGION_LABELS[region] || '').toLowerCase();
+    for (const cand of [t, t.replace(new RegExp(`,\\s*${town.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '')]) {
+      const hit = byName.get(`${region}|${cand}`);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const out = [];
+  for (const r of rows) {
+    if (seen.has(r.id) || !REGION_LABELS[r.region] || !r.slug) continue;
+    seen.add(r.id);
+    let venue = r.venue_id ? venueQ.get(r.venue_id) : null;
+    if (venue && venue.redirect_to) venue = venueQ.get(venue.redirect_to);
+    if (!venue && r.venue_name_text) venue = nameMatch(r.venue_name_text, r.region);
+    const pin = venue && Number.isFinite(Number(venue.latitude)) && Number.isFinite(Number(venue.longitude)) && venue.latitude !== null && venue.longitude !== null && !(Number(venue.latitude) === 0 && Number(venue.longitude) === 0);
+    out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), pin ? mapRound(venue.latitude) : null, pin ? mapRound(venue.longitude) : null,
+      r.start_date, r.start_time || '', r.end_date, r.end_time || '', r.all_day ? 1 : 0]);
+  }
+  return out;
+}
+function mapLiveData(now = new Date()) {
+  const version = mapDataVersion(now);
+  if (mapDataCache && mapDataCache.version === version) return mapDataCache;
+  const json = JSON.stringify({ p: mapPlacesData(now), e: mapEventsData(now) });
+  mapDataCache = { version, json };
+  return mapDataCache;
+}
+function renderPlacesMapPage(placeCount = null, now = new Date()) {
+  const count = placeCount == null ? mapPlaces().length : placeCount;
+  const title = 'Map of the Okanagan: What’s Open Near You | Okanagan Roam';
+  const description = `Find what’s open near you in the Okanagan: ${count.toLocaleString('en-CA')} restaurants, wineries, beaches, trails and more on one map, with directions and what’s on this week.`;
   const canonical = 'https://okanaganroam.com/map';
-  const typeLabel = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
-  const data = JSON.stringify({
-    p: places.map((v) => [Math.round(Number(v.latitude) * 1e5) / 1e5, Math.round(Number(v.longitude) * 1e5) / 1e5, v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`]),
-    g: MAP_GROUP_BY_TYPE, t: typeLabel, r: REGION_LABELS, c: MAP_AREA_CENTERS,
-  }).replace(/</g, '\\u003c');
+  const typeEn = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
+  const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
+  const conf = JSON.stringify({ src: `/map/data.json?v=${mapDataVersion(now)}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS }).replace(/</g, '\\u003c');
   const breadcrumb = breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Map', url: canonical }]);
   const townOptions = VALID_REGIONS.filter((r) => MAP_AREA_CENTERS[r]).map((r) => `<option value="${r}">${escapeHtml(REGION_LABELS[r])}</option>`).join('');
   return `<!DOCTYPE html>
@@ -12155,17 +12541,7 @@ ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css"/>
 ${renderOutdoorThemeStyles()}
 ${renderAnalyticsHeadHtml('hub')}
-<style>
-  body.map-page .pm-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 12px; }
-  body.map-page .pm-chip { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 700; font-size: 0.88rem; cursor: pointer; }
-  body.map-page .pm-chip[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: transparent; }
-  body.map-page .pm-search { flex: 1 1 220px; min-width: 0; min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); font: inherit; font-size: 0.95rem; }
-  body.map-page .pm-town { min-height: 42px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; font: inherit; font-size: 0.92rem; }
-  body.map-page .pm-count { font-weight: 700; opacity: 0.75; margin: 0 0 8px; }
-  body.map-page #okMap { height: min(70vh, 680px); min-height: 400px; border-radius: 16px; z-index: 0; }
-  body.map-page .pm-pop a { font-weight: 800; }
-  body.map-page .pm-pop small { display: block; opacity: 0.75; margin-top: 2px; }
-</style>
+${MAP_PAGE_STYLE}
 </head>
 <body class="golf-page outdoor-page region-page map-page">
   ${renderGolfTripTrayHtml()}
@@ -12174,20 +12550,44 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Map' }])}
   <h1>Map of the Okanagan</h1>
-  <p class="subtitle">Every place on Okanagan Roam with a map position. Zoom in or pick a town, then tap a pin.</p>
-  <div class="pm-controls" role="group" aria-label="Show on the map">
-    <button type="button" class="pm-chip" data-pm-all aria-pressed="true">All</button>
-    ${MAP_GROUPS.map((g) => `<button type="button" class="pm-chip" data-pm-group="${g.key}" aria-pressed="false">${escapeHtml(g.label)}</button>`).join('\n    ')}
+  <p class="subtitle pm-lead">Find what’s open near you, get directions, and see what’s on.</p>
+  <div class="pm-top">
+    <button type="button" class="pm-near" id="pmNear" aria-pressed="false"><span aria-hidden="true">&#9673;</span> <span id="pmNearLabel">Near me</span></button>
+    <div class="pm-tabs" role="tablist" aria-label="Show">
+      <button type="button" role="tab" class="pm-tab" id="pmTabPlaces" aria-selected="true" aria-controls="pmList">Places</button>
+      <button type="button" role="tab" class="pm-tab" id="pmTabEvents" aria-selected="false" aria-controls="pmList">Events</button>
+    </div>
   </div>
-  <div class="pm-controls">
-    <label class="visually-hidden" for="pmSearch">Search places on the map</label>
-    <input type="search" id="pmSearch" class="pm-search" placeholder="Search a place by name..." autocomplete="off">
-    <label class="visually-hidden" for="pmTown">Jump to a town</label>
-    <select id="pmTown" class="pm-town"><option value="">Jump to a town&hellip;</option>${townOptions}</select>
+  <p class="pm-status" id="pmStatus" role="status" aria-live="polite"></p>
+  <div class="pm-filters" id="pmPlaceFilters">
+    <div class="pm-chips" role="group" aria-label="Filters">
+      <button type="button" class="pm-chip pm-open" id="pmOpen" aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
+      <label class="visually-hidden" for="pmRadius">Distance</label>
+      <select id="pmRadius" class="pm-select pm-chip-select" hidden>
+        <option value="1">Within 1 km</option><option value="5" selected>Within 5 km</option><option value="10">Within 10 km</option><option value="25">Within 25 km</option><option value="0">Any distance</option>
+      </select>
+      <span class="pm-sep" aria-hidden="true"></span>
+      <button type="button" class="pm-chip" data-pm-all aria-pressed="true">All</button>
+      ${MAP_GROUPS.map((g) => `<button type="button" class="pm-chip" data-pm-group="${g.key}" aria-pressed="false">${escapeHtml(g.label)}</button>`).join('\n      ')}
+    </div>
+    <div class="pm-row">
+      <label class="visually-hidden" for="pmSearch">Search places by name</label>
+      <input type="search" id="pmSearch" class="pm-search" placeholder="Search a place by name..." autocomplete="off">
+      <label class="visually-hidden" for="pmTown">Jump to a town</label>
+      <select id="pmTown" class="pm-select pm-town"><option value="">Town&hellip;</option>${townOptions}</select>
+    </div>
   </div>
-  <p class="pm-count" id="pmCount" aria-live="polite">${places.length.toLocaleString('en-CA')} places</p>
-  <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
-  <p class="subtitle" style="margin-top:12px">Prefer a list? <a href="/browse">Browse &amp; Search every place</a> or <a href="/destinations">pick a destination</a>.</p>
+  <div class="pm-layout">
+    <div class="pm-map-wrap"><div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div></div>
+    <section class="pm-results" aria-labelledby="pmCount">
+      <h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;</h2>
+      <ul class="pm-list" id="pmList"></ul>
+      <button type="button" class="pm-more" id="pmMore" hidden>Show more</button>
+      <noscript><p>The map needs JavaScript. <a href="/browse">Browse &amp; Search every place</a> instead.</p></noscript>
+    </section>
+  </div>
+  <p class="pm-privacy">Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved. Map tiles come from OpenStreetMap. Opening hours come from each place’s listing and can change; check before you go.</p>
+  <p class="subtitle" style="margin-top:12px">Prefer a list? <a href="/browse">Browse &amp; Search every place</a> or <a href="/whats-on">see everything that’s on</a>.</p>
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
@@ -12195,38 +12595,12 @@ ${renderGolfHeaderHtml()}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script>
 (function(){
-  if (!window.L) return;
-  var D = ${data};
-  var map = L.map('okMap', { scrollWheelZoom: false }).setView([49.75, -119.5], 9);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 18 }).addTo(map);
-  var layer = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 }) : L.layerGroup();
-  map.addLayer(layer);
-  function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  var markers = D.p.map(function(p){
-    var m = L.marker([p[0], p[1]], { title: p[2] });
-    m.bindPopup('<div class="pm-pop"><a href="' + esc(p[5]) + '">' + esc(p[2]) + '</a><small>' + esc((D.t[p[3]] || '') + ' \\u00b7 ' + (D.r[p[4]] || '')) + '</small></div>');
-    return { m: m, g: D.g[p[3]], name: p[2].toLowerCase() };
-  });
-  var groups = {}, term = '';
-  var chips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-group]')), allChip = document.querySelector('[data-pm-all]');
-  var count = document.getElementById('pmCount');
-  function draw(){
-    var on = Object.keys(groups).filter(function(k){ return groups[k]; });
-    var shown = markers.filter(function(x){ return (!on.length || groups[x.g]) && (!term || x.name.indexOf(term) !== -1); });
-    layer.clearLayers();
-    if (layer.addLayers) layer.addLayers(shown.map(function(x){ return x.m; })); else shown.forEach(function(x){ layer.addLayer(x.m); });
-    count.textContent = shown.length.toLocaleString('en-CA') + (shown.length === 1 ? ' place' : ' places');
-    allChip.setAttribute('aria-pressed', on.length ? 'false' : 'true');
-    chips.forEach(function(c){ c.setAttribute('aria-pressed', groups[c.getAttribute('data-pm-group')] ? 'true' : 'false'); });
-    if (term && shown.length && shown.length <= 25) map.fitBounds(L.latLngBounds(shown.map(function(x){ return x.m.getLatLng(); })), { padding: [40, 40], maxZoom: 15 });
-  }
-  chips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-group'); groups[k] = !groups[k]; draw(); }); });
-  allChip.addEventListener('click', function(){ groups = {}; draw(); });
-  var timer = null;
-  document.getElementById('pmSearch').addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ term = v.trim().toLowerCase(); draw(); }, 200); });
-  document.getElementById('pmTown').addEventListener('change', function(e){ var c = D.c[e.target.value]; if (c) map.setView(c, 13); });
-  draw();
-  setTimeout(function(){ map.invalidateSize(); }, 100);
+  var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(OKANAGAN_CLOCK_FORMAT)});
+  ${okanaganClock.toString()}
+  ${hoursModule ? hoursModule.HOURS_CLIENT_SRC : 'function parseHours(){ return null; } function statusAt(){ return null; } function hoursStatusLabel(){ return { state: "unknown", text: "" }; }'}
+  ${FD_HOURS_CLIENT_SRC}
+  var CONF = ${conf};
+  ${MAP_PAGE_SCRIPT}
 })();
 </script>
 </body>
@@ -27429,6 +27803,12 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderPlacesMapPage());
     }
+    // GET /map/data.json -- the places, their hours and this week's events for /map, versioned by ?v=.
+    if (pathname === '/map/data.json' && method === 'GET') {
+      const data = mapLiveData();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': query.v === data.version ? 'public, max-age=86400' : 'public, max-age=300' });
+      return res.end(data.json);
+    }
 
     // GET /favorites (Stage 4.4): the visitor's saved places and events, from
     // this browser's storage. noindex; never cached; not in the sitemap.
@@ -30091,6 +30471,9 @@ module.exports = {
   frHoursText,
   frDe,
   venueHasFrench,
+  mapPlacesData,
+  mapEventsData,
+  mapLiveData,
   hasFrenchTwin,
   frenchTwinRequest,
   frText,
