@@ -19558,6 +19558,11 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   assert.match(src, /map\.on\('dragstart', function\(\)\{ if \(!follow\) return; follow = false;/, 'looking around stops following');
   assert.match(src, /navigator\.wakeLock\.request\('screen'\)/);
   assert.match(src, /DeviceOrientationEvent\.requestPermission\(\)/);
+  // Spoken directions: Mapbox's timed announcements, the phone's own voice, a speaker button to turn it off.
+  assert.match(src, /&voice_instructions=true&voice_units=metric&access_token=/);
+  assert.match(src, /new SpeechSynthesisUtterance\(text\)/);
+  assert.match(src, /id="pmNavVoice" aria-pressed="/);
+  assert.match(src, /sayTurn\(r\); r\.step\+\+;/, 'the turn itself is always announced');
   for (const p of data.p) assert.ok(p[0] >= 48.95 && p[0] <= 50.8 && p[1] >= -120.2 && p[1] <= -118.25, `${p[2]} is inside the map limits`);
   assert.match(fr, /id="pmNearLabel">Près de moi</);
 }));
@@ -19631,7 +19636,7 @@ test('Near-me map: directions on our map through Mapbox only with a public token
     assert.match(html, /"mb":"pk\.eyTestToken123"/);
     const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
     assert.match(src, /https:\/\/api\.mapbox\.com\/directions\/v5\/mapbox\/' \+ r\.mode/);
-    assert.match(src, /if \(off > 0\.075 && Date\.now\(\) - r\.at > 30000\) fetchRoute\(\);/, 're-plans when off the route, at most every 30 s');
+    assert.match(src, /if \(off > 0\.075 && Date\.now\(\) - r\.at > 30000\) \{ say\(T\.rerouting\); fetchRoute\(\); \}/, 're-plans when off the route, at most every 30 s');
     assert.match(html, /When you ask for directions, your starting point and the destination go to Mapbox/);
   } finally {
     if (saved === undefined) delete process.env.MAPBOX_TOKEN; else process.env.MAPBOX_TOKEN = saved;

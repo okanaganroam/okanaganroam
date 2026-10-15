@@ -12176,6 +12176,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-nav-text strong { font-size: 1.1rem; line-height: 1.25; }
   body.map-page .pm-nav-text span { font-size: 1rem; font-weight: 800; color: #BBF7D0; }
   body.map-page .pm-nav-text small { font-size: 0.8rem; opacity: 0.85; }
+  body.map-page .pm-nav-voice { margin-right: -6px; }
   body.map-page .pm-nav-end { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255,255,255,0.16); color: #fff; font-size: 1.1rem; cursor: pointer; }
   body.map-page .pm-stage.is-nav:not(.is-following) .pm-locate { box-shadow: 0 0 0 5px rgba(29,78,216,0.35), 0 2px 10px rgba(27,43,58,0.3); }
   body.map-page .pm-toast { display: table; max-width: 100%; margin: 4px 0 0; padding: 10px 14px; border-radius: 14px; background: var(--ref-navy, #1B2B3A); color: #fff; font-size: 0.88rem; font-weight: 700; line-height: 1.35; box-shadow: 0 2px 10px rgba(0,0,0,0.25); cursor: pointer; }
@@ -12313,7 +12314,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var T = FR ? {
     walk: 'À pied', drive: 'En voiture', bike: 'À vélo', to: 'Vers', endRoute: 'Terminer', howGo: 'Comment y aller', routing: 'Calcul de l’itinéraire…',
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
-    openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'pour le guidage vocal en voiture.', routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
+    openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', share: 'Partager', copied: 'Lien copié',
@@ -12337,7 +12338,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   } : {
     walk: 'Walk', drive: 'Drive', bike: 'Bike', to: 'To', endRoute: 'End', howGo: 'How are you getting there?', routing: 'Working out the route…',
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
-    openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'for spoken directions while driving.', routeNeedsLocation: 'Share your location to get directions.',
+    openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', share: 'Share', copied: 'Link copied',
@@ -12580,7 +12581,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function startRoute(x){
     if (!MB) return false;
     // Asked for during the tap itself (iPhone only allows the compass prompt then).
-    if (!me || !me.pin) startCompass();
+    if (!me || !me.pin) { startCompass(); unlockVoice(); }
     if (!me) { pendingRoute = x; if (!watching) nearBtn.click(); setStatus(T.routeNeedsLocation); return true; }
     if (route && route.line) map.removeLayer(route.line);
     route = { x: x, mode: distKm(me.lat, me.lng, x.lat, x.lng) < 1.5 ? 'walking' : 'driving', step: 0, at: 0 };
@@ -12594,13 +12595,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var r = route; if (!r || !me) return;
     r.at = Date.now(); r.loading = true; drawRoute();
     var url = 'https://api.mapbox.com/directions/v5/mapbox/' + r.mode + '/' + me.lng.toFixed(5) + ',' + me.lat.toFixed(5) + ';' + r.x.lng + ',' + r.x.lat
-      + '?geometries=geojson&steps=true&overview=full&language=' + (FR ? 'fr' : 'en') + '&access_token=' + encodeURIComponent(MB);
+      + '?geometries=geojson&steps=true&overview=full&language=' + (FR ? 'fr' : 'en') + '&voice_instructions=true&voice_units=metric&access_token=' + encodeURIComponent(MB);
     fetch(url).then(function(res){ if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); }).then(function(d){
       if (route !== r) return;
       var rt = d && d.routes && d.routes[0];
       r.loading = false;
       if (!rt) { r.error = true; drawRoute(); return; }
-      r.error = false; r.data = rt; r.steps = (rt.legs && rt.legs[0] && rt.legs[0].steps) || []; r.step = 0;
+      r.error = false; r.data = rt; r.steps = (rt.legs && rt.legs[0] && rt.legs[0].steps) || []; r.step = 0; r.said = {};
       r.path = rt.geometry.coordinates.map(function(c){ return [c[1], c[0]]; });
       if (r.line) map.removeLayer(r.line);
       r.line = L.polyline(r.path, { color: '#1D4ED8', weight: 6, opacity: 0.85 }).addTo(map);
@@ -12630,7 +12631,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function endRoute(){
     if (route && route.line) map.removeLayer(route.line);
-    route = null; follow = false; stage.classList.remove('is-following'); keepAwake(false); stopCompass();
+    route = null; follow = false; stage.classList.remove('is-following'); keepAwake(false); stopCompass(); hush();
     drawRoute(); render(false);
   }
   // ---- Following the visitor along the route ----
@@ -12668,7 +12669,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var r = route, on = !!(r && r.data && me && !me.pin);
     stage.classList.toggle('is-nav', on); navbar.hidden = !on;
     if (!on) { navbar.innerHTML = ''; return; }
-    var end = '<button type="button" class="pm-nav-end" id="pmNavEnd" aria-label="' + esc(T.endRoute) + '">✕</button>';
+    var end = (SAY ? '<button type="button" class="pm-nav-end pm-nav-voice" id="pmNavVoice" aria-pressed="' + voiceOn + '" aria-label="' + esc(voiceOn ? T.voiceOn : T.voiceOff) + '">' + (voiceOn ? '🔊' : '🔇') + '</button>' : '')
+      + '<button type="button" class="pm-nav-end" id="pmNavEnd" aria-label="' + esc(T.endRoute) + '">✕</button>';
+    voiceCheck();
     if (r.arrived) { navbar.innerHTML = '<span class="pm-nav-arrow" aria-hidden="true">⚑</span><div class="pm-nav-text"><strong>' + esc(T.arrived) + '</strong><small>' + esc(r.x.name) + '</small></div>' + end; return; }
     var cur = r.steps[r.step], next = r.steps[r.step + 1], tgt = next && next.maneuver ? next.maneuver.location : [r.x.lng, r.x.lat];
     var toNext = distKm(me.lat, me.lng, tgt[1], tgt[0]), left = toNext + r.steps.slice(r.step + 1).reduce(function(a, st){ return a + (st.distance || 0) / 1000; }, 0);
@@ -12677,7 +12680,57 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     navbar.innerHTML = '<span class="pm-nav-arrow" aria-hidden="true">' + arrowFor(next || cur) + '</span><div class="pm-nav-text">' + cap + '<strong>' + esc((next || cur).maneuver.instruction || '') + '</strong>'
       + (next ? '<span>' + esc(T.inDist(T.km(toNext))) + '</span>' : '') + '<small>' + esc(durText(eta) + ' · ' + T.km(left)) + '</small></div>' + end;
   }
-  navbar.addEventListener('click', function(e){ if (e.target.closest('#pmNavEnd')) endRoute(); });
+  navbar.addEventListener('click', function(e){
+    if (e.target.closest('#pmNavEnd')) { endRoute(); return; }
+    if (e.target.closest('#pmNavVoice')) {
+      voiceOn = !voiceOn;
+      if (voiceOn) { unlockVoice(); say(T.voiceOn); } else hush();
+      track('map_voice', { on: voiceOn }); drawNav();
+    }
+  });
+  // ---- Spoken directions (the phone's own voice) ----
+  // Mapbox times each announcement for walking, cycling or driving ("In 100 metres, turn right onto Bernard
+  // Avenue"); each is spoken once, when the visitor gets within its distance of the next turn. A device voice is
+  // used where there is one, so the words are spoken on the phone. On by default; the speaker button turns it off (for this
+  // visit only: the map page stores nothing in the browser).
+  var SAY = window.speechSynthesis && window.SpeechSynthesisUtterance ? window.speechSynthesis : null, voiceOn = true, sayVoice = null;
+  function pickVoice(){
+    if (!SAY) return;
+    var lang = FR ? 'fr' : 'en', vs = SAY.getVoices().filter(function(v){ return String(v.lang).toLowerCase().indexOf(lang) === 0; });
+    sayVoice = vs.filter(function(v){ return v.localService && /CA$/i.test(v.lang); })[0] || vs.filter(function(v){ return v.localService; })[0] || null;
+  }
+  if (SAY) { pickVoice(); if (SAY.addEventListener) SAY.addEventListener('voiceschanged', pickVoice); }
+  function say(text){
+    if (!SAY || !voiceOn || !text) return;
+    try { var u = new SpeechSynthesisUtterance(text); u.lang = FR ? 'fr-CA' : 'en-CA'; if (sayVoice) u.voice = sayVoice; SAY.speak(u); } catch (e) {}
+  }
+  // At the turn itself: its last announcement ("Turn right onto Bernard Avenue"), if it hasn't been said yet.
+  function sayTurn(r){
+    if (!SAY || !voiceOn || !r.data || !me || me.pin) return;
+    r.said = r.said || {};
+    var vi = (r.steps[r.step] || {}).voiceInstructions || [], last = vi.length - 1, next = r.steps[r.step + 1];
+    if (last >= 0) { if (!r.said[r.step + ':' + last]) { vi.forEach(function(v, i){ r.said[r.step + ':' + i] = 1; }); say(vi[last].announcement); } }
+    else if (next && next.maneuver && !r.said[r.step + ':b']) { r.said[r.step + ':b'] = 1; say(next.maneuver.instruction); }
+  }
+  function hush(){ try { if (SAY) SAY.cancel(); } catch (e) {} }
+  function unlockVoice(){ if (!SAY || !voiceOn) return; try { var u = new SpeechSynthesisUtterance(' '); u.volume = 0; SAY.speak(u); } catch (e) {} }
+  function voiceCheck(){
+    var r = route; if (!SAY || !voiceOn || !r || !r.data || !me || me.pin) return;
+    r.said = r.said || {};
+    if (r.arrived) { if (!r.said.arr) { r.said.arr = 1; say(T.arrivedAt(r.x.name)); } return; }
+    var st = r.steps[r.step], next = r.steps[r.step + 1]; if (!st) return;
+    var tgt = next && next.maneuver ? next.maneuver.location : [r.x.lng, r.x.lat], dm = distKm(me.lat, me.lng, tgt[1], tgt[0]) * 1000;
+    var vi = st.voiceInstructions || [], due = null;
+    if (vi.length) {
+      vi.forEach(function(v, i){ if (dm <= v.distanceAlongGeometry + 10 && !r.said[r.step + ':' + i]) { r.said[r.step + ':' + i] = 1; due = v.announcement; } });
+    } else if (next && next.maneuver) {
+      // Without Mapbox's timing: once at the start of a step, then just before the turn.
+      var near = r.mode === 'driving' ? 80 : 20, ins = next.maneuver.instruction || '', low = ins.charAt(0).toLowerCase() + ins.slice(1);
+      if (!r.said[r.step + ':a']) { r.said[r.step + ':a'] = 1; due = r.step === 0 && st.maneuver ? T.thenIn(st.maneuver.instruction || '', T.spoken(dm / 1000), low) : T.inSay(T.spoken(dm / 1000), low); }
+      if (dm <= near && !r.said[r.step + ':b']) { r.said[r.step + ':b'] = 1; due = ins; }
+    }
+    if (due) say(due);
+  }
   // Which way the visitor faces: the phone's compass (asked for on iPhone when they tap Directions), or their
   // direction of travel. It only turns the arrow on their dot; nothing is sent anywhere.
   var heading = null, compassOn = false, compassSeen = false;
@@ -12709,9 +12762,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var r = route; if (!r || !r.data || !me || r.arrived) return;
     if (distKm(me.lat, me.lng, r.x.lat, r.x.lng) < 0.03) { r.arrived = true; drawRoute(); track('map_arrived', { mode: r.mode }); return; }
     var next = r.steps[r.step + 1];
-    if (next && next.maneuver && distKm(me.lat, me.lng, next.maneuver.location[1], next.maneuver.location[0]) < 0.03) { r.step++; drawRoute(); }
+    if (next && next.maneuver && distKm(me.lat, me.lng, next.maneuver.location[1], next.maneuver.location[0]) < 0.03) { sayTurn(r); r.step++; drawRoute(); }
     var off = r.path.reduce(function(m, c){ return Math.min(m, distKm(me.lat, me.lng, c[0], c[1])); }, Infinity);
-    if (off > 0.075 && Date.now() - r.at > 30000) fetchRoute();
+    if (off > 0.075 && Date.now() - r.at > 30000) { say(T.rerouting); fetchRoute(); }
   }
   // Where the visitor is: only after they tap Near me, kept in this page only.
   function drawMe(){
