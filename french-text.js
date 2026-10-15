@@ -337,6 +337,8 @@ const FR_TEXT = {
   'Okanagan Destinations | Okanagan Roam': 'Destinations de l’Okanagan | Okanagan Roam',
   'Browse & Search the Okanagan | Okanagan Roam': 'Parcourir et rechercher l’Okanagan | Okanagan Roam',
   'All Categories: Food, Wine, Outdoors & Events in the Okanagan | Okanagan Roam': 'Toutes les catégories : gastronomie, vin, plein air et événements dans l’Okanagan | Okanagan Roam',
+  'Okanagan Roam: Restaurants, Wineries & What’s Open Near You': 'Okanagan Roam : restaurants, vignobles et ce qui est ouvert près de vous',
+  'Find what’s open near you in BC’s Okanagan: 1,700+ restaurants, wineries, beaches and trails, live happy hours, this week’s events and a free trip planner.': 'Trouvez ce qui est ouvert près de vous dans l’Okanagan (C.-B.) : plus de 1 700 restaurants, vignobles, plages et sentiers, les happy hours en cours, les événements de la semaine et un planificateur de voyage gratuit.',
   'Okanagan Roam, Find Wineries, Lounges & Restaurants Worth the Drive': 'Okanagan Roam : vignobles, bars et restaurants qui valent le détour',
   'A review-backed guide to {0}+ wineries, restaurants, breweries and cafes across BC\'s Okanagan Valley, plus local events and a day-by-day trip planner.': 'Un guide appuyé par les avis de plus de {0} vignobles, restaurants, brasseries et cafés dans la vallée de l’Okanagan, en Colombie-Britannique, avec les événements locaux et un planificateur de voyage jour par jour.',
   'Lakeside patios, farm-to-table dining rooms and easygoing local favourites — every restaurant across the Okanagan that Okanagan Roam has verified.': 'Terrasses au bord du lac, tables de la ferme à l’assiette et adresses locales sans prétention : tous les restaurants de l’Okanagan vérifiés par Okanagan Roam.',
