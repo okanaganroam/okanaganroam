@@ -19493,6 +19493,8 @@ test('French twins: the sitemap lists each main and town page in both languages,
   assert.match(out[1], /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna<\/loc>\n    <xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna"\/>/);
   assert.match(out[0], /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna"\/>/);
   assert.equal(out[2], entry('/whats-on'));
+});
+
 // 2026-10-14: a town's What's On page carries only that town's events plus valley-wide ones.
 test('What\'s On town pages: only that town (and valley-wide) events, a change-town menu instead of region chips, and quick date buttons', () => {
   const html = app.renderWhatsOnPage(null, { scope: { region: 'kelowna' } });
