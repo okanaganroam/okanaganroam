@@ -19551,6 +19551,13 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   assert.match(src, /var OK_BOUNDS = L\.latLngBounds\(\[48\.95, -120\.2\], \[50\.8, -118\.25\]\);\s*map\.setMaxBounds\(/);
   assert.match(src, /if \(!OK_BOUNDS\.pad\(0\.1\)\.contains\(\[pos\.coords\.latitude, pos\.coords\.longitude\]\)\)/, 'Near me outside the Okanagan asks for a pin');
   assert.match(src, /map\.on\('contextmenu', function\(e\)\{ dropPin\(e\.latlng, true\); \}\);/);
+  // Directions from the visitor's real location: zoom in on them, follow them, a next-turn banner, the screen kept on.
+  assert.match(html, /<div class="pm-navbar" id="pmNavbar" hidden aria-live="polite"><\/div>/);
+  assert.match(src, /if \(first\) \{ map\.stop\(\); if \(!me\.pin\) startNav\(\); else fitTo\(r\.line\.getBounds\(\), 17\); \}/);
+  assert.match(src, /if \(route\) \{ followRoute\(\); if \(follow\) centerOn\(\[me\.lat, me\.lng\], followZoom\); drawNav\(\); return; \}/);
+  assert.match(src, /map\.on\('dragstart', function\(\)\{ if \(!follow\) return; follow = false;/, 'looking around stops following');
+  assert.match(src, /navigator\.wakeLock\.request\('screen'\)/);
+  assert.match(src, /DeviceOrientationEvent\.requestPermission\(\)/);
   for (const p of data.p) assert.ok(p[0] >= 48.95 && p[0] <= 50.8 && p[1] >= -120.2 && p[1] <= -118.25, `${p[2]} is inside the map limits`);
   assert.match(fr, /id="pmNearLabel">Près de moi</);
 }));
@@ -19579,19 +19586,29 @@ test('Near-me map: an event is pinned through its venue link, or an exact one-pl
 
 test('Near-me map: patio, dogs and the rest ship as feature bits; plain words become filters; the home page and the app icon lead to Near me', () => withDiscoveryServer(async (base) => {
   const data = JSON.parse(app.mapLiveData().json);
-  const rows = db.prepare('SELECT name, patio, dog_friendly FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL').all();
+  const rows = db.prepare('SELECT name, patio, dog_friendly, vegetarian, vegan, gluten_free FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL').all();
   const byName = new Map(rows.map((r) => [r.name, r]));
   for (const p of data.p) {
     const v = byName.get(p[2]);
     if (!v) continue;
     assert.equal(!!(p[7] & 1), Number(v.patio) === 1, `${p[2]} patio`);
     assert.equal(!!(p[7] & 2), Number(v.dog_friendly) === 1, `${p[2]} dogs`);
+    assert.equal(!!(p[7] & 64), Number(v.vegetarian) === 1, `${p[2]} vegetarian`);
+    assert.equal(!!(p[7] & 128), Number(v.vegan) === 1, `${p[2]} vegan`);
+    assert.equal(!!(p[7] & 256), Number(v.gluten_free) === 1, `${p[2]} gluten-free`);
     if (p[8]) assert.ok(p[7] & 2, 'a dog rule only on a dog-friendly place');
   }
   const html = await (await fetch(`${base}/map`)).text();
   const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
   assert.match(src, /patio: 'patio patios outside/, 'patio words');
   assert.match(src, /dogs: 'dog dogs pup/, 'dog words');
+  // Dietary filters, and sentences: "Patio close by with vegetarian option and dog friendly".
+  for (const k of ['veg', 'vegan', 'gf', 'late', 'early', 'groups', 'sports', 'nonalc']) assert.match(html, new RegExp(`data-pm-feat="${k}"`), k);
+  assert.match(html, /<h3>Dietary<\/h3>/);
+  assert.match(src, /\[\/gluten\[ -\]\?free/, 'gluten free is one filter');
+  assert.match(src, /\[\/\(dog\|pet\)\[ -\]\?friendly\/g, ' dogs '\]/, 'dog friendly is Dogs OK');
+  assert.match(src, /close \?by\|near \?by\|near me/, 'close by finds the visitor');
+  assert.match(src, /if \(wantNear && !me && !watching\) nearBtn\.click\(\);/);
   assert.match(src, /history\.replaceState\(null, '', location\.pathname \+ \(q \? '\?' \+ q : ''\)/, 'filters in the address, never the location');
   assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
   const home = await (await fetch(`${base}/`)).text();
