@@ -45,3 +45,21 @@ test('selected remaining beach photos are ready, including the chosen Nuyens pho
   const nuyens = readyBySlug.get('nuyens-park');
   assert.equal(nuyens?.imageSourceUrl, 'https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1591474846126-5ZGAXJ4ZZP714V434LP1/Nuyens-park-okanaganJPG');
 });
+
+test('all 93 beach listings have a verified local photo, including the final approved three', () => {
+  const bySlug = new Map(BEACH_PHOTO_MANIFEST.map((item) => [item.slug, item]));
+  const finalApprovedSlugs = [
+    'paddlewheeler-park',
+    '13th-street-viewpoint-centennial-way',
+    'downtown-sails-dog-beach',
+  ];
+
+  assert.equal(BEACH_PHOTO_MANIFEST.filter((item) => item.verified && item.image).length, 93);
+  for (const slug of finalApprovedSlugs) {
+    const item = bySlug.get(slug);
+    assert.ok(item?.verified, `${slug} is marked verified`);
+    assert.ok(item.image, `${slug} has a local image path`);
+    assert.equal(item.path, item.image, `${slug} manifest path matches its served image`);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', item.image.slice(1))), `${slug} image exists`);
+  }
+});
