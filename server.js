@@ -9369,7 +9369,6 @@ function golfFavTripButtonsHtml(venue, opts = {}) {
 //   existing open/close), instead of one 1,770px list of every link.
 const NAV_DISCOVER_PANEL = `<div class="nav-dropdown-panel">
           <a href="/destinations" data-i18n="nav.destinations">Destinations</a>
-          <a href="/map">Roam Now</a>
           <a href="/guides">Guides</a>
           <a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a>
           <a href="/secret-spots">Secret Spots</a>
@@ -9386,6 +9385,17 @@ const NAV_THINGS_PANEL = `<div class="nav-dropdown-panel">
           <a href="/ski-snow" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a>
         </div>`;
 const NAV_REFRESH_STYLE = `<style id="nav-refresh">
+/* Roam Now (2026-10-14): its own menu item with a pulsing red "live" dot, and the same dot on the phone menu button. */
+.live-dot { position: relative; display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #E11D48; vertical-align: middle; top: -1px; }
+.live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: #E11D48; animation: live-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+@keyframes live-ping { 0% { transform: scale(1); opacity: 0.7; } 75%, 100% { transform: scale(2.8); opacity: 0; } }
+.nav-links a.nav-roam-now { font-weight: 800; white-space: nowrap; }
+@media (max-width: 940px) {
+  #navHamburger { position: relative; }
+  #navHamburger::before { content: ''; position: absolute; top: 0; left: -4px; width: 9px; height: 9px; border-radius: 50%; background: #E11D48; box-shadow: 0 0 0 2px #fff; animation: live-glow 2s ease-in-out infinite; }
+}
+@keyframes live-glow { 0%, 100% { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(225,29,72,0.5); } 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 7px rgba(225,29,72,0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot::after, #navHamburger::before { animation: none; } }
 @media (max-width: 940px) {
   .nav-links .nav-dropdown > .nav-dropdown-panel { display: none; }
   .nav-links .nav-dropdown.open > .nav-dropdown-panel { display: block; }
@@ -9403,6 +9413,8 @@ function withNavRefresh(headerHtml) {
   const things = panels.find((m) => m[0].includes('href="/outdoors"'));
   if (discover) out = out.replace(discover[0], NAV_DISCOVER_PANEL);
   if (things) out = out.replace(things[0], NAV_THINGS_PANEL);
+  // Roam Now on its own, right after Discover, so it is seen on every page.
+  if (!out.includes('class="nav-roam-now"')) out = out.replace(/(\n\s*)<li><a href="\/hidden-gems"/, '$1<li><a class="nav-roam-now" href="/map"><span class="live-dot" aria-hidden="true"></span>Roam Now</a></li>$1<li><a href="/hidden-gems"');
   // After everything else the fragment carries (other header rules sit right after </header>).
   return `${out}\n${NAV_REFRESH_STYLE}`;
 }
@@ -28483,7 +28495,7 @@ const server = http.createServer(async (req, res) => {
           .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
           .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`)
           // The near-me map, one tap from the home page (2026-10-14).
-          .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span aria-hidden="true">&#128205;</span> Roam Now: what’s open near me</a>');
+          .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span class="live-dot" aria-hidden="true"></span>Roam Now: what’s open near me</a>');
 
         // Anything still pointing at the now-removed sections (the header's
         // "Browse & Search" dropdown link and every homepage module's own

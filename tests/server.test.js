@@ -5392,7 +5392,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.match(headerHtml, /<span data-i18n="nav\.discover">Discover<\/span>/, '"Discover" dropdown label must be i18n-wired');
   assert.match(headerHtml, /<span data-i18n="nav\.thingsToDo">Things to Do<\/span>/, '"Things to Do" dropdown label must be i18n-wired');
   assert.match(headerHtml, /<span data-i18n="mood\.foodDrink\.title">Food &amp; Drink<\/span>/, '"Food & Drink" dropdown label must reuse the mood card key');
-  assert.match(headerHtml, /<a href="\/map">Roam Now<\/a>/, 'the map is called Roam Now (2026-10-14), a name app.js must not overwrite');
+  assert.match(headerHtml, /<li><a class="nav-roam-now" href="\/map"><span class="live-dot" aria-hidden="true"><\/span>Roam Now<\/a><\/li>/, 'the map is called Roam Now (2026-10-14), a name app.js must not overwrite');
   assert.match(headerHtml, /data-i18n-aria="search\.button"/, 'search icon aria-label must be i18n-wired');
   assert.match(headerHtml, /data-i18n-aria="nav\.switchLanguage"/, 'language toggle aria-label must be i18n-wired');
   assert.match(headerHtml, /<span data-i18n="trip\.buildMyTrip">Build My Trip<\/span>/, 'header "Build My Trip" CTA must reuse the shared trip.buildMyTrip key');
@@ -11451,6 +11451,8 @@ const HEADER_SPEC = [
     ['/dog-friendly', 'gems.dogFriendly.title', 'Dog-Friendly Finds'],
     ['/browse', 'nav.browseSearch', 'Browse &amp; Search'],
   ] },
+  // Roam Now (2026-10-14): its own item with a live dot, right after Discover; no app.js key, so its name stays.
+  { href: '/map', key: null, label: 'Roam Now' },
   { href: '/hidden-gems', key: 'gems.heading', label: 'Hidden Gems' },
   { label: 'Things to Do', key: 'nav.thingsToDo', items: [
     ['/outdoors', 'mood.outdoors.title', 'Outdoors'],
@@ -11485,7 +11487,8 @@ function parseNav(html) {
       return { key: m[1], label: m[2], items: [...li.matchAll(/<a href="([^"]+)"(?: id="[^"]+")? data-i18n="([^"]+)">([^<]+)<\/a>/g)].map((x) => [x[1], x[2], x[3]]) };
     }
     // Stage 4.4: the Favorites link has no data-i18n key (app.js's frozen dictionary has none).
-    const a = li.match(/<a href="([^"]+)"(?: data-i18n="([^"]+)")?>([^<]+)<\/a>/);
+    // Roam Now (2026-10-14) carries a class and its live dot.
+    const a = li.match(/<a(?: class="[^"]+")? href="([^"]+)"(?: data-i18n="([^"]+)")?>(?:<span[^>]*><\/span>)?([^<]+)<\/a>/);
     return { href: a[1], key: a[2] || null, label: a[3], mobileOnly: /class="nav-links-trip"/.test(li) };
   }) };
 }
@@ -11512,7 +11515,7 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
     assert.match(nav.header, /id="navTripBtn"/, `${name}: Build My Trip button`);
     // Map keeps its id and href (okanagan.html is frozen); Stage 3.4: the
     // server answers /browse?openMap=1 with the map page (/map).
-    assert.match(nav.header, /<a href="\/map">Roam Now<\/a>/, name); // straight to /map (2026-10-14)
+    assert.match(nav.header, /<li><a class="nav-roam-now" href="\/map"><span class="live-dot" aria-hidden="true"><\/span>Roam Now<\/a><\/li>/, name); // straight to /map (2026-10-14)
     // No duplicates; Hidden Gems top-level only; no top-level Golf/Map. Secret
     // Spots joined Discover in the menus refresh (2026-10-14).
     const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1]));
@@ -11525,7 +11528,7 @@ test('Header: every header label is translated in both EN and FR (only the 11 ne
   const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
   const en = src.slice(src.indexOf('  en: {'), src.indexOf('  fr: {'));
   const fr = src.slice(src.indexOf('  fr: {'));
-  const keys = new Set(HEADER_SPEC.flatMap((i) => [i.key, ...(i.items || []).map((x) => x[1])]));
+  const keys = new Set(HEADER_SPEC.flatMap((i) => [i.key, ...(i.items || []).map((x) => x[1])]).filter(Boolean));
   for (const k of keys) {
     const re = new RegExp(`'${k.replace(/\./g, '\\.')}':`);
     assert.match(en, re, `EN ${k}`);
@@ -14476,7 +14479,7 @@ test('Map (2026-10-14): /map shows a pin per place with a map position, category
   assert.equal(legacy.status, 302); assert.equal(legacy.headers.get('location'), '/map'); await legacy.text();
   for (const p of ['/', '/trip', '/kelowna/restaurants/test-trattoria']) {
     const h = await (await fetch(base + p)).text();
-    assert.match(h, /<a href="\/map">Roam Now<\/a>/, `${p}: the header Map link goes straight to /map`);
+    assert.match(h, /<li><a class="nav-roam-now" href="\/map"><span class="live-dot" aria-hidden="true"><\/span>Roam Now<\/a><\/li>/, `${p}: the header Map link goes straight to /map`);
   }
   assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/map<\/loc>/);
   const venue = await (await fetch(`${base}/kelowna/restaurants/test-trattoria`)).text();
