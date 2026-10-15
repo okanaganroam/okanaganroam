@@ -9247,6 +9247,12 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
 // previous analytics rather than breaking).
 const HOMEPAGE_GA4_LOADER_TAG = `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}"></script>\n`;
 const HOMEPAGE_GA4_CONFIG_LINES = `  gtag('js', new Date());\n  gtag('config', '${GA4_MEASUREMENT_ID}');\n`;
+// The site icon tag (2026-10-15): real files Google can fetch, replacing the inline-data icon in okanagan.html and the
+// templates that copied it.
+const FAVICON_LINKS = '<link rel="icon" href="/favicon.ico" sizes="48x48">\n<link rel="icon" type="image/svg+xml" href="/favicon.svg">\n<link rel="icon" type="image/png" sizes="192x192" href="/images/icons/okanagan-roam-icon-192.png">';
+function withFaviconFiles(html) {
+  return String(html).replace(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,[^"]*">/g, FAVICON_LINKS);
+}
 function applyHomepageAnalyticsHead(html) {
   const once = (needle) => {
     const i = html.indexOf(needle);
@@ -23336,7 +23342,7 @@ function renderTripPlannerPage(v2 = false) {
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
 <link rel="canonical" href="${canonical}">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23F5EDDD'/%3E%3Ccircle cx='26' cy='11' r='3' fill='%23D9A441'/%3E%3Cpath d='M26 4v2M31 6.5l-1.4 1.4M33.5 11h-2M26 18v-2M20.5 6.5l1.4 1.4' stroke='%23D9A441' stroke-width='1.3' stroke-linecap='round'/%3E%3Cpath d='M6 27L15 13l6 9' stroke='%231F5C5C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' opacity='0.5'/%3E%3Cpath d='M10 27L20 11l10 16' stroke='%231F5C5C' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M5 27.5h30' stroke='%231F5C5C' stroke-width='1.5' stroke-linecap='round' opacity='0.3'/%3E%3C/svg%3E">
+${FAVICON_LINKS}
 <meta property="og:site_name" content="Okanagan Roam">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
@@ -23521,7 +23527,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     title: 'Build My Trip \u2014 Okanagan Roam',
     description: 'Describe your Okanagan trip and get a day-by-day plan built from real wineries, restaurants, beaches and more, with why each stop fits.',
     canonical,
-    faviconLink: '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'%3E%3Crect width=\'40\' height=\'40\' rx=\'8\' fill=\'%23F5EDDD\'/%3E%3Ccircle cx=\'26\' cy=\'11\' r=\'3\' fill=\'%23D9A441\'/%3E%3Cpath d=\'M26 4v2M31 6.5l-1.4 1.4M33.5 11h-2M26 18v-2M20.5 6.5l1.4 1.4\' stroke=\'%23D9A441\' stroke-width=\'1.3\' stroke-linecap=\'round\'/%3E%3Cpath d=\'M6 27L15 13l6 9\' stroke=\'%231F5C5C\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' opacity=\'0.5\'/%3E%3Cpath d=\'M10 27L20 11l10 16\' stroke=\'%231F5C5C\' stroke-width=\'2.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3Cpath d=\'M5 27.5h30\' stroke=\'%231F5C5C\' stroke-width=\'1.5\' stroke-linecap=\'round\' opacity=\'0.3\'/%3E%3C/svg%3E">',
+    faviconLink: FAVICON_LINKS,
     breadcrumbJson: JSON.stringify(breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Build My Trip', url: canonical }])),
     headerHtml,
     tripTrayHtml,
@@ -28724,7 +28730,7 @@ const server = http.createServer(async (req, res) => {
     // of always rendering underneath the new homepage. See /browse below.
     if ((pathname === '/' || pathname === '/okanagan.html') && method === 'GET') {
       if (fs.existsSync(SITE_PATH)) {
-        let html = withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))));
+        let html = withFaviconFiles(withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')))));
         html = html.replace(/<header id="top">[\s\S]*?<\/header>/, (h) => withNavRefresh(h));
         // Inject real, crawlable internal links to the guide pages so search
         // engines can discover them by following links from the homepage,
@@ -28949,7 +28955,7 @@ const server = http.createServer(async (req, res) => {
         // No venues to list (an empty database): fall back to the wizard page.
       }
       if (fs.existsSync(SITE_PATH)) {
-        let html = withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8'))));
+        let html = withFaviconFiles(withTripNav(withVersionedAppJs(applyHomepageAnalyticsHead(fs.readFileSync(SITE_PATH, 'utf8')))));
 
         // /browse redesign harmonization pass (2026-09-18): marks this
         // response so page-scoped CSS can tell it apart from / (same
@@ -29222,6 +29228,17 @@ const server = http.createServer(async (req, res) => {
     // Open Graph / Twitter Card preview image, referenced from the HTML
     // <head> so shared links show a proper branded thumbnail instead of a
     // blank box on Facebook, Twitter/X, Slack, iMessage, etc.
+    // Site icon files (2026-10-15): Google and browsers fetch /favicon.ico for any page without an icon tag, and Google
+    // only shows an icon from a real file (the old icon was inline data, so search results showed a plain globe).
+    const FAVICON_FILES = { '/favicon.ico': 'image/x-icon', '/favicon.svg': 'image/svg+xml', '/favicon-48.png': 'image/png' };
+    if (FAVICON_FILES[pathname] && (method === 'GET' || method === 'HEAD')) {
+      const file = path.join(__dirname, 'public', pathname.slice(1));
+      if (fs.existsSync(file)) {
+        res.writeHead(200, { 'Content-Type': FAVICON_FILES[pathname], 'Cache-Control': 'public, max-age=604800' });
+        return res.end(method === 'HEAD' ? undefined : fs.readFileSync(file));
+      }
+    }
+
     if (pathname === '/og-image.png' && method === 'GET') {
       const ogPath = path.join(__dirname, 'og-image.png');
       if (fs.existsSync(ogPath)) {

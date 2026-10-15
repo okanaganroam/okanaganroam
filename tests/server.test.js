@@ -16776,6 +16776,25 @@ test('Seasonal notices read in French on French pages (2026-10-14)', () => {
   assert.match(fr('Reopening for the season December 11. Check current hours with the venue before you go.'), /^Réouverture pour la saison le 11 décembre\./);
 });
 
+test('Site icon: real favicon files Google can fetch, and the home page points at them (2026-10-15)', async () => {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const [p, type] of [['/favicon.ico', 'image/x-icon'], ['/favicon.svg', 'image/svg+xml'], ['/favicon-48.png', 'image/png']]) {
+      const r = await fetch(base + p);
+      assert.equal(r.status, 200, p);
+      assert.equal(r.headers.get('content-type'), type, p);
+    }
+    const home = await (await fetch(base + '/')).text();
+    assert.match(home, /<link rel="icon" href="\/favicon\.ico" sizes="48x48">/);
+    assert.doesNotMatch(home, /rel="icon" type="image\/svg\+xml" href="data:/, 'no inline-data icon left');
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
 // ---- Derived hours badges: Open Early / Open Late (2026-10-11) ----------
 // Computed only from stored hours (deriveHoursBadges), never set by hand.
 // These tests run last and use their own fixtures in 'summerland', so no
