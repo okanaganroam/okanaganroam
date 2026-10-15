@@ -756,6 +756,8 @@ const FR_TEXT = {
   'April {0} to close': 'Du {0} avril à la fermeture',
   // 404 page.
   'We couldn’t find that page': 'Page introuvable',
+  'Page Not Found | Okanagan Roam': 'Page introuvable | Okanagan Roam',
+  'We couldn\'t find a venue or page at that address.': 'Nous n’avons trouvé aucun lieu ni aucune page à cette adresse.',
   'The place or page may have moved, or the address has a typo. Search for it, or pick up from one of these.': 'Le lieu ou la page a peut-être changé d’adresse, ou l’adresse contient une coquille. Faites une recherche ou repartez de l’une de ces pages.',
   'Search Okanagan Roam': 'Rechercher dans Okanagan Roam',
   'Search a place, town or what you feel like': 'Rechercher un lieu, une ville ou une envie',
@@ -767,7 +769,6 @@ const FR_TEXT = {
   'Map': 'Carte',
   'Back to the home page': 'Retour à l’accueil',
   'Everything in {T}': 'Tout à {T}',
-  '{0} across the Okanagan': '{0} dans tout l’Okanagan',
   'Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley’s best dining rooms — every restaurant, café, pub, cocktail lounge and brewery Okanagan Roam has verified.': 'Dîners en terrasse au bord du lac, cafés de spécialité, salles de dégustation de brasseries et les meilleures tables de la vallée : tous les restaurants, cafés, pubs, bars à cocktails et brasseries vérifiés par Okanagan Roam.',
   'Cafés, wineries, trails, beaches and more that are easy to miss — each card says why it’s a gem.': 'Cafés, vignobles, sentiers, plages et plus encore, faciles à manquer : chaque fiche explique pourquoi c’est un trésor.',
   '{0} restaurants, cafés, pubs and breweries across the Okanagan Valley. Filter by patio, dog-friendly, vegan or gluten-free.': '{0} restaurants, cafés, pubs et brasseries dans la vallée de l’Okanagan. Filtrez par terrasse, chiens acceptés, végane ou sans gluten.',
@@ -943,6 +944,9 @@ const FR_PATTERNS = [
   [/^Add (.+) to (?:my |your )?trip$/i, (m) => `Ajouter ${m[1]} au voyage`],
   [/^Remove (.+) from (?:my |your )?trip$/i, (m) => `Retirer ${m[1]} du voyage`],
   [/^Favorite (.+)$/, (m) => `Favori : ${m[1]}`],
+  // "Restaurants in Kelowna" / "Restaurants across the Okanagan" (the 404 page's suggestions).
+  [/^(.+) in (.+)$/, (m, tr, c) => (c.has(m[1]) && Object.values(c.regions).includes(m[2]) ? `${tr(m[1])} à ${m[2]}` : null)],
+  [/^(.+) across the Okanagan$/, (m, tr, c) => (c.has(m[1]) ? `${tr(m[1])} dans tout l’Okanagan` : null)],
   // "Wineries in Oliver, BC" (a town category page's heading): the kind of place, then the town.
   [/^(.+) in (.+), BC$/, (m, tr, c) => (c.has(m[1]) && Object.values(c.regions).includes(m[2]) ? `${tr(m[1])} à ${m[2]} (C.-B.)` : null)],
   [/^(.+), BC$/, (m, tr) => `${tr(m[1])}, C.-B.`],

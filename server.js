@@ -22144,6 +22144,7 @@ ${renderAnalyticsHeadHtml('not_found')}
   body.golf-page .not-found-main { max-width: 680px; margin: 0 auto; text-align: center; padding-top: 48px; padding-bottom: 72px; }
   body.golf-page .not-found-main a.app-btn { min-height: 44px; padding: 10px 24px; text-decoration: none; }
   body.not-found-page .nf-lead { font-size: 1.05rem; line-height: 1.55; margin: 8px auto 22px; max-width: 46ch; }
+  body.not-found-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   body.not-found-page .nf-search { display: flex; gap: 8px; max-width: 520px; margin: 0 auto 28px; }
   body.not-found-page .nf-search input { flex: 1; min-width: 0; min-height: 46px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line, #cfd8df); font: inherit; font-size: 1rem; background: #fff; color: var(--ink); }
   body.not-found-page .nf-search input:focus-visible { outline: 3px solid var(--teal, #2A6B67); outline-offset: 2px; }
