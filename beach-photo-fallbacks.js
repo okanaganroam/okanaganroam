@@ -23,7 +23,9 @@ function beachPhotoForVenue(venue) {
   const region = regionSlug(venue.region);
   const slug = String(venue.slug || '').trim();
   if (!region || !slug) return null;
-  return photoByRoute.get(`/${region}/beaches/${slug}`) || null;
+  const photo = photoByRoute.get(`/${region}/beaches/${slug}`);
+  // Bypass any edge-cached 404s from before these files were deployed.
+  return photo ? `${photo}?v=beach-photo-1` : null;
 }
 
 module.exports = { beachPhotoForVenue, BEACH_PHOTO_MANIFEST };
