@@ -774,4 +774,35 @@ CREATE TABLE IF NOT EXISTS venue_seasons (
 );
 `);
 
+// Owner portal (2026-10-15): one private edit link per venue (only a hash of
+// the token is stored; the link itself is shown once when created), and the
+// owner's proposed changes, which wait for admin review before anything on
+// the venue changes. `changes` and `previous` are JSON objects keyed by field.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_owner_links (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  token_hash TEXT NOT NULL UNIQUE,
+  contact_email TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  last_used_at TEXT
+);
+CREATE TABLE IF NOT EXISTS owner_change_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'superseded')),
+  changes TEXT NOT NULL,
+  previous TEXT NOT NULL,
+  note TEXT,
+  contact_name TEXT,
+  ip_hash TEXT,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  notify_status TEXT,
+  notify_error TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_owner_change_requests_status ON owner_change_requests (status, submitted_at);
+`);
+
 module.exports = db;

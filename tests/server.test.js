@@ -19830,3 +19830,99 @@ test('Near-me map: directions on our map through Mapbox only with a public token
   }
   assert.match(app.renderPrivacyPage(), /<h2>Your location on the map<\/h2>/);
 });
+
+// ---- Owner portal (2026-10-15) ----------
+test('Owner portal: edit link, owner page, change request, review and approval', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Portal Fixture', type: 'pub', hours: SEASON_WEEK, slug: 'owner-portal-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'pub', 'owner-portal-fixture');
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const admin = (path, body) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  let ip = 1;
+  const send = (token, body) => fetch(`${base}/owner/${token}/changes`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.9.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const week = (w) => ({ mon: [w], tue: [w], wed: [w], thu: [w], fri: [w], sat: [], sun: [] });
+  try {
+    // Links: admin-only, shown once, a second create needs reset.
+    assert.equal((await fetch(`${base}/admin/owner-links`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: v.id }) })).status, 401);
+    const made = await admin('/admin/owner-links', { venue_id: v.id, contact_email: 'owner@example.com' });
+    assert.equal(made.status, 201);
+    const token = made.body.url.split('/owner/')[1];
+    assert.match(token, /^[A-Za-z0-9_-]{32}$/);
+    assert.equal((await admin('/admin/owner-links', { venue_id: v.id })).status, 409);
+    const stored = db.prepare('SELECT token_hash FROM venue_owner_links WHERE venue_id = ?').get(v.id);
+    assert.notEqual(stored.token_hash, token, 'only a hash is stored');
+
+    // Owner page: private, prefilled; bad tokens get a not-valid page.
+    const page = await fetch(`${base}/owner/${token}`);
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get('x-robots-tag'), /noindex/);
+    assert.equal(page.headers.get('cache-control'), 'no-store');
+    const html = await page.text();
+    assert.match(html, /Owner Portal Fixture/);
+    assert.match(html, /<meta name="robots" content="noindex">/);
+    assert.match(html, /Happy hour/);
+    assert.equal((await fetch(`${base}/owner/${'x'.repeat(32)}`)).status, 404);
+
+    // Validation.
+    const started = Date.now() - 10000;
+    assert.equal((await send(token, { changes: { phone: '123' }, started_at: started })).body.errors.phone !== undefined, true);
+    assert.equal((await send(token, { changes: { phone: '250-555-0123' }, started_at: Date.now() })).status, 400, 'too fast');
+    assert.equal((await send(token, { changes: { description: 'short' }, started_at: started })).status, 400);
+    assert.equal((await send(token, { changes: { hours: { mon: [['25:00', '10:00']] } }, started_at: started })).status, 400);
+    const none = await send(token, { changes: { badges: {} }, started_at: started });
+    assert.match(none.body.errors.form, /Nothing has changed/);
+    assert.equal((await send('y'.repeat(32), { changes: { phone: '250-555-0123' }, started_at: started })).status, 404);
+
+    // A good request is stored as pending; nothing on the venue changes yet.
+    const ok = await send(token, { started_at: started, contact_name: 'Pat', note: 'New winter hours',
+      changes: { hours: week(['11:00', '23:00']), phone: '250-555-0123', website: 'https://example.com/pub', badges: { patio: true, live_music: true },
+        description: 'A friendly neighbourhood pub with a big patio, local beer on tap and live music every Friday night.',
+        happy_hour: { mon: [['15:00', '17:00']], fri: [['15:00', '18:00']] } } });
+    assert.equal(ok.status, 201);
+    assert.deepEqual(ok.body.fields.sort(), ['badges', 'description', 'happy_hour', 'hours', 'phone', 'website']);
+    assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(v.id).phone, null);
+    const list = await fetch(`${base}/admin/owner-changes`, { headers: { Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` } }).then((r) => r.json());
+    const reqRow = list.requests.find((r) => r.id === ok.body.id);
+    assert.equal(reqRow.venue_name, 'Owner Portal Fixture');
+    assert.equal(reqRow.previous.badges.patio, false);
+    assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /waiting for review/);
+
+    // A newer request supersedes the older pending one.
+    const second = await send(token, { started_at: started, changes: { phone: '250-555-0199' } });
+    assert.equal(second.status, 201);
+    assert.equal(app.getOwnerChange(ok.body.id).status, 'superseded');
+    assert.equal((await admin(`/admin/owner-changes/${ok.body.id}/approve`, { reviewer: 'test' })).status, 409);
+
+    // Reject, then approve a fresh full request.
+    assert.equal((await admin(`/admin/owner-changes/${second.body.id}/reject`, { reviewer: 'test', reason: 'typo' })).status, 200);
+    const full = await send(token, { started_at: started, changes: { hours: week(['11:00', '23:00']), phone: '250-555-0123', website: 'https://example.com/pub',
+      badges: { patio: true }, description: 'A friendly neighbourhood pub with a big patio and local beer on tap all year round.',
+      happy_hour: { mon: [['15:00', '17:00']] } } });
+    assert.equal((await admin(`/admin/owner-changes/${full.body.id}/approve`, { })).status, 400, 'reviewer required');
+    const approved = await admin(`/admin/owner-changes/${full.body.id}/approve`, { reviewer: 'test' });
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    assert.deepEqual(approved.body.applied.sort(), ['badges', 'description', 'happy_hour', 'hours', 'phone', 'website']);
+    const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id);
+    assert.equal(row.phone, '250-555-0123');
+    assert.equal(row.website, 'https://example.com/pub');
+    assert.equal(row.patio, 1);
+    assert.equal(row.hours_source, 'venue_owner');
+    assert.equal(JSON.parse(row.hours).sat, null);
+    assert.deepEqual(JSON.parse(row.happy_hour_times).mon, [['15:00', '17:00']]);
+    assert.ok(db.prepare("SELECT COUNT(*) AS n FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").get(v.id).n >= 3);
+    assert.equal(app.getOwnerChange(full.body.id).status, 'approved');
+
+    // Reset replaces the link; the old one stops working.
+    const reset = await admin('/admin/owner-links', { venue_id: v.id, reset: true });
+    assert.equal(reset.status, 201);
+    assert.equal((await fetch(`${base}/owner/${token}`)).status, 404);
+    assert.equal((await fetch(reset.body.url.replace('https://okanaganroam.com', base))).status, 200);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
