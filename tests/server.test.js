@@ -19587,3 +19587,25 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   const manifest = await (await fetch(`${base}/site.webmanifest`)).json();
   assert.equal(manifest.shortcuts[0].url, '/map#near-me');
 }));
+
+test('Near-me map: directions on our map through Mapbox only with a public token; without one, Directions opens the maps app', () => {
+  const saved = process.env.MAPBOX_TOKEN;
+  try {
+    delete process.env.MAPBOX_TOKEN;
+    let html = app.renderPlacesMapPage(0);
+    assert.match(html, /"mb":""/, 'no token: no on-site routing');
+    process.env.MAPBOX_TOKEN = 'sk.secret-should-never-ship';
+    html = app.renderPlacesMapPage(0);
+    assert.match(html, /"mb":""/, 'only a public pk. token is ever put in the page');
+    process.env.MAPBOX_TOKEN = 'pk.eyTestToken123';
+    html = app.renderPlacesMapPage(0);
+    assert.match(html, /"mb":"pk\.eyTestToken123"/);
+    const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
+    assert.match(src, /https:\/\/api\.mapbox\.com\/directions\/v5\/mapbox\/' \+ r\.mode/);
+    assert.match(src, /if \(off > 0\.075 && Date\.now\(\) - r\.at > 30000\) fetchRoute\(\);/, 're-plans when off the route, at most every 30 s');
+    assert.match(html, /When you ask for directions, your starting point and the destination go to Mapbox/);
+  } finally {
+    if (saved === undefined) delete process.env.MAPBOX_TOKEN; else process.env.MAPBOX_TOKEN = saved;
+  }
+  assert.match(app.renderPrivacyPage(), /<h2>Your location on the map<\/h2>/);
+});
