@@ -7,6 +7,9 @@
 //   node scripts/owner-portal.js list [pending|approved|rejected|all]
 //   node scripts/owner-portal.js approve <request id> [field,field] # all fields, or only some
 //   node scripts/owner-portal.js reject <request id> "reason"
+//   node scripts/owner-portal.js photos [pending|approved|all]      # new photos, with private preview links
+//   node scripts/owner-portal.js photo-approve <photo id> [--main|--not-main]
+//   node scripts/owner-portal.js photo-reject <photo id> "reason"   # also deletes the file
 //
 // Needs ENRICHMENT_ADMIN_TOKEN in the environment. OKR_BASE_URL overrides the target site.
 // Venue ids are in each listing's data (or ask Claude); request ids come from `list`.
@@ -17,7 +20,7 @@ const REVIEWER = process.env.OKR_REVIEWER || 'dayton';
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 function usage() {
-  console.error('Usage: node scripts/owner-portal.js link|revoke|list|approve|reject ... (see the top of this file)');
+  console.error('Usage: node scripts/owner-portal.js link|revoke|list|approve|reject|photos|photo-approve|photo-reject ... (see the top of this file)');
   process.exit(1);
 }
 
@@ -98,6 +101,25 @@ function printRequest(r) {
     if (!Number.isInteger(id)) usage();
     await call('POST', `/admin/owner-changes/${id}/reject`, { reviewer: REVIEWER, reason: args[1] || '' });
     console.log(`Rejected #${id}. Nothing on the listing changed.`);
+  } else if (cmd === 'photos') {
+    const r = await call('GET', `/admin/owner-photos?status=${encodeURIComponent(args[0] || 'pending')}`);
+    if (!r.photos.length) console.log(`No ${r.status} photos.`);
+    for (const p of r.photos) {
+      console.log(`\nphoto #${p.id}  ${p.venue_name}  [${p.status}${p.is_main ? ', main photo' : ''}]  ${p.width}x${p.height}  credit: ${p.credit}`);
+      console.log(`    view: ${p.preview_url}`);
+      console.log(`    listing: ${p.listing_url}${p.venue_has_own_photo ? '' : '  (no photo of its own yet: approving makes this the main photo)'}`);
+    }
+  } else if (cmd === 'photo-approve') {
+    const id = Number(args[0]);
+    if (!Number.isInteger(id)) usage();
+    const main = args.includes('--main') ? true : args.includes('--not-main') ? false : undefined;
+    const r = await call('POST', `/admin/owner-photos/${id}/approve`, { reviewer: REVIEWER, ...(main === undefined ? {} : { main }) });
+    console.log(`Approved photo #${id}: ${r.public_url}${r.main ? `\nIt is now the main photo on ${r.listing}` : ''}`);
+  } else if (cmd === 'photo-reject') {
+    const id = Number(args[0]);
+    if (!Number.isInteger(id)) usage();
+    await call('POST', `/admin/owner-photos/${id}/reject`, { reviewer: REVIEWER, reason: args[1] || '' });
+    console.log(`Rejected photo #${id} and deleted the file.`);
   } else {
     usage();
   }
