@@ -9628,6 +9628,8 @@ function withBuildMyTripPlacements(headerFragment) {
 // One-line headline in the
 // existing Fraunces, centred over the centred copy and search box.
 const HOME_HERO_STYLE = `<style id="home-hero">
+.hero-scenic-home .hero-near-me { display: flex; width: fit-content; align-items: center; gap: 8px; margin: 14px auto 0; min-height: 44px; padding: 0 20px; border-radius: 999px; background: rgba(255,255,255,0.94); color: #1D4ED8; font-weight: 800; font-size: 0.98rem; text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
+.hero-scenic-home .hero-near-me:hover, .hero-scenic-home .hero-near-me:focus-visible { background: #fff; color: #1E40AF; }
 .hero-scenic-home { min-height: 0; height: clamp(420px, 34vw, 600px); }
 .hero-scenic-home .hero-media picture { display: block; width: 100%; height: 100%; }
 .hero-scenic-home .hero-media-img { object-position: 74% 46%; }
@@ -11220,6 +11222,11 @@ const SITE_WEBMANIFEST = JSON.stringify({
     { src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192', type: 'image/png' },
     { src: '/images/icons/okanagan-roam-icon-512.png', sizes: '512x512', type: 'image/png' },
   ],
+  // Long-press the home-screen icon (Android): straight to what's open nearby.
+  shortcuts: [
+    { name: 'What’s open near me', short_name: 'Near me', url: '/map#near-me', icons: [{ src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192' }] },
+    { name: 'What’s on this week', short_name: 'What’s on', url: '/map#events', icons: [{ src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192' }] },
+  ],
 });
 function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // golfTheme (2026-09-19): Golf pages also load the homepage stylesheet
@@ -12142,7 +12149,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-sep { flex: none; width: 1px; height: 26px; background: rgba(27,43,58,0.2); }
   body.map-page .pm-chip-select { flex: none; }
   body.map-page .pm-row { flex-wrap: nowrap; }
-  body.map-page .pm-town { flex: 0 0 auto; width: 118px; }
+  body.map-page .pm-town { flex: 0 0 auto; width: 112px; }
   @media (max-width: 480px) { body.map-page .pm-lead { font-size: 0.95rem; margin-bottom: 8px; } body.map-page .pm-near { padding: 0 16px; } body.map-page .pm-tab { padding: 0 13px; } }
   body.map-page .pm-near { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px; background: #1D4ED8; color: #fff; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: 0 2px 8px rgba(29,78,216,0.3); }
   body.map-page .pm-near:hover { background: #1E40AF; }
@@ -12169,6 +12176,15 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-to-list[hidden] { display: none; }
   @media (max-height: 576px) { body.map-page .pm-to-list { top: 242px; } }
   @media (min-width: 900px) { body.map-page .pm-to-list { display: none; } }
+  body.map-page .pm-chips + .pm-chips { margin-top: -2px; }
+  body.map-page .pm-radius { flex: 0 0 auto; width: 84px; }
+  body.map-page .pm-active { margin: 2px 0 10px; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy, #1B2B3A); }
+  body.map-page .pm-active[hidden] { display: none; }
+  body.map-page .pm-clear, body.map-page .pm-share { margin-left: 6px; padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-size: 0.82rem; font-weight: 800; cursor: pointer; color: var(--ink); }
+  body.map-page .pm-feats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  body.map-page .pm-feat { padding: 2px 9px; border-radius: 999px; background: rgba(27,43,58,0.06); font-size: 0.78rem; font-weight: 700; color: var(--ink); }
+  body.map-page .pm-feat.is-on { background: rgba(22,101,52,0.12); color: #14532D; }
+  body.map-page .pm-dog { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.35; color: #5B3A1A; }
   body.map-page .pm-key { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 2px 0; padding: 0; font-size: 0.8rem; opacity: 0.85; }
   body.map-page .pm-key li { display: inline-flex; align-items: center; gap: 5px; }
   body.map-page .pm-key-pin { display: inline-block; width: 14px; height: 14px; }
@@ -12225,6 +12241,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FR = document.documentElement.lang === 'fr';
   var T = FR ? {
     seeList: function(n){ return 'Voir la liste (' + n + ')'; },
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants' },
+    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', share: 'Partager', copied: 'Lien copié',
+    widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     stopAria: 'Arrêter d’utiliser ma position', nearMe: 'Près de moi', stop: 'Près de moi ✕', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone. Touchez ✕ pour l’arrêter.',
     denied: 'La localisation est désactivée pour ce site. Vous pouvez quand même parcourir la carte, ou l’activer dans les réglages de votre navigateur.',
     failed: 'Impossible de trouver votre position pour l’instant. Réessayez dans un endroit dégagé, ou parcourez la carte.', unsupported: 'Ce navigateur ne peut pas partager votre position.',
@@ -12239,6 +12258,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
     seeList: function(n){ return 'See the list (' + n + ')'; },
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome' },
+    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', share: 'Share', copied: 'Link copied',
+    widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     stopAria: 'Stop using my location', nearMe: 'Near me', stop: 'Near me ✕', finding: 'Finding you…', near: 'Near you. Your location stays on your phone. Tap ✕ to stop.',
     denied: 'Location is turned off for this site. You can still browse the map, or turn location on in your browser settings.',
     failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or browse the map.', unsupported: 'This browser can’t share your location.',
@@ -12258,10 +12280,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 15 ? 18 : z >= 13 ? 32 : 48; }, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
-  var places = [], events = [], tab = 'places', groups = {}, openOnly = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
+  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, openOnly = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
-  var chips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-group]')), allChip = document.querySelector('[data-pm-all]'), openBtn = $('pmOpen');
+  var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtn = $('pmOpen'), activeEl = $('pmActive'), searchEl = $('pmSearch');
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params || {}); } catch (e) {} }
   var IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -12306,22 +12328,40 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (me ? ' · ' + T.km(p.d) : '')); }
+  // What the place offers, the visitor's must-haves first; the dog rule when dogs matter.
+  var FEAT_ORDER = ['patio', 'dogs', 'happy', 'music', 'lake', 'kids'];
+  function featHtml(p){
+    var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
+    on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
+    var out = on.length ? '<span class="pm-feats">' + on.slice(0, 4).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
+    if (p.dog && feats.dogs) out += '<span class="pm-dog">' + esc(T.dogRule + ' ' + p.dog) + '</span>';
+    return out;
+  }
+  function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
   function popupFor(p){ return '<div class="pm-pop"><a href="' + esc(p.url) + '">' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" href="' + esc(dirUrl(p.lat, p.lng, p.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
   function popupForEvent(e){ return '<div class="pm-pop"><a href="' + esc(e.url) + '">' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" href="' + esc(dirUrl(e.lat, e.lng, e.venue || e.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
   function setStatus(text){ statusEl.textContent = text || ''; statusEl.hidden = !text; }
-  function matchesPlace(p){ return (!Object.keys(groups).some(function(k){ return groups[k]; }) || groups[p.g]) && (!term || p.key.indexOf(term) !== -1) && (!openOnly || (p.st && p.st.state === 'open')); }
+  function matchesPlace(p){
+    if (anyOn(kinds) && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; })) return false;
+    for (var k in feats) if (feats[k] && !(p.f & CONF.f[k])) return false;
+    if (openOnly && !(p.st && p.st.state === 'open')) return false;
+    return !term || term.split(' ').every(function(w){ return p.key.indexOf(w) !== -1; });
+  }
+  var isOpen = function(p){ return p.st && p.st.state === 'open' ? 0 : 1; };
   function render(fit){
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
     var items, onMap;
     if (me) { places.forEach(function(p){ p.d = distKm(me.lat, me.lng, p.lat, p.lng); }); events.forEach(function(e){ e.d = e.lat == null ? null : distKm(me.lat, me.lng, e.lat, e.lng); }); }
     if (tab === 'places') {
       onMap = places.filter(function(p){ return matchesPlace(p) && (!me || !radiusKm || p.d <= radiusKm); });
-      if (me) items = onMap.slice().sort(function(a, b){ return a.d - b.d; });
+      // Open places first, then the closest.
+      if (me) items = onMap.slice().sort(function(a, b){ return isOpen(a) - isOpen(b) || a.d - b.d; });
       else {
         var b = map.getBounds();
-        items = map.getZoom() >= 12 || term ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : [];
+        items = map.getZoom() >= 12 || term || anyOn(kinds) || anyOn(feats) ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : [];
       }
-      countEl.textContent = me ? T.placesNear(items.length, radiusKm) : (items.length || map.getZoom() >= 12 || term ? T.placesHere(items.length) : T.zoomHint);
+      var filtering = anyOn(kinds) || anyOn(feats) || openOnly || term;
+      countEl.textContent = me ? T.placesNear(items.length, radiusKm) : (items.length || map.getZoom() >= 12 || filtering ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, tomorrow: 2, week: 3 };
@@ -12340,6 +12380,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // Near me opens on the closest dozen places (individual pins, not bubbles); the list still covers the whole distance.
     if (fit && me) {
       var close = (tab === 'places' ? items : onMap).filter(function(x){ return x.lat != null; }).slice(0, 12).map(function(x){ return [x.lat, x.lng]; });
+      map.stop();
       if (close.length) map.fitBounds(L.latLngBounds(close.concat([[me.lat, me.lng]])), { padding: [36, 36], maxZoom: 17 });
       else map.setView([me.lat, me.lng], 13);
     }
@@ -12347,10 +12388,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     lastRender = me ? { lat: me.lat, lng: me.lng } : null;
   }
   function drawList(){
-    var html = '', lastGroup = null;
+    var html = '', lastGroup = null, openSeen = false, dividerDone = false;
     listItems.slice(0, limit).forEach(function(x, i){
       if (tab === 'places') {
-        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + '</button>'
+        if (me && x.st && x.st.state === 'open') openSeen = true;
+        if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
+        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" href="' + esc(dirUrl(x.lat, x.lng, x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
@@ -12388,9 +12431,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       meCircle = L.circle(ll, { radius: me.acc, color: '#1D4ED8', weight: 1, fillColor: '#3B82F6', fillOpacity: 0.12, interactive: false }).addTo(map);
     } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(me.acc); }
   }
-  function pickRadius(){
+  function pickRadius(min){
     var counts = [1, 5, 10, 25].map(function(r){ return { r: r, n: places.filter(function(p){ return matchesPlace(p) && distKm(me.lat, me.lng, p.lat, p.lng) <= r; }).length }; });
-    var pick = counts.filter(function(c){ return c.n >= 8; })[0];
+    var pick = counts.filter(function(c){ return c.n >= (min || 8); })[0];
     return pick ? pick.r : 0;
   }
   function onPos(pos){
@@ -12398,7 +12441,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.min(pos.coords.accuracy || 50, 2000) };
     drawMe();
     if (first) {
-      radiusKm = pickRadius(); radiusSel.value = String(radiusKm); radiusSel.hidden = false;
+      radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8); radiusSel.value = String(radiusKm); radiusSel.hidden = false;
       nearBtn.setAttribute('aria-pressed', 'true'); nearBtn.setAttribute('aria-label', T.stopAria); nearLabel.textContent = T.stop; setStatus(T.near);
       track('map_near_me', { radius_km: radiusKm });
       render(true);
@@ -12427,19 +12470,86 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // No location updates while the page is in the background.
   document.addEventListener('visibilitychange', function(){ if (!watching) return; if (document.hidden) stopWatch(); else if (watchId == null) startWatch(); });
   radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); limit = 25; render(true); });
-  chips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-group'); groups[k] = !groups[k]; syncChips(); limit = 25; render(false); }); });
-  allChip.addEventListener('click', function(){ groups = {}; syncChips(); limit = 25; render(false); });
-  function syncChips(){ var any = false; chips.forEach(function(c){ var on = !!groups[c.getAttribute('data-pm-group')]; any = any || on; c.setAttribute('aria-pressed', on ? 'true' : 'false'); }); allChip.setAttribute('aria-pressed', any ? 'false' : 'true'); }
-  openBtn.addEventListener('click', function(){ openOnly = !openOnly; openBtn.setAttribute('aria-pressed', openOnly ? 'true' : 'false'); limit = 25; render(false); });
+  function syncChips(){
+    kindChips.forEach(function(c){ c.setAttribute('aria-pressed', kinds[c.getAttribute('data-pm-kind')] ? 'true' : 'false'); });
+    featChips.forEach(function(c){ c.setAttribute('aria-pressed', feats[c.getAttribute('data-pm-feat')] ? 'true' : 'false'); });
+    openBtn.setAttribute('aria-pressed', openOnly ? 'true' : 'false');
+    var parts = [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtn] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; }))
+      .map(function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); });
+    if (term) parts.push('“' + term + '”');
+    activeEl.hidden = !parts.length;
+    activeEl.innerHTML = parts.length ? esc(parts.join(' · ')) + ' <button type="button" class="pm-clear" id="pmClear">' + esc(T.clear) + '</button>' + (navigator.share || (navigator.clipboard && navigator.clipboard.writeText) ? ' <button type="button" class="pm-share" id="pmShare">' + esc(T.share) + '</button>' : '') : '';
+    // The search lives in the address (never the location), so it can be bookmarked or shared.
+    try {
+      var f = [].concat(Object.keys(kinds).filter(function(k){ return kinds[k]; }), Object.keys(feats).filter(function(k){ return feats[k]; }), openOnly ? ['open'] : []);
+      var q = (f.length ? 'f=' + f.join(',') : '') + (term ? (f.length ? '&' : '') + 'q=' + encodeURIComponent(term) : '');
+      history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + (tab === 'events' ? '#events' : ''));
+    } catch (e) {}
+  }
+  // With location on, a narrower search widens the distance by itself rather than coming up empty.
+  function changed(){
+    syncChips(); limit = 25;
+    if (me && radiusKm) {
+      var n = places.filter(function(p){ return matchesPlace(p) && p.d <= radiusKm; }).length;
+      if (n < 3) { var r = pickRadius(3); if (r !== radiusKm) { radiusKm = r; radiusSel.value = String(r); setStatus(r ? T.widened(r) : T.widenedAny); } }
+    }
+    render(!!me);
+  }
+  kindChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-kind'); kinds[k] = !kinds[k]; track('map_filter', { filter: k, on: kinds[k] }); changed(); }); });
+  featChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-feat'); feats[k] = !feats[k]; track('map_filter', { filter: k, on: feats[k] }); changed(); }); });
+  openBtn.addEventListener('click', function(){ openOnly = !openOnly; track('map_filter', { filter: 'open', on: openOnly }); changed(); });
+  activeEl.addEventListener('click', function(e){
+    if (e.target.id === 'pmClear') { kinds = {}; feats = {}; openOnly = false; term = ''; searchEl.value = ''; changed(); }
+    if (e.target.id === 'pmShare') {
+      var url = location.href;
+      if (navigator.share) navigator.share({ title: document.title, url: url }).catch(function(){});
+      else navigator.clipboard.writeText(url).then(function(){ e.target.textContent = T.copied; });
+      track('map_share', {});
+    }
+  });
+  // Plain words become filters: "patio drinks dog" turns on Drinks, Patio and Dogs OK; anything else searches names.
+  var WORDS = {
+    drinks: 'drink drinks beer beers pint pints cocktail cocktails bar bars pub pubs brewery breweries brew cider booze bevvy bevvies biere bière boire verre',
+    food: 'food eat eats dinner lunch brunch breakfast restaurant restaurants bite hungry manger souper diner dîner resto restos',
+    coffee: 'coffee coffees cafe cafes café cafés latte espresso',
+    wine: 'wine wines winery wineries tasting vin vins vignoble vignobles',
+    beach: 'beach beaches swim swimming plage plages baignade',
+    outdoor: 'hike hikes hiking trail trails park parks walk sentier sentiers randonnée parc',
+    golf: 'golf',
+    patio: 'patio patios outside outdoors terrace deck rooftop terrasse terrasses dehors',
+    dogs: 'dog dogs pup pups puppy doggo pet pets chien chiens',
+    happy: 'happy',
+    music: 'music live band bands musique',
+    lake: 'lake view views waterfront lac',
+    kids: 'kids kid family families children enfants famille',
+    open: 'open ouvert ouverts'
+  };
+  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow us bring on place places near me our my and or go find wonder wondering somewhere something good best nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour ';
+  var WORD_TO = {};
+  Object.keys(WORDS).forEach(function(k){ WORDS[k].split(' ').forEach(function(w){ WORD_TO[w] = k; }); });
+  function readSearch(v){
+    var left = [];
+    String(v).toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿœ'’ -]/g, ' ').split(/\\s+/).filter(Boolean).forEach(function(w){
+      var k = WORD_TO[w];
+      if (k === 'open') openOnly = true;
+      else if (k && CONF.k[k]) kinds[k] = true;
+      else if (k && CONF.f[k]) feats[k] = true;
+      else if (STOP.indexOf(' ' + w.replace('’', '\\'') + ' ') === -1) left.push(w);
+    });
+    term = left.join(' ');
+  }
   var timer = null;
-  $('pmSearch').addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ term = v.trim().toLowerCase(); limit = 25; render(true); }, 200); });
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ term = v.trim().toLowerCase(); syncChips(); limit = 25; render(true); }, 250); });
+  // Enter (or the phone's Search key) reads the words as filters.
+  searchEl.addEventListener('keydown', function(e){ if (e.key !== 'Enter') return; e.preventDefault(); clearTimeout(timer); readSearch(searchEl.value); searchEl.value = term; searchEl.blur(); track('map_search', { words: searchEl.value ? 1 : 0 }); changed(); });
   $('pmTown').addEventListener('change', function(e){ var c = CONF.c[e.target.value]; if (c) map.setView(c, 13); });
   function setTab(t){
     tab = t; limit = 25;
     $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
     $('pmTabEvents').setAttribute('aria-selected', t === 'events' ? 'true' : 'false');
     $('pmPlaceFilters').hidden = t !== 'places';
-    render(false);
+    syncChips();
+    render(!!me);
   }
   $('pmTabPlaces').addEventListener('click', function(){ setTab('places'); });
   $('pmTabEvents').addEventListener('click', function(){ setTab('events'); });
@@ -12448,7 +12558,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = d.p.map(function(a){
-      var p = { lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
       return p;
     });
@@ -12458,8 +12568,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       return e;
     });
     refreshStatus();
-    render(false);
+    try {
+      var qs = new URLSearchParams(location.search);
+      (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
+      if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = term; }
+    } catch (e) {}
+    syncChips();
+    if (location.hash === '#events') setTab('events'); else render(false);
+    // Near me starts by itself when asked for (#near-me, the home-screen shortcut) or when this browser already allows it.
     if (location.hash === '#near-me') nearBtn.click();
+    else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching) nearBtn.click(); }).catch(function(){});
   }).catch(function(){ countEl.textContent = T.loadFailed; });
   // Opening times move on: refresh every minute.
   setInterval(function(){ refreshStatus(); if (!document.hidden) { var y = window.scrollY; render(false); window.scrollTo(0, y); } }, 60000);
@@ -12475,23 +12593,49 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
+const MAP_DATA_FORMAT = 2;
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
   const e = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM events').get();
   const o = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM event_occurrences').get();
-  return crypto.createHash('md5').update(`${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}`).digest('hex').slice(0, 12);
+  // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
+  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}`).digest('hex').slice(0, 12);
 }
 const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
-// Places: [lat, lng, name, type, region, url, hours or 0]. Hours ship only for a
-// place that has them and no current closure notice (as the hub pages).
+// Places: [lat, lng, name, type, region, url, hours or 0, features, dog rule]. Hours ship only for a place that has
+// them and no current closure notice (as the hub pages). Features are bits (MAP_FEATURES); the dog rule is the
+// researched note for a dog-friendly place ("Dogs welcome on the patio"), or ''.
+const MAP_FEATURES = [
+  { key: 'patio', field: 'patio', bit: 1 }, { key: 'dogs', field: 'dog_friendly', bit: 2 }, { key: 'happy', field: 'happy_hour', bit: 4 },
+  { key: 'music', field: 'live_music', bit: 8 }, { key: 'lake', field: 'lake_view', bit: 16 }, { key: 'kids', field: 'kid_friendly', bit: 32 },
+];
+// The kinds of place a visitor picks from (any of them), by venue type.
+const MAP_KINDS = [
+  { key: 'drinks', label: 'Drinks', icon: '\u{1F37A}', types: ['pub', 'brewery', 'cocktail', 'winery', 'distillery'] },
+  { key: 'food', label: 'Food', icon: '\u{1F37D}\uFE0F', types: ['restaurant', 'pub', 'cafe'] },
+  { key: 'coffee', label: 'Coffee', icon: '\u2615', types: ['cafe'] },
+  { key: 'wine', label: 'Wineries', icon: '\u{1F377}', types: ['winery'] },
+  { key: 'beach', label: 'Beaches', icon: '\u{1F3D6}\uFE0F', types: ['beach'] },
+  { key: 'outdoor', label: 'Outdoors', icon: '\u{1F332}', types: ['outdoor'] },
+  { key: 'golf', label: 'Golf', icon: '\u26F3', types: ['golf'] },
+  { key: 'do', label: 'Things to do', icon: '\u{1F3AF}', types: ['tour', 'sport', 'indoor'] },
+];
+const MAP_MUST_HAVES = [
+  { key: 'patio', label: 'Patio', icon: '\u2600\uFE0F' }, { key: 'dogs', label: 'Dogs OK', icon: '\u{1F415}' },
+  { key: 'happy', label: 'Happy hour', icon: '\u{1F378}' }, { key: 'music', label: 'Live music', icon: '\u{1F3B6}' },
+  { key: 'lake', label: 'Lake view', icon: '\u{1F30A}' }, { key: 'kids', label: 'Kids welcome', icon: '\u{1F9D2}' },
+];
 function mapPlacesData(now = new Date()) {
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
+  const dogNotes = getDogPolicyNotes();
   return venues.map((v) => {
     const st = open.byId.get(v.id);
-    return [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0];
+    const bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
+    return [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
+      bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : ''];
   });
 }
 // Events in the next week, one entry each (its next date):
@@ -12549,7 +12693,8 @@ function renderPlacesMapPage(placeCount = null, now = new Date()) {
   const canonical = 'https://okanaganroam.com/map';
   const typeEn = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
-  const conf = JSON.stringify({ src: `/map/data.json?v=${mapDataVersion(now)}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS }).replace(/</g, '\\u003c');
+  const conf = JSON.stringify({ src: `/map/data.json?v=${mapDataVersion(now)}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
+    k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])) }).replace(/</g, '\\u003c');
   const breadcrumb = breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Map', url: canonical }]);
   const townOptions = VALID_REGIONS.filter((r) => MAP_AREA_CENTERS[r]).map((r) => `<option value="${r}">${escapeHtml(REGION_LABELS[r])}</option>`).join('');
   return `<!DOCTYPE html>
@@ -12580,22 +12725,24 @@ ${renderGolfHeaderHtml()}
   </div>
   <p class="pm-status" id="pmStatus" role="status" aria-live="polite"></p>
   <div class="pm-filters" id="pmPlaceFilters">
-    <div class="pm-chips" role="group" aria-label="Filters">
-      <button type="button" class="pm-chip pm-open" id="pmOpen" aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
-      <label class="visually-hidden" for="pmRadius">Distance</label>
-      <select id="pmRadius" class="pm-select pm-chip-select" hidden>
-        <option value="1">Within 1 km</option><option value="5" selected>Within 5 km</option><option value="10">Within 10 km</option><option value="25">Within 25 km</option><option value="0">Any distance</option>
-      </select>
-      <span class="pm-sep" aria-hidden="true"></span>
-      <button type="button" class="pm-chip" data-pm-all aria-pressed="true">All</button>
-      ${MAP_GROUPS.map((g) => `<button type="button" class="pm-chip" data-pm-group="${g.key}" aria-pressed="false">${escapeHtml(g.label)}</button>`).join('\n      ')}
-    </div>
     <div class="pm-row">
-      <label class="visually-hidden" for="pmSearch">Search places by name</label>
-      <input type="search" id="pmSearch" class="pm-search" placeholder="Search a place by name..." autocomplete="off">
+      <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
+      <input type="search" id="pmSearch" class="pm-search" placeholder="Try “patio drinks dog” or a name" autocomplete="off" enterkeyhint="search">
+    </div>
+    <div class="pm-chips" role="group" aria-label="What are you after?">
+      ${MAP_KINDS.map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n      ')}
       <label class="visually-hidden" for="pmTown">Jump to a town</label>
       <select id="pmTown" class="pm-select pm-town"><option value="">Town&hellip;</option>${townOptions}</select>
     </div>
+    <div class="pm-chips" role="group" aria-label="Must have">
+      <label class="visually-hidden" for="pmRadius">Distance</label>
+      <select id="pmRadius" class="pm-select pm-radius" hidden>
+        <option value="1">1 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="0">Any</option>
+      </select>
+      <button type="button" class="pm-chip pm-open" id="pmOpen" aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
+      ${MAP_MUST_HAVES.map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n      ')}
+    </div>
+    <p class="pm-active" id="pmActive" hidden></p>
   </div>
   <div class="pm-layout">
     <div class="pm-map-wrap"><div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
@@ -27771,7 +27918,9 @@ const server = http.createServer(async (req, res) => {
         html = html
           .replace('<section class="hero-scenic" id="heroScenic">', '<section class="hero-scenic hero-scenic-home" id="heroScenic">')
           .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
-          .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`);
+          .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`)
+          // The near-me map, one tap from the home page (2026-10-14).
+          .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span aria-hidden="true">&#128205;</span> What’s open near me</a>');
 
         // Anything still pointing at the now-removed sections (the header's
         // "Browse & Search" dropdown link and every homepage module's own
