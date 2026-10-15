@@ -12584,12 +12584,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (p.r ? ' · ★ ' + (FR ? p.r.toFixed(1).replace('.', ',') : p.r.toFixed(1)) : '') + (me ? ' · ' + T.km(p.d) : '')); }
-  // What the place offers, the visitor's must-haves first; the dog rule when dogs matter.
+  // What the place offers, the visitor's must-haves first (three at most, easy to read on the move); the dog rule when dogs matter.
   var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc'];
   function featHtml(p){
     var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
-    var out = on.length ? '<span class="pm-feats">' + on.slice(0, 4).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
+    var out = on.length ? '<span class="pm-feats">' + on.slice(0, 3).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
     if (p.dog && feats.dogs) out += '<span class="pm-dog">' + esc(T.dogRule + ' ' + p.dog) + '</span>';
     if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">🍸 ' + esc(p.hhs.text) + '</span>';
     return out;
@@ -12795,7 +12795,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function endRoute(){
     if (route && route.line) map.removeLayer(route.line);
     route = null; follow = false; stage.classList.remove('is-following'); keepAwake(false); stopCompass(); hush();
-    drawRoute(); render(false);
+    // Back from street level to the results around the visitor, with the list half open.
+    drawRoute(); if (me) setSheet('half'); render(true);
   }
   // ---- Following the visitor along the route ----
   var navbar = $('pmNavbar'), follow = false, wakeLock = null, followZoom = 18, waitingZoom = false;
