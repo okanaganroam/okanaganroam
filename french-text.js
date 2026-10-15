@@ -786,7 +786,7 @@ const FR_TEXT = {
   'Town…': 'Ville…', '1 km': '1 km', '5 km': '5 km', '10 km': '10 km', '25 km': '25 km', 'Any': 'Toutes',
   'What the pins mean': 'Ce que signifient les repères',
   'Filters': 'Filtres', 'Done': 'Terminé', 'Go to a town': 'Aller à une ville', 'Turn off my location': 'Désactiver ma position',
-  'Drop a pin': 'Déposer un repère', 'Dietary': 'Alimentation', 'Gluten-free': 'Sans gluten', 'Open late': 'Ouvert tard', 'Open early': 'Ouvert tôt', 'Good for groups': 'Bien pour les groupes', 'Alcohol-free drinks': 'Boissons sans alcool',
+  'Drop a pin': 'Déposer un repère', 'Happy hour now': 'Happy hour en cours', 'Dietary': 'Alimentation', 'Gluten-free': 'Sans gluten', 'Open late': 'Ouvert tard', 'Open early': 'Ouvert tôt', 'Good for groups': 'Bien pour les groupes', 'Alcohol-free drinks': 'Boissons sans alcool',
     '✕ Clear': '✕ Effacer', 'Quick filters': 'Filtres rapides', 'Show more of the list': 'Afficher plus de la liste',
   'Tours, sports & indoor': 'Visites, sports et intérieur',
   'Browse & Search every place': 'Parcourir et rechercher tous les lieux',

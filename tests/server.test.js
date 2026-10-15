@@ -16706,6 +16706,57 @@ test('POST /admin/set-season: auth, validation and a write, on a private server 
   }
 });
 
+// ---- Happy hour times (2026-10-14) ----------
+test('Happy hour times: guarded write, the admin route, and Happy hour now on the map', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Happy Hour Fixture', type: 'pub', hours: SEASON_WEEK, slug: 'happy-hour-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'pub', 'happy-hour-fixture');
+  const today = app.todayLocal();
+  const g = app.guardedHappyHourUpdate;
+  const meta = { reason: 'test', batch_id: 'hh-test' };
+  const times = { mon: [['15:00', '18:00']], fri: [['15:00', '18:00'], ['21:00', '23:00']] };
+  assert.equal(g(v.id, null, { times, source_url: 'https://example.com/menu', checked_at: today }, { reason: '', batch_id: 'x' }).reason, 'invalid_meta');
+  assert.equal(g(v.id, null, { times: { funday: [['15:00', '18:00']] }, source_url: 'https://example.com', checked_at: today }, meta).reason, 'invalid_times');
+  assert.equal(g(v.id, null, { times: { mon: [['3pm', '6pm']] }, source_url: 'https://example.com', checked_at: today }, meta).reason, 'invalid_times');
+  assert.equal(g(v.id, null, { times, source_url: 'not a url', checked_at: today }, meta).reason, 'invalid_source');
+  assert.equal(g(v.id, null, { times, source_url: 'https://example.com', checked_at: '2999-01-01' }, meta).reason, 'invalid_checked_at');
+  const ok = g(v.id, null, { times, source_url: 'https://example.com/menu', checked_at: today }, meta);
+  assert.equal(ok.ok, true);
+  const stored = JSON.parse(ok.happy_hour_times);
+  assert.deepEqual(stored.fri, [['15:00', '18:00'], ['21:00', '23:00']]);
+  assert.equal(stored.tue, null, 'a day left out has no happy hour');
+  assert.equal(g(v.id, null, { times, source_url: 'https://example.com/menu', checked_at: today }, meta).reason, 'mismatch', 'compare-and-set');
+  const log = db.prepare("SELECT field_name FROM venue_enrichment_log WHERE venue_id = ? AND batch_id = 'hh-test'").all(v.id).map((r) => r.field_name).sort();
+  assert.deepEqual(log, ['happy_hour_checked_at', 'happy_hour_source', 'happy_hour_times']);
+  // The route: auth and allowlist, then a clear.
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const post = async (body, token = process.env.ENRICHMENT_ADMIN_TOKEN) => {
+    const res = await fetch(`${base}/admin/set-happy-hour`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  try {
+    const body = { id: v.id, expected_current_times: ok.happy_hour_times, happy_hour: { times: null }, reason: 'clear', batch_id: 'hh-http' };
+    assert.equal((await post(body, 'wrong')).status, 401);
+    assert.equal((await post({ ...body, extra: 1 })).status, 400);
+    assert.equal((await post({ ...body, expected_current_times: null })).status, 409);
+    const cleared = await post(body);
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.body.venue.happy_hour_times, null);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+  // The map ships the times of a place that has them, and the chip is Happy hour now.
+  const placed = db.prepare('SELECT id, name, happy_hour_times FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL AND slug IS NOT NULL AND type = ? LIMIT 1').get('pub');
+  assert.equal(g(placed.id, placed.happy_hour_times, { times: { sat: [['14:00', '17:00']] }, source_url: 'https://example.com/hh', checked_at: today }, meta).ok, true);
+  const row = JSON.parse(app.mapLiveData().json).p.find((p) => p[2] === placed.name);
+  assert.ok(row && typeof row[11] === 'string' && row[11].includes('14:00-17:00'), 'the compact times ship as [11]');
+  const html = app.renderPlacesMapPage();
+  assert.match(html, /data-pm-feat="happy" aria-pressed="false"><span aria-hidden="true">🍸<\/span> Happy hour now<\/button>/);
+  assert.match(html, /k === 'happy' && hhKnown \? !\(p\.hhs && p\.hhs\.now\)/, 'Happy hour now needs researched times that are on now');
+});
+
 // ---- Derived hours badges: Open Early / Open Late (2026-10-11) ----------
 // Computed only from stored hours (deriveHoursBadges), never set by hand.
 // These tests run last and use their own fixtures in 'summerland', so no

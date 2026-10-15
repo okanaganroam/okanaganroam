@@ -740,6 +740,15 @@ for (const col of ['hours_source', 'hours_checked_at']) {
   }
 }
 
+// Happy hour times (2026-10-14): the week the happy hour runs, in the same JSON shape as `hours` (a day with none is
+// null), the page it was read on, and the Okanagan date it was checked. Written only by server.js
+// guardedHappyHourUpdate(), which logs every change. NULL means not researched yet.
+for (const col of ['happy_hour_times', 'happy_hour_source', 'happy_hour_checked_at']) {
+  if (!venueColsForHours.includes(col)) {
+    db.exec(`ALTER TABLE venues ADD COLUMN ${col} TEXT`);
+  }
+}
+
 try {
   require('./golf-data.js').initGolfData(db);
 } catch (e) {
