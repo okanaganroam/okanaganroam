@@ -1,6 +1,6 @@
 # Beach photo sources and review status
 
-This index covers 93 live beach listings. 90 exact-location photos are staged locally and visually screened for readable writing; 3 still need an acceptable exact-beach image. Unverified listings keep their current image fallback.
+This index covers 93 live beach listings. All 93 beach listings have a selected local photo. The newly completed images were visually checked for visible writing and match their approved beach or viewpoint locations.
 
 The owner stated permission to use the selected photos. The photos were not altered to remove writing; images with visible writing or the wrong location were excluded. Source links are retained below.
 
@@ -19,8 +19,10 @@ The owner stated permission to use the selected photos. The photos were not alte
 - [Source page](https://camperumo.blogspot.com/2013/04/review-vaseux-lake-provincial-park.html) · [Original image](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiBOfoaD0IXRjRgwGR307Xfqz0F5z4qiwS-veiLtFOvpr3ZefmWxIolYz-7ODPOc8XXv4y6N-ioN-dS4eiGqKV2wZ4DXgoSgve1x590wjagJQindmzjg6Wt8igROF1kI1vV6XlqTOs4IGs/s1600/IMG_3662_stitch.jpg)
 - Local file: `/images/beaches/venues/okanagan-falls-vaseux-lake-provincial-park.jpg`
 
-## 04. Paddlewheeler Park (West Kelowna) — NEEDS PHOTO
-- No acceptable exact-beach photo staged. Checked: [source page](https://www.castanetkamloops.net/news/Vernon/91980/Enjoying-Vernon-beaches)
+## 04. Paddlewheeler Park (West Kelowna) — READY
+- Source: City of West Kelowna
+- [Source page](https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-C47F8786-3B45-433D-9F1E-0CEA77FE7793) · [Original image](https://gvstksacacpcyowka001.ghdcdn.com/media/ParksAndFacilities/ff5bc462-6286-423f-820d-a7d0e4dc6562.jpg)
+- Local file: `/images/beaches/venues/west-kelowna-paddlewheeler-park.jpg`
 
 ## 05. Poplar Point Dog Beach — READY
 - Source: Exploratory Glory
@@ -257,8 +259,11 @@ The owner stated permission to use the selected photos. The photos were not alte
 - [Source page](https://www.tourismkelowna.com/listing/bear-creek-provincial-park/1654/) · [Original image](https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/Bear-Creek-Provincial-Park-Beach-438a8fc75056a36_438a93fa-5056-a36a-0ba5571ef54f2fba.jpg)
 - Local file: `/images/beaches/venues/west-kelowna-bear-creek-provincial-park.jpg`
 
-## 52. 13th Street Viewpoint & Centennial Way — NEEDS PHOTO
-- No acceptable exact-beach photo staged. Checked: [source page](https://www.shopkelownahomes.com/blog/moving-peachland-beaches/)
+## 52. 13th Street Viewpoint & Centennial Way — READY
+- Source: Shop Kelowna Homes
+- [Source page](https://www.shopkelownahomes.com/blog/moving-peachland-beaches/) · [Original image](https://u.realgeeks.media/yourrealtyguy/13th-Street-Viewpoint-Beach-Peachland-BC1web700px.jpg)
+- Local file: `/images/beaches/venues/peachland-13th-street-viewpoint-centennial-way.jpg`
+- Note: The approved image shows the viewpoint deck beside the lake, not a sandy shoreline.
 
 ## 53. Lions Park (Osoyoos) — READY
 - Source: osoyoos.com
@@ -315,8 +320,10 @@ The owner stated permission to use the selected photos. The photos were not alte
 - [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/nuyens-park-okanagan) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1591474846126-5ZGAXJ4ZZP714V434LP1/Nuyens-park-okanaganJPG)
 - Local file: `/images/beaches/venues/lake-country-nuyens-park.jpg`
 
-## 64. Downtown Sails Dog Beach (Kerry Park) — NEEDS PHOTO
-- No acceptable exact-beach photo staged. Checked: [source page](https://okanagan.com/kelowna/dog-friendly-beaches-in-kelowna/)
+## 64. Downtown Sails Dog Beach (Kerry Park) — READY
+- Source: Okanagan.com
+- [Source page](https://okanagan.com/kelowna/dog-friendly-beaches-in-kelowna/) · [Original image](https://okanagan.com/wp-content/uploads/image-61.png)
+- Local file: `/images/beaches/venues/kelowna-downtown-sails-dog-beach.jpg`
 
 ## 65. Whiskey Cove Beach — READY
 - Source: www.exploratoryglory.com
