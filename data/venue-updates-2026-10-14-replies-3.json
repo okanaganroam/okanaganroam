@@ -1,0 +1,53 @@
+{
+  "reason": "Venue replies to the 2026-10-14 outreach email: corrections and their own photos for the listing",
+  "batch_id": "venue-replies-2026-10-14-ryse-mashawi-btm",
+  "venues": [
+    {
+      "id": 710,
+      "name": "The Ryse Breadworks & Coffeehouse",
+      "region": "west-kelowna",
+      "slug": "the-ryse-breadworks-coffeehouse",
+      "source": "Email from Kit, The Ryse Breadworks & Coffeehouse (via theryse.ca), 2026-10-14: the phone number was wrong for the West Kelowna location; sent their own photos for the listing",
+      "expect": {
+        "phone": "+1 250-862-2811",
+        "image_url": null
+      },
+      "set": {
+        "phone": "+1 250-980-6891",
+        "image_url": "/images/venues/the-ryse-breadworks-bakery-case.jpg"
+      }
+    },
+    {
+      "id": 378,
+      "name": "MASHAWI - Shawarma & Grill",
+      "region": "kelowna",
+      "slug": "mashawi-shawarma-grill",
+      "source": "Email from Info Mashawi, 2026-10-14: the cuisine is Turkish, not Lebanese; sent their own photos (the shawarma wrap is used; the others are price ads)",
+      "expect": {
+        "cuisine": "Lebanese",
+        "description": "MASHAWI - Shawarma & Grill is a Kelowna spot run by a hardworking young couple serving authentic Middle Eastern food. It stays open well past typical dinner hours, and portions are generous.",
+        "description_fr": "MASHAWI - Shawarma & Grill est une adresse de Kelowna tenue par un jeune couple travaillant qui sert une cuisine moyen-orientale authentique. Elle reste ouverte bien après l'heure habituelle du souper, et les portions sont généreuses.",
+        "image_url": null
+      },
+      "set": {
+        "cuisine": "Turkish",
+        "description": "MASHAWI - Shawarma & Grill is a Kelowna spot run by a hardworking young couple serving authentic Turkish food. It stays open well past typical dinner hours, and portions are generous.",
+        "description_fr": "MASHAWI - Shawarma & Grill est une adresse de Kelowna tenue par un jeune couple travaillant qui sert une cuisine turque authentique. Elle reste ouverte bien après l'heure habituelle du souper, et les portions sont généreuses.",
+        "image_url": "/images/venues/mashawi-chicken-shawarma-wrap.jpg"
+      }
+    },
+    {
+      "id": 1427,
+      "name": "Bar Travelling Man",
+      "region": "kelowna",
+      "slug": "bar-travelling-man",
+      "source": "Email from Harry Dosanj, owner, hsdosanj@gmail.com, 2026-10-14: sent their own photos for the listing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bar-travelling-man-beef-carpaccio.jpg"
+      }
+    }
+  ]
+}
