@@ -7487,6 +7487,7 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="/about">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
+          <li><a href="/owner/login">Business login</a></li>
           <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
         </ul>
       </div>
@@ -28793,7 +28794,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
   const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Changes are only accepted from the Okanagan Roam website.' });
   if (ownerChangeRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' });
-  const found = venueForOwnerToken(token);
+  const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
   if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
@@ -28845,7 +28846,7 @@ async function handleOwnerEventSubmission(req, res, token) {
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Events are only accepted from the Okanagan Roam website.' });
   const ip = requestClientIp(req);
   if (eventSubmissionRateLimited(ip)) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions. Please try again in an hour.' });
-  const found = venueForOwnerToken(token);
+  const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
   if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
@@ -28968,7 +28969,7 @@ async function handleOwnerPhotoUpload(req, res, token) {
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Photos are only accepted from the Okanagan Roam website.' });
   const ip = requestClientIp(req);
   if (ownerPhotoRateLimited(ip)) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many photos at once. Please wait a while and try again.' });
-  const found = venueForOwnerToken(token);
+  const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
   if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
@@ -29087,6 +29088,254 @@ function sendOwnerPhotoFile(res, file, headers) {
   }
   res.writeHead(200, { 'Content-Type': 'image/jpeg', ...headers });
   return res.end(fs.readFileSync(fp));
+}
+
+// ---------- Owner logins (2026-10-15) ----------
+//
+// An owner turns their private edit link into a login: from /owner/<token>
+// they set an email + password (owner_accounts), which grants that account
+// the venue (owner_account_venues). Later they sign in at /owner/login and
+// manage every venue on the account from /owner/account. The same link also
+// resets a forgotten password, so "forgot password" = Dayton sends a fresh
+// link. Passwords use scrypt; the session cookie (okr_owner) is httpOnly,
+// SameSite=Lax and Secure on https, and only a hash of it is stored.
+const OWNER_SESSION_COOKIE = 'okr_owner';
+const OWNER_SESSION_DAYS = 30;
+const OWNER_PASSWORD_MIN = 10;
+const OWNER_LOGIN_MAX_FAILS = 5;
+const OWNER_LOGIN_LOCK_MINUTES = 15;
+const OWNER_LOGIN_RATE_LIMIT = 30;
+
+function hashOwnerPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 });
+  return `scrypt$16384$${salt.toString('base64')}$${hash.toString('base64')}`;
+}
+
+function checkOwnerPassword(password, stored) {
+  const parts = String(stored || '').split('$');
+  if (parts.length !== 4 || parts[0] !== 'scrypt') return false;
+  const expected = Buffer.from(parts[3], 'base64');
+  const got = crypto.scryptSync(String(password), Buffer.from(parts[2], 'base64'), expected.length, { N: Number(parts[1]), r: 8, p: 1 });
+  return got.length === expected.length && crypto.timingSafeEqual(got, expected);
+}
+
+function ownerSessionHash(value) {
+  return crypto.createHash('sha256').update(`okanagan-roam-owner-session:${value}`).digest('hex');
+}
+
+function readCookie(req, name) {
+  const header = String(req.headers.cookie || '');
+  for (const part of header.split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return null;
+}
+
+function ownerCookieHeader(req, value, maxAgeSeconds) {
+  const secure = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https' || /okanaganroam\.com$/.test(String(req.headers.host || ''));
+  return `${OWNER_SESSION_COOKIE}=${encodeURIComponent(value)}; Path=/owner; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
+}
+
+function startOwnerSession(accountId) {
+  const value = crypto.randomBytes(32).toString('base64url');
+  db.prepare("INSERT INTO owner_sessions (token_hash, account_id, expires_at) VALUES (?, ?, datetime('now', ?))")
+    .run(ownerSessionHash(value), accountId, `+${OWNER_SESSION_DAYS} days`);
+  db.prepare('UPDATE owner_accounts SET last_login_at = CURRENT_TIMESTAMP, failed_logins = 0, locked_until = NULL WHERE id = ?').run(accountId);
+  return value;
+}
+
+// The signed-in owner account for this request, or null.
+function ownerAccountForRequest(req) {
+  const value = readCookie(req, OWNER_SESSION_COOKIE);
+  if (!value || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
+  const row = db.prepare(`SELECT a.id, a.email FROM owner_sessions s JOIN owner_accounts a ON a.id = s.account_id
+    WHERE s.token_hash = ? AND s.expires_at > datetime('now')`).get(ownerSessionHash(value));
+  return row || null;
+}
+
+function ownerAccountVenues(accountId) {
+  return db.prepare(`SELECT v.* FROM owner_account_venues av JOIN venues v ON v.id = av.venue_id
+    WHERE av.account_id = ? AND v.redirect_to IS NULL ORDER BY v.name`).all(accountId).map(rowToVenue);
+}
+
+// The same shape venueForOwnerToken() returns, for a venue the signed-in
+// account manages (null otherwise).
+function venueForOwnerAccount(account, venueId) {
+  if (!account) return null;
+  const ok = db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(account.id, venueId);
+  if (!ok) return null;
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+  if (!row || row.redirect_to) return null;
+  return { venue: rowToVenue(row), happyHourTimes: row.happy_hour_times || null, contactEmail: account.email, account };
+}
+
+const ownerLoginAttempts = new Map(); // ip -> [timestamps]
+function ownerLoginRateLimited(ip, now = Date.now()) {
+  const recent = (ownerLoginAttempts.get(ip) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
+  recent.push(now);
+  ownerLoginAttempts.set(ip, recent);
+  if (ownerLoginAttempts.size > 5000) {
+    for (const [key, times] of ownerLoginAttempts) if (!times.some((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS)) ownerLoginAttempts.delete(key);
+  }
+  return recent.length > OWNER_LOGIN_RATE_LIMIT;
+}
+
+function validOwnerEmail(value) {
+  const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
+async function readOwnerJson(req, res, keys) {
+  if (!isSameOriginSubmission(req)) { sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' }); return null; }
+  if (ownerLoginRateLimited(requestClientIp(req))) { sendSubmissionResponse(res, 429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' }); return null; }
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) { sendSubmissionResponse(res, 415, { ok: false, error: 'Please try again.' }); return null; }
+  let body;
+  try { body = await readLimitedJsonBody(req, 4096); } catch (err) { sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' }); return null; }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !keys.includes(k))) {
+    sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' });
+    return null;
+  }
+  return body;
+}
+
+// POST /owner/<token>/account: create a login for this venue, add this venue
+// to an existing login (needs that login's password), or reset the password
+// of a login that already manages this venue (the link proves ownership).
+async function handleOwnerAccountSetup(req, res, token) {
+  const body = await readOwnerJson(req, res, ['email', 'password']);
+  if (!body) return;
+  const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  const email = validOwnerEmail(body.email);
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (!email) return sendSubmissionResponse(res, 400, { ok: false, errors: { email: 'Please enter your email address.' } });
+  if (password.length < OWNER_PASSWORD_MIN || password.length > 200) {
+    return sendSubmissionResponse(res, 400, { ok: false, errors: { password: `Please use at least ${OWNER_PASSWORD_MIN} characters.` } });
+  }
+  const venueId = found.venue.id;
+  let account = db.prepare('SELECT * FROM owner_accounts WHERE email = ?').get(email);
+  let action;
+  if (!account) {
+    const id = Number(db.prepare('INSERT INTO owner_accounts (email, password_hash) VALUES (?, ?)').run(email, hashOwnerPassword(password)).lastInsertRowid);
+    account = { id, email };
+    action = 'created';
+  } else {
+    const manages = db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(account.id, venueId);
+    if (manages) {
+      db.prepare('UPDATE owner_accounts SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?').run(hashOwnerPassword(password), account.id);
+      db.prepare('DELETE FROM owner_sessions WHERE account_id = ?').run(account.id); // signs out other devices
+      action = 'password_reset';
+    } else if (checkOwnerPassword(password, account.password_hash)) {
+      action = 'venue_added';
+    } else {
+      return sendSubmissionResponse(res, 409, { ok: false, errors: { password: 'That email already has a login. Enter its password to add this business to it.' } });
+    }
+  }
+  db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(account.id, venueId);
+  const session = startOwnerSession(account.id);
+  res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
+  return res.end(JSON.stringify({ ok: true, action }));
+}
+
+// POST /owner/login
+async function handleOwnerLogin(req, res) {
+  const body = await readOwnerJson(req, res, ['email', 'password']);
+  if (!body) return;
+  const email = validOwnerEmail(body.email);
+  const password = typeof body.password === 'string' ? body.password : '';
+  const wrong = () => sendSubmissionResponse(res, 401, { ok: false, error: 'That email and password don’t match. Forgot your password? Email info@okanaganroam.com and we’ll send you a link to set a new one.' });
+  if (!email || !password) return wrong();
+  const account = db.prepare('SELECT * FROM owner_accounts WHERE email = ?').get(email);
+  if (!account) { checkOwnerPassword(password, hashOwnerPassword('timing-padding')); return wrong(); }
+  if (account.locked_until && account.locked_until > new Date().toISOString().replace('T', ' ').slice(0, 19)) {
+    return sendSubmissionResponse(res, 429, { ok: false, error: `Too many wrong passwords. Please try again in ${OWNER_LOGIN_LOCK_MINUTES} minutes.` });
+  }
+  if (!checkOwnerPassword(password, account.password_hash)) {
+    const fails = account.failed_logins + 1;
+    if (fails >= OWNER_LOGIN_MAX_FAILS) {
+      db.prepare("UPDATE owner_accounts SET failed_logins = 0, locked_until = datetime('now', ?) WHERE id = ?").run(`+${OWNER_LOGIN_LOCK_MINUTES} minutes`, account.id);
+    } else {
+      db.prepare('UPDATE owner_accounts SET failed_logins = ? WHERE id = ?').run(fails, account.id);
+    }
+    return wrong();
+  }
+  const session = startOwnerSession(account.id);
+  res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
+  return res.end(JSON.stringify({ ok: true }));
+}
+
+function ownerSimplePage(title, inner, extraHead = '') {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(`${title} | Okanagan Roam`, 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
+${extraHead}
+<style>
+  body.owner-page .op-wrap { max-width: 560px; margin: 0 auto; padding: 24px 0 56px; }
+  body.owner-page .op-hint { font-size: 0.86rem; color: rgba(42,32,25,0.66); }
+  body.owner-page .lyv-error { font-size: 0.85rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
+  body.owner-page .op-venues { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 12px; }
+  body.owner-page .op-venues li { background: var(--paper); border-radius: 14px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  body.owner-page .op-venues a.op-edit { font-weight: 800; }
+  body.owner-page .op-bar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 0.9rem; }
+  body.owner-page .op-linkbtn { background: none; border: 0; padding: 0; color: var(--ref-navy); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body class="golf-page owner-page">
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main"><div class="op-wrap">
+${inner}
+  </div></main>
+</body>
+</html>`;
+}
+
+function renderOwnerLoginPage() {
+  return ownerSimplePage('Business login', `
+    <span class="eyebrow">For businesses</span>
+    <h1>Business login</h1>
+    <p>Sign in to update your listing on Okanagan Roam, add events and send photos.</p>
+    <form class="venue-form" id="olForm" novalidate>
+      <div class="form-field"><label for="olEmail">Email</label><input type="email" id="olEmail" autocomplete="username" maxlength="254"></div>
+      <div class="form-field"><label for="olPassword">Password</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
+      <p class="lyv-error" id="olError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="olSubmit">Sign in</button>
+    </form>
+    <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there.
+    <br><strong>Forgot your password?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll send you a link to set a new one.
+    <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>
+<script>
+(function(){
+  var f = document.getElementById('olForm'), err = document.getElementById('olError'), btn = document.getElementById('olSubmit');
+  f.addEventListener('submit', function(e){
+    e.preventDefault(); err.hidden = true; btn.disabled = true;
+    fetch('/owner/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ email: document.getElementById('olEmail').value, password: document.getElementById('olPassword').value }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = (j && j.error) || 'Please try again.'; err.hidden = false; })
+      .catch(function(){ btn.disabled = false; err.textContent = 'Could not sign in. Please check your connection.'; err.hidden = false; });
+  });
+})();
+</script>`);
+}
+
+function renderOwnerAccountPage(account) {
+  const venues = ownerAccountVenues(account.id);
+  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a></span>
+      <a class="op-edit" href="/owner/account/venue/${v.id}">Edit listing, events &amp; photos &rarr;</a></li>`).join('');
+  return ownerSimplePage('My listings', `
+    <div class="op-bar"><span>Signed in as <strong>${escapeHtml(account.email)}</strong></span>
+      <button type="button" class="op-linkbtn" id="opLogout">Log out</button></div>
+    <h1>My listings</h1>
+    ${venues.length ? `<ul class="op-venues">${items}</ul>` : '<p>No businesses are linked to this login yet.</p>'}
+    <p class="op-hint">Manage another business? Open its private edit link and sign in with this email and password there to add it here.</p>
+<script>
+document.getElementById('opLogout').addEventListener('click', function(){
+  fetch('/owner/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.href = '/owner/login'; });
+});
+</script>`);
 }
 
 // Applies an approved request. `fields` (optional) approves only some of the
@@ -29239,6 +29488,10 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .venue-form-submit:disabled { opacity: 0.6; cursor: wait; }
   body.owner-page #events { scroll-margin-top: 96px; }
   body.owner-page #photos { scroll-margin-top: 96px; }
+  body.owner-page .op-login { background: var(--paper); border-radius: 14px; padding: 14px 18px; margin: 14px 0 6px; }
+  body.owner-page .op-login summary { cursor: pointer; }
+  body.owner-page .op-login form { margin-top: 12px; }
+  body.owner-page .op-bar-in { font-size: 0.9rem; }
   body.owner-page .op-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 12px 0 18px; }
   body.owner-page .op-photos figure { margin: 0; }
   body.owner-page .op-photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; }
@@ -29256,6 +29509,20 @@ ${renderGolfHeaderHtml()}
       <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>. Keep this link private; anyone with it can suggest changes.</p>
       <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
       ${pendingNote}
+      ${found.account ? `<p class="op-bar-in">Signed in as <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="/owner/account">My listings</a></p>` : `
+      <details class="op-login" id="opLogin">
+        <summary><strong>Create a login</strong> so you don&rsquo;t need this link next time</summary>
+        <form id="olsForm" novalidate>
+          <p class="op-hint">Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login for another business? Use the same email and password to add this one.</p>
+          <div class="form-row">
+            <div class="form-field"><label for="olsEmail">Email</label><input type="email" id="olsEmail" autocomplete="username" maxlength="254" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="olsEmailError" hidden></p></div>
+            <div class="form-field"><label for="olsPassword">Password (${OWNER_PASSWORD_MIN}+ characters)</label><input type="password" id="olsPassword" autocomplete="new-password" maxlength="200"><p class="lyv-error" id="olsPasswordError" hidden></p></div>
+          </div>
+          <p class="lyv-error" id="olsError" hidden></p>
+          <button type="submit" class="venue-form-submit" id="olsSubmit">Create login</button>
+        </form>
+        <p class="op-done" id="olsDone">Done! You&rsquo;re signed in. Next time, go to <a href="/owner/login">okanaganroam.com/owner/login</a>.</p>
+      </details>`}
     </div>
     <form class="venue-form" id="opForm" novalidate>
       <p class="lyv-section-label">Opening hours</p>
@@ -29505,6 +29772,22 @@ ${renderGolfHeaderHtml()}
       if (problems.length) show('ofFormError', problems.join(' '));
       if (sent) { document.getElementById('ofFiles').value = ''; }
     }).catch(function(){ btn.disabled = false; show('ofFormError', 'Could not upload. Please check your connection and try again.'); });
+  });
+  var ls = document.getElementById('olsForm');
+  if (ls) ls.addEventListener('submit', function(e){
+    e.preventDefault(); show('olsEmailError', ''); show('olsPasswordError', ''); show('olsError', '');
+    var b = document.getElementById('olsSubmit'); b.disabled = true;
+    fetch(location.pathname + '/account', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ email: document.getElementById('olsEmail').value, password: document.getElementById('olsPassword').value }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        b.disabled = false;
+        if (j && j.ok) { ls.style.display = 'none'; document.getElementById('olsDone').classList.add('show'); return; }
+        var errs = (j && j.errors) || {};
+        show('olsEmailError', errs.email); show('olsPasswordError', errs.password);
+        if (!errs.email && !errs.password) show('olsError', (j && j.error) || 'Please try again.');
+      })
+      .catch(function(){ b.disabled = false; show('olsError', 'Could not connect. Please try again.'); });
   });
 })();
 </script>
@@ -32130,6 +32413,47 @@ const server = http.createServer(async (req, res) => {
 
     // List an Event, Phase 1 (2026-09-25) -- see renderListAnEventPage
     // and handleEventSubmission above.
+    // Owner logins (2026-10-15): checked before the /owner/<token> routes.
+    if (pathname === '/owner/login' || pathname === '/owner/login/') {
+      if (method === 'POST') return await handleOwnerLogin(req, res);
+      if (method === 'GET' || method === 'HEAD') {
+        if (ownerAccountForRequest(req)) { res.writeHead(302, { Location: '/owner/account', 'Cache-Control': 'no-store' }); return res.end(); }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+        return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage());
+      }
+    }
+    if (pathname === '/owner/logout' && method === 'POST') {
+      const value = readCookie(req, OWNER_SESSION_COOKIE);
+      if (value) db.prepare('DELETE FROM owner_sessions WHERE token_hash = ?').run(ownerSessionHash(value));
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, '', 0) });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+    if (pathname === '/owner/account' || pathname.startsWith('/owner/account/')) {
+      const account = ownerAccountForRequest(req);
+      const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' };
+      if (pathname === '/owner/account' && method === 'GET') {
+        if (!account) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
+        res.writeHead(200, headers);
+        return res.end(renderOwnerAccountPage(account));
+      }
+      const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos))?$/.exec(pathname);
+      if (vm) {
+        const resolve = () => venueForOwnerAccount(account, Number(vm[1]));
+        if (vm[2] && method === 'POST') {
+          if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
+          if (vm[2] === 'changes') return await handleOwnerChangeSubmission(req, res, resolve);
+          if (vm[2] === 'events') return await handleOwnerEventSubmission(req, res, resolve);
+          return await handleOwnerPhotoUpload(req, res, resolve);
+        }
+        if (!vm[2] && method === 'GET') {
+          if (!account) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
+          const found = resolve();
+          if (!found) { res.writeHead(404, headers); return res.end(renderOwnerInvalidLinkPage()); }
+          res.writeHead(200, headers);
+          return res.end(renderOwnerPage(found, null, pendingOwnerChange(found.venue.id)));
+        }
+      }
+    }
     // Owner portal (2026-10-15): private edit page + change requests.
     if (pathname.startsWith(OWNER_LINK_PATH)) {
       const rest = pathname.slice(OWNER_LINK_PATH.length);
@@ -32139,6 +32463,8 @@ const server = http.createServer(async (req, res) => {
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
       if (photosMatch && method === 'POST') return await handleOwnerPhotoUpload(req, res, photosMatch[1]);
+      const accountMatch = /^([A-Za-z0-9_-]+)\/account$/.exec(rest);
+      if (accountMatch && method === 'POST') return await handleOwnerAccountSetup(req, res, accountMatch[1]);
       if (/^[A-Za-z0-9_-]+$/.test(rest) && (method === 'GET' || method === 'HEAD')) {
         const found = venueForOwnerToken(rest);
         const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
@@ -32830,6 +33156,8 @@ module.exports = {
   approveOwnerPhoto,
   rejectOwnerPhoto,
   listOwnerPhotos,
+  hashOwnerPassword,
+  checkOwnerPassword,
   OWNER_PHOTO_DIR,
   getSeasonStates,
   breadcrumbListSchema,
