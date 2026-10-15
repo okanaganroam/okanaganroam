@@ -1,6 +1,6 @@
 # Beach photo sources and review status
 
-This index covers 93 live beach listings. All 93 beach listings have a selected local photo. The newly completed images were visually checked for visible writing and match their approved beach or viewpoint locations.
+This index covers 93 live beach listings. Each selected photo was individually reviewed and given a restrained, non-generative photographic correction for exposure, contrast, color, and sharpness. Scene content and framing were preserved; no objects were added or removed. Source attributions are retained below.
 
 The owner stated permission to use the selected photos. The photos were not altered to remove writing; images with visible writing or the wrong location were excluded. Source links are retained below.
 
@@ -278,7 +278,7 @@ The owner stated permission to use the selected photos. The photos were not alte
 ## 55. Raymer Bay Regional Park — READY
 - Source: Exploratory Glory
 - [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/raymer-bay-kelowna) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1590945321018-F0Y2OINKPJFOI9JPAAB2/raymer-bay-kelowna.jpg)
-- Local file: `/images/beaches/venues/west-kelowna-raymer-bay-regional-park.webp`
+- Local file: `/images/beaches/venues/west-kelowna-raymer-bay-regional-park.jpg`
 
 ## 56. Traders Cove Regional Park — READY
 - Source: Exploratory Glory
