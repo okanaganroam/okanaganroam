@@ -1,0 +1,42 @@
+{
+  "reason": "Owner-approved Nighthawk vineyard/lake, Armstrong Museum exhibit and Play Area equipment images submitted by venue email.",
+  "batch_id": "venue-photos-next-2026-10-15",
+  "venues": [
+    {
+      "id": 439,
+      "name": "Nighthawk Vineyards",
+      "region": "okanagan-falls",
+      "slug": "nighthawk-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nighthawk-vineyard-lake.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 1539,
+      "name": "Armstrong Spallumcheen Museum & Art Gallery",
+      "region": "armstrong",
+      "slug": "armstrong-spallumcheen-museum-art-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/armstrong-museum-exhibit.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 1477,
+      "name": "Play Area Kelowna",
+      "region": "kelowna",
+      "slug": "play-area-kelowna",
+      "expect": {
+        "image_url": "https://lh3.googleusercontent.com/d/170mvqQGTtdFNukJVitGsTtoeMBFAbh5t"
+      },
+      "set": {
+        "image_url": "/images/venues/play-area-kelowna-equipment.jpg?v=20261015"
+      }
+    }
+  ]
+}
