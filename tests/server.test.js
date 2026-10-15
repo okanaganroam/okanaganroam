@@ -2032,8 +2032,8 @@ test('render404Page returns a 404-flavored page for an unknown path', () => {
 // Mobile 404 (2026-09-26): readable at phone width, inside the approved
 // themed shell (the homepage's own header, Trip tray and footer), with the
 // original wording, noindex, and no canonical/og:url.
-test('render404Page: mobile viewport, themed site shell, landmarks, original wording, noindex, no canonical', () => {
-  const html = app.render404Page('/nonexistent/path');
+test('render404Page: mobile viewport, themed site shell, landmarks, search box, suggestions read from the address, noindex, no canonical', () => {
+  const html = app.render404Page('/kelowna/restaurants/test-trattoriaa');
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0">/);
   assert.match(html, /<title>Page Not Found \| Okanagan Roam<\/title>/);
   assert.match(html, /<meta name="robots" content="noindex">/);
@@ -2043,12 +2043,28 @@ test('render404Page: mobile viewport, themed site shell, landmarks, original wor
   assert.match(html, /<body class="golf-page not-found-page">/);
   assert.match(html, /<main class="wrap-wide golf-main not-found-main">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one H1');
-  assert.match(html, /<h1>Page not found<\/h1>/);
-  assert.match(html, /We couldn't find a venue or page at that address\./);
-  assert.match(html, /<a class="app-btn" href="https:\/\/okanaganroam\.com\/">Back to Okanagan Roam<\/a>/);
+  assert.match(html, /<h1>We couldn\u2019t find that page<\/h1>/);
+  // 2026-10-14: a search box to /browse, prefilled from the address.
+  assert.match(html, /<form class="nf-search" action="\/browse" method="get" role="search">/);
+  assert.match(html, /<input type="search" id="nfSearch" name="q" value="test trattoriaa"/);
+  // Did you mean: the town's category page and the town, from the address.
+  assert.ok(html.includes('<a href="/kelowna/restaurants"><span>Restaurants in Kelowna</span>'), 'the category page in that town');
+  assert.ok(html.includes('<a href="/kelowna"><span>Everything in Kelowna</span>'), 'the town page');
+  assert.match(html, /<p class="nf-popular"><a href="\/browse">Browse everything<\/a>/);
+  assert.match(html, /<a class="app-btn" href="\/">Back to the home page<\/a>/);
   assert.match(html, /min-height: 44px/, 'the back link is a 44px tap target');
   assert.match(html, /<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/, 'app.js drives the shared header menu and Trip tray');
-  assert.doesNotMatch(html, /font-family:-apple-system/, 'the old unstyled system-font page is gone');
+  // An address with nothing to suggest still gets search and the popular row, and no empty list.
+  const bare = app.render404Page('/zzzzqqq');
+  assert.doesNotMatch(bare, /id="nfSuggestHeading"/);
+  assert.match(bare, /id="nfPopularHeading"/);
+});
+
+test('404 suggestions: a mistyped place address suggests the place with the same words in its address', () => {
+  const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const html = app.render404Page('/kelowna/restaurants/test-trattoria-kitchen');
+  assert.ok(html.includes(`<a href="/kelowna/restaurants/test-trattoria"><span>${trattoria.name}</span>`), 'the matching place');
+  assert.ok(html.indexOf('/kelowna/restaurants/test-trattoria"') < html.indexOf('<a href="/kelowna/restaurants"><span>'), 'places first');
 });
 
 test('pageHead: a string canonical renders exactly as before; null omits canonical and og:url', () => {
@@ -4885,71 +4901,47 @@ const batch4bGuideVenues = () => [
   ...app.getVenuesByRegionCategory('kelowna', 'golf'),
 ];
 
-test('Batch 4B Guides: guide pages render the themed shell around unchanged content', () => {
+test('Guide pages (2026-10-14): the shared directory engine, a friendly heading, the town crumb, our picks, and the same SEO address', () => {
   const venues = batch4bGuideVenues();
   const html = app.renderGuidePage('kelowna', 'patio', venues);
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
-  assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), 'app.css before the inline SEO CSS');
-  assert.match(html, /body\.golf-page \{/);
-  assert.match(html, /<body class="golf-page guide-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page curated-hub-page guide-page">/);
   assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/);
-  assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), 'tray precedes the header');
-  assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, 'old shell header gone');
-  assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1);
-  const main = html.slice(html.indexOf('<main '), html.indexOf('</main>'));
-  assert.ok(main.includes('<nav class="breadcrumb">') && main.includes('<h1>Patio Venues in Kelowna, BC</h1>') && main.includes('<ul class="card-grid">') && main.includes('<a class="cta" href="/kelowna">See all of Kelowna on Okanagan Roam</a>'), 'page content inside <main>');
-  assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), 'footer after <main>');
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
-  assert.equal((main.match(/<li class="venue-card"/g) || []).length, venues.length, 'every venue still listed');
-  // Head unchanged: title, canonical, indexable, ItemList covering every venue (plus the GA4 tag since Measurement Phase A).
+  assert.match(html, /<h1>Patios in Kelowna<\/h1>/);
+  assert.ok(html.includes('<a href="/guides/best-patios-kelowna">Our picks: the best patios in Kelowna &rarr;</a>'), 'our picks link');
+  assert.match(html, /<nav class="breadcrumb"[\s\S]*?href="\/kelowna">Kelowna<\/a>/);
+  // Kinds of place as chips; a one-town page has no Regions control.
+  for (const t of ['restaurant', 'winery', 'golf']) assert.ok(html.includes(`data-fd-type="${t}"`), `${t} chip`);
+  assert.doesNotMatch(html, /id="fdRegionsBtn"/);
+  // Every venue is on the page (the first 48 as cards, the rest deferred).
+  for (const v of venues) assert.ok(html.includes(`data-venue-id="${v.id}"`), v.name);
   const head = html.split('</head>')[0];
-  assert.match(head, /<title>Patio Venues in Kelowna, BC \| Okanagan Roam<\/title>/);
+  assert.match(head, /<title>Patios in Kelowna, BC \| Okanagan Roam<\/title>/);
   assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guide\/kelowna\/patio">/);
   assert.doesNotMatch(head, /name="robots"/);
   const ld = [...head.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1]));
   assert.deepEqual(ld.map((b) => b['@type']), ['BreadcrumbList', 'ItemList']);
+  assert.deepEqual(ld[0].itemListElement.map((x) => x.name), ['Home', 'Kelowna', 'Patios']);
   assert.equal(ld[1].itemListElement.length, venues.length);
-  // Measurement Phase A (2026-09-27): the GA4 tag, labelled page_type "guide"; still no tracked links.
-  assert.equal((html.match(/googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/g) || []).length, 1, 'one GA4 tag');
-  assert.ok(head.includes("var cfg = { page_type: 'guide' };"), 'page_type guide');
-  assert.doesNotMatch(html, /data-track=/, 'no tracked links');
-});
-
-test('Batch 4B Guides + Stage 5B: every guide card is the compact card -- View details, Read more, Favorite / Add to Trip with canonical labels -- and app.js loads before the card script', () => {
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
-  const heart = appJs.match(/var HEART_OUTLINE = '([^']+)';/)[1];
-  const venues = batch4bGuideVenues();
-  const html = app.renderGuidePage('kelowna', 'patio', venues);
-  const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
-  const cards = markup.match(/<li class="venue-card"[^>]*>[\s\S]*?<\/li>/g);
-  assert.equal(cards.length, venues.length, 'every venue still listed, once');
-  const types = new Set(cards.map((c) => (c.match(/data-venue-category="([^"]+)"/) || [])[1]));
-  assert.ok(types.has('golf') && types.has('restaurant') && types.has('winery'), 'fixture mixes golf, restaurant and winery cards');
-  for (const c of cards) {
-    // Stage 5B: the compact card /dog-friendly uses, for every venue type.
-    assert.match(c, /^<li class="venue-card" data-venue-id="\d+" data-venue-region="[^"]+" data-venue-category="[^"]+" data-venue-name="[^"]+" data-surface="category_card">/);
-    assert.match(c, /<h2><a class="venue-card-link" href="\/kelowna\/[a-z-]+\/[^"]+"><span class="venue-card-name">[^<]+<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a><\/h2>/);
-    assert.match(c, /<div class="golf-desc" id="golf-desc-(\d+)"><p>[\s\S]+?<\/p><\/div>\s*<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-\1" hidden>Read more &rarr;<\/button>/, 'Read more markup present, hidden until the script finds the text truncated');
-    assert.match(c, /<div class="card-actions">/);
-    assert.ok(c.includes(`${heart} Favorite</button>`) && c.includes('\u{1F9F3} Add to trip</button>'), 'canonical labels');
-    assert.match(c, /class="card-action fav-btn" data-fav-name="[^"]+" aria-pressed="false" aria-label="Favorite [^"]+"/);
-    assert.match(c, /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false" aria-label="Add [^"]+ to trip"/);
-    assert.ok(c.indexOf('class="chips"') < c.indexOf('class="card-actions"'), 'buttons after the badge chips');
-  }
-  assert.doesNotMatch(html, /&#9825; Favorite|&#65291; Add to Trip/, 'no standalone labels');
-  // The full description stays in the page for every card (the clamp is visual only).
-  // Card excerpts (2026-10-13): guide cards carry the short blurb; the full text is on the venue page.
-  for (const v of venues.filter((x) => x.description)) assert.ok(markup.includes(`<p>${app.escapeHtml(app.descExcerpt(v.description))}</p>`), `description excerpt of ${v.name}`);
-  // Scripts: app.js exactly once, then the card script (guide holder: every venue type).
+  ga4Check(html, 'guide', 'guide');
   assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1);
-  const appAt = html.indexOf(`<script src="${app.APP_JS_SRC}"></script>`);
-  const guideScript = app.golfCardEngagementScriptHtml('guide', true, { impressionCards: '[data-venue-category="golf"]' });
-  assert.ok(html.includes(guideScript), 'the guide card script, built by the shared function');
-  assert.ok(html.indexOf(guideScript) > appAt, 'card script follows app.js, so it takes its hand-off branch');
-  assert.ok(!html.includes(app.golfCardEngagementScriptHtml('golf')), 'the golf-only script is no longer used here');
-  assert.match(html, /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{/);
 });
-
+test('Guide pages: each badge has its own heading, other badges in the town are linked, and only the Kelowna write-ups get a picks link', () => {
+  const venues = batch4bGuideVenues();
+  for (const [badge, heading] of [['dog_friendly', 'Dog-Friendly Places in Kelowna'], ['sports_tv', 'Where to Watch the Game in Kelowna'], ['open_early', 'Breakfast &amp; Early Spots in Kelowna'], ['happy_hour', 'Happy Hour in Kelowna']]) {
+    const html = app.renderGuidePage('kelowna', badge, venues);
+    assert.ok(html.includes(`<h1>${heading}</h1>`), heading);
+  }
+  const pen = app.renderGuidePage('penticton', 'patio', venues);
+  assert.match(pen, /<h1>Patios in Penticton<\/h1>/);
+  assert.doesNotMatch(pen, /class="guide-picks"/, 'no write-up for Penticton patios');
+  const html = app.renderGuidePage('kelowna', 'patio', venues);
+  assert.match(html, /<h2 class="category-subsection-heading" id="guideMoreHeading">More in Kelowna<\/h2>/);
+  assert.doesNotMatch(html, /class="guide-more-chip" href="\/guide\/kelowna\/patio"/, 'no link to itself');
+  // The patio filter is the page itself, so it is not offered again.
+  assert.doesNotMatch(html, /data-fd-feature="patio"/);
+});
 // Stage 5B (2026-10-01): guide-card analytics, option (b). The guide card
 // script wires every card (Read more, aria-pressed, venue_favorite) and reports
 // each card's own venue_category, but venue_impression stays golf-only -- the
@@ -4990,21 +4982,13 @@ test('Stage 5B: every other page\'s card script is unchanged (no impression limi
   assert.ok(app.golfCardEngagementScriptHtml('golf').includes("venue_category: 'golf',"), 'golf pages still report the literal golf category');
 });
 
-test('Stage 5B: guide pages keep their SEO head, structured data and links; only the card treatment changes', () => {
-  const venues = batch4bGuideVenues();
-  const html = app.renderGuidePage('kelowna', 'patio', venues);
-  const head = html.split('</head>')[0];
-  assert.match(head, /<title>Patio Venues in Kelowna, BC \| Okanagan Roam<\/title>/);
-  assert.match(head, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guide\/kelowna\/patio">/);
-  assert.doesNotMatch(head, /noindex/);
-  const itemList = JSON.parse(head.match(/<script type="application\/ld\+json">\s*(\{"@context":"https:\/\/schema\.org","@type":"ItemList"[\s\S]*?)\s*<\/script>/)[1]);
-  assert.equal(itemList.itemListElement.length, venues.length);
-  assert.deepEqual(itemList.itemListElement.map((x) => x.item.name), venues.map((v) => v.name), 'same venues, same order');
-  assert.match(html, /<p class="venue-meta">Browse by category: /);
-  assert.ok(html.includes('<a class="cta" href="/kelowna">See all of Kelowna on Okanagan Roam</a>'));
-  ga4Check(html, 'guide', 'guide');
-});
-
+test('Guide route: a real guide renders, an unknown badge or thin guide is the site 404 page', () => withDiscoveryServer(async (base) => {
+  const bad = await fetch(`${base}/guide/kelowna/not_a_badge`);
+  assert.equal(bad.status, 404);
+  const body = await bad.text();
+  assert.match(body, /<body class="golf-page not-found-page">/);
+  assert.match(body, /<a href="\/kelowna"><span>Everything in Kelowna<\/span>/);
+}));
 // Stage 5C (2026-10-01): My Trip identifies a stop by its ref (Trip half of
 // W07). Every server-rendered Add to trip button carries "venue:<id>" or
 // "event:<id>" next to its existing name / query / region.
@@ -7583,7 +7567,7 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches\/homepage-beach-one<\/loc>/);
     // No beach *category or venue* URLs before the data exists. (The static
     // valley-wide /beaches hub is always listed, so match region-scoped URLs.)
-    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/[a-z-]+\/beaches/);
+    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/(?!fr\/)[a-z-]+\/beaches/);
 
     // Region hub shows the new category card.
     const hub = await (await fetch(`${base}/kelowna`)).text();
@@ -7946,7 +7930,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors\/fixture-canyon-park<\/loc>/);
     // No outdoor *category or venue* URLs before the data exists. (The static
     // valley-wide /outdoors hub is always listed, so match region-scoped URLs.)
-    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/[a-z-]+\/outdoors/);
+    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/(?!fr\/)[a-z-]+\/outdoors/);
     const hub = await (await fetch(`${base}/kelowna`)).text();
     assert.match(hub, /<h3><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h3>/, 'region hub gains the category card, exactly as Beaches did');
     // Phase 2: an activity page appears only once the activity has MIN_ACTIVITY_VENUES destinations.
@@ -10477,7 +10461,8 @@ test('Phase 3: the planner flag is off by default and /trip is unchanged without
   assert.match(legacy, /id="tripConvHero"/, 'the original conversational hero');
   assert.doesNotMatch(legacy, /tripPlanForm|trip-plan-summary/);
   const page = await (await fetch(`${base}/trip`)).text();
-  assert.equal(page, legacy, 'GET /trip serves the unchanged page');
+  // French twins (2026-10-14): only the EN / FR switch and hreflang are added on the way out.
+  assert.equal(page, app.englishTwinHtml(legacy, '/trip'), 'GET /trip serves the unchanged page');
   const api = await fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Plan 3 days in Kelowna' }) });
   assert.equal(api.status, 404, 'the route does not exist when the flag is off');
 })));
@@ -11966,7 +11951,7 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
     const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
     assert.ok(header, page);
-    assert.doesNotMatch(header[0], /list-your-venue|list-venue|nav\.listVenue/, `${page}: header has no List Your Venue link`);
+    assert.doesNotMatch(header[0].replace(/<a class="lang-toggle"[^>]*>[^<]*<\/a>/, ''), /list-your-venue|list-venue|nav\.listVenue/, `${page}: header has no List Your Venue link`);
   }
 }));
 
@@ -15359,15 +15344,13 @@ test('Stage 4.3: What\'s On cards carry the first occurrence in their window; th
   assert.doesNotMatch(JSON.stringify(all), /firstOccurrence|data-occurrence/);
 });
 
-test('Stage 4.3 + 5B: guide cards keep their venue id for the capture script (and, since Stage 5B, the compact-card attributes)', () => {
+test('Stage 4.3: guide cards keep their venue id for the capture script', () => {
   const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderGuidePage('kelowna', 'patio', [trattoria]);
-  assert.ok(html.includes(`<li class="venue-card" data-venue-id="${trattoria.id}" data-venue-region="kelowna" data-venue-category="restaurant" data-venue-name="Test Trattoria" data-surface="category_card">`));
+  assert.match(html, new RegExp(`<li class="venue-card" data-fd-i="0" data-venue-id="${trattoria.id}" [^>]*data-venue-region="kelowna" data-venue-category="restaurant" data-venue-name="Test Trattoria" data-surface="category_card">`));
   assert.equal(app.renderSavedSidecarScriptHtml().length > 0 && (html.match(/okanaganSaved/g) || []).length > 0, true, 'the Stage 4.3 capture script is still on the page');
-  // Other card surfaces are unchanged: without savedId a non-engagement card has no attributes.
   assert.match(app.venueCardHtml(trattoria, {}), /<li class="venue-card">/);
 });
-
 test('Stage 4.3: GET /api/saved/resolve resolves ids and exact names, is bounded, and never writes', () => withDiscoveryServer(async (base) => {
   const trattoria = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const fest = db.prepare("SELECT o.id, o.event_id FROM event_occurrences o JOIN events e ON e.id = o.event_id WHERE e.region = 'kelowna' AND e.slug = 'test-future-festival'").get();
@@ -15998,7 +15981,9 @@ test('Browse hub: head metadata -- the wizard page\'s share-card, locale and Web
 })));
 
 test('Browse hub: /browse keeps its previous header -- no Favorites link -- while every other themed page keeps the link', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
-  const html = await (await fetch(`${base}/browse`)).text();
+  // French twins (2026-10-14): the EN / FR switch and its menu item are added to the header on the way out.
+  const html = (await (await fetch(`${base}/browse`)).text())
+    .replace(/<a class="lang-toggle" id="langToggle"[^>]*>[^<]*<\/a>\n    /, '').replace(/\n      <li class="nav-links-lang">[\s\S]*?<\/li>(?=\n)/, '');
   assert.ok(!html.includes('nav-links-favorites') && !html.includes('href="/favorites"'), '/browse: no Favorites link and no rule for it');
   assert.ok(!html.includes(app.FAVORITES_NAV_STYLE), 'the 941-1099px rule is gone with it');
   // Exactly the shared themed header, minus what withFavoritesNavLink adds.
@@ -19440,3 +19425,92 @@ test('Browse (2026-10-14): only the first page of cards ships with /browse; the 
   assert.ok(Object.keys(data.k).length > 0, 'search words for the places');
   assert.match(html, /<option value=""[^>]*>Recommended<\/option>/);
 }));
+
+// ---- French twins of the main and town pages (2026-10-14) -------------------------------------------------
+test('French twins: which addresses have one, and how a /fr request maps to its English page', () => {
+  for (const p of ['/', '/food-drink', '/wineries', '/browse', '/kelowna', '/big-white', '/kelowna/restaurants/test-trattoria']) assert.equal(app.hasFrenchTwin(p), true, p);
+  // Phases 2 and 3: What's On, town category pages, guides, badge guides, the info pages and tools.
+  for (const p of ['/whats-on', '/whats-on/live-music', '/kelowna/events', '/kelowna/events/this-weekend', '/kelowna/restaurants', '/outdoors/hiking',
+    '/guides', '/guides/best-patios-kelowna', '/guide/kelowna/patio', '/about', '/privacy', '/terms', '/contact', '/map', '/trip', '/my-trip', '/favorites',
+    '/list-your-venue', '/list-an-event']) assert.equal(app.hasFrenchTwin(p), true, p);
+  for (const p of ['/nowhere', '/kelowna/events/test-future-festival', '/admin/x', '/api/venues', '/kelowna/nowhere/x/y']) assert.equal(app.hasFrenchTwin(p), false, p);
+  assert.deepEqual(app.frenchTwinRequest('/fr'), { enPath: '/', enUrl: '/' });
+  assert.deepEqual(app.frenchTwinRequest('/fr/food-drink?types=cafe'), { enPath: '/food-drink', enUrl: '/food-drink?types=cafe' });
+  assert.deepEqual(app.frenchTwinRequest('/fr/kelowna/'), { enPath: '/kelowna', enUrl: '/kelowna' });
+  assert.deepEqual(app.frenchTwinRequest('/fr/whats-on'), { enPath: '/whats-on', enUrl: '/whats-on' });
+  assert.equal(app.frenchTwinRequest('/fr/kelowna/events/test-future-festival'), null, 'event pages stay English');
+  assert.equal(app.frenchTwinRequest('/fr/kelowna/restaurants/test-trattoria'), null, 'place pages keep their own route');
+});
+
+test('French twins: the word list and its patterns (times, opening status, counts, cuisines, ratings)', () => {
+  assert.equal(app.frText('View details →'), 'Voir les détails →');
+  assert.equal(app.frText('Closes 8:30 PM'), 'Ferme à 20 h 30');
+  assert.equal(app.frText('Closes 12 AM'), 'Ferme à minuit');
+  assert.equal(app.frText('Open now · Closes 9 PM'), 'Ouvert · ferme à 21 h');
+  assert.equal(app.frText('Closed · Opens tomorrow 7 AM'), 'Fermé · ouvre demain à 7 h');
+  assert.equal(app.frText('Kelowna · Italian · 4.6★'), 'Kelowna · Italien · 4,6★');
+  assert.equal(app.frText('+3 more'), '+3 autres');
+  assert.equal(app.frText('12 cafes in Vernon'), '12 cafés à Vernon');
+  assert.equal(app.frText('1,774 places'), '1 774 lieux');
+  assert.equal(app.frText('Add Test Trattoria to trip'), 'Ajouter Test Trattoria au voyage');
+  assert.equal(app.frText('Places to start in Penticton'), 'Par où commencer à Penticton');
+  assert.equal(app.frText('Patio, Lake View, Live Music'), 'Terrasse, Vue sur le lac, Musique en direct');
+  assert.equal(app.frText('Some sentence nobody has translated'), null, 'unknown text stays as it is');
+});
+
+test('French twins: /fr/food-drink is the Food & Drink page in French, paired with the English page', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/fr/food-drink`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /<html lang="fr" data-page-lang="fr">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/fr\/food-drink">/);
+  assert.match(html, /<link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/food-drink">\n<link rel="alternate" hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink">\n<link rel="alternate" hreflang="x-default" href="https:\/\/okanaganroam\.com\/food-drink">/);
+  assert.match(html, /<meta property="og:locale" content="fr_CA">/);
+  assert.match(html, /<title>Où manger et boire dans l’Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /<h1 id="fdHeading">Où manger et boire dans l’Okanagan<\/h1>/);
+  assert.match(html, /<a class="lang-toggle" id="langToggle" href="\/food-drink" hreflang="en"/, 'the switch goes to the English page');
+  assert.doesNotMatch(html, /class="desc-en"/, 'cards carry the French blurb only');
+  assert.doesNotMatch(html, />View details →</);
+  // Place cards link to the French place pages; pages with no French twin keep their English address.
+  assert.match(html, /href="\/fr\/kelowna\/restaurants\/test-trattoria"/);
+  assert.match(html, /href="\/fr\/whats-on"/);
+  // The page scripts still parse after translation.
+  for (const m of html.matchAll(/<script(?![^>]*(?:src=|application\/(?:ld\+)?json))[^>]*>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]));
+  const en = await (await fetch(`${base}/food-drink`)).text();
+  assert.match(en, /<html lang="en" data-page-lang="en">/);
+  assert.match(en, /<a class="lang-toggle" id="langToggle" href="\/fr\/food-drink" hreflang="fr"/);
+  assert.match(en, /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink"/);
+  assert.match(en, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/, 'the English page is unchanged');
+  const nf = await fetch(`${base}/fr/kelowna/events/test-future-festival`);
+  assert.equal(nf.status, 404, 'event pages have no French twin');
+  assert.match(await nf.text(), /<html lang="fr" data-page-lang="fr">/, 'the /fr 404 page is French');
+}));
+
+test('French twins: a French place page links up to the French town page but keeps its English switch', () => withDiscoveryServer(async (base) => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  if (!app.venueHasFrench(venue)) return;
+  const html = await (await fetch(`${base}/fr/kelowna/restaurants/test-trattoria`)).text();
+  assert.match(html, /href="\/fr\/kelowna"/);
+  assert.match(html, /<a href="\/kelowna\/restaurants\/test-trattoria" hreflang="en" lang="en">English<\/a>/);
+}));
+
+test('French twins: the sitemap lists each main and town page in both languages, each naming the pair', () => {
+  const entry = (p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>2026-10-14</lastmod>\n  </url>`;
+  const out = app.withFrenchTwinEntries([entry('/kelowna'), entry('/whats-on'), entry('/kelowna/restaurants/test-trattoria')]);
+  assert.equal(out.length, 5, 'one extra entry each for /fr/kelowna and /fr/whats-on');
+  assert.match(out[1], /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna<\/loc>\n    <xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna"\/>/);
+  assert.match(out[0], /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna"\/>/);
+  assert.match(out[3], /<loc>https:\/\/okanaganroam\.com\/fr\/whats-on<\/loc>/);
+  assert.equal(out[4], entry('/kelowna/restaurants/test-trattoria'), 'place pages are listed by their own route');
+});
+
+// 2026-10-14: a town's What's On page carries only that town's events plus valley-wide ones.
+test('What\'s On town pages: only that town (and valley-wide) events, a change-town menu instead of region chips, and quick date buttons', () => {
+  const html = app.renderWhatsOnPage(null, { scope: { region: 'kelowna' } });
+  const cards = html.match(/<li class="venue-card whatson-event-card"[^>]*>/g) || [];
+  for (const c of cards) assert.ok(/data-event-region="kelowna"/.test(c) || /data-event-valley-wide="1"/.test(c), c);
+  assert.doesNotMatch(html, /id="whatsOnRegionsBtn"/);
+  if (html.includes('id="whatsOnTownsBtn"')) assert.match(html, /<ul class="whatson-town-links">\s*<li><a href="\/whats-on">All of the Okanagan<\/a><\/li>/);
+  const all = app.renderWhatsOnPage(null);
+  assert.match(all, /id="whatsOnRegionsBtn"/, 'the valley page keeps its Regions chips');
+});

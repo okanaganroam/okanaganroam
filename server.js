@@ -6437,94 +6437,100 @@ const GUIDE_BADGE_SHARE_IMAGES = {
   happy_hour: () => FOOD_DRINK_HUB_BANNER.src,
   sports_tv: () => CATEGORY_BANNER_IMAGES.pub.src,
 };
-function renderGuidePage(region, badge, venues) {
+// Badge guide pages on the shared directory engine (2026-10-14): "Patios in
+// Kelowna" rather than "Patio Venues in Kelowna, BC", with a photo banner,
+// kind-of-place chips, search, Open now, filters, a photo per card and the
+// Mixed order (never by rating). Each badge gets its own heading, intro and
+// banner; a badge with no fitting photo uses the town's own.
+const GUIDE_BADGE_TEXT = {
+  dog_friendly: { h: 'Dog-Friendly Places in {T}', i: 'Patios, wineries, breweries and caf\u00e9s in {T} where your dog is welcome. Check the house rules before you go; some only allow dogs outside.' },
+  vegan: { h: 'Vegan-Friendly Places to Eat in {T}', i: 'Restaurants and caf\u00e9s in {T} with real vegan options on the menu, from plant-based plates to dairy-free coffee.' },
+  vegetarian: { h: 'Vegetarian-Friendly Places to Eat in {T}', i: 'Restaurants, caf\u00e9s and pubs in {T} with good vegetarian choices, not just a side salad.' },
+  patio: { h: 'Patios in {T}', i: 'Where to eat and drink outside in {T}: lakeside decks, winery terraces, rooftop bars and brewery lawns.' },
+  kid_friendly: { h: 'Kid-Friendly Places in {T}', i: 'Restaurants, caf\u00e9s and places to go in {T} that welcome families, with room for kids and food they will eat.' },
+  gluten_free: { h: 'Gluten-Free Options in {T}', i: 'Places in {T} with gluten-free choices on the menu. If you have celiac disease, ask about kitchen practices before you order.' },
+  lake_view: { h: 'Lake View Spots in {T}', i: 'Restaurants, wineries and patios in {T} with a view of the water.' },
+  nonalcoholic: { h: 'Non-Alcoholic Drinks in {T}', i: 'Places in {T} with real alcohol-free choices: zero-proof cocktails, non-alcoholic beer and more.' },
+  sports_tv: { h: 'Where to Watch the Game in {T}', i: 'Pubs, sports bars and restaurants in {T} with the game on, from hockey nights to the big final.' },
+  live_music: { h: 'Live Music in {T}', i: 'Pubs, wineries, breweries and lounges in {T} that put on live music. Check each place for this week\u2019s line-up.' },
+  great_groups: { h: 'Great Spots for Groups in {T}', i: 'Places in {T} with the room and the menu for a crowd: birthdays, team nights and family get-togethers.' },
+  happy_hour: { h: 'Happy Hour in {T}', i: 'Pubs, restaurants and lounges in {T} with a happy hour. Times change, so check with the place before you go.' },
+  open_early: { h: 'Breakfast & Early Spots in {T}', i: 'Caf\u00e9s and restaurants in {T} that open early, for breakfast, brunch or a first coffee.' },
+  open_late: { h: 'Late-Night Spots in {T}', i: 'Places in {T} that stay open late, for a last drink or a bite after the show.' },
+};
+const GUIDE_BADGE_BANNERS = {
+  dog_friendly: () => DOG_FRIENDLY_BANNER,
+  live_music: () => WHATS_ON_BANNER,
+  kid_friendly: () => WHATSON_CATEGORY_BANNERS['family-kids'],
+  great_groups: () => FOOD_DRINK_HUB_BANNER,
+  happy_hour: () => CATEGORY_BANNER_IMAGES.cocktail,
+  sports_tv: () => CATEGORY_BANNER_IMAGES.pub,
+  patio: () => FOOD_DRINK_HUB_BANNER,
+  open_early: () => CATEGORY_BANNER_IMAGES.cafe,
+  open_late: () => CATEGORY_BANNER_IMAGES.cocktail,
+  vegan: () => CATEGORY_BANNER_IMAGES.restaurant,
+  vegetarian: () => CATEGORY_BANNER_IMAGES.restaurant,
+  gluten_free: () => CATEGORY_BANNER_IMAGES.restaurant,
+  nonalcoholic: () => CATEGORY_BANNER_IMAGES.cocktail,
+};
+// Our own write-ups for a town and badge, linked from the top of the page.
+const GUIDE_BADGE_PICKS = {
+  'kelowna/patio': () => [PATIO_GUIDE_PATH, 'Our picks: the best patios in Kelowna'],
+  'kelowna/open_early': () => [BRUNCH_GUIDE_PATH, 'Our picks: the best brunch in Kelowna'],
+  'kelowna/dog_friendly': () => [DOG_GUIDE_PATH, 'Our guide: dog beaches, trails and patios in Kelowna'],
+};
+const GUIDE_FEATURES = ['patio', 'dog_friendly', 'kid_friendly', 'lake_view', 'great_groups', 'live_music', 'happy_hour', 'vegetarian', 'open_late'];
+function guideBadgeHeading(region, badge) {
+  const t = GUIDE_BADGE_TEXT[badge] || { h: `${BADGE_LABELS[badge].title} Places in {T}`, i: `${BADGE_LABELS[badge].title} places in {T}.` };
+  const town = REGION_LABELS[region];
+  return { heading: t.h.replace('{T}', town), intro: t.i.replace(/\{T\}/g, town) };
+}
+function renderGuidePage(region, badge, venues, filter = null, now = new Date()) {
   const regionLabel = REGION_LABELS[region];
-  const badgeInfo = BADGE_LABELS[badge];
-  const title = `${badgeInfo.title} Venues in ${regionLabel}, BC | Okanagan Roam`;
-  const description = `${venues.length} verified ${badgeInfo.noun} in ${regionLabel}, BC — wineries, restaurants, breweries, and more, reviewed and badge-checked by Okanagan Roam.`;
-  const canonical = `https://okanaganroam.com/guide/${region}/${badge}`;
-  const regionUrl = `https://okanaganroam.com/${region}`;
-
-  const breadcrumb = breadcrumbListSchema([
-    { name: 'Home', url: 'https://okanaganroam.com/' },
-    { name: regionLabel, url: regionUrl },
-    { name: `${badgeInfo.title} Venues`, url: canonical },
-  ]);
-
-  // Cross-link to whichever category pages actually have venues on this
-  // guide page — e.g. a "Kelowna Dog-Friendly" page that lists both
-  // restaurants and wineries links to both /kelowna/restaurants and
-  // /kelowna/wineries, not just one.
-  const categoriesPresent = [...new Set(venues.map((v) => v.type))]
-    .filter((t) => CATEGORY_SLUGS[t])
-    .sort();
-  const categoryLinksHtml = categoriesPresent.length
-    ? `<p class="venue-meta">Browse by category: ${categoriesPresent
-        .map((t) => `<a href="/${region}/${CATEGORY_SLUGS[t]}">${escapeHtml(CATEGORY_LABELS[t].plural)}</a>`)
-        .join(', ')}</p>`
-    : '';
-
-  const hiddenGemIds = getHiddenGemVenueIds();
-  const localFavouriteIds = getCollectionVenueIds('local_favorite');
-  // Batch 4B Guides (2026-09-27): the page uses the themed shell (site
-  // header + navigation, Trip tray, <main>, app.css / app.js, body.golf-page
-  // theme), so every card -- golf, winery and the rest -- takes the themed
-  // card treatment. Winery venue pages and the winery region pages are
-  // separate templates and are not affected.
-  // Stage 5B (2026-10-01): every guide card uses the compact card that
-  // /dog-friendly, /local-favorites and golf cards already use -- "View
-  // details", the description clamped behind Read more / Read less, and
-  // Favorite / Add to Trip with app.js's canonical labels. Golf cards are
-  // unchanged (they already had it).
-  const cards = venues.map((v) => venueCardHtml(v, { showType: true, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), appLabels: true, savedId: true, themed: true, excerpt: true })).join('\n');
-
-  const itemList = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: title,
-    description,
-    // No cap — every venue on the visible page is also in the structured
-    // data, however large the list gets.
-    itemListElement: venues.map((v, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      url: (v.slug && CATEGORY_SLUGS[v.type]) ? `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}` : undefined,
-      item: {
-        '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
-        name: v.name,
-      },
-    })),
-  };
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: (GUIDE_BADGE_SHARE_IMAGES[badge] && GUIDE_BADGE_SHARE_IMAGES[badge]()) || REGION_SHARE_IMAGES[region] || null, golfTheme: true, savedSidecar: true })}
-${renderAnalyticsHeadHtml('guide')}
-</head>
-<body class="golf-page guide-page">
-  ${renderGolfTripTrayHtml()}
-<div id="floatingTooltip"></div>
-${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
-  ${breadcrumbNavHtml([
-    { name: 'Home', href: '/' },
-    { name: regionLabel, href: `/${region}` },
-    { name: `${badgeInfo.title} Venues` },
-  ])}
-  <h1>${escapeHtml(badgeInfo.title)} Venues in ${escapeHtml(regionLabel)}, BC</h1>
-  <p class="subtitle">${venues.length} verified ${escapeHtml(badgeInfo.noun)} in ${escapeHtml(regionLabel)} — badge-checked from real listings, not guessed.</p>
-  ${categoryLinksHtml}${region === 'kelowna' && badge === 'patio' ? `\n  <p class="subtitle"><a href="${PATIO_GUIDE_PATH}">Our picks: the best patios in Kelowna &rarr;</a></p>` : ''}${region === 'kelowna' && badge === 'open_early' ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Our picks: the best brunch in Kelowna &rarr;</a></p>` : ''}${region === 'kelowna' && badge === 'dog_friendly' ? `\n  <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Our guide: dog beaches, trails and patios in Kelowna &rarr;</a></p>` : ''}
-  <ul class="card-grid">
-    ${cards}
-  </ul>
-  <a class="cta" href="/${region}">See all of ${escapeHtml(regionLabel)} on Okanagan Roam</a>
-  </main>
-  ${renderHomeFooterHTML(true)}
-  ${GOLF_APP_SCRIPT_TAG}
-  ${golfCardEngagementScriptHtml('guide', true, { impressionCards: '[data-venue-category="golf"]' })}
-</body>
-</html>`;
+  const { heading, intro } = guideBadgeHeading(region, badge);
+  const tally = {};
+  for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
+  const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
+    .map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural }));
+  const town = regionBannerPhoto(region);
+  const banner = (GUIDE_BADGE_BANNERS[badge] && GUIDE_BADGE_BANNERS[badge]()) || (town ? { src: town.src, alt: town.alt, pos: town.pos } : FOOD_DRINK_HUB_BANNER);
+  const picks = GUIDE_BADGE_PICKS[`${region}/${badge}`] ? GUIDE_BADGE_PICKS[`${region}/${badge}`]() : null;
+  const path = `/guide/${region}/${badge}`;
+  const others = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && c.badge !== badge).map((c) => c.badge);
+  const typesPresent = types.map((t) => t.type).filter((t) => CATEGORY_SLUGS[t]);
+  const afterHtml = `<section class="guide-more" aria-labelledby="guideMoreHeading">
+    <h2 class="category-subsection-heading" id="guideMoreHeading">More in ${escapeHtml(regionLabel)}</h2>
+    ${others.length ? `<p class="guide-more-row">${others.map((b) => `<a class="guide-more-chip" href="/guide/${region}/${b}">${escapeHtml(guideBadgeHeading(region, b).heading.slice(0, -(` in ${regionLabel}`).length))}</a>`).join('')}</p>` : ''}
+    ${typesPresent.length ? `<p class="venue-meta">All ${escapeHtml(regionLabel)} ${typesPresent.map((t) => `<a href="/${region}/${CATEGORY_SLUGS[t]}">${escapeHtml(CATEGORY_LABELS[t].plural.toLowerCase())}</a>`).join(', ')}, or <a href="/${region}">everything in ${escapeHtml(regionLabel)}</a>.</p>` : ''}
+  </section>`;
+  return renderCuratedHubPage({
+    path,
+    region,
+    name: heading.replace(` in ${regionLabel}`, ''),
+    crumbs: [{ name: regionLabel, href: `/${region}` }],
+    title: `${heading}, BC | Okanagan Roam`,
+    description: `${venues.length} ${BADGE_LABELS[badge].noun} in ${regionLabel}, BC. ${intro}`.slice(0, 300),
+    bodyClass: 'guide-page',
+    surface: 'guide',
+    pageType: 'guide',
+    types,
+    catsFor: (v) => [v.type],
+    photoKeyFor: (v) => curatedPhotoKey(v),
+    features: GUIDE_FEATURES.filter((k) => k !== badge),
+    openNow: true,
+    search: { label: `Search ${heading.toLowerCase()}`, placeholder: 'Search by name or what you feel like...' },
+    categoryContent: { all: { banner, heading, intro } },
+    heroExtraHtml: picks ? `\n  <p class="guide-picks"><a href="${picks[0]}">${escapeHtml(picks[1])} &rarr;</a></p>` : '',
+    extraHead: `<style id="guide-page">
+  body.guide-page .guide-picks { margin: 8px 0 0; font-weight: 800; }
+  body.guide-page .guide-picks a { color: var(--teal-deep, #1F5450); }
+  body.guide-page .guide-more { margin: 32px 0 8px; }
+  body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
+</style>`,
+    afterHtml,
+  }, venues, filter, now);
 }
 
 // ---------- Design Sprint 3: homepage discovery modules ----------
@@ -12337,6 +12343,23 @@ ${renderAnalyticsHeadHtml('favorites')}
   body.favorites-page details.fav-past summary { cursor: pointer; font-weight: 800; min-height: 44px; display: flex; align-items: center; }
   body.favorites-page .fav-empty a { font-weight: 800; }
   body.favorites-page #favRoot { padding-bottom: 72px; } /* clear of the floating Trip button on phones */
+  body.favorites-page .fav-item.has-photo { display: grid; grid-template-columns: 96px 1fr; grid-template-areas: "photo main" "photo actions"; align-items: start; gap: 6px 14px; padding: 10px; }
+  body.favorites-page .fav-item.has-photo .fav-photo { grid-area: photo; display: block; width: 96px; height: 96px; border-radius: 10px; overflow: hidden; background: #2A6B67; }
+  body.favorites-page .fav-item.has-photo .fav-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  body.favorites-page .fav-item.has-photo .fav-main { grid-area: main; padding-top: 4px; }
+  body.favorites-page .fav-item.has-photo .fav-actions { grid-area: actions; }
+  body.favorites-page .fav-actions .trip-btn, body.favorites-page .fav-actions .fav-save { min-height: 40px; padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 0.85rem; font-weight: 800; cursor: pointer; background: var(--ref-navy, #1B2B3A); color: #fff; border: 1px solid var(--ref-navy, #1B2B3A); }
+  body.favorites-page .fav-actions .trip-btn.in-trip, body.favorites-page .fav-actions .fav-save[disabled] { background: transparent; color: var(--ref-navy, #1B2B3A); }
+  body.favorites-page .fav-actions .fav-remove { min-height: 40px; }
+  body.favorites-page .fav-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: -2px 0 14px; }
+  body.favorites-page .fav-toolbar button { min-height: 40px; padding: 8px 16px; border-radius: 999px; font: inherit; font-size: 0.85rem; font-weight: 800; cursor: pointer; background: #fff; color: var(--ref-navy, #1B2B3A); border: 1px solid rgba(27,43,58,0.35); }
+  body.favorites-page .fav-toolbar button:hover { background: rgba(27,43,58,0.06); }
+  body.favorites-page .fav-share-out { flex-basis: 100%; display: flex; gap: 8px; align-items: center; font-size: 0.88rem; }
+  body.favorites-page .fav-share-out input { flex: 1; min-width: 0; min-height: 38px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(27,43,58,0.3); font: inherit; font-size: 0.85rem; }
+  body.favorites-page .fav-town { font-size: 0.95rem; margin: 18px 0 8px; }
+  body.favorites-page .fav-town span { font-weight: 600; opacity: 0.6; }
+  body.favorites-page .fav-shared { padding: 16px; border-radius: 16px; background: rgba(42,107,103,0.08); }
+  @media (max-width: 420px) { body.favorites-page .fav-item.has-photo { grid-template-columns: 76px 1fr; } body.favorites-page .fav-item.has-photo .fav-photo { width: 76px; height: 76px; } }
   @media (min-width: 900px) { body.favorites-page .fav-list { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
@@ -12350,7 +12373,7 @@ ${renderGolfHeaderHtml()}
     { name: 'Favorites' },
   ])}
   <h1>My Favorites</h1>
-  <p class="fav-intro">Places and events you have saved. Favorites are kept in this browser only.</p>
+  <p class="fav-intro">Places and events you have saved. Add them to My Trip, or share the list with whoever you are travelling with. Favorites are kept in this browser only.</p>
   <p id="favStatus" class="visually-hidden" role="status" aria-live="polite"></p>
   <div id="favRoot" aria-busy="true"><p>Loading your favorites&hellip;</p></div>
   <noscript><p>Your favorites are saved in this browser and need JavaScript to show here.</p></noscript>
@@ -12378,11 +12401,20 @@ ${renderGolfHeaderHtml()}
   }
   function where(region, type){ return [REGIONS[region] || region, type ? (TYPES[type] || type) : ''].filter(Boolean).join(' · '); }
   function removeBtn(attrs, name){ return '<button type="button" class="fav-remove" ' + attrs + ' aria-label="Remove ' + esc(name) + ' from Favorites">Remove</button>'; }
-  function placeHtml(p){
-    return '<li class="fav-item"><div class="fav-main"><a class="fav-name" href="' + esc(p.url) + '">' + esc(p.name) + '</a><span class="fav-meta">' + esc(where(p.region, p.type)) + '</span></div>'
-      + '<div class="fav-actions">' + removeBtn('data-ref="' + esc(p.ref) + '"', p.name) + '</div></li>';
+  // Photos and trip details come from /api/trip-stops (2026-10-14), keyed by the item's ref without its date.
+  var STOPS = {};
+  function baseRef(r){ return String(r || '').split('@')[0]; }
+  function photoHtml(ref, url){ var st = STOPS[baseRef(ref)]; return st && st.photo ? '<a class="fav-photo" href="' + esc(url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(st.photo) + '" alt="" width="96" height="96" loading="lazy" decoding="async"></a>' : ''; }
+  function tripBtnHtml(ref, name, region){
+    var st = STOPS[baseRef(ref)] || {};
+    return '<button type="button" class="trip-btn" data-trip-ref="' + esc(baseRef(ref)) + '" data-trip-name="' + esc(name) + '" data-trip-region="' + esc(region || '') + '" data-trip-query="' + esc(st.query || (name + ', ' + (REGIONS[region] || region || '') + ', Okanagan Valley, BC')) + '">Add to Trip</button>';
   }
-  function eventHtml(e){
+  function itemOpen(ref, url){ var ph = photoHtml(ref, url); return '<li class="fav-item' + (ph ? ' has-photo' : '') + '">' + ph; }
+  function placeHtml(p){
+    return itemOpen(p.ref, p.url) + '<div class="fav-main"><a class="fav-name" href="' + esc(p.url) + '">' + esc(p.name) + '</a><span class="fav-meta">' + esc(where(p.region, p.type)) + '</span></div>'
+      + '<div class="fav-actions">' + tripBtnHtml(p.ref, p.name, p.region) + removeBtn('data-ref="' + esc(p.ref) + '"', p.name) + '</div></li>';
+  }
+  function eventHtml(e, canTrip){
     var when = '';
     if (e.status === 'undated') when = 'No date saved';
     else if (e.status === 'missing_occurrence') when = 'This date is no longer listed';
@@ -12390,9 +12422,11 @@ ${renderGolfHeaderHtml()}
       when = fmtDate(e.date) + (e.endDate && e.endDate !== e.date ? ' – ' + fmtDate(e.endDate) : '') + (e.time ? ' · ' + fmtTime(e.time) : '');
     }
     var flag = e.status === 'cancelled' ? '<span class="fav-flag">Cancelled</span>' : e.status === 'postponed' ? '<span class="fav-flag">Postponed</span>' : '';
-    return '<li class="fav-item"><div class="fav-main"><a class="fav-name" href="' + esc(e.url) + '">' + esc(e.name) + '</a>' + flag + '<span class="fav-meta">' + esc(when) + (REGIONS[e.region] ? ' · ' + esc(REGIONS[e.region]) : '') + '</span></div>'
-      + '<div class="fav-actions">' + removeBtn('data-ref="' + esc(e.ref) + '"', e.name) + '</div></li>';
+    var trip = canTrip === true && e.status !== 'cancelled' ? tripBtnHtml(e.ref, e.name, e.region) : '';
+    return itemOpen(e.ref, e.url) + '<div class="fav-main"><a class="fav-name" href="' + esc(e.url) + '">' + esc(e.name) + '</a>' + flag + '<span class="fav-meta">' + esc(when) + (REGIONS[e.region] ? ' · ' + esc(REGIONS[e.region]) : '') + '</span></div>'
+      + '<div class="fav-actions">' + trip + removeBtn('data-ref="' + esc(e.ref) + '"', e.name) + '</div></li>';
   }
+  function upcomingEventHtml(e){ return eventHtml(e, true); }
   function chooseHtml(c){
     var opts = c.candidates.map(function(o){
       return '<li class="fav-item"><div class="fav-main"><a class="fav-name" href="' + esc(o.url) + '">' + esc(o.name) + '</a><span class="fav-meta">' + esc(o.kind === 'event' ? 'Event · ' + (REGIONS[o.region] || o.region) : where(o.region, o.type)) + '</span></div>'
@@ -12409,16 +12443,76 @@ ${renderGolfHeaderHtml()}
   function render(view){
     var html = '';
     var places = view.places.slice().sort(function(a, b){ return a.name.localeCompare(b.name); });
-    if (places.length) html += section('favPlaces', 'Places', '<ul class="fav-list">' + places.map(placeHtml).join('') + '</ul>');
     var g = core.eventGroups(view.events), ev = '';
-    if (g.upcoming.length) ev += '<h3>Upcoming</h3><ul class="fav-list">' + g.upcoming.map(eventHtml).join('') + '</ul>';
+    shareRefs = places.map(function(p){ return baseRef(p.ref); }).concat(g.upcoming.map(function(e){ return baseRef(e.ref); })).slice(0, 30);
+    var toolbar = '<div class="fav-toolbar">' + (places.length > 1 ? '<button type="button" class="fav-add-all">Add all places to My Trip</button>' : '') + (shareRefs.length ? '<button type="button" class="fav-share">Share this list</button>' : '') + '</div>';
+    if (places.length) {
+      // Six or more places across more than one town: grouped by town, in the site's town order.
+      var towns = {}, order = Object.keys(REGIONS);
+      places.forEach(function(p){ (towns[p.region] = towns[p.region] || []).push(p); });
+      var keys = Object.keys(towns).sort(function(a, b){ return order.indexOf(a) - order.indexOf(b); });
+      var body = places.length >= 6 && keys.length > 1
+        ? keys.map(function(r){ return '<h3 class="fav-town">' + esc(REGIONS[r] || r) + ' <span>' + towns[r].length + '</span></h3><ul class="fav-list">' + towns[r].map(placeHtml).join('') + '</ul>'; }).join('')
+        : '<ul class="fav-list">' + places.map(placeHtml).join('') + '</ul>';
+      html += section('favPlaces', 'Places', toolbar + body);
+    }
+    if (g.upcoming.length) ev += (places.length ? '' : toolbar) + '<h3>Upcoming</h3><ul class="fav-list">' + g.upcoming.map(upcomingEventHtml).join('') + '</ul>';
     if (g.undated.length) ev += '<h3>No date saved</h3><ul class="fav-list">' + g.undated.map(eventHtml).join('') + '</ul>';
-    if (g.past.length) ev += '<details class="fav-past"><summary>Past events (' + g.past.length + ')</summary><ul class="fav-list">' + g.past.map(eventHtml).join('') + '</ul></details>';
+    if (g.past.length) ev += '<details class="fav-past"><summary>Past events (' + g.past.length + ')</summary><ul class="fav-list">' + g.past.map(function(e){ return eventHtml(e, false); }).join('') + '</ul></details>';
     if (ev) html += section('favEvents', 'Events', ev);
     if (view.choose.length) html += section('favChoose', 'Choose which one', view.choose.map(chooseHtml).join(''));
     if (view.gone.length) html += section('favGone', 'No longer listed', '<ul class="fav-list">' + view.gone.map(goneHtml).join('') + '</ul>');
     if (!html) html = '<div class="fav-empty"><p>You haven’t saved any favorites yet. Tap “Favorite” on a place or event to keep it here.</p><p><a href="/wineries">Wineries</a> · <a href="/food-drink">Food &amp; Drink</a> · <a href="/beaches">Beaches</a> · <a href="/outdoors">Outdoors</a> · <a href="/whats-on">What’s On</a></p></div>';
-    root.innerHTML = html;
+    root.innerHTML = sharedHtml() + html;
+    if (window.__syncTripButtons) window.__syncTripButtons();
+  }
+  // A list someone shared (/favorites?list=venue:1,event:2): shown above your own, each with Add to Trip and Save.
+  var SHARED = [], shareRefs = [];
+  function sharedRefsFromUrl(){
+    var m = /[?&]list=([^&#]*)/.exec(location.search); if (!m) return [];
+    var out = [];
+    decodeURIComponent(m[1]).split(',').forEach(function(r){ if (/^(venue|event):[1-9][0-9]*$/.test(r) && out.indexOf(r) === -1) out.push(r); });
+    return out.slice(0, 30);
+  }
+  function isSaved(ref){ var p = /^(venue|event):([0-9]+)$/.exec(ref), st = stores(); return !!p && st.saved.items.some(function(x){ return x.k === p[1] && x.id === Number(p[2]); }); }
+  function sharedHtml(){
+    if (!SHARED.length) return '';
+    var unsaved = SHARED.filter(function(x){ return !isSaved(x.ref); }).length;
+    return section('favShared', 'A list shared with you', '<div class="fav-shared"><div class="fav-toolbar">' + (unsaved ? '<button type="button" class="fav-save-all">Save all ' + unsaved + ' to my favorites</button>' : '') + '<button type="button" class="fav-add-all" data-scope="favShared">Add all to My Trip</button></div><ul class="fav-list">' + SHARED.map(function(x){
+      var saved = isSaved(x.ref);
+      return itemOpen(x.ref, x.url) + '<div class="fav-main"><a class="fav-name" href="' + esc(x.url) + '">' + esc(x.name) + '</a><span class="fav-meta">' + esc([x.type, x.regionLabel].filter(Boolean).join(' · ')) + '</span></div>'
+        + '<div class="fav-actions">' + tripBtnHtml(x.ref, x.name, x.region) + '<button type="button" class="fav-save" data-ref="' + esc(x.ref) + '" data-name="' + esc(x.name) + '"' + (saved ? ' disabled' : '') + '>' + (saved ? '♥ Saved' : '♡ Save') + '</button></div></li>';
+    }).join('') + '</ul></div>');
+  }
+  function saveShared(ref, name){
+    var p = /^(venue|event):([0-9]+)$/.exec(ref); if (!p || isSaved(ref)) return;
+    var st = stores(), names = st.legacy.slice();
+    st.saved.items.push(p[1] === 'event' ? { k: 'event', id: Number(p[2]), occ: null, name: name, savedAt: new Date().toISOString() } : { k: 'venue', id: Number(p[2]), name: name, savedAt: new Date().toISOString() });
+    if (names.indexOf(name) === -1) names.push(name);
+    put(SAVED, st.saved); put(LEGACY, names);
+  }
+  function fetchStops(refs){
+    var want = refs.map(baseRef).filter(function(r){ return r && !STOPS[r]; }), chunks = [];
+    for (var i = 0; i < want.length; i += 30) chunks.push(want.slice(i, i + 30));
+    return Promise.all(chunks.map(function(c){
+      return fetch('/api/trip-stops?refs=' + encodeURIComponent(c.join(',')), { headers: { Accept: 'application/json' } })
+        .then(function(r){ return r.ok ? r.json() : { stops: [] }; })
+        .then(function(j){ (j.stops || []).forEach(function(x){ if (x && !x.missing) STOPS[x.ref] = x; }); })
+        .catch(function(){});
+    }));
+  }
+  function shareList(btn){
+    var url = location.origin + '/favorites?list=' + shareRefs.join(',');
+    var box = btn.parentNode.querySelector('.fav-share-out');
+    function show(msg){
+      if (!box) { box = document.createElement('div'); box.className = 'fav-share-out'; btn.parentNode.appendChild(box); }
+      box.innerHTML = '<span>' + esc(msg) + '</span><input type="text" readonly aria-label="Link to your list" value="' + esc(url) + '">';
+      var inp = box.querySelector('input'); if (inp) { inp.focus(); inp.select(); }
+      announce(msg);
+    }
+    if (navigator.share) { navigator.share({ title: 'My Okanagan favorites', url: url }).catch(function(){}); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function(){ show('Link copied. Anyone with it can see this list.'); }, function(){ show('Copy this link to share your list:'); });
+    else show('Copy this link to share your list:');
   }
   function renderOffline(st){
     var names = st.legacy.slice();
@@ -12448,13 +12542,23 @@ ${renderGolfHeaderHtml()}
     resolveAll(p).then(function(res){
       var a = core.apply(st.legacy, st.saved, res, new Date().toISOString());
       if (a.changed) put(SAVED, a.saved);
-      render(a.view);
+      return fetchStops(a.view.places.map(function(x){ return x.ref; }).concat(a.view.events.map(function(x){ return x.ref; }))).then(function(){ render(a.view); });
     }).catch(function(){ renderOffline(st); }).then(function(){ root.removeAttribute('aria-busy'); });
   }
   root.addEventListener('click', function(e){
     var t = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!t) return;
     if (t.classList.contains('fav-retry')) { load(); return; }
+    if (t.classList.contains('fav-share')) { shareList(t); return; }
+    if (t.classList.contains('fav-add-all')) {
+      // app.js's own Add to Trip on each card, so the tray, the 10-stop cap and its message all apply.
+      var scope = t.closest('.fav-section') || root;
+      Array.prototype.forEach.call(scope.querySelectorAll('.trip-btn:not(.in-trip)'), function(b){ b.click(); });
+      announce('Added to My Trip.');
+      return;
+    }
+    if (t.classList.contains('fav-save')) { saveShared(t.getAttribute('data-ref'), t.getAttribute('data-name')); announce('Saved to your favorites.'); load(); return; }
+    if (t.classList.contains('fav-save-all')) { SHARED.forEach(function(x){ saveShared(x.ref, x.name); }); announce('Saved to your favorites.'); load(); return; }
     var st = stores();
     if (t.classList.contains('fav-remove')) {
       var ref = t.getAttribute('data-ref'), name = t.getAttribute('data-name');
@@ -12471,7 +12575,9 @@ ${renderGolfHeaderHtml()}
     }
   });
   window.addEventListener('storage', function(ev){ if (ev.key === LEGACY || ev.key === SAVED) load(); });
-  load();
+  var sharedRefs = sharedRefsFromUrl();
+  if (sharedRefs.length) fetchStops(sharedRefs).then(function(){ SHARED = sharedRefs.map(function(r){ return STOPS[r]; }).filter(Boolean); load(); });
+  else load();
 })();
 </script>
 </body>
@@ -17579,7 +17685,7 @@ ${pageHead(cfg.title, cfg.description, canonical, [breadcrumb, itemList], { shar
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
-${golfEngagementHeadHtml(cfg.surface, true, 'hub')}
+${golfEngagementHeadHtml(cfg.surface, true, cfg.pageType || 'hub')}
 ${cfg.extraHead || ''}
 <style id="curated-hub">
   body.curated-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
@@ -18413,6 +18519,28 @@ function whatsOnCategoryChipsHtml(state = {}) {
 // FOOTER_REGION_GROUPS, so the grouping is whatever the data says) and the
 // date presets (still server-side links, per the page's frozen design) --
 // so no filtering behaviour moves, only where it lives.
+// A town page's quick date buttons: the next three months, today, this weekend (the town's own weekend page),
+// this week and this month (2026-10-14).
+function whatsOnTownQuickDatesHtml(region, active) {
+  const base = `/${region}/events`;
+  const items = [
+    { key: 'upcoming', label: 'Next 3 months', href: base },
+    { key: 'today', label: 'Today', href: `${base}?when=today` },
+    { key: 'this-weekend', label: 'This weekend', href: `${base}/this-weekend` },
+    { key: 'this-week', label: 'This week', href: `${base}?when=this-week` },
+    { key: 'this-month', label: 'This month', href: `${base}?when=this-month` },
+  ];
+  return `<nav class="whatson-quick-dates" aria-label="When">
+    ${items.map((i) => `<a class="whatson-quick-date" href="${i.href}"${i.key === active ? ' aria-current="page"' : ''}>${escapeHtml(i.label)}</a>`).join('\n    ')}
+  </nav>`;
+}
+function whatsOnTownLinksHtml(current, counts) {
+  const towns = Object.keys(REGION_LABELS).filter((r) => r !== current && (counts[r] || 0) > 0);
+  return `<ul class="whatson-town-links">
+        <li><a href="/whats-on">All of the Okanagan</a></li>
+        ${towns.map((r) => `<li><a href="/${r}/events">${escapeHtml(REGION_LABELS[r])} <span class="whatson-town-count">${counts[r]}</span></a></li>`).join('\n        ')}
+      </ul>`;
+}
 function whatsOnFilterBarHtml(state = {}) {
   const nRegions = (state.selectedRegions || []).length;
   const dateActive = state.window && state.window.preset !== 'upcoming';
@@ -18422,8 +18550,14 @@ function whatsOnFilterBarHtml(state = {}) {
         <div class="whatson-pop-actions"><button type="button" class="whatson-pop-apply" data-whatson-apply>Show results</button></div>
       </div>
     </div>`;
+  const townPop = state.town ? `<div class="whatson-pop">
+      <button type="button" class="whatson-pop-btn" id="whatsOnTownsBtn" aria-expanded="false" aria-controls="whatsOnTownsPanel"><span class="whatson-pop-icon" aria-hidden="true">&#128205;</span> ${escapeHtml(REGION_LABELS[state.town])} <span class="whatson-pop-change">· change town</span></button>
+      <div class="whatson-pop-panel" id="whatsOnTownsPanel" hidden>
+      ${whatsOnTownLinksHtml(state.town, state.townCounts || {})}
+      </div>
+    </div>` : '';
   return `<div class="whatson-controls">
-    ${pop('whatsOnRegions', 'Regions', '&#128205;', nRegions || '', whatsOnRegionChipsHtml(state))}
+    ${state.town ? townPop : pop('whatsOnRegions', 'Regions', '&#128205;', nRegions || '', whatsOnRegionChipsHtml(state))}
     ${state.hasInventory ? pop('whatsOnDate', 'Date', '&#128197;', dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true, basePath: state.basePath })) : ''}
   </div>`;
 }
@@ -18631,6 +18765,16 @@ function buildWhatsOnStyles() {
     body.whatson-page .whatson-pop-panel { left: 0; right: 0; width: auto; min-width: 0; max-width: none; }
   }
   body.whatson-page .whatson-pop-panel .outdoor-step { margin: 0; }
+  body.whatson-page .whatson-pop-change { font-weight: 600; color: var(--muted, #5b6b78); }
+  body.whatson-page .whatson-pop-btn[aria-expanded="true"] .whatson-pop-change { color: inherit; }
+  body.whatson-page .whatson-town-links { list-style: none; margin: 0; padding: 4px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
+  body.whatson-page .whatson-town-links a { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; color: var(--ink); text-decoration: none; font-weight: 700; }
+  body.whatson-page .whatson-town-links a:hover, body.whatson-page .whatson-town-links a:focus-visible { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
+  body.whatson-page .whatson-town-count { color: var(--muted, #5b6b78); font-weight: 600; }
+  body.whatson-page .whatson-quick-dates { display: flex; gap: 8px; overflow-x: auto; margin: 10px 0 4px; padding-bottom: 2px; scrollbar-width: none; }
+  body.whatson-page .whatson-quick-date { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.whatson-page .whatson-quick-date:hover { background: rgba(27,43,58,0.06); }
+  body.whatson-page .whatson-quick-date[aria-current="page"] { background: var(--ref-navy, #1B2B3A); border-color: var(--ref-navy, #1B2B3A); color: var(--paper); }
   body.whatson-page .whatson-date-compact { margin: 0; }
 
   /* "Show results" (2026-09-24): selecting the last filter in a popover used
@@ -19070,7 +19214,11 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // query picks its own, and defaults to the scope's 90-day window unless the query sets dates.
   const scope = opts.scope || null;
   const queryPicks = !!(filter && (filter.regions.length || filter.categories.length));
-  const selectedRegions = queryPicks ? filter.regions : (scope && scope.region ? [scope.region] : []);
+  // A town page (/<town>/events, /<town>/events/this-weekend) carries only that town's events plus valley-wide ones
+  // (2026-10-14): it used to ship every other town's events hidden (Kelowna: 1 MB). Its town is fixed, so it has no
+  // region chips; other towns are links to their own pages.
+  const townScope = scope && scope.region ? scope.region : null;
+  const selectedRegions = townScope ? [] : (queryPicks ? filter.regions : []);
   const selectedCategories = queryPicks ? filter.categories : (scope && scope.category ? [scope.category] : []);
   const queryDates = !!(filter && (filter.when !== undefined || filter.from !== undefined || filter.to !== undefined));
   const weekendWindow = scope && scope.weekend && !queryDates ? whatsOnWeekendWindow() : null;
@@ -19081,7 +19229,9 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // (default: the rolling next 30 days) and selects the events rendered;
   // region/category chips then filter that set exactly as before.
   const window = weekendWindow || (scope && !scope.weekend && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {}));
-  const events = getWhatsOnEvents(window);
+  const allEvents = getWhatsOnEvents(window);
+  const events = townScope ? allEvents.filter((e) => e.valleyWide || e.region === townScope) : allEvents;
+  const townCounts = townScope ? Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, allEvents.filter((e) => !e.valleyWide && e.region === r).length])) : null;
   const matching = filterWhatsOnEvents(events, selectedRegions, selectedCategories);
   const filtered = selectedRegions.length > 0 || selectedCategories.length > 0;
   const hasInventory = whatsOnInventoryExists();
@@ -19111,7 +19261,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const scopeList = scope ? (scope.weekend ? matching : whatsOnScopeEvents(scope, matching).concat(scope.region ? matching.filter((e) => e.valleyWide) : [])) : [];
   // A quiet weekend still gives the visitor something: the next events after it (up to 6 in the following 30 days).
   const comingUp = scope && scope.weekend && scopeList.length < WHATSON_SCOPE_MIN_EVENTS
-    ? filterWhatsOnEvents(getWhatsOnEvents({ from: addLocalDays(window.to, 1), to: addLocalDays(window.to, 30) }), selectedRegions, []).slice(0, 6)
+    ? filterWhatsOnEvents(getWhatsOnEvents({ from: addLocalDays(window.to, 1), to: addLocalDays(window.to, 30) }), townScope ? [townScope] : selectedRegions, []).slice(0, 6)
     : [];
   const itemList = scope && scopeList.length ? {
     '@context': 'https://schema.org',
@@ -19196,7 +19346,8 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-intro whatson-intro">${escapeHtml(woText.intro)}</p>`)}
   ${whatsOnSearchHtml()}
   ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
-  ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory, basePath })}
+  ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory, basePath, town: townScope, townCounts })}
+  ${townScope && hasInventory ? whatsOnTownQuickDatesHtml(townScope, scope.weekend ? 'this-weekend' : (queryDates ? window.preset : 'upcoming')) : ''}
   <span class="visually-hidden" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span>
   <section class="outdoor-step outdoor-step-results whatson-results-step" aria-labelledby="whatsOnResultsTop">
   <h2 class="visually-hidden" id="whatsOnResultsTop">Results</h2>
@@ -19205,7 +19356,7 @@ ${renderGolfHeaderHtml()}
     <h3>We’re gathering what’s on.</h3>
     <p>Okanagan Roam is building its What’s On listings community by community. Your region and category choices are saved in the address bar, so this page is ready the moment the first events arrive — in the meantime, <a href="/outdoors">explore the outdoors</a> or <a href="/trip">start planning a trip</a>.</p>
   </div>
-  <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 ? '' : ' hidden'}>No events match that combination yet. <a href="/whats-on" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
+  <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 ? '' : ' hidden'}>No events match that combination yet. <a href="${basePath}" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
   ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
@@ -19375,6 +19526,319 @@ function venueHasFrench(venue) {
 function venueAlternates(venue) {
   const en = `https://okanaganroam.com${venuePagePath(venue)}`;
   return [{ hreflang: 'en-CA', href: en }, { hreflang: 'fr-CA', href: `https://okanaganroam.com${venuePagePath(venue, 'fr')}` }, { hreflang: 'x-default', href: en }];
+}
+// ---------- French hub pages (Phase 2 of French, 2026-10-14): /fr, /fr/food-drink, /fr/kelowna ... ----------
+// The main pages each get a French twin at /fr + the English address. The English page is rendered as usual and then
+// translated on the way out (frenchTwinHtml): the header/footer through app.js's data-i18n keys, every other piece of
+// visible text through the FR_TEXT word list (french-text.js), card blurbs from each place's French description (the
+// cards already carry both), and links to pages that have a French twin point at /fr. Both pages name each other with
+// hreflang and carry an EN / FR switch in the header. Anything not in the list stays as it was (place names, towns).
+// Optional like the other helper modules: a copy of server.js running on its own still starts (French twins then
+// carry only the header/footer translation).
+const frenchText = (() => { try { return require('./french-text'); } catch (e) { return { FR_TEXT: {}, FR_PATTERNS: [], FR_SCRIPT: [] }; } })();
+const FR_TWIN_STATIC = new Set(['/', '/food-drink', '/restaurants', '/cafes', '/breweries', '/pubs', '/cocktail-lounges', '/distilleries',
+  '/wineries', '/golf', '/beaches', '/outdoors', '/tours', '/ski-snow', '/indoor', '/sports', '/dog-friendly', '/local-favorites',
+  '/secret-spots', '/hidden-gems', '/destinations', '/browse', '/categories',
+  // Phase 2 and 3 (2026-10-14): What's On, the guides, the map, the trip pages, the forms and the info pages.
+  '/whats-on', '/guides', '/map', '/trip', '/my-trip', '/favorites', '/list-your-venue', '/list-an-event', '/about', '/contact', '/privacy', '/terms']);
+const FR_TWIN_SECTIONS = new Set(['outdoors', 'tours', 'indoor', 'sports', 'whats-on', 'guides']);
+// A place page (/kelowna/restaurants/slug): it has its own French route.
+function frIsVenuePath(p) {
+  const seg = String(p || '').split('/').filter(Boolean);
+  return seg.length === 3 && !!REGION_LABELS[seg[0]] && !!SLUG_TO_TYPE[seg[1]] && /^[a-z0-9-]+$/.test(seg[2]);
+}
+// An English address with a French twin: a main page, a section's activity page, a town page or a town's category
+// or events page, a badge guide, a guide, or a place page. Event pages stay English (their text is English only).
+function hasFrenchTwin(p) {
+  const path = String(p || '').replace(/(.)\/$/, '$1');
+  if (FR_TWIN_STATIC.has(path)) return true;
+  const seg = path.split('/').filter(Boolean);
+  if (!seg.every((x) => /^[a-z0-9-]+$/.test(x)) && !(seg[0] === 'guide' && seg.length === 3 && /^[a-z_]+$/.test(seg[2]))) return false;
+  if (seg.length === 1) return !!REGION_LABELS[seg[0]];
+  if (seg.length === 2) return FR_TWIN_SECTIONS.has(seg[0]) || (!!REGION_LABELS[seg[0]] && (!!SLUG_TO_TYPE[seg[1]] || seg[1] === 'events'));
+  if (seg.length === 3) return (seg[0] === 'guide' && !!REGION_LABELS[seg[1]]) || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && seg[2] === 'this-weekend') || frIsVenuePath(path);
+  return false;
+}
+function frTwinPath(enPath) { return enPath === '/' ? '/fr' : `/fr${enPath}`; }
+// A /fr request for a main or town page -> the English address it is rendered from (place pages have their own route).
+function frenchTwinRequest(rawUrl) {
+  const m = /^\/fr(\/[^?#]*)?(\?[^#]*)?$/.exec(String(rawUrl || ''));
+  if (!m) return null;
+  const enPath = (m[1] || '/').replace(/(.)\/$/, '$1');
+  if (enPath === '/browse/cards.json') return { enPath, enUrl: enPath + (m[2] || '') };
+  if (!hasFrenchTwin(enPath) || frIsVenuePath(enPath)) return null;
+  return { enPath, enUrl: enPath + (m[2] || '') };
+}
+function frDecode(s) {
+  return String(s).replace(/&(amp|lt|gt|quot|#39|apos|rsquo|lsquo|ldquo|rdquo|rarr|larr|rsaquo|lsaquo|laquo|raquo|egrave|agrave|ccedil|copy|uarr|darr|middot|mdash|ndash|hellip|nbsp|times|eacute|#(\d+)|#x([0-9a-f]+));/gi, (m, name, dec, hex) => {
+    if (dec) return String.fromCodePoint(Number(dec));
+    if (hex) return String.fromCodePoint(parseInt(hex, 16));
+    return { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'", rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', rarr: '→', larr: '←', rsaquo: '›', lsaquo: '‹', laquo: '«', raquo: '»', egrave: 'è', agrave: 'à', ccedil: 'ç', copy: '©', uarr: '↑', darr: '↓', middot: '·', mdash: '—', ndash: '–', hellip: '…', nbsp: ' ', times: '×', eacute: 'é' }[name.toLowerCase()] || m;
+  });
+}
+// One piece of text -> French, or null when the list has nothing for it. Exact entries first, then the patterns
+// (counts, opening times, "Wineries in Kelowna" ...), which may translate pieces through frText again.
+// The list keyed the way lookups are: one space between words, straight apostrophes.
+const frNorm = (s) => frDecode(String(s)).replace(/\s+/g, ' ').replace(/[\u2019\u2018]/g, "'").trim();
+const FR_TEXT_MAP = new Map(Object.entries(frenchText.FR_TEXT).map(([k, v]) => [frNorm(k), v]));
+function frLookup(key) { const k = frNorm(key); return FR_TEXT_MAP.has(k) ? FR_TEXT_MAP.get(k) : null; }
+function frText(plain) {
+  const key = String(plain).replace(/\s+/g, ' ').trim();
+  if (!key) return null;
+  const hit = frLookup(key);
+  if (hit != null) return hit;
+  if (FR_FROM_APP.has(key)) return FR_FROM_APP.get(key);
+  if (FR_FROM_APP_LC.has(key.toLowerCase())) return FR_FROM_APP_LC.get(key.toLowerCase());
+  const templated = frTemplated(key, frLookup);
+  if (templated != null) return templated;
+  for (const [re, fn] of frenchText.FR_PATTERNS) {
+    const m = re.exec(key);
+    if (m) { const out = typeof fn === 'function' ? fn(m, frTextOr, FR_CTX) : key.replace(re, fn); if (out != null) return out; }
+  }
+  // Numbers as placeholders: "{0} verified wineries across ..." covers every count; town names as {T}: "Patios in
+  // {T}" covers every town.
+  return frTemplated(key, frLookup);
+}
+const FR_TOWNS_LONGEST_FIRST = Object.values(REGION_LABELS).sort((a, b) => b.length - a.length);
+const FR_TOWN_RE = new RegExp(FR_TOWNS_LONGEST_FIRST.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+function frTemplated(key, lookup) {
+  const nums = [], towns = [];
+  const withNums = key.replace(/(?<!\{a)\d[\d,]*(?:\.\d+)?/g, (n) => { nums.push(n); return `{${nums.length - 1}}`; });
+  const withTowns = key.replace(FR_TOWN_RE, (t) => { towns.push(t); return '{T}'; });
+  const both = withNums.replace(FR_TOWN_RE, '{T}');
+  let t = null;
+  if (nums.length) t = lookup(withNums);
+  if (t == null && towns.length) t = lookup(withTowns);
+  if (t == null && towns.length && nums.length) t = lookup(both);
+  if (t == null) return null;
+  let i = 0;
+  return t.replace(/\b(de|à) \{T\}|\{T\}/g, (m, prep) => {
+    const town = towns[Math.min(i++, towns.length - 1)] || '';
+    return prep === 'de' ? frDe(town) : prep ? `${prep} ${town}` : town;
+  }).replace(/\{(\d+)\}/g, (m, n) => frNumber(nums[Number(n)]))
+    // Clock times the English wrote as "7:30 pm" read "19 h 30" in French.
+    .replace(/\b(\d{1,2})(?:[:h](\d{2}))? ?(a\.m\.|p\.m\.|am|pm|AM|PM)(?![a-z])(?: \(p\.m\.\))?/g, (m, h, mm, ap) => frenchText.frTime ? frenchText.frTime(h, mm, ap.replace(/\./g, '')) : m)
+    .replace(/\b(\d{1,2}) h( \d{2})? \(p\.m\.\)/g, (m, h, mm) => `${(Number(h) % 12) + 12} h${mm || ''}`);
+}
+// 1,774 -> 1 774 and 4.6 -> 4,6, the Canadian French way.
+function frNumber(n) {
+  return String(n).replace(/,(?=\d{3}\b)/g, '\u00a0').replace(/\.(\d)/, ',$1');
+}
+// A paragraph with links or bold text inside ("Swim at <a>Gyro Beach</a>, ride the <a>KVR</a> ..."): its text with the
+// inline pieces as {a0}, {a1} ... is looked up whole, so the French sentence can put them in its own order.
+function frParagraph(inner) {
+  const pieces = [];
+  const tpl = inner.replace(/<(a|strong|em|b|span)\b([^>]*)>([^<]*)<\/\1>/g, (m) => { pieces.push(m); return `{a${pieces.length - 1}}`; });
+  if (!pieces.length || /<(?!br\b)/.test(tpl)) return null;
+  const key = frDecode(tpl).replace(/\s+/g, ' ').trim();
+  const t = frLookup(key) != null ? frLookup(key) : frTemplated(key, frLookup);
+  if (t == null) return null;
+  const lead = /^\s*/.exec(inner)[0], trail = /\s*$/.exec(inner)[0];
+  return lead + escapeHtml(t)
+    .replace(/\{a(\d+)\}/g, (m, i) => pieces[Number(i)].replace(/>([^<]*)</, (mm, txt) => (frIsVenueName(frDecode(txt)) ? mm : `>${escapeHtml(frTextOr(frDecode(txt)))}<`))) + trail;
+}
+function frTextOr(s) { const t = frText(s); return t == null ? s : t; }
+// app.js's own French (its TRANSLATIONS.en text -> TRANSLATIONS.fr), so a label reads the same as on the home page.
+const FR_FROM_APP = (() => {
+  const m = new Map(), en = APP_TRANSLATIONS.en || {}, fr = APP_TRANSLATIONS.fr || {};
+  for (const k of Object.keys(en)) {
+    const e = typeof en[k] === 'string' ? en[k].replace(/\s+/g, ' ').trim() : '';
+    if (e && typeof fr[k] === 'string' && fr[k] && !/[{<]/.test(e) && !m.has(e)) m.set(e, fr[k]);
+  }
+  return m;
+})();
+const FR_FROM_APP_LC = new Map([...FR_FROM_APP].map(([k, v]) => [k.toLowerCase(), v]).reverse());
+const FR_CTX = { regions: REGION_LABELS, frDe: (n) => frDe(n), cuisine: (c) => frCuisine(c), has: (t) => frText(t) != null, status: (t) => frStatusText(t) };
+function frHref(href) {
+  const m = /^(https:\/\/okanaganroam\.com)?(\/[^?#"]*)([?#][^"]*)?$/.exec(href);
+  if (!m || /^\/fr(\/|$)/.test(m[2]) || !hasFrenchTwin(m[2])) return href;
+  return `${m[1] || ''}${frTwinPath(m[2].replace(/(.)\/$/, '$1'))}${m[3] || ''}`;
+}
+// Place names are never translated, even when one reads like a list entry ("KVR Trail - Naramata Bench").
+let frVenueNames = null, frVenueNamesAt = 0;
+function frIsVenueName(text) {
+  if (!frVenueNames || Date.now() - frVenueNamesAt > 10 * 60 * 1000) {
+    try { frVenueNames = new Set(db.prepare('SELECT name FROM venues').all().map((r) => String(r.name).trim())); } catch (e) { frVenueNames = new Set(); }
+    frVenueNamesAt = Date.now();
+  }
+  return frVenueNames.has(String(text).replace(/\s+/g, ' ').trim());
+}
+// Search words from each place's French description, so a French search finds "terrasse" or "bière" too.
+let frWordsById = null, frWordsAt = 0;
+function frSearchWords(id) {
+  if (!frWordsById || Date.now() - frWordsAt > 10 * 60 * 1000) {
+    frWordsById = new Map();
+    try { for (const r of db.prepare("SELECT id, description_fr FROM venues WHERE description_fr IS NOT NULL AND description_fr != ''").all()) frWordsById.set(String(r.id), descSearchWords(r.description_fr)); } catch (e) { /* English words only */ }
+    frWordsAt = Date.now();
+  }
+  return frWordsById.get(String(id)) || '';
+}
+function frSearchData(json) {
+  let data; try { data = JSON.parse(json); } catch (e) { return json; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return json;
+  for (const [id, v] of Object.entries(data)) if (v && typeof v === 'object' && typeof v.k === 'string') v.k = `${v.k} ${frSearchWords(id)}`.trim();
+  return JSON.stringify(data).replace(/</g, '\\u003c');
+}
+// Sitemap (2026-10-14): each main or town page with a French twin lists both addresses, each naming the pair.
+function withFrenchTwinEntries(entries) {
+  const out = [];
+  for (const e of entries) {
+    const m = /<loc>https:\/\/okanaganroam\.com(\/[^<]*)<\/loc>/.exec(e);
+    const p = m ? m[1].replace(/(.)\/$/, '$1') : null;
+    if (!p || !hasFrenchTwin(p) || frIsVenuePath(p) || /xhtml:link/.test(e)) { out.push(e); continue; }
+    const alts = twinHeadLinks(p).trim().split('\n').map((l) => `\n    ${l.replace('<link ', '<xhtml:link ').replace(/>$/, '/>')}`).join('');
+    const withAlts = e.replace(/(<\/loc>)/, `$1${alts}`);
+    out.push(withAlts, withAlts.replace(/<loc>https:\/\/okanaganroam\.com[^<]*<\/loc>/, `<loc>https://okanaganroam.com${frTwinPath(p)}</loc>`));
+  }
+  return out;
+}
+// A French place page's links to pages with a French twin go to the twin (2026-10-14); its "English" switch
+// (hreflang="en") keeps its English address.
+function frPageLinks(html) {
+  return html.replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)));
+}
+// Text and attributes of the markup outside <script>/<style>.
+function frMarkup(part) {
+  return part
+    .replace(/(<(p|li|h[1-6]|figcaption)\b[^>]*>)((?:(?!<\/?(?:p|li|div|ul|ol|section|h[1-6])\b)[\s\S])*?)(<\/\2>)/g, (m, open, tag, inner, close) => {
+      const t = frParagraph(inner);
+      return t == null ? m : open + t + close;
+    })
+    // A card shows the French blurb only.
+    .replace(/<span class="desc-en" lang="en">[\s\S]*?<\/span><span class="desc-fr" lang="fr">([\s\S]*?)<\/span>/g, '$1')
+    .replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)))
+    .replace(/(\s(?:alt|aria-label|placeholder|title|data-tooltip|content)=")([^"]+)"/g, (m, a, v) => {
+      if (a.includes('content') && !/[a-z]{3,} [a-z]/i.test(v)) return m;
+      const t = frText(frDecode(v));
+      return t == null ? m : `${a}${escapeHtml(t)}"`;
+    })
+    .replace(/>([^<>]+)</g, (m, text) => {
+      if (!/[A-Za-z]/.test(text) || frIsVenueName(frDecode(text))) return m;
+      const t = frText(frDecode(text));
+      if (t == null) return m;
+      const lead = /^\s*/.exec(text)[0], trail = /\s*$/.exec(text)[0];
+      return `>${lead}${escapeHtml(t)}${trail}<`;
+    });
+}
+// String literals inside page scripts: JSON-style "..." strings that are whole entries in the list (banner text,
+// headings, chip labels), plus the script fragments in FR_SCRIPT ("Show N results" ...).
+// Text in single quotes that is wording, not logic: the hours labels are left to the hoursStatusLabel wrapper.
+const FR_SCRIPT_KEEP = new Set(['Closed today', 'Closed', 'Closed now', 'Open 24 hours', 'Hours not listed for today', 'Open now', 'Open Now']);
+function frScript(src) {
+  src = src.replace(/'((?:[^'\\\n]|\\.){2,400})'/g, (m, body) => {
+    let plain; try { plain = JSON.parse(`"${body.replace(/\\'/g, "'").replace(/"/g, '\\"')}"`); } catch (e) { return m; }
+    if (!/[A-Za-z]{2}/.test(plain) || !/[ .!?]/.test(plain) || FR_SCRIPT_KEEP.has(plain.trim()) || /^(Open now|Open 24|Closed|Hours not| · Opens)/.test(plain)) return m;
+    const t = frText(plain);
+    return t == null ? m : `'${t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')}'`;
+  });
+  let out = src.replace(/"((?:[^"\\\n]|\\.){2,400})"/g, (m, body) => {
+    let plain; try { plain = JSON.parse(m); } catch (e) { return m; }
+    if (!/[A-Za-z]{2}/.test(plain) || /^[a-z0-9_.\-\/#:]+$/.test(plain)) return m;
+    const t = frText(plain);
+    return t == null ? m : JSON.stringify(t).replace(/</g, '\\u003c');
+  });
+  // Each fragment as written in the source and with its \\uXXXX escapes as characters (a template literal serves those).
+  const chars = (x) => x.replace(/\\u([0-9a-fA-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+  for (const [en, fr] of frenchText.FR_SCRIPT) out = out.split(en).join(fr).split(chars(en)).join(chars(fr));
+  return out;
+}
+function frJsonLd(json) {
+  let data; try { data = JSON.parse(json); } catch (e) { return json; }
+  const walk = (o) => {
+    if (Array.isArray(o)) return o.map(walk);
+    if (o && typeof o === 'object') {
+      const n = {};
+      for (const [k, v] of Object.entries(o)) {
+        if (typeof v === 'string' && (k === 'url' || k === 'item' || k === '@id')) n[k] = frHref(v);
+        else if (typeof v === 'string' && (k === 'name' || k === 'description')) n[k] = frTextOr(v);
+        else n[k] = walk(v);
+      }
+      if (o['@type'] === 'ItemList' || o['@type'] === 'CollectionPage' || o['@type'] === 'WebPage') n.inLanguage = 'fr-CA';
+      return n;
+    }
+    return o;
+  };
+  return JSON.stringify(walk(data));
+}
+function twinHeadLinks(enPath) {
+  const en = `https://okanaganroam.com${enPath}`, fr = `https://okanaganroam.com${frTwinPath(enPath)}`;
+  return `<link rel="alternate" hreflang="en-CA" href="${en}">\n<link rel="alternate" hreflang="fr-CA" href="${fr}">\n<link rel="alternate" hreflang="x-default" href="${en}">\n`;
+}
+// The header's EN / FR switch: a real link to the twin (app.js also handles it and remembers the choice).
+function withTwinLangSwitch(html, href, lang) {
+  if (!html.includes('id="langToggle"')) {
+    const label = lang === 'fr' ? 'FR / EN' : 'EN / FR';
+    const a = `<a class="lang-toggle" id="langToggle" href="${href}" hreflang="${lang === 'fr' ? 'en' : 'fr'}" aria-label="${lang === 'fr' ? 'Voir cette page en anglais' : 'View this page in French'}" data-i18n-aria="nav.switchLanguage">${label}</a>`;
+    html = html.replace(/(<a class="nav-search-btn")/, `${a}\n    $1`);
+  }
+  return withMobileLanguageItem(html);
+}
+function addTwinHead(html, enPath) {
+  if (/hreflang="fr-CA"/.test(html)) return html;
+  return html.replace(/(<link rel="canonical" href="[^"]*">\n)/, `$1${twinHeadLinks(enPath)}`);
+}
+// The English page of a pair: hreflang, data-page-lang="en" (app.js keeps it English) and the switch. A visitor who
+// chose French before goes straight to the French twin.
+function englishTwinHtml(html, enPath) {
+  if (!/^<!DOCTYPE html>/i.test(html)) return html;
+  const frHrefPath = frTwinPath(enPath);
+  let out = addTwinHead(html, enPath)
+    .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
+    .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
+  out = withTwinLangSwitch(out, frHrefPath, 'en');
+  return out;
+}
+function frenchTwinHtml(html, enPath) {
+  if (!/^<!DOCTYPE html>/i.test(html)) return html;
+  const frPath = frTwinPath(enPath);
+  let out = localizeStaticFr(localizeHtml(html, 'fr'));
+  out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
+    if (i % 2 === 0) return frMarkup(part);
+    if (part.startsWith('<style')) return part;
+    const m = /^(<script[^>]*>)([\s\S]*?)(<\/script>)$/.exec(part);
+    if (!m) return part;
+    if (/application\/ld\+json/.test(m[1])) return `${m[1]}\n${frJsonLd(m[2].trim())}\n${m[3]}`;
+    if (/application\/json/.test(m[1])) return `${m[1]}${frSearchData(m[2])}${m[3]}`;
+    return m[1] + frScript(m[2]) + m[3];
+  }).join('');
+  // Head and switch last, so their English addresses are not turned French.
+  out = addTwinHead(out, enPath)
+    .replace(/<html lang="en"(?: data-page-lang="en")?/, '<html lang="fr" data-page-lang="fr"')
+    .replace(/(<link rel="canonical" href=")https:\/\/okanaganroam\.com[^"]*"/, `$1https://okanaganroam.com${frPath}"`)
+    .replace(/(<meta property="og:url" content=")https:\/\/okanaganroam\.com[^"]*"/, `$1https://okanaganroam.com${frPath}"`)
+    .replace(/(<meta property="og:type"[^>]*>\n)/, '$1<meta property="og:locale" content="fr_CA">\n');
+  out = withTwinLangSwitch(out, enPath, 'fr');
+  // Deferred card batches and the rest of /browse load from their French addresses.
+  return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
+}
+// Wraps writeHead/end for one request: the page goes out as its English or French twin; a redirect inside the set
+// stays French.
+function installTwinResponse(res, lang, enPath) {
+  const realWriteHead = res.writeHead.bind(res), realEnd = res.end.bind(res);
+  let status = 200, headers = {};
+  res.writeHead = (code, h) => { status = code; headers = { ...(h || {}) }; return res; };
+  res.end = (body) => {
+    const type = String(headers['Content-Type'] || headers['content-type'] || '');
+    if (lang === 'fr' && status >= 300 && status < 400 && headers.Location) headers.Location = frHref(headers.Location);
+    if (body != null && status === 200 && /text\/html/.test(type)) {
+      body = lang === 'fr' ? frenchTwinHtml(String(body), enPath) : englishTwinHtml(String(body), enPath);
+      delete headers['Content-Length']; delete headers.ETag;
+    } else if (body != null && status === 404 && lang === 'fr' && /text\/html/.test(type)) {
+      // A French address whose English page does not exist gets the French 404 page.
+      body = frenchTwinHtml(String(body), '/');
+      delete headers['Content-Length'];
+    } else if (body != null && status === 200 && lang === 'fr' && /application\/json/.test(type) && enPath === '/browse/cards.json') {
+      try {
+        const j = JSON.parse(String(body));
+        if (j.k && typeof j.k === 'object') for (const id of Object.keys(j.k)) j.k[id] = `${j.k[id]} ${frSearchWords(id)}`.trim();
+        j.html = frenchTwinHtml(`<!DOCTYPE html><html lang="en"><body>${j.html}</body></html>`, '/browse').replace(/^[\s\S]*?<body>|<\/body><\/html>$/g, '');
+        body = JSON.stringify(j);
+      } catch (e) { /* the English rest is better than none */ }
+      delete headers['Content-Length'];
+    }
+    realWriteHead(status, headers);
+    return realEnd(body);
+  };
 }
 
 // Place share cards (2026-10-13): a place page's share image is its own generated card (share-card.js) -- the brand mark, a
@@ -21629,24 +22093,95 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
 // noindex and no canonical. The back link reuses the homepage's .app-btn
 // navy pill; the two scoped rules only centre the message and give that
 // link a 44px tap target.
+// The 404 page (2026-10-14): a search box (to /browse?q=), "did you mean"
+// links read from the address (the town, that town's category page, places
+// with a similar name) and a row of popular pages, instead of one button home.
+const NOT_FOUND_STOP_WORDS = new Set(['the', 'and', 'bar', 'inc', 'ltd', 'cafe', 'co', 'bc', 'okanagan', 'kelowna', 'penticton', 'vernon', 'west', 'restaurant', 'winery', 'wines', 'estate', 'guide', 'events']);
+function notFoundSuggestions(pathname) {
+  const segs = String(pathname || '').toLowerCase().split('/').map((x) => { try { return decodeURIComponent(x); } catch (e) { return x; } }).filter(Boolean);
+  const out = [];
+  const region = segs.find((x) => REGION_LABELS[x]) || null;
+  const typeBySlug = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([t, sl]) => [sl, t]));
+  const catSlug = segs.find((x) => typeBySlug[x]) || null;
+  if (region && catSlug) out.push({ href: `/${region}/${catSlug}`, label: `${CATEGORY_LABELS[typeBySlug[catSlug]].plural} in ${REGION_LABELS[region]}` });
+  if (region) out.push({ href: `/${region}`, label: `Everything in ${REGION_LABELS[region]}` });
+  else if (catSlug) out.push({ href: `/${catSlug}`, label: `${CATEGORY_LABELS[typeBySlug[catSlug]].plural} across the Okanagan` });
+  // Places whose address shares the longest words of the last part of the address.
+  const last = segs.filter((x) => !REGION_LABELS[x] && !typeBySlug[x]).pop() || '';
+  const words = [...new Set(last.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !NOT_FOUND_STOP_WORDS.has(w)))].sort((a, b) => b.length - a.length).slice(0, 3);
+  if (words.length && db) {
+    try {
+      const rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND (${words.map(() => 'slug LIKE ?').join(' OR ')}) LIMIT 300`)
+        .all(...words.map((w) => `%${w}%`));
+      const scored = rows.filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]).map((v) => {
+        const parts = String(v.slug).split('-');
+        const hits = words.filter((w) => parts.includes(w)).length + words.filter((w) => !parts.includes(w) && v.slug.includes(w)).length * 0.5;
+        return { v, hits, score: hits + (region && v.region === region ? 0.75 : 0) + (catSlug && CATEGORY_SLUGS[v.type] === catSlug ? 0.25 : 0) };
+      }).filter((x) => x.hits >= Math.min(words.length, 2) * 0.75).sort((a, b) => b.score - a.score || String(a.v.name).localeCompare(String(b.v.name))).slice(0, 4);
+      for (const { v } of scored.reverse()) out.unshift({ href: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, label: v.name, meta: `${CATEGORY_LABELS[v.type].singular} \u00b7 ${REGION_LABELS[v.region]}` });
+    } catch (e) { /* suggestions are optional */ }
+  }
+  const guess = words.length ? words.slice().sort((a, b) => last.indexOf(a) - last.indexOf(b)).join(' ') : '';
+  return { links: out.slice(0, 6), guess };
+}
+const NOT_FOUND_POPULAR = [
+  ['/browse', 'Browse everything'], ['/food-drink', 'Food & Drink'], ['/wineries', 'Wineries'], ['/whats-on', 'What\u2019s On'],
+  ['/outdoors', 'Outdoors'], ['/beaches', 'Beaches'], ['/destinations', 'Towns'], ['/map', 'Map'],
+];
 function render404Page(pathname) {
+  // Under /fr the page is French, with French suggestions (2026-10-14).
+  if (/^\/fr(\/|$)/.test(String(pathname || ''))) return frenchTwinHtml(render404PageEn(String(pathname).replace(/^\/fr/, '') || '/'), '/');
+  return render404PageEn(pathname);
+}
+function render404PageEn(pathname) {
+  const { links, guess } = notFoundSuggestions(pathname);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead('Page Not Found | Okanagan Roam', "We couldn't find a venue or page at that address.", null, [], { noindex: true, golfTheme: true })}
 ${renderAnalyticsHeadHtml('not_found')}
 <style>
-  body.golf-page .not-found-main { text-align: center; padding-top: 56px; padding-bottom: 88px; }
+  body.golf-page .not-found-main { max-width: 680px; margin: 0 auto; text-align: center; padding-top: 48px; padding-bottom: 72px; }
   body.golf-page .not-found-main a.app-btn { min-height: 44px; padding: 10px 24px; text-decoration: none; }
+  body.not-found-page .nf-lead { font-size: 1.05rem; line-height: 1.55; margin: 8px auto 22px; max-width: 46ch; }
+  body.not-found-page .nf-search { display: flex; gap: 8px; max-width: 520px; margin: 0 auto 28px; }
+  body.not-found-page .nf-search input { flex: 1; min-width: 0; min-height: 46px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line, #cfd8df); font: inherit; font-size: 1rem; background: #fff; color: var(--ink); }
+  body.not-found-page .nf-search input:focus-visible { outline: 3px solid var(--teal, #2A6B67); outline-offset: 2px; }
+  body.not-found-page .nf-search button { min-height: 46px; padding: 10px 20px; border: 0; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: #fff; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; }
+  body.not-found-page .nf-block { text-align: left; margin: 0 auto 26px; }
+  body.not-found-page .nf-block h2 { font-size: 1.05rem; margin: 0 0 10px; text-align: center; }
+  body.not-found-page .nf-suggest { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  body.not-found-page .nf-suggest a { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 12px 16px; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(27,43,58,.12); color: var(--ink); text-decoration: none; font-weight: 800; }
+  body.not-found-page .nf-suggest a:hover { text-decoration: underline; }
+  body.not-found-page .nf-suggest .nf-meta { font-weight: 600; font-size: 0.86rem; opacity: .7; white-space: nowrap; }
+  body.not-found-page .nf-popular { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  body.not-found-page .nf-popular a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
+  body.not-found-page .nf-popular a:hover { background: rgba(27,43,58,0.06); }
+  @media (max-width: 520px) { body.not-found-page .nf-suggest a { flex-direction: column; gap: 2px; } body.not-found-page .nf-search button { padding: 10px 16px; } }
 </style>
 </head>
 <body class="golf-page not-found-page">
   ${renderGolfTripTrayHtml()}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main not-found-main">
-    <h1>Page not found</h1>
-    <p>We couldn't find a venue or page at that address.</p>
-    <a class="app-btn" href="https://okanaganroam.com/">Back to Okanagan Roam</a>
+    <h1>We couldn\u2019t find that page</h1>
+    <p class="nf-lead">The place or page may have moved, or the address has a typo. Search for it, or pick up from one of these.</p>
+    <form class="nf-search" action="/browse" method="get" role="search">
+      <label class="visually-hidden" for="nfSearch">Search Okanagan Roam</label>
+      <input type="search" id="nfSearch" name="q" value="${escapeHtml(guess)}" placeholder="Search a place, town or what you feel like" autocomplete="off">
+      <button type="submit">Search</button>
+    </form>
+    ${links.length ? `<section class="nf-block" aria-labelledby="nfSuggestHeading">
+      <h2 id="nfSuggestHeading">Were you looking for\u2026</h2>
+      <ul class="nf-suggest">${links.map((l) => `
+        <li><a href="${escapeHtml(l.href)}"><span>${escapeHtml(l.label)}</span>${l.meta ? `<span class="nf-meta">${escapeHtml(l.meta)}</span>` : ''}</a></li>`).join('')}
+      </ul>
+    </section>` : ''}
+    <section class="nf-block" aria-labelledby="nfPopularHeading">
+      <h2 id="nfPopularHeading">Popular on Okanagan Roam</h2>
+      <p class="nf-popular">${NOT_FOUND_POPULAR.map(([h, t]) => `<a href="${h}">${escapeHtml(t)}</a>`).join('')}</p>
+    </section>
+    <a class="app-btn" href="/">Back to the home page</a>
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
@@ -25013,6 +25548,20 @@ function seasonalGuideLink(now = new Date()) {
   if (m === 12 || m <= 3) return FILE_GUIDES['/guides/winter-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/winter-okanagan']) ? { href: '/guides/winter-okanagan', label: 'Winter in the Okanagan: our seasonal guides' } : { href: SKI_GUIDE_PATH, label: 'Winter in the Okanagan: the ski season guide' };
   return null;
 }
+// "By town" on /guides (2026-10-14): each town's badge pages (Patios in
+// Kelowna, Happy Hour in Penticton...), one fold per town, Kelowna open.
+function guidesByTownHtml() {
+  const byTown = new Map();
+  for (const c of listGuideCombos(MIN_GUIDE_VENUES)) { if (!byTown.has(c.region)) byTown.set(c.region, []); byTown.get(c.region).push(c); }
+  if (!byTown.size) return '';
+  return `<section class="guides-group guides-by-town" id="by-town">
+        <h2>By town</h2>
+        <p class="guides-index-intro">Patios, happy hours, dog-friendly spots and more, town by town.</p>${[...byTown].map(([r, list], i) => `
+        <details class="guides-town"${i === 0 ? ' open' : ''}><summary>${escapeHtml(REGION_LABELS[r])}</summary>
+          <p class="guides-town-links">${list.map((c) => `<a href="/guide/${r}/${c.badge}">${escapeHtml(guideBadgeHeading(r, c.badge).heading.slice(0, -(` in ${REGION_LABELS[r]}`).length))} <span>${c.count}</span></a>`).join('')}</p>
+        </details>`).join('')}
+      </section>`;
+}
 function renderGuidesIndexPage(now = new Date()) {
   const title = 'Okanagan Guides: Things to Do by Season | Okanagan Roam';
   const description = 'Okanagan Roam’s guides to the Okanagan: fall harvest and events, cozy and rainy days, ski season, brunch, patios, wineries and dog-friendly spots.';
@@ -25052,6 +25601,12 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: t
   body.guides-index-page .guide-card-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 16px; }
   body.guides-index-page .guide-card-title { font-weight: 800; font-size: 1.02rem; line-height: 1.3; }
   body.guides-index-page .guide-card-desc { font-size: .9rem; line-height: 1.45; opacity: .8; }
+  body.guides-index-page .guides-town { border-top: 1px solid var(--line, #d9e0e6); padding: 10px 0; }
+  body.guides-index-page .guides-town summary { cursor: pointer; font-weight: 800; font-size: 1.05rem; }
+  body.guides-index-page .guides-town-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+  body.guides-index-page .guides-town-links a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); font-weight: 800; font-size: .88rem; text-decoration: none; }
+  body.guides-index-page .guides-town-links a:hover { background: rgba(27,43,58,0.06); }
+  body.guides-index-page .guides-town-links span { font-weight: 600; opacity: .65; }
 </style>
 </head>
 <body class="golf-page guides-index-page">
@@ -25068,6 +25623,7 @@ ${renderGolfHeaderHtml()}
         <ul class="guide-grid">${g.guides.map(card).join('')}
         </ul>
       </section>`).join('')}
+      ${guidesByTownHtml()}
     </div>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -26658,6 +27214,18 @@ ${renderGolfHeaderHtml()}
 }
 
 const server = http.createServer(async (req, res) => {
+  // French twins (2026-10-14): /fr + a main or town page renders that page and translates it on the way out; the
+  // English page of a pair gets its hreflang and EN / FR switch the same way.
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    const frTwinReq = frenchTwinRequest(req.url);
+    if (frTwinReq) {
+      req.url = frTwinReq.enUrl;
+      installTwinResponse(res, 'fr', frTwinReq.enPath);
+    } else {
+      const p = String(req.url).split('?')[0].replace(/(.)\/$/, '$1');
+      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p);
+    }
+  }
   const parsed = url.parse(req.url, true);
   const { pathname, query } = parsed;
 
@@ -27179,7 +27747,7 @@ const server = http.createServer(async (req, res) => {
       const sitemap = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-        ...urlEntries,
+        ...withFrenchTwinEntries(urlEntries),
         '</urlset>',
         '',
       ].join('\n');
@@ -27296,13 +27864,14 @@ const server = http.createServer(async (req, res) => {
           .prepare(`SELECT * FROM venues WHERE region = ? AND ${badge} = 1 AND redirect_to IS NULL ORDER BY reviews DESC`)
           .all(region);
         if (rows.length >= MIN_GUIDE_VENUES) {
-          const html = renderGuidePage(region, badge, rows.map(rowToVenue));
+          const gv = rows.map(rowToVenue);
+          const html = renderGuidePage(region, badge, gv, parseCuratedHubQuery(query, new Set(gv.map((v) => v.type)), new Set(GUIDE_FEATURES)));
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
       }
-      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      return res.end('Guide page not found');
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(render404Page(pathname));
     }
 
     // GET /admin/indexnow-submit?key=<INDEXNOW_KEY>
@@ -29011,7 +29580,7 @@ const server = http.createServer(async (req, res) => {
           return res.end();
         }
         const venueGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && venue[c.badge]);
-        const html = renderVenuePage(venue, getRelatedVenues(venue), getNearbyVenues(venue), venueGuidePages, { lang: 'fr' });
+        const html = frPageLinks(renderVenuePage(venue, getRelatedVenues(venue), getNearbyVenues(venue), venueGuidePages, { lang: 'fr' }));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': 'fr-CA' });
         return res.end(html);
       }
@@ -29521,6 +30090,12 @@ module.exports = {
   frHoursText,
   frDe,
   venueHasFrench,
+  hasFrenchTwin,
+  frenchTwinRequest,
+  frText,
+  frenchTwinHtml,
+  englishTwinHtml,
+  withFrenchTwinEntries,
   venuePagePath,
   APP_TRANSLATIONS,
   venueShareCardUrl,
