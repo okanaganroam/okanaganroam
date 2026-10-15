@@ -11963,6 +11963,7 @@ const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
           <li><a href="/about">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
+          <li><a href="/owner/login">Business login</a></li>
           <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
         </ul>`;
 
@@ -11973,7 +11974,7 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     const html = await res.text();
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
     assert.ok(footer, `${page} renders the shared footer`);
-    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly About Okanagan Roam / List your venue / List an Event / Contact`);
+    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly About Okanagan Roam / List your venue / List an Event / Business login / Contact`);
     const footerLinks = footer[0].replace(/<dialog[\s\S]*?<\/dialog>|<script[\s\S]*?<\/script>/g, '');
     assert.equal((footerLinks.match(/href="\/list-your-venue"/g) || []).length, 1, page);
     assert.equal((footerLinks.match(/href="\/list-an-event"/g) || []).length, 1, `${page}: exactly one List an Event link`);
@@ -20026,6 +20027,75 @@ test('Owner portal: photo uploads are private until approved, then can become th
     assert.equal((await fetch(`${base}/owner-photos/preview/${row2.preview_key}.jpg`)).status, 404);
   } finally {
     for (const f of created) { try { require('node:fs').unlinkSync(require('node:path').join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner portal: logins (create from the link, sign in, my listings, edit via session, lockout, reset)', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Login Fixture A', type: 'pub', hours: SEASON_WEEK, slug: 'owner-login-fixture-a' });
+  seasonInsert.run({ name: 'Owner Login Fixture B', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-login-fixture-b' });
+  const a = app.findVenueBySlug('kelowna', 'pub', 'owner-login-fixture-a');
+  const b = app.findVenueBySlug('kelowna', 'cafe', 'owner-login-fixture-b');
+  const tokenA = app.createOwnerLink(a.id, {}).url.split('/owner/')[1];
+  const tokenB = app.createOwnerLink(b.id, {}).url.split('/owner/')[1];
+  assert.ok(app.checkOwnerPassword('correct horse battery', app.hashOwnerPassword('correct horse battery')));
+  assert.equal(app.checkOwnerPassword('wrong', app.hashOwnerPassword('correct horse battery')), false);
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie) => fetch(`${base}${path}`, { method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.6.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
+  try {
+    assert.match(await get('/owner/login').then((r) => r.text()), /Business login/);
+    const venuePage = await get('/kelowna/pubs/owner-login-fixture-a').then((r) => r.text());
+    assert.match(venuePage, /Own this business\? <a href="\/owner\/login" rel="nofollow">Sign in to update this listing<\/a>/);
+    assert.match(venuePage, /<a href="\/owner\/login" class="nav-business-login" rel="nofollow">Business login<\/a>/);
+    assert.equal((await get('/owner/account')).status, 302);
+    // The edit link offers a login; creating one signs the owner in.
+    assert.match(await get(`/owner/${tokenA}`).then((r) => r.text()), /Create a login/);
+    assert.equal((await post(`/owner/${tokenA}/account`, { email: 'pat@example.com', password: 'short' })).status, 400);
+    const made = await post(`/owner/${tokenA}/account`, { email: 'Pat@Example.com', password: 'a long enough password' });
+    assert.equal(made.status, 201);
+    assert.equal(made.body.action, 'created');
+    assert.match(made.cookie, /^okr_owner=/);
+    // Adding venue B to the same login needs the password.
+    assert.equal((await post(`/owner/${tokenB}/account`, { email: 'pat@example.com', password: 'not the right password' })).status, 409);
+    assert.equal((await post(`/owner/${tokenB}/account`, { email: 'pat@example.com', password: 'a long enough password' })).body.action, 'venue_added');
+    // Sign in, see both venues, open and edit one through the session.
+    assert.equal((await post('/owner/login', { email: 'pat@example.com', password: 'nope nope nope' })).status, 401);
+    const login = await post('/owner/login', { email: 'pat@example.com', password: 'a long enough password' });
+    assert.equal(login.status, 200);
+    const mine = await get('/owner/account', login.cookie).then((r) => r.text());
+    assert.match(mine, /Owner Login Fixture A/);
+    assert.match(mine, /Owner Login Fixture B/);
+    const editPage = await get(`/owner/account/venue/${b.id}`, login.cookie);
+    assert.equal(editPage.status, 200);
+    assert.match(await editPage.text(), /Signed in as <strong>pat@example.com<\/strong>/);
+    const change = await post(`/owner/account/venue/${b.id}/changes`, { changes: { phone: '250-555-0177' }, started_at: Date.now() - 10000 }, login.cookie);
+    assert.equal(change.status, 201, JSON.stringify(change.body));
+    assert.equal(app.getOwnerChange(change.body.id).venue_id, b.id);
+    // A venue the account doesn't manage is off limits.
+    seasonInsert.run({ name: 'Owner Login Fixture C', type: 'pub', hours: SEASON_WEEK, slug: 'owner-login-fixture-c' });
+    const c = app.findVenueBySlug('kelowna', 'pub', 'owner-login-fixture-c');
+    assert.equal((await get(`/owner/account/venue/${c.id}`, login.cookie)).status, 404);
+    assert.equal((await post(`/owner/account/venue/${c.id}/changes`, { changes: { phone: '250-555-0100' }, started_at: Date.now() - 10000 }, login.cookie)).status, 404);
+    assert.equal((await post(`/owner/account/venue/${b.id}/changes`, { changes: { phone: '250-555-0100' }, started_at: Date.now() - 10000 })).status, 401);
+    // Logout ends the session.
+    await post('/owner/logout', {}, login.cookie);
+    assert.equal((await get('/owner/account', login.cookie)).status, 302);
+    // Five wrong passwords lock the account for a while.
+    for (let i = 0; i < 5; i++) await post('/owner/login', { email: 'pat@example.com', password: `wrong ${i} password` });
+    assert.equal((await post('/owner/login', { email: 'pat@example.com', password: 'a long enough password' })).status, 429);
+    // The edit link resets the password (and unlocks).
+    const reset = await post(`/owner/${tokenA}/account`, { email: 'pat@example.com', password: 'a brand new password' });
+    assert.equal(reset.body.action, 'password_reset');
+    assert.equal((await post('/owner/login', { email: 'pat@example.com', password: 'a brand new password' })).status, 200);
+  } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
 });

@@ -830,4 +830,31 @@ CREATE TABLE IF NOT EXISTS owner_photos (
 CREATE INDEX IF NOT EXISTS idx_owner_photos_venue ON owner_photos (venue_id, status);
 `);
 
+// Owner logins (2026-10-15): an owner creates a password from their private
+// edit link; one account can manage several venues. Sessions are stored as a
+// hash of the cookie value and expire after 30 days.
+db.exec(`
+CREATE TABLE IF NOT EXISTS owner_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  last_login_at TEXT,
+  failed_logins INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT
+);
+CREATE TABLE IF NOT EXISTS owner_account_venues (
+  account_id INTEGER NOT NULL REFERENCES owner_accounts(id),
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  added_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (account_id, venue_id)
+);
+CREATE TABLE IF NOT EXISTS owner_sessions (
+  token_hash TEXT PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES owner_accounts(id),
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL
+);
+`);
+
 module.exports = db;
