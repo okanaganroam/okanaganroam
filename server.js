@@ -12165,7 +12165,15 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-st.is-closed .pm-dot { background: transparent; box-shadow: inset 0 0 0 2px #B45309; }
   body.map-page .pm-layout { display: grid; gap: 14px; margin-top: 4px; }
   body.map-page .pm-map-wrap { position: relative; }
-  body.map-page #okMap { height: 52vh; min-height: 300px; max-height: 560px; border-radius: 16px; z-index: 0; }
+  body.map-page .pm-to-list { position: absolute; z-index: 500; left: 50%; transform: translateX(-50%); top: calc(min(52vh, 560px) - 58px); min-height: 42px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: #fff; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.92rem; box-shadow: 0 2px 10px rgba(0,0,0,0.3); cursor: pointer; white-space: nowrap; }
+  body.map-page .pm-to-list[hidden] { display: none; }
+  @media (max-height: 576px) { body.map-page .pm-to-list { top: 242px; } }
+  @media (min-width: 900px) { body.map-page .pm-to-list { display: none; } }
+  body.map-page .pm-key { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 2px 0; padding: 0; font-size: 0.8rem; opacity: 0.85; }
+  body.map-page .pm-key li { display: inline-flex; align-items: center; gap: 5px; }
+  body.map-page .pm-key-pin { display: inline-block; width: 14px; height: 14px; }
+  body.map-page .pm-key-pin span { width: 10px; height: 10px; margin: 0; border-width: 2px; }
+  body.map-page #okMap { height: min(52vh, 560px); min-height: 300px; border-radius: 16px; z-index: 0; }
   @media (min-width: 900px) {
     body.map-page .pm-layout { grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); align-items: start; }
     body.map-page .pm-map-wrap { position: sticky; top: 84px; }
@@ -12216,7 +12224,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
 const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FR = document.documentElement.lang === 'fr';
   var T = FR ? {
-    nearMe: 'Près de moi', stop: 'Arrêter', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.',
+    seeList: function(n){ return 'Voir la liste (' + n + ')'; },
+    stopAria: 'Arrêter d’utiliser ma position', nearMe: 'Près de moi', stop: 'Près de moi ✕', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone. Touchez ✕ pour l’arrêter.',
     denied: 'La localisation est désactivée pour ce site. Vous pouvez quand même parcourir la carte, ou l’activer dans les réglages de votre navigateur.',
     failed: 'Impossible de trouver votre position pour l’instant. Réessayez dans un endroit dégagé, ou parcourez la carte.', unsupported: 'Ce navigateur ne peut pas partager votre position.',
     loading: 'Chargement de la carte…', loadFailed: 'La carte n’a pas pu se charger. Rechargez la page pour réessayer.',
@@ -12229,7 +12238,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
     today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
-    nearMe: 'Near me', stop: 'Stop', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.',
+    seeList: function(n){ return 'See the list (' + n + ')'; },
+    stopAria: 'Stop using my location', nearMe: 'Near me', stop: 'Near me ✕', finding: 'Finding you…', near: 'Near you. Your location stays on your phone. Tap ✕ to stop.',
     denied: 'Location is turned off for this site. You can still browse the map, or turn location on in your browser settings.',
     failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or browse the map.', unsupported: 'This browser can’t share your location.',
     loading: 'Loading the map…', loadFailed: 'The map couldn’t load. Reload the page to try again.',
@@ -12246,7 +12256,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var mapEl = document.getElementById('okMap');
   var map = L.map(mapEl, { scrollWheelZoom: false }).setView([49.75, -119.5], 9);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
-  var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, chunkedLoading: true }) : L.layerGroup();
+  var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 15 ? 18 : z >= 13 ? 32 : 48; }, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
   var places = [], events = [], tab = 'places', groups = {}, openOnly = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
@@ -12276,18 +12286,20 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function mins(t){ if (!t) return null; var p = t.split(':'); return Number(p[0]) * 60 + Number(p[1]); }
   function timeText(t){ var m = mins(t); if (m == null) return ''; var h = Math.floor(m / 60), mm = m % 60, pad = (mm < 10 ? '0' : '') + mm; if (FR) return h + ' h' + (mm ? ' ' + pad : ''); return (h % 12 || 12) + (mm ? ':' + pad : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
   function dayText(d){ return new Date(d + 'T12:00:00Z').toLocaleDateString(FR ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); }
+  // Each day of an event runs from its start time (for a multi-day run, its daily start), so an evening event is
+  // "later today" in the afternoon, and one that has finished for the day moves to tomorrow if it runs on.
   function eventGroup(e, today, nowMin){
     if (e.sd > today) return e.sd === addDays(today, 1) ? 'tomorrow' : 'week';
     if (e.ed < today) return null;
-    var sm = mins(e.st), em = mins(e.et);
-    if (e.sd === today && sm != null && nowMin < sm) return 'later';
-    if (e.ed === today && em != null && sm != null && em > sm && nowMin >= em) return null;
-    if (e.sd === today && e.ed === today && sm != null && em == null && nowMin >= sm + 180) return null;
+    var sm = mins(e.st), em = mins(e.et), next = e.ed > today ? (e.ed >= addDays(today, 1) ? 'tomorrow' : null) : null;
+    if (sm != null && nowMin < sm) return 'later';
+    if (sm != null && em != null && em > sm && nowMin >= em) return next;
+    if (sm != null && em == null && nowMin >= sm + 180) return next;
     return 'now';
   }
   function whenText(e, g){
     var times = e.st ? timeText(e.st) + (e.et ? '–' + timeText(e.et) : '') : '';
-    if (g === 'now') return e.ed > e.sd ? T.onNow + ' · ' + T.until + ' ' + dayText(e.ed) : T.onNow + (times ? ' · ' + times : '');
+    if (g === 'now') return e.ed > e.sd && !e.st ? T.onNow + ' · ' + T.until + ' ' + dayText(e.ed) : T.onNow + (times ? ' · ' + times : '') + (e.ed > e.sd ? ' · ' + T.until + ' ' + dayText(e.ed) : '');
     if (g === 'later') return T.today + ' · ' + times;
     if (g === 'tomorrow') return T.tomorrow + (times ? ' · ' + times : '');
     return dayText(e.sd) + (times ? ' · ' + times : '');
@@ -12325,7 +12337,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (cluster.addLayers) cluster.addLayers(layers); else layers.forEach(function(m){ cluster.addLayer(m); });
     listItems = items;
     drawList();
-    if (fit && me && radiusKm) map.fitBounds(L.latLng(me.lat, me.lng).toBounds(radiusKm * 2000), { padding: [20, 20] });
+    // Near me opens on the closest dozen places (individual pins, not bubbles); the list still covers the whole distance.
+    if (fit && me) {
+      var close = (tab === 'places' ? items : onMap).filter(function(x){ return x.lat != null; }).slice(0, 12).map(function(x){ return [x.lat, x.lng]; });
+      if (close.length) map.fitBounds(L.latLngBounds(close.concat([[me.lat, me.lng]])), { padding: [36, 36], maxZoom: 17 });
+      else map.setView([me.lat, me.lng], 13);
+    }
     else if (fit && term && tab === 'places' && onMap.length && onMap.length <= 25) map.fitBounds(L.latLngBounds(onMap.map(function(p){ return [p.lat, p.lng]; })), { padding: [40, 40], maxZoom: 16 });
     lastRender = me ? { lat: me.lat, lng: me.lng } : null;
   }
@@ -12344,6 +12361,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     });
     if (!listItems.length && (me || tab === 'events' || map.getZoom() >= 12 || term)) html = '<li class="pm-empty">' + esc(tab === 'places' ? T.none : T.noEvents) + '</li>';
     listEl.innerHTML = html;
+    toList.hidden = !listItems.length;
+    toList.textContent = T.seeList(listItems.length);
     moreBtn.hidden = listItems.length <= limit;
     moreBtn.textContent = T.more;
   }
@@ -12359,6 +12378,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   });
   document.addEventListener('click', function(e){ var d = e.target.closest && e.target.closest('[data-dir]'); if (d) track('map_directions', { kind: d.getAttribute('data-dir'), located: !!me }); });
   moreBtn.addEventListener('click', function(){ limit += 25; drawList(); });
+  var toList = $('pmToList');
+  toList.addEventListener('click', function(){ countEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   // Where the visitor is: only after they tap Near me, kept in this page only.
   function drawMe(){
     var ll = [me.lat, me.lng];
@@ -12378,14 +12399,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     drawMe();
     if (first) {
       radiusKm = pickRadius(); radiusSel.value = String(radiusKm); radiusSel.hidden = false;
-      nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.stop; setStatus(T.near);
+      nearBtn.setAttribute('aria-pressed', 'true'); nearBtn.setAttribute('aria-label', T.stopAria); nearLabel.textContent = T.stop; setStatus(T.near);
       track('map_near_me', { radius_km: radiusKm });
       render(true);
-      if (!radiusKm) map.setView([me.lat, me.lng], 12);
     } else if (!lastRender || distKm(lastRender.lat, lastRender.lng, me.lat, me.lng) > 0.15) render(false);
   }
   function onErr(err){
-    stopWatch();
+    watching = false; stopWatch();
     if (!me) { nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; }
     setStatus(err && err.code === 1 ? T.denied : T.failed);
   }
@@ -12399,7 +12419,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (watching || me) {
       watching = false; stopWatch(); me = null;
       if (meMarker) { map.removeLayer(meMarker); map.removeLayer(meCircle); meMarker = meCircle = null; }
-      nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; radiusSel.hidden = true; setStatus('');
+      nearBtn.setAttribute('aria-pressed', 'false'); nearBtn.removeAttribute('aria-label'); nearLabel.textContent = T.nearMe; radiusSel.hidden = true; setStatus('');
       places.forEach(function(p){ p.d = null; }); render(false); return;
     }
     nearLabel.textContent = T.finding; startWatch();
@@ -12578,7 +12598,12 @@ ${renderGolfHeaderHtml()}
     </div>
   </div>
   <div class="pm-layout">
-    <div class="pm-map-wrap"><div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div></div>
+    <div class="pm-map-wrap"><div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
+      <button type="button" class="pm-to-list" id="pmToList" hidden>See the list</button>
+      <ul class="pm-key" aria-label="What the pins mean">
+        ${MAP_GROUPS.map((g) => `<li><span class="pm-pin pm-key-pin pm-pin-${g.key}" aria-hidden="true"><span></span></span>${escapeHtml(g.label)}</li>`).join('')}<li><span class="pm-pin pm-key-pin pm-pin-event" aria-hidden="true"><span></span></span>Events</li>
+      </ul>
+    </div>
     <section class="pm-results" aria-labelledby="pmCount">
       <h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;</h2>
       <ul class="pm-list" id="pmList"></ul>
