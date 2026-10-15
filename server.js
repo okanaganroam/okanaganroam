@@ -9456,7 +9456,7 @@ const NAV_REFRESH_STYLE = `<style id="nav-refresh">
 .nav-links a.nav-roam-now { font-weight: 800; white-space: nowrap; }
 @media (max-width: 940px) {
   #navHamburger { position: relative; }
-  #navHamburger::before { content: ''; position: absolute; top: 0; left: -4px; width: 9px; height: 9px; border-radius: 50%; background: #E11D48; box-shadow: 0 0 0 2px #fff; animation: live-glow 2s ease-in-out infinite; }
+  #navHamburger::before { content: ''; position: absolute; bottom: -1px; right: -5px; width: 9px; height: 9px; border-radius: 50%; background: #E11D48; box-shadow: 0 0 0 2px #fff; animation: live-glow 2s ease-in-out infinite; }
 }
 @keyframes live-glow { 0%, 100% { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(225,29,72,0.5); } 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 7px rgba(225,29,72,0); } }
 @media (prefers-reduced-motion: reduce) { .live-dot::after, #navHamburger::before { animation: none; } }
@@ -12299,7 +12299,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   @keyframes pm-spin { to { transform: rotate(360deg); } }
   /* The list: a sheet that peeks from the bottom; tap or drag the handle for more. */
   body.map-page .pm-sheet { position: absolute; z-index: 650; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; height: 150px; max-height: calc(100% - 20px); background: var(--bg, #F7F5F0); border-radius: 20px 20px 0 0; box-shadow: 0 -2px 14px rgba(27,43,58,0.2); transition: height 0.25s ease; }
-  body.map-page .pm-sheet[data-state="half"] { height: 52%; }
+  body.map-page .pm-sheet[data-state="half"] { height: 42%; }
   body.map-page .pm-sheet[data-state="full"] { height: calc(100% - 124px); }
   body.map-page .pm-sheet.is-dragging { transition: none; }
   body.map-page .pm-handle { flex: none; display: flex; justify-content: center; align-items: center; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; }
@@ -12395,6 +12395,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-empty { padding: 14px; border-radius: 12px; background: rgba(27,43,58,0.05); font-size: 0.92rem; }
   body.map-page .pm-more { margin: 12px auto 4px; display: block; min-height: 42px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
   body.map-page .pm-more[hidden] { display: none; }
+  @media (max-width: 899px) { body.map-page .pm-sheet[data-state="peek"] .pm-privacy { display: none; } }
   body.map-page .pm-privacy { margin: 16px 4px 0; font-size: 0.78rem; line-height: 1.45; opacity: 0.7; max-width: 72ch; }
   body.map-page .pm-pop a { font-weight: 800; }
   body.map-page .pm-pop small { display: block; opacity: 0.75; margin: 2px 0 4px; }
@@ -12429,7 +12430,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
     micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
-    nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.', stopped: 'Position désactivée.',
+    nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Voici ce qui est près de vous.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
     pinBtn: 'Déposer un repère', pinRemove: 'Retirer le repère', pinRemoved: 'Repère retiré.', stopLocTxt: 'Désactiver ma position',
     tapToPin: 'Touchez la carte là où vous voulez regarder autour.', pinned: 'Voici ce qui est autour de votre repère. Faites-le glisser pour le déplacer.',
@@ -12441,7 +12442,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     placesHere: function(n){ return n + (n === 1 ? ' lieu' : ' lieux') + ' dans cette zone de la carte'; },
     openSuffix: ' ouverts', eventsCount: function(n){ return n + (n === 1 ? ' événement' : ' événements') + ' cette semaine'; },
     eventsNear: function(n, r){ return n + (n === 1 ? ' événement' : ' événements') + (r ? ' à moins de ' + r + ' km' : ' près de vous') + ' cette semaine'; },
-    zoomHint: 'Touchez le bouton de position, déposez un repère ou zoomez pour voir ce qui est proche.',
+    zoomHint: 'Touchez le bouton de position pour voir ce qui est près de vous.',
     none: 'Rien ne correspond ici. Essayez une plus grande distance ou retirez un filtre.', noEvents: 'Aucun événement cette semaine ici. Essayez une plus grande distance.',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
     today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
@@ -12454,7 +12455,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
     micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
-    nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.', stopped: 'Location turned off.',
+    nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Showing what’s near you.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
     pinBtn: 'Drop a pin', pinRemove: 'Remove the pin', pinRemoved: 'Pin removed.', stopLocTxt: 'Turn off my location',
     tapToPin: 'Tap the map where you want to look around.', pinned: 'Showing what’s around your pin. Drag it to move it.',
@@ -12466,7 +12467,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     placesHere: function(n){ return n + (n === 1 ? ' place' : ' places') + ' in this part of the map'; },
     openSuffix: ' open', eventsCount: function(n){ return n + (n === 1 ? ' event' : ' events') + ' this week'; },
     eventsNear: function(n, r){ return n + (n === 1 ? ' event' : ' events') + (r ? ' within ' + r + ' km' : ' near you') + ' this week'; },
-    zoomHint: 'Tap the locate button, drop a pin, or zoom in to see what’s close by.',
+    zoomHint: 'Tap the locate button to see what’s near you.',
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
     today: 'Today', until: 'until', onNow: 'On now', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
@@ -12494,7 +12495,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   fitStage(); map.invalidateSize(); okLimits(); window.addEventListener('resize', function(){ fitStage(); map.invalidateSize(); okLimits(); });
   // The list sheet: peek, half or full. Tap the handle to step up; drag it (or the heading) to any of the three.
   var STATES = ['peek', 'half', 'full'];
-  function sheetH(){ stage.style.setProperty('--pm-sheet-h', WIDE.matches ? '0px' : Math.round(Math.min(sheet.offsetHeight, stage.offsetHeight * 0.52)) + 'px'); }
+  function sheetH(){ stage.style.setProperty('--pm-sheet-h', WIDE.matches ? '0px' : Math.round(Math.min(sheet.offsetHeight, stage.offsetHeight * 0.42)) + 'px'); }
   function setSheet(st){ if (WIDE.matches) return; sheet.setAttribute('data-state', st); handle.setAttribute('aria-label', st === 'full' ? T.sheetLess : T.sheetMore); setTimeout(sheetH, 260); }
   var drag = null;
   function dragStart(e){ if (WIDE.matches || (e.button != null && e.button !== 0) || e.target.closest('.pm-tab')) return; drag = { y: e.clientY, h: sheet.offsetHeight, moved: false }; }
@@ -12607,8 +12608,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var st = stage.getBoundingClientRect(), fl = topEl.getBoundingClientRect(), sh = sheet.getBoundingClientRect();
     if (WIDE.matches) return { paddingTopLeft: [Math.round(sh.right - st.left) + 24, 24], paddingBottomRight: [70, 24] };
     // The sheet may still be sliding, so use the height it is heading for.
-    var state = sheet.getAttribute('data-state'), H = st.height, sheetPx = state === 'full' ? H - 124 : state === 'half' ? H * 0.52 : 150;
-    return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(Math.min(sheetPx, H * 0.52)) + 20] };
+    var state = sheet.getAttribute('data-state'), H = st.height, sheetPx = state === 'full' ? H - 124 : state === 'half' ? H * 0.42 : 150;
+    return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(Math.min(sheetPx, H * 0.42)) + 20] };
   }
   function fitTo(bounds, maxZoom){ var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
   var TAGIX = {}; (CONF.tg || []).forEach(function(t, i){ TAGIX[t.k] = i; });
@@ -13252,6 +13253,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
   }
   searchEl.addEventListener('keydown', function(e){ if (e.key !== 'Enter') return; e.preventDefault(); runSearch(searchEl.value); });
+  // The search hint cycles through real examples the search understands (each fits beside the microphone on a phone),
+  // and stops while the visitor is typing or the box has words in it.
+  var HINTS = FR ? ['Ex. « terrasse chiens OK »', 'Ex. « glace près de moi »', 'Ex. « sushi à Penticton »', 'Ex. « happy hour »', 'Ex. « brunch demain »', 'Ex. « vignobles à Oliver »', 'Ex. « pizza et bière »', 'Ex. « végane près de moi »']
+    : ['Try “dog-friendly patio”', 'Try “ice cream near me”', 'Try “sushi in Penticton”', 'Try “happy hour now”', 'Try “brunch tomorrow”', 'Try “cheap eats open late”', 'Try “wineries in Oliver”', 'Try “live music tonight”', 'Try “pizza and craft beer”', 'Try “vegan food near me”'];
+  var hintAt = 0;
+  setInterval(function(){ if (document.hidden || searchEl.value || document.activeElement === searchEl) return; hintAt = (hintAt + 1) % HINTS.length; searchEl.placeholder = HINTS[hintAt]; }, 3500);
   // ---- Search by voice: the browser's own speech service types what the visitor says, then it is searched ----
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition, micBtn = $('pmMic'), rec = null, listening = false;
   if (SR && micBtn) {
@@ -13527,7 +13534,7 @@ ${renderGolfHeaderHtml()}
       <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
-        <input type="search" id="pmSearch" class="pm-search" placeholder="Try “patio drinks dog” or a name" autocomplete="off" enterkeyhint="search">
+        <input type="search" id="pmSearch" class="pm-search" placeholder="Try “dog-friendly patio”" autocomplete="off" enterkeyhint="search">
         <button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
         <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="visually-hidden">Filters</span><span class="pm-badge" id="pmBadge" hidden></span></button>
       </div>
