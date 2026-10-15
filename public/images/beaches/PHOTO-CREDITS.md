@@ -40,8 +40,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/summerland-crescent-beach.jpg`
 
 ## 08. Coral Beach North — READY
-- Source: www.lakecountry.bc.ca
-- [Source page](https://www.lakecountry.bc.ca/parks-recreation-culture/parks-facilities-directory/coral-beach-north) · [Original image](https://www.lakecountry.bc.ca/sites/default/files/styles/medium/public/2024-06/e4814c8b-2c84-4af3-8919-b595a86f8f7d.jpg?itok=03WB4B7F)
+- Source: OKConnect.events
+- [Source page](https://okconnect.events/beaches-in-the-okanagan-family-fun-beach-spots/) · [Original image](https://okconnect.events/wp-content/uploads/2025/11/coral-beach-north-beach-area-lake-country-bc-OKConnect.jpg)
 - Local file: `/images/beaches/venues/lake-country-coral-beach-north.jpg`
 
 ## 09. Rotary Beach Park (Kelowna) — READY
@@ -195,8 +195,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/kelowna-bertram-creek-regional-park.jpg`
 
 ## 39. Goodman Park Dog Swimming Area — READY
-- Source: OKConnect.events
-- [Source page](https://okconnect.events/beaches-in-the-okanagan-family-fun-beach-spots/) · [Original image](https://okconnect.events/wp-content/uploads/2022/05/goodman-park-beach-osoyoos-bc.jpg)
+- Source: Canada Culinary (adapted from Destination Osoyoos)
+- [Source page](https://www.canadaculinary.com/stories/7-worthy-spots-for-picnic-lunches-around-osoyoos/) · [Original image](https://www.canadaculinary.com/images/transforms/stories/_story/Goodman-Park.jpeg)
 - Local file: `/images/beaches/venues/osoyoos-goodman-park-dog-swimming-area.jpg`
 
 ## 40. Lions Park (Okanagan Falls) — READY
