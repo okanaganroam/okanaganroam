@@ -16766,6 +16766,16 @@ test('Happy hour times: guarded write, the admin route, and Happy hour now on th
   assert.match(html, /k === 'happy' && hhKnown \? !\(p\.hhs && p\.hhs\.now\)/, 'Happy hour now needs researched times that are on now');
 });
 
+test('Seasonal notices read in French on French pages (2026-10-14)', () => {
+  const f = require('../french-text.js');
+  const fr = (t) => { for (const [rx, fn] of f.FR_PATTERNS) { const m = t.match(rx); if (m) return fn(m, null, {}); } return null; };
+  assert.equal(fr('Closed for the season. Reopens November 26.'), 'Fermé pour la saison. Réouverture le 26 novembre.');
+  assert.equal(fr('Closed for the season. Reopens May 15, 2027.'), 'Fermé pour la saison. Réouverture le 15 mai 2027.');
+  assert.equal(fr('Closed for the season. The reopening date has not been announced yet.'), 'Fermé pour la saison. La date de réouverture n’a pas encore été annoncée.');
+  assert.equal(fr('Open for the season until October 1.'), 'Ouvert pour la saison jusqu’au 1er octobre.');
+  assert.match(fr('Reopening for the season December 11. Check current hours with the venue before you go.'), /^Réouverture pour la saison le 11 décembre\./);
+});
+
 // ---- Derived hours badges: Open Early / Open Late (2026-10-11) ----------
 // Computed only from stored hours (deriveHoursBadges), never set by hand.
 // These tests run last and use their own fixtures in 'summerland', so no

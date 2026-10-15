@@ -961,7 +961,17 @@ for (let n = 1; n <= 20; n++) {
   if (n === 1) FR_TEXT[`All {T} ${links[0]}, or ${links[1]}.`] = `À {T} : ${links[0]} ou ${links[1]}.`;
 }
 
+// Seasonal notices (2026-10-14): "Closed for the season. Reopens November 26." and the rest, with the full month names
+// the season dates use.
+const MONTHS_LONG = { January: 'janvier', February: 'février', March: 'mars', April: 'avril', May: 'mai', June: 'juin', July: 'juillet', August: 'août', September: 'septembre', October: 'octobre', November: 'novembre', December: 'décembre' };
+const SEASON_DATE = '(January|February|March|April|May|June|July|August|September|October|November|December) (\\d{1,2})(?:, (\\d{4}))?';
+const seasonDate = (m, i) => `${m[i + 1] === '1' ? '1er' : m[i + 1]} ${MONTHS_LONG[m[i]]}${m[i + 2] ? ` ${m[i + 2]}` : ''}`;
 const FR_PATTERNS = [
+  [/^Closed for the season\.$/, () => 'Fermé pour la saison.'],
+  [/^Closed for the season\. The reopening date has not been announced yet\.$/, () => 'Fermé pour la saison. La date de réouverture n’a pas encore été annoncée.'],
+  [new RegExp(`^Closed for the season\\. Reopens ${SEASON_DATE}\\.$`), (m) => `Fermé pour la saison. Réouverture le ${seasonDate(m, 1)}.`],
+  [new RegExp(`^Open for the season until ${SEASON_DATE}\\.$`), (m) => `Ouvert pour la saison jusqu’au ${seasonDate(m, 1)}.`],
+  [new RegExp(`^Reopening for the season ${SEASON_DATE}\\. Check current hours with the venue before you go\\.$`), (m) => `Réouverture pour la saison le ${seasonDate(m, 1)}. Vérifiez les heures auprès de l’établissement avant d’y aller.`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
   [/^Places to start in (.+)$/, (m) => `Par où commencer à ${m[1]}`],
   [/^Read more about (.+)$/, (m) => `En savoir plus sur ${m[1]}`],
