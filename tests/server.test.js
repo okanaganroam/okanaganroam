@@ -17644,8 +17644,12 @@ test('Venue descriptions ship in English and French: the EN / FR toggle (<html l
       assert.equal(page.status, 200);
       assert.match(page.text, /<p class="venue-description"><span class="desc-en" lang="en">A cosy test bistro \(fixture\)\.<\/span><span class="desc-fr" lang="fr">Un bistro d&#39;essai chaleureux \(fixture\)\.<\/span><\/p>/);
       assert.match(page.text, /\.desc-fr \{ display: none; \}\nhtml\[lang="fr"\] \.desc-fr \{ display: inline; \}\nhtml\[lang="fr"\] \.desc-en \{ display: none; \}/);
+      // A list page with a French twin (2026-10-14) carries the English blurb only; its /fr twin carries the French.
       const list = await WINTER_GET(base, '/kelowna/restaurants');
-      assert.match(list.text, /<span class="desc-en" lang="en">A cosy test bistro \(fixture\)\.<\/span><span class="desc-fr" lang="fr">Un bistro d&#39;essai chaleureux/);
+      assert.match(list.text, /A cosy test bistro \(fixture\)\./);
+      assert.doesNotMatch(list.text, /Un bistro d&#39;essai chaleureux/);
+      const frList = await WINTER_GET(base, '/fr/kelowna/restaurants');
+      assert.match(frList.text, /Un bistro d&#39;essai chaleureux/);
       // No translation: plain escaped English, exactly as before.
       const beach = await WINTER_GET(base, '/kelowna/beaches/english-only-test-beach');
       assert.match(beach.text, /<p class="venue-description">A test beach &amp; cove \(fixture\)\.<\/p>/);

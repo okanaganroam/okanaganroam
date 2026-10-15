@@ -8913,6 +8913,13 @@ const SEO_PAGE_CSS = `
   .category-region-selector a:hover {
     background: var(--plum); color: var(--paper);
   }
+  /* Phones (2026-10-14): one row of towns that scrolls sideways, so the places themselves show on the first screen
+     (wrapped, twenty towns took seven rows). */
+  @media (max-width: 700px) {
+    html body nav.category-region-selector { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 6px; }
+    html body nav.category-region-selector::-webkit-scrollbar { display: none; }
+    html body nav.category-region-selector a, html body nav.category-region-selector .category-region-selector-active { flex: none; white-space: nowrap; }
+  }
 
   /* Back-link on a category's single-region page (e.g. /kelowna/golf)
      to its Okanagan-wide page (e.g. /golf) -- only categories in
@@ -21218,6 +21225,8 @@ function englishTwinHtml(html, enPath) {
     .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
     .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
   out = withTwinLangSwitch(out, frHrefPath, 'en');
+  // French readers are sent to the twin, so an English card carries its English blurb only (lighter list pages).
+  out = out.replace(/<span class="desc-en" lang="en">([\s\S]*?)<\/span><span class="desc-fr" lang="fr">[\s\S]*?<\/span>/g, '$1');
   return out;
 }
 function frenchTwinHtml(html, enPath) {
