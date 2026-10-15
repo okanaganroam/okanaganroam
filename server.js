@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const { beachPhotoForVenue } = require('./beach-photo-fallbacks');
 // Golf course data (2026-09-26): verified green fees, course profiles and
 // links to official course maps -- golf pages only. Guarded like db.js so a
 // copy of the app without golf-data.js renders exactly as before.
@@ -195,6 +196,9 @@ function rowToVenue(row) {
   for (const f of ['name', 'region', 'type', 'cuisine', 'phone', 'price', 'reviews', 'rating', 'description', 'description_fr', 'hours', 'address', 'website', 'image_url', 'slug', 'latitude', 'longitude', 'redirect_to']) {
     v[f] = row[f];
   }
+  // Exact-place beach photography stays local and is only a fallback; an
+  // image supplied on the venue record always takes precedence.
+  v.image_url = beachPhotoForVenue(v);
   for (const f of BOOL_FIELDS) {
     v[f] = !!row[f];
   }
