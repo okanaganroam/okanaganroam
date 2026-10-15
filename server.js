@@ -12392,6 +12392,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-dir { background: #1D4ED8; color: #fff; }
   body.map-page .pm-dir:hover { background: #1E40AF; color: #fff; }
   body.map-page .pm-link { border: 1px solid rgba(27,43,58,0.25); color: var(--ink); }
+  body.map-page .pm-relax { margin-left: 4px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: #1D4ED8; color: #fff; font: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer; }
   body.map-page .pm-empty { padding: 14px; border-radius: 12px; background: rgba(27,43,58,0.05); font-size: 0.92rem; }
   body.map-page .pm-more { margin: 12px auto 4px; display: block; min-height: 42px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
   body.map-page .pm-more[hidden] { display: none; }
@@ -12427,7 +12428,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
-    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
+    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
     micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Voici ce qui est près de vous.', stopped: 'Position désactivée.',
@@ -12452,7 +12453,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
-    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
+    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
     micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Showing what’s near you.', stopped: 'Location turned off.',
@@ -12713,7 +12714,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
           + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
       }
     });
-    if (!listItems.length && (me || tab === 'events' || map.getZoom() >= 12 || term)) html = '<li class="pm-empty">' + esc(tab === 'places' ? T.none : T.noEvents) + '</li>';
+    if (!listItems.length && (me || tab === 'events' || map.getZoom() >= 12 || term)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(T.noEvents)) + '</li>';
     listEl.innerHTML = html;
     if (typeof route !== 'undefined' && route) drawRoute();
     moreBtn.hidden = listItems.length <= limit;
@@ -13067,9 +13068,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (onTags().length > 1 && !places.some(matchesPlace)) { tagAny = true; setStatus(T.anyOf); }
     if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || town || price || atMin != null || atDay) && !places.some(matchesPlace)) { setStatus(T.ignored(term)); term = ''; searchEl.value = ''; }
     syncChips(); limit = 25;
-    if (me && radiusKm && !radiusFixed && !town) {
-      var n = places.filter(function(p){ return matchesPlace(p) && p.d <= radiusKm; }).length;
-      if (n < 3) { var r = pickRadius(3); if (r !== radiusKm) { radiusKm = r; radiusSel.value = String(r); setStatus(r ? T.widened(r) : T.widenedAny); } }
+    if (me && !radiusFixed && !town) {
+      var filtering = anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || price || atMin != null || atDay || term;
+      if (places.some(matchesPlace)) {
+        var r = pickRadius(filtering ? 3 : 8), wider = r === 0 || (radiusKm && r > radiusKm);
+        if (r !== radiusKm) { radiusKm = r; radiusSel.value = String(r); if (wider && filtering) setStatus(r ? T.widened(r) : T.widenedAny); }
+      }
     }
     render(!!me || !!town);
   }
@@ -13090,8 +13094,42 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (part[0] === 'notf') delete notFeats[part[1]];
     liveBase = null; changed();
   });
-  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; liveBase = null; searchEl.value = ''; changed(); }
+  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; liveBase = null; radiusFixed = false; searchEl.value = ''; changed(); }
   function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
+  // When nothing matches: the first filter worth dropping that gives results at some distance ("Try without Open at
+  // 3 AM"), with a button that drops it (the distance then chooses itself). Tried one at a time on a copy of the filters.
+  function dropOne(id){
+    var part = id.split(':');
+    if (part[0] === 'tag') delete tags[part[1]]; else if (part[0] === 'town') town = ''; else if (part[0] === 'price') price = '';
+    else if (part[0] === 'at') { atMin = null; atDay = ''; atUntil = false; } else if (part[0] === 'nott') delete notTags[part[1]];
+    else if (part[0] === 'notk') delete notKinds[part[1]]; else if (part[0] === 'notf') delete notFeats[part[1]]; else if (part[0] === 'noty') delete notTypes[part[1]];
+    else if (part[0] === 'kind') delete kinds[part[1]]; else if (part[0] === 'feat') delete feats[part[1]];
+    else if (part[0] === 'open') openOnly = false; else if (part[0] === 'top') topOnly = false; else if (part[0] === 'term') term = '';
+  }
+  // In the order worth dropping first: where and when before what the visitor is looking for.
+  function candidates(){
+    var xs = extras(), pick = function(pre){ return xs.filter(function(x){ return x.id.indexOf(pre) === 0; }).map(function(x){ return { id: x.id, label: x.label }; }); };
+    var out = [].concat(pick('town'), pick('at'), pick('price'));
+    if (topOnly) out.push({ id: 'top', label: T.top });
+    if (openOnly) out.push({ id: 'open', label: openBtns[0].textContent.replace(/^\\s+|\\s+$/g, '') });
+    on(feats).forEach(function(k){ out.push({ id: 'feat:' + k, label: featLabel(k) }); });
+    out = out.concat(pick('not'), pick('tag'));
+    on(kinds).forEach(function(k){ out.push({ id: 'kind:' + k, label: kindLabel(k) }); });
+    if (term) out.push({ id: 'term', label: term });
+    return out;
+  }
+  function relaxHtml(){
+    var best = null, base = snapshot(), t0 = term, cs = candidates();
+    if (cs.length === 1 && cs[0].id === 'term') return esc(T.noName(term));
+    cs.forEach(function(c){
+      if (best) return;
+      dropOne(c.id); var n = places.some(matchesPlace) ? 1 : 0; restore(JSON.parse(JSON.stringify(base))); term = t0;
+      if (n) best = { id: c.id, label: c.label, n: n };
+    });
+    if (!best) return esc(T.none);
+    return esc(T.without(best.label)) + ' <button type="button" class="pm-relax" data-relax="' + esc(best.id) + '">' + esc(T.dropIt) + '</button>';
+  }
+  listEl.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-relax]'); if (!b) return; dropOne(b.getAttribute('data-relax')); if (b.getAttribute('data-relax') === 'term') searchEl.value = ''; liveBase = null; changed(); });
   function kindLabel(k){ var c = kindChips.filter(function(x){ return x.getAttribute('data-pm-kind') === k; })[0]; return c ? c.textContent.replace(/^\\s+|\\s+$/g, '').replace(/^\\S+\\s+/, '') : k; }
   function featLabel(k){ return T.feat[k] || k; }
   function tagLabel(k){ var t = CONF.tg[TAGIX[k]]; return FR ? t.fr : t.en; }
@@ -13248,7 +13286,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } term = v.trim().toLowerCase(); changed(); } }, 450); });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
-    clearTimeout(timer); wantNear = false; readSearch(v, false); searchEl.value = term; searchEl.blur();
+    clearTimeout(timer); wantNear = false; radiusFixed = false; readSearch(v, false); searchEl.value = term; searchEl.blur();
     track('map_search', { words: searchEl.value ? 1 : 0, how: how || 'typed' }); changed();
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
