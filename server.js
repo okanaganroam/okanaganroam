@@ -12185,6 +12185,23 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-feat { padding: 2px 9px; border-radius: 999px; background: rgba(27,43,58,0.06); font-size: 0.78rem; font-weight: 700; color: var(--ink); }
   body.map-page .pm-feat.is-on { background: rgba(22,101,52,0.12); color: #14532D; }
   body.map-page .pm-dog { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.35; color: #5B3A1A; }
+  body.map-page .pm-route[hidden], body.map-page .pm-count[hidden], body.map-page .pm-list[hidden] { display: none; }
+  body.map-page .pm-route { background: #fff; border-radius: 16px; box-shadow: 0 1px 4px rgba(27,43,58,0.15); padding: 14px 16px; margin-bottom: 12px; }
+  body.map-page .pm-route-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  body.map-page .pm-route-head h2 { margin: 0; font-size: 1.1rem; line-height: 1.3; }
+  body.map-page .pm-route-end { flex: none; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
+  body.map-page .pm-modes { display: inline-flex; gap: 4px; padding: 4px; margin: 10px 0 6px; border-radius: 999px; background: rgba(27,43,58,0.07); }
+  body.map-page .pm-mode { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer; color: var(--ink); }
+  body.map-page .pm-mode[aria-pressed="true"] { background: #1D4ED8; color: #fff; }
+  body.map-page .pm-route-sum { margin: 6px 0 8px; font-size: 1rem; }
+  body.map-page .pm-route-sum strong { font-size: 1.25rem; color: #1D4ED8; }
+  body.map-page .pm-route-sum.is-arrived { font-weight: 800; color: #166534; }
+  body.map-page .pm-steps { margin: 0; padding: 0 0 0 22px; display: grid; gap: 6px; font-size: 0.92rem; line-height: 1.35; }
+  body.map-page .pm-steps li { padding: 4px 6px; border-radius: 8px; }
+  body.map-page .pm-steps li small { display: block; opacity: 0.65; font-size: 0.8rem; }
+  body.map-page .pm-steps li.is-now { background: rgba(29,78,216,0.1); font-weight: 800; }
+  body.map-page .pm-steps li.is-done { opacity: 0.45; }
+  body.map-page .pm-route-alt { margin: 10px 0 0; font-size: 0.82rem; opacity: 0.85; }
   body.map-page .pm-key { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 2px 0; padding: 0; font-size: 0.8rem; opacity: 0.85; }
   body.map-page .pm-key li { display: inline-flex; align-items: center; gap: 5px; }
   body.map-page .pm-key-pin { display: inline-block; width: 14px; height: 14px; }
@@ -12241,6 +12258,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FR = document.documentElement.lang === 'fr';
   var T = FR ? {
     seeList: function(n){ return 'Voir la liste (' + n + ')'; },
+    walk: 'À pied', drive: 'En voiture', bike: 'À vélo', to: 'Vers', endRoute: 'Terminer', howGo: 'Comment y aller', routing: 'Calcul de l’itinéraire…',
+    routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
+    openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'pour le guidage vocal en voiture.', routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
+    stepsBtn: function(t){ return 'Étapes · ' + t; },
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
@@ -12258,6 +12279,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
     seeList: function(n){ return 'See the list (' + n + ')'; },
+    walk: 'Walk', drive: 'Drive', bike: 'Bike', to: 'To', endRoute: 'End', howGo: 'How are you getting there?', routing: 'Working out the route…',
+    routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
+    openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'for spoken directions while driving.', routeNeedsLocation: 'Share your location to get directions.',
+    stepsBtn: function(t){ return 'Steps · ' + t; },
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
@@ -12338,8 +12363,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return out;
   }
   function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
-  function popupFor(p){ return '<div class="pm-pop"><a href="' + esc(p.url) + '">' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" href="' + esc(dirUrl(p.lat, p.lng, p.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
-  function popupForEvent(e){ return '<div class="pm-pop"><a href="' + esc(e.url) + '">' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" href="' + esc(dirUrl(e.lat, e.lng, e.venue || e.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  function popupFor(p){ return '<div class="pm-pop"><a href="' + esc(p.url) + '">' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" data-k="p' + p.ix + '" href="' + esc(dirUrl(p.lat, p.lng, p.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  function popupForEvent(e){ return '<div class="pm-pop"><a href="' + esc(e.url) + '">' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" data-k="e' + e.ix + '" href="' + esc(dirUrl(e.lat, e.lng, e.venue || e.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
   function setStatus(text){ statusEl.textContent = text || ''; statusEl.hidden = !text; }
   function matchesPlace(p){
     if (anyOn(kinds) && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; })) return false;
@@ -12373,6 +12398,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       countEl.textContent = me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
     }
     cluster.clearLayers();
+    // During directions, only the destination stays on the map.
+    if (typeof route !== 'undefined' && route) onMap = [route.x];
     var layers = onMap.map(function(x){ return x.m; }).filter(Boolean);
     if (cluster.addLayers) cluster.addLayers(layers); else layers.forEach(function(m){ cluster.addLayer(m); });
     listItems = items;
@@ -12394,18 +12421,19 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
         html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
-          + '<div class="pm-acts"><a class="pm-dir" data-dir="place" href="' + esc(dirUrl(x.lat, x.lng, x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
+          + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" href="' + esc(dirUrl(x.lat, x.lng, x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
         var where = [x.venue, CONF.r[x.region], x.d != null && me ? T.km(x.d) : ''].filter(Boolean).join(' · ');
         html += '<li class="pm-item pm-event"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span><span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></button>'
-          + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
+          + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
       }
     });
     if (!listItems.length && (me || tab === 'events' || map.getZoom() >= 12 || term)) html = '<li class="pm-empty">' + esc(tab === 'places' ? T.none : T.noEvents) + '</li>';
     listEl.innerHTML = html;
     toList.hidden = !listItems.length;
     toList.textContent = T.seeList(listItems.length);
+    if (typeof route !== 'undefined' && route) drawRoute();
     moreBtn.hidden = listItems.length <= limit;
     moreBtn.textContent = T.more;
   }
@@ -12419,10 +12447,82 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var b = e.target.closest('.pm-item-main');
     if (b) { focusItem(listItems[Number(b.getAttribute('data-i'))]); return; }
   });
-  document.addEventListener('click', function(e){ var d = e.target.closest && e.target.closest('[data-dir]'); if (d) track('map_directions', { kind: d.getAttribute('data-dir'), located: !!me }); });
+  document.addEventListener('click', function(e){
+    var d = e.target.closest && e.target.closest('[data-dir]');
+    if (!d) return;
+    var k = d.getAttribute('data-k') || '', x = k.charAt(0) === 'p' ? places[Number(k.slice(1))] : k.charAt(0) === 'e' ? events[Number(k.slice(1))] : null;
+    if (x && x.lat != null && startRoute(x)) { e.preventDefault(); return; }
+    track('map_directions', { kind: d.getAttribute('data-dir'), located: !!me, on_site: false });
+  });
   moreBtn.addEventListener('click', function(){ limit += 25; drawList(); });
   var toList = $('pmToList');
-  toList.addEventListener('click', function(){ countEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  toList.addEventListener('click', function(){ (route ? routeEl : countEl).scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  // ---- Directions on our map (Mapbox), when a token is set ----
+  var MB = CONF.mb || '', route = null, pendingRoute = null, routeEl = $('pmRoute');
+  var MODES = [['walking', T.walk], ['driving', T.drive], ['cycling', T.bike]];
+  function durText(sec){ var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
+  function startRoute(x){
+    if (!MB) return false;
+    if (!me) { pendingRoute = x; if (!watching) nearBtn.click(); setStatus(T.routeNeedsLocation); return true; }
+    if (route && route.line) map.removeLayer(route.line);
+    route = { x: x, mode: distKm(me.lat, me.lng, x.lat, x.lng) < 1.5 ? 'walking' : 'driving', step: 0, at: 0 };
+    map.closePopup();
+    render(false);
+    fetchRoute();
+    if (window.innerWidth < 900) mapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return true;
+  }
+  function fetchRoute(){
+    var r = route; if (!r || !me) return;
+    r.at = Date.now(); r.loading = true; drawRoute();
+    var url = 'https://api.mapbox.com/directions/v5/mapbox/' + r.mode + '/' + me.lng.toFixed(5) + ',' + me.lat.toFixed(5) + ';' + r.x.lng + ',' + r.x.lat
+      + '?geometries=geojson&steps=true&overview=full&language=' + (FR ? 'fr' : 'en') + '&access_token=' + encodeURIComponent(MB);
+    fetch(url).then(function(res){ if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); }).then(function(d){
+      if (route !== r) return;
+      var rt = d && d.routes && d.routes[0];
+      r.loading = false;
+      if (!rt) { r.error = true; drawRoute(); return; }
+      r.error = false; r.data = rt; r.steps = (rt.legs && rt.legs[0] && rt.legs[0].steps) || []; r.step = 0;
+      r.path = rt.geometry.coordinates.map(function(c){ return [c[1], c[0]]; });
+      if (r.line) map.removeLayer(r.line);
+      r.line = L.polyline(r.path, { color: '#1D4ED8', weight: 6, opacity: 0.85 }).addTo(map);
+      if (!r.fitted) { map.stop(); map.fitBounds(r.line.getBounds(), { padding: [40, 40], maxZoom: 17 }); r.fitted = true; }
+      drawRoute();
+      track('map_directions', { kind: 'route', mode: r.mode, on_site: true });
+    }).catch(function(){ if (route !== r) return; r.loading = false; r.error = true; drawRoute(); });
+  }
+  function drawRoute(){
+    var r = route;
+    routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
+    if (!r) { routeEl.innerHTML = ''; toList.hidden = !listItems.length; toList.textContent = T.seeList(listItems.length); return; }
+    var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2><button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(T.endRoute) + '</button></div>';
+    html += '<div class="pm-modes" role="group" aria-label="' + esc(T.howGo) + '">' + MODES.map(function(m){ return '<button type="button" class="pm-mode" data-mode="' + m[0] + '" aria-pressed="' + (r.mode === m[0]) + '">' + esc(m[1]) + '</button>'; }).join('') + '</div>';
+    if (r.arrived) html += '<p class="pm-route-sum is-arrived">' + esc(T.arrived) + '</p>';
+    else if (r.loading && !r.data) html += '<p class="pm-route-sum">' + esc(T.routing) + '</p>';
+    else if (r.error && !r.data) html += '<p class="pm-route-sum">' + esc(T.routeFailed) + '</p>';
+    else if (r.data) {
+      html += '<p class="pm-route-sum"><strong>' + esc(durText(r.data.duration)) + '</strong> · ' + esc(T.km(r.data.distance / 1000)) + '</p>';
+      html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
+    }
+    html += '<p class="pm-route-alt"><a href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
+    routeEl.innerHTML = html;
+    toList.hidden = false; toList.textContent = r.arrived ? T.arrived : r.data ? T.stepsBtn(durText(r.data.duration)) : T.routing;
+  }
+  function endRoute(){ if (route && route.line) map.removeLayer(route.line); route = null; drawRoute(); render(false); }
+  routeEl.addEventListener('click', function(e){
+    if (e.target.id === 'pmRouteEnd') { endRoute(); return; }
+    var m = e.target.closest('[data-mode]');
+    if (m && route && route.mode !== m.getAttribute('data-mode')) { route.mode = m.getAttribute('data-mode'); route.data = null; route.fitted = false; fetchRoute(); }
+  });
+  // As the visitor moves: the next step lights up, arriving is announced, and leaving the route plans it again.
+  function followRoute(){
+    var r = route; if (!r || !r.data || !me || r.arrived) return;
+    if (distKm(me.lat, me.lng, r.x.lat, r.x.lng) < 0.03) { r.arrived = true; drawRoute(); track('map_arrived', { mode: r.mode }); return; }
+    var next = r.steps[r.step + 1];
+    if (next && next.maneuver && distKm(me.lat, me.lng, next.maneuver.location[1], next.maneuver.location[0]) < 0.03) { r.step++; drawRoute(); }
+    var off = r.path.reduce(function(m, c){ return Math.min(m, distKm(me.lat, me.lng, c[0], c[1])); }, Infinity);
+    if (off > 0.075 && Date.now() - r.at > 30000) fetchRoute();
+  }
   // Where the visitor is: only after they tap Near me, kept in this page only.
   function drawMe(){
     var ll = [me.lat, me.lng];
@@ -12440,6 +12540,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var first = !me;
     me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.min(pos.coords.accuracy || 50, 2000) };
     drawMe();
+    if (pendingRoute) { var pr = pendingRoute; pendingRoute = null; if (first) { radiusKm = pickRadius(8); radiusSel.value = String(radiusKm); radiusSel.hidden = false; nearBtn.setAttribute('aria-pressed', 'true'); nearBtn.setAttribute('aria-label', T.stopAria); nearLabel.textContent = T.stop; setStatus(T.near); render(false); } startRoute(pr); return; }
+    if (route) { followRoute(); return; }
     if (first) {
       radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8); radiusSel.value = String(radiusKm); radiusSel.hidden = false;
       nearBtn.setAttribute('aria-pressed', 'true'); nearBtn.setAttribute('aria-label', T.stopAria); nearLabel.textContent = T.stop; setStatus(T.near);
@@ -12460,7 +12562,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function stopWatch(){ if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); watchId = null; }
   nearBtn.addEventListener('click', function(){
     if (watching || me) {
-      watching = false; stopWatch(); me = null;
+      watching = false; stopWatch(); me = null; if (route) endRoute();
       if (meMarker) { map.removeLayer(meMarker); map.removeLayer(meCircle); meMarker = meCircle = null; }
       nearBtn.setAttribute('aria-pressed', 'false'); nearBtn.removeAttribute('aria-label'); nearLabel.textContent = T.nearMe; radiusSel.hidden = true; setStatus('');
       places.forEach(function(p){ p.d = null; }); render(false); return;
@@ -12557,15 +12659,15 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   map.on('moveend', function(){ if (me || tab !== 'places') return; clearTimeout(moveTimer); moveTimer = setTimeout(function(){ render(false); }, 150); });
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
-    places = d.p.map(function(a){
-      var p = { lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+    places = []; d.p.forEach(function(a){
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
-      return p;
+      places.push(p);
     });
-    events = d.e.map(function(a){
-      var e = { name: a[0], url: a[1], region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], d: null };
+    events = []; d.e.forEach(function(a){
+      var e = { ix: events.length, name: a[0], url: a[1], region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], d: null };
       if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(function(){ return popupForEvent(e); });
-      return e;
+      events.push(e);
     });
     refreshStatus();
     try {
@@ -12694,7 +12796,10 @@ function renderPlacesMapPage(placeCount = null, now = new Date()) {
   const typeEn = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
   const conf = JSON.stringify({ src: `/map/data.json?v=${mapDataVersion(now)}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
-    k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])) }).replace(/</g, '\\u003c');
+    k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])),
+    // Directions on our own map (2026-10-14): a public Mapbox token (pk.), locked to okanaganroam.com in Mapbox. Without
+    // one, Directions opens Google or Apple Maps as before.
+    mb: /^pk\.[A-Za-z0-9._-]+$/.test(String(process.env.MAPBOX_TOKEN || '')) ? process.env.MAPBOX_TOKEN : '' }).replace(/</g, '\\u003c');
   const breadcrumb = breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Map', url: canonical }]);
   const townOptions = VALID_REGIONS.filter((r) => MAP_AREA_CENTERS[r]).map((r) => `<option value="${r}">${escapeHtml(REGION_LABELS[r])}</option>`).join('');
   return `<!DOCTYPE html>
@@ -12752,13 +12857,14 @@ ${renderGolfHeaderHtml()}
       </ul>
     </div>
     <section class="pm-results" aria-labelledby="pmCount">
+      <section class="pm-route" id="pmRoute" hidden aria-live="polite"></section>
       <h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;</h2>
       <ul class="pm-list" id="pmList"></ul>
       <button type="button" class="pm-more" id="pmMore" hidden>Show more</button>
       <noscript><p>The map needs JavaScript. <a href="/browse">Browse &amp; Search every place</a> instead.</p></noscript>
     </section>
   </div>
-  <p class="pm-privacy">Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved. Map tiles come from OpenStreetMap. Opening hours come from each place’s listing and can change; check before you go.</p>
+  <p class="pm-privacy">Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved. When you ask for directions, your starting point and the destination go to Mapbox to work out the route. Map tiles come from OpenStreetMap. Opening hours come from each place’s listing and can change; check before you go.</p>
   <p class="subtitle" style="margin-top:12px">Prefer a list? <a href="/browse">Browse &amp; Search every place</a> or <a href="/whats-on">see everything that’s on</a>.</p>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -26528,6 +26634,8 @@ function renderPrivacyPage() {
     <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
+    <h2>Your location on the map</h2>
+    <p>The map asks for your location only when you tap Near me. Your browser keeps it on your device to sort what’s near you; it is never sent to Okanagan Roam, saved, or put in a link. When you ask for directions on the map, your starting point and the destination are sent to Mapbox, which works out the route. Opening a place in Google Maps or Apple Maps hands the destination to that app.</p>
     <h2>What we never do</h2>
     <p>We don&rsquo;t sell, rent or trade personal information, and we don&rsquo;t use it for anything other than the reasons above.</p>
     <h2>How long we keep it, and your choices</h2>
