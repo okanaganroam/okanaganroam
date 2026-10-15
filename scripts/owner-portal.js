@@ -10,6 +10,7 @@
 //   node scripts/owner-portal.js photos [pending|approved|all]      # new photos, with private preview links
 //   node scripts/owner-portal.js photo-approve <photo id> [--main|--not-main]
 //   node scripts/owner-portal.js photo-reject <photo id> "reason"   # also deletes the file
+//   node scripts/owner-portal.js photo-remove <photo id> "reason"   # take a live photo down (and delete it)
 //
 // Needs ENRICHMENT_ADMIN_TOKEN in the environment. OKR_BASE_URL overrides the target site.
 // Venue ids are in each listing's data (or ask Claude); request ids come from `list`.
@@ -20,7 +21,7 @@ const REVIEWER = process.env.OKR_REVIEWER || 'dayton';
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 function usage() {
-  console.error('Usage: node scripts/owner-portal.js link|revoke|list|approve|reject|photos|photo-approve|photo-reject ... (see the top of this file)');
+  console.error('Usage: node scripts/owner-portal.js link|revoke|list|approve|reject|photos|photo-approve|photo-reject|photo-remove ... (see the top of this file)');
   process.exit(1);
 }
 
@@ -120,6 +121,11 @@ function printRequest(r) {
     if (!Number.isInteger(id)) usage();
     await call('POST', `/admin/owner-photos/${id}/reject`, { reviewer: REVIEWER, reason: args[1] || '' });
     console.log(`Rejected photo #${id} and deleted the file.`);
+  } else if (cmd === 'photo-remove') {
+    const id = Number(args[0]);
+    if (!Number.isInteger(id)) usage();
+    const r = await call('POST', `/admin/owner-photos/${id}/remove`, { reviewer: REVIEWER, reason: args[1] || '' });
+    console.log(`Removed photo #${id} from the site and deleted the file.${r.was_main ? ' It was the main photo; the listing shows its example photo again.' : ''}`);
   } else {
     usage();
   }

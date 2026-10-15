@@ -20099,3 +20099,60 @@ test('Owner portal: logins (create from the link, sign in, my listings, edit via
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner portal: signed-in owners publish photos straight away; link uploads wait; photo-remove takes one down', async () => {
+  const http = require('node:http');
+  const nodeFs = require('node:fs');
+  const nodePath = require('node:path');
+  seasonInsert.run({ name: 'Owner Autophoto Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-autophoto-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-autophoto-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const photo = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, credit: 'Autophoto Cafe', rights: true, notify: true, company_website: '', started_at: Date.now() - 10000 };
+  const sentEmails = [];
+  app.setVenueSubmissionTransport(async (payload) => { sentEmails.push(payload); });
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.5.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}), ...(path.startsWith('/admin') ? { Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const files = [];
+  try {
+    // Through the link: waits for review.
+    const viaLink = await post(`/owner/${token}/photos`, photo);
+    assert.equal(viaLink.status, 201);
+    assert.equal(viaLink.body.live, false);
+    files.push(db.prepare('SELECT file FROM owner_photos WHERE id = ?').get(viaLink.body.id).file);
+    assert.match(sentEmails[sentEmails.length - 1]._subject, /^\[PENDING REVIEW\]/);
+    // Signed in: live straight away, and the main photo since the listing had none.
+    const made = await post(`/owner/${token}/account`, { email: 'auto@example.com', password: 'a long enough password' });
+    const live = await post(`/owner/account/venue/${v.id}/photos`, photo, made.cookie);
+    assert.equal(live.status, 201, JSON.stringify(live.body));
+    assert.equal(live.body.live, true);
+    assert.equal(live.body.main, true);
+    const row = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(live.body.id);
+    files.push(row.file);
+    assert.equal(row.status, 'approved');
+    assert.equal((await fetch(`${base}/images/owner/${row.file}`)).status, 200);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/owner/${row.file}`);
+    assert.match(sentEmails[sentEmails.length - 1]._subject, /^\[LIVE\]/);
+    // A second signed-in photo goes live but doesn't replace the main photo.
+    const second = await post(`/owner/account/venue/${v.id}/photos`, photo, made.cookie);
+    files.push(db.prepare('SELECT file FROM owner_photos WHERE id = ?').get(second.body.id).file);
+    assert.equal(second.body.main, false);
+    // photo-remove takes the main photo down and the listing falls back.
+    const removed = await post(`/admin/owner-photos/${live.body.id}/remove`, { reviewer: 'test', reason: 'not their photo' });
+    assert.equal(removed.status, 200, JSON.stringify(removed.body));
+    assert.equal(removed.body.was_main, true);
+    assert.equal((await fetch(`${base}/images/owner/${row.file}`)).status, 404);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, null);
+    assert.equal(nodeFs.existsSync(nodePath.join(app.OWNER_PHOTO_DIR, row.file)), false);
+  } finally {
+    app.setVenueSubmissionTransport(null);
+    for (const f of files) { try { nodeFs.unlinkSync(nodePath.join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
