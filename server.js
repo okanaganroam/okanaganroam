@@ -20931,12 +20931,21 @@ const FR_STATIC_TEXT = {
   'Prefer email?': 'Vous pr\u00e9f\u00e9rez le courriel?',
 };
 const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
+// A seasonal notice in French ("Closed for the season. Reopens November 26." -> "Fermé pour la saison. Réouverture le
+// 26 novembre."), from french-text.js's season patterns; null for any other text.
+function frSeasonText(t) {
+  if (!/^(Closed for the season|Open for the season until|Reopening for the season)/.test(t)) return null;
+  for (const [rx, fn] of frenchText.FR_PATTERNS || []) { const m = t.match(rx); if (m) return fn(m, null, FR_CTX); }
+  return null;
+}
 function localizeStaticFr(html) {
   return html.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 1) return part;
     let out = part.replace(/>(\s*)([^<>]+?)(\s*)</g, (m, a, text, b) => {
       const key = text.replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"');
-      return FR_STATIC_TEXT[key] ? `>${a}${escapeHtml(FR_STATIC_TEXT[key])}${b}<` : m;
+      if (FR_STATIC_TEXT[key]) return `>${a}${escapeHtml(FR_STATIC_TEXT[key])}${b}<`;
+      const season = frSeasonText(key);
+      return season ? `>${a}${escapeHtml(season)}${b}<` : m;
     });
     for (const [en, frAttr] of Object.entries(FR_STATIC_ATTRS)) out = out.split(en).join(frAttr);
     return out;
