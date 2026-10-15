@@ -20052,6 +20052,9 @@ test('Owner portal: logins (create from the link, sign in, my listings, edit via
   const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
   try {
     assert.match(await get('/owner/login').then((r) => r.text()), /Business login/);
+    const venuePage = await get('/kelowna/pubs/owner-login-fixture-a').then((r) => r.text());
+    assert.match(venuePage, /Own this business\? <a href="\/owner\/login" rel="nofollow">Sign in to update this listing<\/a>/);
+    assert.match(venuePage, /<a href="\/owner\/login" class="nav-business-login" rel="nofollow">Business login<\/a>/);
     assert.equal((await get('/owner/account')).status, 302);
     // The edit link offers a login; creating one signs the owner in.
     assert.match(await get(`/owner/${tokenA}`).then((r) => r.text()), /Create a login/);

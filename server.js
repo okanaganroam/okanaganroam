@@ -9509,6 +9509,7 @@ const NAV_DISCOVER_PANEL = `<div class="nav-dropdown-panel">
           <a href="/secret-spots">Secret Spots</a>
           <a href="/dog-friendly" data-i18n="gems.dogFriendly.title">Dog-Friendly Finds</a>
           <a href="/browse" data-i18n="nav.browseSearch">Browse &amp; Search</a>
+          <a href="/owner/login" class="nav-business-login" rel="nofollow">Business login</a>
         </div>`;
 const NAV_THINGS_PANEL = `<div class="nav-dropdown-panel">
           <a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a>
@@ -9525,6 +9526,8 @@ const NAV_REFRESH_STYLE = `<style id="nav-refresh">
 .live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: #E11D48; animation: live-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
 @keyframes live-ping { 0% { transform: scale(1); opacity: 0.7; } 75%, 100% { transform: scale(2.8); opacity: 0; } }
 .nav-links a.nav-roam-now { font-weight: 800; white-space: nowrap; }
+/* Business login (2026-10-15): last in Discover, set apart from the visitor links. */
+.nav-dropdown-panel a.nav-business-login { border-top: 1px solid rgba(42,32,25,0.12); margin-top: 4px; padding-top: 10px; font-size: 0.9em; opacity: 0.85; }
 @media (max-width: 940px) {
   #navHamburger { position: relative; }
   #navHamburger::before { content: ''; position: absolute; bottom: -1px; right: -5px; width: 9px; height: 9px; border-radius: 50%; background: #E11D48; box-shadow: 0 0 0 2px #fff; animation: live-glow 2s ease-in-out infinite; }
@@ -21862,6 +21865,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
   </div>` : ''}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
+  <p class="venue-owner-cta" style="font-size:.88rem;margin:16px 0 0;opacity:.85">${L('Own this business?', 'C\u2019est votre entreprise\u00a0?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
   </aside>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
