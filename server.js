@@ -28498,6 +28498,610 @@ async function handleContactMessage(req, res) {
   return sendSubmissionResponse(res, 201, { ok: true, message: 'Thanks! Okanagan Roam has received your message.' });
 }
 
+// ---------- Owner portal (2026-10-15) ----------
+//
+// A business owner gets a private edit link (/owner/<token>) from Dayton.
+// From it they can propose changes to their listing: hours, phone, website,
+// description, badges and happy hour. Nothing on the venue changes until an
+// admin approves the request (POST /admin/owner-changes/:id/approve), which
+// writes through the same guarded, audited paths as the research scripts
+// (hours via guardedHoursVerifyUpdate with source 'venue_owner', happy hour
+// via guardedHappyHourUpdate) and logs every other field to
+// venue_enrichment_log with source 'venue_owner'.
+//
+// Only a salted hash of each token is stored (venue_owner_links); the link is
+// shown once, when created. Creating a link again needs reset:true and
+// replaces the old one, so a leaked link can be killed.
+const OWNER_LINK_PATH = '/owner/';
+const OWNER_TOKEN_RE = /^[A-Za-z0-9_-]{32}$/;
+const OWNER_CHANGE_MAX_BYTES = 32 * 1024;
+const OWNER_CHANGE_RATE_LIMIT = 20;
+const OWNER_CHANGE_RATE_WINDOW_MS = 60 * 60 * 1000;
+const OWNER_CHANGE_KEYS = new Set(['changes', 'note', 'contact_name', 'company_website', 'started_at']);
+const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour'];
+const OWNER_DESCRIPTION_MIN = 30;
+const OWNER_DESCRIPTION_MAX = 1200;
+const OWNER_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const OWNER_DAY_LABELS = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+// Happy hour only makes sense where alcohol is served.
+const OWNER_HAPPY_HOUR_TYPES = new Set(['restaurant', 'pub', 'cocktail', 'brewery', 'winery', 'distillery', 'golf']);
+
+function ownerTokenHash(token) {
+  return crypto.createHash('sha256').update(`okanagan-roam-owner-link:${token}`).digest('hex');
+}
+
+function ownerLinkUrl(token) {
+  return `https://okanaganroam.com${OWNER_LINK_PATH}${token}`;
+}
+
+function venueListingUrl(v) {
+  const slug = CATEGORY_SLUGS[v.type];
+  return slug && v.region && v.slug ? `https://okanaganroam.com/${v.region}/${slug}/${v.slug}` : 'https://okanaganroam.com/';
+}
+
+// Creates (or, with reset, replaces) a venue's edit link. Returns
+// { ok: true, token, url } -- the only time the token is ever visible.
+function createOwnerLink(venueId, opts = {}) {
+  const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(venueId);
+  if (!venue) return { ok: false, reason: 'venue_not_found' };
+  if (venue.redirect_to) return { ok: false, reason: 'venue_redirected' };
+  const email = opts.contact_email == null ? null : String(opts.contact_email).trim().slice(0, 254) || null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'invalid_email' };
+  const existing = db.prepare('SELECT venue_id FROM venue_owner_links WHERE venue_id = ?').get(venueId);
+  if (existing && !opts.reset) return { ok: false, reason: 'link_exists' };
+  const token = crypto.randomBytes(24).toString('base64url');
+  db.prepare(`INSERT INTO venue_owner_links (venue_id, token_hash, contact_email, created_at, last_used_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, NULL)
+    ON CONFLICT(venue_id) DO UPDATE SET token_hash = excluded.token_hash,
+      contact_email = COALESCE(excluded.contact_email, venue_owner_links.contact_email),
+      created_at = CURRENT_TIMESTAMP, last_used_at = NULL`).run(venueId, ownerTokenHash(token), email);
+  return { ok: true, token, url: ownerLinkUrl(token), replaced: !!existing };
+}
+
+function revokeOwnerLink(venueId) {
+  return db.prepare('DELETE FROM venue_owner_links WHERE venue_id = ?').run(venueId).changes > 0;
+}
+
+// The venue behind an edit-link token, or null for a malformed, unknown or
+// revoked token (and for a venue that has since been retired).
+function venueForOwnerToken(token) {
+  if (typeof token !== 'string' || !OWNER_TOKEN_RE.test(token)) return null;
+  const link = db.prepare('SELECT venue_id, contact_email FROM venue_owner_links WHERE token_hash = ?').get(ownerTokenHash(token));
+  if (!link) return null;
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(link.venue_id);
+  if (!row || row.redirect_to) return null;
+  return { venue: rowToVenue(row), happyHourTimes: row.happy_hour_times || null, contactEmail: link.contact_email };
+}
+
+// What the owner sees and can change, in the same shapes the form submits.
+function ownerVenueSnapshot(venue, happyHourTimes) {
+  const badges = {};
+  for (const f of RESEARCHED_BOOL_FIELDS) badges[f] = !!venue[f];
+  return {
+    hours: venue.hours || null,
+    phone: venue.phone || '',
+    website: venue.website || '',
+    description: venue.description || '',
+    badges,
+    happy_hour: happyHourTimes || null,
+  };
+}
+
+// A week of time windows from the form: { mon: [["11:00","22:00"]], tue: [] ... }.
+// Returns { ok, json } in the site's stored format (closed days null), or an error.
+function ownerWeekJson(input, label, { allowEmptyWeek }) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, detail: `${label} must list each day.` };
+  const extra = Object.keys(input).filter((k) => !OWNER_DAYS.includes(k));
+  if (extra.length) return { ok: false, detail: `${label}: unexpected day(s) ${extra.join(', ')}.` };
+  const week = {};
+  for (const d of OWNER_DAYS) {
+    const windows = input[d] == null ? [] : input[d];
+    if (!Array.isArray(windows) || windows.length > 2) return { ok: false, detail: `${label}: ${OWNER_DAY_LABELS[d]} can have at most two time ranges.` };
+    for (const w of windows) {
+      if (!Array.isArray(w) || w.length !== 2 || !w.every((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t))) {
+        return { ok: false, detail: `${label}: ${OWNER_DAY_LABELS[d]} has a time we could not read.` };
+      }
+      if (w[0] === w[1]) return { ok: false, detail: `${label}: ${OWNER_DAY_LABELS[d]} opens and closes at the same time.` };
+    }
+    week[d] = windows.length ? windows.map((w) => [w[0], w[1]]) : null;
+  }
+  if (!allowEmptyWeek && OWNER_DAYS.every((d) => !week[d])) return { ok: false, detail: `${label}: add at least one open day.` };
+  const checked = validateVerifiedHours(JSON.stringify(week));
+  if (!checked.ok) return { ok: false, detail: `${label}: ${checked.detail}.` };
+  return { ok: true, json: checked.json, empty: OWNER_DAYS.every((d) => !week[d]) };
+}
+
+function sameJsonWeek(a, b) {
+  const norm = (s) => {
+    if (!s) return null;
+    try {
+      const o = typeof s === 'string' ? JSON.parse(s) : s;
+      const out = {};
+      for (const d of OWNER_DAYS) out[d] = o[d] && o[d].length ? o[d] : null;
+      return JSON.stringify(out);
+    } catch (e) { return String(s); }
+  };
+  return norm(a) === norm(b);
+}
+
+// Validates an owner's proposed changes against the live venue. Returns
+// { changes, previous, errors }: only fields that actually differ are kept.
+function validateOwnerChanges(venue, happyHourTimes, body) {
+  const errors = {};
+  const changes = {};
+  const current = ownerVenueSnapshot(venue, happyHourTimes);
+  const input = body && typeof body.changes === 'object' && body.changes && !Array.isArray(body.changes) ? body.changes : null;
+  if (!input) return { changes, previous: {}, errors: { form: 'Nothing was sent. Please try again.' } };
+  const unknown = Object.keys(input).filter((k) => !OWNER_CHANGE_FIELDS.includes(k));
+  if (unknown.length) return { changes, previous: {}, errors: { form: 'Some of the information could not be read. Please reload the page and try again.' } };
+
+  if ('hours' in input) {
+    const w = ownerWeekJson(input.hours, 'Hours', { allowEmptyWeek: false });
+    if (!w.ok) errors.hours = w.detail;
+    else if (!sameJsonWeek(w.json, current.hours)) changes.hours = w.json;
+  }
+  if ('phone' in input) {
+    const phone = typeof input.phone === 'string' ? input.phone.trim().replace(/\s+/g, ' ') : '';
+    const digits = phone.replace(/\D/g, '');
+    if (!phone || phone.length > 40 || !/^[0-9+().\-\s]+(\s*(ext\.?|x)\s*\d{1,6})?$/i.test(phone) || digits.length < 10 || digits.length > 15) {
+      errors.phone = 'Please enter a phone number, like 250-555-0123.';
+    } else if (phone !== current.phone) changes.phone = phone;
+  }
+  if ('website' in input) {
+    const site = typeof input.website === 'string' ? input.website.trim() : '';
+    let ok = site === '';
+    if (site) {
+      try {
+        const u = new URL(site);
+        ok = (u.protocol === 'https:' || u.protocol === 'http:') && /\./.test(u.hostname) && site.length <= 300 && !/\s/.test(site);
+      } catch (e) { ok = false; }
+    }
+    if (!ok) errors.website = 'Please enter the full web address, starting with https://';
+    else if (site !== current.website) changes.website = site || null;
+  }
+  if ('description' in input) {
+    const text = typeof input.description === 'string' ? input.description.replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : '';
+    if (text.length < OWNER_DESCRIPTION_MIN || text.length > OWNER_DESCRIPTION_MAX) {
+      errors.description = `Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`;
+    } else if (/[<>]/.test(text)) {
+      errors.description = 'Please leave out < and > characters.';
+    } else if (text !== current.description) changes.description = text;
+  }
+  if ('badges' in input) {
+    const b = input.badges;
+    if (!b || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).some((k) => !RESEARCHED_BOOL_FIELDS.includes(k) || typeof b[k] !== 'boolean')) {
+      errors.badges = 'The badges could not be read. Please reload the page and try again.';
+    } else {
+      const diff = {};
+      for (const k of Object.keys(b)) if (b[k] !== current.badges[k]) diff[k] = b[k];
+      if (Object.keys(diff).length) changes.badges = diff;
+    }
+  }
+  if ('happy_hour' in input) {
+    if (!OWNER_HAPPY_HOUR_TYPES.has(venue.type)) {
+      errors.happy_hour = 'Happy hour is only listed for places that serve alcohol.';
+    } else if (input.happy_hour === null) {
+      if (current.happy_hour) changes.happy_hour = null;
+    } else {
+      const w = ownerWeekJson(input.happy_hour, 'Happy hour', { allowEmptyWeek: true });
+      if (!w.ok) errors.happy_hour = w.detail;
+      else if (w.empty) { if (current.happy_hour) changes.happy_hour = null; }
+      else if (!sameJsonWeek(w.json, current.happy_hour)) changes.happy_hour = w.json;
+    }
+  }
+  const previous = {};
+  for (const k of Object.keys(changes)) {
+    previous[k] = k === 'badges' ? Object.fromEntries(Object.keys(changes.badges).map((f) => [f, current.badges[f]])) : current[k];
+  }
+  if (!Object.keys(errors).length && !Object.keys(changes).length) errors.form = 'Nothing has changed yet. Edit a field, then send it.';
+  return { changes, previous, errors };
+}
+
+const ownerChangeAttempts = new Map(); // ip -> [timestamps]
+function ownerChangeRateLimited(ip, now = Date.now()) {
+  const recent = (ownerChangeAttempts.get(ip) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
+  recent.push(now);
+  ownerChangeAttempts.set(ip, recent);
+  if (ownerChangeAttempts.size > 5000) {
+    for (const [key, times] of ownerChangeAttempts) {
+      if (!times.some((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS)) ownerChangeAttempts.delete(key);
+    }
+  }
+  return recent.length > OWNER_CHANGE_RATE_LIMIT;
+}
+
+function getOwnerChange(id) {
+  const row = db.prepare('SELECT * FROM owner_change_requests WHERE id = ?').get(id);
+  if (!row) return null;
+  return { ...row, changes: JSON.parse(row.changes), previous: JSON.parse(row.previous) };
+}
+
+function pendingOwnerChange(venueId) {
+  return db.prepare("SELECT id, submitted_at FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1").get(venueId) || null;
+}
+
+function listOwnerChanges(status = 'pending') {
+  const rows = status === 'all'
+    ? db.prepare('SELECT * FROM owner_change_requests ORDER BY id DESC LIMIT 200').all()
+    : db.prepare('SELECT * FROM owner_change_requests WHERE status = ? ORDER BY id DESC LIMIT 200').all(status);
+  return rows.map((r) => {
+    const v = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(r.venue_id) || {};
+    return { ...r, changes: JSON.parse(r.changes), previous: JSON.parse(r.previous), venue_name: v.name, listing_url: venueListingUrl(v) };
+  });
+}
+
+const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour' };
+function ownerWeekText(json) {
+  if (!json) return '(none)';
+  try {
+    const o = JSON.parse(json);
+    return OWNER_DAYS.map((d) => `${OWNER_DAY_LABELS[d].slice(0, 3)} ${o[d] && o[d].length ? o[d].map((w) => `${w[0]}–${w[1]}`).join(', ') : 'closed'}`).join('; ');
+  } catch (e) { return String(json); }
+}
+function ownerValueText(field, value) {
+  if (field === 'hours' || field === 'happy_hour') return ownerWeekText(value);
+  if (field === 'badges') return Object.entries(value).map(([k, on]) => `${on ? 'add' : 'remove'} ${BADGE_LABELS[k] ? BADGE_LABELS[k].title : k}`).join(', ');
+  return value == null || value === '' ? '(none)' : String(value);
+}
+
+function buildOwnerChangeEmail(req) {
+  const v = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(req.venue_id) || {};
+  const payload = {
+    _subject: `[PENDING REVIEW] Owner update #${req.id}: ${v.name}`,
+    _template: 'table',
+    _captcha: 'false',
+    'Status': 'PENDING REVIEW. Nothing on the listing has changed. It changes only when approved.',
+    'Request ID': String(req.id),
+    'Venue': `${v.name} (venue #${v.id})`,
+    'Listing': venueListingUrl(v),
+  };
+  if (req.contact_name) payload['Sent by'] = req.contact_name;
+  for (const [field, value] of Object.entries(req.changes)) {
+    if (field === 'badges') payload['Badges'] = ownerValueText('badges', value);
+    else payload[`${OWNER_FIELD_LABELS[field]} (new)`] = ownerValueText(field, value);
+  }
+  if (req.note) payload['Note from the owner'] = req.note;
+  payload['How to review'] = `node scripts/owner-portal.js list, then node scripts/owner-portal.js approve ${req.id} (or reject ${req.id} "reason").`;
+  return payload;
+}
+
+async function notifyOwnerChange(id) {
+  const req = getOwnerChange(id);
+  try {
+    await venueSubmissionTransport(buildOwnerChangeEmail(req));
+    db.prepare("UPDATE owner_change_requests SET notify_status = 'sent', notify_error = NULL WHERE id = ?").run(id);
+    return true;
+  } catch (err) {
+    const message = String((err && err.message) || err).slice(0, 300);
+    db.prepare("UPDATE owner_change_requests SET notify_status = 'failed', notify_error = ? WHERE id = ?").run(message, id);
+    console.error(`[owner-portal] notification for request #${id} failed (request kept as pending): ${message}`);
+    return false;
+  }
+}
+
+async function handleOwnerChangeSubmission(req, res, token) {
+  const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Changes are only accepted from the Okanagan Roam website.' });
+  if (ownerChangeRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' });
+  const found = venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
+  let body;
+  try {
+    body = await readLimitedJsonBody(req, OWNER_CHANGE_MAX_BYTES);
+  } catch (err) {
+    return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'That is too much text in one go. Please shorten it and try again.' : generic }, err.status === 413);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !OWNER_CHANGE_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+  if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
+  const startedAt = Number(body.started_at);
+  if (!Number.isFinite(startedAt) || Date.now() - startedAt < VENUE_SUBMISSION_MIN_FILL_MS) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check your changes and send them again.' });
+  }
+  const { venue, happyHourTimes } = found;
+  const { changes, previous, errors } = validateOwnerChanges(venue, happyHourTimes, body);
+  if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, errors });
+  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 1000) || null : null;
+  const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
+  const ipHash = crypto.createHash('sha256').update(`okanagan-roam-owner-change:${requestClientIp(req)}`).digest('hex');
+  let id;
+  db.exec('BEGIN');
+  try {
+    // A newer request replaces an older one still waiting for review.
+    db.prepare("UPDATE owner_change_requests SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status = 'pending'").run(venue.id);
+    id = Number(db.prepare('INSERT INTO owner_change_requests (venue_id, changes, previous, note, contact_name, ip_hash) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(venue.id, JSON.stringify(changes), JSON.stringify(previous), note, contactName, ipHash).lastInsertRowid);
+    db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    console.error(`[owner-portal] storing a request for venue #${venue.id} failed: ${err.message}`);
+    return sendSubmissionResponse(res, 500, { ok: false, error: generic });
+  }
+  await notifyOwnerChange(id);
+  return sendSubmissionResponse(res, 201, { ok: true, id, fields: Object.keys(changes) });
+}
+
+// Applies an approved request. `fields` (optional) approves only some of the
+// changed fields. Each field goes through its guarded writer; any failure
+// rolls the whole approval back and leaves the request pending.
+function approveOwnerChange(id, reviewer, fields, now = new Date()) {
+  const req = getOwnerChange(id);
+  if (!req) return { ok: false, reason: 'not_found' };
+  if (req.status !== 'pending') return { ok: false, reason: 'not_pending', status: req.status };
+  const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(req.venue_id);
+  if (!venue || venue.redirect_to) return { ok: false, reason: 'venue_unavailable' };
+  const chosen = Array.isArray(fields) && fields.length ? fields.filter((f) => f in req.changes) : Object.keys(req.changes);
+  if (!chosen.length) return { ok: false, reason: 'no_fields' };
+  const meta = { reason: `owner request #${id}`, batch_id: `owner-${todayLocal(now)}`, reviewed_by: reviewer };
+  const listing = venueListingUrl(venue);
+  const applied = [];
+  const log = db.prepare(`INSERT INTO venue_enrichment_log
+    (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+    VALUES (?, ?, ?, ?, 'venue_owner', ?, 'high', ?, 0, ?)`);
+  db.exec('SAVEPOINT owner_approve');
+  try {
+    for (const field of chosen) {
+      const value = req.changes[field];
+      if (field === 'hours') {
+        // guardedHoursVerifyUpdate runs its own BEGIN/COMMIT, which SQLite
+        // does not allow inside a savepoint -- so hours are written last,
+        // outside it (below).
+        continue;
+      }
+      if (field === 'happy_hour') continue; // same reason; written below
+      if (field === 'badges') {
+        const update = {};
+        for (const [k, on] of Object.entries(value)) {
+          update[k] = on;
+          log.run(venue.id, k, String(venue[k] ? 1 : 0), on ? '1' : '0', meta.reason, meta.batch_id, reviewer);
+        }
+        updateVenue(venue.id, update);
+      } else {
+        updateVenue(venue.id, { [field]: value });
+        log.run(venue.id, field, venue[field] == null ? null : String(venue[field]), value == null ? null : String(value), meta.reason, meta.batch_id, reviewer);
+      }
+      applied.push(field);
+    }
+    db.exec('RELEASE owner_approve');
+  } catch (err) {
+    try { db.exec('ROLLBACK TO owner_approve'); db.exec('RELEASE owner_approve'); } catch (_) { /* already gone */ }
+    return { ok: false, reason: 'write_failed', detail: String(err.message || err) };
+  }
+  if (chosen.includes('hours')) {
+    const r = guardedHoursVerifyUpdate(venue.id, venue.hours, { hours: req.changes.hours, hours_source: 'venue_owner', hours_checked_at: todayLocal(now) }, meta, now);
+    if (!r.ok) return { ok: false, reason: 'hours_failed', detail: r.reason, applied };
+    applied.push('hours');
+  }
+  if (chosen.includes('happy_hour')) {
+    const value = req.changes.happy_hour;
+    let times = null;
+    if (value) {
+      const o = JSON.parse(value);
+      times = {};
+      for (const d of OWNER_DAYS) if (o[d] && o[d].length) times[d] = o[d];
+    }
+    const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer }, now);
+    if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };
+    applied.push('happy_hour');
+  }
+  db.prepare("UPDATE owner_change_requests SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
+  return { ok: true, applied, listing };
+}
+
+function rejectOwnerChange(id, reviewer, reason) {
+  const req = getOwnerChange(id);
+  if (!req) return { ok: false, reason: 'not_found' };
+  if (req.status !== 'pending') return { ok: false, reason: 'not_pending', status: req.status };
+  db.prepare("UPDATE owner_change_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
+    .run(reviewer, String(reason || '').slice(0, 300) || null, id);
+  return { ok: true };
+}
+
+function renderOwnerInvalidLinkPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead('Edit link not valid | Okanagan Roam', 'This edit link is not valid.', null, [], { golfTheme: true, noindex: true })}
+</head>
+<body class="golf-page">
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main" style="padding:48px 0;max-width:640px">
+    <h1>This edit link isn&rsquo;t valid</h1>
+    <p>It may have been replaced with a newer link. Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll send you a fresh one.</p>
+  </main>
+</body>
+</html>`;
+}
+
+function renderOwnerPage(found, token, pending) {
+  const { venue, happyHourTimes } = found;
+  const snap = ownerVenueSnapshot(venue, happyHourTimes);
+  const listing = venueListingUrl(venue);
+  const showHappyHour = OWNER_HAPPY_HOUR_TYPES.has(venue.type);
+  const parseWeek = (json) => { try { return json ? JSON.parse(json) : null; } catch (e) { return null; } };
+  const hours = parseWeek(snap.hours) || {};
+  const hh = parseWeek(snap.happy_hour) || {};
+  const dayRows = (prefix, week, emptyMeansClosed) => OWNER_DAYS.map((d) => {
+    const w = week[d] && week[d].length ? week[d] : [];
+    const closed = emptyMeansClosed ? !w.length : false;
+    const w1 = w[0] || ['', ''];
+    const w2 = w[1] || ['', ''];
+    return `<div class="op-day" data-day="${d}" data-prefix="${prefix}">
+          <span class="op-day-name">${OWNER_DAY_LABELS[d]}</span>
+          <label class="op-closed"><input type="checkbox" class="op-off"${(emptyMeansClosed ? closed : !w.length) ? ' checked' : ''}> ${emptyMeansClosed ? 'Closed' : 'None'}</label>
+          <span class="op-times">
+            <input type="time" class="op-t" data-i="0" value="${escapeHtml(w1[0])}" aria-label="${OWNER_DAY_LABELS[d]} from"> to
+            <input type="time" class="op-t" data-i="1" value="${escapeHtml(w1[1])}" aria-label="${OWNER_DAY_LABELS[d]} until">
+            <span class="op-second"${w[1] ? '' : ' hidden'}>and <input type="time" class="op-t" data-i="2" value="${escapeHtml(w2[0])}" aria-label="${OWNER_DAY_LABELS[d]} second range from"> to
+            <input type="time" class="op-t" data-i="3" value="${escapeHtml(w2[1])}" aria-label="${OWNER_DAY_LABELS[d]} second range until"></span>
+            <button type="button" class="op-add"${w[1] ? ' hidden' : ''}>+ second time</button>
+          </span>
+        </div>`;
+  }).join('');
+  const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
+          <label class="amenity-check"><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(BADGE_LABELS[f].title)}</label>`).join('');
+  const pendingNote = pending
+    ? `<p class="op-pending">You sent changes on ${escapeHtml(String(pending.submitted_at).slice(0, 10))}. They&rsquo;re waiting for review. If you send new changes, they replace that request.</p>`
+    : '';
+  const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(`Edit ${venue.name} | Okanagan Roam`, `Update the details for ${venue.name} on Okanagan Roam.`, null, [], { golfTheme: true, noindex: true })}
+${golfEngagementHeadHtml('fd', true, 'listing_form')}
+<meta name="referrer" content="no-referrer">
+<style>
+  body.owner-page .op-wrap { max-width: 760px; margin: 0 auto; padding: 16px 0 48px; }
+  body.owner-page .op-head p { color: rgba(42,32,25,0.75); }
+  body.owner-page .op-pending { background: #FFF6E5; border-radius: 12px; padding: 12px 16px; font-weight: 600; }
+  body.owner-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 28px 0 10px; }
+  body.owner-page .op-day { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 0; border-bottom: 1px solid rgba(42,32,25,0.08); }
+  body.owner-page .op-day-name { width: 96px; font-weight: 700; }
+  body.owner-page .op-closed { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.9rem; width: 90px; }
+  body.owner-page .op-closed input { width: auto; }
+  body.owner-page .op-times { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  body.owner-page .op-times input { width: auto; min-width: 110px; }
+  body.owner-page .op-day.is-off .op-times { opacity: 0.35; pointer-events: none; }
+  body.owner-page .op-add { background: none; border: 0; color: var(--ref-navy); font-weight: 700; cursor: pointer; padding: 4px; }
+  body.owner-page .op-hint { font-size: 0.82rem; color: rgba(42,32,25,0.62); margin: 4px 0 8px; }
+  body.owner-page .lyv-error { font-size: 0.85rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
+  body.owner-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  body.owner-page .op-done { display: none; background: #E9F6EE; border-radius: 14px; padding: 18px; font-weight: 600; }
+  body.owner-page .op-done.show { display: block; }
+  body.owner-page .venue-form-submit:disabled { opacity: 0.6; cursor: wait; }
+  @media (max-width: 640px) { body.owner-page .venue-form { padding: 22px 16px; } body.owner-page .op-day-name { width: 100%; } }
+</style>
+</head>
+<body class="golf-page owner-page">
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main">
+  <div class="op-wrap">
+    <div class="op-head">
+      <span class="eyebrow">Owner edit page</span>
+      <h1>${escapeHtml(venue.name)}</h1>
+      <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>. Keep this link private; anyone with it can suggest changes.</p>
+      ${pendingNote}
+    </div>
+    <form class="venue-form" id="opForm" novalidate>
+      <p class="lyv-section-label">Opening hours</p>
+      <p class="op-hint">Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. Closing after midnight? Just enter the closing time, like 01:00.</p>
+      <div id="opHours">${dayRows('hours', hours, true)}</div>
+      <p class="lyv-error" id="opHoursError" hidden></p>
+
+      <p class="lyv-section-label">Contact</p>
+      <div class="form-row">
+        <div class="form-field"><label for="opPhone">Phone</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
+        <div class="form-field"><label for="opWebsite">Website</label><input type="url" id="opWebsite" maxlength="300" placeholder="https://" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
+      </div>
+
+      <p class="lyv-section-label">Description</p>
+      <div class="form-row full"><div class="form-field">
+        <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}">${escapeHtml(snap.description)}</textarea>
+        <p class="op-hint">A few sentences about what makes your place worth a visit. We may lightly edit for length and style.</p>
+        <p class="lyv-error" id="opDescriptionError" hidden></p>
+      </div></div>
+
+      <p class="lyv-section-label">Badges</p>
+      <p class="op-hint">Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.</p>
+      <div class="amenity-check-grid" id="opBadges">${badgeChecks}
+      </div>
+      <p class="lyv-error" id="opBadgesError" hidden></p>
+      ${showHappyHour ? `
+      <p class="lyv-section-label">Happy hour</p>
+      <p class="op-hint">Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.</p>
+      <div id="opHappy">${dayRows('happy', hh, false)}</div>
+      <p class="lyv-error" id="opHappyError" hidden></p>` : ''}
+
+      <p class="lyv-section-label">Anything else?</p>
+      <div class="form-row">
+        <div class="form-field"><label for="opName">Your name</label><input type="text" id="opName" maxlength="100" autocomplete="name"></div>
+      </div>
+      <div class="form-row full"><div class="form-field">
+        <label for="opNote">Note for us (optional)</label>
+        <textarea id="opNote" rows="3" maxlength="1000" placeholder="Seasonal closures, new menu, anything we should know."></textarea>
+      </div></div>
+      <div class="lyv-hp" aria-hidden="true"><label>Company website <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
+      <p class="lyv-error" id="opFormError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="opSubmit">Send changes</button>
+    </form>
+    <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them shortly. You can come back to this page any time to send more.</div>
+    <p class="op-hint" style="margin-top:28px">Have an event coming up? <a href="/list-an-event">List it on What&rsquo;s On</a>. Want to send photos? Reply to our email or write to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
+  </div>
+  </main>
+<script>
+(function(){
+  var startedAt = Date.now();
+  var initial = ${initial};
+  var form = document.getElementById('opForm');
+  function rows(id){ var el = document.getElementById(id); return el ? Array.prototype.slice.call(el.querySelectorAll('.op-day')) : []; }
+  function syncRow(row){ row.classList.toggle('is-off', row.querySelector('.op-off').checked); }
+  rows('opHours').concat(rows('opHappy')).forEach(function(row){
+    syncRow(row);
+    row.querySelector('.op-off').addEventListener('change', function(){ syncRow(row); });
+    var add = row.querySelector('.op-add');
+    add.addEventListener('click', function(){ row.querySelector('.op-second').hidden = false; add.hidden = true; });
+  });
+  function week(id){
+    var out = {}, bad = '';
+    rows(id).forEach(function(row){
+      var d = row.getAttribute('data-day');
+      if (row.querySelector('.op-off').checked) { out[d] = []; return; }
+      var t = row.querySelectorAll('.op-t'), w = [];
+      if (t[0].value || t[1].value) { if (!t[0].value || !t[1].value) bad = d; else w.push([t[0].value, t[1].value]); }
+      if (t[2].value || t[3].value) { if (!t[2].value || !t[3].value) bad = d; else w.push([t[2].value, t[3].value]); }
+      out[d] = w;
+    });
+    return { week: out, bad: bad };
+  }
+  function show(id, msg){ var el = document.getElementById(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg; }
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    ['opHoursError','opPhoneError','opWebsiteError','opDescriptionError','opBadgesError','opHappyError','opFormError'].forEach(function(id){ show(id, ''); });
+    var h = week('opHours');
+    if (h.bad) { show('opHoursError', 'Please fill in both times for each day you are open.'); return; }
+    var changes = {
+      hours: h.week,
+      phone: document.getElementById('opPhone').value,
+      website: document.getElementById('opWebsite').value,
+      description: document.getElementById('opDescription').value,
+      badges: {}
+    };
+    Array.prototype.forEach.call(document.querySelectorAll('#opBadges input'), function(b){ changes.badges[b.value] = b.checked; });
+    if (document.getElementById('opHappy')) {
+      var hh = week('opHappy');
+      if (hh.bad) { show('opHappyError', 'Please fill in both times for each happy hour.'); return; }
+      changes.happy_hour = hh.week;
+    }
+    // Only send what the owner actually touched.
+    if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
+    if (changes.phone === initial.phone) delete changes.phone;
+    if (changes.website === initial.website) delete changes.website;
+    if (changes.description === initial.description) delete changes.description;
+    var btn = document.getElementById('opSubmit');
+    btn.disabled = true;
+    fetch(location.pathname + '/changes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ changes: changes, note: document.getElementById('opNote').value, contact_name: document.getElementById('opName').value,
+        company_website: document.getElementById('opHp').value, started_at: startedAt }) })
+      .then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }); })
+      .then(function(r){
+        btn.disabled = false;
+        if (r.body && r.body.ok) { form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
+        var errs = (r.body && r.body.errors) || {};
+        show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
+        show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour);
+        show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? 'Please fix the highlighted fields.' : 'Sorry, something went wrong. Please try again.'));
+      })
+      .catch(function(){ btn.disabled = false; show('opFormError', 'Could not send. Please check your connection and try again.'); });
+  });
+})();
+</script>
+</body>
+</html>`;
+}
+
 function renderListAnEventPage(now = new Date()) {
   const title = 'List an Event | Okanagan Roam';
   const description = 'Organizing a festival, concert, market, tasting or community event in the Okanagan? Send us the details and we will review them for What’s On.';
@@ -31082,6 +31686,56 @@ const server = http.createServer(async (req, res) => {
 
     // List an Event, Phase 1 (2026-09-25) -- see renderListAnEventPage
     // and handleEventSubmission above.
+    // Owner portal (2026-10-15): private edit page + change requests.
+    if (pathname.startsWith(OWNER_LINK_PATH)) {
+      const rest = pathname.slice(OWNER_LINK_PATH.length);
+      const changesMatch = /^([A-Za-z0-9_-]+)\/changes$/.exec(rest);
+      if (changesMatch && method === 'POST') return await handleOwnerChangeSubmission(req, res, changesMatch[1]);
+      if (/^[A-Za-z0-9_-]+$/.test(rest) && (method === 'GET' || method === 'HEAD')) {
+        const found = venueForOwnerToken(rest);
+        const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
+        if (!found) { res.writeHead(404, headers); return res.end(method === 'HEAD' ? undefined : renderOwnerInvalidLinkPage()); }
+        res.writeHead(200, headers);
+        return res.end(method === 'HEAD' ? undefined : renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id)));
+      }
+    }
+    if (pathname === '/admin/owner-links' && method === 'POST') {
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const unexpected = Object.keys(body || {}).filter((k) => !['venue_id', 'contact_email', 'reset'].includes(k));
+      if (unexpected.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+      if (!Number.isInteger(body.venue_id) || body.venue_id <= 0) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
+      const r = createOwnerLink(body.venue_id, { contact_email: body.contact_email, reset: body.reset === true });
+      if (!r.ok) return sendJSON(res, { venue_not_found: 404, venue_redirected: 409, link_exists: 409 }[r.reason] || 400, { error: r.reason });
+      return sendJSON(res, 201, { venue_id: body.venue_id, url: r.url, replaced: r.replaced });
+    }
+    if (pathname === '/admin/owner-links/revoke' && method === 'POST') {
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      if (!body || !Number.isInteger(body.venue_id)) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
+      return sendJSON(res, 200, { venue_id: body.venue_id, revoked: revokeOwnerLink(body.venue_id) });
+    }
+    if (pathname === '/admin/owner-changes' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      const status = ['pending', 'approved', 'rejected', 'superseded', 'all'].includes(query.status) ? query.status : 'pending';
+      return sendJSON(res, 200, { status, requests: listOwnerChanges(status) });
+    }
+    {
+      const m = /^\/admin\/owner-changes\/(\d+)\/(approve|reject)$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!requireAdminToken(req, res)) return;
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        const reviewer = validateReviewer(body && body.reviewer);
+        if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
+        const id = Number(m[1]);
+        const r = m[2] === 'approve' ? approveOwnerChange(id, reviewer, body.fields) : rejectOwnerChange(id, reviewer, body.reason);
+        if (!r.ok) return sendJSON(res, { not_found: 404, not_pending: 409, venue_unavailable: 409 }[r.reason] || 400, { error: r.reason, detail: r.detail, applied: r.applied, status: r.status });
+        return sendJSON(res, 200, { id, ...r });
+      }
+    }
     if ((pathname === '/list-an-event' || pathname === '/list-an-event/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderListAnEventPage());
@@ -31716,6 +32370,14 @@ module.exports = {
   guardedSeasonUpdate,
   guardedHappyHourUpdate,
   guardedCuisineUpdate,
+  createOwnerLink,
+  revokeOwnerLink,
+  venueForOwnerToken,
+  validateOwnerChanges,
+  approveOwnerChange,
+  rejectOwnerChange,
+  listOwnerChanges,
+  getOwnerChange,
   getSeasonStates,
   breadcrumbListSchema,
   FALL_MOOD_IMAGES,
