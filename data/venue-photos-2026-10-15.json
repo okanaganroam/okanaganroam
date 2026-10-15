@@ -11,7 +11,7 @@
         "image_url": null
       },
       "set": {
-        "image_url": "/images/venues/blue-mountain-outdoor-tasting.jpg"
+        "image_url": "/images/venues/blue-mountain-outdoor-tasting.jpg?v=20261015"
       }
     },
     {
@@ -23,7 +23,7 @@
         "image_url": null
       },
       "set": {
-        "image_url": "/images/venues/joiefarm-tasting-room.jpg"
+        "image_url": "/images/venues/joiefarm-tasting-room.jpg?v=20261015"
       }
     },
     {
@@ -35,7 +35,7 @@
         "image_url": "https://lh3.googleusercontent.com/d/1Ho_cKkCoYu16xjqsMKjoRd_kTlIK8Gxh"
       },
       "set": {
-        "image_url": "/images/venues/marmalade-bakery-cupcakes.jpg"
+        "image_url": "/images/venues/marmalade-bakery-cupcakes.jpg?v=20261015"
       }
     },
     {
@@ -47,7 +47,79 @@
         "image_url": "https://lh3.googleusercontent.com/d/1udkmbYJcoLni0KhX8eJyea0og_cJLSR2"
       },
       "set": {
-        "image_url": "/images/venues/priest-creek-winery-exterior.jpg"
+        "image_url": "/images/venues/priest-creek-winery-exterior.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 63,
+      "name": "Bean to Cup",
+      "region": "vernon",
+      "slug": "bean-to-cup",
+      "expect": {
+        "image_url": "/images/venues/bean-to-cup.jpg"
+      },
+      "set": {
+        "image_url": "/images/venues/bean-to-cup.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 141,
+      "name": "Chulo Tapas & Bar",
+      "region": "penticton",
+      "slug": "chulo-tapas-bar",
+      "expect": {
+        "image_url": "/images/venues/chulo-tapas.jpg"
+      },
+      "set": {
+        "image_url": "/images/venues/chulo-tapas.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 378,
+      "name": "MASHAWI - Shawarma & Grill",
+      "region": "kelowna",
+      "slug": "mashawi-shawarma-grill",
+      "expect": {
+        "image_url": "/images/venues/mashawi-shawarma.jpg"
+      },
+      "set": {
+        "image_url": "/images/venues/mashawi-shawarma.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 624,
+      "name": "Summerland Heritage Cider Company",
+      "region": "summerland",
+      "slug": "summerland-heritage-cider-company",
+      "expect": {
+        "image_url": "/images/venues/summerland-heritage-cider.jpg"
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-heritage-cider.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 710,
+      "name": "The Ryse Breadworks & Coffeehouse",
+      "region": "west-kelowna",
+      "slug": "the-ryse-breadworks-coffeehouse",
+      "expect": {
+        "image_url": "/images/venues/ryse-breadworks.jpg"
+      },
+      "set": {
+        "image_url": "/images/venues/ryse-breadworks.jpg?v=20261015"
+      }
+    },
+    {
+      "id": 734,
+      "name": "Truck 59 Ciderhouse",
+      "region": "west-kelowna",
+      "slug": "truck-59-ciderhouse",
+      "expect": {
+        "image_url": "/images/venues/truck-59-ciderhouse.jpg"
+      },
+      "set": {
+        "image_url": "/images/venues/truck-59-ciderhouse.jpg?v=20261015"
       }
     }
   ]
