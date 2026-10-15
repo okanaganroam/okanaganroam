@@ -1,0 +1,18 @@
+{
+  "reason": "Repair missing Office Brewery photo using DSC05660.jpeg supplied by Maggie at officebrewery.ca in October 15 email.",
+  "batch_id": "photo-coverage-office-2026-10-15",
+  "venues": [
+    {
+      "id": 1416,
+      "name": "The Office Brewery",
+      "region": "kelowna",
+      "slug": "the-office-brewery",
+      "expect": {
+        "image_url": "/images/venues/office-brewery.jpg"
+      },
+      "set": {
+        "image_url": "/images/venues/office-brewery.jpg?v=20261015"
+      }
+    }
+  ]
+}
