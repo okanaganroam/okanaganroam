@@ -12170,6 +12170,11 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-toast:empty, body.map-page .pm-toast[hidden] { display: none; }
   body.map-page .pm-locate { position: absolute; z-index: 600; right: 12px; bottom: calc(var(--pm-sheet-h) + 14px); width: 54px; height: 54px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: #fff; color: #1D4ED8; box-shadow: 0 2px 10px rgba(27,43,58,0.3); cursor: pointer; transition: bottom 0.25s ease; }
   body.map-page .pm-locate[aria-pressed="true"] { background: #1D4ED8; color: #fff; }
+  body.map-page .pm-pinbtn { position: absolute; z-index: 600; right: 16px; bottom: calc(var(--pm-sheet-h) + 80px); width: 46px; height: 46px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: #fff; color: #DC2626; box-shadow: 0 2px 10px rgba(27,43,58,0.3); cursor: pointer; transition: bottom 0.25s ease; }
+  body.map-page .pm-pinbtn[aria-pressed="true"] { background: #DC2626; color: #fff; }
+  body.map-page .pm-stage.is-pinning #okMap { cursor: crosshair; }
+  .pm-droppin { background: none; border: 0; }
+  .pm-droppin svg { display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
   body.map-page .pm-locate.is-finding svg { animation: pm-spin 1s linear infinite; }
   @keyframes pm-spin { to { transform: rotate(360deg); } }
   /* The list: a sheet that peeks from the bottom; tap or drag the handle for more. */
@@ -12206,6 +12211,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
     body.map-page .pm-handle { display: none; }
     body.map-page .pm-sheet-head { padding-top: 14px; }
     body.map-page .pm-locate { bottom: 100px; right: 12px; }
+    body.map-page .pm-pinbtn { bottom: 166px; right: 16px; }
     body.map-page .pm-panel { top: 16px; left: 16px; bottom: 16px; right: auto; width: 392px; border-radius: 18px; box-shadow: 0 2px 14px rgba(27,43,58,0.25); }
     body.map-page .pm-panel-head { border-radius: 18px 18px 0 0; }
   }
@@ -12299,14 +12305,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
-    denied: 'La localisation est désactivée pour ce site. Vous pouvez quand même parcourir la carte, ou l’activer dans les réglages de votre navigateur.',
-    failed: 'Impossible de trouver votre position pour l’instant. Réessayez dans un endroit dégagé, ou parcourez la carte.', unsupported: 'Ce navigateur ne peut pas partager votre position.',
+    pinBtn: 'Déposer un repère', pinRemove: 'Retirer le repère', pinRemoved: 'Repère retiré.', stopLocTxt: 'Désactiver ma position',
+    tapToPin: 'Touchez la carte là où vous voulez regarder autour.', pinned: 'Voici ce qui est autour de votre repère. Faites-le glisser pour le déplacer.',
+    pinOutside: 'Déposez le repère dans l’Okanagan.', outside: 'Vous êtes hors de l’Okanagan, alors « Près de moi » ne peut pas aider. Touchez la carte pour déposer un repère là où vous serez.',
+    denied: 'La localisation est désactivée pour ce site. Déposez un repère sur la carte (bouton rouge), ou activez la localisation dans les réglages de votre navigateur.',
+    failed: 'Impossible de trouver votre position pour l’instant. Réessayez dans un endroit dégagé, ou déposez un repère sur la carte.', unsupported: 'Ce navigateur ne peut pas partager votre position.',
     loading: 'Chargement de la carte…', loadFailed: 'La carte n’a pas pu se charger. Rechargez la page pour réessayer.',
     placesNear: function(n, r){ return n + (n === 1 ? ' lieu' : ' lieux') + (r ? ' à moins de ' + r + ' km' : ' autour de vous'); },
     placesHere: function(n){ return n + (n === 1 ? ' lieu' : ' lieux') + ' dans cette zone de la carte'; },
     openSuffix: ' ouverts', eventsCount: function(n){ return n + (n === 1 ? ' événement' : ' événements') + ' cette semaine'; },
     eventsNear: function(n, r){ return n + (n === 1 ? ' événement' : ' événements') + (r ? ' à moins de ' + r + ' km' : ' près de vous') + ' cette semaine'; },
-    zoomHint: 'Touchez le bouton de position ou zoomez sur la carte pour voir les lieux à proximité.',
+    zoomHint: 'Touchez le bouton de position, déposez un repère ou zoomez pour voir ce qui est proche.',
     none: 'Rien ne correspond ici. Essayez une plus grande distance ou retirez un filtre.', noEvents: 'Aucun événement cette semaine ici. Essayez une plus grande distance.',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
     today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
@@ -12320,14 +12329,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
-    denied: 'Location is turned off for this site. You can still browse the map, or turn location on in your browser settings.',
-    failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or browse the map.', unsupported: 'This browser can’t share your location.',
+    pinBtn: 'Drop a pin', pinRemove: 'Remove the pin', pinRemoved: 'Pin removed.', stopLocTxt: 'Turn off my location',
+    tapToPin: 'Tap the map where you want to look around.', pinned: 'Showing what’s around your pin. Drag it to move it.',
+    pinOutside: 'Drop the pin inside the Okanagan.', outside: 'You’re outside the Okanagan, so Near me can’t help yet. Tap the map to drop a pin where you’ll be.',
+    denied: 'Location is turned off for this site. Drop a pin on the map instead (the red button), or turn location on in your browser settings.',
+    failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or drop a pin on the map.', unsupported: 'This browser can’t share your location.',
     loading: 'Loading the map…', loadFailed: 'The map couldn’t load. Reload the page to try again.',
     placesNear: function(n, r){ return n + (n === 1 ? ' place' : ' places') + (r ? ' within ' + r + ' km' : ' near you'); },
     placesHere: function(n){ return n + (n === 1 ? ' place' : ' places') + ' in this part of the map'; },
     openSuffix: ' open', eventsCount: function(n){ return n + (n === 1 ? ' event' : ' events') + ' this week'; },
     eventsNear: function(n, r){ return n + (n === 1 ? ' event' : ' events') + (r ? ' within ' + r + ' km' : ' near you') + ' this week'; },
-    zoomHint: 'Tap the locate button, or zoom into the map, to see what’s close by.',
+    zoomHint: 'Tap the locate button, drop a pin, or zoom in to see what’s close by.',
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
     today: 'Today', until: 'until', onNow: 'On now', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
@@ -12337,6 +12349,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var WIDE = window.matchMedia ? window.matchMedia('(min-width: 900px)') : { matches: false };
   var map = L.map(mapEl, { zoomControl: false }).setView([49.75, -119.5], 9);
   if (WIDE.matches) L.control.zoom({ position: 'bottomright' }).addTo(map);
+  // The Okanagan only (Osoyoos to Enderby, Big White and the Lumby lakes): the map can't be panned or zoomed out past it.
+  var OK_BOUNDS = L.latLngBounds([48.95, -120.2], [50.8, -118.25]);
+  map.setMaxBounds(OK_BOUNDS.pad(0.04)); map.options.maxBoundsViscosity = 1;
+  function okLimits(){ map.setMinZoom(Math.max(6, map.getBoundsZoom(OK_BOUNDS))); }
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 15 ? 18 : z >= 13 ? 32 : 48; }, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
@@ -12348,7 +12364,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
   // The map fills the screen below the header.
   function fitStage(){ var top = stage.getBoundingClientRect().top + (window.scrollY || 0); document.documentElement.style.setProperty('--pm-top', Math.max(0, Math.round(top)) + 'px'); }
-  fitStage(); map.invalidateSize(); window.addEventListener('resize', function(){ fitStage(); map.invalidateSize(); });
+  fitStage(); map.invalidateSize(); okLimits(); window.addEventListener('resize', function(){ fitStage(); map.invalidateSize(); okLimits(); });
   // The list sheet: peek, half or full. Tap the handle to step up; drag it (or the heading) to any of the three.
   var STATES = ['peek', 'half', 'full'];
   function sheetH(){ stage.style.setProperty('--pm-sheet-h', WIDE.matches ? '0px' : Math.round(Math.min(sheet.offsetHeight, stage.offsetHeight * 0.52)) + 'px'); }
@@ -12377,6 +12393,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   if (window.ResizeObserver) new ResizeObserver(sheetH).observe(sheet);
   if (WIDE.addEventListener) WIDE.addEventListener('change', sheetH);
   sheetH();
+  // Opens on Kelowna and around, where most places are.
+  fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);
   // Filters: everything beyond the quick chips, in one panel.
   function openPanel(){ panel.hidden = false; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus(); }
   function closePanel(){ if (panel.hidden) return; panel.hidden = true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
@@ -12440,13 +12458,15 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function popupForEvent(e){ return '<div class="pm-pop"><a href="' + esc(e.url) + '">' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" data-k="e' + e.ix + '" href="' + esc(dirUrl(e.lat, e.lng, e.venue || e.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
   // Messages show briefly over the map; tap one to hide it.
   var statusTimer = null;
-  function setStatus(text){ clearTimeout(statusTimer); statusEl.textContent = text || ''; statusEl.hidden = !text; if (text) statusTimer = setTimeout(function(){ setStatus(''); }, 7000); }
+  function setStatus(text, ms){ clearTimeout(statusTimer); statusEl.textContent = text || ''; statusEl.hidden = !text; if (text) statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
   statusEl.addEventListener('click', function(){ setStatus(''); });
   // Room taken by the search bar and the list, so fitted pins land where they can be seen.
   function pad(){
     var st = stage.getBoundingClientRect(), fl = floatEl.getBoundingClientRect(), sh = sheet.getBoundingClientRect();
     if (WIDE.matches) return { paddingTopLeft: [Math.round(sh.right - st.left) + 24, 24], paddingBottomRight: [70, 24] };
-    return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(st.bottom - sh.top) + 20] };
+    // The sheet may still be sliding, so use the height it is heading for.
+    var state = sheet.getAttribute('data-state'), H = st.height, sheetPx = state === 'full' ? H - 124 : state === 'half' ? H * 0.52 : 150;
+    return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(Math.min(sheetPx, H * 0.52)) + 20] };
   }
   function fitTo(bounds, maxZoom){ var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
   function matchesPlace(p){
@@ -12615,6 +12635,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return pick ? pick.r : 0;
   }
   function onPos(pos){
+    if (!me || me.pin) {
+      if (!OK_BOUNDS.pad(0.1).contains([pos.coords.latitude, pos.coords.longitude])) {
+        watching = false; stopWatch(); pendingRoute = null; nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe;
+        if (!pinMarker) setPinMode(true);
+        setStatus(T.outside, 15000); track('map_outside', {}); return;
+      }
+      if (pinMarker) { map.removeLayer(pinMarker); pinMarker = null; pinBtn.setAttribute('aria-pressed', 'false'); me = null; }
+    }
     var first = !me;
     me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.min(pos.coords.accuracy || 50, 2000) };
     drawMe();
@@ -12628,7 +12656,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     } else if (!lastRender || distKm(lastRender.lat, lastRender.lng, me.lat, me.lng) > 0.15) render(false);
   }
   function located(){
-    radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false;
+    radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.stopLocTxt;
     nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.recenter; setStatus(T.near);
   }
   function onErr(err){
@@ -12643,19 +12671,51 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function stopWatch(){ if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); watchId = null; }
   // The round button finds the visitor, then brings the map back to them; turning location off is in Filters.
-  function stopLocation(){
+  function stopLocation(quiet){
     watching = false; stopWatch(); me = null; if (route) endRoute();
     if (meMarker) { map.removeLayer(meMarker); map.removeLayer(meCircle); meMarker = meCircle = null; }
+    if (pinMarker) { map.removeLayer(pinMarker); pinMarker = null; pinBtn.setAttribute('aria-pressed', 'false'); }
+    if (quiet) return;
     nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; radiusSel.disabled = true; stopLoc.hidden = true;
     places.forEach(function(p){ p.d = null; }); render(false);
   }
   nearBtn.addEventListener('click', function(){
-    if (me) { if (route && route.line) fitTo(route.line.getBounds(), 17); else render(true); return; }
+    if (me && !me.pin) { if (route && route.line) fitTo(route.line.getBounds(), 17); else render(true); return; }
+    setPinMode(false);
     if (watching) return;
     nearLabel.textContent = T.finding; nearBtn.classList.add('is-finding'); startWatch();
   });
   var stopLoc = $('pmStopLoc');
-  stopLoc.addEventListener('click', function(){ stopLocation(); setStatus(T.stopped); closePanel(); });
+  stopLoc.addEventListener('click', function(){ var wasPin = me && me.pin; stopLocation(); setStatus(wasPin ? T.pinRemoved : T.stopped); closePanel(); });
+  // Drop a pin: for visitors outside the Okanagan (or without location), everything sorts from a pin they place.
+  // Tap the red button then the map, or long-press the map; drag the pin to move it. The pin stays in this page only.
+  var pinBtn = $('pmPinBtn'), pinMarker = null, pinMode = false;
+  var PIN_ICON = L.divIcon({ className: 'pm-droppin', html: '<svg viewBox="0 0 24 34" width="30" height="42" aria-hidden="true"><path d="M12 1C6 1 1 5.8 1 11.9 1 20.3 12 33 12 33s11-12.7 11-21.1C23 5.8 18 1 12 1z" fill="#DC2626" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="#fff"/></svg>', iconSize: [30, 42], iconAnchor: [15, 41] });
+  function setPinMode(on){ pinMode = on; stage.classList.toggle('is-pinning', on); pinBtn.setAttribute('aria-pressed', on || pinMarker ? 'true' : 'false'); if (on) setStatus(T.tapToPin, 15000); }
+  function dropPin(ll, fit){
+    if (!OK_BOUNDS.contains(ll)) { setStatus(T.pinOutside); return; }
+    if (watching || (me && !me.pin)) stopLocation(true);
+    me = { lat: ll.lat, lng: ll.lng, acc: 0, pin: true };
+    if (!pinMarker) {
+      pinMarker = L.marker(ll, { icon: PIN_ICON, draggable: true, zIndexOffset: 1000, keyboard: false, title: T.pinBtn }).addTo(map);
+      pinMarker.on('dragend', function(){ dropPin(pinMarker.getLatLng(), false); });
+    } else pinMarker.setLatLng(ll);
+    setPinMode(false);
+    if (route) { if (route.line) map.removeLayer(route.line); route = null; drawRoute(); }
+    radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8);
+    radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.pinRemove;
+    setStatus(T.pinned); limit = 25;
+    if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
+    track('map_pin', { radius_km: radiusKm });
+    render(fit);
+  }
+  pinBtn.addEventListener('click', function(){
+    if (pinMarker) { stopLocation(); setStatus(T.pinRemoved); return; }
+    setPinMode(!pinMode); if (!pinMode) setStatus('');
+  });
+  map.on('click', function(e){ if (pinMode) dropPin(e.latlng, true); });
+  // A long press (or right-click) drops the pin anywhere, any time.
+  map.on('contextmenu', function(e){ dropPin(e.latlng, true); });
   // No location updates while the page is in the background.
   document.addEventListener('visibilitychange', function(){ if (!watching) return; if (document.hidden) stopWatch(); else if (watchId == null) startWatch(); });
   radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); limit = 25; render(true); });
@@ -12939,6 +12999,7 @@ ${renderGolfHeaderHtml()}
       <p class="pm-toast" id="pmStatus" role="status" aria-live="polite"></p>
     </div>
     <button type="button" class="pm-locate" id="pmNear" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="visually-hidden" id="pmNearLabel">Near me</span></button>
+    <button type="button" class="pm-pinbtn" id="pmPinBtn" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span class="visually-hidden">Drop a pin</span></button>
     <section class="pm-sheet" id="pmSheet" data-state="peek" aria-labelledby="pmCount">
       <button type="button" class="pm-handle" id="pmHandle" aria-label="Show more of the list"><span></span></button>
       <div class="pm-sheet-head">

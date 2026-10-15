@@ -782,7 +782,7 @@ const FR_TEXT = {
   'Town…': 'Ville…', '1 km': '1 km', '5 km': '5 km', '10 km': '10 km', '25 km': '25 km', 'Any': 'Toutes',
   'What the pins mean': 'Ce que signifient les repères',
   'Filters': 'Filtres', 'Done': 'Terminé', 'Go to a town': 'Aller à une ville', 'Turn off my location': 'Désactiver ma position',
-  '✕ Clear': '✕ Effacer', 'Quick filters': 'Filtres rapides', 'Show more of the list': 'Afficher plus de la liste',
+  'Drop a pin': 'Déposer un repère',   '✕ Clear': '✕ Effacer', 'Quick filters': 'Filtres rapides', 'Show more of the list': 'Afficher plus de la liste',
   'Tours, sports & indoor': 'Visites, sports et intérieur',
   'Browse & Search every place': 'Parcourir et rechercher tous les lieux',
   'see everything that’s on': 'voir tout ce qui se passe',

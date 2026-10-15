@@ -19547,6 +19547,12 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   const fr = await (await fetch(`${base}/fr/map`)).text();
   assert.match(fr, /<h1 class="visually-hidden">Carte de l’Okanagan<\/h1>/);
   assert.match(fr, /<h2 id="pmPanelTitle">Filtres<\/h2>/);
+  // The Okanagan only, and a pin to drop for visitors who are elsewhere (or without location).
+  assert.match(html, /<button type="button" class="pm-pinbtn" id="pmPinBtn" aria-pressed="false">/);
+  assert.match(src, /var OK_BOUNDS = L\.latLngBounds\(\[48\.95, -120\.2\], \[50\.8, -118\.25\]\);\s*map\.setMaxBounds\(/);
+  assert.match(src, /if \(!OK_BOUNDS\.pad\(0\.1\)\.contains\(\[pos\.coords\.latitude, pos\.coords\.longitude\]\)\)/, 'Near me outside the Okanagan asks for a pin');
+  assert.match(src, /map\.on\('contextmenu', function\(e\)\{ dropPin\(e\.latlng, true\); \}\);/);
+  for (const p of data.p) assert.ok(p[0] >= 48.95 && p[0] <= 50.8 && p[1] >= -120.2 && p[1] <= -118.25, `${p[2]} is inside the map limits`);
   assert.match(fr, /id="pmNearLabel">Près de moi</);
 }));
 
