@@ -7583,7 +7583,7 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/beaches\/homepage-beach-one<\/loc>/);
     // No beach *category or venue* URLs before the data exists. (The static
     // valley-wide /beaches hub is always listed, so match region-scoped URLs.)
-    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/[a-z-]+\/beaches/);
+    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/(?!fr\/)[a-z-]+\/beaches/);
 
     // Region hub shows the new category card.
     const hub = await (await fetch(`${base}/kelowna`)).text();
@@ -7946,7 +7946,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors\/fixture-canyon-park<\/loc>/);
     // No outdoor *category or venue* URLs before the data exists. (The static
     // valley-wide /outdoors hub is always listed, so match region-scoped URLs.)
-    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/[a-z-]+\/outdoors/);
+    assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/(?!fr\/)[a-z-]+\/outdoors/);
     const hub = await (await fetch(`${base}/kelowna`)).text();
     assert.match(hub, /<h3><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h3>/, 'region hub gains the category card, exactly as Beaches did');
     // Phase 2: an activity page appears only once the activity has MIN_ACTIVITY_VENUES destinations.
@@ -15998,7 +15998,9 @@ test('Browse hub: head metadata -- the wizard page\'s share-card, locale and Web
 })));
 
 test('Browse hub: /browse keeps its previous header -- no Favorites link -- while every other themed page keeps the link', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
-  const html = await (await fetch(`${base}/browse`)).text();
+  // French twins (2026-10-14): the EN / FR switch and its menu item are added to the header on the way out.
+  const html = (await (await fetch(`${base}/browse`)).text())
+    .replace(/<a class="lang-toggle" id="langToggle"[^>]*>[^<]*<\/a>\n    /, '').replace(/\n      <li class="nav-links-lang">[\s\S]*?<\/li>(?=\n)/, '');
   assert.ok(!html.includes('nav-links-favorites') && !html.includes('href="/favorites"'), '/browse: no Favorites link and no rule for it');
   assert.ok(!html.includes(app.FAVORITES_NAV_STYLE), 'the 941-1099px rule is gone with it');
   // Exactly the shared themed header, minus what withFavoritesNavLink adds.
@@ -19440,3 +19442,73 @@ test('Browse (2026-10-14): only the first page of cards ships with /browse; the 
   assert.ok(Object.keys(data.k).length > 0, 'search words for the places');
   assert.match(html, /<option value=""[^>]*>Recommended<\/option>/);
 }));
+
+// ---- French twins of the main and town pages (2026-10-14) -------------------------------------------------
+test('French twins: which addresses have one, and how a /fr request maps to its English page', () => {
+  for (const p of ['/', '/food-drink', '/wineries', '/browse', '/kelowna', '/big-white', '/kelowna/restaurants/test-trattoria']) assert.equal(app.hasFrenchTwin(p), true, p);
+  for (const p of ['/whats-on', '/kelowna/restaurants', '/guides', '/about', '/nowhere']) assert.equal(app.hasFrenchTwin(p), false, p);
+  assert.deepEqual(app.frenchTwinRequest('/fr'), { enPath: '/', enUrl: '/' });
+  assert.deepEqual(app.frenchTwinRequest('/fr/food-drink?types=cafe'), { enPath: '/food-drink', enUrl: '/food-drink?types=cafe' });
+  assert.deepEqual(app.frenchTwinRequest('/fr/kelowna/'), { enPath: '/kelowna', enUrl: '/kelowna' });
+  assert.equal(app.frenchTwinRequest('/fr/whats-on'), null, 'no twin yet');
+  assert.equal(app.frenchTwinRequest('/fr/kelowna/restaurants/test-trattoria'), null, 'place pages keep their own route');
+});
+
+test('French twins: the word list and its patterns (times, opening status, counts, cuisines, ratings)', () => {
+  assert.equal(app.frText('View details →'), 'Voir les détails →');
+  assert.equal(app.frText('Closes 8:30 PM'), 'Ferme à 20 h 30');
+  assert.equal(app.frText('Closes 12 AM'), 'Ferme à minuit');
+  assert.equal(app.frText('Open now · Closes 9 PM'), 'Ouvert · ferme à 21 h');
+  assert.equal(app.frText('Closed · Opens tomorrow 7 AM'), 'Fermé · ouvre demain à 7 h');
+  assert.equal(app.frText('Kelowna · Italian · 4.6★'), 'Kelowna · Italien · 4,6★');
+  assert.equal(app.frText('+3 more'), '+3 autres');
+  assert.equal(app.frText('12 cafes in Vernon'), '12 cafés à Vernon');
+  assert.equal(app.frText('1,774 places'), '1 774 lieux');
+  assert.equal(app.frText('Add Test Trattoria to trip'), 'Ajouter Test Trattoria au voyage');
+  assert.equal(app.frText('Places to start in Penticton'), 'Par où commencer à Penticton');
+  assert.equal(app.frText('Patio, Lake View, Live Music'), 'Terrasse, Vue sur le lac, Musique en direct');
+  assert.equal(app.frText('Some sentence nobody has translated'), null, 'unknown text stays as it is');
+});
+
+test('French twins: /fr/food-drink is the Food & Drink page in French, paired with the English page', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/fr/food-drink`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /<html lang="fr" data-page-lang="fr">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/fr\/food-drink">/);
+  assert.match(html, /<link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/food-drink">\n<link rel="alternate" hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink">\n<link rel="alternate" hreflang="x-default" href="https:\/\/okanaganroam\.com\/food-drink">/);
+  assert.match(html, /<meta property="og:locale" content="fr_CA">/);
+  assert.match(html, /<title>Où manger et boire dans l’Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /<h1 id="fdHeading">Où manger et boire dans l’Okanagan<\/h1>/);
+  assert.match(html, /<a class="lang-toggle" id="langToggle" href="\/food-drink" hreflang="en"/, 'the switch goes to the English page');
+  assert.doesNotMatch(html, /class="desc-en"/, 'cards carry the French blurb only');
+  assert.doesNotMatch(html, />View details →</);
+  // Place cards link to the French place pages; pages with no French twin keep their English address.
+  assert.match(html, /href="\/fr\/kelowna\/restaurants\/test-trattoria"/);
+  assert.match(html, /href="\/whats-on"/);
+  // The page scripts still parse after translation.
+  for (const m of html.matchAll(/<script(?![^>]*(?:src=|application\/(?:ld\+)?json))[^>]*>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]));
+  const en = await (await fetch(`${base}/food-drink`)).text();
+  assert.match(en, /<html lang="en" data-page-lang="en">/);
+  assert.match(en, /<a class="lang-toggle" id="langToggle" href="\/fr\/food-drink" hreflang="fr"/);
+  assert.match(en, /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink"/);
+  assert.match(en, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/, 'the English page is unchanged');
+  assert.equal((await fetch(`${base}/fr/whats-on`)).status, 404, 'pages without a twin are not served under /fr');
+}));
+
+test('French twins: a French place page links up to the French town page but keeps its English switch', () => withDiscoveryServer(async (base) => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  if (!app.venueHasFrench(venue)) return;
+  const html = await (await fetch(`${base}/fr/kelowna/restaurants/test-trattoria`)).text();
+  assert.match(html, /href="\/fr\/kelowna"/);
+  assert.match(html, /<a href="\/kelowna\/restaurants\/test-trattoria" hreflang="en" lang="en">English<\/a>/);
+}));
+
+test('French twins: the sitemap lists each main and town page in both languages, each naming the pair', () => {
+  const entry = (p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>2026-10-14</lastmod>\n  </url>`;
+  const out = app.withFrenchTwinEntries([entry('/kelowna'), entry('/whats-on'), entry('/kelowna/restaurants/test-trattoria')]);
+  assert.equal(out.length, 4, 'one extra entry, for /fr/kelowna');
+  assert.match(out[1], /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna<\/loc>\n    <xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna"\/>/);
+  assert.match(out[0], /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna"\/>/);
+  assert.equal(out[2], entry('/whats-on'));
+});

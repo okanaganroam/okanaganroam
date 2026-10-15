@@ -19376,6 +19376,285 @@ function venueAlternates(venue) {
   const en = `https://okanaganroam.com${venuePagePath(venue)}`;
   return [{ hreflang: 'en-CA', href: en }, { hreflang: 'fr-CA', href: `https://okanaganroam.com${venuePagePath(venue, 'fr')}` }, { hreflang: 'x-default', href: en }];
 }
+// ---------- French hub pages (Phase 2 of French, 2026-10-14): /fr, /fr/food-drink, /fr/kelowna ... ----------
+// The main pages each get a French twin at /fr + the English address. The English page is rendered as usual and then
+// translated on the way out (frenchTwinHtml): the header/footer through app.js's data-i18n keys, every other piece of
+// visible text through the FR_TEXT word list (french-text.js), card blurbs from each place's French description (the
+// cards already carry both), and links to pages that have a French twin point at /fr. Both pages name each other with
+// hreflang and carry an EN / FR switch in the header. Anything not in the list stays as it was (place names, towns).
+// Optional like the other helper modules: a copy of server.js running on its own still starts (French twins then
+// carry only the header/footer translation).
+const frenchText = (() => { try { return require('./french-text'); } catch (e) { return { FR_TEXT: {}, FR_PATTERNS: [], FR_SCRIPT: [] }; } })();
+const FR_TWIN_STATIC = new Set(['/', '/food-drink', '/restaurants', '/cafes', '/breweries', '/pubs', '/cocktail-lounges', '/distilleries',
+  '/wineries', '/golf', '/beaches', '/outdoors', '/tours', '/ski-snow', '/indoor', '/sports', '/dog-friendly', '/local-favorites',
+  '/secret-spots', '/hidden-gems', '/destinations', '/browse', '/categories']);
+// An English address with a French twin: a main page, a town page, or a place page.
+function hasFrenchTwin(p) {
+  const path = String(p || '').replace(/(.)\/$/, '$1');
+  if (FR_TWIN_STATIC.has(path)) return true;
+  const seg = path.split('/').filter(Boolean);
+  if (seg.length === 1 && REGION_LABELS[seg[0]]) return true;
+  return seg.length === 3 && !!REGION_LABELS[seg[0]] && !!SLUG_TO_TYPE[seg[1]] && /^[a-z0-9-]+$/.test(seg[2]);
+}
+function frTwinPath(enPath) { return enPath === '/' ? '/fr' : `/fr${enPath}`; }
+// A /fr request for a main or town page -> the English address it is rendered from (place pages have their own route).
+function frenchTwinRequest(rawUrl) {
+  const m = /^\/fr(\/[^?#]*)?(\?[^#]*)?$/.exec(String(rawUrl || ''));
+  if (!m) return null;
+  const enPath = (m[1] || '/').replace(/(.)\/$/, '$1');
+  if (enPath === '/browse/cards.json') return { enPath, enUrl: enPath + (m[2] || '') };
+  if (!hasFrenchTwin(enPath) || enPath.split('/').filter(Boolean).length === 3) return null;
+  return { enPath, enUrl: enPath + (m[2] || '') };
+}
+function frDecode(s) {
+  return String(s).replace(/&(amp|lt|gt|quot|#39|apos|rsquo|lsquo|ldquo|rdquo|rarr|larr|rsaquo|lsaquo|laquo|raquo|egrave|agrave|ccedil|copy|uarr|darr|middot|mdash|ndash|hellip|nbsp|times|eacute|#(\d+)|#x([0-9a-f]+));/gi, (m, name, dec, hex) => {
+    if (dec) return String.fromCodePoint(Number(dec));
+    if (hex) return String.fromCodePoint(parseInt(hex, 16));
+    return { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'", rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', rarr: '→', larr: '←', rsaquo: '›', lsaquo: '‹', laquo: '«', raquo: '»', egrave: 'è', agrave: 'à', ccedil: 'ç', copy: '©', uarr: '↑', darr: '↓', middot: '·', mdash: '—', ndash: '–', hellip: '…', nbsp: ' ', times: '×', eacute: 'é' }[name.toLowerCase()] || m;
+  });
+}
+// One piece of text -> French, or null when the list has nothing for it. Exact entries first, then the patterns
+// (counts, opening times, "Wineries in Kelowna" ...), which may translate pieces through frText again.
+// The list keyed the way lookups are: one space between words, straight apostrophes.
+const frNorm = (s) => String(s).replace(/\s+/g, ' ').replace(/[\u2019\u2018]/g, "'").trim();
+const FR_TEXT_MAP = new Map(Object.entries(frenchText.FR_TEXT).map(([k, v]) => [frNorm(k), v]));
+function frLookup(key) { const k = frNorm(key); return FR_TEXT_MAP.has(k) ? FR_TEXT_MAP.get(k) : null; }
+function frText(plain) {
+  const key = String(plain).replace(/\s+/g, ' ').trim();
+  if (!key) return null;
+  const hit = frLookup(key);
+  if (hit != null) return hit;
+  if (FR_FROM_APP.has(key)) return FR_FROM_APP.get(key);
+  if (FR_FROM_APP_LC.has(key.toLowerCase())) return FR_FROM_APP_LC.get(key.toLowerCase());
+  for (const [re, fn] of frenchText.FR_PATTERNS) {
+    const m = re.exec(key);
+    if (m) { const out = typeof fn === 'function' ? fn(m, frTextOr, FR_CTX) : key.replace(re, fn); if (out != null) return out; }
+  }
+  // Numbers as placeholders: "{0} verified wineries across ..." covers every count.
+  const nums = [];
+  const tpl = key.replace(/\d[\d,]*(?:\.\d+)?/g, (n) => { nums.push(n); return `{${nums.length - 1}}`; });
+  const t = nums.length ? frLookup(tpl) : null;
+  if (t != null) return t.replace(/\{(\d+)\}/g, (m, i) => frNumber(nums[Number(i)]));
+  return null;
+}
+// 1,774 -> 1 774 and 4.6 -> 4,6, the Canadian French way.
+function frNumber(n) {
+  return String(n).replace(/,(?=\d{3}\b)/g, '\u00a0').replace(/\.(\d)/, ',$1');
+}
+// A paragraph with links or bold text inside ("Swim at <a>Gyro Beach</a>, ride the <a>KVR</a> ..."): its text with the
+// inline pieces as {a0}, {a1} ... is looked up whole, so the French sentence can put them in its own order.
+function frParagraph(inner) {
+  const pieces = [];
+  const tpl = inner.replace(/<(a|strong|em|b|span)\b([^>]*)>([^<]*)<\/\1>/g, (m) => { pieces.push(m); return `{a${pieces.length - 1}}`; });
+  if (!pieces.length || /<(?!br\b)/.test(tpl)) return null;
+  const key = frDecode(tpl).replace(/\s+/g, ' ').trim();
+  const nums = [];
+  const keyN = key.replace(/(?<!\{a)\d[\d,]*(?:\.\d+)?/g, (n) => { nums.push(n); return `{${nums.length - 1}}`; });
+  const t = frLookup(key) != null ? frLookup(key) : (nums.length ? frLookup(keyN) : null);
+  if (t == null) return null;
+  const lead = /^\s*/.exec(inner)[0], trail = /\s*$/.exec(inner)[0];
+  return lead + escapeHtml(t.replace(/\{(\d+)\}/g, (m, i) => frNumber(nums[Number(i)])))
+    .replace(/\{a(\d+)\}/g, (m, i) => pieces[Number(i)].replace(/>([^<]*)</, (mm, txt) => (frIsVenueName(frDecode(txt)) ? mm : `>${escapeHtml(frTextOr(frDecode(txt)))}<`))) + trail;
+}
+function frTextOr(s) { const t = frText(s); return t == null ? s : t; }
+// app.js's own French (its TRANSLATIONS.en text -> TRANSLATIONS.fr), so a label reads the same as on the home page.
+const FR_FROM_APP = (() => {
+  const m = new Map(), en = APP_TRANSLATIONS.en || {}, fr = APP_TRANSLATIONS.fr || {};
+  for (const k of Object.keys(en)) {
+    const e = typeof en[k] === 'string' ? en[k].replace(/\s+/g, ' ').trim() : '';
+    if (e && typeof fr[k] === 'string' && fr[k] && !/[{<]/.test(e) && !m.has(e)) m.set(e, fr[k]);
+  }
+  return m;
+})();
+const FR_FROM_APP_LC = new Map([...FR_FROM_APP].map(([k, v]) => [k.toLowerCase(), v]).reverse());
+const FR_CTX = { regions: REGION_LABELS, frDe: (n) => frDe(n), cuisine: (c) => frCuisine(c), has: (t) => frText(t) != null, status: (t) => frStatusText(t) };
+function frHref(href) {
+  const m = /^(https:\/\/okanaganroam\.com)?(\/[^?#"]*)([?#][^"]*)?$/.exec(href);
+  if (!m || /^\/fr(\/|$)/.test(m[2]) || !hasFrenchTwin(m[2])) return href;
+  return `${m[1] || ''}${frTwinPath(m[2].replace(/(.)\/$/, '$1'))}${m[3] || ''}`;
+}
+// Place names are never translated, even when one reads like a list entry ("KVR Trail - Naramata Bench").
+let frVenueNames = null, frVenueNamesAt = 0;
+function frIsVenueName(text) {
+  if (!frVenueNames || Date.now() - frVenueNamesAt > 10 * 60 * 1000) {
+    try { frVenueNames = new Set(db.prepare('SELECT name FROM venues').all().map((r) => String(r.name).trim())); } catch (e) { frVenueNames = new Set(); }
+    frVenueNamesAt = Date.now();
+  }
+  return frVenueNames.has(String(text).replace(/\s+/g, ' ').trim());
+}
+// Search words from each place's French description, so a French search finds "terrasse" or "bière" too.
+let frWordsById = null, frWordsAt = 0;
+function frSearchWords(id) {
+  if (!frWordsById || Date.now() - frWordsAt > 10 * 60 * 1000) {
+    frWordsById = new Map();
+    try { for (const r of db.prepare("SELECT id, description_fr FROM venues WHERE description_fr IS NOT NULL AND description_fr != ''").all()) frWordsById.set(String(r.id), descSearchWords(r.description_fr)); } catch (e) { /* English words only */ }
+    frWordsAt = Date.now();
+  }
+  return frWordsById.get(String(id)) || '';
+}
+function frSearchData(json) {
+  let data; try { data = JSON.parse(json); } catch (e) { return json; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return json;
+  for (const [id, v] of Object.entries(data)) if (v && typeof v === 'object' && typeof v.k === 'string') v.k = `${v.k} ${frSearchWords(id)}`.trim();
+  return JSON.stringify(data).replace(/</g, '\\u003c');
+}
+// Sitemap (2026-10-14): each main or town page with a French twin lists both addresses, each naming the pair.
+function withFrenchTwinEntries(entries) {
+  const out = [];
+  for (const e of entries) {
+    const m = /<loc>https:\/\/okanaganroam\.com(\/[^<]*)<\/loc>/.exec(e);
+    const p = m ? m[1].replace(/(.)\/$/, '$1') : null;
+    if (!p || !hasFrenchTwin(p) || p.split('/').filter(Boolean).length === 3 || /xhtml:link/.test(e)) { out.push(e); continue; }
+    const alts = twinHeadLinks(p).trim().split('\n').map((l) => `\n    ${l.replace('<link ', '<xhtml:link ').replace(/>$/, '/>')}`).join('');
+    const withAlts = e.replace(/(<\/loc>)/, `$1${alts}`);
+    out.push(withAlts, withAlts.replace(/<loc>https:\/\/okanaganroam\.com[^<]*<\/loc>/, `<loc>https://okanaganroam.com${frTwinPath(p)}</loc>`));
+  }
+  return out;
+}
+// A French place page's links to pages with a French twin go to the twin (2026-10-14); its "English" switch
+// (hreflang="en") keeps its English address.
+function frPageLinks(html) {
+  return html.replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)));
+}
+// Text and attributes of the markup outside <script>/<style>.
+function frMarkup(part) {
+  return part
+    .replace(/(<(p|li|h[1-6]|figcaption)\b[^>]*>)((?:(?!<\/?(?:p|li|div|ul|ol|section|h[1-6])\b)[\s\S])*?)(<\/\2>)/g, (m, open, tag, inner, close) => {
+      const t = frParagraph(inner);
+      return t == null ? m : open + t + close;
+    })
+    // A card shows the French blurb only.
+    .replace(/<span class="desc-en" lang="en">[\s\S]*?<\/span><span class="desc-fr" lang="fr">([\s\S]*?)<\/span>/g, '$1')
+    .replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)))
+    .replace(/(\s(?:alt|aria-label|placeholder|title|data-tooltip|content)=")([^"]+)"/g, (m, a, v) => {
+      if (a.includes('content') && !/[a-z]{3,} [a-z]/i.test(v)) return m;
+      const t = frText(frDecode(v));
+      return t == null ? m : `${a}${escapeHtml(t)}"`;
+    })
+    .replace(/>([^<>]+)</g, (m, text) => {
+      if (!/[A-Za-z]/.test(text) || frIsVenueName(frDecode(text))) return m;
+      const t = frText(frDecode(text));
+      if (t == null) return m;
+      const lead = /^\s*/.exec(text)[0], trail = /\s*$/.exec(text)[0];
+      return `>${lead}${escapeHtml(t)}${trail}<`;
+    });
+}
+// String literals inside page scripts: JSON-style "..." strings that are whole entries in the list (banner text,
+// headings, chip labels), plus the script fragments in FR_SCRIPT ("Show N results" ...).
+// Text in single quotes that is wording, not logic: the hours labels are left to the hoursStatusLabel wrapper.
+const FR_SCRIPT_KEEP = new Set(['Closed today', 'Closed', 'Closed now', 'Open 24 hours', 'Hours not listed for today', 'Open now', 'Open Now']);
+function frScript(src) {
+  src = src.replace(/'((?:[^'\\\n]|\\.){2,400})'/g, (m, body) => {
+    let plain; try { plain = JSON.parse(`"${body.replace(/\\'/g, "'").replace(/"/g, '\\"')}"`); } catch (e) { return m; }
+    if (!/[A-Za-z]{2}/.test(plain) || !/[ .!?]/.test(plain) || FR_SCRIPT_KEEP.has(plain.trim()) || /^(Open now|Open 24|Closed|Hours not| · Opens)/.test(plain)) return m;
+    const t = frText(plain);
+    return t == null ? m : `'${t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')}'`;
+  });
+  let out = src.replace(/"((?:[^"\\\n]|\\.){2,400})"/g, (m, body) => {
+    let plain; try { plain = JSON.parse(m); } catch (e) { return m; }
+    if (!/[A-Za-z]{2}/.test(plain) || /^[a-z0-9_.\-\/#:]+$/.test(plain)) return m;
+    const t = frText(plain);
+    return t == null ? m : JSON.stringify(t).replace(/</g, '\\u003c');
+  });
+  // Each fragment as written in the source and with its \\uXXXX escapes as characters (a template literal serves those).
+  const chars = (x) => x.replace(/\\u([0-9a-fA-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+  for (const [en, fr] of frenchText.FR_SCRIPT) out = out.split(en).join(fr).split(chars(en)).join(chars(fr));
+  return out;
+}
+function frJsonLd(json) {
+  let data; try { data = JSON.parse(json); } catch (e) { return json; }
+  const walk = (o) => {
+    if (Array.isArray(o)) return o.map(walk);
+    if (o && typeof o === 'object') {
+      const n = {};
+      for (const [k, v] of Object.entries(o)) {
+        if (typeof v === 'string' && (k === 'url' || k === 'item' || k === '@id')) n[k] = frHref(v);
+        else if (typeof v === 'string' && (k === 'name' || k === 'description')) n[k] = frTextOr(v);
+        else n[k] = walk(v);
+      }
+      if (o['@type'] === 'ItemList' || o['@type'] === 'CollectionPage' || o['@type'] === 'WebPage') n.inLanguage = 'fr-CA';
+      return n;
+    }
+    return o;
+  };
+  return JSON.stringify(walk(data));
+}
+function twinHeadLinks(enPath) {
+  const en = `https://okanaganroam.com${enPath}`, fr = `https://okanaganroam.com${frTwinPath(enPath)}`;
+  return `<link rel="alternate" hreflang="en-CA" href="${en}">\n<link rel="alternate" hreflang="fr-CA" href="${fr}">\n<link rel="alternate" hreflang="x-default" href="${en}">\n`;
+}
+// The header's EN / FR switch: a real link to the twin (app.js also handles it and remembers the choice).
+function withTwinLangSwitch(html, href, lang) {
+  if (!html.includes('id="langToggle"')) {
+    const label = lang === 'fr' ? 'FR / EN' : 'EN / FR';
+    const a = `<a class="lang-toggle" id="langToggle" href="${href}" hreflang="${lang === 'fr' ? 'en' : 'fr'}" aria-label="${lang === 'fr' ? 'Voir cette page en anglais' : 'View this page in French'}" data-i18n-aria="nav.switchLanguage">${label}</a>`;
+    html = html.replace(/(<a class="nav-search-btn")/, `${a}\n    $1`);
+  }
+  return withMobileLanguageItem(html);
+}
+function addTwinHead(html, enPath) {
+  if (/hreflang="fr-CA"/.test(html)) return html;
+  return html.replace(/(<link rel="canonical" href="[^"]*">\n)/, `$1${twinHeadLinks(enPath)}`);
+}
+// The English page of a pair: hreflang, data-page-lang="en" (app.js keeps it English) and the switch. A visitor who
+// chose French before goes straight to the French twin.
+function englishTwinHtml(html, enPath) {
+  if (!/^<!DOCTYPE html>/i.test(html)) return html;
+  const frHrefPath = frTwinPath(enPath);
+  let out = addTwinHead(html, enPath)
+    .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
+    .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
+  out = withTwinLangSwitch(out, frHrefPath, 'en');
+  return out;
+}
+function frenchTwinHtml(html, enPath) {
+  if (!/^<!DOCTYPE html>/i.test(html)) return html;
+  const frPath = frTwinPath(enPath);
+  let out = localizeStaticFr(localizeHtml(html, 'fr'));
+  out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
+    if (i % 2 === 0) return frMarkup(part);
+    if (part.startsWith('<style')) return part;
+    const m = /^(<script[^>]*>)([\s\S]*?)(<\/script>)$/.exec(part);
+    if (!m) return part;
+    if (/application\/ld\+json/.test(m[1])) return `${m[1]}\n${frJsonLd(m[2].trim())}\n${m[3]}`;
+    if (/application\/json/.test(m[1])) return `${m[1]}${frSearchData(m[2])}${m[3]}`;
+    return m[1] + frScript(m[2]) + m[3];
+  }).join('');
+  // Head and switch last, so their English addresses are not turned French.
+  out = addTwinHead(out, enPath)
+    .replace(/<html lang="en"(?: data-page-lang="en")?/, '<html lang="fr" data-page-lang="fr"')
+    .replace(/(<link rel="canonical" href=")https:\/\/okanaganroam\.com[^"]*"/, `$1https://okanaganroam.com${frPath}"`)
+    .replace(/(<meta property="og:url" content=")https:\/\/okanaganroam\.com[^"]*"/, `$1https://okanaganroam.com${frPath}"`)
+    .replace(/(<meta property="og:type"[^>]*>\n)/, '$1<meta property="og:locale" content="fr_CA">\n');
+  out = withTwinLangSwitch(out, enPath, 'fr');
+  // Deferred card batches and the rest of /browse load from their French addresses.
+  return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
+}
+// Wraps writeHead/end for one request: the page goes out as its English or French twin; a redirect inside the set
+// stays French.
+function installTwinResponse(res, lang, enPath) {
+  const realWriteHead = res.writeHead.bind(res), realEnd = res.end.bind(res);
+  let status = 200, headers = {};
+  res.writeHead = (code, h) => { status = code; headers = { ...(h || {}) }; return res; };
+  res.end = (body) => {
+    const type = String(headers['Content-Type'] || headers['content-type'] || '');
+    if (lang === 'fr' && status >= 300 && status < 400 && headers.Location) headers.Location = frHref(headers.Location);
+    if (body != null && status === 200 && /text\/html/.test(type)) {
+      body = lang === 'fr' ? frenchTwinHtml(String(body), enPath) : englishTwinHtml(String(body), enPath);
+      delete headers['Content-Length']; delete headers.ETag;
+    } else if (body != null && status === 200 && lang === 'fr' && /application\/json/.test(type) && enPath === '/browse/cards.json') {
+      try {
+        const j = JSON.parse(String(body));
+        if (j.k && typeof j.k === 'object') for (const id of Object.keys(j.k)) j.k[id] = `${j.k[id]} ${frSearchWords(id)}`.trim();
+        j.html = frenchTwinHtml(`<!DOCTYPE html><html lang="en"><body>${j.html}</body></html>`, '/browse').replace(/^[\s\S]*?<body>|<\/body><\/html>$/g, '');
+        body = JSON.stringify(j);
+      } catch (e) { /* the English rest is better than none */ }
+      delete headers['Content-Length'];
+    }
+    realWriteHead(status, headers);
+    return realEnd(body);
+  };
+}
 
 // Place share cards (2026-10-13): a place page's share image is its own generated card (share-card.js) -- the brand mark, a
 // gold "WINERY · KELOWNA, BC" line and the place's name -- instead of the site logo. It is only the og:image preview, never
@@ -26658,6 +26937,18 @@ ${renderGolfHeaderHtml()}
 }
 
 const server = http.createServer(async (req, res) => {
+  // French twins (2026-10-14): /fr + a main or town page renders that page and translates it on the way out; the
+  // English page of a pair gets its hreflang and EN / FR switch the same way.
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    const frTwinReq = frenchTwinRequest(req.url);
+    if (frTwinReq) {
+      req.url = frTwinReq.enUrl;
+      installTwinResponse(res, 'fr', frTwinReq.enPath);
+    } else {
+      const p = String(req.url).split('?')[0].replace(/(.)\/$/, '$1');
+      if (hasFrenchTwin(p) && p.split('/').filter(Boolean).length < 3) installTwinResponse(res, 'en', p);
+    }
+  }
   const parsed = url.parse(req.url, true);
   const { pathname, query } = parsed;
 
@@ -27179,7 +27470,7 @@ const server = http.createServer(async (req, res) => {
       const sitemap = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-        ...urlEntries,
+        ...withFrenchTwinEntries(urlEntries),
         '</urlset>',
         '',
       ].join('\n');
@@ -29011,7 +29302,7 @@ const server = http.createServer(async (req, res) => {
           return res.end();
         }
         const venueGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && venue[c.badge]);
-        const html = renderVenuePage(venue, getRelatedVenues(venue), getNearbyVenues(venue), venueGuidePages, { lang: 'fr' });
+        const html = frPageLinks(renderVenuePage(venue, getRelatedVenues(venue), getNearbyVenues(venue), venueGuidePages, { lang: 'fr' }));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': 'fr-CA' });
         return res.end(html);
       }
@@ -29521,6 +29812,12 @@ module.exports = {
   frHoursText,
   frDe,
   venueHasFrench,
+  hasFrenchTwin,
+  frenchTwinRequest,
+  frText,
+  frenchTwinHtml,
+  englishTwinHtml,
+  withFrenchTwinEntries,
   venuePagePath,
   APP_TRANSLATIONS,
   venueShareCardUrl,
