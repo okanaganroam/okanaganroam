@@ -748,6 +748,26 @@ const FR_TEXT = {
   '✓ In trip': '✓ Dans le voyage',
   '＋ Add to Trip': '＋ Ajouter au voyage',
   'Big White:': 'Big White :',
+  'Tomorrow': 'Demain',
+  'Today': 'Aujourd’hui',
+  'Tonight': 'Ce soir',
+  '{T} Restaurants, Bars & Après-Ski, BC | Okanagan Roam': 'Restaurants, bars et après-ski à {T} (C.-B.) | Okanagan Roam',
+  'Summer season': 'Saison estivale',
+  'April {0} to close': 'Du {0} avril à la fermeture',
+  // 404 page.
+  'We couldn’t find that page': 'Page introuvable',
+  'The place or page may have moved, or the address has a typo. Search for it, or pick up from one of these.': 'Le lieu ou la page a peut-être changé d’adresse, ou l’adresse contient une coquille. Faites une recherche ou repartez de l’une de ces pages.',
+  'Search Okanagan Roam': 'Rechercher dans Okanagan Roam',
+  'Search a place, town or what you feel like': 'Rechercher un lieu, une ville ou une envie',
+  'Search': 'Rechercher',
+  'Were you looking for…': 'Vous cherchiez peut-être…',
+  'Popular on Okanagan Roam': 'Populaire sur Okanagan Roam',
+  'Browse everything': 'Tout parcourir',
+  'Towns': 'Villes',
+  'Map': 'Carte',
+  'Back to the home page': 'Retour à l’accueil',
+  'Everything in {T}': 'Tout à {T}',
+  '{0} across the Okanagan': '{0} dans tout l’Okanagan',
   'Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley’s best dining rooms — every restaurant, café, pub, cocktail lounge and brewery Okanagan Roam has verified.': 'Dîners en terrasse au bord du lac, cafés de spécialité, salles de dégustation de brasseries et les meilleures tables de la vallée : tous les restaurants, cafés, pubs, bars à cocktails et brasseries vérifiés par Okanagan Roam.',
   'Cafés, wineries, trails, beaches and more that are easy to miss — each card says why it’s a gem.': 'Cafés, vignobles, sentiers, plages et plus encore, faciles à manquer : chaque fiche explique pourquoi c’est un trésor.',
   '{0} restaurants, cafés, pubs and breweries across the Okanagan Valley. Filter by patio, dog-friendly, vegan or gluten-free.': '{0} restaurants, cafés, pubs et brasseries dans la vallée de l’Okanagan. Filtrez par terrasse, chiens acceptés, végane ou sans gluten.',
@@ -886,6 +906,13 @@ const FR_TEXT = {
   'Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at info@okanaganroam.com.': 'Désolés, impossible de joindre Okanagan Roam. Vérifiez votre connexion et réessayez, ou écrivez-nous à info@okanaganroam.com.',
 };
 
+// "All Kelowna restaurants, cafés, ..., or everything in Kelowna." on the badge guide pages, for any number of links.
+for (let n = 1; n <= 20; n++) {
+  const links = Array.from({ length: n + 1 }, (_, i) => `{a${i}}`);
+  FR_TEXT[`All {T} ${links.slice(0, -1).join(', ')}, or ${links[n]}.`] = `À {T} : ${links.slice(0, -1).join(', ')} ou ${links[n]}.`;
+  if (n === 1) FR_TEXT[`All {T} ${links[0]}, or ${links[1]}.`] = `À {T} : ${links[0]} ou ${links[1]}.`;
+}
+
 const FR_PATTERNS = [
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
   [/^Places to start in (.+)$/, (m) => `Par où commencer à ${m[1]}`],
@@ -897,6 +924,7 @@ const FR_PATTERNS = [
   [/^(.+) categories$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `Catégories à ${m[1]}` : null)],
   [/^(.+) in the Okanagan Valley$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `${m[1]} dans la vallée de l’Okanagan` : null)],
   [/^Until (.+)$/, (m, tr) => `Jusqu’au ${tr(m[1])}`],
+  [/^until (.+)$/, (m, tr) => `jusqu’au ${tr(m[1])}`],
   [/^Rates as published, checked (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}|\d{4})$/, (m) => (m[2].length === 4 ? `Tarifs publiés, vérifiés en ${MONTHS[m[1]]} ${m[2]}` : `Tarifs publiés, vérifiés le ${m[2]} ${MONTHS[m[1]]}`)],
   [new RegExp(`^Open-${TIME}$`), (m) => `De l’ouverture à ${frTime(m[1], m[2], m[3])}`],
   [/^Open-twilight$/, () => 'De l’ouverture au crépuscule'],
@@ -915,7 +943,11 @@ const FR_PATTERNS = [
   [/^Add (.+) to (?:my |your )?trip$/i, (m) => `Ajouter ${m[1]} au voyage`],
   [/^Remove (.+) from (?:my |your )?trip$/i, (m) => `Retirer ${m[1]} du voyage`],
   [/^Favorite (.+)$/, (m) => `Favori : ${m[1]}`],
+  // "Wineries in Oliver, BC" (a town category page's heading): the kind of place, then the town.
+  [/^(.+) in (.+), BC$/, (m, tr, c) => (c.has(m[1]) && Object.values(c.regions).includes(m[2]) ? `${tr(m[1])} à ${m[2]} (C.-B.)` : null)],
   [/^(.+), BC$/, (m, tr) => `${tr(m[1])}, C.-B.`],
+  [/^Showing the next (\d+) days: (.+) – (.+)$/, (m, tr) => `Les ${m[1]} prochains jours : ${tr(m[2])} – ${tr(m[3])}`],
+  [/^Showing (.+) – (.+)$/, (m, tr) => `Du ${tr(m[1])} au ${tr(m[2])}`],
   [/^(.+?) \((\d+)\)$/, (m, tr) => { const t = tr(m[1]); return t === m[1] ? null : `${t} (${m[2]})`; }],
   // "3 cafes in Vernon", "1 beach in Kaleden": the noun from the list, "à" before the town.
   [/^(\d+) (.+) in (.+)$/, (m, tr, c) => (!c.has(m[2]) || !Object.values(c.regions).includes(m[3]) ? null : `${m[1]} ${tr(m[2])} à ${m[3]}`)],
@@ -983,5 +1015,21 @@ const FR_SCRIPT = [
     "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
     "function hoursStatusLabelEn(status, clock) {"],
 ];
+
+// The rest of the site's text (town category pages, What's On, the guides, the info pages and forms, the map and trip
+// pages), one JSON file per part in data/french/, each { "English": "French" }. Entries above win over these.
+(() => {
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, 'data', 'french');
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort(); } catch (e) { return; }
+  for (const f of files) {
+    try {
+      const add = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+      for (const [en, fr] of Object.entries(add)) if (typeof fr === 'string' && fr && !Object.prototype.hasOwnProperty.call(FR_TEXT, en)) FR_TEXT[en] = fr;
+    } catch (e) { /* a broken file is skipped, never fatal */ }
+  }
+})();
 
 module.exports = { FR_TEXT, FR_PATTERNS, FR_SCRIPT, FR_CUISINE, frTime };

@@ -10461,7 +10461,8 @@ test('Phase 3: the planner flag is off by default and /trip is unchanged without
   assert.match(legacy, /id="tripConvHero"/, 'the original conversational hero');
   assert.doesNotMatch(legacy, /tripPlanForm|trip-plan-summary/);
   const page = await (await fetch(`${base}/trip`)).text();
-  assert.equal(page, legacy, 'GET /trip serves the unchanged page');
+  // French twins (2026-10-14): only the EN / FR switch and hreflang are added on the way out.
+  assert.equal(page, app.englishTwinHtml(legacy, '/trip'), 'GET /trip serves the unchanged page');
   const api = await fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Plan 3 days in Kelowna' }) });
   assert.equal(api.status, 404, 'the route does not exist when the flag is off');
 })));
@@ -11950,7 +11951,7 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
     const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
     assert.ok(header, page);
-    assert.doesNotMatch(header[0], /list-your-venue|list-venue|nav\.listVenue/, `${page}: header has no List Your Venue link`);
+    assert.doesNotMatch(header[0].replace(/<a class="lang-toggle"[^>]*>[^<]*<\/a>/, ''), /list-your-venue|list-venue|nav\.listVenue/, `${page}: header has no List Your Venue link`);
   }
 }));
 
@@ -19428,11 +19429,16 @@ test('Browse (2026-10-14): only the first page of cards ships with /browse; the 
 // ---- French twins of the main and town pages (2026-10-14) -------------------------------------------------
 test('French twins: which addresses have one, and how a /fr request maps to its English page', () => {
   for (const p of ['/', '/food-drink', '/wineries', '/browse', '/kelowna', '/big-white', '/kelowna/restaurants/test-trattoria']) assert.equal(app.hasFrenchTwin(p), true, p);
-  for (const p of ['/whats-on', '/kelowna/restaurants', '/guides', '/about', '/nowhere']) assert.equal(app.hasFrenchTwin(p), false, p);
+  // Phases 2 and 3: What's On, town category pages, guides, badge guides, the info pages and tools.
+  for (const p of ['/whats-on', '/whats-on/live-music', '/kelowna/events', '/kelowna/events/this-weekend', '/kelowna/restaurants', '/outdoors/hiking',
+    '/guides', '/guides/best-patios-kelowna', '/guide/kelowna/patio', '/about', '/privacy', '/terms', '/contact', '/map', '/trip', '/my-trip', '/favorites',
+    '/list-your-venue', '/list-an-event']) assert.equal(app.hasFrenchTwin(p), true, p);
+  for (const p of ['/nowhere', '/kelowna/events/test-future-festival', '/admin/x', '/api/venues', '/kelowna/nowhere/x/y']) assert.equal(app.hasFrenchTwin(p), false, p);
   assert.deepEqual(app.frenchTwinRequest('/fr'), { enPath: '/', enUrl: '/' });
   assert.deepEqual(app.frenchTwinRequest('/fr/food-drink?types=cafe'), { enPath: '/food-drink', enUrl: '/food-drink?types=cafe' });
   assert.deepEqual(app.frenchTwinRequest('/fr/kelowna/'), { enPath: '/kelowna', enUrl: '/kelowna' });
-  assert.equal(app.frenchTwinRequest('/fr/whats-on'), null, 'no twin yet');
+  assert.deepEqual(app.frenchTwinRequest('/fr/whats-on'), { enPath: '/whats-on', enUrl: '/whats-on' });
+  assert.equal(app.frenchTwinRequest('/fr/kelowna/events/test-future-festival'), null, 'event pages stay English');
   assert.equal(app.frenchTwinRequest('/fr/kelowna/restaurants/test-trattoria'), null, 'place pages keep their own route');
 });
 
@@ -19467,7 +19473,7 @@ test('French twins: /fr/food-drink is the Food & Drink page in French, paired wi
   assert.doesNotMatch(html, />View details →</);
   // Place cards link to the French place pages; pages with no French twin keep their English address.
   assert.match(html, /href="\/fr\/kelowna\/restaurants\/test-trattoria"/);
-  assert.match(html, /href="\/whats-on"/);
+  assert.match(html, /href="\/fr\/whats-on"/);
   // The page scripts still parse after translation.
   for (const m of html.matchAll(/<script(?![^>]*(?:src=|application\/(?:ld\+)?json))[^>]*>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]));
   const en = await (await fetch(`${base}/food-drink`)).text();
@@ -19475,7 +19481,9 @@ test('French twins: /fr/food-drink is the Food & Drink page in French, paired wi
   assert.match(en, /<a class="lang-toggle" id="langToggle" href="\/fr\/food-drink" hreflang="fr"/);
   assert.match(en, /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink"/);
   assert.match(en, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/, 'the English page is unchanged');
-  assert.equal((await fetch(`${base}/fr/whats-on`)).status, 404, 'pages without a twin are not served under /fr');
+  const nf = await fetch(`${base}/fr/kelowna/events/test-future-festival`);
+  assert.equal(nf.status, 404, 'event pages have no French twin');
+  assert.match(await nf.text(), /<html lang="fr" data-page-lang="fr">/, 'the /fr 404 page is French');
 }));
 
 test('French twins: a French place page links up to the French town page but keeps its English switch', () => withDiscoveryServer(async (base) => {
@@ -19489,10 +19497,11 @@ test('French twins: a French place page links up to the French town page but kee
 test('French twins: the sitemap lists each main and town page in both languages, each naming the pair', () => {
   const entry = (p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>2026-10-14</lastmod>\n  </url>`;
   const out = app.withFrenchTwinEntries([entry('/kelowna'), entry('/whats-on'), entry('/kelowna/restaurants/test-trattoria')]);
-  assert.equal(out.length, 4, 'one extra entry, for /fr/kelowna');
+  assert.equal(out.length, 5, 'one extra entry each for /fr/kelowna and /fr/whats-on');
   assert.match(out[1], /<loc>https:\/\/okanaganroam\.com\/fr\/kelowna<\/loc>\n    <xhtml:link rel="alternate" hreflang="en-CA" href="https:\/\/okanaganroam\.com\/kelowna"\/>/);
   assert.match(out[0], /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/kelowna"\/>/);
-  assert.equal(out[2], entry('/whats-on'));
+  assert.match(out[3], /<loc>https:\/\/okanaganroam\.com\/fr\/whats-on<\/loc>/);
+  assert.equal(out[4], entry('/kelowna/restaurants/test-trattoria'), 'place pages are listed by their own route');
 });
 
 // 2026-10-14: a town's What's On page carries only that town's events plus valley-wide ones.

@@ -19538,14 +19538,26 @@ function venueAlternates(venue) {
 const frenchText = (() => { try { return require('./french-text'); } catch (e) { return { FR_TEXT: {}, FR_PATTERNS: [], FR_SCRIPT: [] }; } })();
 const FR_TWIN_STATIC = new Set(['/', '/food-drink', '/restaurants', '/cafes', '/breweries', '/pubs', '/cocktail-lounges', '/distilleries',
   '/wineries', '/golf', '/beaches', '/outdoors', '/tours', '/ski-snow', '/indoor', '/sports', '/dog-friendly', '/local-favorites',
-  '/secret-spots', '/hidden-gems', '/destinations', '/browse', '/categories']);
-// An English address with a French twin: a main page, a town page, or a place page.
+  '/secret-spots', '/hidden-gems', '/destinations', '/browse', '/categories',
+  // Phase 2 and 3 (2026-10-14): What's On, the guides, the map, the trip pages, the forms and the info pages.
+  '/whats-on', '/guides', '/map', '/trip', '/my-trip', '/favorites', '/list-your-venue', '/list-an-event', '/about', '/contact', '/privacy', '/terms']);
+const FR_TWIN_SECTIONS = new Set(['outdoors', 'tours', 'indoor', 'sports', 'whats-on', 'guides']);
+// A place page (/kelowna/restaurants/slug): it has its own French route.
+function frIsVenuePath(p) {
+  const seg = String(p || '').split('/').filter(Boolean);
+  return seg.length === 3 && !!REGION_LABELS[seg[0]] && !!SLUG_TO_TYPE[seg[1]] && /^[a-z0-9-]+$/.test(seg[2]);
+}
+// An English address with a French twin: a main page, a section's activity page, a town page or a town's category
+// or events page, a badge guide, a guide, or a place page. Event pages stay English (their text is English only).
 function hasFrenchTwin(p) {
   const path = String(p || '').replace(/(.)\/$/, '$1');
   if (FR_TWIN_STATIC.has(path)) return true;
   const seg = path.split('/').filter(Boolean);
-  if (seg.length === 1 && REGION_LABELS[seg[0]]) return true;
-  return seg.length === 3 && !!REGION_LABELS[seg[0]] && !!SLUG_TO_TYPE[seg[1]] && /^[a-z0-9-]+$/.test(seg[2]);
+  if (!seg.every((x) => /^[a-z0-9-]+$/.test(x)) && !(seg[0] === 'guide' && seg.length === 3 && /^[a-z_]+$/.test(seg[2]))) return false;
+  if (seg.length === 1) return !!REGION_LABELS[seg[0]];
+  if (seg.length === 2) return FR_TWIN_SECTIONS.has(seg[0]) || (!!REGION_LABELS[seg[0]] && (!!SLUG_TO_TYPE[seg[1]] || seg[1] === 'events'));
+  if (seg.length === 3) return (seg[0] === 'guide' && !!REGION_LABELS[seg[1]]) || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && seg[2] === 'this-weekend') || frIsVenuePath(path);
+  return false;
 }
 function frTwinPath(enPath) { return enPath === '/' ? '/fr' : `/fr${enPath}`; }
 // A /fr request for a main or town page -> the English address it is rendered from (place pages have their own route).
@@ -19554,7 +19566,7 @@ function frenchTwinRequest(rawUrl) {
   if (!m) return null;
   const enPath = (m[1] || '/').replace(/(.)\/$/, '$1');
   if (enPath === '/browse/cards.json') return { enPath, enUrl: enPath + (m[2] || '') };
-  if (!hasFrenchTwin(enPath) || enPath.split('/').filter(Boolean).length === 3) return null;
+  if (!hasFrenchTwin(enPath) || frIsVenuePath(enPath)) return null;
   return { enPath, enUrl: enPath + (m[2] || '') };
 }
 function frDecode(s) {
@@ -19567,7 +19579,7 @@ function frDecode(s) {
 // One piece of text -> French, or null when the list has nothing for it. Exact entries first, then the patterns
 // (counts, opening times, "Wineries in Kelowna" ...), which may translate pieces through frText again.
 // The list keyed the way lookups are: one space between words, straight apostrophes.
-const frNorm = (s) => String(s).replace(/\s+/g, ' ').replace(/[\u2019\u2018]/g, "'").trim();
+const frNorm = (s) => frDecode(String(s)).replace(/\s+/g, ' ').replace(/[\u2019\u2018]/g, "'").trim();
 const FR_TEXT_MAP = new Map(Object.entries(frenchText.FR_TEXT).map(([k, v]) => [frNorm(k), v]));
 function frLookup(key) { const k = frNorm(key); return FR_TEXT_MAP.has(k) ? FR_TEXT_MAP.get(k) : null; }
 function frText(plain) {
@@ -19577,16 +19589,36 @@ function frText(plain) {
   if (hit != null) return hit;
   if (FR_FROM_APP.has(key)) return FR_FROM_APP.get(key);
   if (FR_FROM_APP_LC.has(key.toLowerCase())) return FR_FROM_APP_LC.get(key.toLowerCase());
+  const templated = frTemplated(key, frLookup);
+  if (templated != null) return templated;
   for (const [re, fn] of frenchText.FR_PATTERNS) {
     const m = re.exec(key);
     if (m) { const out = typeof fn === 'function' ? fn(m, frTextOr, FR_CTX) : key.replace(re, fn); if (out != null) return out; }
   }
-  // Numbers as placeholders: "{0} verified wineries across ..." covers every count.
-  const nums = [];
-  const tpl = key.replace(/\d[\d,]*(?:\.\d+)?/g, (n) => { nums.push(n); return `{${nums.length - 1}}`; });
-  const t = nums.length ? frLookup(tpl) : null;
-  if (t != null) return t.replace(/\{(\d+)\}/g, (m, i) => frNumber(nums[Number(i)]));
-  return null;
+  // Numbers as placeholders: "{0} verified wineries across ..." covers every count; town names as {T}: "Patios in
+  // {T}" covers every town.
+  return frTemplated(key, frLookup);
+}
+const FR_TOWNS_LONGEST_FIRST = Object.values(REGION_LABELS).sort((a, b) => b.length - a.length);
+const FR_TOWN_RE = new RegExp(FR_TOWNS_LONGEST_FIRST.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+function frTemplated(key, lookup) {
+  const nums = [], towns = [];
+  const withNums = key.replace(/(?<!\{a)\d[\d,]*(?:\.\d+)?/g, (n) => { nums.push(n); return `{${nums.length - 1}}`; });
+  const withTowns = key.replace(FR_TOWN_RE, (t) => { towns.push(t); return '{T}'; });
+  const both = withNums.replace(FR_TOWN_RE, '{T}');
+  let t = null;
+  if (nums.length) t = lookup(withNums);
+  if (t == null && towns.length) t = lookup(withTowns);
+  if (t == null && towns.length && nums.length) t = lookup(both);
+  if (t == null) return null;
+  let i = 0;
+  return t.replace(/\b(de|à) \{T\}|\{T\}/g, (m, prep) => {
+    const town = towns[Math.min(i++, towns.length - 1)] || '';
+    return prep === 'de' ? frDe(town) : prep ? `${prep} ${town}` : town;
+  }).replace(/\{(\d+)\}/g, (m, n) => frNumber(nums[Number(n)]))
+    // Clock times the English wrote as "7:30 pm" read "19 h 30" in French.
+    .replace(/\b(\d{1,2})(?:[:h](\d{2}))? ?(a\.m\.|p\.m\.|am|pm|AM|PM)(?![a-z])(?: \(p\.m\.\))?/g, (m, h, mm, ap) => frenchText.frTime ? frenchText.frTime(h, mm, ap.replace(/\./g, '')) : m)
+    .replace(/\b(\d{1,2}) h( \d{2})? \(p\.m\.\)/g, (m, h, mm) => `${(Number(h) % 12) + 12} h${mm || ''}`);
 }
 // 1,774 -> 1 774 and 4.6 -> 4,6, the Canadian French way.
 function frNumber(n) {
@@ -19599,12 +19631,10 @@ function frParagraph(inner) {
   const tpl = inner.replace(/<(a|strong|em|b|span)\b([^>]*)>([^<]*)<\/\1>/g, (m) => { pieces.push(m); return `{a${pieces.length - 1}}`; });
   if (!pieces.length || /<(?!br\b)/.test(tpl)) return null;
   const key = frDecode(tpl).replace(/\s+/g, ' ').trim();
-  const nums = [];
-  const keyN = key.replace(/(?<!\{a)\d[\d,]*(?:\.\d+)?/g, (n) => { nums.push(n); return `{${nums.length - 1}}`; });
-  const t = frLookup(key) != null ? frLookup(key) : (nums.length ? frLookup(keyN) : null);
+  const t = frLookup(key) != null ? frLookup(key) : frTemplated(key, frLookup);
   if (t == null) return null;
   const lead = /^\s*/.exec(inner)[0], trail = /\s*$/.exec(inner)[0];
-  return lead + escapeHtml(t.replace(/\{(\d+)\}/g, (m, i) => frNumber(nums[Number(i)])))
+  return lead + escapeHtml(t)
     .replace(/\{a(\d+)\}/g, (m, i) => pieces[Number(i)].replace(/>([^<]*)</, (mm, txt) => (frIsVenueName(frDecode(txt)) ? mm : `>${escapeHtml(frTextOr(frDecode(txt)))}<`))) + trail;
 }
 function frTextOr(s) { const t = frText(s); return t == null ? s : t; }
@@ -19655,7 +19685,7 @@ function withFrenchTwinEntries(entries) {
   for (const e of entries) {
     const m = /<loc>https:\/\/okanaganroam\.com(\/[^<]*)<\/loc>/.exec(e);
     const p = m ? m[1].replace(/(.)\/$/, '$1') : null;
-    if (!p || !hasFrenchTwin(p) || p.split('/').filter(Boolean).length === 3 || /xhtml:link/.test(e)) { out.push(e); continue; }
+    if (!p || !hasFrenchTwin(p) || frIsVenuePath(p) || /xhtml:link/.test(e)) { out.push(e); continue; }
     const alts = twinHeadLinks(p).trim().split('\n').map((l) => `\n    ${l.replace('<link ', '<xhtml:link ').replace(/>$/, '/>')}`).join('');
     const withAlts = e.replace(/(<\/loc>)/, `$1${alts}`);
     out.push(withAlts, withAlts.replace(/<loc>https:\/\/okanaganroam\.com[^<]*<\/loc>/, `<loc>https://okanaganroam.com${frTwinPath(p)}</loc>`));
@@ -19793,6 +19823,10 @@ function installTwinResponse(res, lang, enPath) {
     if (body != null && status === 200 && /text\/html/.test(type)) {
       body = lang === 'fr' ? frenchTwinHtml(String(body), enPath) : englishTwinHtml(String(body), enPath);
       delete headers['Content-Length']; delete headers.ETag;
+    } else if (body != null && status === 404 && lang === 'fr' && /text\/html/.test(type)) {
+      // A French address whose English page does not exist gets the French 404 page.
+      body = frenchTwinHtml(String(body), '/');
+      delete headers['Content-Length'];
     } else if (body != null && status === 200 && lang === 'fr' && /application\/json/.test(type) && enPath === '/browse/cards.json') {
       try {
         const j = JSON.parse(String(body));
@@ -22095,6 +22129,11 @@ const NOT_FOUND_POPULAR = [
   ['/outdoors', 'Outdoors'], ['/beaches', 'Beaches'], ['/destinations', 'Towns'], ['/map', 'Map'],
 ];
 function render404Page(pathname) {
+  // Under /fr the page is French, with French suggestions (2026-10-14).
+  if (/^\/fr(\/|$)/.test(String(pathname || ''))) return frenchTwinHtml(render404PageEn(String(pathname).replace(/^\/fr/, '') || '/'), '/');
+  return render404PageEn(pathname);
+}
+function render404PageEn(pathname) {
   const { links, guess } = notFoundSuggestions(pathname);
   return `<!DOCTYPE html>
 <html lang="en">
@@ -27184,7 +27223,7 @@ const server = http.createServer(async (req, res) => {
       installTwinResponse(res, 'fr', frTwinReq.enPath);
     } else {
       const p = String(req.url).split('?')[0].replace(/(.)\/$/, '$1');
-      if (hasFrenchTwin(p) && p.split('/').filter(Boolean).length < 3) installTwinResponse(res, 'en', p);
+      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p);
     }
   }
   const parsed = url.parse(req.url, true);
