@@ -19971,3 +19971,61 @@ test('Owner portal: events from the owner page are linked to the venue on approv
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner portal: photo uploads are private until approved, then can become the main photo with credit', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Photos Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-photos-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-photos-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  // A tiny but well-formed JPEG header: SOF0 says 1200x900.
+  const jpeg = (w, h) => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  assert.deepEqual(app.jpegDimensions(jpeg(1200, 900)), { width: 1200, height: 900 });
+  assert.equal(app.jpegDimensions(Buffer.from('not a jpeg')), null);
+  const dataUrl = (buf) => `data:image/jpeg;base64,${buf.toString('base64')}`;
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const up = (body) => fetch(`${base}/owner/${token}/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.7.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const admin = (path, body) => fetch(`${base}${path}`, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` }, body: body ? JSON.stringify(body) : undefined })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const good = { image: dataUrl(jpeg(1200, 900)), credit: 'Owner Photos Fixture', rights: true, notify: false, company_website: '', started_at: Date.now() - 10000 };
+  const created = [];
+  try {
+    assert.equal((await up({ ...good, rights: false })).status, 400);
+    assert.equal((await up({ ...good, credit: '' })).status, 400);
+    assert.equal((await up({ ...good, image: dataUrl(jpeg(400, 300)) })).body.errors.image.includes('too small'), true);
+    assert.equal((await up({ ...good, image: 'data:image/png;base64,AAAA' })).status, 400);
+    const ok = await up(good);
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    const row = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(ok.body.id);
+    created.push(row.file);
+    assert.ok(require('node:fs').existsSync(require('node:path').join(app.OWNER_PHOTO_DIR, row.file)));
+    // Private preview works; the public URL does not until approval.
+    assert.equal((await fetch(`${base}${ok.body.preview}`)).status, 200);
+    assert.equal((await fetch(`${base}/images/owner/${row.file}`)).status, 404);
+    assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /Waiting for review/);
+    const list = await admin('/admin/owner-photos');
+    assert.ok(list.body.photos.some((p) => p.id === ok.body.id && !p.venue_has_own_photo));
+    // Approving makes it public and (no photo of its own yet) the main photo, credited.
+    const approved = await admin(`/admin/owner-photos/${ok.body.id}/approve`, { reviewer: 'test' });
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    assert.equal(approved.body.main, true);
+    assert.equal((await fetch(`${base}/images/owner/${row.file}`)).status, 200);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/owner/${row.file}`);
+    const page = await fetch(`${base}/kelowna/cafes/owner-photos-fixture`).then((r) => r.text());
+    assert.match(page, new RegExp(`/images/owner/${row.file}`));
+    assert.match(page, /Photo: Owner Photos Fixture/);
+    // Rejecting deletes the file.
+    const second = await up(good);
+    const row2 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(second.body.id);
+    assert.equal((await admin(`/admin/owner-photos/${second.body.id}/reject`, { reviewer: 'test', reason: 'blurry' })).status, 200);
+    assert.equal(require('node:fs').existsSync(require('node:path').join(app.OWNER_PHOTO_DIR, row2.file)), false);
+    assert.equal((await fetch(`${base}/owner-photos/preview/${row2.preview_key}.jpg`)).status, 404);
+  } finally {
+    for (const f of created) { try { require('node:fs').unlinkSync(require('node:path').join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

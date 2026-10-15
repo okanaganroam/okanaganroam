@@ -805,4 +805,29 @@ CREATE TABLE IF NOT EXISTS owner_change_requests (
 CREATE INDEX IF NOT EXISTS idx_owner_change_requests_status ON owner_change_requests (status, submitted_at);
 `);
 
+// Owner photo uploads (2026-10-15). The image files live on the persistent
+// volume (server.js OWNER_PHOTO_DIR), not in git; this table tracks them.
+// preview_key is an unguessable id for viewing a photo before it is approved.
+db.exec(`
+CREATE TABLE IF NOT EXISTS owner_photos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  file TEXT NOT NULL UNIQUE,
+  preview_key TEXT NOT NULL UNIQUE,
+  width INTEGER,
+  height INTEGER,
+  bytes INTEGER,
+  credit TEXT NOT NULL,
+  contact_name TEXT,
+  rights_confirmed_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  ip_hash TEXT,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_owner_photos_venue ON owner_photos (venue_id, status);
+`);
+
 module.exports = db;

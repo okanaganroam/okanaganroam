@@ -21674,8 +21674,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const themedShell = usesThemedVenueShell(venue.type);
   const themedHeroTitle = themedShell && !venue.image_url;
   const heroPhoto = themedHeroTitle ? venueHeroPhoto(venue) : null;
+  const photoCredit = venue.image_url ? ownerPhotoCreditFor(venue.image_url) : null;
   const imageHtml = venue.image_url
-    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>`
+    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>${photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : ''}`
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
         <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
@@ -28876,6 +28877,218 @@ async function handleOwnerEventSubmission(req, res, token) {
   return sendSubmissionResponse(res, 201, { ok: true, id });
 }
 
+// ---------- Owner photo uploads (2026-10-15) ----------
+//
+// Owners upload photos from their edit page. The browser resizes each one to
+// at most 1600px and re-encodes it as JPEG before sending (which also drops
+// EXIF data such as phone GPS), one photo per request. Files are written to
+// the persistent volume, never into public/ or git. A photo is visible only
+// through its unguessable preview link until an admin approves it; approved
+// photos are served at /images/owner/<file>, and approving can make one the
+// listing's main photo (venue image_url), credited on the venue page.
+const OWNER_PHOTO_DIR = process.env.OWNER_PHOTO_DIR
+  || (fs.existsSync('/data') ? '/data/owner-photos' : path.join(__dirname, '.owner-photos-local'));
+const OWNER_PHOTO_MAX_BYTES = 3 * 1024 * 1024; // decoded JPEG
+const OWNER_PHOTO_MAX_BODY = 4 * 1024 * 1024 + 4096; // base64 + fields
+const OWNER_PHOTO_MIN_EDGE = 800;
+const OWNER_PHOTO_MAX_EDGE = 2400;
+const OWNER_PHOTO_PENDING_LIMIT = 12; // per venue, waiting for review
+const OWNER_PHOTO_RATE_LIMIT = 30;
+const OWNER_PHOTO_KEYS = new Set(['image', 'credit', 'rights', 'contact_name', 'notify', 'company_website', 'started_at']);
+
+function ownerPhotoPath(file) {
+  if (!/^[a-z0-9]{24}\.jpg$/.test(file)) return null;
+  return path.join(OWNER_PHOTO_DIR, file);
+}
+
+// Width and height from a JPEG's start-of-frame marker, or null if the bytes
+// are not a well-formed baseline/progressive JPEG.
+function jpegDimensions(buf) {
+  if (!buf || buf.length < 4 || buf[0] !== 0xFF || buf[1] !== 0xD8) return null;
+  let i = 2;
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xFF) return null;
+    const marker = buf[i + 1];
+    if (marker === 0xD9 || marker === 0xDA) return null;
+    const len = buf.readUInt16BE(i + 2);
+    if (len < 2) return null;
+    if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7) || (marker >= 0xC9 && marker <= 0xCB) || (marker >= 0xCD && marker <= 0xCF)) {
+      return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    }
+    i += 2 + len;
+  }
+  return null;
+}
+
+const ownerPhotoAttempts = new Map(); // ip -> [timestamps]
+function ownerPhotoRateLimited(ip, now = Date.now()) {
+  const recent = (ownerPhotoAttempts.get(ip) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
+  recent.push(now);
+  ownerPhotoAttempts.set(ip, recent);
+  if (ownerPhotoAttempts.size > 5000) {
+    for (const [key, times] of ownerPhotoAttempts) {
+      if (!times.some((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS)) ownerPhotoAttempts.delete(key);
+    }
+  }
+  return recent.length > OWNER_PHOTO_RATE_LIMIT;
+}
+
+function ownerPhotosForVenue(venueId) {
+  return db.prepare("SELECT id, file, preview_key, status, credit, submitted_at FROM owner_photos WHERE venue_id = ? AND status != 'rejected' ORDER BY id DESC LIMIT 40").all(venueId);
+}
+
+function ownerPhotoPreviewUrl(key) {
+  return `https://okanaganroam.com/owner-photos/preview/${key}.jpg`;
+}
+
+// The credit for a venue's main photo when it is an approved owner upload.
+function ownerPhotoCreditFor(imageUrl) {
+  const m = /^\/images\/owner\/([a-z0-9]{24}\.jpg)$/.exec(String(imageUrl || ''));
+  if (!m) return null;
+  const row = db.prepare("SELECT credit FROM owner_photos WHERE file = ? AND status = 'approved'").get(m[1]);
+  return row ? row.credit : null;
+}
+
+function buildOwnerPhotoEmail(venue, photos) {
+  return {
+    _subject: `[PENDING REVIEW] ${photos.length} photo${photos.length === 1 ? '' : 's'} from ${venue.name}`,
+    _template: 'table',
+    _captcha: 'false',
+    'Status': 'PENDING REVIEW. These photos are not on the site until approved.',
+    'Venue': `${venue.name} (venue #${venue.id})`,
+    'Listing': venueListingUrl(venue),
+    'Photos': photos.map((p) => `#${p.id}: ${ownerPhotoPreviewUrl(p.preview_key)}`).join('\n'),
+    'Credit': photos[0].credit,
+    'How to review': 'node scripts/owner-portal.js photos, then photo-approve <id> [--main] or photo-reject <id> "reason".',
+  };
+}
+
+async function handleOwnerPhotoUpload(req, res, token) {
+  const generic = 'Sorry, something went wrong. Please try again, or email the photo to info@okanaganroam.com.';
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Photos are only accepted from the Okanagan Roam website.' });
+  const ip = requestClientIp(req);
+  if (ownerPhotoRateLimited(ip)) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many photos at once. Please wait a while and try again.' });
+  const found = venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
+  let body;
+  try {
+    body = await readLimitedJsonBody(req, OWNER_PHOTO_MAX_BODY);
+  } catch (err) {
+    return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'That photo is too large.' : generic }, err.status === 413);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !OWNER_PHOTO_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+  if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
+  const startedAt = Number(body.started_at);
+  if (!Number.isFinite(startedAt) || Date.now() - startedAt < VENUE_SUBMISSION_MIN_FILL_MS) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please try again.' });
+  }
+  if (body.rights !== true) return sendSubmissionResponse(res, 400, { ok: false, errors: { rights: 'Please confirm you took these photos or have permission to share them.' } });
+  const credit = typeof body.credit === 'string' ? body.credit.trim().replace(/\s+/g, ' ') : '';
+  if (credit.length < 2 || credit.length > 80 || /[<>]/.test(credit)) {
+    return sendSubmissionResponse(res, 400, { ok: false, errors: { credit: 'Please enter who to credit, e.g. your business or photographer name.' } });
+  }
+  const m = typeof body.image === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(body.image) : null;
+  const buf = m ? Buffer.from(m[1], 'base64') : null;
+  const dims = buf ? jpegDimensions(buf) : null;
+  if (!buf || !dims || buf.length > OWNER_PHOTO_MAX_BYTES) {
+    return sendSubmissionResponse(res, 400, { ok: false, errors: { image: 'That file could not be read as a photo. Please try a JPG or PNG.' } });
+  }
+  const longEdge = Math.max(dims.width, dims.height);
+  if (longEdge < OWNER_PHOTO_MIN_EDGE) return sendSubmissionResponse(res, 400, { ok: false, errors: { image: `That photo is too small. Please use one at least ${OWNER_PHOTO_MIN_EDGE} pixels wide.` } });
+  if (longEdge > OWNER_PHOTO_MAX_EDGE) return sendSubmissionResponse(res, 400, { ok: false, errors: { image: 'That photo is too large. Please try again.' } });
+  const { venue } = found;
+  const pending = db.prepare("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'pending'").get(venue.id).n;
+  if (pending >= OWNER_PHOTO_PENDING_LIMIT) {
+    return sendSubmissionResponse(res, 409, { ok: false, error: `You have ${pending} photos waiting for review. Please wait until we have looked at those.` });
+  }
+  const file = `${crypto.randomBytes(12).toString('hex')}.jpg`;
+  const previewKey = crypto.randomBytes(18).toString('base64url');
+  try {
+    fs.mkdirSync(OWNER_PHOTO_DIR, { recursive: true });
+    fs.writeFileSync(ownerPhotoPath(file), buf, { flag: 'wx' });
+  } catch (err) {
+    console.error(`[owner-photos] writing ${file} for venue #${venue.id} failed: ${err.message}`);
+    return sendSubmissionResponse(res, 500, { ok: false, error: generic });
+  }
+  const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
+  const id = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, contact_name, rights_confirmed_at, ip_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`).run(venue.id, file, previewKey, dims.width, dims.height, buf.length, credit, contactName,
+    crypto.createHash('sha256').update(`okanagan-roam-owner-photo:${ip}`).digest('hex')).lastInsertRowid);
+  db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
+  if (body.notify === true) {
+    // One email per upload batch: the browser sets notify on the last photo.
+    const recent = db.prepare("SELECT id, preview_key, credit FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND submitted_at >= datetime('now', '-1 hour') ORDER BY id").all(venue.id);
+    try {
+      await venueSubmissionTransport(buildOwnerPhotoEmail(venue, recent.length ? recent : [{ id, preview_key: previewKey, credit }]));
+    } catch (err) {
+      console.error(`[owner-photos] notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+    }
+  }
+  return sendSubmissionResponse(res, 201, { ok: true, id, preview: `/owner-photos/preview/${previewKey}.jpg` });
+}
+
+function listOwnerPhotos(status = 'pending') {
+  const rows = status === 'all'
+    ? db.prepare('SELECT * FROM owner_photos ORDER BY id DESC LIMIT 300').all()
+    : db.prepare('SELECT * FROM owner_photos WHERE status = ? ORDER BY id DESC LIMIT 300').all(status);
+  return rows.map((r) => {
+    const v = db.prepare('SELECT id, name, region, type, slug, image_url FROM venues WHERE id = ?').get(r.venue_id) || {};
+    return { id: r.id, venue_id: r.venue_id, venue_name: v.name, listing_url: venueListingUrl(v), status: r.status, credit: r.credit,
+      width: r.width, height: r.height, submitted_at: r.submitted_at, preview_url: ownerPhotoPreviewUrl(r.preview_key),
+      public_url: r.status === 'approved' ? `https://okanaganroam.com/images/owner/${r.file}` : null,
+      is_main: v.image_url === `/images/owner/${r.file}`, venue_has_own_photo: /^(?:https:\/\/|\/images\/)/.test(String(v.image_url || '')) };
+  });
+}
+
+// Approve: the photo becomes public; with main (or when the listing has no
+// photo of its own yet) it also becomes the venue's main photo.
+function approveOwnerPhoto(id, reviewer, opts = {}) {
+  const p = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(id);
+  if (!p) return { ok: false, reason: 'not_found' };
+  if (p.status === 'rejected') return { ok: false, reason: 'not_pending', status: p.status };
+  const venue = db.prepare('SELECT id, name, region, type, slug, image_url, redirect_to FROM venues WHERE id = ?').get(p.venue_id);
+  if (!venue || venue.redirect_to) return { ok: false, reason: 'venue_unavailable' };
+  if (!fs.existsSync(ownerPhotoPath(p.file))) return { ok: false, reason: 'file_missing' };
+  if (p.status === 'pending') {
+    db.prepare("UPDATE owner_photos SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
+  }
+  const url = `/images/owner/${p.file}`;
+  const hasOwn = /^(?:https:\/\/|\/images\/)/.test(String(venue.image_url || ''));
+  let madeMain = false;
+  if (opts.main === true || (opts.main === undefined && !hasOwn)) {
+    if (venue.image_url !== url) {
+      updateVenue(venue.id, { image_url: url });
+      db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, 'image_url', ?, ?, 'venue_owner', ?, 'high', ?, 0, ?)`).run(venue.id, venue.image_url || null, url, `owner photo #${id}`, `owner-photo-${id}`, reviewer);
+    }
+    madeMain = true;
+  }
+  return { ok: true, public_url: `https://okanaganroam.com${url}`, main: madeMain, listing: venueListingUrl(venue) };
+}
+
+function rejectOwnerPhoto(id, reviewer, reason) {
+  const p = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(id);
+  if (!p) return { ok: false, reason: 'not_found' };
+  if (p.status !== 'pending') return { ok: false, reason: 'not_pending', status: p.status };
+  db.prepare("UPDATE owner_photos SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
+    .run(reviewer, String(reason || '').slice(0, 300) || null, id);
+  try { fs.unlinkSync(ownerPhotoPath(p.file)); } catch (err) { /* already gone */ }
+  return { ok: true };
+}
+
+function sendOwnerPhotoFile(res, file, headers) {
+  const fp = ownerPhotoPath(file);
+  if (!fp || !fs.existsSync(fp)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    return res.end('Not found');
+  }
+  res.writeHead(200, { 'Content-Type': 'image/jpeg', ...headers });
+  return res.end(fs.readFileSync(fp));
+}
+
 // Applies an approved request. `fields` (optional) approves only some of the
 // changed fields. Each field goes through its guarded writer; any failure
 // rolls the whole approval back and leaves the request pending.
@@ -29025,6 +29238,11 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-done.show { display: block; }
   body.owner-page .venue-form-submit:disabled { opacity: 0.6; cursor: wait; }
   body.owner-page #events { scroll-margin-top: 96px; }
+  body.owner-page #photos { scroll-margin-top: 96px; }
+  body.owner-page .op-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 12px 0 18px; }
+  body.owner-page .op-photos figure { margin: 0; }
+  body.owner-page .op-photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; }
+  body.owner-page .op-photos figcaption { font-size: 0.78rem; font-weight: 700; color: rgba(42,32,25,0.7); margin-top: 4px; }
   @media (max-width: 640px) { body.owner-page .venue-form { padding: 22px 16px; } body.owner-page .op-day-name { width: 100%; } }
 </style>
 </head>
@@ -29036,7 +29254,7 @@ ${renderGolfHeaderHtml()}
       <span class="eyebrow">Owner edit page</span>
       <h1>${escapeHtml(venue.name)}</h1>
       <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>. Keep this link private; anyone with it can suggest changes.</p>
-      <p><a href="#events"><strong>Have an event coming up? Add it here &darr;</strong></a></p>
+      <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
       ${pendingNote}
     </div>
     <form class="venue-form" id="opForm" novalidate>
@@ -29082,6 +29300,26 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="opSubmit">Send changes</button>
     </form>
     <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them shortly. You can come back to this page any time to send more.</div>
+    <h2 id="photos" style="margin-top:44px">Photos</h2>
+    <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. We review every photo; the best one can become the main photo on your page, credited to you.</p>
+    ${(() => { const ph = ownerPhotosForVenue(venue.id); return ph.length ? `<div class="op-photos">${ph.map((p) => `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${p.status === 'approved' ? 'Approved' : 'Waiting for review'}</figcaption></figure>`).join('')}</div>` : ''; })()}
+    <form class="venue-form" id="ofForm" novalidate>
+      <div class="form-row full"><div class="form-field">
+        <label for="ofFiles">Choose photos</label>
+        <input type="file" id="ofFiles" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
+        <p class="lyv-error" id="ofFilesError" hidden></p>
+      </div></div>
+      <div class="form-row">
+        <div class="form-field"><label for="ofCredit">Credit photos to</label><input type="text" id="ofCredit" maxlength="80" value="${escapeHtml(venue.name)}"><p class="lyv-error" id="ofCreditError" hidden></p></div>
+      </div>
+      <div class="form-row full"><div class="form-field">
+        <label class="op-closed" style="width:auto;align-items:flex-start"><input type="checkbox" id="ofRights" style="margin-top:4px"> <span>I took these photos or have permission to share them, and Okanagan Roam may use them on its website and social media with credit.</span></label>
+        <p class="lyv-error" id="ofRightsError" hidden></p>
+      </div></div>
+      <p class="op-hint" id="ofProgress" aria-live="polite"></p>
+      <p class="lyv-error" id="ofFormError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="ofSubmit">Upload photos</button>
+    </form>
     <h2 id="events" style="margin-top:44px">Add an event</h2>
     <p class="op-hint">Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.</p>
     <form class="venue-form" id="oeForm" novalidate>
@@ -29117,7 +29355,7 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="oeSubmit">Send event</button>
     </form>
     <div class="op-done" id="oeDone">Thanks! Your event is in for review. <a href="#events" id="oeAnother">Add another event</a></div>
-    <p class="op-hint" style="margin-top:28px">Want to send photos? Reply to our email or write to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
+
   </div>
   </main>
 <script>
@@ -29212,6 +29450,61 @@ ${renderGolfHeaderHtml()}
         show('oeFormError', (j && j.error) || 'Sorry, something went wrong. Please try again.');
       })
       .catch(function(){ b.disabled = false; show('oeFormError', 'Could not send. Please check your connection and try again.'); });
+  });
+  var pf = document.getElementById('ofForm');
+  var pfStarted = Date.now();
+  function resize(file){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){
+        var w = img.naturalWidth, h = img.naturalHeight, long = Math.max(w, h);
+        URL.revokeObjectURL(url);
+        if (long < 800) return reject(new Error('small'));
+        var scale = Math.min(1, 1600 / long);
+        var c = document.createElement('canvas');
+        c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('read')); };
+      img.src = url;
+    });
+  }
+  pf.addEventListener('submit', function(e){
+    e.preventDefault();
+    ['ofFilesError','ofCreditError','ofRightsError','ofFormError'].forEach(function(id){ show(id, ''); });
+    var files = Array.prototype.slice.call(document.getElementById('ofFiles').files || []);
+    if (!files.length) return show('ofFilesError', 'Choose at least one photo.');
+    if (files.length > 5) return show('ofFilesError', 'Please choose up to 5 photos at a time.');
+    if (!document.getElementById('ofRights').checked) return show('ofRightsError', 'Please confirm you took these photos or have permission to share them.');
+    var credit = document.getElementById('ofCredit').value;
+    var btn = document.getElementById('ofSubmit'); btn.disabled = true;
+    var progress = document.getElementById('ofProgress');
+    var sent = 0, problems = [];
+    var chain = Promise.resolve();
+    files.forEach(function(file, i){
+      chain = chain.then(function(){
+        progress.textContent = 'Uploading photo ' + (i + 1) + ' of ' + files.length + '...';
+        return resize(file).then(function(dataUrl){
+          return fetch(location.pathname + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ image: dataUrl, credit: credit, rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
+            .then(function(r){ return r.json(); })
+            .then(function(j){
+              if (j && j.ok) { sent++; return; }
+              var errs = (j && j.errors) || {};
+              if (errs.credit) show('ofCreditError', errs.credit);
+              problems.push(file.name + ': ' + (errs.image || errs.credit || (j && j.error) || 'could not upload'));
+            });
+        }, function(err){ problems.push(file.name + ': ' + (err.message === 'small' ? 'too small (needs to be at least 800 pixels wide)' : 'could not be read. Try a JPG or PNG.')); });
+      });
+    });
+    chain.then(function(){
+      btn.disabled = false;
+      progress.textContent = sent ? sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded. Thanks! We will review them shortly.' : '';
+      if (problems.length) show('ofFormError', problems.join(' '));
+      if (sent) { document.getElementById('ofFiles').value = ''; }
+    }).catch(function(){ btn.disabled = false; show('ofFormError', 'Could not upload. Please check your connection and try again.'); });
   });
 })();
 </script>
@@ -30113,6 +30406,40 @@ const server = http.createServer(async (req, res) => {
     const IMAGE_EXTENSIONS = {
       '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
     };
+    // Owner photos: private previews (pending or approved) and approved public files.
+    {
+      const pm = /^\/owner-photos\/preview\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
+      if (pm && method === 'GET') {
+        const row = db.prepare("SELECT file FROM owner_photos WHERE preview_key = ? AND status != 'rejected'").get(pm[1]);
+        if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex' });
+      }
+      const im = /^\/images\/owner\/([a-z0-9]{24}\.jpg)$/.exec(pathname);
+      if (im && method === 'GET') {
+        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(im[1]);
+        if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'public, max-age=86400' });
+      }
+    }
+    if (pathname === '/admin/owner-photos' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      const status = ['pending', 'approved', 'rejected', 'all'].includes(query.status) ? query.status : 'pending';
+      return sendJSON(res, 200, { status, photos: listOwnerPhotos(status) });
+    }
+    {
+      const m = /^\/admin\/owner-photos\/(\d+)\/(approve|reject)$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!requireAdminToken(req, res)) return;
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        const reviewer = validateReviewer(body && body.reviewer);
+        if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
+        const id = Number(m[1]);
+        const r = m[2] === 'approve' ? approveOwnerPhoto(id, reviewer, { main: typeof body.main === 'boolean' ? body.main : undefined }) : rejectOwnerPhoto(id, reviewer, body.reason);
+        if (!r.ok) return sendJSON(res, { not_found: 404, not_pending: 409, venue_unavailable: 409, file_missing: 410 }[r.reason] || 400, { error: r.reason, status: r.status });
+        return sendJSON(res, 200, { id, ...r });
+      }
+    }
     if (pathname.startsWith('/images/') && method === 'GET') {
       const imagesRoot = path.join(__dirname, 'public/images');
       const requestedPath = path.join(imagesRoot, pathname.slice('/images/'.length));
@@ -31810,6 +32137,8 @@ const server = http.createServer(async (req, res) => {
       if (changesMatch && method === 'POST') return await handleOwnerChangeSubmission(req, res, changesMatch[1]);
       const eventsMatch = /^([A-Za-z0-9_-]+)\/events$/.exec(rest);
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
+      const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
+      if (photosMatch && method === 'POST') return await handleOwnerPhotoUpload(req, res, photosMatch[1]);
       if (/^[A-Za-z0-9_-]+$/.test(rest) && (method === 'GET' || method === 'HEAD')) {
         const found = venueForOwnerToken(rest);
         const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
@@ -32497,6 +32826,11 @@ module.exports = {
   rejectOwnerChange,
   listOwnerChanges,
   getOwnerChange,
+  jpegDimensions,
+  approveOwnerPhoto,
+  rejectOwnerPhoto,
+  listOwnerPhotos,
+  OWNER_PHOTO_DIR,
   getSeasonStates,
   breadcrumbListSchema,
   FALL_MOOD_IMAGES,
