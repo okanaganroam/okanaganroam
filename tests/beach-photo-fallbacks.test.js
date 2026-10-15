@@ -63,3 +63,18 @@ test('all 93 beach listings have a verified local photo, including the final app
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', item.image.slice(1))), `${slug} image exists`);
   }
 });
+
+test('the four refreshed beach photos retain their exact photo sources', () => {
+  const bySlug = new Map(BEACH_PHOTO_MANIFEST.map((item) => [item.slug, item]));
+  const expectedSources = {
+    'lions-park-okanagan-falls': 'https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1602895725928-J01RXKHQ39RQESFI58J8/Lions-Gardens-Okanagan-Falls-BC.jpg?format=2500w',
+    'pandosy-waterfront-park': 'https://robmosesphotography.com/wp-content/uploads/2024/11/sunset-okanagan-lake-mountains-street-peir-pandosy-waterfront-park-50mm-kelowna-bc-british-columbia-rob-moses-photography-frist-nations-aboriginal-indigenous-native-american-photographer.jpg',
+    'goodman-park-dog-swimming-area': 'https://okconnect.events/wp-content/uploads/2022/05/goodman-park-beach-osoyoos-bc.jpg',
+    'cove-beach': 'https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1620069816829-9YJE3BROP30WBAKHU3TE/Davis-Cove-Beach-Peachland-BC.jpg?format=1500w',
+  };
+
+  for (const [slug, imageSourceUrl] of Object.entries(expectedSources)) {
+    assert.equal(bySlug.get(slug)?.imageSourceUrl, imageSourceUrl, `${slug} points to the selected source image`);
+    assert.ok(bySlug.get(slug)?.sourcePage, `${slug} retains a source page`);
+  }
+});

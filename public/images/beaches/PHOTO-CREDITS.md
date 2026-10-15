@@ -185,8 +185,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/west-kelowna-willow-beach.jpg`
 
 ## 37. Cove Beach (Peachland) — READY
-- Source: District of Peachland
-- [Source page](https://www.peachland.ca/parks-recreation/parks-trails/cove-beach) · [Original image](https://www.peachland.ca/sites/default/files/styles/medium/public/2025-05/Cove%20Beach.jpg?itok=qae-kvN3)
+- Source: Exploratory Glory
+- [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/davis-cove-beach-peachland-bc) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1620069816829-9YJE3BROP30WBAKHU3TE/Davis-Cove-Beach-Peachland-BC.jpg?format=1500w)
 - Local file: `/images/beaches/venues/peachland-cove-beach.jpg`
 
 ## 38. Bertram Creek Regional Park — READY
@@ -200,8 +200,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/osoyoos-goodman-park-dog-swimming-area.jpg`
 
 ## 40. Lions Park (Okanagan Falls) — READY
-- Source: RDOS
-- [Source page](https://www.rdos.bc.ca/community-services/parks-trails/lions-park/) · [Original image](https://www.rdos.bc.ca/assets/rdos/migrated/pics/LionsPark1.jpg)
+- Source: Exploratory Glory
+- [Source page](https://www.exploratoryglory.com/travel-blog/2020/10/16/lions-gardens-okanagan-falls-bc) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1602895725928-J01RXKHQ39RQESFI58J8/Lions-Gardens-Okanagan-Falls-BC.jpg?format=2500w)
 - Local file: `/images/beaches/venues/okanagan-falls-lions-park-okanagan-falls.jpg`
 
 ## 41. Sudbury Beach — READY
@@ -461,8 +461,8 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/osoyoos-legion-beach.jpg`
 
 ## 92. Pandosy Waterfront Park — READY
-- Source: OKConnect.events
-- [Source page](https://okconnect.events/beaches-in-the-okanagan-family-fun-beach-spots/) · [Original image](https://okconnect.events/wp-content/uploads/2025/08/pandosy-waterfront-park-beach-kelowna-bc.jpg)
+- Source: Rob Moses Photography
+- [Source page](https://robmosesphotography.com/2024/11/10/sunset-on-the-lake/) · [Original image](https://robmosesphotography.com/wp-content/uploads/2024/11/sunset-okanagan-lake-mountains-street-peir-pandosy-waterfront-park-50mm-kelowna-bc-british-columbia-rob-moses-photography-frist-nations-aboriginal-indigenous-native-american-photographer.jpg)
 - Local file: `/images/beaches/venues/kelowna-pandosy-waterfront-park.jpg`
 
 ## 93. Marshall Park — READY
