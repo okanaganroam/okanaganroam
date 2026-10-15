@@ -5198,6 +5198,64 @@ function validateSeason(input, now = new Date()) {
 
 // Sets (season object) or clears (null) a venue's season, with one audit row.
 // -> { ok: false, reason } | { ok: true, changed, season }
+// Happy hour times (2026-10-14). Sets (or clears, with times null) the week a venue's happy hour runs, the page the
+// times were read on and the Okanagan date they were checked. Compare-and-set on the caller's expected current times
+// (the stored text, or null); days left out mean no happy hour that day; every window must parse with hours.js; one
+// venue_enrichment_log row per changed column, in the same transaction. Returns { ok, changedFields, ... } or
+// { ok: false, reason, detail } like guardedHoursVerifyUpdate().
+function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new Date()) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  const v = input || {};
+  let next = { happy_hour_times: null, happy_hour_source: null, happy_hour_checked_at: null };
+  if (v.times !== null) {
+    if (!v.times || typeof v.times !== 'object' || Array.isArray(v.times)) return { ok: false, reason: 'invalid_times', detail: 'times must be an object keyed by day, or null' };
+    const days = hoursModule ? hoursModule.HOURS_WEEKDAYS : FD_HOURS_DAYS;
+    const extra = Object.keys(v.times).filter((k) => !days.includes(k));
+    if (extra.length) return { ok: false, reason: 'invalid_times', detail: `unexpected key(s): ${extra.join(', ')}` };
+    const week = {};
+    for (const d of days) week[d] = Object.prototype.hasOwnProperty.call(v.times, d) && v.times[d] && v.times[d].length ? v.times[d] : null;
+    if (!days.some((d) => week[d])) return { ok: false, reason: 'invalid_times', detail: 'at least one day needs a window (use times: null to clear)' };
+    const checked = validateVerifiedHours(week);
+    if (!checked.ok) return { ok: false, reason: 'invalid_times', detail: checked.detail };
+    if (typeof v.source_url !== 'string' || !/^https?:\/\/[^\s]+$/.test(v.source_url) || v.source_url.length > 500) {
+      return { ok: false, reason: 'invalid_source', detail: 'source_url must be the http(s) page the times were read on' };
+    }
+    if (!parseLocalDate(v.checked_at) || v.checked_at > todayLocal(now)) {
+      return { ok: false, reason: 'invalid_checked_at', detail: 'checked_at must be a real YYYY-MM-DD date, not in the future' };
+    }
+    next = { happy_hour_times: checked.json, happy_hour_source: v.source_url, happy_hour_checked_at: v.checked_at };
+  }
+  const existing = db.prepare('SELECT id, redirect_to, happy_hour_times, happy_hour_source, happy_hour_checked_at FROM venues WHERE id = ?').get(id);
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  const expected = expectedCurrentTimes === undefined ? null : expectedCurrentTimes;
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const info = db.prepare(`UPDATE venues SET happy_hour_times = ?, happy_hour_source = ?, happy_hour_checked_at = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND redirect_to IS NULL AND happy_hour_times IS ?`).run(next.happy_hour_times, next.happy_hour_source, next.happy_hour_checked_at, id, expected);
+    if (info.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      const live = db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(id);
+      return { ok: false, reason: 'mismatch', live: { happy_hour_times: live ? live.happy_hour_times : null } };
+    }
+    const changedFields = Object.keys(next).filter((f) => existing[f] !== next[f]);
+    const logStmt = db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, ?, ?, ?, 'happy_hour_research', ?, 'high', ?, 0, ?)`);
+    for (const f of changedFields) logStmt.run(id, f, existing[f] === null ? null : String(existing[f]), next[f], m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changedFields, ...next };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
 function guardedSeasonUpdate(id, season, meta, now = new Date()) {
   const m = meta || {};
   if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
@@ -12258,6 +12316,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-feats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
   body.map-page .pm-feat { padding: 2px 9px; border-radius: 999px; background: rgba(27,43,58,0.06); font-size: 0.78rem; font-weight: 700; color: var(--ink); }
   body.map-page .pm-feat.is-on { background: rgba(22,101,52,0.12); color: #14532D; }
+  body.map-page .pm-hh { display: block; margin-top: 4px; font-size: 0.84rem; font-weight: 700; color: #7C2D12; }
+  body.map-page .pm-hh.is-now { color: #9D174D; font-weight: 800; }
   body.map-page .pm-dog { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.35; color: #5B3A1A; }
   body.map-page .pm-route[hidden], body.map-page .pm-count[hidden], body.map-page .pm-list[hidden] { display: none; }
   body.map-page .pm-route { background: #fff; border-radius: 16px; box-shadow: 0 1px 4px rgba(27,43,58,0.15); padding: 14px 16px; margin-bottom: 12px; }
@@ -12331,7 +12391,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
-    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
+    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
@@ -12355,7 +12415,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
-    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
+    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
@@ -12443,7 +12503,19 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (!p.h) return null;
     try { var clock = okanaganClock(new Date()); var l = hoursStatusLabel(statusAt(parseHours(expandFoodDrinkHours(p.h)), clock), clock); return l.state === 'unknown' ? null : l; } catch (e) { return null; }
   }
-  function refreshStatus(){ places.forEach(function(p){ p.st = statusOf(p); }); }
+  // Happy hour now (2026-10-14): from the researched times; a place without times never shows as happy hour now.
+  function clockText(m){ m = ((m % 1440) + 1440) % 1440; var h = Math.floor(m / 60), mm = m % 60; return FR ? h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '') : (h % 12 || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
+  function hhOf(p){
+    if (!p.hh) return null;
+    try {
+      var clock = okanaganClock(new Date()), s = statusAt(parseHours(expandFoodDrinkHours(p.hh)), clock);
+      if (s.state === 'open' && !(p.st && p.st.state === 'closed')) return { now: true, text: T.hhNow(s.closesAt ? clockText(s.closesAt.minutes) : '') };
+      if (s.state === 'closed' && s.opensAt && s.opensAt.weekday === clock.weekday) return { now: false, text: T.hhLater(clockText(s.opensAt.minutes)) };
+    } catch (e) {}
+    return null;
+  }
+  var hhKnown = false;
+  function refreshStatus(){ places.forEach(function(p){ p.st = statusOf(p); p.hhs = hhOf(p); }); }
   // Dates on the Okanagan calendar.
   function okToday(){
     var now = new Date();
@@ -12481,6 +12553,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
     var out = on.length ? '<span class="pm-feats">' + on.slice(0, 4).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
     if (p.dog && feats.dogs) out += '<span class="pm-dog">' + esc(T.dogRule + ' ' + p.dog) + '</span>';
+    if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">🍸 ' + esc(p.hhs.text) + '</span>';
     return out;
   }
   function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
@@ -12510,7 +12583,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // A cocktail lounge counts for "dinner and cocktails" through the cocktail tag, even though it isn't a restaurant.
     if (anyOn(kinds) && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; }) && !tk.some(function(k){ return CONF.tg[TAGIX[k]].t.indexOf(p.type) !== -1; })) return false;
     if (topOnly && !(p.r >= 4.5)) return false;
-    for (var k in feats) if (feats[k] && !(p.f & CONF.f[k])) return false;
+    for (var k in feats) if (feats[k] && (k === 'happy' && hhKnown ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
     return !term || term.split(' ').every(function(w){ return p.key.indexOf(w) !== -1; });
   }
@@ -13039,7 +13112,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
       places.push(p);
     });
@@ -13049,6 +13122,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       events.push(e);
     });
     refreshStatus();
+    // Until researched times are loaded, the chip stays "Happy hour" (places that have one).
+    hhKnown = places.some(function(p){ return p.hh; });
+    if (!hhKnown) featChips.forEach(function(c){ if (c.getAttribute('data-pm-feat') === 'happy') c.lastChild.textContent = ' ' + T.feat.happy; });
     try {
       var qs = new URLSearchParams(location.search);
       (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
@@ -13074,7 +13150,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
-const MAP_DATA_FORMAT = 4;
+const MAP_DATA_FORMAT = 5;
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -13108,7 +13184,7 @@ const MAP_KINDS = [
 ];
 const MAP_MUST_HAVES = [
   { key: 'patio', label: 'Patio', icon: '\u2600\uFE0F' }, { key: 'dogs', label: 'Dogs OK', icon: '\u{1F415}' },
-  { key: 'happy', label: 'Happy hour', icon: '\u{1F378}' }, { key: 'music', label: 'Live music', icon: '\u{1F3B6}' },
+  { key: 'happy', label: 'Happy hour now', icon: '\u{1F378}' }, { key: 'music', label: 'Live music', icon: '\u{1F3B6}' },
   { key: 'lake', label: 'Lake view', icon: '\u{1F30A}' }, { key: 'kids', label: 'Kids welcome', icon: '\u{1F9D2}' },
   { key: 'late', label: 'Open late', icon: '\u{1F319}' }, { key: 'early', label: 'Open early', icon: '\u{1F305}' },
   { key: 'groups', label: 'Good for groups', icon: '\u{1F465}' }, { key: 'sports', label: 'Sports on TV', icon: '\u{1F4FA}' },
@@ -13157,12 +13233,15 @@ const MAP_TAGS = [
 const MAP_DIETARY = [
   { key: 'veg', label: 'Vegetarian', icon: '\u{1F957}' }, { key: 'vegan', label: 'Vegan', icon: '\u{1F331}' }, { key: 'gf', label: 'Gluten-free', icon: '\u{1F33E}' },
 ];
+function mapHappyHourTimes(json) {
+  try { return compactFoodDrinkHours(JSON.parse(json)) || 0; } catch (e) { return 0; }
+}
 function mapPlaceTags(v) {
   const text = `${v.name} ${v.cuisine || ''} ${v.description || ''}`.toLowerCase();
   return MAP_TAGS.reduce((out, t, i) => (t.types.includes(v.type) || t.find.test(text) ? out.concat(i) : out), []);
 }
 function mapPlacesData(now = new Date()) {
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description, happy_hour_times FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const dogNotes = getDogPolicyNotes();
@@ -13172,7 +13251,9 @@ function mapPlacesData(now = new Date()) {
     return [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
       // [9] rating x10 (0 when none); [10] what it serves or is good for, as MAP_TAGS positions.
-      Number(v.rating) > 0 ? Math.round(Number(v.rating) * 10) : 0, mapPlaceTags(v)];
+      Number(v.rating) > 0 ? Math.round(Number(v.rating) * 10) : 0, mapPlaceTags(v),
+      // [11] happy hour times (researched, compact like the hours), or 0; none while the place has a closure notice.
+      v.happy_hour_times && !(st && st.reason === 'advisory') ? mapHappyHourTimes(v.happy_hour_times) : 0];
   });
 }
 // Events in the next week, one entry each (its next date):
@@ -29699,6 +29780,51 @@ const server = http.createServer(async (req, res) => {
     // checked_at }) or clears it (season: null). Same bearer-token check and
     // strict key allowlist as every admin route; reason and batch_id are
     // required for the audit row.
+    // POST /admin/set-happy-hour (2026-10-14)
+    //
+    // The HTTP route for guardedHappyHourUpdate(): { id, expected_current_times, happy_hour: { times, source_url,
+    // checked_at } | { times: null }, reason, batch_id }. Same bearer-token check and strict key allowlist as every
+    // admin route.
+    if (pathname === '/admin/set-happy-hour' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Set-happy-hour endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const unexpectedKeys = Object.keys(body).filter((k) => !['id', 'expected_current_times', 'happy_hour', 'reason', 'batch_id'].includes(k));
+      if (unexpectedKeys.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (!('expected_current_times' in body) || (body.expected_current_times !== null && typeof body.expected_current_times !== 'string')) {
+        return sendJSON(res, 400, { error: 'expected_current_times is required and must be the stored times text or null.' });
+      }
+      const hh = body.happy_hour;
+      if (!hh || typeof hh !== 'object' || Array.isArray(hh)) return sendJSON(res, 400, { error: 'happy_hour must be an object with times, source_url and checked_at.' });
+      const unexpectedHh = Object.keys(hh).filter((k) => !['times', 'source_url', 'checked_at'].includes(k));
+      if (unexpectedHh.length) return sendJSON(res, 400, { error: `happy_hour has unexpected field(s): ${unexpectedHh.join(', ')}` });
+      if (!('times' in hh)) return sendJSON(res, 400, { error: 'happy_hour.times is required (null clears it).' });
+      let result;
+      try {
+        result = guardedHappyHourUpdate(body.id, body.expected_current_times, hh, { reason: body.reason, batch_id: body.batch_id, reviewed_by: null });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Happy hour update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { invalid_meta: 400, invalid_times: 400, invalid_source: 400, invalid_checked_at: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, venue: { happy_hour_times: result.happy_hour_times, happy_hour_source: result.happy_hour_source, happy_hour_checked_at: result.happy_hour_checked_at } });
+    }
+
     if (pathname === '/admin/set-season' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Set-season endpoint is not configured.' });
@@ -31206,6 +31332,7 @@ module.exports = {
   seasonClosedRange,
   validateSeason,
   guardedSeasonUpdate,
+  guardedHappyHourUpdate,
   getSeasonStates,
   breadcrumbListSchema,
   FALL_MOOD_IMAGES,
