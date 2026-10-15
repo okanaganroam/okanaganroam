@@ -31,3 +31,17 @@ test('beach photo manifest inventories all 93 live listings and only marks exist
     }
   }
 });
+
+test('selected remaining beach photos are ready, including the chosen Nuyens photo', () => {
+  const readyBySlug = new Map(BEACH_PHOTO_MANIFEST.map((item) => [item.slug, item]));
+  for (const slug of ['lions-park-okanagan-falls', 'raymer-bay-regional-park', 'gellatly-nut-farm-regional-park', 'nuyens-park']) {
+    const item = readyBySlug.get(slug);
+    assert.ok(item?.verified, `${slug} is marked verified`);
+    assert.ok(item.image, `${slug} has a local image path`);
+    assert.equal(item.path, item.image, `${slug} manifest path matches its served image`);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', item.image.slice(1))), `${slug} image exists`);
+  }
+
+  const nuyens = readyBySlug.get('nuyens-park');
+  assert.equal(nuyens?.imageSourceUrl, 'https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1591474846126-5ZGAXJ4ZZP714V434LP1/Nuyens-park-okanaganJPG');
+});
