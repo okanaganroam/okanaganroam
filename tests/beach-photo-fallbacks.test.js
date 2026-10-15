@@ -70,7 +70,7 @@ test('the refreshed beach photos retain their exact photo sources', () => {
     'lions-park-okanagan-falls': 'https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1602895725928-J01RXKHQ39RQESFI58J8/Lions-Gardens-Okanagan-Falls-BC.jpg?format=2500w',
     'pandosy-waterfront-park': 'https://robmosesphotography.com/wp-content/uploads/2024/11/sunset-okanagan-lake-mountains-street-peir-pandosy-waterfront-park-50mm-kelowna-bc-british-columbia-rob-moses-photography-frist-nations-aboriginal-indigenous-native-american-photographer.jpg',
     'coral-beach-north': 'https://okconnect.events/wp-content/uploads/2025/11/coral-beach-north-beach-area-lake-country-bc-OKConnect.jpg',
-    'goodman-park-dog-swimming-area': 'https://www.canadaculinary.com/images/transforms/stories/_story/Goodman-Park.jpeg',
+    'goodman-park-dog-swimming-area': 'https://admin.destinationosoyoos.com/wp-content/uploads/2020/04/goodmanpark.jpg',
     'cove-beach': 'https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1620069816829-9YJE3BROP30WBAKHU3TE/Davis-Cove-Beach-Peachland-BC.jpg?format=1500w',
   };
 

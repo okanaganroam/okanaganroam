@@ -195,9 +195,9 @@ The owner stated permission to use the selected photos. The photos were not alte
 - Local file: `/images/beaches/venues/kelowna-bertram-creek-regional-park.jpg`
 
 ## 39. Goodman Park Dog Swimming Area — READY
-- Source: Canada Culinary (adapted from Destination Osoyoos)
-- [Source page](https://www.canadaculinary.com/stories/7-worthy-spots-for-picnic-lunches-around-osoyoos/) · [Original image](https://www.canadaculinary.com/images/transforms/stories/_story/Goodman-Park.jpeg)
-- Local file: `/images/beaches/venues/osoyoos-goodman-park-dog-swimming-area.jpg`
+- Source: Destination Osoyoos
+- [Source page](https://www.destinationosoyoos.com/listing/goodman-park/) · [Original image](https://admin.destinationosoyoos.com/wp-content/uploads/2020/04/goodmanpark.jpg)
+- Local file: `/images/beaches/venues/osoyoos-goodman-park-dog-swimming-area-destination-osoyoos.webp`
 
 ## 40. Lions Park (Okanagan Falls) — READY
 - Source: Exploratory Glory
