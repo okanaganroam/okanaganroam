@@ -752,6 +752,10 @@ const FR_TEXT = {
   'Map of the Okanagan: What’s Open Near You | Okanagan Roam': 'Carte de l’Okanagan : ce qui est ouvert près de vous | Okanagan Roam',
   'Find what’s open near you in the Okanagan: {0} restaurants, wineries, beaches, trails and more on one map, with directions and what’s on this week.': 'Trouvez ce qui est ouvert près de vous dans l’Okanagan : {0} restaurants, vignobles, plages, sentiers et plus sur une seule carte, avec l’itinéraire et ce qui se passe cette semaine.',
   'Map of the Okanagan': 'Carte de l’Okanagan',
+  // Roam Now is the feature's name (2026-10-14), kept in French like the site name.
+  'Roam Now': 'Roam Now', 'Roam Now: what’s open near me': 'Roam Now : ce qui est ouvert près de moi',
+  'Roam Now: Okanagan Map of What’s Open Near You | Okanagan Roam': 'Roam Now : carte de ce qui est ouvert près de vous dans l’Okanagan | Okanagan Roam',
+  'Roam Now: map of what’s open near you in the Okanagan': 'Roam Now : carte de ce qui est ouvert près de vous dans l’Okanagan',
   'Find what’s open near you, get directions, and see what’s on.': 'Trouvez ce qui est ouvert près de vous, obtenez l’itinéraire et voyez ce qui se passe.',
   'Near me': 'Près de moi',
   'Places': 'Lieux',
