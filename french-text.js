@@ -769,7 +769,6 @@ const FR_TEXT = {
   'Map': 'Carte',
   'Back to the home page': 'Retour à l’accueil',
   'Everything in {T}': 'Tout à {T}',
-  '{0} across the Okanagan': '{0} dans tout l’Okanagan',
   'Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley’s best dining rooms — every restaurant, café, pub, cocktail lounge and brewery Okanagan Roam has verified.': 'Dîners en terrasse au bord du lac, cafés de spécialité, salles de dégustation de brasseries et les meilleures tables de la vallée : tous les restaurants, cafés, pubs, bars à cocktails et brasseries vérifiés par Okanagan Roam.',
   'Cafés, wineries, trails, beaches and more that are easy to miss — each card says why it’s a gem.': 'Cafés, vignobles, sentiers, plages et plus encore, faciles à manquer : chaque fiche explique pourquoi c’est un trésor.',
   '{0} restaurants, cafés, pubs and breweries across the Okanagan Valley. Filter by patio, dog-friendly, vegan or gluten-free.': '{0} restaurants, cafés, pubs et brasseries dans la vallée de l’Okanagan. Filtrez par terrasse, chiens acceptés, végane ou sans gluten.',
@@ -945,6 +944,9 @@ const FR_PATTERNS = [
   [/^Add (.+) to (?:my |your )?trip$/i, (m) => `Ajouter ${m[1]} au voyage`],
   [/^Remove (.+) from (?:my |your )?trip$/i, (m) => `Retirer ${m[1]} du voyage`],
   [/^Favorite (.+)$/, (m) => `Favori : ${m[1]}`],
+  // "Restaurants in Kelowna" / "Restaurants across the Okanagan" (the 404 page's suggestions).
+  [/^(.+) in (.+)$/, (m, tr, c) => (c.has(m[1]) && Object.values(c.regions).includes(m[2]) ? `${tr(m[1])} à ${m[2]}` : null)],
+  [/^(.+) across the Okanagan$/, (m, tr, c) => (c.has(m[1]) ? `${tr(m[1])} dans tout l’Okanagan` : null)],
   // "Wineries in Oliver, BC" (a town category page's heading): the kind of place, then the town.
   [/^(.+) in (.+), BC$/, (m, tr, c) => (c.has(m[1]) && Object.values(c.regions).includes(m[2]) ? `${tr(m[1])} à ${m[2]} (C.-B.)` : null)],
   [/^(.+), BC$/, (m, tr) => `${tr(m[1])}, C.-B.`],
