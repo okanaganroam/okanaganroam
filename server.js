@@ -28068,6 +28068,7 @@ function buildEventSubmissionEmail(sub) {
     'When': describeEventSubmissionWhen(sub),
     'Region': REGION_LABELS[sub.region],
     'Venue / location': sub.venue_name,
+    ...(sub.owner_venue_id ? { 'Sent from': `The venue's owner edit page (venue #${sub.owner_venue_id}); approving links it to that venue` } : {}),
     'Categories': sub.categories.map((k) => WHATSON_CATEGORY_BY_KEY[k].label).join(', '),
     'Description': sub.description,
     'Event website / tickets': sub.event_url || '(none given)',
@@ -28099,6 +28100,27 @@ async function notifyEventSubmission(id) {
     console.error(`[event-submissions] notification for submission #${id} failed (submission kept as pending): ${message}`);
     return false;
   }
+}
+
+// Stores a validated event submission; ownerVenueId is set when it came from
+// a venue's owner edit page, so approval links the event to that venue.
+function insertEventSubmission(data, ip, userAgent, ownerVenueId) {
+  const info = db.prepare(
+    `INSERT INTO event_submissions
+       (name, region, categories, description, venue_name, start_date, end_date, start_time, end_time, all_day, ends_next_day,
+        event_url, organizer_name, schedule_notes, contact_name, contact_email, consent, consent_version, ip_hash, user_agent,
+        price_text, image_link, owner_venue_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    data.name, data.region, JSON.stringify(data.categories), data.description, data.venue_name,
+    data.start_date, data.end_date, data.start_time, data.end_time, data.all_day, data.ends_next_day,
+    data.event_url, data.organizer_name, data.schedule_notes || null, data.contact_name, data.contact_email,
+    EVENT_SUBMISSION_CONSENT_VERSION,
+    crypto.createHash('sha256').update(`okanagan-roam-event-submission:${ip}`).digest('hex'),
+    String(userAgent || '').slice(0, 300) || null,
+    data.price_text || null, data.image_link || null, ownerVenueId || null
+  );
+  return Number(info.lastInsertRowid);
 }
 
 async function handleEventSubmission(req, res) {
@@ -28153,22 +28175,7 @@ async function handleEventSubmission(req, res) {
     return sendSubmissionResponse(res, 409, { ok: false, error: 'We already have a pending submission for this event from this email address. We will be in touch after we review it.' });
   }
 
-  const info = db.prepare(
-    `INSERT INTO event_submissions
-       (name, region, categories, description, venue_name, start_date, end_date, start_time, end_time, all_day, ends_next_day,
-        event_url, organizer_name, schedule_notes, contact_name, contact_email, consent, consent_version, ip_hash, user_agent,
-        price_text, image_link)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`
-  ).run(
-    data.name, data.region, JSON.stringify(data.categories), data.description, data.venue_name,
-    data.start_date, data.end_date, data.start_time, data.end_time, data.all_day, data.ends_next_day,
-    data.event_url, data.organizer_name, data.schedule_notes || null, data.contact_name, data.contact_email,
-    EVENT_SUBMISSION_CONSENT_VERSION,
-    crypto.createHash('sha256').update(`okanagan-roam-event-submission:${ip}`).digest('hex'),
-    String(req.headers['user-agent'] || '').slice(0, 300) || null,
-    data.price_text || null, data.image_link || null
-  );
-  const id = Number(info.lastInsertRowid);
+  const id = insertEventSubmission(data, ip, req.headers['user-agent'], null);
   await notifyEventSubmission(id);
   return sendSubmissionResponse(res, 201, {
     ok: true,
@@ -28235,12 +28242,14 @@ function approveEventSubmission(id, body, now = new Date()) {
     occurrences: [eventSubmissionOccurrence(sub)],
     status: 'scheduled',
     event_confidence: 'medium',
-    source_type: body.source_type || 'official_organizer',
+    source_type: body.source_type || (sub.owner_venue_id ? 'official_venue' : 'official_organizer'),
     source_name: sub.organizer_name,
     // No link given: the provenance is the organizer's own submission.
     source_url: sub.event_url || `https://okanaganroam.com/list-an-event#submission-${sub.id}`,
   };
-  if (body.venue_id !== undefined) data.venue_id = body.venue_id;
+  // An owner-page submission is linked to its venue unless the reviewer says otherwise.
+  const venueId = body.venue_id !== undefined ? body.venue_id : (sub.owner_venue_id || undefined);
+  if (venueId !== undefined) data.venue_id = venueId;
   else data.venue_name_text = sub.venue_name;
   if (body.type !== undefined) data.type = body.type;
   const meta = {
@@ -28824,6 +28833,49 @@ async function handleOwnerChangeSubmission(req, res, token) {
   return sendSubmissionResponse(res, 201, { ok: true, id, fields: Object.keys(changes) });
 }
 
+// An event from the owner edit page: the venue, region and organizer come
+// from the listing, so the owner only fills in the event itself. It lands in
+// the normal event review (owner_venue_id set), with the same checks as
+// /api/event-submissions.
+const OWNER_EVENT_KEYS = new Set(['name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day',
+  'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'company_website', 'started_at']);
+async function handleOwnerEventSubmission(req, res, token) {
+  const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Events are only accepted from the Okanagan Roam website.' });
+  const ip = requestClientIp(req);
+  if (eventSubmissionRateLimited(ip)) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many submissions. Please try again in an hour.' });
+  const found = venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
+  let body;
+  try {
+    body = await readLimitedJsonBody(req, EVENT_SUBMISSION_MAX_BODY_BYTES);
+  } catch (err) {
+    return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'Your event is too long. Please shorten it and try again.' : generic }, err.status === 413);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !OWNER_EVENT_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  }
+  if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
+  const startedAt = Number(body.started_at);
+  if (!Number.isFinite(startedAt) || Date.now() - startedAt < VENUE_SUBMISSION_MIN_FILL_MS) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check the event and send it again.' });
+  }
+  const { venue } = found;
+  const full = { ...body, region: venue.region, venue_name: venue.name, organizer_name: venue.name, consent: true };
+  delete full.company_website;
+  delete full.started_at;
+  const { data, errors } = validateEventSubmission(full);
+  if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
+  const duplicate = db.prepare(
+    `SELECT id FROM event_submissions WHERE status = 'pending' AND owner_venue_id = ? AND start_date = ? AND LOWER(name) = LOWER(?)`
+  ).get(venue.id, data.start_date, data.name);
+  if (duplicate) return sendSubmissionResponse(res, 409, { ok: false, error: 'You already sent this event. It is waiting for review.' });
+  const id = insertEventSubmission(data, ip, req.headers['user-agent'], venue.id);
+  await notifyEventSubmission(id);
+  return sendSubmissionResponse(res, 201, { ok: true, id });
+}
+
 // Applies an approved request. `fields` (optional) approves only some of the
 // changed fields. Each field goes through its guarded writer; any failure
 // rolls the whole approval back and leaves the request pending.
@@ -28972,6 +29024,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-done { display: none; background: #E9F6EE; border-radius: 14px; padding: 18px; font-weight: 600; }
   body.owner-page .op-done.show { display: block; }
   body.owner-page .venue-form-submit:disabled { opacity: 0.6; cursor: wait; }
+  body.owner-page #events { scroll-margin-top: 96px; }
   @media (max-width: 640px) { body.owner-page .venue-form { padding: 22px 16px; } body.owner-page .op-day-name { width: 100%; } }
 </style>
 </head>
@@ -28983,6 +29036,7 @@ ${renderGolfHeaderHtml()}
       <span class="eyebrow">Owner edit page</span>
       <h1>${escapeHtml(venue.name)}</h1>
       <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>. Keep this link private; anyone with it can suggest changes.</p>
+      <p><a href="#events"><strong>Have an event coming up? Add it here &darr;</strong></a></p>
       ${pendingNote}
     </div>
     <form class="venue-form" id="opForm" novalidate>
@@ -29028,7 +29082,42 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="opSubmit">Send changes</button>
     </form>
     <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them shortly. You can come back to this page any time to send more.</div>
-    <p class="op-hint" style="margin-top:28px">Have an event coming up? <a href="/list-an-event">List it on What&rsquo;s On</a>. Want to send photos? Reply to our email or write to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
+    <h2 id="events" style="margin-top:44px">Add an event</h2>
+    <p class="op-hint">Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.</p>
+    <form class="venue-form" id="oeForm" novalidate>
+      <div class="form-row full"><div class="form-field"><label for="oeName">Event name *</label><input type="text" id="oeName" maxlength="120"><p class="lyv-error" id="oeNameError" hidden></p></div></div>
+      <div class="form-row full"><div class="form-field">
+        <label id="oeCatLabel">Categories * <span class="op-hint">(choose 1 to 3)</span></label>
+        <div class="amenity-check-grid" role="group" aria-labelledby="oeCatLabel" id="oeCategories">${WHATSON_CATEGORIES.map((c) => `
+          <label class="amenity-check"><input type="checkbox" value="${c.key}"> ${escapeHtml(c.label)}</label>`).join('')}
+        </div>
+        <p class="lyv-error" id="oeCategoriesError" hidden></p>
+      </div></div>
+      <div class="form-row full"><div class="form-field"><label for="oeDescription">Description *</label><textarea id="oeDescription" rows="4" maxlength="1000" placeholder="What is happening, who is it for, and what should people know?"></textarea><p class="lyv-error" id="oeDescriptionError" hidden></p></div></div>
+      <div class="form-row">
+        <div class="form-field"><label for="oeStartDate">Date *</label><input type="date" id="oeStartDate" min="${todayLocal()}" max="${addLocalDays(todayLocal(), EVENT_SUBMISSION_MAX_FUTURE_DAYS)}"><p class="lyv-error" id="oeStartDateError" hidden></p></div>
+        <div class="form-field"><label for="oeEndDate">End date (multi-day)</label><input type="date" id="oeEndDate" min="${todayLocal()}"><p class="lyv-error" id="oeEndDateError" hidden></p></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label for="oeStartTime">Start time *</label><input type="time" id="oeStartTime"><p class="lyv-error" id="oeStartTimeError" hidden></p></div>
+        <div class="form-field"><label for="oeEndTime">End time</label><input type="time" id="oeEndTime"><p class="lyv-error" id="oeEndTimeError" hidden></p></div>
+      </div>
+      <div class="form-row full"><div class="form-field"><label class="op-closed" style="width:auto"><input type="checkbox" id="oeAllDay"> All-day event (no set times)</label></div></div>
+      <div class="form-row">
+        <div class="form-field"><label for="oeUrl">Event or ticket link</label><input type="url" id="oeUrl" maxlength="500" placeholder="https://"><p class="lyv-error" id="oeEventUrlError" hidden></p></div>
+        <div class="form-field"><label for="oePrice">Price</label><input type="text" id="oePrice" maxlength="80" placeholder="e.g. Free, or $25"></div>
+      </div>
+      <div class="form-row full"><div class="form-field"><label for="oeNotes">Repeats or other dates?</label><textarea id="oeNotes" rows="2" maxlength="500" placeholder="e.g. every Friday until December. We'll add the dates."></textarea></div></div>
+      <div class="form-row">
+        <div class="form-field"><label for="oeContactName">Your name *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
+        <div class="form-field"><label for="oeContactEmail">Your email *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
+      </div>
+      <div class="lyv-hp" aria-hidden="true"><label>Company website <input type="text" id="oeHp" tabindex="-1" autocomplete="off"></label></div>
+      <p class="lyv-error" id="oeFormError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="oeSubmit">Send event</button>
+    </form>
+    <div class="op-done" id="oeDone">Thanks! Your event is in for review. <a href="#events" id="oeAnother">Add another event</a></div>
+    <p class="op-hint" style="margin-top:28px">Want to send photos? Reply to our email or write to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
   </div>
   </main>
 <script>
@@ -29095,6 +29184,34 @@ ${renderGolfHeaderHtml()}
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? 'Please fix the highlighted fields.' : 'Sorry, something went wrong. Please try again.'));
       })
       .catch(function(){ btn.disabled = false; show('opFormError', 'Could not send. Please check your connection and try again.'); });
+  });
+  var ev = document.getElementById('oeForm');
+  var evStarted = Date.now();
+  var allDay = document.getElementById('oeAllDay');
+  allDay.addEventListener('change', function(){ ['oeStartTime','oeEndTime'].forEach(function(id){ document.getElementById(id).disabled = allDay.checked; }); });
+  document.getElementById('oeAnother').addEventListener('click', function(){ ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); });
+  ev.addEventListener('submit', function(e){
+    e.preventDefault();
+    var ids = { name:'oeNameError', categories:'oeCategoriesError', description:'oeDescriptionError', start_date:'oeStartDateError', end_date:'oeEndDateError',
+      start_time:'oeStartTimeError', end_time:'oeEndTimeError', event_url:'oeEventUrlError', contact_name:'oeContactNameError', contact_email:'oeContactEmailError' };
+    Object.keys(ids).forEach(function(k){ show(ids[k], ''); }); show('oeFormError', '');
+    var cats = Array.prototype.map.call(document.querySelectorAll('#oeCategories input:checked'), function(c){ return c.value; });
+    var v = function(id){ return document.getElementById(id).value; };
+    var payload = { name: v('oeName'), categories: cats, description: v('oeDescription'), start_date: v('oeStartDate'), end_date: v('oeEndDate'),
+      start_time: allDay.checked ? '' : v('oeStartTime'), end_time: allDay.checked ? '' : v('oeEndTime'), all_day: allDay.checked,
+      event_url: v('oeUrl'), price_text: v('oePrice'), schedule_notes: v('oeNotes'), contact_name: v('oeContactName'), contact_email: v('oeContactEmail'),
+      company_website: v('oeHp'), started_at: evStarted };
+    var b = document.getElementById('oeSubmit'); b.disabled = true;
+    fetch(location.pathname + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        b.disabled = false;
+        if (j && j.ok) { ev.style.display = 'none'; document.getElementById('oeDone').classList.add('show'); return; }
+        var errs = (j && j.errors) || {};
+        Object.keys(errs).forEach(function(k){ if (ids[k]) show(ids[k], errs[k]); });
+        show('oeFormError', (j && j.error) || 'Sorry, something went wrong. Please try again.');
+      })
+      .catch(function(){ b.disabled = false; show('oeFormError', 'Could not send. Please check your connection and try again.'); });
   });
 })();
 </script>
@@ -31691,6 +31808,8 @@ const server = http.createServer(async (req, res) => {
       const rest = pathname.slice(OWNER_LINK_PATH.length);
       const changesMatch = /^([A-Za-z0-9_-]+)\/changes$/.exec(rest);
       if (changesMatch && method === 'POST') return await handleOwnerChangeSubmission(req, res, changesMatch[1]);
+      const eventsMatch = /^([A-Za-z0-9_-]+)\/events$/.exec(rest);
+      if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       if (/^[A-Za-z0-9_-]+$/.test(rest) && (method === 'GET' || method === 'HEAD')) {
         const found = venueForOwnerToken(rest);
         const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };

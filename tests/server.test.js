@@ -19926,3 +19926,48 @@ test('Owner portal: edit link, owner page, change request, review and approval',
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner portal: events from the owner page are linked to the venue on approval', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Events Fixture', type: 'brewery', hours: SEASON_WEEK, slug: 'owner-events-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'brewery', 'owner-events-fixture');
+  const link = app.createOwnerLink(v.id, { contact_email: 'brewer@example.com' });
+  const token = link.url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const send = (body, t = token) => fetch(`${base}/owner/${t}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.8.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const day = app.todayLocal ? app.todayLocal() : new Date().toISOString().slice(0, 10);
+  const later = new Date(Date.parse(`${day}T12:00:00Z`) + 10 * 86400000).toISOString().slice(0, 10);
+  const good = { name: 'Fresh Hop Friday', categories: ['food-drink-events', 'live-music'], description: 'Our fresh hop release with live acoustic music on the patio all evening.',
+    start_date: later, end_date: '', start_time: '17:00', end_time: '21:00', all_day: false, event_url: '', price_text: 'Free', schedule_notes: '',
+    contact_name: 'Sam Brewer', contact_email: 'brewer@example.com', company_website: '', started_at: Date.now() - 10000 };
+  try {
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /Add an event/);
+    assert.match(page, /value="brewer@example.com"/);
+    assert.equal((await send({ ...good, region: 'kelowna' })).status, 400, 'region comes from the listing');
+    const bad = await send({ ...good, name: '' });
+    assert.equal(bad.status, 400);
+    assert.ok(bad.body.errors.name);
+    assert.equal((await send(good, 'z'.repeat(32))).status, 404);
+    const ok = await send(good);
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal((await send(good)).status, 409, 'duplicate');
+    const sub = db.prepare('SELECT * FROM event_submissions WHERE id = ?').get(ok.body.id);
+    assert.equal(sub.owner_venue_id, v.id);
+    assert.equal(sub.venue_name, 'Owner Events Fixture');
+    assert.equal(sub.region, 'kelowna');
+    const approved = await fetch(`${base}/admin/event-submissions/${ok.body.id}/approve`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` }, body: JSON.stringify({ reviewer: 'test' }) });
+    const out = await approved.json();
+    assert.equal(approved.status, 200, JSON.stringify(out));
+    assert.equal(out.event.venue_id, v.id);
+    assert.equal(out.event.source_type, 'official_venue');
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
