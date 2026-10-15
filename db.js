@@ -714,7 +714,7 @@ CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(sta
 // notification email and the admin list); none is published automatically.
 for (const [table, cols] of [
   ['venue_submissions', ['hours_text TEXT', 'happy_hour_text TEXT', 'social_url TEXT', 'submitter_role TEXT']],
-  ['event_submissions', ['price_text TEXT', 'image_link TEXT']],
+  ['event_submissions', ['price_text TEXT', 'image_link TEXT', 'owner_venue_id INTEGER']],
 ]) {
   const have = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
   for (const col of cols) if (!have.has(col.split(' ')[0])) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
