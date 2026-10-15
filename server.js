@@ -12315,7 +12315,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'pour le guidage vocal en voiture.', routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants' },
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.', stopped: 'Position désactivée.',
@@ -12339,7 +12339,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'for spoken directions while driving.', routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome' },
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.', stopped: 'Location turned off.',
@@ -12460,7 +12460,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (me ? ' · ' + T.km(p.d) : '')); }
   // What the place offers, the visitor's must-haves first; the dog rule when dogs matter.
-  var FEAT_ORDER = ['patio', 'dogs', 'happy', 'music', 'lake', 'kids'];
+  var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc'];
   function featHtml(p){
     var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
@@ -12874,16 +12874,36 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     music: 'music live band bands musique',
     lake: 'lake view views waterfront lac',
     kids: 'kids kid family families children enfants famille',
-    open: 'open ouvert ouverts'
+    veg: 'veg vegetarian vegetarians veggie veggies végétarien végétarienne végétariens végé',
+    vegan: 'vegan vegans végane véganes végétalien',
+    gf: 'gf', late: 'late', early: 'early', nonalc: 'nonalc',
+    groups: 'group groups party parties groupe groupes',
+    sports: 'sports sport tv game games hockey football',
+    open: 'open ouvert ouverts', nearme: 'nearme'
   };
-  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow us bring on place places near me our my and or go find wonder wondering somewhere something good best nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour ';
+  // Two-word ideas first ("gluten free", "dog friendly", "close by"), so each becomes one filter.
+  var PHRASES = [
+    [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
+    [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '],
+    [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live/g, ' music '],
+    [/lake ?views?|vue sur le lac/g, ' lake '], [/close ?by|near ?by|near me|around here|près de moi|pas loin/g, ' nearme ']
+  ];
+  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good best nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly free serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre ';
   var WORD_TO = {};
   Object.keys(WORDS).forEach(function(k){ WORDS[k].split(' ').forEach(function(w){ WORD_TO[w] = k; }); });
+  function parseWords(v){
+    var t = ' ' + String(v).toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿœ'’ -]/g, ' ') + ' ';
+    PHRASES.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
+    return t.replace(/-/g, ' ').split(/\\s+/).filter(Boolean);
+  }
+  function hasWords(v){ return parseWords(v).some(function(w){ return WORD_TO[w]; }); }
+  var wantNear = false;
   function readSearch(v){
     var left = [];
-    String(v).toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿœ'’ -]/g, ' ').split(/\\s+/).filter(Boolean).forEach(function(w){
+    parseWords(v).forEach(function(w){
       var k = WORD_TO[w];
-      if (k === 'open') openOnly = true;
+      if (k === 'nearme') wantNear = true;
+      else if (k === 'open') openOnly = true;
       else if (k && CONF.k[k]) kinds[k] = true;
       else if (k && CONF.f[k]) feats[k] = true;
       else if (STOP.indexOf(' ' + w.replace('’', '\\'') + ' ') === -1) left.push(w);
@@ -12891,9 +12911,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     term = left.join(' ');
   }
   var timer = null;
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ term = v.trim().toLowerCase(); syncChips(); limit = 25; render(true); }, 250); });
-  // Enter (or the phone's Search key) reads the words as filters.
-  searchEl.addEventListener('keydown', function(e){ if (e.key !== 'Enter') return; e.preventDefault(); clearTimeout(timer); readSearch(searchEl.value); searchEl.value = term; searchEl.blur(); track('map_search', { words: searchEl.value ? 1 : 0 }); changed(); if (sheet.getAttribute('data-state') === 'peek') setSheet('half'); });
+  // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v); wantNear = false; changed(); } else { term = v.trim().toLowerCase(); syncChips(); limit = 25; render(true); } }, 450); });
+  // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
+  searchEl.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter') return;
+    e.preventDefault(); clearTimeout(timer); wantNear = false; readSearch(searchEl.value); searchEl.value = term; searchEl.blur();
+    track('map_search', { words: searchEl.value ? 1 : 0 }); changed();
+    if (wantNear && !me && !watching) nearBtn.click();
+    if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
+  });
   $('pmTown').addEventListener('change', function(e){ var c = CONF.c[e.target.value]; if (c) { closePanel(); map.setView(c, 13); } });
   function setTab(t){
     tab = t; limit = 25;
@@ -12945,7 +12972,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
-const MAP_DATA_FORMAT = 2;
+const MAP_DATA_FORMAT = 3;
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -12961,6 +12988,10 @@ const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
 const MAP_FEATURES = [
   { key: 'patio', field: 'patio', bit: 1 }, { key: 'dogs', field: 'dog_friendly', bit: 2 }, { key: 'happy', field: 'happy_hour', bit: 4 },
   { key: 'music', field: 'live_music', bit: 8 }, { key: 'lake', field: 'lake_view', bit: 16 }, { key: 'kids', field: 'kid_friendly', bit: 32 },
+  // Dietary and the rest (2026-10-14).
+  { key: 'veg', field: 'vegetarian', bit: 64 }, { key: 'vegan', field: 'vegan', bit: 128 }, { key: 'gf', field: 'gluten_free', bit: 256 },
+  { key: 'late', field: 'open_late', bit: 512 }, { key: 'early', field: 'open_early', bit: 1024 }, { key: 'groups', field: 'great_groups', bit: 2048 },
+  { key: 'sports', field: 'sports_tv', bit: 4096 }, { key: 'nonalc', field: 'nonalcoholic', bit: 8192 },
 ];
 // The kinds of place a visitor picks from (any of them), by venue type.
 const MAP_KINDS = [
@@ -12977,9 +13008,15 @@ const MAP_MUST_HAVES = [
   { key: 'patio', label: 'Patio', icon: '\u2600\uFE0F' }, { key: 'dogs', label: 'Dogs OK', icon: '\u{1F415}' },
   { key: 'happy', label: 'Happy hour', icon: '\u{1F378}' }, { key: 'music', label: 'Live music', icon: '\u{1F3B6}' },
   { key: 'lake', label: 'Lake view', icon: '\u{1F30A}' }, { key: 'kids', label: 'Kids welcome', icon: '\u{1F9D2}' },
+  { key: 'late', label: 'Open late', icon: '\u{1F319}' }, { key: 'early', label: 'Open early', icon: '\u{1F305}' },
+  { key: 'groups', label: 'Good for groups', icon: '\u{1F465}' }, { key: 'sports', label: 'Sports on TV', icon: '\u{1F4FA}' },
+  { key: 'nonalc', label: 'Alcohol-free drinks', icon: '\u{1F9C3}' },
+];
+const MAP_DIETARY = [
+  { key: 'veg', label: 'Vegetarian', icon: '\u{1F957}' }, { key: 'vegan', label: 'Vegan', icon: '\u{1F331}' }, { key: 'gf', label: 'Gluten-free', icon: '\u{1F33E}' },
 ];
 function mapPlacesData(now = new Date()) {
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const dogNotes = getDogPolicyNotes();
@@ -13082,11 +13119,11 @@ ${renderGolfHeaderHtml()}
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
         ${(() => {
-          // Every filter in one row: Happy hour first, then Patio and Dogs OK, the kinds of place, then the other must-haves.
+          // Every filter in one row: Happy hour, Patio and Dogs OK, the dietary ones, the kinds of place, then the rest.
           const feat = (f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`;
           const kind = (k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`;
           const first = ['happy', 'patio', 'dogs'];
-          return [...first.map((key) => MAP_MUST_HAVES.find((f) => f.key === key)).map(feat), ...MAP_KINDS.map(kind), ...MAP_MUST_HAVES.filter((f) => !first.includes(f.key)).map(feat)].join('\n        ');
+          return [...first.map((key) => MAP_MUST_HAVES.find((f) => f.key === key)).map(feat), ...MAP_DIETARY.map(feat), ...MAP_KINDS.map(kind), ...MAP_MUST_HAVES.filter((f) => !first.includes(f.key)).map(feat)].join('\n        ');
         })()}
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
       </div>
@@ -13123,6 +13160,10 @@ ${renderGolfHeaderHtml()}
       <div class="pm-chips" role="group" aria-label="Must have">
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
         ${MAP_MUST_HAVES.map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n        ')}
+      </div>
+      <h3>Dietary</h3>
+      <div class="pm-chips" role="group" aria-label="Dietary">
+        ${MAP_DIETARY.map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n        ')}
       </div>
       <div class="pm-panel-row">
         <label><span>Distance</span>

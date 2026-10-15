@@ -19586,19 +19586,29 @@ test('Near-me map: an event is pinned through its venue link, or an exact one-pl
 
 test('Near-me map: patio, dogs and the rest ship as feature bits; plain words become filters; the home page and the app icon lead to Near me', () => withDiscoveryServer(async (base) => {
   const data = JSON.parse(app.mapLiveData().json);
-  const rows = db.prepare('SELECT name, patio, dog_friendly FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL').all();
+  const rows = db.prepare('SELECT name, patio, dog_friendly, vegetarian, vegan, gluten_free FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL').all();
   const byName = new Map(rows.map((r) => [r.name, r]));
   for (const p of data.p) {
     const v = byName.get(p[2]);
     if (!v) continue;
     assert.equal(!!(p[7] & 1), Number(v.patio) === 1, `${p[2]} patio`);
     assert.equal(!!(p[7] & 2), Number(v.dog_friendly) === 1, `${p[2]} dogs`);
+    assert.equal(!!(p[7] & 64), Number(v.vegetarian) === 1, `${p[2]} vegetarian`);
+    assert.equal(!!(p[7] & 128), Number(v.vegan) === 1, `${p[2]} vegan`);
+    assert.equal(!!(p[7] & 256), Number(v.gluten_free) === 1, `${p[2]} gluten-free`);
     if (p[8]) assert.ok(p[7] & 2, 'a dog rule only on a dog-friendly place');
   }
   const html = await (await fetch(`${base}/map`)).text();
   const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
   assert.match(src, /patio: 'patio patios outside/, 'patio words');
   assert.match(src, /dogs: 'dog dogs pup/, 'dog words');
+  // Dietary filters, and sentences: "Patio close by with vegetarian option and dog friendly".
+  for (const k of ['veg', 'vegan', 'gf', 'late', 'early', 'groups', 'sports', 'nonalc']) assert.match(html, new RegExp(`data-pm-feat="${k}"`), k);
+  assert.match(html, /<h3>Dietary<\/h3>/);
+  assert.match(src, /\[\/gluten\[ -\]\?free/, 'gluten free is one filter');
+  assert.match(src, /\[\/\(dog\|pet\)\[ -\]\?friendly\/g, ' dogs '\]/, 'dog friendly is Dogs OK');
+  assert.match(src, /close \?by\|near \?by\|near me/, 'close by finds the visitor');
+  assert.match(src, /if \(wantNear && !me && !watching\) nearBtn\.click\(\);/);
   assert.match(src, /history\.replaceState\(null, '', location\.pathname \+ \(q \? '\?' \+ q : ''\)/, 'filters in the address, never the location');
   assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
   const home = await (await fetch(`${base}/`)).text();
