@@ -19605,6 +19605,7 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   }
   const html = await (await fetch(`${base}/map`)).text();
   const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
+  const conf0 = JSON.parse(src.match(/var CONF = (\{[\s\S]*?\});\n/)[1]);
   assert.match(src, /patio: 'patio patios outside/, 'patio words');
   assert.match(src, /dogs: 'dog dogs pup/, 'dog words');
   // Dietary filters, and sentences: "Patio close by with vegetarian option and dog friendly".
@@ -19612,8 +19613,23 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   assert.match(html, /<h3>Dietary<\/h3>/);
   assert.match(src, /\[\/gluten\[ -\]\?free/, 'gluten free is one filter');
   assert.match(src, /\[\/\(dog\|pet\)\[ -\]\?friendly\/g, ' dogs '\]/, 'dog friendly is Dogs OK');
-  assert.match(src, /close \?by\|near \?by\|near me/, 'close by finds the visitor');
+  assert.match(src, /close \?\(by\|to \(me\|us\|here\)\|to\)\|near \?by\|near \(me\|us\|here\)/, 'close by, close to me and near me find the visitor');
   assert.match(src, /if \(wantNear && !me && !watching\) nearBtn\.click\(\);/);
+  // What a place serves, from its name, cuisine and description: "great ice cream close to me", "dinner and great cocktails".
+  const tagKeys = conf0.tg.map((t) => t.k);
+  for (const k of ['icecream', 'cocktail', 'sushi', 'pizza', 'brunch']) assert.ok(tagKeys.includes(k), k);
+  const vs = db.prepare('SELECT name, type, cuisine, description, rating FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL').all();
+  const vByName = new Map(vs.map((v) => [v.name, v]));
+  const ice = tagKeys.indexOf('icecream'), cocktail = tagKeys.indexOf('cocktail');
+  for (const p of data.p) {
+    const v = vByName.get(p[2]); if (!v) continue;
+    const text = `${v.name} ${v.cuisine || ''} ${v.description || ''}`.toLowerCase();
+    assert.equal(p[10].includes(ice), /ice[ -]?cream|gelato|soft[ -]serve|frozen yog|sorbet/.test(text), `${p[2]} ice cream`);
+    if (v.type === 'cocktail') assert.ok(p[10].includes(cocktail), `${p[2]} is a cocktail lounge`);
+    assert.equal(p[9], Number(v.rating) > 0 ? Math.round(Number(v.rating) * 10) : 0, `${p[2]} rating`);
+  }
+  assert.match(src, /top: 'great best top amazing/, '"great" and "best" mean Top rated');
+  assert.match(html, /data-pm-top aria-pressed="false"><span aria-hidden="true">⭐<\/span> Top rated/);
   assert.match(src, /history\.replaceState\(null, '', location\.pathname \+ \(q \? '\?' \+ q : ''\)/, 'filters in the address, never the location');
   assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
   const home = await (await fetch(`${base}/`)).text();
