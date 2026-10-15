@@ -1,6 +1,6 @@
 # Beach photo sources and review status
 
-This index covers 93 live beach listings. 86 exact-location photos are staged locally and visually screened for readable writing; 7 still need an acceptable exact-beach image. Unverified listings keep their current image fallback.
+This index covers 93 live beach listings. 90 exact-location photos are staged locally and visually screened for readable writing; 3 still need an acceptable exact-beach image. Unverified listings keep their current image fallback.
 
 The owner stated permission to use the selected photos. The photos were not altered to remove writing; images with visible writing or the wrong location were excluded. Source links are retained below.
 
@@ -197,8 +197,10 @@ The owner stated permission to use the selected photos. The photos were not alte
 - [Source page](https://okconnect.events/beaches-in-the-okanagan-family-fun-beach-spots/) · [Original image](https://okconnect.events/wp-content/uploads/2022/05/goodman-park-beach-osoyoos-bc.jpg)
 - Local file: `/images/beaches/venues/osoyoos-goodman-park-dog-swimming-area.jpg`
 
-## 40. Lions Park (Okanagan Falls) — NEEDS PHOTO
-- No acceptable exact-beach photo staged. Checked: [source page](https://www.rdos.bc.ca/community-services/parks-trails/lions-park/)
+## 40. Lions Park (Okanagan Falls) — READY
+- Source: RDOS
+- [Source page](https://www.rdos.bc.ca/community-services/parks-trails/lions-park/) · [Original image](https://www.rdos.bc.ca/assets/rdos/migrated/pics/LionsPark1.jpg)
+- Local file: `/images/beaches/venues/okanagan-falls-lions-park-okanagan-falls.jpg`
 
 ## 41. Sudbury Beach — READY
 - Source: Exploratory Glory
@@ -230,8 +232,10 @@ The owner stated permission to use the selected photos. The photos were not alte
 - [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/pioneer-park-oyama-british-columbia) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1601850214336-CRDDBWUXYRXRUVXXOYY0/IMG_6196.jpeg)
 - Local file: `/images/beaches/venues/lake-country-pioneer-park.jpg`
 
-## 47. Gellatly Nut Farm Regional Park — NEEDS PHOTO
-- No acceptable exact-beach photo staged. Checked: [source page](https://commons.wikimedia.org/wiki/File:Panorama_of_Gellatly_Nut_Farm_Beach_spot.jpg)
+## 47. Gellatly Nut Farm Regional Park — READY
+- Source: Tourism Kelowna
+- [Source page](https://www.tourismkelowna.com/listing/gellatly-nut-farm-regional-park/1655/) · [Original image](https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/Gellatly-Nut-Farm-2--d8047d245056a36_d80480cd-5056-a36a-0b2f57db44185865.jpg)
+- Local file: `/images/beaches/venues/west-kelowna-gellatly-nut-farm-regional-park.jpg`
 
 ## 48. Pebble Beach Park (Lake Country) — READY
 - Source: www.exploratoryglory.com
@@ -266,8 +270,10 @@ The owner stated permission to use the selected photos. The photos were not alte
 - [Source page](https://www.tourismkelowna.com/listing/boyce-gyro-beach/1633/) · [Original image](https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/Beach-and-Water-a0787a585056a36_a07882a9-5056-a36a-0b3a9b9f4621037e.jpg)
 - Local file: `/images/beaches/venues/kelowna-boyce-gyro-beach-park.jpg`
 
-## 55. Raymer Bay Regional Park — NEEDS PHOTO
-- No acceptable exact-beach photo staged. Checked: [source page](https://www.kelownanow.com/watercooler/news/news/Kelowna/Playground_in_West_Kelowna_park_to_get_76K_makeover/)
+## 55. Raymer Bay Regional Park — READY
+- Source: Exploratory Glory
+- [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/raymer-bay-kelowna) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1590945321018-F0Y2OINKPJFOI9JPAAB2/raymer-bay-kelowna.jpg)
+- Local file: `/images/beaches/venues/west-kelowna-raymer-bay-regional-park.webp`
 
 ## 56. Traders Cove Regional Park — READY
 - Source: Exploratory Glory
@@ -304,8 +310,10 @@ The owner stated permission to use the selected photos. The photos were not alte
 - [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/killiney-beach-park-okanagan) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1590862821729-OHY0U8GKP6GGW4XWE1W6/killiney-beach-park-okanagan.JPG?format=1500w)
 - Local file: `/images/beaches/venues/west-kelowna-killiney-beach-regional-park.jpg`
 
-## 63. Nuyens Park — NEEDS PHOTO
-- No acceptable exact-beach photo staged. Checked: [source page](https://www.google.com/maps/place/Nuyens+Park/@50.0941687,-119.45351,17z/)
+## 63. Nuyens Park — READY
+- Source: Exploratory Glory
+- [Source page](https://www.exploratoryglory.com/lake-it-and-love-it-lake-reviews/nuyens-park-okanagan) · [Original image](https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1591474846126-5ZGAXJ4ZZP714V434LP1/Nuyens-park-okanaganJPG)
+- Local file: `/images/beaches/venues/lake-country-nuyens-park.jpg`
 
 ## 64. Downtown Sails Dog Beach (Kerry Park) — NEEDS PHOTO
 - No acceptable exact-beach photo staged. Checked: [source page](https://okanagan.com/kelowna/dog-friendly-beaches-in-kelowna/)

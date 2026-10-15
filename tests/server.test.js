@@ -3714,6 +3714,9 @@ test('S4 #4: with ENRICHMENT_ADMIN_TOKEN unset the event write API fails closed 
   const projectRoot = path.join(__dirname, '..');
   fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
   fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
+  fs.mkdirSync(path.join(tempDir, 'data'));
+  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
   const ISOLATED_PORT = '3097';
   const childEnv = { ...process.env };
   delete childEnv.ENRICHMENT_ADMIN_TOKEN;
@@ -4403,6 +4406,9 @@ test('S5 #24: with zero events the sitemap carries no event URLs and is unaffect
   const projectRoot = path.join(__dirname, '..');
   fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
   fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
+  fs.mkdirSync(path.join(tempDir, 'data'));
+  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
   const ISOLATED_PORT = '3096';
   const childEnv = { ...process.env, PORT: ISOLATED_PORT };
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -4471,6 +4477,9 @@ test('S6 #1/#20/#22: with zero publishable inventory /whats-on renders the appro
   const projectRoot = path.join(__dirname, '..');
   fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
   fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
+  fs.mkdirSync(path.join(tempDir, 'data'));
+  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
   const ISOLATED_PORT = '3095';
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: { ...process.env, PORT: ISOLATED_PORT }, stdio: ['ignore', 'pipe', 'pipe'] });
   let text;
