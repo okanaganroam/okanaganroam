@@ -7,7 +7,7 @@ const { sportsPhotoForVenue, SPORTS_PHOTO_MANIFEST } = require('../sports-photo-
 test('a sourced sports photo fills only its matching empty listing and never replaces a supplied image', () => {
   assert.equal(
     sportsPhotoForVenue({ name: 'Crawford Trails – Myra-Bellevue Provincial Park', region: 'kelowna', image_url: null }),
-    '/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-1',
+    '/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-2',
   );
   assert.equal(
     sportsPhotoForVenue({ name: 'Crawford Trails – Myra-Bellevue Provincial Park', region: 'kelowna', image_url: 'https://example.com/owner-photo.jpg' }),

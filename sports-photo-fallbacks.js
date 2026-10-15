@@ -25,7 +25,7 @@ function sportsPhotoForVenue(venue) {
   const supplied = String(venue.image_url || '').trim();
   if (supplied) return supplied;
   const image = photoByListing.get(photoKey(venue.region, venue.name));
-  return image ? `${image}?v=sports-photo-1` : null;
+  return image ? `${image}?v=sports-photo-2` : null;
 }
 
 module.exports = { sportsPhotoForVenue, SPORTS_PHOTO_MANIFEST };
