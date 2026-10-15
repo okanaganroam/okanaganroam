@@ -9369,7 +9369,6 @@ function golfFavTripButtonsHtml(venue, opts = {}) {
 //   existing open/close), instead of one 1,770px list of every link.
 const NAV_DISCOVER_PANEL = `<div class="nav-dropdown-panel">
           <a href="/destinations" data-i18n="nav.destinations">Destinations</a>
-          <a href="/map">Roam Now</a>
           <a href="/guides">Guides</a>
           <a href="/local-favorites" data-i18n="gems.localFavourites.title">Local Favourites</a>
           <a href="/secret-spots">Secret Spots</a>
@@ -9386,6 +9385,17 @@ const NAV_THINGS_PANEL = `<div class="nav-dropdown-panel">
           <a href="/ski-snow" data-i18n="mood.skiSnow.title">Ski &amp; Snow</a>
         </div>`;
 const NAV_REFRESH_STYLE = `<style id="nav-refresh">
+/* Roam Now (2026-10-14): its own menu item with a pulsing red "live" dot, and the same dot on the phone menu button. */
+.live-dot { position: relative; display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #E11D48; vertical-align: middle; top: -1px; }
+.live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: #E11D48; animation: live-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+@keyframes live-ping { 0% { transform: scale(1); opacity: 0.7; } 75%, 100% { transform: scale(2.8); opacity: 0; } }
+.nav-links a.nav-roam-now { font-weight: 800; white-space: nowrap; }
+@media (max-width: 940px) {
+  #navHamburger { position: relative; }
+  #navHamburger::before { content: ''; position: absolute; top: 0; left: -4px; width: 9px; height: 9px; border-radius: 50%; background: #E11D48; box-shadow: 0 0 0 2px #fff; animation: live-glow 2s ease-in-out infinite; }
+}
+@keyframes live-glow { 0%, 100% { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(225,29,72,0.5); } 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 7px rgba(225,29,72,0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot::after, #navHamburger::before { animation: none; } }
 @media (max-width: 940px) {
   .nav-links .nav-dropdown > .nav-dropdown-panel { display: none; }
   .nav-links .nav-dropdown.open > .nav-dropdown-panel { display: block; }
@@ -9403,6 +9413,8 @@ function withNavRefresh(headerHtml) {
   const things = panels.find((m) => m[0].includes('href="/outdoors"'));
   if (discover) out = out.replace(discover[0], NAV_DISCOVER_PANEL);
   if (things) out = out.replace(things[0], NAV_THINGS_PANEL);
+  // Roam Now on its own, right after Discover, so it is seen on every page.
+  if (!out.includes('class="nav-roam-now"')) out = out.replace(/(\n\s*)<li><a href="\/hidden-gems"/, '$1<li><a class="nav-roam-now" href="/map"><span class="live-dot" aria-hidden="true"></span>Roam Now</a></li>$1<li><a href="/hidden-gems"');
   // After everything else the fragment carries (other header rules sit right after </header>).
   return `${out}\n${NAV_REFRESH_STYLE}`;
 }
@@ -12166,6 +12178,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-quick .pm-chip { box-shadow: 0 1px 6px rgba(27,43,58,0.2); border-color: transparent; }
   body.map-page .pm-quick .pm-chip[aria-pressed="true"] { box-shadow: 0 1px 6px rgba(27,43,58,0.35); }
   body.map-page .pm-quick-clear[hidden] { display: none; }
+  body.map-page .pm-tagchips { display: contents; }
+  body.map-page .pm-tagchip b { margin-left: 2px; font-weight: 800; opacity: 0.8; }
   /* Walking (or driving) directions: a next-turn banner replaces the search, and the map follows the visitor. */
   body.map-page .pm-navbar { display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 14px; border-radius: 18px; background: #14532D; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
   body.map-page .pm-navbar[hidden] { display: none; }
@@ -12317,7 +12331,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
-    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', share: 'Partager', copied: 'Lien copié',
+    dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Près de vous. Votre position reste sur votre téléphone.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
@@ -12341,7 +12355,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
-    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', share: 'Share', copied: 'Link copied',
+    dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Near you. Your location stays on your phone.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
@@ -12372,10 +12386,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 15 ? 18 : z >= 13 ? 32 : 48; }, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
-  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, openOnly = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
+  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
-  var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-open]')), activeEl = $('pmActive'), searchEl = $('pmSearch');
+  var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-open]')), topBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-top]')), tagHolder = document.getElementById('pmTagChips'), activeEl = $('pmActive'), searchEl = $('pmSearch');
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
   // The map fills the screen below the header.
@@ -12459,7 +12473,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return dayText(e.sd) + (times ? ' · ' + times : '');
   }
   function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + esc(st.text) + '</span>' : ''; }
-  function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (me ? ' · ' + T.km(p.d) : '')); }
+  function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (p.r ? ' · ★ ' + (FR ? p.r.toFixed(1).replace('.', ',') : p.r.toFixed(1)) : '') + (me ? ' · ' + T.km(p.d) : '')); }
   // What the place offers, the visitor's must-haves first; the dog rule when dogs matter.
   var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc'];
   function featHtml(p){
@@ -12487,8 +12501,15 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(Math.min(sheetPx, H * 0.52)) + 20] };
   }
   function fitTo(bounds, maxZoom){ var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
+  var TAGIX = {}; (CONF.tg || []).forEach(function(t, i){ TAGIX[t.k] = i; });
+  function onTags(){ return Object.keys(tags).filter(function(k){ return tags[k]; }); }
   function matchesPlace(p){
-    if (anyOn(kinds) && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; })) return false;
+    var tk = onTags();
+    // What it serves: all of them (or, when no place has all, any of them).
+    if (tk.length) { var hits = tk.filter(function(k){ return p.tg.indexOf(TAGIX[k]) !== -1; }).length; if (tagAny ? !hits : hits < tk.length) return false; }
+    // A cocktail lounge counts for "dinner and cocktails" through the cocktail tag, even though it isn't a restaurant.
+    if (anyOn(kinds) && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; }) && !tk.some(function(k){ return CONF.tg[TAGIX[k]].t.indexOf(p.type) !== -1; })) return false;
+    if (topOnly && !(p.r >= 4.5)) return false;
     for (var k in feats) if (feats[k] && !(p.f & CONF.f[k])) return false;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
     return !term || term.split(' ').every(function(w){ return p.key.indexOf(w) !== -1; });
@@ -12870,8 +12891,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     kindChips.forEach(function(c){ c.setAttribute('aria-pressed', kinds[c.getAttribute('data-pm-kind')] ? 'true' : 'false'); });
     featChips.forEach(function(c){ c.setAttribute('aria-pressed', feats[c.getAttribute('data-pm-feat')] ? 'true' : 'false'); });
     openBtns.forEach(function(c){ c.setAttribute('aria-pressed', openOnly ? 'true' : 'false'); });
+    topBtns.forEach(function(c){ c.setAttribute('aria-pressed', topOnly ? 'true' : 'false'); });
+    var tk = onTags();
+    tagHolder.innerHTML = tk.map(function(k){ var t = CONF.tg[TAGIX[k]]; return '<button type="button" class="pm-chip pm-tagchip" data-pm-tag="' + k + '" aria-pressed="true" aria-label="' + esc(T.removeTag + ' ' + (FR ? t.fr : t.en)) + '"><span aria-hidden="true">' + t.i + '</span> ' + esc(FR ? t.fr : t.en) + ' <b aria-hidden="true">✕</b></button>'; }).join('');
     var label = function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); }, uniq = function(a){ return a.filter(function(v, i){ return a.indexOf(v) === i; }); };
-    var parts = uniq([].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label));
+    var parts = uniq([].concat(tk.map(function(k){ var t = CONF.tg[TAGIX[k]]; return t.i + ' ' + (FR ? t.fr : t.en); }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
     badge.hidden = !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
@@ -12884,13 +12908,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     activeEl.innerHTML = parts.length ? esc(parts.join(' · ')) + ' <button type="button" class="pm-clear" id="pmClear">' + esc(T.clear) + '</button>' + (navigator.share || (navigator.clipboard && navigator.clipboard.writeText) ? ' <button type="button" class="pm-share" id="pmShare">' + esc(T.share) + '</button>' : '') : '';
     // The search lives in the address (never the location), so it can be bookmarked or shared.
     try {
-      var f = [].concat(Object.keys(kinds).filter(function(k){ return kinds[k]; }), Object.keys(feats).filter(function(k){ return feats[k]; }), openOnly ? ['open'] : []);
+      var f = [].concat(Object.keys(kinds).filter(function(k){ return kinds[k]; }), Object.keys(feats).filter(function(k){ return feats[k]; }), openOnly ? ['open'] : [], topOnly ? ['top'] : [], tk.map(function(k){ return 't.' + k; }));
       var q = (f.length ? 'f=' + f.join(',') : '') + (term ? (f.length ? '&' : '') + 'q=' + encodeURIComponent(term) : '');
       history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + (tab === 'events' ? '#events' : ''));
     } catch (e) {}
   }
   // With location on, a narrower search widens the distance by itself rather than coming up empty.
   function changed(){
+    tagAny = false;
+    if (onTags().length > 1 && !places.some(matchesPlace)) { tagAny = true; setStatus(T.anyOf); }
+    if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly) && !places.some(matchesPlace)) { setStatus(T.ignored(term)); term = ''; searchEl.value = ''; }
     syncChips(); limit = 25;
     if (me && radiusKm) {
       var n = places.filter(function(p){ return matchesPlace(p) && p.d <= radiusKm; }).length;
@@ -12901,7 +12928,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   kindChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-kind'); kinds[k] = !kinds[k]; track('map_filter', { filter: k, on: kinds[k] }); changed(); }); });
   featChips.forEach(function(c){ c.addEventListener('click', function(){ var k = c.getAttribute('data-pm-feat'); feats[k] = !feats[k]; track('map_filter', { filter: k, on: feats[k] }); changed(); }); });
   openBtns.forEach(function(c){ c.addEventListener('click', function(){ openOnly = !openOnly; track('map_filter', { filter: 'open', on: openOnly }); changed(); }); });
-  function clearAll(){ kinds = {}; feats = {}; openOnly = false; term = ''; searchEl.value = ''; changed(); }
+  topBtns.forEach(function(c){ c.addEventListener('click', function(){ topOnly = !topOnly; track('map_filter', { filter: 'top', on: topOnly }); changed(); }); });
+  tagHolder.addEventListener('click', function(e){ var b = e.target.closest('[data-pm-tag]'); if (!b) return; delete tags[b.getAttribute('data-pm-tag')]; changed(); });
+  function clearAll(){ kinds = {}; feats = {}; tags = {}; topOnly = false; openOnly = false; term = ''; searchEl.value = ''; changed(); }
   quickClear.addEventListener('click', clearAll);
   activeEl.addEventListener('click', function(e){
     if (e.target.id === 'pmClear') clearAll();
@@ -12914,9 +12943,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   });
   // Plain words become filters: "patio drinks dog" turns on Drinks, Patio and Dogs OK; anything else searches names.
   var WORDS = {
-    drinks: 'drink drinks beer beers pint pints cocktail cocktails bar bars pub pubs brewery breweries brew cider booze bevvy bevvies biere bière boire verre',
-    food: 'food eat eats dinner lunch brunch breakfast restaurant restaurants bite hungry manger souper diner dîner resto restos',
-    coffee: 'coffee coffees cafe cafes café cafés latte espresso',
+    drinks: 'drink drinks beer beers pint pints bar bars pub pubs brewery breweries brew cider booze bevvy bevvies biere bière boire verre',
+    food: 'food eat eats dinner supper lunch restaurant restaurants bite hungry manger souper diner dîner resto restos',
+    coffee: 'coffee coffees cafe cafes café cafés latte',
+    top: 'great best top amazing excellent awesome incredible fantastic highly rated meilleur meilleurs meilleure meilleures excellente',
     wine: 'wine wines winery wineries tasting vin vins vignoble vignobles',
     beach: 'beach beaches swim swimming plage plages baignade',
     outdoor: 'hike hikes hiking trail trails park parks walk sentier sentiers randonnée parc',
@@ -12939,37 +12969,56 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
     [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '],
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live/g, ' music '],
-    [/lake ?views?|vue sur le lac/g, ' lake '], [/close ?by|near ?by|near me|around here|près de moi|pas loin/g, ' nearme ']
+    [/lake ?views?|vue sur le lac/g, ' lake '], [/close ?(by|to (me|us|here)|to)|near ?by|near (me|us|here)|nearest|closest|around here|près de moi|près d’ici|pas loin/g, ' nearme '], [/top rated|highly rated|well reviewed|best rated/g, ' top ']
   ];
-  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good best nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly free serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre ';
+  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly free serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre ';
   var WORD_TO = {};
   Object.keys(WORDS).forEach(function(k){ WORDS[k].split(' ').forEach(function(w){ WORD_TO[w] = k; }); });
+  var TAG_RX = (CONF.tg || []).map(function(t, i){
+    var alts = t.s.split('|').sort(function(a, b){ return b.length - a.length; });
+    return [new RegExp(' (' + alts.join('|') + ')(?= )', 'g'), ' #' + i + ' '];
+  });
   function parseWords(v){
     var t = ' ' + String(v).toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿœ'’ -]/g, ' ') + ' ';
     PHRASES.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
-    return t.replace(/-/g, ' ').split(/\\s+/).filter(Boolean);
+    t = t.replace(/-/g, ' ').replace(/\\s+/g, ' ');
+    TAG_RX.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
+    return t.split(/\\s+/).filter(Boolean);
   }
-  function hasWords(v){ return parseWords(v).some(function(w){ return WORD_TO[w]; }); }
+  function hasWords(v){ return parseWords(v).some(function(w){ return WORD_TO[w] || w.charAt(0) === '#'; }); }
   var wantNear = false;
-  function readSearch(v){
+  // While typing, what the words turned on is undone before the next read, so changing the words changes the filters.
+  var live = null;
+  function undoLive(){
+    if (!live) return;
+    live.kinds.forEach(function(k){ delete kinds[k]; }); live.feats.forEach(function(k){ delete feats[k]; }); live.tags.forEach(function(k){ delete tags[k]; });
+    if (live.open) openOnly = false; if (live.top) topOnly = false;
+    live = null;
+  }
+  function mark(set, k){ var o = set === 'kinds' ? kinds : set === 'feats' ? feats : tags; if (!o[k]) { o[k] = true; if (live) live[set].push(k); } }
+  function readSearch(v, typing){
+    undoLive();
+    if (typing) live = { kinds: [], feats: [], tags: [], open: false, top: false };
     var left = [];
     parseWords(v).forEach(function(w){
       var k = WORD_TO[w];
-      if (k === 'nearme') wantNear = true;
-      else if (k === 'open') openOnly = true;
-      else if (k && CONF.k[k]) kinds[k] = true;
-      else if (k && CONF.f[k]) feats[k] = true;
+      if (w.charAt(0) === '#' && CONF.tg[Number(w.slice(1))]) mark('tags', CONF.tg[Number(w.slice(1))].k);
+      else if (k === 'nearme') wantNear = true;
+      else if (k === 'top') { if (!topOnly) { topOnly = true; if (live) live.top = true; } }
+      else if (k === 'open') { if (!openOnly) { openOnly = true; if (live) live.open = true; } }
+      else if (k && CONF.k[k]) mark('kinds', k);
+      else if (k && CONF.f[k]) mark('feats', k);
       else if (STOP.indexOf(' ' + w.replace('’', '\\'') + ' ') === -1) left.push(w);
     });
     term = left.join(' ');
   }
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v); wantNear = false; changed(); } else { term = v.trim().toLowerCase(); syncChips(); limit = 25; render(true); } }, 450); });
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { undoLive(); term = v.trim().toLowerCase(); changed(); } }, 450); });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   searchEl.addEventListener('keydown', function(e){
     if (e.key !== 'Enter') return;
-    e.preventDefault(); clearTimeout(timer); wantNear = false; readSearch(searchEl.value); searchEl.value = term; searchEl.blur();
+    e.preventDefault(); clearTimeout(timer); wantNear = false; readSearch(searchEl.value, false); live = null; searchEl.value = term; searchEl.blur();
     track('map_search', { words: searchEl.value ? 1 : 0 }); changed();
     if (wantNear && !me && !watching) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
@@ -12990,7 +13039,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
       places.push(p);
     });
@@ -13002,7 +13051,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     refreshStatus();
     try {
       var qs = new URLSearchParams(location.search);
-      (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
+      (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
       if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = term; }
     } catch (e) {}
     syncChips();
@@ -13025,7 +13074,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
-const MAP_DATA_FORMAT = 3;
+const MAP_DATA_FORMAT = 4;
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -13065,11 +13114,55 @@ const MAP_MUST_HAVES = [
   { key: 'groups', label: 'Good for groups', icon: '\u{1F465}' }, { key: 'sports', label: 'Sports on TV', icon: '\u{1F4FA}' },
   { key: 'nonalc', label: 'Alcohol-free drinks', icon: '\u{1F9C3}' },
 ];
+// What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
+// understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
+// how the listing says it (find), the words a visitor types (say), and venue types that count by themselves.
+const MAP_TAGS = [
+  ['icecream', 'Ice cream', 'Crème glacée', '🍨', /\b(ice[ -]?cream|gelato|soft[ -]serve|frozen yog(h)?urt|sorbet)/, 'ice cream|icecream|gelato|soft serve|froyo|frozen yogurt|sorbet|glace|glaces|creme glacee|crème glacée', []],
+  ['cocktail', 'Cocktails', 'Cocktails', '🍸', /\b(cocktail|mixolog|martini|negroni)/, 'cocktail|cocktails|martini|martinis|mixology|negroni|negronis|margarita|margaritas', ['cocktail']],
+  ['sushi', 'Sushi', 'Sushi', '🍣', /\b(sushi|sashimi|omakase)/, 'sushi|sashimi|omakase', []],
+  ['pizza', 'Pizza', 'Pizza', '🍕', /\bpizz/, 'pizza|pizzas|pizzeria', []],
+  ['tacos', 'Tacos & Mexican', 'Tacos et mexicain', '🌮', /\b(taco|mexican|burrito|quesadilla)/, 'taco|tacos|mexican|burrito|burritos|quesadilla|quesadillas|mexicain', []],
+  ['burger', 'Burgers', 'Burgers', '🍔', /\bburger/, 'burger|burgers|cheeseburger|cheeseburgers', []],
+  ['brunch', 'Brunch', 'Brunch', '🥞', /\b(brunch|breakfast|eggs benedict|benny|pancake)/, 'brunch|breakfast|breaky|brekkie|benny|eggs benedict|pancakes|dejeuner|déjeuner', []],
+  ['steak', 'Steak', 'Steak', '🥩', /\bsteak/, 'steak|steaks|steakhouse', []],
+  ['fishchips', 'Fish & chips', 'Fish and chips', '🐟', /\bfish (and|&|n'?) chips/, 'fish and chips|fish chips|fish n chips|fish n\'chips', []],
+  ['seafood', 'Seafood', 'Fruits de mer', '🦪', /\b(seafood|oyster|salmon|prawn|mussel|lobster|crab)/, 'seafood|oyster|oysters|salmon|prawns|mussels|lobster|crab|fruits de mer|huitres|huîtres', []],
+  ['wings', 'Wings', 'Ailes de poulet', '🍗', /\bwings\b/, 'chicken wings|wings|ailes de poulet|ailes', []],
+  ['ramen', 'Ramen & noodles', 'Ramen et nouilles', '🍜', /\b(ramen|noodle|pho|udon)\b/, 'ramen|noodles|noodle|pho|udon|nouilles', []],
+  ['thai', 'Thai', 'Thaï', '🍛', /\bthai\b/, 'thai|thaï', []],
+  ['indian', 'Indian', 'Indien', '🍛', /\b(indian|curry|curries|tandoori|butter chicken)\b/, 'indian|curry|curries|tandoori|butter chicken|indien', []],
+  ['italian', 'Italian & pasta', 'Italien et pâtes', '🍝', /\b(italian|pasta)/, 'italian|pasta|italien|pates|pâtes', []],
+  ['chinese', 'Chinese & dim sum', 'Chinois et dim sum', '🥟', /\b(chinese|dim sum|dumpling)/, 'chinese|dim sum|dumplings|dumpling|chinois', []],
+  ['korean', 'Korean', 'Coréen', '🍲', /\bkorean/, 'korean|coreen|coréen', []],
+  ['greek', 'Greek & Mediterranean', 'Grec et méditerranéen', '🥙', /\b(greek|mediterranean|lebanese|shawarma|falafel|gyro|souvlaki)/, 'greek|mediterranean|lebanese|shawarma|falafel|gyro|gyros|souvlaki|grec', []],
+  ['bbq', 'BBQ', 'BBQ', '🍖', /\b(bbq|barbecue|smokehouse|brisket)\b/, 'bbq|barbecue|smokehouse|brisket|ribs', []],
+  ['poutine', 'Poutine', 'Poutine', '🍟', /\bpoutine/, 'poutine', []],
+  ['dessert', 'Dessert', 'Dessert', '🍰', /\b(dessert|cake|cheesecake|chocolat|pastr)/, 'dessert|desserts|sweets|sweet treat|treats|cake|cakes|cheesecake|chocolate|gateau|gâteau', []],
+  ['bakery', 'Bakery', 'Boulangerie', '🥐', /\b(baker|croissant|sourdough)/, 'bakery|bakeries|bread|croissant|croissants|pastry|pastries|boulangerie|viennoiseries', []],
+  ['donut', 'Donuts', 'Beignes', '🍩', /\b(donut|doughnut)/, 'donut|donuts|doughnut|doughnuts|beigne|beignes', []],
+  ['bubbletea', 'Bubble tea', 'Thé aux perles', '🧋', /\b(bubble tea|boba)/, 'bubble tea|boba', []],
+  ['smoothie', 'Smoothies & juice', 'Smoothies et jus', '🥤', /\b(smoothie|juice|acai)/, 'smoothie|smoothies|juice|juices|acai|jus', []],
+  ['sandwich', 'Sandwiches', 'Sandwichs', '🥪', /\b(sandwich|deli)\b/, 'sandwich|sandwiches|deli', []],
+  ['tapas', 'Tapas & small plates', 'Tapas', '🫒', /\b(tapas|small plates|sharing plates|charcuterie)/, 'tapas|small plates|sharing plates|charcuterie', []],
+  ['craftbeer', 'Craft beer', 'Bière artisanale', '🍻', /\b(craft beer|taproom|on tap|ipa)\b/, 'craft beer|craft beers|taproom|ipa|ipas|on tap|microbrasserie', ['brewery']],
+  ['winebar', 'Wine bar', 'Bar à vin', '🍷', /\b(wine bar|wine list|by the glass)/, 'wine bar|wine list|bar a vin|bar à vin', []],
+  ['datenight', 'Date night', 'Soirée en amoureux', '🕯️', /\b(romantic|date night|intimate|candlelit|anniversar)/, 'date night|date|romantic|anniversary|romantique', []],
+  ['sunset', 'Sunset views', 'Coucher de soleil', '🌅', /\bsunset/, 'sunset|sunsets|coucher de soleil', []],
+  ['games', 'Games & pool', 'Jeux et billard', '🎱', /\b(arcade|pool table|billiard|board game|darts|bowling|shuffleboard|trivia|karaoke)/, 'games|arcade|pool|billiards|darts|bowling|shuffleboard|trivia|karaoke|jeux|billard', []],
+  ['salad', 'Salads & bowls', 'Salades et bols', '🥗', /\b(salad|poke|bowls?)\b/, 'salad|salads|poke|bowl|bowls|salade|salades', []],
+  ['crepes', 'Crêpes & waffles', 'Crêpes et gaufres', '🧇', /\b(cr[eê]pe|waffle)/, 'crepe|crepes|crêpe|crêpes|waffle|waffles|gaufre|gaufres', []],
+  ['specialty', 'Specialty coffee', 'Café de spécialité', '☕', /\b(roaster|pour[ -]over|specialty coffee|espresso)/, 'specialty coffee|pour over|roaster|espresso', []],
+].map(([key, en, fr, icon, find, say, types]) => ({ key, en, fr, icon, find, say, types }));
 const MAP_DIETARY = [
   { key: 'veg', label: 'Vegetarian', icon: '\u{1F957}' }, { key: 'vegan', label: 'Vegan', icon: '\u{1F331}' }, { key: 'gf', label: 'Gluten-free', icon: '\u{1F33E}' },
 ];
+function mapPlaceTags(v) {
+  const text = `${v.name} ${v.cuisine || ''} ${v.description || ''}`.toLowerCase();
+  return MAP_TAGS.reduce((out, t, i) => (t.types.includes(v.type) || t.find.test(text) ? out.concat(i) : out), []);
+}
 function mapPlacesData(now = new Date()) {
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const dogNotes = getDogPolicyNotes();
@@ -13077,7 +13170,9 @@ function mapPlacesData(now = new Date()) {
     const st = open.byId.get(v.id);
     const bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
     return [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
-      bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : ''];
+      bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
+      // [9] rating x10 (0 when none); [10] what it serves or is good for, as MAP_TAGS positions.
+      Number(v.rating) > 0 ? Math.round(Number(v.rating) * 10) : 0, mapPlaceTags(v)];
   });
 }
 // Events in the next week, one entry each (its next date):
@@ -13137,6 +13232,7 @@ function renderPlacesMapPage(placeCount = null, now = new Date()) {
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
   const conf = JSON.stringify({ src: `/map/data.json?v=${mapDataVersion(now)}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
     k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])),
+    tg: MAP_TAGS.map((t) => ({ k: t.key, en: t.en, fr: t.fr, i: t.icon, s: t.say, t: t.types })),
     // Directions on our own map (2026-10-14): a public Mapbox token (pk.), locked to okanaganroam.com in Mapbox. Without
     // one, Directions opens Google or Apple Maps as before.
     mb: /^pk\.[A-Za-z0-9._-]+$/.test(String(process.env.MAPBOX_TOKEN || '')) ? process.env.MAPBOX_TOKEN : '' }).replace(/</g, '\\u003c');
@@ -13170,7 +13266,9 @@ ${renderGolfHeaderHtml()}
         <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="visually-hidden">Filters</span><span class="pm-badge" id="pmBadge" hidden></span></button>
       </div>
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
+        <span class="pm-tagchips" id="pmTagChips"></span>
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
+        <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">⭐</span> Top rated</button>
         ${(() => {
           // Every filter in one row: Happy hour, Patio and Dogs OK, the dietary ones, the kinds of place, then the rest.
           const feat = (f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`;
@@ -13212,6 +13310,7 @@ ${renderGolfHeaderHtml()}
       <h3>Must have</h3>
       <div class="pm-chips" role="group" aria-label="Must have">
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
+        <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">⭐</span> Top rated</button>
         ${MAP_MUST_HAVES.map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n        ')}
       </div>
       <h3>Dietary</h3>
@@ -28396,7 +28495,7 @@ const server = http.createServer(async (req, res) => {
           .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
           .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`)
           // The near-me map, one tap from the home page (2026-10-14).
-          .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span aria-hidden="true">&#128205;</span> Roam Now: what’s open near me</a>');
+          .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span class="live-dot" aria-hidden="true"></span>Roam Now: what’s open near me</a>');
 
         // Anything still pointing at the now-removed sections (the header's
         // "Browse & Search" dropdown link and every homepage module's own
