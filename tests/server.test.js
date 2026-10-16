@@ -21346,3 +21346,27 @@ test('Event photos (2026-10-16): each event shows its kind of event; new events 
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public/images/events', f.replace('-2610.jpg', '-2610-800.jpg'))), `${f} has an -800 copy`);
   }
 });
+
+test('Combination guides (2026-10-16): /guide/<town>/<dog-friendly-patios> lists places with every badge (and the kind of place), needs 6, and is in the sitemap', async () => {
+  const mk = (i, extra) => app.createVenue({ name: `Combo Test ${i}`, slug: `combo-test-${i}`, region: 'peachland', type: 'winery', description: 'A test winery.', ...extra });
+  const made = [];
+  try {
+    for (let i = 0; i < 6; i += 1) made.push(mk(i, { dog_friendly: 1, patio: 1, lake_view: 1 }));
+    made.push(mk(9, { dog_friendly: 1, patio: 0, lake_view: 1 }));
+    const combo = app.GUIDE_COMBOS.find((c) => c.slug === 'dog-friendly-patios');
+    assert.deepEqual(combo.badges, ['dog_friendly', 'patio']);
+    const listed = app.listComboGuides().filter((c) => c.region === 'peachland');
+    assert.ok(listed.some((c) => c.slug === 'dog-friendly-patios' && c.count >= 6));
+    assert.ok(listed.some((c) => c.slug === 'wineries-with-lake-views' && c.count >= 7), 'type + badge combos count the kind of place');
+    await withWinterServer(async (base) => {
+      const page = await WINTER_GET(base, '/guide/peachland/dog-friendly-patios');
+      assert.equal(page.status, 200);
+      assert.match(page.text, /<h1[^>]*>Dog-Friendly Patios in Peachland/);
+      assert.match(page.text, /Combo Test 0/);
+      assert.doesNotMatch(page.text, /Combo Test 9/, 'a place without a patio is not listed');
+      assert.equal((await WINTER_GET(base, '/guide/peachland/not-a-combo')).status, 404);
+      const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+      assert.match(sitemap, /https:\/\/okanaganroam\.com\/guide\/peachland\/dog-friendly-patios/);
+    });
+  } finally { for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+});
