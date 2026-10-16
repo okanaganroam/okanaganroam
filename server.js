@@ -4918,7 +4918,7 @@ const OUTDOOR_ACTIVITIES = [
 const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
   hiking: { src: '/images/outdoors/activity-hiking.jpg', alt: 'The Myra Canyon trail winding along a forested canyon above Kelowna', pos: 50 },
   viewpoints: { src: '/images/outdoors/activity-viewpoints.jpg', alt: 'Kelowna and Okanagan Lake seen from the Knox Mountain lookout', pos: 55 },
-  nature: { src: '/images/outdoors/activity-nature.jpg', alt: 'Spotted Lake’s mineral pools in the dry hills near Osoyoos', pos: 55 },
+  nature: { src: '/images/outdoors/activity-nature-wildlife.jpg', alt: 'Painted turtles basking on a log at Chichester Wetland Park in Kelowna', pos: 50 },
   cycling: { src: '/images/outdoors/activity-cycling.jpg', alt: 'A cyclist crossing a wooden trestle on the Myra Canyon trail', pos: 55 },
   winter: { src: '/images/outdoors/activity-winter.jpg', alt: 'Snow-covered trees in a winter forest at Big White', pos: 50 },
   adventure: { src: '/images/outdoors/activity-adventure.jpg', alt: 'Climbers on a rocky bluff above Penticton', pos: 20 },
