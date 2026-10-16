@@ -15947,6 +15947,10 @@ const EXAMPLE_ACTIVITY_FILES = Object.freeze({
   exhorse: 'adventure-horseback', exatv: 'adventure-atv', exbuggy: 'adventure-buggy', exballoon: 'adventure-balloon',
   exfishboat: 'fishing-boat', exfishlake: 'fishing-lake-boats', exfishtrout: 'fishing-trout', exfishcast: 'fishing-cast',
   exfishkid: 'fishing-kid-dock', exfishtackle: 'fishing-tackle',
+  excamptent: 'camping-tent-lake', excampfamily: 'camping-family-tents', excampfire: 'camping-campfire-lake',
+  excampsunrise: 'camping-tent-sunrise', excampnight: 'camping-tent-night', excampstars: 'camping-tent-stars',
+  excamprvtrees: 'camping-rv-trees', excampcaravan: 'camping-caravan-river', excamprvsite: 'camping-rv-site',
+  excamprvmeadow: 'camping-rv-meadow', excampglamp: 'camping-glamping', excamprvpark: 'camping-rv-park',
 });
 const FD_CARD_PHOTOS = Object.freeze({
   restaurant: ['/images/trip-v3/stops/stop-restaurant-480.jpg', '/images/trip-v3/stops/stop-restaurant-2-480.jpg', '/images/trip-v3/stops/stop-restaurant-3-480.jpg', '/images/food-drink/restaurants-800.jpg'],
@@ -16023,6 +16027,19 @@ const EXAMPLE_ACTIVITY_PHOTOS = Object.freeze({
   exfishcast: { alt: 'An angler casting from the shore of a lake', pos: 40 },
   exfishkid: { alt: 'A child fishing from a small dock', pos: 50 },
   exfishtackle: { alt: 'Hand-tied flies, lures and a rod laid out on a table', pos: 50 },
+  // Camping (2026-10-16).
+  excamptent: { alt: 'A tent pitched at a waterfront lake campsite', pos: 65 },
+  excampfamily: { alt: 'A family camping among the trees by a lake', pos: 45 },
+  excampfire: { alt: 'A campfire at a forest campsite', pos: 60 },
+  excampsunrise: { alt: 'A tent and kayak beside the water at sunrise', pos: 60 },
+  excampnight: { alt: 'A lit tent on a lakeside dock at night', pos: 55 },
+  excampstars: { alt: 'A campfire and tent under the stars', pos: 55 },
+  excamprvtrees: { alt: 'A motorhome parked at a shady campsite', pos: 60 },
+  excampcaravan: { alt: 'Caravans camped beside a river below the mountains', pos: 55 },
+  excamprvsite: { alt: 'A full-hookup RV site under a big tree', pos: 60 },
+  excamprvmeadow: { alt: 'Motorhomes parked on a grassy campground at sunset', pos: 65 },
+  excampglamp: { alt: 'A furnished glamping tent lit up at dusk', pos: 50 },
+  excamprvpark: { alt: 'Trailers and picnic tables at a lakeside RV park', pos: 55 },
 });
 const VENUE_EXAMPLE_PHOTOS = Object.freeze({
   1242: 'exzipline', 1243: 'exzipline', 1244: 'exropes', 1308: 'exropes',
@@ -16031,6 +16048,16 @@ const VENUE_EXAMPLE_PHOTOS = Object.freeze({
   1303: 'exatv', 1304: 'exbuggy', 1451: 'exballoon',
   // Fishing (2026-10-16): Al-ways Charters, Oyama Lake Lodge, Dee Lake, Beaver Lake, Headwaters, Okanagan Bucktail.
   1317: 'exfishboat', 1313: 'exfishlake', 1311: 'exfishtrout', 1310: 'exfishcast', 1314: 'exfishkid', 1316: 'exfishtackle',
+  // Camping (2026-10-16): Recreation Sites and campgrounds with no photo of
+  // their own or of their lake; tents for rec sites, RVs for RV parks.
+  1356: 'excamptent', 1358: 'excamptent', 1364: 'excamptent',
+  1359: 'excampfamily', 1363: 'excampfamily', 1375: 'excampfamily',
+  1360: 'excampfire', 1378: 'excampfire',
+  1361: 'excampsunrise', 1366: 'excampsunrise', 1404: 'excampsunrise',
+  1362: 'excampnight', 1365: 'excampstars',
+  1370: 'excamprvtrees', 1382: 'excamprvtrees', 1405: 'excamprvtrees',
+  1374: 'excampcaravan', 1381: 'excampcaravan',
+  1376: 'excamprvsite', 1379: 'excamprvmeadow', 1380: 'excampglamp', 1450: 'excamprvpark',
 });
 const FD_CARD_DOG_PHOTOS = Object.freeze({
   restaurant: '/images/trip-v3/stops/stop-dog-restaurant-480.jpg', cafe: '/images/trip-v3/stops/stop-dog-cafe-480.jpg',
