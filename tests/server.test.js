@@ -11504,6 +11504,8 @@ const HEADER_SPEC = [
     ['/cocktail-lounges', 'wizard.cocktailLounges', 'Cocktail Lounges'],
   ] },
   { href: '/whats-on', key: 'mood.whatsOn.title', label: 'What\'s On' },
+  // Phones only (2026-10-15): on computers Business login stays at the end of Discover.
+  { href: '/owner/login', key: null, label: 'Business login' },
   { href: '/trip', key: 'trip.buildMyTrip', label: 'Build My Trip', mobileOnly: true },
 ];
 function parseNav(html) {
@@ -11548,7 +11550,8 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
     assert.match(nav.header, /<li><a class="nav-roam-now" href="\/map"><span class="live-dot" aria-hidden="true"><\/span>Roam Now<\/a><\/li>/, name); // straight to /map (2026-10-14)
     // No duplicates; Hidden Gems top-level only; no top-level Golf/Map. Secret
     // Spots joined Discover in the menus refresh (2026-10-14).
-    const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1]));
+    // /owner/login is in Discover on computers and its own item on phones; CSS shows only one.
+    const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1])).filter((h) => h !== '/owner/login');
     assert.equal(new Set(hrefs).size, hrefs.length, `${name}: no duplicate navigation targets`);
     assert.doesNotMatch(nav.header, /#hiddenGems|#exploreRegions|#moodCards|#mapPanel|\/kelowna\//, `${name}: no stale targets`);
   }
@@ -20636,6 +20639,42 @@ test('Owner account settings (2026-10-15): change email and password, sign out o
     assert.ok(db.prepare('SELECT 1 FROM venues WHERE id = ?').get(b.id), 'the listing itself stays');
   } finally {
     app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner first visit polish (2026-10-15): copy Monday hours, login prompt after sending, phone menu link, one forgot link', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'First Visit Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'first-visit-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'first-visit-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  try {
+    const page = await get(`/owner/${token}`);
+    assert.match(page, /Copy Monday to: <button type="button" data-copy="weekdays">Tue&ndash;Fri<\/button> <button type="button" data-copy="all">every day<\/button>/);
+    assert.equal((page.match(/class="op-copy"/g) || []).length, 1, 'hours only (no happy hour for a cafe)');
+    assert.match(page, /id="opDoneLogin"><strong>Skip the link next time:<\/strong> <a href="#opLogin">create a login<\/a>/);
+    assert.match(page, /<span id="opDoneMail" hidden> We&rsquo;ll email you when they&rsquo;re live\.<\/span>/);
+    assert.match(page, /<span id="opLinkNote"> Keep this link private/);
+
+    const made = await fetch(`${base}/owner/${token}/account`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.13.0.1' },
+      body: JSON.stringify({ email: 'firstvisit@example.com', password: 'a long enough password' }) });
+    const cookie = (made.headers.get('set-cookie') || '').split(';')[0];
+    const signed = await get(`/owner/account/venue/${v.id}`, cookie);
+    assert.doesNotMatch(signed, /id="opDoneLogin"/, 'signed-in owners are not asked to make a login');
+    assert.match(signed, /<span id="opDoneMail"> We&rsquo;ll email you/);
+
+    const login = await get('/owner/login');
+    assert.equal((login.match(/Forgot your password\?/g) || []).length, 1);
+
+    const venuePage = await get('/kelowna/cafes/first-visit-fixture');
+    assert.match(venuePage, /<li class="nav-business-li"><a href="\/owner\/login">Business login<\/a><\/li>\s*<li class="nav-links-(?:favorites|trip)">/);
+    assert.match(venuePage, /#navLinks > li\.nav-business-li \{ display: none; \}/);
+  } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
 });
