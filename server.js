@@ -29902,13 +29902,13 @@ function ownerDecisionRecipients(venueId, senderEmail) {
   return [...new Set([sender, ...ownerEmailsForVenue(venueId)].filter(Boolean))];
 }
 
-function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner }) {
+function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edited }) {
   const sign = '\n\nThanks,\nOkanagan Roam\ninfo@okanaganroam.com';
   const manage = owner ? `\n\nYou can update your listing, add events or send photos any time: ${OWNER_LOGIN_URL} (or use your private edit link).` : '';
   if (outcome === 'approved') {
     return {
       subject: `Approved: ${what} for ${venueName}`,
-      text: `Hi,\n\nGood news: we approved ${what} for ${venueName}, and it's now live on Okanagan Roam.${link ? `\n\nSee it here: ${link}` : ''}${manage}${sign}`,
+      text: `Hi,\n\nGood news: we approved ${what} for ${venueName}, and it's now live on Okanagan Roam.${edited ? ' We made a small edit before publishing it, so please have a look.' : ''}${link ? `\n\nSee it here: ${link}` : ''}${manage}${sign}`,
     };
   }
   const why = reason ? `\n\nReason: ${reason}` : '';
@@ -29953,13 +29953,13 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const v = r && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(r.venue_id);
     if (!v) return 'no_address';
     const fields = outcome === 'approved' && Array.isArray(extra.applied) ? extra.applied : Object.keys(r.changes);
-    return sendOwnerDecision(ownerDecisionRecipients(v.id, r.contact_email), ownerDecisionEmail({ venueName: v.name, what: `your ${ownerFieldList(fields)} update`, outcome, reason, link: venueListingUrl(v), owner: true }));
+    return sendOwnerDecision(ownerDecisionRecipients(v.id, r.contact_email), ownerDecisionEmail({ venueName: v.name, what: `your ${ownerFieldList(fields)} update`, outcome, reason, edited: !!extra.edited, link: venueListingUrl(v), owner: true }));
   }
   if (kind === 'photo') {
     const p = db.prepare('SELECT venue_id, contact_email FROM owner_photos WHERE id = ?').get(id);
     const v = p && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(p.venue_id);
     if (!v) return 'no_address';
-    return sendOwnerDecision(ownerDecisionRecipients(v.id, p.contact_email), ownerDecisionEmail({ venueName: v.name, what: 'your photo', outcome, reason, link: venueListingUrl(v), owner: true }));
+    return sendOwnerDecision(ownerDecisionRecipients(v.id, p.contact_email), ownerDecisionEmail({ venueName: v.name, what: 'your photo', outcome, reason, edited: !!extra.edited, link: venueListingUrl(v), owner: true }));
   }
   if (kind === 'event') {
     const s = getEventSubmission(id);
@@ -29975,12 +29975,46 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     if (!s) return 'no_address';
     const v = s.venue_id ? db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(s.venue_id) : null;
     return sendOwnerDecision(s.contact_email ? [String(s.contact_email).trim().toLowerCase()] : [],
-      ownerDecisionEmail({ venueName: s.name, what: 'your new listing', outcome, reason, link: v ? venueListingUrl(v) : null, owner: false }));
+      ownerDecisionEmail({ venueName: s.name, what: 'your new listing', outcome, reason, edited: !!extra.edited, link: v ? venueListingUrl(v) : null, owner: false }));
   }
   return 'no_address';
 }
 
 // --- review actions ---------------------------------------------------------
+
+const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description'];
+
+// Applies the reviewer's edits to a pending update's text fields, checked
+// exactly like the owner's own input. The owner's original is kept in
+// original_changes. An edit back to what the listing already says drops that
+// field. -> { ok, edited, dropped, restore } | { ok: false, errors }
+function editOwnerChange(id, edits) {
+  const req = getOwnerChange(id);
+  if (!req || req.status !== 'pending') return { ok: true, edited: [], dropped: [] };
+  const wanted = {};
+  for (const f of OWNER_EDITABLE_FIELDS) {
+    if (f in req.changes && typeof edits[f] === 'string' && edits[f] !== (req.changes[f] == null ? '' : String(req.changes[f]))) wanted[f] = edits[f];
+  }
+  if (!Object.keys(wanted).length) return { ok: true, edited: [], dropped: [] };
+  const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(req.venue_id);
+  if (!venue) return { ok: true, edited: [], dropped: [] };
+  const { changes, errors } = validateOwnerChanges(rowToVenue(venue), venue.happy_hour_times || null, { changes: wanted });
+  if (Object.keys(errors).length) return { ok: false, errors };
+  const next = { ...req.changes };
+  const edited = [], dropped = [];
+  for (const f of Object.keys(wanted)) {
+    if (f in changes) { next[f] = changes[f]; edited.push(f); } else { delete next[f]; dropped.push(f); }
+  }
+  const raw = db.prepare('SELECT changes, original_changes FROM owner_change_requests WHERE id = ?').get(id);
+  db.prepare('UPDATE owner_change_requests SET changes = ?, original_changes = COALESCE(original_changes, ?) WHERE id = ?').run(JSON.stringify(next), raw.changes, id);
+  return { ok: true, edited, dropped, restore: () => db.prepare('UPDATE owner_change_requests SET changes = ?, original_changes = ? WHERE id = ?').run(raw.changes, raw.original_changes, id) };
+}
+
+function pickEdits(edits, keys) {
+  const out = {};
+  if (edits && typeof edits === 'object' && !Array.isArray(edits)) for (const k of keys) if (typeof edits[k] === 'string') out[k] = edits[k];
+  return out;
+}
 
 const ADMIN_REVIEW_ERRORS = {
   not_found: 'This was already removed.', not_pending: 'This was already reviewed.', venue_unavailable: 'The listing no longer exists.',
@@ -29994,34 +30028,65 @@ async function adminReviewAction(kind, id, action, body) {
   let r;
   if (kind === 'change') {
     if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
-    const fields = Array.isArray(body.fields) ? body.fields.filter((f) => typeof f === 'string') : undefined;
+    let fields = Array.isArray(body.fields) ? body.fields.filter((f) => typeof f === 'string') : undefined;
+    let ed = { edited: [], dropped: [] };
+    if (action === 'approve') {
+      ed = editOwnerChange(id, pickEdits(body.edits, OWNER_EDITABLE_FIELDS));
+      if (!ed.ok) return { status: 400, body: { error: Object.values(ed.errors).join(' '), errors: ed.errors } };
+      if (fields) fields = fields.filter((f) => !ed.dropped.includes(f));
+      if (fields && !fields.length) { if (ed.restore) ed.restore(); return { status: 400, body: { error: 'Nothing left to approve: the edits match what the listing already says.' } }; }
+    }
     r = action === 'approve' ? approveOwnerChange(id, ADMIN_REVIEWER, fields) : rejectOwnerChange(id, ADMIN_REVIEWER, reason);
-    if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason, detail: r.detail } };
+    if (!r.ok) {
+      if (ed.restore) ed.restore();
+      return { status: r.reason === 'not_found' ? 404 : r.reason === 'no_fields' ? 400 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason, detail: r.detail } };
+    }
+    r.edited = ed.edited.length > 0;
   } else if (kind === 'photo') {
+    const credit = pickEdits(body.edits, ['credit']).credit;
+    if (action === 'approve' && credit !== undefined) {
+      const c = credit.trim().replace(/\s+/g, ' ');
+      if (c.length < 2 || c.length > 80 || /[<>]/.test(c)) return { status: 400, body: { error: 'The credit should be 2 to 80 characters, without < or >.', errors: { credit: 'Check the credit.' } } };
+      const p = db.prepare('SELECT credit, status FROM owner_photos WHERE id = ?').get(id);
+      if (p && p.status === 'pending' && p.credit !== c) { db.prepare('UPDATE owner_photos SET credit = ? WHERE id = ?').run(c, id); r = { edited: true }; }
+    }
+    const edited = !!(r && r.edited);
     r = action === 'approve' ? approveOwnerPhoto(id, ADMIN_REVIEWER, { main: typeof body.main === 'boolean' ? body.main : undefined })
       : action === 'remove' ? removeOwnerPhoto(id, ADMIN_REVIEWER, reason) : rejectOwnerPhoto(id, ADMIN_REVIEWER, reason);
     if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason } };
+    r.edited = edited;
   } else if (kind === 'event' || kind === 'venue') {
     if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
     const payload = { reviewer: ADMIN_REVIEWER };
     if (action === 'reject') { if (reason) payload.reason = reason; }
-    else if (kind === 'event' && Array.isArray(body.reviewed_duplicates)) payload.reviewed_duplicates = body.reviewed_duplicates.filter((n) => Number.isInteger(n) && n > 0);
-    else if (kind === 'venue') {
+    else if (kind === 'event') {
+      if (Array.isArray(body.reviewed_duplicates)) payload.reviewed_duplicates = body.reviewed_duplicates.filter((n) => Number.isInteger(n) && n > 0);
+      const sub = getEventSubmission(id);
+      const o = pickEdits(body.edits, ['name', 'description']);
+      for (const k of Object.keys(o)) if (!sub || o[k] === sub[k]) delete o[k];
+      if (Object.keys(o).length) payload.overrides = o;
+    } else {
       if (body.allow_duplicate === true) payload.allow_duplicate = true;
       if (body.include_amenities === true) payload.include_amenities = true;
+      const sub = getVenueSubmission(id);
+      const o = pickEdits(body.edits, ['name', 'description', 'address', 'phone', 'website']);
+      for (const k of Object.keys(o)) if (!sub || o[k] === (sub[k] || '')) delete o[k];
+      if (Object.keys(o).length) payload.overrides = o;
     }
     const out = kind === 'event'
       ? (action === 'approve' ? approveEventSubmission(id, payload) : rejectEventSubmission(id, payload))
       : (action === 'approve' ? approveVenueSubmission(id, payload) : rejectVenueSubmission(id, payload));
     if (out.status !== 200) {
       const dup = out.body.error === 'possible_duplicate' || out.body.error === 'duplicate_event';
-      return { status: out.status, body: { error: dup ? 'This looks like an event that is already listed. Check it, then tick "Not a duplicate" to publish anyway.' : out.body.error, detail: out.body.detail || out.body.existing } };
+      const errs = out.body.errors && typeof out.body.errors === 'object' ? out.body.errors : null;
+      return { status: out.status, body: { error: dup ? 'This looks like an event that is already listed. Check it, then tick "Not a duplicate" to publish anyway.'
+        : errs ? `Please check your edits: ${Object.values(errs).join(' ')}` : out.body.error, errors: errs || undefined, detail: out.body.detail || out.body.existing } };
     }
-    r = { ok: true };
+    r = { ok: true, edited: !!payload.overrides };
   } else {
     return { status: 404, body: { error: 'Unknown item.' } };
   }
-  const emailed = await notifyReviewDecision(kind, id, action, { reason, applied: r.applied });
+  const emailed = await notifyReviewDecision(kind, id, action, { reason, applied: r.applied, edited: !!r.edited });
   return { status: 200, body: { ok: true, emailed } };
 }
 
@@ -30050,6 +30115,13 @@ const ADMIN_REVIEW_CSS = `
   .rv-opt { font-size: 0.85rem; display: inline-flex; gap: 6px; align-items: center; margin-right: 12px; }
   .rv-result { font-size: 0.86rem; font-weight: 700; margin: 8px 0 0; }
   .rv-card.rv-done { opacity: 0.55; }
+  .rv-edit { width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(42,32,25,0.2); background: #fff; font: inherit; font-size: 0.88rem; font-weight: 600; }
+  .rv-edit.rv-changed { border-color: #C98A1B; background: #FFF8E8; }
+  textarea.rv-edit { resize: vertical; line-height: 1.45; }
+  .rv-field { display: block; font-size: 0.8rem; font-weight: 800; margin: 8px 0; }
+  .rv-field .rv-edit { margin-top: 3px; }
+  .rv-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 600px) { .rv-row { grid-template-columns: 1fr; } }
   .rv-empty { font-size: 0.9rem; color: rgba(42,32,25,0.66); }
   .rv-mail { font-size: 0.84rem; background: var(--paper); border-radius: 10px; padding: 8px 12px; }
 `;
@@ -30071,17 +30143,28 @@ function adminReviewActions(kind, id, opts = {}) {
       <p class="rv-result" hidden></p>`;
 }
 
+// An editable box prefilled with the sent value; only changed boxes are sent.
+function adminEditBox(key, value, opts = {}) {
+  const v = adminReviewEsc(value == null ? '' : value);
+  return opts.multiline
+    ? `<textarea class="rv-edit" name="${key}" rows="${opts.rows || 4}" maxlength="${opts.max || 2000}" data-orig="${v}">${v}</textarea>`
+    : `<input type="text" class="rv-edit" name="${key}" value="${v}" maxlength="${opts.max || 300}" data-orig="${v}">`;
+}
+
 function renderAdminChangeCard(r) {
   const rows = Object.keys(r.changes).map((f) => {
     const before = f === 'badges' ? '' : ownerValueText(f, r.previous[f]);
+    const after = OWNER_EDITABLE_FIELDS.includes(f) ? adminEditBox(f, r.changes[f], { multiline: f === 'description', rows: 5, max: OWNER_DESCRIPTION_MAX + 50 })
+      : adminReviewEsc(ownerValueText(f, r.changes[f]));
     return `<tr><th><label class="rv-opt"><input type="checkbox" name="field" value="${adminReviewEsc(f)}" checked>${adminReviewEsc(OWNER_FIELD_LABELS[f] || f)}</label></th>
-        <td class="rv-old">${adminReviewEsc(before)}</td><td class="rv-new">${adminReviewEsc(ownerValueText(f, r.changes[f]))}</td></tr>`;
+        <td class="rv-old">${adminReviewEsc(before)}</td><td class="rv-new">${after}</td></tr>`;
   }).join('');
   return `<article class="rv-card" data-kind="change" data-id="${r.id}">
       <h3>${adminReviewEsc(r.venue_name)}</h3>
       <p class="rv-meta">Update #${r.id} · sent ${adminReviewEsc(adminReviewTime(r.submitted_at))}${r.contact_name ? ` by ${adminReviewEsc(r.contact_name)}` : ''} · <a href="${adminReviewEsc(r.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <table class="rv-diff"><tr><th>Change</th><th>Now</th><th>New</th></tr>${rows}</table>
       ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
+      ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix the phone, website or description before approving.</p>' : ''}
       ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
     </article>`;
 }
@@ -30093,6 +30176,7 @@ function renderAdminPhotoCard(p, live) {
       <h3>${adminReviewEsc(p.venue_name)}</h3>
       <p class="rv-meta">Photo #${p.id} · ${p.width}×${p.height} · sent ${adminReviewEsc(adminReviewTime(p.submitted_at))} · credit “${adminReviewEsc(p.credit)}”${p.is_main ? ' · <strong>main photo</strong>' : ''} · <a href="${adminReviewEsc(p.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <img class="rv-photo" src="${adminReviewEsc(preview)}" alt="" loading="lazy">
+      ${live ? '' : `<label class="rv-field">Credit ${adminEditBox('credit', p.credit, { max: 80 })}</label>`}
       ${adminReviewActions('photo', p.id, { remove: live, options: main })}
     </article>`;
 }
@@ -30105,7 +30189,8 @@ function renderAdminEventCard(s) {
   return `<article class="rv-card" data-kind="event" data-id="${s.id}">
       <h3>${adminReviewEsc(s.name)}</h3>
       <p class="rv-meta">Event #${s.id} · ${adminReviewEsc(when)} · ${adminReviewEsc(s.venue_name || '')}, ${adminReviewEsc(REGION_LABELS[s.region] || s.region)} · by ${adminReviewEsc(s.organizer_name)} (${adminReviewEsc(s.contact_email)})${s.owner_venue_id ? ' · <strong>from the venue owner</strong>' : ''}${s.event_url ? ` · <a href="${adminReviewEsc(s.event_url)}" target="_blank" rel="noopener nofollow">their link</a>` : ''}</p>
-      <p class="rv-text">${adminReviewEsc(s.description)}</p>
+      <label class="rv-field">Name ${adminEditBox('name', s.name, { max: 120 })}</label>
+      <label class="rv-field">Description ${adminEditBox('description', s.description, { multiline: true, rows: 5, max: 2000 })}</label>
       ${dupHtml}
       ${adminReviewActions('event', s.id, { options: dupOpt })}
     </article>`;
@@ -30118,8 +30203,10 @@ function renderAdminVenueCard(s) {
   return `<article class="rv-card" data-kind="venue" data-id="${s.id}">
       <h3>${adminReviewEsc(s.name)}</h3>
       <p class="rv-meta">New venue #${s.id} · ${adminReviewEsc(s.type)} · ${adminReviewEsc(REGION_LABELS[s.region] || s.region)} · from ${adminReviewEsc(s.contact_name)} (${adminReviewEsc(s.contact_email)})</p>
-      <p class="rv-text">${[s.address, s.phone, s.website].filter(Boolean).map(adminReviewEsc).join(' · ')}</p>
-      <p class="rv-text">${adminReviewEsc(s.description)}</p>
+      <label class="rv-field">Name ${adminEditBox('name', s.name, { max: 120 })}</label>
+      <div class="rv-row"><label class="rv-field">Address ${adminEditBox('address', s.address)}</label><label class="rv-field">Phone ${adminEditBox('phone', s.phone, { max: 40 })}</label></div>
+      <label class="rv-field">Website ${adminEditBox('website', s.website)}</label>
+      <label class="rv-field">Description ${adminEditBox('description', s.description, { multiline: true, rows: 5, max: 2000 })}</label>
       ${dups.length ? `<div class="rv-warn">Already listed with this name: ${dups.map((d) => adminReviewEsc(d.name)).join(', ')}</div>` : ''}
       ${adminReviewActions('venue', s.id, { options: opts })}
     </article>`;
@@ -30157,6 +30244,9 @@ function renderAdminReviewPage() {
   document.getElementById('rvLogout').addEventListener('click', function(){
     fetch('/admin/review/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.reload(); });
   });
+  document.addEventListener('input', function(e){
+    if (e.target.classList && e.target.classList.contains('rv-edit')) e.target.classList.toggle('rv-changed', e.target.value !== e.target.getAttribute('data-orig'));
+  });
   var EMAIL = { sent: ' They were emailed.', failed: ' The email to them failed.', email_off: '', no_address: ' (No email address to tell them.)' };
   document.addEventListener('click', function(e){
     var btn = e.target.closest('button[data-act]'); if (!btn) return;
@@ -30168,13 +30258,18 @@ function renderAdminReviewPage() {
     var nd = card.querySelector('input[name=notdup]'); if (nd && nd.checked) body.reviewed_duplicates = nd.getAttribute('data-ids').split(',').map(Number);
     var ad = card.querySelector('input[name=allowdup]'); if (ad) body.allow_duplicate = ad.checked;
     var am = card.querySelector('input[name=amenities]'); if (am) body.include_amenities = am.checked;
+    if (act === 'approve') {
+      var edits = {}, any = false;
+      Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ if (el.value !== el.getAttribute('data-orig')) { edits[el.name] = el.value; any = true; } });
+      if (any) body.edits = edits;
+    }
     var buttons = card.querySelectorAll('button'); Array.prototype.forEach.call(buttons, function(b){ b.disabled = true; });
     fetch('/admin/review/' + kind + '/' + card.getAttribute('data-id') + '/' + act, { method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(x){
         out.hidden = false;
-        if (x.ok) { out.textContent = (act === 'approve' ? 'Approved and live.' : act === 'remove' ? 'Removed from the site.' : 'Rejected.') + (EMAIL[x.j.emailed] || ''); card.classList.add('rv-done'); return; }
+        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') : act === 'remove' ? 'Removed from the site.' : 'Rejected.') + (EMAIL[x.j.emailed] || ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
       })
