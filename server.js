@@ -28882,7 +28882,174 @@ async function handleOwnerChangeSubmission(req, res, token) {
 // from the listing, so the owner only fills in the event itself. It lands in
 // the normal event review (owner_venue_id set), with the same checks as
 // /api/event-submissions.
-const OWNER_EVENT_KEYS = new Set(['name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day',
+// ---------- Owner event changes and cancellations (2026-10-15) ----------
+//
+// From "Your updates" an owner can change or cancel an event they sent:
+// - still waiting for review: a change edits the submission in place (it is
+//   still reviewed once); cancelling withdraws it.
+// - live on What's On: cancelling takes it off straight away (its date is
+//   marked cancelled, so What's On and the venue page say so); a change waits
+//   in owner_event_changes for review, and approving it updates the event.
+// Dayton gets an email either way. Owner events have one date; a change to
+// the date of an event with several dates is refused (we handle those).
+const OWNER_EVENT_DATA_KEYS = ['name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day', 'ends_next_day',
+  'event_url', 'schedule_notes', 'price_text', 'image_link'];
+
+function ownerEventSubmission(venueId, subId) {
+  const sub = getEventSubmission(subId);
+  return sub && sub.owner_venue_id === venueId ? sub : null;
+}
+
+function ownerEventPendingChange(subId) {
+  return db.prepare("SELECT * FROM owner_event_changes WHERE submission_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1").get(subId) || null;
+}
+
+// What the owner's Change form starts from: the event as it is now.
+function ownerEventFormData(sub) {
+  const out = {};
+  for (const k of OWNER_EVENT_DATA_KEYS) out[k] = sub[k] == null ? '' : sub[k];
+  out.categories = sub.categories || [];
+  const pending = ownerEventPendingChange(sub.id);
+  if (pending) Object.assign(out, JSON.parse(pending.data));
+  else if (sub.status === 'approved' && sub.event_id) {
+    const ev = db.prepare('SELECT name, description, website FROM events WHERE id = ?').get(sub.event_id);
+    const occ = listEventOccurrences(sub.event_id, { includeCancelled: false });
+    if (ev) { out.name = ev.name; out.description = ev.description || out.description; out.event_url = ev.website || ''; }
+    if (occ.length === 1) for (const k of ['start_date', 'end_date', 'start_time', 'end_time', 'all_day', 'ends_next_day']) out[k] = occ[0][k] == null ? '' : occ[0][k];
+  }
+  out.all_day = !!Number(out.all_day);
+  return out;
+}
+
+async function notifyOwnerEventAction(subject, rows) {
+  try {
+    await venueSubmissionTransport({ _subject: subject, _template: 'table', _captcha: 'false', ...rows, 'How to review': `Open ${ADMIN_REVIEW_URL}` });
+  } catch (err) {
+    console.error(`[owner-events] notification failed: ${String((err && err.message) || err).slice(0, 300)}`);
+  }
+}
+
+// A change from the owner's event form (body.change_of = submission id).
+async function handleOwnerEventChange(req, res, venue, subId, data) {
+  const sub = ownerEventSubmission(venue.id, subId);
+  if (!sub || sub.status === 'rejected') return sendSubmissionResponse(res, 404, { ok: false, error: 'This event can’t be changed any more. Send it as a new event instead.' });
+  if (sub.status === 'pending') {
+    db.prepare(`UPDATE event_submissions SET name = ?, categories = ?, description = ?, start_date = ?, end_date = ?, start_time = ?, end_time = ?,
+        all_day = ?, ends_next_day = ?, event_url = ?, schedule_notes = ?, price_text = ?, image_link = ?, contact_name = ?, contact_email = ?
+      WHERE id = ? AND status = 'pending'`).run(data.name, JSON.stringify(data.categories), data.description, data.start_date, data.end_date,
+      data.start_time, data.end_time, data.all_day, data.ends_next_day, data.event_url, data.schedule_notes || null, data.price_text || null,
+      data.image_link || null, data.contact_name, data.contact_email, sub.id);
+    await notifyEventSubmission(sub.id);
+    return sendSubmissionResponse(res, 200, { ok: true, id: sub.id, updated: true });
+  }
+  const event = sub.event_id && db.prepare('SELECT id, status FROM events WHERE id = ?').get(sub.event_id);
+  if (!event || event.status === 'cancelled') return sendSubmissionResponse(res, 409, { ok: false, error: 'This event was cancelled. Send it as a new event instead.' });
+  const keep = {};
+  for (const k of OWNER_EVENT_DATA_KEYS) keep[k] = data[k] === undefined ? null : data[k];
+  db.prepare("UPDATE owner_event_changes SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP WHERE submission_id = ? AND status = 'pending'").run(sub.id);
+  const id = Number(db.prepare('INSERT INTO owner_event_changes (submission_id, event_id, venue_id, data, contact_email) VALUES (?, ?, ?, ?, ?)')
+    .run(sub.id, event.id, venue.id, JSON.stringify(keep), data.contact_email || null).lastInsertRowid);
+  await notifyOwnerEventAction(`[PENDING REVIEW] Event change #${id}: ${data.name} (${venue.name})`, {
+    'Status': 'PENDING REVIEW. The live event has not changed yet.', 'Venue': venue.name, 'Event': sub.name,
+    'New details': `${data.name}; ${data.start_date}${data.start_time ? ` ${data.start_time}` : ''}${data.end_time ? `-${data.end_time}` : ''}`,
+  });
+  return sendSubmissionResponse(res, 200, { ok: true, change: id });
+}
+
+// POST .../events/<submission id>/cancel
+async function handleOwnerEventCancel(req, res, token, subId) {
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
+  const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This page has expired. Please sign in again.' });
+  const sub = ownerEventSubmission(found.venue.id, subId);
+  if (!sub || sub.status === 'rejected') return sendSubmissionResponse(res, 404, { ok: false, error: 'This event was already removed.' });
+  if (sub.status === 'pending') {
+    db.prepare("UPDATE event_submissions SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = 'owner', rejection_reason = 'Withdrawn by the owner' WHERE id = ? AND status = 'pending'").run(sub.id);
+    return sendSubmissionResponse(res, 200, { ok: true, withdrawn: true });
+  }
+  const event = sub.event_id && db.prepare('SELECT id, name, status FROM events WHERE id = ?').get(sub.event_id);
+  if (!event) return sendSubmissionResponse(res, 404, { ok: false, error: 'This event was already removed.' });
+  if (event.status !== 'cancelled') {
+    const meta = { reason: `cancelled by the owner (event submission #${sub.id})`, batch_id: `owner-event-cancel-${sub.id}`, reviewed_by: `owner:${found.account ? found.account.email : 'link'}` };
+    const live = listEventOccurrences(event.id, { includeCancelled: false }).filter((o) => o.status === 'scheduled');
+    live.forEach((o, i) => {
+      const r = setEventOccurrenceStatus(event.id, o.id, 'cancelled', i === live.length - 1 ? { ...meta, event_status: 'cancelled' } : meta);
+      if (!r.ok) throw new Error(`cancel failed: ${r.reason}`);
+    });
+    if (!live.length) updateEvent(event.id, { status: 'cancelled' }, meta);
+  }
+  db.prepare("UPDATE owner_event_changes SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP WHERE submission_id = ? AND status = 'pending'").run(sub.id);
+  await notifyOwnerEventAction(`[LIVE] Owner cancelled an event: ${event.name} (${found.venue.name})`, {
+    'Status': 'CANCELLED by the owner. It now shows as cancelled on What’s On.', 'Venue': found.venue.name, 'Event': event.name,
+  });
+  return sendSubmissionResponse(res, 200, { ok: true, cancelled: true });
+}
+
+function listOwnerEventChanges(status = 'pending') {
+  return db.prepare('SELECT * FROM owner_event_changes WHERE status = ? ORDER BY id DESC LIMIT 200').all(status).map((c) => {
+    const ev = db.prepare('SELECT id, name, region, slug, description, website FROM events WHERE id = ?').get(c.event_id) || {};
+    const v = db.prepare('SELECT name FROM venues WHERE id = ?').get(c.venue_id) || {};
+    const occ = ev.id ? listEventOccurrences(ev.id, { includeCancelled: false }) : [];
+    return { ...c, data: JSON.parse(c.data), event: ev, venue_name: v.name, occurrences: occ };
+  });
+}
+
+// Approve: update the live event's name, description, link and (single) date.
+function approveOwnerEventChange(id, reviewer) {
+  const c = db.prepare('SELECT * FROM owner_event_changes WHERE id = ?').get(id);
+  if (!c) return { ok: false, reason: 'not_found' };
+  if (c.status !== 'pending') return { ok: false, reason: 'not_pending' };
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(c.event_id);
+  if (!event || event.status === 'cancelled') return { ok: false, reason: 'venue_unavailable' };
+  const d = JSON.parse(c.data);
+  const meta = { reason: `owner event change #${id}`, batch_id: `owner-event-change-${id}`, reviewed_by: reviewer };
+  const occs = listEventOccurrences(event.id, { includeCancelled: false });
+  const next = normalizeEventOccurrence({ start_date: d.start_date, end_date: d.end_date || d.start_date, start_time: d.start_time || null,
+    end_time: d.end_time || null, all_day: d.all_day ? 1 : 0, ends_next_day: d.ends_next_day ? 1 : 0 });
+  const occ = occs[0];
+  const dateChanged = occ && ['start_date', 'end_date', 'start_time', 'end_time', 'all_day', 'ends_next_day'].some((k) => (occ[k] == null ? null : occ[k]) !== (next[k] == null ? null : next[k]));
+  if (dateChanged && occs.length !== 1) return { ok: false, reason: 'many_dates' };
+  if (dateChanged) {
+    const err = validateEventOccurrence({ start_date: next.start_date, end_date: next.end_date, start_time: next.start_time, end_time: next.end_time, all_day: next.all_day, ends_next_day: next.ends_next_day });
+    if (err) return { ok: false, reason: 'write_failed', detail: err.detail };
+  }
+  const fields = {};
+  if (d.name && d.name !== event.name) fields.name = d.name;
+  if (d.description && d.description !== event.description) fields.description = d.description;
+  const link = d.event_url || null;
+  if (link !== (event.website || null)) fields.website = link;
+  if (Object.keys(fields).length) {
+    const r = updateEvent(event.id, fields, meta);
+    if (!r.ok) return { ok: false, reason: 'write_failed', detail: r.reason };
+  }
+  if (dateChanged) {
+    const logMeta = { ...meta, source: event.source_name, confidence: event.event_confidence };
+    db.exec('BEGIN');
+    try {
+      db.prepare(`UPDATE event_occurrences SET start_date = ?, end_date = ?, start_time = ?, end_time = ?, all_day = ?, ends_next_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .run(next.start_date, next.end_date, next.start_time, next.end_time, next.all_day, next.ends_next_day, occ.id);
+      logEventChange(event.id, occ.id, 'occurrence', `${occ.start_date} ${occ.start_time || ''}`.trim(), `${next.start_date} ${next.start_time || ''}`.trim(), logMeta);
+      recomputeEventSpan(event.id);
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (_) { /* nothing open */ }
+      return { ok: false, reason: 'write_failed', detail: String(e.message || e) };
+    }
+  }
+  db.prepare("UPDATE owner_event_changes SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
+  return { ok: true };
+}
+
+function rejectOwnerEventChange(id, reviewer, reason) {
+  const c = db.prepare('SELECT status FROM owner_event_changes WHERE id = ?').get(id);
+  if (!c) return { ok: false, reason: 'not_found' };
+  if (c.status !== 'pending') return { ok: false, reason: 'not_pending' };
+  db.prepare("UPDATE owner_event_changes SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
+    .run(reviewer, String(reason || '').slice(0, 300) || null, id);
+  return { ok: true };
+}
+
+const OWNER_EVENT_KEYS = new Set(['change_of', 'name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day',
   'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'company_website', 'started_at']);
 async function handleOwnerEventSubmission(req, res, token) {
   const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
@@ -28910,8 +29077,10 @@ async function handleOwnerEventSubmission(req, res, token) {
   const full = { ...body, region: venue.region, venue_name: venue.name, organizer_name: venue.name, consent: true };
   delete full.company_website;
   delete full.started_at;
+  delete full.change_of;
   const { data, errors } = validateEventSubmission(full);
   if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
+  if (body.change_of !== undefined && body.change_of !== null && body.change_of !== '') return await handleOwnerEventChange(req, res, venue, Number(body.change_of), data);
   const duplicate = db.prepare(
     `SELECT id FROM event_submissions WHERE status = 'pending' AND owner_venue_id = ? AND start_date = ? AND LOWER(name) = LOWER(?)`
   ).get(venue.id, data.start_date, data.name);
@@ -30009,6 +30178,14 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     return sendOwnerDecision(to, ownerDecisionEmail({ venueName: venue ? venue.name : 'Okanagan Roam', what: `your event "${s.name}"`, outcome, reason,
       link: ev ? `https://okanaganroam.com/${ev.region}/events/${ev.slug}` : null, owner: !!s.owner_venue_id }));
   }
+  if (kind === 'eventchange') {
+    const c = db.prepare('SELECT * FROM owner_event_changes WHERE id = ?').get(id);
+    const v = c && db.prepare('SELECT name FROM venues WHERE id = ?').get(c.venue_id);
+    const ev = c && db.prepare('SELECT name, region, slug FROM events WHERE id = ?').get(c.event_id);
+    if (!v || !ev) return 'no_address';
+    return sendOwnerDecision(ownerDecisionRecipients(c.venue_id, c.contact_email), ownerDecisionEmail({ venueName: v.name, what: `the change to your event "${ev.name}"`,
+      outcome, reason, edited: false, link: `https://okanaganroam.com/${ev.region}/events/${ev.slug}`, owner: true }));
+  }
   if (kind === 'venue') {
     const s = getVenueSubmission(id);
     if (!s) return 'no_address';
@@ -30094,6 +30271,10 @@ async function adminReviewAction(kind, id, action, body) {
       : action === 'remove' ? removeOwnerPhoto(id, ADMIN_REVIEWER, reason) : rejectOwnerPhoto(id, ADMIN_REVIEWER, reason);
     if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason } };
     r.edited = edited;
+  } else if (kind === 'eventchange') {
+    if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
+    r = action === 'approve' ? approveOwnerEventChange(id, ADMIN_REVIEWER) : rejectOwnerEventChange(id, ADMIN_REVIEWER, reason);
+    if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: r.reason === 'many_dates' ? 'This event has several dates; change its dates with the admin tools.' : r.reason === 'venue_unavailable' ? 'The event was cancelled or removed.' : (ADMIN_REVIEW_ERRORS[r.reason] || r.reason), detail: r.detail } };
   } else if (kind === 'event' || kind === 'venue') {
     if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
     const payload = { reviewer: ADMIN_REVIEWER };
@@ -30235,6 +30416,29 @@ function renderAdminEventCard(s) {
     </article>`;
 }
 
+function adminOccText(o) {
+  if (!o || !o.start_date) return '';
+  const date = `${formatSubmissionLocalDate(o.start_date)}${o.end_date && o.end_date !== o.start_date ? ` – ${formatSubmissionLocalDate(o.end_date)}` : ''}`;
+  return Number(o.all_day) || !o.start_time ? `${date}, all day` : `${date}, ${formatSubmissionLocalTime(o.start_time)}${o.end_time ? `–${formatSubmissionLocalTime(o.end_time)}` : ''}`;
+}
+
+function renderAdminEventChangeCard(c) {
+  const ev = c.event || {}, d = c.data, now = c.occurrences[0] || {};
+  const rows = [
+    ['Name', ev.name, d.name],
+    ['When', adminOccText(now), adminOccText(d)],
+    ['Description', ev.description, d.description],
+    ['Link', ev.website || '', d.event_url || ''],
+  ].filter(([, a, b]) => String(a || '') !== String(b || '')).map(([label, a, b]) => `<tr><th>${label}</th><td class="rv-old">${adminReviewEsc(a)}</td><td class="rv-new">${adminReviewEsc(b)}</td></tr>`).join('');
+  return `<article class="rv-card" data-kind="eventchange" data-id="${c.id}">
+      <h3>${adminReviewEsc(ev.name)} <span class="rv-meta">(${adminReviewEsc(c.venue_name)})</span></h3>
+      <p class="rv-meta">Event change #${c.id} · sent ${adminReviewEsc(adminReviewTime(c.submitted_at))}${ev.slug ? ` · <a href="/${adminReviewEsc(ev.region)}/events/${adminReviewEsc(ev.slug)}" target="_blank" rel="noopener">live event</a>` : ''}</p>
+      ${rows ? `<table class="rv-diff"><tr><th>Change</th><th>Now</th><th>New</th></tr>${rows}</table>` : '<p class="rv-meta">Nothing visible changed (categories or notes only).</p>'}
+      ${c.occurrences.length > 1 ? '<div class="rv-warn">This event has several dates; only its name, description and link can change here.</div>' : ''}
+      ${adminReviewActions('eventchange', c.id, {})}
+    </article>`;
+}
+
 function renderAdminVenueCard(s) {
   const dups = s.possible_existing_venues || [];
   const amen = (s.amenities || []).map((a) => (BADGE_LABELS[a] ? BADGE_LABELS[a].title : a));
@@ -30261,8 +30465,9 @@ function renderAdminReviewPage() {
   const photos = listOwnerPhotos('pending');
   const live = recentLiveOwnerPhotos();
   const events = listEventSubmissions('pending');
+  const eventChanges = listOwnerEventChanges('pending');
   const venues = listVenueSubmissions('pending');
-  const total = changes.length + photos.length + events.length + venues.length;
+  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
   const mail = ownerDirectEmail()
@@ -30272,10 +30477,11 @@ function renderAdminReviewPage() {
     <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a><a href="#venues">New venues (${venues.length})</a><a href="#live">Live photos (${live.length})</a></nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#live">Live photos (${live.length})</a></nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
+    ${eventChanges.length ? section('eventchanges', 'Changes to live events', eventChanges, renderAdminEventChangeCard, '') : ''}
     ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
     ${section('live', 'Photos owners published (last 14 days)', live, (p) => renderAdminPhotoCard(p, true), 'None in the last 14 days.')}
 <script>
@@ -30366,8 +30572,18 @@ function ownerVenueActivity(venueId, limit = 12) {
     items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.status, reason: r.rejection_reason,
       title: fields.length ? `Listing update: ${fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}` : 'Listing update' });
   }
-  for (const e of db.prepare('SELECT id, name, start_date, status, submitted_at, reviewed_at, rejection_reason FROM event_submissions WHERE owner_venue_id = ? ORDER BY id DESC LIMIT 10').all(venueId)) {
-    items.push({ kind: 'event', at: e.reviewed_at || e.submitted_at, sent: e.submitted_at, status: e.status, reason: e.rejection_reason, title: `Event: ${e.name}`, date: e.start_date });
+  const today = todayLocal();
+  for (const e of db.prepare('SELECT id, name, start_date, end_date, status, submitted_at, reviewed_at, reviewed_by, rejection_reason, event_id FROM event_submissions WHERE owner_venue_id = ? ORDER BY id DESC LIMIT 10').all(venueId)) {
+    let status = e.status;
+    let title = `Event: ${e.name}`;
+    const ev = e.event_id ? db.prepare('SELECT name, status FROM events WHERE id = ?').get(e.event_id) : null;
+    if (ev) title = `Event: ${ev.name}`;
+    if (status === 'rejected' && e.reviewed_by === 'owner') status = 'withdrawn';
+    else if (status === 'approved' && ev && ev.status === 'cancelled') status = 'cancelled';
+    else if (status === 'approved' && ownerEventPendingChange(e.id)) status = 'changewait';
+    const upcoming = (e.end_date || e.start_date) >= today;
+    items.push({ kind: 'event', id: e.id, at: e.reviewed_at || e.submitted_at, sent: e.submitted_at, status, reason: e.rejection_reason, title, date: e.start_date,
+      canEdit: upcoming && ['pending', 'approved', 'changewait'].includes(status) });
   }
   const main = ownerVenueMainImage(venueId);
   for (const ph of db.prepare('SELECT id, file, status, submitted_at, reviewed_at, reviewed_by, rejection_reason FROM owner_photos WHERE venue_id = ? ORDER BY id DESC LIMIT 20').all(venueId)) {
@@ -30382,6 +30598,9 @@ function ownerStatusLabel(item) {
   if (item.status === 'pending') return { cls: 'wait', text: 'Waiting for review' };
   if (item.status === 'approved') return { cls: 'live', text: item.kind === 'event' ? 'Approved: on What’s On' : 'Live' };
   if (item.status === 'removed') return { cls: 'off', text: 'Removed by you' };
+  if (item.status === 'withdrawn') return { cls: 'off', text: 'Withdrawn by you' };
+  if (item.status === 'cancelled') return { cls: 'off', text: 'Cancelled' };
+  if (item.status === 'changewait') return { cls: 'wait', text: 'Change waiting for review' };
   return { cls: 'no', text: 'Not approved' };
 }
 
@@ -30392,7 +30611,9 @@ function ownerActivityHtml(items) {
       <ul>${items.map((it) => {
         const st = ownerStatusLabel(it);
         const why = st.cls === 'no' && it.reason ? `<span class="op-why">${escapeHtml(it.reason)}</span>` : '';
-        return `<li><span class="op-act-main"><strong>${escapeHtml(it.title)}</strong><span class="op-act-date">Sent ${escapeHtml(ownerLocalDate(it.sent))}</span>${why}</span><span class="op-status op-status-${st.cls}">${st.text}</span></li>`;
+        const live = it.status !== 'pending';
+        const btns = it.kind === 'event' && it.canEdit ? `<span class="op-act-btns"><button type="button" class="op-linkbtn" data-ev-change="${it.id}">Change</button> &middot; <button type="button" class="op-linkbtn" data-ev-cancel="${it.id}" data-ev-live="${live ? 1 : 0}">${live ? 'Cancel event' : 'Withdraw'}</button></span>` : '';
+        return `<li><span class="op-act-main"><strong>${escapeHtml(it.title)}</strong><span class="op-act-date">Sent ${escapeHtml(ownerLocalDate(it.sent))}</span>${why}${btns}</span><span class="op-status op-status-${st.cls}">${st.text}</span></li>`;
       }).join('')}</ul>
     </section>`;
 }
@@ -30484,7 +30705,14 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-status-live { background: #E2F3E8; color: #1E6B3A; }
   body.owner-page .op-last { font-size: 0.84rem; font-weight: 700; color: rgba(42,32,25,0.7); margin: 6px 0 0; }
   body.owner-page .op-status-no { background: #FBE3E0; color: #9C2F22; }
-  body.owner-page .op-status-off { background: #ECEAE6; color: #5B534C; }`;
+  body.owner-page .op-status-off { background: #ECEAE6; color: #5B534C; }
+  body.owner-page .op-act-btns { display: block; font-size: 0.86rem; margin-top: 4px; }
+  body.owner-page .op-act-btns button, body.owner-page .op-changing button { background: none; border: 0; padding: 2px 0; color: var(--ref-navy); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+  body.owner-page .op-act-btns button[data-sure="1"] { color: #9C2F22; }
+  body.owner-page .op-count { margin: 4px 0 0; font-size: 0.8rem; }
+  body.owner-page .op-count-low { color: #9C2F22; font-weight: 700; }
+  body.owner-page .op-changing { background: #FFF4D6; border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; margin: 0 0 12px; }
+  body.owner-page .op-changing[hidden] { display: none; }`;
 function renderOwnerPage(found, token, pending) {
   const { venue, happyHourTimes } = found;
   const snap = ownerVenueSnapshot(venue, happyHourTimes);
@@ -30519,6 +30747,12 @@ function renderOwnerPage(found, token, pending) {
     ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review. Anything else you send now is added to them.</p>`
     : '';
   const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
+  // Events the owner can still change or cancel, with what the Change form starts from.
+  const editableEvents = {};
+  for (const it of ownerVenueActivity(venue.id)) {
+    if (it.kind === 'event' && it.canEdit) editableEvents[it.id] = ownerEventFormData(getEventSubmission(it.id));
+  }
+  const editableEventsJson = JSON.stringify(editableEvents).replace(/</g, '\\u003c');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30615,6 +30849,7 @@ ${renderGolfHeaderHtml()}
       <div class="form-row full"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}">${escapeHtml(snap.description)}</textarea>
         <p class="op-hint">A few sentences about what makes your place worth a visit. We may lightly edit for length and style.</p>
+        <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
@@ -30635,6 +30870,7 @@ ${renderGolfHeaderHtml()}
         ${found.account ? '' : `<div class="form-field"><label for="opEmail">Your email (optional)</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">We&rsquo;ll email you when it&rsquo;s live.</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
       <div class="form-row full"><div class="form-field">
+        <p class="op-hint" style="margin:0 0 6px">Need to change your business name, address, menu or booking link, or social links? Tell us here and we&rsquo;ll update it.</p>
         <label for="opNote">Note for us (optional)</label>
         <textarea id="opNote" rows="3" maxlength="1000" placeholder="Seasonal closures, new menu, anything we should know."></textarea>
       </div></div>
@@ -30679,6 +30915,7 @@ ${renderGolfHeaderHtml()}
     <h2 id="events" style="margin-top:44px">Add an event</h2>
     <p class="op-hint">Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.</p>
     <form class="venue-form" id="oeForm" novalidate>
+      <p class="op-changing" id="oeChanging" hidden>Changing <strong id="oeChangingName"></strong>. Edit anything below and press <strong>Send change</strong>. <button type="button" class="op-linkbtn" id="oeChangeStop">Add a new event instead</button></p>
       <div class="form-row full"><div class="form-field"><label for="oeName">Event name *</label><input type="text" id="oeName" maxlength="120"><p class="lyv-error" id="oeNameError" hidden></p></div></div>
       <div class="form-row full"><div class="form-field">
         <label id="oeCatLabel">Categories * <span class="op-hint">(choose 1 to 3)</span></label>
@@ -30710,7 +30947,7 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="oeFormError" hidden></p>
       <button type="submit" class="venue-form-submit" id="oeSubmit">Send event</button>
     </form>
-    <div class="op-done" id="oeDone">Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On. <a href="#events" id="oeAnother">Add another event</a></div>
+    <div class="op-done" id="oeDone"><span id="oeDoneText">Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.</span> <a href="#events" id="oeAnother">Add another event</a></div>
 
   </div>
   </main>
@@ -30718,6 +30955,7 @@ ${renderGolfHeaderHtml()}
 (function(){
   var startedAt = Date.now();
   var initial = ${initial};
+  var ownerEvents = ${editableEventsJson};
   var form = document.getElementById('opForm');
   function rows(id){ var el = document.getElementById(id); return el ? Array.prototype.slice.call(el.querySelectorAll('.op-day')) : []; }
   function syncRow(row){ row.classList.toggle('is-off', row.querySelector('.op-off').checked); }
@@ -30759,6 +30997,20 @@ ${renderGolfHeaderHtml()}
     return { week: out, bad: bad, blank: any ? blank : '' };
   }
   function show(id, msg){ var el = document.getElementById(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg; }
+  // On a problem, scroll to the first field that needs fixing (not the note by the button) and put the cursor in it.
+  function jumpToError(scope){
+    var errs = Array.prototype.filter.call(scope.querySelectorAll('.lyv-error'), function(x){ return !x.hidden && x.textContent; });
+    var first = errs.filter(function(x){ return !/FormError$/.test(x.id); })[0] || errs[0];
+    if (!first) return;
+    first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var f = first.closest('.form-field') || first.parentNode;
+    var input = f && f.querySelector('input:not([type=checkbox]):not([disabled]), textarea, select');
+    if (input) setTimeout(function(){ input.focus({ preventScroll: true }); }, 350);
+  }
+  // Live count under the description, so the minimum is clear before sending.
+  var dsc = document.getElementById('opDescription'), dscCount = document.getElementById('opDescCount');
+  function countDesc(){ if (!dsc || !dscCount) return; var n = dsc.value.trim().length; dscCount.textContent = n + ' characters' + (n < ${OWNER_DESCRIPTION_MIN} ? ' (at least ${OWNER_DESCRIPTION_MIN} needed)' : ''); dscCount.classList.toggle('op-count-low', n < ${OWNER_DESCRIPTION_MIN}); }
+  if (dsc) { dsc.addEventListener('input', countDesc); countDesc(); }
   // A field's error goes away as soon as the owner edits that field.
   document.addEventListener('input', function(e){
     var f = e.target && e.target.closest ? e.target.closest('.form-field') : null;
@@ -30783,8 +31035,8 @@ ${renderGolfHeaderHtml()}
     e.preventDefault();
     ['opHoursError','opPhoneError','opWebsiteError','opDescriptionError','opBadgesError','opHappyError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
-    if (h.bad) { show('opHoursError', 'Please fill in both times for each day you are open.'); return; }
-    if (h.blank) { show('opHoursError', 'Add the times for ' + h.blank + ', or tick Closed.'); return; }
+    if (h.bad) { show('opHoursError', 'Please fill in both times for each day you are open.'); jumpToError(form); return; }
+    if (h.blank) { show('opHoursError', 'Add the times for ' + h.blank + ', or tick Closed.'); jumpToError(form); return; }
     var changes = {
       hours: h.week,
       phone: document.getElementById('opPhone').value,
@@ -30795,7 +31047,7 @@ ${renderGolfHeaderHtml()}
     Array.prototype.forEach.call(document.querySelectorAll('#opBadges input'), function(b){ changes.badges[b.value] = b.checked; });
     if (document.getElementById('opHappy')) {
       var hh = week('opHappy');
-      if (hh.bad) { show('opHappyError', 'Please fill in both times for each happy hour.'); return; }
+      if (hh.bad) { show('opHappyError', 'Please fill in both times for each happy hour.'); jumpToError(form); return; }
       changes.happy_hour = hh.week;
     }
     // Only send what the owner actually touched.
@@ -30820,6 +31072,7 @@ ${renderGolfHeaderHtml()}
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opEmailError', errs.contact_email);
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? 'Please fix the highlighted fields.' : 'Sorry, something went wrong. Please try again.'));
+        jumpToError(form);
       })
       .catch(function(){ btn.disabled = false; show('opFormError', 'Could not send. Please check your connection and try again.'); });
   });
@@ -30827,7 +31080,42 @@ ${renderGolfHeaderHtml()}
   var evStarted = Date.now();
   var allDay = document.getElementById('oeAllDay');
   allDay.addEventListener('change', function(){ ['oeStartTime','oeEndTime'].forEach(function(id){ document.getElementById(id).disabled = allDay.checked; }); });
-  document.getElementById('oeAnother').addEventListener('click', function(){ ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); if (lastEmail) document.getElementById('oeContactEmail').value = lastEmail; });
+  // Change or cancel an event from "Your updates".
+  var changeOf = null;
+  function stopChange(){
+    changeOf = null; document.getElementById('oeChanging').hidden = true;
+    document.getElementById('oeSubmit').textContent = 'Send event'; document.getElementById('events').textContent = 'Add an event';
+  }
+  document.getElementById('oeChangeStop').addEventListener('click', function(){ ev.reset(); stopChange(); });
+  document.addEventListener('click', function(e){
+    var c = e.target.closest ? e.target.closest('[data-ev-change]') : null;
+    if (c) {
+      var d = ownerEvents[c.getAttribute('data-ev-change')]; if (!d) return;
+      ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now() - 10000;
+      document.getElementById('oeName').value = d.name || '';
+      Array.prototype.forEach.call(document.querySelectorAll('#oeCategories input'), function(x){ x.checked = (d.categories || []).indexOf(x.value) >= 0; });
+      [['oeDescription', 'description'], ['oeStartDate', 'start_date'], ['oeEndDate', 'end_date'], ['oeStartTime', 'start_time'], ['oeEndTime', 'end_time'],
+        ['oeUrl', 'event_url'], ['oePrice', 'price_text'], ['oeNotes', 'schedule_notes']].forEach(function(p){ var el = document.getElementById(p[0]); if (el) el.value = d[p[1]] == null ? '' : d[p[1]]; });
+      allDay.checked = !!d.all_day; allDay.dispatchEvent(new Event('change'));
+      if (lastEmail && !document.getElementById('oeContactEmail').value) document.getElementById('oeContactEmail').value = lastEmail;
+      changeOf = c.getAttribute('data-ev-change');
+      document.getElementById('oeChangingName').textContent = d.name || 'your event';
+      document.getElementById('oeChanging').hidden = false;
+      document.getElementById('oeSubmit').textContent = 'Send change'; document.getElementById('events').textContent = 'Change your event';
+      document.getElementById('events').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    var x = e.target.closest ? e.target.closest('[data-ev-cancel]') : null;
+    if (!x) return;
+    var live = x.getAttribute('data-ev-live') === '1';
+    if (x.getAttribute('data-sure') !== '1') { x.setAttribute('data-sure', '1'); x.textContent = live ? 'Tap again to cancel it on What\u2019s On' : 'Tap again to withdraw it'; return; }
+    x.disabled = true;
+    fetch(location.pathname + '/events/' + x.getAttribute('data-ev-cancel') + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (j && j.ok) { location.hash = 'opActivityHead'; location.reload(); return; } x.disabled = false; x.textContent = (j && j.error) || 'Please try again.'; })
+      .catch(function(){ x.disabled = false; x.textContent = 'Could not connect. Please try again.'; });
+  });
+  document.getElementById('oeAnother').addEventListener('click', function(){ stopChange(); ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); if (lastEmail) document.getElementById('oeContactEmail').value = lastEmail; });
   // Signed-in owners: remove a photo, or make one the main photo.
   var grid = document.getElementById('opPhotoGrid');
   if (grid) grid.addEventListener('click', function(e){
@@ -30852,15 +31140,24 @@ ${renderGolfHeaderHtml()}
       start_time: allDay.checked ? '' : v('oeStartTime'), end_time: allDay.checked ? '' : v('oeEndTime'), all_day: allDay.checked,
       event_url: v('oeUrl'), price_text: v('oePrice'), schedule_notes: v('oeNotes'), contact_name: v('oeContactName'), contact_email: v('oeContactEmail'),
       company_website: v('oeHp'), started_at: evStarted };
+    if (changeOf) payload.change_of = changeOf;
     var b = document.getElementById('oeSubmit'); b.disabled = true;
     fetch(location.pathname + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
       .then(function(r){ return r.json(); })
       .then(function(j){
         b.disabled = false;
-        if (j && j.ok) { rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none'; document.getElementById('oeDone').classList.add('show'); return; }
+        if (j && j.ok) {
+          rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none';
+          if (j.updated) document.getElementById('oeDoneText').textContent = 'Updated. Your event is still waiting for review, usually within a day.';
+          if (j.change) document.getElementById('oeDoneText').textContent = 'Thanks! Your change is in for review, usually within a day. The event stays as it is until then, and we\u2019ll email you when it\u2019s updated.';
+          document.getElementById('oeDone').classList.add('show');
+          if (j.updated || j.change) setTimeout(function(){ location.hash = 'opActivityHead'; location.reload(); }, 3500);
+          return;
+        }
         var errs = (j && j.errors) || {};
         Object.keys(errs).forEach(function(k){ if (ids[k]) show(ids[k], errs[k]); });
         show('oeFormError', (j && j.error) || 'Sorry, something went wrong. Please try again.');
+        jumpToError(ev);
       })
       .catch(function(){ b.disabled = false; show('oeFormError', 'Could not send. Please check your connection and try again.'); });
   });
@@ -33621,6 +33918,11 @@ const server = http.createServer(async (req, res) => {
       }
       const sa = /^\/owner\/account\/(?:(email|password|signout-others)|venue\/(\d+)\/unlink)$/.exec(pathname);
       if (sa && method === 'POST') return await handleOwnerSettingsAction(req, res, account, sa[1] || 'unlink', sa[2] ? Number(sa[2]) : null);
+      const ec = /^\/owner\/account\/venue\/(\d+)\/events\/(\d+)\/cancel$/.exec(pathname);
+      if (ec && method === 'POST') {
+        if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
+        return await handleOwnerEventCancel(req, res, () => venueForOwnerAccount(account, Number(ec[1])), Number(ec[2]));
+      }
       const pa = /^\/owner\/account\/venue\/(\d+)\/photos\/(\d+)\/(remove|main)$/.exec(pathname);
       if (pa && method === 'POST') return await handleOwnerPhotoAction(req, res, account, Number(pa[1]), Number(pa[2]), pa[3]);
       const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos))?$/.exec(pathname);
@@ -33646,6 +33948,8 @@ const server = http.createServer(async (req, res) => {
       const rest = pathname.slice(OWNER_LINK_PATH.length);
       const changesMatch = /^([A-Za-z0-9_-]+)\/changes$/.exec(rest);
       if (changesMatch && method === 'POST') return await handleOwnerChangeSubmission(req, res, changesMatch[1]);
+      const eventCancel = /^([A-Za-z0-9_-]+)\/events\/(\d+)\/cancel$/.exec(rest);
+      if (eventCancel && method === 'POST') return await handleOwnerEventCancel(req, res, eventCancel[1], Number(eventCancel[2]));
       const eventsMatch = /^([A-Za-z0-9_-]+)\/events$/.exec(rest);
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
@@ -33711,7 +34015,7 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true });
     }
     {
-      const m = /^\/admin\/review\/(change|photo|event|venue)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
