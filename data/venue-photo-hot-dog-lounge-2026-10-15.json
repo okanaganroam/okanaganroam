@@ -1,0 +1,18 @@
+{
+  "reason": "Owner-supplied photo for The Hot Dog Lounge at JoieFarm, from the Media Assets folder Stephanie Madryga (JoieFarm) shared by email on 2026-10-15 with permission to use any photo in it.",
+  "batch_id": "venue-photo-hot-dog-lounge-2026-10-15",
+  "venues": [
+    {
+      "id": 1813,
+      "name": "The Hot Dog Lounge at JoieFarm",
+      "region": "naramata",
+      "slug": "the-hot-dog-lounge-at-joiefarm",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/joiefarm-hot-dog-lounge-toast.jpg?v=20261015"
+      }
+    }
+  ]
+}
