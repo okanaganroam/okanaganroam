@@ -21057,24 +21057,27 @@ test('Owner accessibility (2026-10-15): errors announce and tie to their box, de
 test('Venue photo gallery (2026-10-16): main photo plus approved owner photos open in a viewer; one photo shows no gallery', () => withDiscoveryServer(async (base) => {
   seasonInsert.run({ name: 'Gallery Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'gallery-fixture-cafe' });
   const v = app.findVenueBySlug('kelowna', 'cafe', 'gallery-fixture-cafe');
-  db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run('/images/owner/galleryfixture00000000001.jpg', v.id);
+  db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run('/images/owner/galleryfixture0000000001.jpg', v.id);
   const add = db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, rights_confirmed_at, status)
     VALUES (?, ?, ?, 1600, 1200, 100, 'Gallery Cafe', CURRENT_TIMESTAMP, ?)`);
   // The listing's own page with just one photo: no gallery.
   let page = await fetch(`${base}/kelowna/cafes/gallery-fixture-cafe`).then((r) => r.text());
   assert.doesNotMatch(page, /id="venueGallery"/);
   assert.doesNotMatch(page, /See all \d+ photos/);
-  add.run(v.id, 'galleryfixture00000000001.jpg', 'galleryfixturepreview001', 'approved'); // the main photo itself
-  add.run(v.id, 'galleryfixture00000000002.jpg', 'galleryfixturepreview002', 'approved');
-  add.run(v.id, 'galleryfixture00000000003.jpg', 'galleryfixturepreview003', 'approved');
-  add.run(v.id, 'galleryfixture00000000004.jpg', 'galleryfixturepreview004', 'pending');
+  add.run(v.id, 'galleryfixture0000000001.jpg', 'galleryfixturepreview001', 'approved'); // the main photo itself
+  add.run(v.id, 'galleryfixture0000000002.jpg', 'galleryfixturepreview002', 'approved');
+  add.run(v.id, 'galleryfixture0000000003.jpg', 'galleryfixturepreview003', 'approved');
+  add.run(v.id, 'galleryfixture0000000004.jpg', 'galleryfixturepreview004', 'pending');
   page = await fetch(`${base}/kelowna/cafes/gallery-fixture-cafe`).then((r) => r.text());
   assert.match(page, /<button type="button" class="vg-all" data-vg-open="0">See all 3 photos<\/button>/);
   assert.match(page, /<dialog class="vg-dialog" id="venueGallery"/);
   const slides = page.match(/<figure class="vg-slide"><img src="([^"]+)"/g).map((x) => x.match(/src="([^"]+)"/)[1]);
-  assert.deepEqual(slides, ['/images/owner/galleryfixture00000000001.jpg', '/images/owner/galleryfixture00000000002.jpg', '/images/owner/galleryfixture00000000003.jpg'], 'main photo first, once; pending photos stay hidden');
+  assert.deepEqual(slides, ['/images/owner/galleryfixture0000000001.jpg', '/images/owner/galleryfixture0000000002.jpg', '/images/owner/galleryfixture0000000003.jpg'], 'main photo first, once; pending photos stay hidden');
   assert.match(page, /<figcaption>Photo: Gallery Cafe<\/figcaption>/);
-  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 3);
+  // The thumbnails skip the main photo (it is already the big one) and open the viewer at photo 2.
+  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 2);
+  assert.match(page, /<div class="vg-mosaic"><div class="venue-hero venue-hero-photo">[\s\S]*?<\/div><div class="vg-strip vg-count-2"><button type="button" class="vg-thumb" data-vg-open="1" aria-label="Open photo 2 of 3">/);
+  assert.match(page, /<\/div><\/div><p class="venue-photo-credit"[^>]*>Photo: Gallery Cafe<\/p>/, 'credit sits under the whole gallery');
   assert.match(page, /aria-label="Next photo"/);
 }));
 

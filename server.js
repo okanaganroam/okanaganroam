@@ -21719,8 +21719,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // button and a thumbnail row that open a full-screen viewer.
   const galleryPhotos = venue.image_url ? venueGalleryPhotos(venue) : [];
   const galleryHtml = venueGalleryHtml(venue, galleryPhotos, L);
+  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
+  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
-    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>${photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : ''}${galleryHtml}`
+    ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
         <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
@@ -29289,19 +29291,22 @@ function venueGalleryPhotos(venue) {
 }
 
 // The thumbnail row, "See all photos" button and full-screen viewer for a
-// venue page, or '' when the venue has fewer than two photos.
+// venue page as { strip, viewer }, or null when the venue has fewer than two photos.
 function venueGalleryHtml(venue, photos, L) {
-  if (!photos || photos.length < 2) return '';
+  if (!photos || photos.length < 2) return null;
   const n = photos.length;
   const name = escapeHtml(venue.name);
-  const shown = photos.slice(0, 5);
+  // The main photo is already the big one, so the thumbnails start at the
+  // second photo; the last one shown carries "+N" for any not shown.
+  const rest = photos.slice(1);
+  const shown = rest.slice(0, 4);
   const thumbs = shown.map((p, i) => {
-    const more = (i === shown.length - 1 && n > shown.length) ? `<span class="vg-more">+${n - shown.length}</span>` : '';
-    return `<button type="button" class="vg-thumb" data-vg-open="${i}" aria-label="${L(`Open photo ${i + 1} of ${n}`, `Ouvrir la photo ${i + 1} sur ${n}`)}"><img src="${escapeHtml(p.src)}" alt="" loading="lazy">${more}</button>`;
+    const hidden = rest.length - shown.length;
+    const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
+    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(p.src)}" alt="" loading="lazy">${more}</button>`;
   }).join('');
   const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}" alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo', 'Photo')}: ${escapeHtml(p.credit)}</figcaption>` : ''}</figure>`).join('');
-  return `
-      <div class="vg-strip">${thumbs}</div>
+  return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
       <dialog class="vg-dialog" id="venueGallery" aria-label="${L(`Photos of ${name}`, `Photos de ${name}`)}">
         <div class="vg-bar"><span class="vg-count" aria-live="polite">1 / ${n}</span><button type="button" class="vg-close" aria-label="${L('Close photos', 'Fermer les photos')}">&times;</button></div>
         <div class="vg-track" tabindex="0">${slides}</div>
@@ -29312,11 +29317,25 @@ function venueGalleryHtml(venue, photos, L) {
         .venue-hero-photo { position: relative; }
         .vg-all { position: absolute; right: 12px; bottom: 12px; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(27,43,58,0.85); color: #fff; font: 700 0.85rem/1.2 'Nunito', sans-serif; cursor: pointer; }
         .vg-all:hover, .vg-all:focus-visible { background: rgba(27,43,58,1); }
-        .vg-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 8px 0 18px; }
-        .vg-thumb { position: relative; padding: 0; border: 0; border-radius: 8px; overflow: hidden; aspect-ratio: 4 / 3; cursor: pointer; background: #EAE6D9; }
+        .vg-strip { display: flex; gap: 6px; margin: 6px 0 0; }
+        .vg-thumb { position: relative; flex: 1 1 0; min-width: 0; max-width: 96px; height: 64px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: #EAE6D9; }
         .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
-        .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1.1rem 'Nunito', sans-serif; }
+        .vg-mosaic + .venue-photo-credit { margin-bottom: 14px !important; }
+        .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1rem 'Nunito', sans-serif; }
+        /* Wide screens: main photo on the left, the other photos as a 2x2
+           grid on the right at the same height, so the venue name below is
+           on the first screen. */
+        @media (min-width: 900px) {
+          .vg-mosaic { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
+          .vg-mosaic .venue-hero-photo, .vg-mosaic .venue-hero-photo img { height: 380px; max-height: none; }
+          .vg-mosaic .venue-hero-photo img { width: 100%; object-fit: cover; }
+          .vg-mosaic .vg-strip { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 8px; margin: 0; height: 380px; }
+          .vg-mosaic .vg-strip.vg-count-1 { grid-template-columns: 1fr; }
+          .vg-mosaic .vg-strip.vg-count-2 { grid-template-columns: 1fr; }
+          .vg-mosaic .vg-strip.vg-count-3 .vg-thumb:first-child { grid-column: 1 / -1; }
+          .vg-mosaic .vg-thumb { width: auto; max-width: none; height: auto; min-height: 0; border-radius: 10px; }
+        }
         .vg-dialog { width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #101B24; color: #fff; }
         .vg-dialog::backdrop { background: rgba(0,0,0,0.85); }
         .vg-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; z-index: 2; font: 700 0.95rem 'Nunito', sans-serif; }
@@ -29328,7 +29347,7 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-slide figcaption { margin-top: 8px; font-size: 0.8rem; opacity: 0.75; }
         .vg-nav { position: absolute; top: 50%; transform: translateY(-50%); border: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.15); color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; z-index: 2; }
         .vg-prev { left: 12px; } .vg-next { right: 12px; }
-        @media (max-width: 600px) { .vg-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } .vg-strip .vg-thumb:nth-child(5) { display: none; } .vg-nav { display: none; } }
+        @media (max-width: 600px) { .vg-nav { display: none; } }
       </style>
       <script>
       (function(){
@@ -29345,7 +29364,7 @@ function venueGalleryHtml(venue, photos, L) {
         d.addEventListener('keydown', function(e){ if (e.key === 'ArrowRight') { e.preventDefault(); go(cur() + 1, true); } else if (e.key === 'ArrowLeft') { e.preventDefault(); go(cur() - 1, true); } });
         d.addEventListener('click', function(e){ if (e.target === d) d.close(); });
       })();
-      </script>`;
+      </script>` };
 }
 
 function ownerPhotoCreditFor(imageUrl) {
