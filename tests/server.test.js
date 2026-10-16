@@ -20678,3 +20678,46 @@ test('Owner first visit polish (2026-10-15): copy Monday hours, login prompt aft
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Last updated (2026-10-15): only the owner\'s own changes date the listing, shown to owners and visitors', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Last Updated Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'last-updated-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'last-updated-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, headers = {}) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.14.0.${ip++}`, ...headers }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), cookie: (r.headers.get('set-cookie') || '').split(';')[0] }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  const listing = '/kelowna/cafes/last-updated-fixture';
+  try {
+    // Never touched by an owner: no date anywhere.
+    assert.doesNotMatch(await get(listing), /Updated by the owner/);
+    // Our own edit (admin) does not count.
+    app.updateVenue(v.id, { description: 'Changed by us, not the owner. A cozy cafe in Kelowna.' });
+    assert.doesNotMatch(await get(listing), /Updated by the owner/);
+    // A rejected owner update does not count either.
+    const r1 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0181' }, started_at: Date.now() - 10000 });
+    await post(`/admin/owner-changes/${r1.body.id}/reject`, { reviewer: 'dayton', reason: 'x' }, { Authorization: `Bearer ${LYV_TOKEN}` });
+    assert.doesNotMatch(await get(listing), /Updated by the owner/);
+    // The owner's update that went live dates it, by when the owner sent it.
+    const r2 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0182' }, started_at: Date.now() - 10000 });
+    db.prepare("UPDATE owner_change_requests SET submitted_at = '2026-09-02 18:30:00' WHERE id = ?").run(r2.body.id);
+    const ok = await post(`/admin/owner-changes/${r2.body.id}/approve`, { reviewer: 'dayton' }, { Authorization: `Bearer ${LYV_TOKEN}` });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.match(await get(listing), /<p class="venue-owner-updated"[^>]*><span aria-hidden="true">&#10003;<\/span> Updated by the owner &middot; Sept 2, 2026<\/p>/);
+    // Later edits by us leave the owner's date alone.
+    app.updateVenue(v.id, { description: 'Changed by us again. A cozy cafe in Kelowna with pastries.' });
+    assert.match(await get(listing), /Updated by the owner &middot; Sept 2, 2026/);
+    // The owner sees it too.
+    assert.match(await get(`/owner/${token}`), /<p class="op-last">Last updated Sept 2, 2026<\/p>/);
+    const cookie = (await post(`/owner/${token}/account`, { email: 'lastupdated@example.com', password: 'a long enough password' })).cookie;
+    assert.match(await get('/owner/account', cookie), /<span class="op-last">Last updated Sept 2, 2026<\/span>/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

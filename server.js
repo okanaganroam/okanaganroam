@@ -21878,7 +21878,10 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    ${openStatusHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>
+    ${openStatusHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${(() => {
+      const last = ownerLastUpdatedAt(venue.id);
+      return last ? `\n    <p class="venue-owner-updated" style="font-size:.84rem;margin:6px 0 0;color:#1E6B3A;font-weight:700"><span aria-hidden="true">&#10003;</span> ${L('Updated by the owner', 'Mis \u00e0 jour par le propri\u00e9taire')} &middot; ${escapeHtml(ownerUpdatedDate(last, fr))}</p>` : '';
+    })()}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
@@ -30380,6 +30383,28 @@ function ownerActivityHtml(items) {
 }
 
 // One line per venue on "My listings".
+// "Last updated" (2026-10-15): the last time the OWNER changed the listing -- the
+// send date of their most recent update that went live, or of a photo of theirs
+// that is live. Our own edits (research, admin tools, the review page's own
+// changes) never count, so a listing no owner has touched shows no date.
+// -> 'YYYY-MM-DD HH:MM:SS' (UTC) | null
+function ownerLastUpdatedAt(venueId) {
+  const row = db.prepare(`SELECT MAX(t) AS t FROM (
+    SELECT submitted_at AS t FROM owner_change_requests WHERE venue_id = ? AND status = 'approved'
+    UNION ALL SELECT submitted_at FROM owner_photos WHERE venue_id = ? AND status = 'approved')`).get(venueId, venueId);
+  return (row && row.t) || null;
+}
+
+const OWNER_UPDATED_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+// "Sept 2, 2026" (or "2 sept. 2026" in French), in Okanagan time.
+function ownerUpdatedDate(utc, fr = false) {
+  const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  if (fr) return d.toLocaleDateString('fr-CA', { timeZone: OKANAGAN_TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
+  const [y, m, day] = d.toLocaleDateString('en-CA', { timeZone: OKANAGAN_TIME_ZONE }).split('-').map(Number);
+  return `${OWNER_UPDATED_MONTHS[m - 1]} ${day}, ${y}`;
+}
+
 function ownerVenueSummary(venueId) {
   const n = (sql) => db.prepare(sql).get(venueId).n;
   const waiting = [
@@ -30395,7 +30420,9 @@ function ownerVenueSummary(venueId) {
   if (waiting.length) parts.push(`<span class="op-status op-status-wait">Waiting for review: ${waiting.join(', ')}</span>`);
   if (notApproved) parts.push(`<span class="op-status op-status-no">${notApproved} not approved</span>`);
   if (live) parts.push(`<span class="op-status op-status-live">${live} photo${live === 1 ? '' : 's'} live</span>`);
-  return parts.length ? parts.join(' ') : '<span class="op-status op-status-live">Up to date</span>';
+  const last = ownerLastUpdatedAt(venueId);
+  const lastHtml = last ? `<br><span class="op-last">Last updated ${ownerUpdatedDate(last)}</span>` : '';
+  return (parts.length ? parts.join(' ') : '<span class="op-status op-status-live">Up to date</span>') + lastHtml;
 }
 
 // POST /owner/account/venue/<id>/photos/<photoId>/(remove|main), signed-in owners only.
@@ -30440,6 +30467,7 @@ ${renderGolfHeaderHtml()}
 const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
   body.owner-page .op-status-wait { background: #FFF1D6; color: #8A5A00; }
   body.owner-page .op-status-live { background: #E2F3E8; color: #1E6B3A; }
+  body.owner-page .op-last { font-size: 0.84rem; font-weight: 700; color: rgba(42,32,25,0.7); margin: 6px 0 0; }
   body.owner-page .op-status-no { background: #FBE3E0; color: #9C2F22; }
   body.owner-page .op-status-off { background: #ECEAE6; color: #5B534C; }`;
 function renderOwnerPage(found, token, pending) {
@@ -30538,6 +30566,7 @@ ${renderGolfHeaderHtml()}
       <h1>${escapeHtml(venue.name)}</h1>
       <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : '<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span>'}</p>
       <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
+      ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">Last updated ${ownerUpdatedDate(last)}</p>` : ''; })()}
       ${pendingNote}
       ${ownerActivityHtml(ownerVenueActivity(venue.id))}
       ${found.account ? `<p class="op-bar-in">Signed in as <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="/owner/account">My listings</a> &middot; <a href="/owner/account/settings">Account settings</a></p>` : `
