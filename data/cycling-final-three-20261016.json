@@ -1,0 +1,42 @@
+{
+  "reason": "User approved all three visually reviewed linked-page alternatives, including documented capture-date exceptions.",
+  "batch_id": "cycling-final-three-20261016",
+  "venues": [
+    {
+      "id": 1392,
+      "name": "Big White Nordic & Wilderness Trails",
+      "region": "big-white",
+      "slug": "big-white-nordic-wilderness-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/big-white-nordic-wilderness-trails-20261016-cycling-final.jpg?v=20261016cyclingfinallive"
+      }
+    },
+    {
+      "id": 1388,
+      "name": "SilverStar Fat Bike Trails",
+      "region": "silverstar",
+      "slug": "silverstar-fat-bike-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/silverstar-fat-bike-trails-20261016-cycling-final.jpg?v=20261016cyclingfinallive"
+      }
+    },
+    {
+      "id": 1236,
+      "name": "Sovereign Lake Nordic Centre",
+      "region": "silverstar",
+      "slug": "sovereign-lake-nordic-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/sovereign-lake-nordic-centre-20261016-cycling-final.jpg?v=20261016cyclingfinallive"
+      }
+    }
+  ]
+}

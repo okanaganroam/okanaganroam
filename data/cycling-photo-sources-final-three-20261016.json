@@ -1,0 +1,53 @@
+[
+  {
+    "id": 1392,
+    "name": "Big White Nordic & Wilderness Trails",
+    "file": "/Users/dr/okanaganroam/output/cycling-photo-search/final-three/big-white-fat-biking.jpg",
+    "source": "https://m.bigwhite.com/events-activities/winter-activities/fat-biking-trails",
+    "image_source": "https://www.bigwhite.com/sites/default/files/2023-01/Winter-Activities-Fat-Biking-2000x800px_0.jpg",
+    "credit": "Photo: Big White Ski Resort",
+    "assessment": "Two people fat biking on snowy trails, from Big White’s own fat-biking page.",
+    "capture_date": "Unconfirmed; published in a January 2023 image folder, older than one year",
+    "status": "Recommended cycling photo",
+    "candidate": {
+      "file": "/Users/dr/okanaganroam/output/cycling-photo-search/final-three/big-white-fat-biking.jpg",
+      "url": "https://www.bigwhite.com/sites/default/files/2023-01/Winter-Activities-Fat-Biking-2000x800px_0.jpg"
+    },
+    "approved": true,
+    "deployed_asset": "/images/hiking/venues/big-white-nordic-wilderness-trails-20261016-cycling-final.jpg"
+  },
+  {
+    "id": 1388,
+    "name": "SilverStar Fat Bike Trails",
+    "file": "/Users/dr/okanaganroam/output/cycling-photo-search/final-three/silverstar-fat-biking.jpg",
+    "source": "https://destinationsilverstar.com/experience/fat-biking/",
+    "image_source": "https://destinationsilverstar.com/wp-content/uploads/2022/03/FatBike-2048x1365.jpg",
+    "credit": "Photo: Destination Silver Star",
+    "assessment": "A fat-bike rider on a snowy forest trail, from Destination Silver Star’s activity page.",
+    "capture_date": "Unconfirmed; published in a March 2022 image folder, older than one year",
+    "status": "Recommended cycling photo",
+    "candidate": {
+      "file": "/Users/dr/okanaganroam/output/cycling-photo-search/final-three/silverstar-fat-biking.jpg",
+      "url": "https://destinationsilverstar.com/wp-content/uploads/2022/03/FatBike-2048x1365.jpg"
+    },
+    "approved": true,
+    "deployed_asset": "/images/hiking/venues/silverstar-fat-bike-trails-20261016-cycling-final.jpg"
+  },
+  {
+    "id": 1236,
+    "name": "Sovereign Lake Nordic Centre",
+    "file": "/Users/dr/okanaganroam/output/cycling-photo-search/final-three/sovereign-lake-nordic.jpg",
+    "source": "https://sovereignlake.com/",
+    "image_source": "https://sovereignlake.com/wp-content/uploads/2025/03/SLNC_VGarrison_20241123-8505.jpg",
+    "credit": "Photo: Sovereign Lake Nordic Club / V. Garrison",
+    "assessment": "Visitors skiing beside the Nordic centre. Actual location, but not cycling. No verified photo of people cycling here was found; do not represent this as biking.",
+    "capture_date": "23 November 2024 per filename; older than one year",
+    "status": "Nordic-centre fallback — not a cycling photo",
+    "candidate": {
+      "file": "/Users/dr/okanaganroam/output/cycling-photo-search/final-three/sovereign-lake-nordic.jpg",
+      "url": "https://sovereignlake.com/wp-content/uploads/2025/03/SLNC_VGarrison_20241123-8505.jpg"
+    },
+    "approved": true,
+    "deployed_asset": "/images/hiking/venues/sovereign-lake-nordic-centre-20261016-cycling-final.jpg"
+  }
+]
