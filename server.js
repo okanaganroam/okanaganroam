@@ -4945,7 +4945,7 @@ const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
   winter: { src: '/images/outdoors/activity-winter.jpg', alt: 'Snow-covered trees in a winter forest at Big White', pos: 50 },
   // posX (2026-10-16): the climbers sit at the left edge, so narrow (phone) crops keep the left side.
   adventure: { src: '/images/outdoors/activity-adventure-2610.jpg', alt: 'Two climbers roped together on a rocky summit at sunset', pos: 30, posX: 8 },
-  fishing: { src: '/images/outdoors/activity-fishing.jpg', alt: 'Two men fishing from a boat on a calm lake at dawn', pos: 50 },
+  fishing: { src: '/images/outdoors/activity-fishing-2610.jpg', alt: 'A wooden fishing dock on a calm, forest-lined BC lake', pos: 60 },
   camping: { src: '/images/outdoors/activity-camping.jpg', alt: 'A tent pitched beside the lake near Kelowna', pos: 55 },
   water: { src: '/images/outdoors/activity-water.jpg', alt: 'Friends leaping off a wooden dock into the lake on a summer day', pos: 25 },
 });
@@ -15941,6 +15941,13 @@ function sortFoodDrinkVenues(venues, sort = 'recommended') {
 // Food & Drink banners and Build My Trip stops already use -- rotated by
 // venue id so neighbouring cards differ, and a dog photo for dog-friendly
 // places. A venue with its own image_url shows that instead.
+// File names of the activity example photos (public/images/outdoors/examples/<name>-2610[-800].jpg).
+const EXAMPLE_ACTIVITY_FILES = Object.freeze({
+  exzipline: 'adventure-zipline', exropes: 'adventure-ropes', exparaglide: 'adventure-paraglide', exskydive: 'adventure-skydive',
+  exhorse: 'adventure-horseback', exatv: 'adventure-atv', exbuggy: 'adventure-buggy', exballoon: 'adventure-balloon',
+  exfishboat: 'fishing-boat', exfishlake: 'fishing-lake-boats', exfishtrout: 'fishing-trout', exfishcast: 'fishing-cast',
+  exfishkid: 'fishing-kid-dock', exfishtackle: 'fishing-tackle',
+});
 const FD_CARD_PHOTOS = Object.freeze({
   restaurant: ['/images/trip-v3/stops/stop-restaurant-480.jpg', '/images/trip-v3/stops/stop-restaurant-2-480.jpg', '/images/trip-v3/stops/stop-restaurant-3-480.jpg', '/images/food-drink/restaurants-800.jpg'],
   cafe: ['/images/trip-v3/stops/stop-cafe-480.jpg', '/images/food-drink/cafes-800.jpg'],
@@ -15994,28 +16001,36 @@ const FD_CARD_PHOTOS = Object.freeze({
   dogoutdoor: ['/images/trip-v3/stops/stop-hiking-480.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg', '/images/trip-v3/stops/stop-outdoor-480.jpg', '/images/trip-v3/stops/stop-viewpoints-480.jpg', '/images/outdoors/activity-hiking-800.jpg'],
   winery: ['/images/trip-v3/stops/stop-winery-480.jpg', '/images/trip-v3/stops/stop-winery-2-480.jpg', '/images/trip-v3/stops/stop-winery-3-480.jpg', '/images/food-drink/wineries-800.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg'],
   // Activity example photos for single venues (VENUE_EXAMPLE_PHOTOS).
-  ...Object.fromEntries(Object.entries({ exzipline: 'zipline', exropes: 'ropes', exparaglide: 'paraglide', exskydive: 'skydive', exhorse: 'horseback', exatv: 'atv', exbuggy: 'buggy', exballoon: 'balloon' })
-    .map(([k, f]) => [k, [`/images/outdoors/examples/adventure-${f}-2610-800.jpg`]])),
+  ...Object.fromEntries(Object.entries(EXAMPLE_ACTIVITY_FILES).map(([k, f]) => [k, [`/images/outdoors/examples/${f}-2610-800.jpg`]])),
 });
 // Adventure businesses without a photo of their own (2026-10-16): an example
 // photo of their actual activity (free Adobe Stock), still labelled "Example
 // photo" on the venue page, instead of one generic adventure picture. A
 // venue's own image_url always wins.
 const EXAMPLE_ACTIVITY_PHOTOS = Object.freeze({
-  exzipline: { file: 'zipline', alt: 'A rider on a forest zipline', pos: 40 },
-  exropes: { file: 'ropes', alt: 'A treetop rope walk in an adventure park', pos: 40 },
-  exparaglide: { file: 'paraglide', alt: 'A paraglider against a blue sky', pos: 40 },
-  exskydive: { file: 'skydive', alt: 'A tandem skydive under an open canopy', pos: 35 },
-  exhorse: { file: 'horseback', alt: 'Riders on a guided trail ride', pos: 45 },
-  exatv: { file: 'atv', alt: 'An ATV rider on a rocky mountain trail', pos: 50 },
-  exbuggy: { file: 'buggy', alt: 'A side-by-side off-road buggy in the mountains', pos: 55 },
-  exballoon: { file: 'balloon', alt: 'A hot-air balloon over rolling hills at sunrise', pos: 45 },
+  exzipline: { alt: 'A rider on a forest zipline', pos: 40 },
+  exropes: { alt: 'A treetop rope walk in an adventure park', pos: 40 },
+  exparaglide: { alt: 'A paraglider against a blue sky', pos: 40 },
+  exskydive: { alt: 'A tandem skydive under an open canopy', pos: 35 },
+  exhorse: { alt: 'Riders on a guided trail ride', pos: 45 },
+  exatv: { alt: 'An ATV rider on a rocky mountain trail', pos: 50 },
+  exbuggy: { alt: 'A side-by-side off-road buggy in the mountains', pos: 55 },
+  exballoon: { alt: 'A hot-air balloon over rolling hills at sunrise', pos: 45 },
+  // Fishing (2026-10-16).
+  exfishboat: { alt: 'A fisherman in a boat on a misty morning lake', pos: 55 },
+  exfishlake: { alt: 'Rowboats on a mirror-calm mountain lake', pos: 60 },
+  exfishtrout: { alt: 'A rainbow trout held just above the water', pos: 50 },
+  exfishcast: { alt: 'An angler casting from the shore of a lake', pos: 40 },
+  exfishkid: { alt: 'A child fishing from a small dock', pos: 50 },
+  exfishtackle: { alt: 'Hand-tied flies, lures and a rod laid out on a table', pos: 50 },
 });
 const VENUE_EXAMPLE_PHOTOS = Object.freeze({
   1242: 'exzipline', 1243: 'exzipline', 1244: 'exropes', 1308: 'exropes',
   1301: 'exparaglide', 1302: 'exparaglide', 1300: 'exskydive',
   1305: 'exhorse', 1306: 'exhorse', 1307: 'exhorse', 1449: 'exhorse',
   1303: 'exatv', 1304: 'exbuggy', 1451: 'exballoon',
+  // Fishing (2026-10-16): Al-ways Charters, Oyama Lake Lodge, Dee Lake, Beaver Lake, Headwaters, Okanagan Bucktail.
+  1317: 'exfishboat', 1313: 'exfishlake', 1311: 'exfishtrout', 1310: 'exfishcast', 1314: 'exfishkid', 1316: 'exfishtackle',
 });
 const FD_CARD_DOG_PHOTOS = Object.freeze({
   restaurant: '/images/trip-v3/stops/stop-dog-restaurant-480.jpg', cafe: '/images/trip-v3/stops/stop-dog-cafe-480.jpg',
@@ -21507,7 +21522,7 @@ function venueHeroPhoto(venue) {
   if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return { src: own, small: null, alt: venue.name, pos: 50, example: false };
   const ex = EXAMPLE_ACTIVITY_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(venue.id) || 0]];
   if (ex) {
-    const src = `/images/outdoors/examples/adventure-${ex.file}-2610.jpg`;
+    const src = `/images/outdoors/examples/${EXAMPLE_ACTIVITY_FILES[VENUE_EXAMPLE_PHOTOS[Number(venue.id) || 0]]}-2610.jpg`;
     return { src, small: smallBannerFor(src), alt: ex.alt, pos: ex.pos, example: true };
   }
   const b = CATEGORY_BANNER_IMAGES[venue.type];

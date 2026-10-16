@@ -21266,3 +21266,19 @@ test('scripts/utm-links.js tags okanaganroam.com page links only', () => {
   assert.throws(() => main(['link', 'https://okanaganroam.com/', '--source', 'Insta Gram', '--medium', 'social', '--campaign', 'bio']), /--source is required/);
   assert.throws(() => main(['link', 'https://example.com/', '--source', 'a', '--medium', 'b', '--campaign', 'c']), /okanaganroam\.com address/);
 });
+
+test('Fishing photos (2026-10-16): new banner; fishing example photos exist in both sizes', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const b = app.OUTDOOR_ACTIVITY_BANNERS.fishing;
+  assert.equal(b.src, '/images/outdoors/activity-fishing-2610.jpg');
+  for (const rel of [b.src, '/images/outdoors/activity-fishing-2610-800.jpg', '/images/outdoors/thumbs/activity-fishing-2610.jpg']) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', rel)), `${rel} exists`);
+  }
+  for (const f of ['boat', 'lake-boats', 'trout', 'cast', 'kid-dock', 'tackle']) {
+    for (const suffix of ['', '-800']) {
+      const rel = `public/images/outdoors/examples/fishing-${f}-2610${suffix}.jpg`;
+      assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
+    }
+  }
+});

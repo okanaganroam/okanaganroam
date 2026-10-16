@@ -1,0 +1,42 @@
+{
+  "reason": "Fishing photo pass 2026-10-16 (Dayton chose my picks): real, freely licensed photos \u2014 Postill Lake Lodge's dock (Adam Jones, Flickr, CC BY-SA 2.0, https://www.flickr.com/photos/41000732@N04/30761054861), Chute Lake Lodge tent cabin (GoToVan, Flickr, CC BY 2.0, https://www.flickr.com/photos/47022937@N03/51354285156), Wood Lake from the Rail Trail for Wood Lake Fishing Dock (Adam Jones, Wikimedia Commons, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Rail_Trail_along_Wood_Lake_-_Lake_Country_-_BC_-_Canada_-_05_(49189586181).jpg).",
+  "batch_id": "venue-photo-fishing-2026-10-16",
+  "venues": [
+    {
+      "id": 1309,
+      "name": "Postill Lake Lodge",
+      "region": "kelowna",
+      "slug": "postill-lake-lodge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/postill-lake-lodge-dock.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1312,
+      "name": "Chute Lake Lodge",
+      "region": "naramata",
+      "slug": "chute-lake-lodge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chute-lake-lodge-tent.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1315,
+      "name": "Wood Lake Fishing Dock",
+      "region": "lake-country",
+      "slug": "wood-lake-fishing-dock",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wood-lake-shore-lake-country.jpg?v=20261016"
+      }
+    }
+  ]
+}
