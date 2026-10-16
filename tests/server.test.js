@@ -21300,3 +21300,9 @@ test('Camping photos (2026-10-16): example photos exist in both sizes; credited 
     assert.ok(credits[rel], `${rel} is credited`);
   }
 });
+
+test('Example photo cards keep the photo focal height (camping tent sits low in its photo)', () => {
+  const css = app.foodDrinkCardPhotoCss();
+  assert.match(css, /\[data-ph="excamptent-0"\]\{--fd-ph:url\('\/images\/outdoors\/examples\/camping-tent-lake-2610-800\.jpg'\);--fd-ph-y:72%\}/);
+  assert.match(css, /\[data-ph="restaurant-0"\]\{--fd-ph:url\('[^']+'\)\}/);
+});
