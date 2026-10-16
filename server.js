@@ -6655,8 +6655,11 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
   const path = `/guide/${region}/${badge}`;
   const others = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && c.badge !== badge).map((c) => c.badge);
   const typesPresent = types.map((t) => t.type).filter((t) => CATEGORY_SLUGS[t]);
+  // Combination guides that narrow this one down (2026-10-16), first in the list.
+  const narrow = listComboGuides().filter((c) => c.region === region && GUIDE_COMBO_BY_SLUG[c.slug].badges.includes(badge)).map((c) => GUIDE_COMBO_BY_SLUG[c.slug]);
   const afterHtml = `<section class="guide-more" aria-labelledby="guideMoreHeading">
     <h2 class="category-subsection-heading" id="guideMoreHeading">More in ${escapeHtml(regionLabel)}</h2>
+    ${narrow.length ? `<p class="guide-more-row">${narrow.map((c) => `<a class="guide-more-chip" href="/guide/${region}/${c.slug}">${escapeHtml(comboGuideShortName(region, c))}</a>`).join('')}</p>` : ''}
     ${others.length ? `<p class="guide-more-row">${others.map((b) => `<a class="guide-more-chip" href="/guide/${region}/${b}">${escapeHtml(guideBadgeHeading(region, b).heading.slice(0, -(` in ${regionLabel}`).length))}</a>`).join('')}</p>` : ''}
     ${typesPresent.length ? `<p class="venue-meta">All ${escapeHtml(regionLabel)} ${typesPresent.map((t) => `<a href="/${region}/${CATEGORY_SLUGS[t]}">${escapeHtml(CATEGORY_LABELS[t].plural.toLowerCase())}</a>`).join(', ')}, or <a href="/${region}">everything in ${escapeHtml(regionLabel)}</a>.</p>` : ''}
   </section>`;
@@ -6681,6 +6684,124 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
     extraHead: `<style id="guide-page">
   body.guide-page .guide-picks { margin: 8px 0 0; font-weight: 800; }
   body.guide-page .guide-picks a { color: var(--teal-deep, #1F5450); }
+  body.guide-page .guide-more { margin: 32px 0 8px; }
+  body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
+</style>`,
+    afterHtml,
+  }, venues, filter, now);
+}
+
+// Combination guides (2026-10-16): pages for the searches people actually
+// make -- "dog-friendly patios in Kelowna", "wineries with lake views in
+// Penticton" -- from a town's badges, either two together or one with a kind
+// of place. Only phrases people search for are listed (not every pair), and a
+// page exists only while the town has MIN_COMBO_GUIDE_VENUES matching places,
+// so the list (sitemap, links) grows by itself as more venues get badges.
+const MIN_COMBO_GUIDE_VENUES = 6;
+const GUIDE_COMBOS = [
+  { slug: 'dog-friendly-patios', badges: ['dog_friendly', 'patio'], h: 'Dog-Friendly Patios in {T}', i: 'Patios in {T} where your dog can come along: winery terraces, brewery lawns and café decks. Most only allow dogs outside, so check the house rules first.' },
+  { slug: 'patios-with-a-lake-view', badges: ['patio', 'lake_view'], h: 'Patios with a Lake View in {T}', i: 'Where to sit outside in {T} with the lake in front of you, from waterfront decks to hillside winery terraces.' },
+  { slug: 'patios-with-live-music', badges: ['patio', 'live_music'], h: 'Patios with Live Music in {T}', i: 'Outdoor seating and live music together in {T}. Line-ups change week to week, so check with each place.' },
+  { slug: 'happy-hour-patios', badges: ['patio', 'happy_hour'], h: 'Happy Hour Patios in {T}', i: 'Happy hour deals you can enjoy outside in {T}. Times and specials change, so check before you go.' },
+  { slug: 'family-friendly-patios', badges: ['kid_friendly', 'patio'], h: 'Family-Friendly Patios in {T}', i: 'Patios in {T} that welcome kids, with room to spread out and food the whole family will eat.' },
+  { slug: 'wineries-with-lake-views', type: 'winery', badges: ['lake_view'], h: 'Wineries with Lake Views in {T}', i: 'Tasting rooms and winery patios in {T} that look out over the water.' },
+  { slug: 'winery-patios', type: 'winery', badges: ['patio'], h: 'Winery Patios in {T}', i: 'Wineries in {T} where you can taste or have a glass outside among the vines.' },
+  { slug: 'dog-friendly-wineries', type: 'winery', badges: ['dog_friendly'], h: 'Dog-Friendly Wineries in {T}', i: 'Wineries in {T} that welcome dogs, usually on the patio or the grounds. Ask before bringing them into the tasting room.' },
+  { slug: 'family-friendly-wineries', type: 'winery', badges: ['kid_friendly'], h: 'Family-Friendly Wineries in {T}', i: 'Wineries in {T} where kids are welcome, with space to run around, food or something for them to drink.' },
+  { slug: 'wineries-with-live-music', type: 'winery', badges: ['live_music'], h: 'Wineries with Live Music in {T}', i: 'Wineries in {T} that put on live music. Most play on weekends and in summer, so check each winery’s calendar.' },
+  { slug: 'wineries-for-groups', type: 'winery', badges: ['great_groups'], h: 'Wineries for Groups in {T}', i: 'Wineries in {T} with the room for a group tasting, a birthday or a wine tour stop. Book ahead for larger groups.' },
+  { slug: 'restaurants-with-a-lake-view', type: 'restaurant', badges: ['lake_view'], h: 'Restaurants with a Lake View in {T}', i: 'Restaurants in {T} where you can eat with a view of the water.' },
+  { slug: 'restaurants-with-patios', type: 'restaurant', badges: ['patio'], h: 'Restaurants with Patios in {T}', i: 'Restaurants in {T} with outdoor seating for lunch or dinner in the sun.' },
+  { slug: 'family-friendly-restaurants', type: 'restaurant', badges: ['kid_friendly'], h: 'Family-Friendly Restaurants in {T}', i: 'Restaurants in {T} that welcome kids, with menus and seating that work for families.' },
+  { slug: 'dog-friendly-restaurants', type: 'restaurant', badges: ['dog_friendly'], h: 'Dog-Friendly Restaurants in {T}', i: 'Restaurants in {T} where dogs are welcome, almost always on the patio.' },
+  { slug: 'vegan-friendly-restaurants', type: 'restaurant', badges: ['vegan'], h: 'Vegan-Friendly Restaurants in {T}', i: 'Restaurants in {T} with real vegan dishes on the menu, not just a side salad.' },
+  { slug: 'gluten-free-restaurants', type: 'restaurant', badges: ['gluten_free'], h: 'Gluten-Free Restaurants in {T}', i: 'Restaurants in {T} with gluten-free choices. If you have celiac disease, ask about kitchen practices before you order.' },
+  { slug: 'restaurants-with-happy-hour', type: 'restaurant', badges: ['happy_hour'], h: 'Restaurants with Happy Hour in {T}', i: 'Restaurants in {T} with a happy hour on food or drinks. Times change, so check before you go.' },
+  { slug: 'restaurants-for-groups', type: 'restaurant', badges: ['great_groups'], h: 'Restaurants for Groups in {T}', i: 'Restaurants in {T} with the space and the menu for a crowd: birthdays, team dinners and family get-togethers.' },
+  { slug: 'cafes-with-patios', type: 'cafe', badges: ['patio'], h: 'Cafés with Patios in {T}', i: 'Cafés in {T} where you can take your coffee outside.' },
+  { slug: 'dog-friendly-cafes', type: 'cafe', badges: ['dog_friendly'], h: 'Dog-Friendly Cafés in {T}', i: 'Cafés in {T} where your dog is welcome, usually on the patio.' },
+  { slug: 'gluten-free-cafes', type: 'cafe', badges: ['gluten_free'], h: 'Gluten-Free Cafés in {T}', i: 'Cafés in {T} with gluten-free baking or food.' },
+  { slug: 'vegan-friendly-cafes', type: 'cafe', badges: ['vegan'], h: 'Vegan-Friendly Cafés in {T}', i: 'Cafés in {T} with plant milks and vegan food or baking.' },
+  { slug: 'dog-friendly-breweries', type: 'brewery', badges: ['dog_friendly'], h: 'Dog-Friendly Breweries in {T}', i: 'Breweries in {T} where dogs are welcome on the patio or in the taproom.' },
+  { slug: 'brewery-patios', type: 'brewery', badges: ['patio'], h: 'Brewery Patios in {T}', i: 'Breweries in {T} with outdoor seating for a pint in the sun.' },
+  { slug: 'family-friendly-breweries', type: 'brewery', badges: ['kid_friendly'], h: 'Family-Friendly Breweries in {T}', i: 'Breweries in {T} that welcome kids, often with food and space to play.' },
+  { slug: 'pubs-with-patios', type: 'pub', badges: ['patio'], h: 'Pubs with Patios in {T}', i: 'Pubs in {T} with outdoor seating.' },
+  { slug: 'pubs-to-watch-the-game', type: 'pub', badges: ['sports_tv'], h: 'Pubs to Watch the Game in {T}', i: 'Pubs in {T} with the game on, from hockey nights to the big final.' },
+];
+const GUIDE_COMBO_BY_SLUG = Object.fromEntries(GUIDE_COMBOS.map((c) => [c.slug, c]));
+function comboGuideWhere(combo) {
+  return [combo.type ? 'type = ?' : null, ...combo.badges.map((b) => `${b} = 1`), 'redirect_to IS NULL'].filter(Boolean).join(' AND ');
+}
+function getComboGuideVenues(region, combo) {
+  return db.prepare(`SELECT * FROM venues WHERE region = ? AND ${comboGuideWhere(combo)} ORDER BY reviews DESC`)
+    .all(...[region, combo.type].filter(Boolean));
+}
+// Every town + combination page with enough places: { region, slug, count, lastmod }.
+function listComboGuides(minCount = MIN_COMBO_GUIDE_VENUES) {
+  const out = [];
+  for (const combo of GUIDE_COMBOS) {
+    const rows = db.prepare(`SELECT region, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE ${comboGuideWhere(combo)} GROUP BY region`)
+      .all(...[combo.type].filter(Boolean));
+    for (const r of rows) if (REGION_LABELS[r.region] && r.n >= minCount) out.push({ region: r.region, slug: combo.slug, count: r.n, lastmod: r.lastmod });
+  }
+  return out;
+}
+function comboGuideHeading(region, combo) {
+  const town = REGION_LABELS[region];
+  return { heading: combo.h.replace('{T}', town), intro: combo.i.replace(/\{T\}/g, town) };
+}
+const comboGuideShortName = (region, combo) => comboGuideHeading(region, combo).heading.slice(0, -(` in ${REGION_LABELS[region]}`).length);
+// "Popular with visitors: A, B and C." -- from the page's own list, so each
+// town's page reads differently and stays true as the list changes.
+function comboGuidePopularLine(venues) {
+  const names = venues.slice(0, 3).map((v) => v.name);
+  if (names.length < 2) return '';
+  return ` Among the most-reviewed: ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}.`;
+}
+function renderComboGuidePage(region, combo, venues, filter = null, now = new Date()) {
+  const regionLabel = REGION_LABELS[region];
+  const { heading, intro } = comboGuideHeading(region, combo);
+  const fullIntro = `${intro}${comboGuidePopularLine(venues)}`;
+  const tally = {};
+  for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
+  const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
+    .map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural }));
+  const town = regionBannerPhoto(region);
+  const banner = (combo.type && CATEGORY_BANNER_IMAGES[combo.type])
+    || (GUIDE_BADGE_BANNERS[combo.badges[0]] && GUIDE_BADGE_BANNERS[combo.badges[0]]())
+    || (town ? { src: town.src, alt: town.alt, pos: town.pos, credit: town.credit } : FOOD_DRINK_HUB_BANNER);
+  const path = `/guide/${region}/${combo.slug}`;
+  const others = listComboGuides().filter((c) => c.region === region && c.slug !== combo.slug).map((c) => GUIDE_COMBO_BY_SLUG[c.slug]);
+  const singles = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && combo.badges.includes(c.badge)).map((c) => c.badge);
+  const chip = (href, label) => `<a class="guide-more-chip" href="${href}">${escapeHtml(label)}</a>`;
+  const afterHtml = `<section class="guide-more" aria-labelledby="guideMoreHeading">
+    <h2 class="category-subsection-heading" id="guideMoreHeading">More in ${escapeHtml(regionLabel)}</h2>
+    ${others.length ? `<p class="guide-more-row">${others.map((c) => chip(`/guide/${region}/${c.slug}`, comboGuideShortName(region, c))).join('')}</p>` : ''}
+    ${singles.length ? `<p class="venue-meta">All ${singles.map((b) => `<a href="/guide/${region}/${b}">${escapeHtml(guideBadgeHeading(region, b).heading.slice(0, -(` in ${regionLabel}`).length).toLowerCase())}</a>`).join(' and ')} in ${escapeHtml(regionLabel)}${combo.type && CATEGORY_SLUGS[combo.type] ? `, or all <a href="/${region}/${CATEGORY_SLUGS[combo.type]}">${escapeHtml(CATEGORY_LABELS[combo.type].plural.toLowerCase())}</a>` : ''}.</p>` : ''}
+  </section>`;
+  const crumbs = [{ name: regionLabel, href: `/${region}` }];
+  if (singles[0]) crumbs.push({ name: guideBadgeHeading(region, singles[0]).heading.slice(0, -(` in ${regionLabel}`).length), href: `/guide/${region}/${singles[0]}` });
+  return renderCuratedHubPage({
+    path,
+    region,
+    name: heading.replace(` in ${regionLabel}`, ''),
+    crumbs,
+    title: `${heading}, BC | Okanagan Roam`,
+    description: `${venues.length} ${heading.replace(` in ${regionLabel}`, '').toLowerCase()} in ${regionLabel}, BC. ${intro}`.slice(0, 300),
+    bodyClass: 'guide-page',
+    surface: 'guide',
+    pageType: 'guide',
+    types,
+    catsFor: (v) => [v.type],
+    photoKeyFor: (v) => curatedPhotoKey(v),
+    features: GUIDE_FEATURES.filter((k) => !combo.badges.includes(k)),
+    openNow: true,
+    search: { label: `Search ${heading.toLowerCase()}`, placeholder: 'Search by name or what you feel like...' },
+    categoryContent: { all: { banner, heading, intro: fullIntro } },
+    heroExtraHtml: '',
+    extraHead: `<style id="guide-page">
   body.guide-page .guide-more { margin: 32px 0 8px; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
   body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
@@ -32635,6 +32756,10 @@ const server = http.createServer(async (req, res) => {
           ({ region, badge, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${badge}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
         ),
+        ...listComboGuides().map(
+          ({ region, slug, lastmod }) =>
+            `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${slug}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
+        ),
         // Outdoors Phase 2: activity pages, only those that actually render
         // (same MIN_ACTIVITY_VENUES gate as the route).
         ...listLiveOutdoorActivities().map(
@@ -32817,10 +32942,21 @@ const server = http.createServer(async (req, res) => {
     }
 
     // GET /guide/:region/:badge — server-rendered SEO landing page.
-    const guideMatch = pathname.match(/^\/guide\/([a-z-]+)\/([a-z_]+)\/?$/);
+    const guideMatch = pathname.match(/^\/guide\/([a-z-]+)\/([a-z_-]+)\/?$/);
     if (guideMatch && method === 'GET') {
       const region = guideMatch[1];
       const badge = guideMatch[2];
+      // Combination guides (2026-10-16): /guide/<town>/<dog-friendly-patios>.
+      const combo = GUIDE_COMBO_BY_SLUG[badge];
+      if (REGION_LABELS[region] && combo) {
+        const rows = getComboGuideVenues(region, combo);
+        if (rows.length >= MIN_COMBO_GUIDE_VENUES) {
+          const gv = rows.map(rowToVenue);
+          const html = renderComboGuidePage(region, combo, gv, parseCuratedHubQuery(query, new Set(gv.map((v) => v.type)), new Set(GUIDE_FEATURES)));
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
+      }
       if (REGION_LABELS[region] && BOOL_FIELDS.includes(badge)) {
         const rows = db
           .prepare(`SELECT * FROM venues WHERE region = ? AND ${badge} = 1 AND redirect_to IS NULL ORDER BY reviews DESC`)
@@ -32861,6 +32997,7 @@ const server = http.createServer(async (req, res) => {
       const urlList = [
         'https://okanaganroam.com/',
         ...combos.map(({ region, badge }) => `https://okanaganroam.com/guide/${region}/${badge}`),
+        ...listComboGuides().map(({ region, slug }) => `https://okanaganroam.com/guide/${region}/${slug}`),
       ];
       try {
         const submitRes = await fetch('https://api.indexnow.org/indexnow', {
@@ -35706,6 +35843,9 @@ module.exports = {
   venueHeroPhoto,
   foodDrinkCardPhotoCss,
   eventKindPhoto,
+  listComboGuides,
+  renderComboGuidePage,
+  GUIDE_COMBOS,
   venueThumbPhoto,
   trimVenueTagline,
   venueDayHoursText,
