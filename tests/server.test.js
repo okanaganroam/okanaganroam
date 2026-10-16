@@ -20240,7 +20240,99 @@ test('Owner portal: signed-in owners publish photos straight away; link uploads 
     assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, null);
     assert.equal(nodeFs.existsSync(nodePath.join(app.OWNER_PHOTO_DIR, row.file)), false);
   } finally {
-    app.setVenueSubmissionTransport(null);
+    // Back to the suite's capturing transport (null would mean real FormSubmit email).
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    for (const f of files) { try { nodeFs.unlinkSync(nodePath.join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner portal (2026-10-15): owners see where every update stands, manage their photos, and the polish fixes', async () => {
+  const http = require('node:http');
+  const nodeFs = require('node:fs');
+  const nodePath = require('node:path');
+  seasonInsert.run({ name: 'Owner Status Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-status-fixture' });
+  seasonInsert.run({ name: 'Owner Nohours Fixture', type: 'cafe', hours: null, slug: 'owner-nohours-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-status-fixture');
+  const nh = app.findVenueBySlug('kelowna', 'cafe', 'owner-nohours-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const tokenNh = app.createOwnerLink(nh.id, {}).url.split('/owner/')[1];
+  const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const photo = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, credit: 'Status Cafe', rights: true, company_website: '', started_at: Date.now() - 10000 };
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie, origin = base) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin, 'X-Real-IP': `10.8.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), cookie: (r.headers.get('set-cookie') || '').split(';')[0] }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  const files = [];
+  try {
+    // No hours on file: days start blank with a note, not all ticked "Closed".
+    const nhPage = await get(`/owner/${tokenNh}`);
+    assert.match(nhPage, /We don&rsquo;t have your hours yet/);
+    assert.doesNotMatch(nhPage.slice(nhPage.indexOf('id="opHours"'), nhPage.indexOf('id="opHoursError"')), /class="op-off" checked/);
+    const page = await get(`/owner/${token}`);
+    assert.doesNotMatch(page, /We don&rsquo;t have your hours yet/, 'known hours are shown as they are');
+    assert.match(page, /Keep this link private/);
+    assert.match(page, /okrOwnerName/, 'the name is remembered for the next form');
+    assert.match(page, /Add the times for/);
+
+    // Activity: a change, an event and two photos.
+    const made = await post(`/owner/${token}/account`, { email: 'status@example.com', password: 'a long enough password' });
+    const cookie = made.cookie;
+    const change = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0123' }, started_at: Date.now() - 10000 });
+    assert.equal(change.status, 201, JSON.stringify(change.body));
+    db.prepare("UPDATE owner_change_requests SET submitted_at = '2026-10-16 03:30:00' WHERE id = ?").run(change.body.id);
+    const p1 = await post(`/owner/account/venue/${v.id}/photos`, photo, cookie);
+    const p2 = await post(`/owner/account/venue/${v.id}/photos`, photo, cookie);
+    for (const r of [p1, p2]) files.push(db.prepare('SELECT file FROM owner_photos WHERE id = ?').get(r.body.id).file);
+    assert.equal(p1.body.main, true);
+    const ev = db.prepare(`INSERT INTO event_submissions (status, name, region, categories, description, venue_name, start_date, end_date, event_url, organizer_name, contact_name, contact_email, consent, consent_version, owner_venue_id, rejection_reason, reviewed_at)
+      VALUES ('rejected', 'Owner Status Gala', 'kelowna', '["live_music"]', 'x', 'Owner Status Fixture', '2026-11-20', '2026-11-20', '', 'x', 'x', 'x@example.com', 1, 'v1', ?, 'Please add a ticket link', CURRENT_TIMESTAMP)`).run(v.id);
+    assert.ok(ev.lastInsertRowid);
+
+    const signedIn = await get(`/owner/account/venue/${v.id}`, cookie);
+    assert.match(signedIn, /Your updates/);
+    assert.match(signedIn, /Listing update: Phone<\/strong><span class="op-act-date">Sent Oct 15<\/span>/, 'Okanagan date, not UTC');
+    assert.match(signedIn, /You sent changes on Oct 15/);
+    assert.match(signedIn, /Event: Owner Status Gala/);
+    assert.match(signedIn, /Please add a ticket link<\/span><\/span><span class="op-status op-status-no">Not approved/);
+    assert.match(signedIn, /Photo \(main photo\)/);
+    assert.doesNotMatch(signedIn, /Keep this link private/, 'signed-in owners are not told to guard a link');
+    assert.match(signedIn, /data-photo="\d+">Make main photo/);
+    const mine = await get('/owner/account', cookie);
+    assert.match(mine, /Waiting for review: 1 update/);
+    assert.match(mine, /1 not approved/);
+    assert.match(mine, /2 photos live/);
+
+    // Photo controls: signed-in, own venue, same site only.
+    assert.equal((await post(`/owner/account/venue/${v.id}/photos/${p2.body.id}/main`, {})).status, 401);
+    assert.equal((await post(`/owner/account/venue/${v.id}/photos/${p2.body.id}/main`, {}, cookie, 'https://evil.example')).status, 403);
+    seasonInsert.run({ name: 'Owner Status Other', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-status-other' });
+    const other = app.findVenueBySlug('kelowna', 'cafe', 'owner-status-other');
+    assert.equal((await post(`/owner/account/venue/${other.id}/photos/${p2.body.id}/main`, {}, cookie)).status, 404);
+    const mk = await post(`/owner/account/venue/${v.id}/photos/${p2.body.id}/main`, {}, cookie);
+    assert.equal(mk.status, 200, JSON.stringify(mk.body));
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/owner/${files[1]}`);
+    // Removing the main photo hands the spot to the other live photo.
+    const rm = await post(`/owner/account/venue/${v.id}/photos/${p2.body.id}/remove`, {}, cookie);
+    assert.equal(rm.status, 200);
+    assert.equal(rm.body.new_main, p1.body.id);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/owner/${files[0]}`);
+    assert.equal(nodeFs.existsSync(nodePath.join(app.OWNER_PHOTO_DIR, files[1])), false);
+    assert.match(await get(`/owner/account/venue/${v.id}`, cookie), /Removed by you/);
+    assert.equal((await post(`/owner/account/venue/${v.id}/photos/${p2.body.id}/remove`, {}, cookie)).status, 404, 'already gone');
+    // The last photo: removing it leaves no main photo.
+    assert.equal((await post(`/owner/account/venue/${v.id}/photos/${p1.body.id}/remove`, {}, cookie)).body.new_main, null);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, null);
+    // Link holders see the status but get no photo controls.
+    const viaLink = await get(`/owner/${token}`);
+    assert.match(viaLink, /Your updates/);
+    assert.doesNotMatch(viaLink, /class="op-remove"/);
+  } finally {
     for (const f of files) { try { nodeFs.unlinkSync(nodePath.join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
     await new Promise((resolve) => srv.close(resolve));
   }

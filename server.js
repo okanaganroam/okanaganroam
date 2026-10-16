@@ -29324,6 +29324,8 @@ ${extraHead}
   body.owner-page .op-linkbtn { background: none; border: 0; padding: 0; color: var(--ref-navy); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
   body.owner-page .op-done { background: #E9F6EE; border-radius: 14px; padding: 18px; font-weight: 600; }
   body.owner-page .op-done[hidden] { display: none; }
+  body.owner-page .op-summary { display: inline-flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+  ${OWNER_STATUS_CSS}
 </style>
 </head>
 <body class="golf-page owner-page">
@@ -29367,7 +29369,7 @@ function renderOwnerLoginPage() {
 
 function renderOwnerAccountPage(account) {
   const venues = ownerAccountVenues(account.id);
-  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a></span>
+  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><span class="op-summary">${ownerVenueSummary(v.id)}</span><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a></span>
       <a class="op-edit" href="/owner/account/venue/${v.id}">Edit listing, events &amp; photos &rarr;</a></li>`).join('');
   return ownerSimplePage('My listings', `
     <div class="op-bar"><span>Signed in as <strong>${escapeHtml(account.email)}</strong></span>
@@ -29664,6 +29666,103 @@ function rejectOwnerChange(id, reviewer, reason) {
   return { ok: true };
 }
 
+// ---------- Owner status + photo controls (2026-10-15) ----------
+// Owners see where everything they sent stands (waiting, live, not approved
+// with the reason), and signed-in owners can remove their photos or pick
+// the main one. Dates are shown in Okanagan time.
+function ownerLocalDate(utc) {
+  const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'short', day: 'numeric' });
+}
+
+function ownerVenueMainImage(venueId) {
+  const row = db.prepare('SELECT image_url FROM venues WHERE id = ?').get(venueId);
+  return row ? row.image_url || null : null;
+}
+
+// Everything sent for this venue, newest first.
+function ownerVenueActivity(venueId, limit = 12) {
+  const items = [];
+  for (const r of db.prepare("SELECT id, status, changes, submitted_at, reviewed_at, rejection_reason FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
+    let fields = [];
+    try { fields = Object.keys(JSON.parse(r.changes)).map((f) => OWNER_FIELD_LABELS[f] || f); } catch (e) { /* unreadable */ }
+    items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.status, reason: r.rejection_reason,
+      title: fields.length ? `Listing update: ${fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}` : 'Listing update' });
+  }
+  for (const e of db.prepare('SELECT id, name, start_date, status, submitted_at, reviewed_at, rejection_reason FROM event_submissions WHERE owner_venue_id = ? ORDER BY id DESC LIMIT 10').all(venueId)) {
+    items.push({ kind: 'event', at: e.reviewed_at || e.submitted_at, sent: e.submitted_at, status: e.status, reason: e.rejection_reason, title: `Event: ${e.name}`, date: e.start_date });
+  }
+  const main = ownerVenueMainImage(venueId);
+  for (const ph of db.prepare('SELECT id, file, status, submitted_at, reviewed_at, reviewed_by, rejection_reason FROM owner_photos WHERE venue_id = ? ORDER BY id DESC LIMIT 20').all(venueId)) {
+    items.push({ kind: 'photo', at: ph.reviewed_at || ph.submitted_at, sent: ph.submitted_at, status: ph.reviewed_by === 'owner' && ph.status === 'rejected' ? 'removed' : ph.status,
+      reason: ph.rejection_reason, title: main === `/images/owner/${ph.file}` ? 'Photo (main photo)' : 'Photo' });
+  }
+  items.sort((a, b) => String(b.sent).localeCompare(String(a.sent)));
+  return items.slice(0, limit);
+}
+
+function ownerStatusLabel(item) {
+  if (item.status === 'pending') return { cls: 'wait', text: 'Waiting for review' };
+  if (item.status === 'approved') return { cls: 'live', text: item.kind === 'event' ? 'Approved: on What’s On' : 'Live' };
+  if (item.status === 'removed') return { cls: 'off', text: 'Removed by you' };
+  return { cls: 'no', text: 'Not approved' };
+}
+
+function ownerActivityHtml(items) {
+  if (!items.length) return '';
+  return `<section class="op-activity" aria-labelledby="opActivityHead">
+      <h2 id="opActivityHead" class="lyv-section-label" style="margin-top:22px">Your updates</h2>
+      <ul>${items.map((it) => {
+        const st = ownerStatusLabel(it);
+        const why = st.cls === 'no' && it.reason ? `<span class="op-why">${escapeHtml(it.reason)}</span>` : '';
+        return `<li><span class="op-act-main"><strong>${escapeHtml(it.title)}</strong><span class="op-act-date">Sent ${escapeHtml(ownerLocalDate(it.sent))}</span>${why}</span><span class="op-status op-status-${st.cls}">${st.text}</span></li>`;
+      }).join('')}</ul>
+    </section>`;
+}
+
+// One line per venue on "My listings".
+function ownerVenueSummary(venueId) {
+  const n = (sql) => db.prepare(sql).get(venueId).n;
+  const waiting = [
+    [n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'pending'"), 'update', 'updates'],
+    [n("SELECT COUNT(*) AS n FROM event_submissions WHERE owner_venue_id = ? AND status = 'pending'"), 'event', 'events'],
+    [n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'pending'"), 'photo', 'photos'],
+  ].filter(([c]) => c > 0).map(([c, one, many]) => `${c} ${c === 1 ? one : many}`);
+  const notApproved = n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'rejected' AND reviewed_at > datetime('now', '-30 days')")
+    + n("SELECT COUNT(*) AS n FROM event_submissions WHERE owner_venue_id = ? AND status = 'rejected' AND reviewed_at > datetime('now', '-30 days')")
+    + n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'rejected' AND reviewed_by != 'owner' AND reviewed_at > datetime('now', '-30 days')");
+  const live = n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'approved'");
+  const parts = [];
+  if (waiting.length) parts.push(`<span class="op-status op-status-wait">Waiting for review: ${waiting.join(', ')}</span>`);
+  if (notApproved) parts.push(`<span class="op-status op-status-no">${notApproved} not approved</span>`);
+  if (live) parts.push(`<span class="op-status op-status-live">${live} photo${live === 1 ? '' : 's'} live</span>`);
+  return parts.length ? parts.join(' ') : '<span class="op-status op-status-live">Up to date</span>';
+}
+
+// POST /owner/account/venue/<id>/photos/<photoId>/(remove|main), signed-in owners only.
+async function handleOwnerPhotoAction(req, res, account, venueId, photoId, action) {
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
+  if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
+  const found = venueForOwnerAccount(account, venueId);
+  const photo = found && db.prepare('SELECT * FROM owner_photos WHERE id = ? AND venue_id = ?').get(photoId, venueId);
+  if (!photo || photo.status === 'rejected') return sendSubmissionResponse(res, 404, { ok: false, error: 'That photo isn’t available any more.' });
+  if (action === 'main') {
+    if (photo.status !== 'approved') return sendSubmissionResponse(res, 409, { ok: false, error: 'This photo is still waiting for review.' });
+    const r = approveOwnerPhoto(photo.id, 'owner', { main: true });
+    return sendSubmissionResponse(res, r.ok ? 200 : 409, r.ok ? { ok: true, main: true } : { ok: false, error: 'Sorry, that didn’t work. Please try again.' });
+  }
+  const r = removeOwnerPhoto(photo.id, 'owner', 'removed by owner');
+  if (!r.ok) return sendSubmissionResponse(res, 409, { ok: false, error: 'Sorry, that didn’t work. Please try again.' });
+  // Removing the main photo hands the spot to the owner's newest other live photo.
+  let newMain = null;
+  if (r.was_main) {
+    const next = db.prepare("SELECT id FROM owner_photos WHERE venue_id = ? AND status = 'approved' ORDER BY id DESC LIMIT 1").get(venueId);
+    if (next && approveOwnerPhoto(next.id, 'owner', { main: true }).ok) newMain = next.id;
+  }
+  return sendSubmissionResponse(res, 200, { ok: true, removed: true, new_main: newMain });
+}
+
 function renderOwnerInvalidLinkPage() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -29680,6 +29779,11 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+  body.owner-page .op-status-wait { background: #FFF1D6; color: #8A5A00; }
+  body.owner-page .op-status-live { background: #E2F3E8; color: #1E6B3A; }
+  body.owner-page .op-status-no { background: #FBE3E0; color: #9C2F22; }
+  body.owner-page .op-status-off { background: #ECEAE6; color: #5B534C; }`;
 function renderOwnerPage(found, token, pending) {
   const { venue, happyHourTimes } = found;
   const snap = ownerVenueSnapshot(venue, happyHourTimes);
@@ -29687,10 +29791,12 @@ function renderOwnerPage(found, token, pending) {
   const showHappyHour = OWNER_HAPPY_HOUR_TYPES.has(venue.type);
   const parseWeek = (json) => { try { return json ? JSON.parse(json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
+  // No hours on file yet: start every day blank, not ticked "Closed".
+  const hoursKnown = !!parseWeek(snap.hours);
   const hh = parseWeek(snap.happy_hour) || {};
   const dayRows = (prefix, week, emptyMeansClosed) => OWNER_DAYS.map((d) => {
     const w = week[d] && week[d].length ? week[d] : [];
-    const closed = emptyMeansClosed ? !w.length : false;
+    const closed = emptyMeansClosed ? (hoursKnown && !w.length) : false;
     const w1 = w[0] || ['', ''];
     const w2 = w[1] || ['', ''];
     return `<div class="op-day" data-day="${d}" data-prefix="${prefix}">
@@ -29708,7 +29814,7 @@ function renderOwnerPage(found, token, pending) {
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
           <label class="amenity-check"><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(BADGE_LABELS[f].title)}</label>`).join('');
   const pendingNote = pending
-    ? `<p class="op-pending">You sent changes on ${escapeHtml(String(pending.submitted_at).slice(0, 10))}. They&rsquo;re waiting for review. If you send new changes, they replace that request.</p>`
+    ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review. If you send new changes, they replace that request.</p>`
     : '';
   const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
   return `<!DOCTYPE html>
@@ -29745,7 +29851,17 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 12px 0 18px; }
   body.owner-page .op-photos figure { margin: 0; }
   body.owner-page .op-photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; }
-  body.owner-page .op-photos figcaption { font-size: 0.78rem; font-weight: 700; color: rgba(42,32,25,0.7); margin-top: 4px; }
+  body.owner-page .op-photos figcaption { font-size: 0.78rem; font-weight: 700; color: rgba(42,32,25,0.7); margin-top: 6px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  body.owner-page .op-photo-btns { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  body.owner-page .op-photo-btns button { background: none; border: 0; padding: 0; font: inherit; font-size: 0.8rem; font-weight: 700; color: var(--ref-navy); text-decoration: underline; cursor: pointer; }
+  body.owner-page .op-photo-btns button.op-remove { color: #9C2F22; }
+  body.owner-page .op-activity ul { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper); border-radius: 14px; }
+  body.owner-page .op-activity li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(42,32,25,0.08); }
+  body.owner-page .op-activity li:last-child { border-bottom: 0; }
+  body.owner-page .op-act-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  body.owner-page .op-act-date { font-size: 0.78rem; color: rgba(42,32,25,0.6); }
+  body.owner-page .op-why { font-size: 0.82rem; color: #9C2F22; }
+  ${OWNER_STATUS_CSS}
   @media (max-width: 640px) { body.owner-page .venue-form { padding: 22px 16px; } body.owner-page .op-day-name { width: 100%; } }
 </style>
 </head>
@@ -29756,9 +29872,10 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">Owner edit page</span>
       <h1>${escapeHtml(venue.name)}</h1>
-      <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>. Keep this link private; anyone with it can suggest changes.</p>
+      <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : ' Keep this link private; anyone with it can suggest changes.'}</p>
       <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
       ${pendingNote}
+      ${ownerActivityHtml(ownerVenueActivity(venue.id))}
       ${found.account ? `<p class="op-bar-in">Signed in as <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="/owner/account">My listings</a></p>` : `
       <details class="op-login" id="opLogin">
         <summary><strong>Create a login</strong> so you don&rsquo;t need this link next time</summary>
@@ -29776,7 +29893,7 @@ ${renderGolfHeaderHtml()}
     </div>
     <form class="venue-form" id="opForm" novalidate>
       <p class="lyv-section-label">Opening hours</p>
-      <p class="op-hint">Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. Closing after midnight? Just enter the closing time, like 01:00.</p>
+      <p class="op-hint">${hoursKnown ? '' : '<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. '}${hoursKnown ? 'Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ' : ''}Closing after midnight? Just enter the closing time, like 01:00.</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>
 
@@ -29819,7 +29936,18 @@ ${renderGolfHeaderHtml()}
     <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them shortly. You can come back to this page any time to send more.</div>
     <h2 id="photos" style="margin-top:44px">Photos</h2>
     <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. ${found.account ? 'Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.' : 'We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.'}</p>
-    ${(() => { const ph = ownerPhotosForVenue(venue.id); return ph.length ? `<div class="op-photos">${ph.map((p) => `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${p.status === 'approved' ? 'Live' : 'Waiting for review'}</figcaption></figure>`).join('')}</div>` : ''; })()}
+    ${(() => {
+      const ph = ownerPhotosForVenue(venue.id);
+      if (!ph.length) return '';
+      const main = ownerVenueMainImage(venue.id);
+      return `<div class="op-photos" id="opPhotoGrid">${ph.map((p) => {
+        const isMain = main === `/images/owner/${p.file}`;
+        const st = p.status === 'approved' ? (isMain ? '<span class="op-status op-status-live">Main photo</span>' : '<span class="op-status op-status-live">Live</span>') : '<span class="op-status op-status-wait">Waiting for review</span>';
+        const btns = found.account ? `<span class="op-photo-btns">${p.status === 'approved' && !isMain ? `<button type="button" class="op-make-main" data-photo="${p.id}">Make main photo</button>` : ''}<button type="button" class="op-remove" data-photo="${p.id}">Remove</button></span>` : '';
+        return `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${st}${btns}</figcaption></figure>`;
+      }).join('')}</div>
+    <p class="lyv-error" id="opPhotoActionError" hidden></p>`;
+    })()}
     <form class="venue-form" id="ofForm" novalidate>
       <div class="form-row full"><div class="form-field">
         <label for="ofFiles">Choose photos</label>
@@ -29889,23 +30017,36 @@ ${renderGolfHeaderHtml()}
     add.addEventListener('click', function(){ row.querySelector('.op-second').hidden = false; add.hidden = true; });
   });
   function week(id){
-    var out = {}, bad = '';
+    var out = {}, bad = '', blank = '', any = false;
     rows(id).forEach(function(row){
       var d = row.getAttribute('data-day');
       if (row.querySelector('.op-off').checked) { out[d] = []; return; }
       var t = row.querySelectorAll('.op-t'), w = [];
       if (t[0].value || t[1].value) { if (!t[0].value || !t[1].value) bad = d; else w.push([t[0].value, t[1].value]); }
       if (t[2].value || t[3].value) { if (!t[2].value || !t[3].value) bad = d; else w.push([t[2].value, t[3].value]); }
+      if (w.length) any = true; else if (!blank) blank = row.querySelector('.op-day-name').textContent;
       out[d] = w;
     });
-    return { week: out, bad: bad };
+    // An open day needs times (opening hours only; a blank happy-hour day just means none).
+    return { week: out, bad: bad, blank: any ? blank : '' };
   }
   function show(id, msg){ var el = document.getElementById(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg; }
+  // A field's error goes away as soon as the owner edits that field.
+  document.addEventListener('input', function(e){
+    var f = e.target && e.target.closest ? e.target.closest('.form-field') : null;
+    if (f) Array.prototype.forEach.call(f.querySelectorAll('.lyv-error'), function(x){ x.hidden = true; });
+  });
+  // Remember the owner's name on this device for the next form.
+  var NAME_KEY = 'okrOwnerName';
+  function savedName(){ try { return localStorage.getItem(NAME_KEY) || ''; } catch (e) { return ''; } }
+  function rememberName(v){ try { if (v && v.trim()) localStorage.setItem(NAME_KEY, v.trim().slice(0, 100)); } catch (e) {} }
+  ['opName', 'oeContactName'].forEach(function(id){ var el = document.getElementById(id); if (el && !el.value) el.value = savedName(); });
   form.addEventListener('submit', function(e){
     e.preventDefault();
     ['opHoursError','opPhoneError','opWebsiteError','opDescriptionError','opBadgesError','opHappyError','opFormError'].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', 'Please fill in both times for each day you are open.'); return; }
+    if (h.blank) { show('opHoursError', 'Add the times for ' + h.blank + ', or tick Closed.'); return; }
     var changes = {
       hours: h.week,
       phone: document.getElementById('opPhone').value,
@@ -29932,7 +30073,7 @@ ${renderGolfHeaderHtml()}
       .then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }); })
       .then(function(r){
         btn.disabled = false;
-        if (r.body && r.body.ok) { form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
+        if (r.body && r.body.ok) { rememberName(document.getElementById('opName').value); form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour);
@@ -29944,7 +30085,20 @@ ${renderGolfHeaderHtml()}
   var evStarted = Date.now();
   var allDay = document.getElementById('oeAllDay');
   allDay.addEventListener('change', function(){ ['oeStartTime','oeEndTime'].forEach(function(id){ document.getElementById(id).disabled = allDay.checked; }); });
-  document.getElementById('oeAnother').addEventListener('click', function(){ ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); });
+  document.getElementById('oeAnother').addEventListener('click', function(){ ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); });
+  // Signed-in owners: remove a photo, or make one the main photo.
+  var grid = document.getElementById('opPhotoGrid');
+  if (grid) grid.addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('button[data-photo]') : null;
+    if (!btn) return;
+    var remove = btn.classList.contains('op-remove');
+    if (remove && !window.confirm('Remove this photo from your page? This can\u2019t be undone.')) return;
+    btn.disabled = true; show('opPhotoActionError', '');
+    fetch(location.pathname + '/photos/' + btn.getAttribute('data-photo') + (remove ? '/remove' : '/main'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (j && j.ok) { location.reload(); return; } btn.disabled = false; show('opPhotoActionError', (j && j.error) || 'Please try again.'); })
+      .catch(function(){ btn.disabled = false; show('opPhotoActionError', 'Could not connect. Please try again.'); });
+  });
   ev.addEventListener('submit', function(e){
     e.preventDefault();
     var ids = { name:'oeNameError', categories:'oeCategoriesError', description:'oeDescriptionError', start_date:'oeStartDateError', end_date:'oeEndDateError',
@@ -29961,7 +30115,7 @@ ${renderGolfHeaderHtml()}
       .then(function(r){ return r.json(); })
       .then(function(j){
         b.disabled = false;
-        if (j && j.ok) { ev.style.display = 'none'; document.getElementById('oeDone').classList.add('show'); return; }
+        if (j && j.ok) { rememberName(v('oeContactName')); ev.style.display = 'none'; document.getElementById('oeDone').classList.add('show'); return; }
         var errs = (j && j.errors) || {};
         Object.keys(errs).forEach(function(k){ if (ids[k]) show(ids[k], errs[k]); });
         show('oeFormError', (j && j.error) || 'Sorry, something went wrong. Please try again.');
@@ -32703,6 +32857,8 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, headers);
         return res.end(renderOwnerAccountPage(account));
       }
+      const pa = /^\/owner\/account\/venue\/(\d+)\/photos\/(\d+)\/(remove|main)$/.exec(pathname);
+      if (pa && method === 'POST') return await handleOwnerPhotoAction(req, res, account, Number(pa[1]), Number(pa[2]), pa[3]);
       const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos))?$/.exec(pathname);
       if (vm) {
         const resolve = () => venueForOwnerAccount(account, Number(vm[1]));
