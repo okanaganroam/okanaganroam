@@ -20337,3 +20337,102 @@ test('Owner portal (2026-10-15): owners see where every update stands, manage th
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Admin review page (2026-10-15): one sign-in, approve/reject everything in one place, owners are emailed the result', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Review Page Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'review-page-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'review-page-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie, origin = base) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin, 'X-Real-IP': `10.9.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  const sent = [];
+  try {
+    // Signed out: only the sign-in form, nothing pending is shown.
+    const out = await get('/admin/review');
+    assert.match(out, /Admin key/);
+    assert.doesNotMatch(out, /Review Page Fixture/);
+    assert.equal((await post('/admin/review/login', { token: 'wrong' })).status, 401);
+    assert.equal((await post('/admin/review/login', { token: LYV_TOKEN }, null, 'https://evil.example')).status, 403);
+    const login = await post('/admin/review/login', { token: LYV_TOKEN });
+    assert.equal(login.status, 200);
+    assert.match(login.setCookie, /^okr_admin=\d{13}\.[A-Za-z0-9_-]{43}; Path=\/admin; HttpOnly; SameSite=Strict/);
+    const cookie = login.setCookie.split(';')[0];
+    assert.equal((await post('/admin/review/change/1/approve', {})).status, 401, 'no cookie');
+    assert.equal((await post('/admin/review/change/1/approve', {}, cookie.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A')))).status, 401, 'tampered cookie');
+    assert.equal((await post('/admin/review/change/1/approve', {}, cookie, 'https://evil.example')).status, 403);
+
+    // Something of each kind waiting.
+    await post(`/owner/${token}/account`, { email: 'Review.Owner@example.com', password: 'a long enough password' });
+    const change = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0187', website: 'https://reviewfixture.example' }, started_at: Date.now() - 10000 });
+    assert.equal(change.status, 201, JSON.stringify(change.body));
+    const photoId = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, rights_confirmed_at)
+      VALUES (?, 'reviewfixture000000000000.jpg', 'reviewfixturepreviewkey', 1200, 900, 100, 'Review Cafe', CURRENT_TIMESTAMP)`).run(v.id).lastInsertRowid);
+    const eventId = Number(db.prepare(`INSERT INTO event_submissions (status, name, region, categories, description, venue_name, start_date, end_date, event_url, organizer_name, contact_name, contact_email, consent, consent_version, owner_venue_id)
+      VALUES ('pending', 'Review Fixture Jazz Night', 'kelowna', '["live_music"]', 'Live jazz.', 'Review Page Fixture', '2027-01-20', '2027-01-20', '', 'Review Cafe', 'Sam', 'sam@example.com', 1, 'v1', ?)`).run(v.id).lastInsertRowid);
+    const venueSubId = Number(db.prepare(`INSERT INTO venue_submissions (name, type, region, description, contact_name, contact_email, consent, consent_version)
+      VALUES ('Review Fixture Bakery', 'cafe', 'kelowna', 'A small bakery.', 'Lee', 'Lee@Example.com', 1, 'v1')`).run().lastInsertRowid);
+
+    // Emails off: the page says so, decisions still work.
+    const offPage = await get('/admin/review', cookie);
+    assert.match(offPage, /Owner emails are off/);
+    assert.match(offPage, /Review Page Fixture/);
+    assert.match(offPage, /250-555-0187/);
+    assert.match(offPage, /src="\/owner-photos\/preview\/reviewfixturepreviewkey\.jpg"/);
+    assert.match(offPage, /Review Fixture Jazz Night/);
+    assert.match(offPage, /Review Fixture Bakery/);
+    assert.doesNotMatch(offPage, /test-fixture-admin-token/);
+    const vs = await post(`/admin/review/venue/${venueSubId}/reject`, { reason: 'Already listed' }, cookie);
+    assert.equal(vs.status, 200, JSON.stringify(vs.body));
+    assert.equal(vs.body.emailed, 'email_off');
+
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    assert.match(await get('/admin/review', cookie), /Owners get an email/);
+    // Approve only the ticked field.
+    const ok = await post(`/admin/review/change/${change.body.id}/approve`, { fields: ['phone'] }, cookie);
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.emailed, 'sent');
+    const row = db.prepare('SELECT phone, website FROM venues WHERE id = ?').get(v.id);
+    assert.equal(row.phone, '250-555-0187');
+    assert.notEqual(row.website, 'https://reviewfixture.example');
+    assert.equal(sent[0].to, 'review.owner@example.com');
+    assert.equal(sent[0].subject, 'Approved: your phone update for Review Page Fixture');
+    assert.match(sent[0].text, /now live on Okanagan Roam/);
+    assert.match(sent[0].text, /\/owner\/login/);
+    assert.equal((await post(`/admin/review/change/${change.body.id}/reject`, {}, cookie)).body.error, 'This was already reviewed.');
+
+    const ph = await post(`/admin/review/photo/${photoId}/reject`, { reason: 'Too dark' }, cookie);
+    assert.equal(ph.status, 200);
+    assert.equal(sent[1].subject, 'Not published: your photo for Review Page Fixture');
+    assert.match(sent[1].text, /Reason: Too dark/);
+
+    const ev = await post(`/admin/review/event/${eventId}/reject`, { reason: 'Please add a ticket link' }, cookie);
+    assert.equal(ev.status, 200, JSON.stringify(ev.body));
+    assert.equal(sent[2].to, 'review.owner@example.com', 'the venue login, not just the form email');
+    assert.match(sent[2].subject, /your event "Review Fixture Jazz Night"/);
+
+    // The owner portal shows the same results.
+    const after = await get('/admin/review', cookie);
+    assert.doesNotMatch(after, /250-555-0187/);
+    assert.doesNotMatch(after, /Review Fixture Jazz Night/);
+
+    // The token API (scripts/owner-portal.js) emails owners too.
+    const c2 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0111' }, started_at: Date.now() - 10000 });
+    const api = await fetch(`${base}/admin/owner-changes/${c2.body.id}/reject`, { method: 'POST',
+      headers: { Authorization: `Bearer ${LYV_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ reviewer: 'dayton', reason: 'Wrong number' }) }).then((r) => r.json());
+    assert.equal(api.emailed, 'sent');
+    assert.match(sent[3].text, /Reason: Wrong number/);
+
+    const logout = await post('/admin/review/logout', {}, cookie);
+    assert.match(logout.setCookie, /okr_admin=; Path=\/admin;.*Max-Age=0/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
