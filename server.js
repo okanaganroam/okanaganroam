@@ -21447,9 +21447,19 @@ function venueHeroPhoto(venue) {
 }
 // A small photo for a related / nearby card: its own photo, else the same
 // example photo its Food & Drink card uses, else its type's trip photo.
-function venueThumbPhoto(v) {
+// used (2026-10-16): an optional Set shared by one group of cards; an
+// example photo already shown in that group is skipped for the next one in
+// the type's list, so related cards do not repeat one stock picture.
+function venueThumbPhoto(v, used) {
   const own = String(v.image_url || '').trim();
   if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return own;
+  if (used && FD_CARD_PHOTOS[v.type]) {
+    const first = venueThumbPhoto(v);
+    const pool = [first, ...FD_CARD_PHOTOS[v.type]];
+    const pick = pool.find((src) => src && !used.has(src)) || first;
+    used.add(pick);
+    return pick;
+  }
   if (FD_CARD_PHOTOS[v.type]) {
     const key = foodDrinkCardPhotoKey(v);
     if (key === 'noodle') return '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg';
@@ -21795,11 +21805,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const relatedNearbyHiddenGemIds = (relatedVenues.length || nearbyVenues.length) ? getHiddenGemVenueIds() : new Set();
   const relatedNearbyLocalFavouriteIds = (relatedVenues.length || nearbyVenues.length) ? getCollectionVenueIds('local_favorite') : new Set();
 
+  const relatedStockPhotosUsed = new Set();
   function relatedCard(v) {
     const meta = [fr && v.cuisine ? frCuisine(v.cuisine) : v.cuisine, v.rating ? `${num(v.rating)}\u2605` : null].filter(Boolean).join(' \u00b7 ');
     const badge = ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
-    const photo = venueThumbPhoto(v);
+    const photo = venueThumbPhoto(v, relatedStockPhotosUsed);
     const typeLabel = ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type;
     const href = fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
     const away = typeof v.distance_km === 'number' ? (v.distance_km < 1 ? `${Math.max(100, Math.round(v.distance_km * 10) * 100)} m` : `${num(v.distance_km.toFixed(1))} km`) : '';
