@@ -20838,3 +20838,33 @@ test('Owner event changes (2026-10-15): change or withdraw a waiting event; chan
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner final polish (2026-10-15): website without https is accepted, Change keeps the name, description hint', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Final Polish Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'final-polish-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'final-polish-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (body) => fetch(`${base}/owner/${token}/changes`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.17.0.${ip++}` },
+    body: JSON.stringify({ changes: body, started_at: Date.now() - 10000 }) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  try {
+    const ok = await post({ website: 'woodfirebakery.ca' });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal(app.getOwnerChange(ok.body.id).changes.website, 'https://woodfirebakery.ca');
+    const www = await post({ website: 'www.woodfirebakery.ca/menu' });
+    assert.equal(app.getOwnerChange(www.body.id).changes.website, 'https://www.woodfirebakery.ca/menu');
+    const bad = await post({ website: 'not a website' });
+    assert.equal(bad.status, 400);
+    assert.match(bad.body.errors.website, /for example yourbusiness\.com/);
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /placeholder="yourbusiness\.com"/);
+    assert.match(page, /If it mentions your hours or prices, check they still match\./);
+    assert.match(page, /var keepName = document\.getElementById\('oeContactName'\)\.value \|\| savedName\(\)/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
