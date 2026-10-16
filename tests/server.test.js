@@ -21118,3 +21118,21 @@ test('Venue page top and "More in" links (2026-10-16): back link and language sw
   assert.match(page, /<div class="venue-top-links"[^>]*><a class="category-back-link" href="\/kelowna\/cafes">← Kelowna Cafes<\/a>/);
   assert.doesNotMatch(page, /Also see:/);
 }));
+
+test('Adventure photos (2026-10-16): new banner anchored left for phones; activity example photos exist in both sizes', () => withDiscoveryServer(async (base) => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const b = app.OUTDOOR_ACTIVITY_BANNERS.adventure;
+  assert.equal(b.src, '/images/outdoors/activity-adventure-2610.jpg');
+  assert.equal(b.posX, 8);
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)));
+  for (const f of ['zipline', 'ropes', 'paraglide', 'skydive', 'horseback', 'atv', 'buggy', 'balloon']) {
+    for (const suffix of ['', '-800']) {
+      const rel = `public/images/outdoors/examples/adventure-${f}-2610${suffix}.jpg`;
+      assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
+    }
+  }
+  for (const rel of ['public/images/outdoors/activity-adventure-2610-800.jpg', 'public/images/outdoors/thumbs/activity-adventure-2610.jpg']) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
+  }
+}));
