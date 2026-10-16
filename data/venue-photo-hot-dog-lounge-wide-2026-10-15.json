@@ -1,0 +1,18 @@
+{
+  "reason": "Swap The Hot Dog Lounge photo for a wide version that fits the listing banner (the toast photo looked zoomed in). Same owner-supplied Media Assets folder from Stephanie Madryga (JoieFarm), 2026-10-15; this is 260503-HDL-411.",
+  "batch_id": "venue-photo-hot-dog-lounge-wide-2026-10-15",
+  "venues": [
+    {
+      "id": 1813,
+      "name": "The Hot Dog Lounge at JoieFarm",
+      "region": "naramata",
+      "slug": "the-hot-dog-lounge-at-joiefarm",
+      "expect": {
+        "image_url": "/images/venues/joiefarm-hot-dog-lounge-toast.jpg?v=20261015"
+      },
+      "set": {
+        "image_url": "/images/venues/joiefarm-hot-dog-lounge-table.jpg?v=20261015"
+      }
+    }
+  ]
+}
