@@ -2213,14 +2213,12 @@ test('Reference redesign: Explore the Okanagan shows exactly the 6 approved feat
 
 test('Reference redesign: Explore the Okanagan cards each include a real, servable destination image', () => {
   const html = app.renderExploreRegionsHTML();
-  // Kelowna and Penticton have their own 960x375 photos (2026-10-06); the other four keep their 640px thumbnails.
-  const OWN_PHOTO = { kelowna: 'kelowna-explore', penticton: 'penticton-explore' };
+  // One photo per destination (2026-10-15): each card shows the town's own photo, the 800px copy of its banner.
   for (const region of REFERENCE_EXPLORE_REGIONS) {
-    const file = OWN_PHOTO[region] || region;
-    assert.match(html, new RegExp(`src="/images/regions/${file}\\.webp"`), `expected a destination image for ${region}`);
-    if (OWN_PHOTO[region]) assert.match(html, new RegExp(`src="/images/regions/${file}\\.webp" width="960" height="375"`), `${region}: the new photo's real size`);
+    const src = app.regionPhoto(region).src800;
+    assert.ok(html.includes(`src="${src}" width="800" height="333"`), `expected ${region}'s photo`);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), `${src} exists`);
   }
-  for (const region of Object.keys(OWN_PHOTO)) assert.ok(!html.includes(`src="/images/regions/${region}.webp"`), `${region}: the old thumbnail is not used on the homepage cards`);
 });
 
 test('Reference redesign: Explore the Okanagan cards still link to their real, unchanged region pages', () => {
@@ -5434,9 +5432,9 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // destinations) — the redesigned Explore cards each reference a
   // placeholder region image; confirm the /images/* route actually serves
   // one of them (not just that the HTML references the path).
-  const exploreRegionImg = await fetch(`${base}/images/regions/kelowna.webp`);
-  assert.equal(exploreRegionImg.status, 200, 'Explore the Okanagan placeholder region image must be servable');
-  assert.equal(exploreRegionImg.headers.get('content-type'), 'image/webp');
+  const exploreRegionImg = await fetch(`${base}/images/regions/photos/kelowna-2610-800.jpg`);
+  assert.equal(exploreRegionImg.status, 200, 'Explore the Okanagan region image must be servable');
+  assert.equal(exploreRegionImg.headers.get('content-type'), 'image/jpeg');
 
   // Milestone 3 (Build Your Perfect Okanagan Trip) — the approved
   // architecture's final homepage section order: Hero -> Mood -> Hidden
@@ -14018,20 +14016,16 @@ test('map day headers: a region whose config or image is missing falls back to t
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('Build My Trip V3 images: day headers use the same current town photos as the Destinations page (2026-10-14)', () => {
+test('Build My Trip V3 images: day headers use each town\'s one photo (2026-10-15)', () => {
   const m = app.TRIP_V3_REGION_IMAGES;
-  for (const slug of ['kelowna', 'lake-country', 'naramata', 'penticton', 'vernon', 'west-kelowna']) {
-    assert.deepEqual(m[slug], { src: `/images/regions/${slug}-explore-fall.jpg`, srcset: null }, `${slug}: the autumn panorama`);
-  }
-  assert.deepEqual(m.oliver, { src: '/images/regions/cards/oliver.jpg', srcset: null });
-  assert.deepEqual(m.osoyoos, { src: '/images/regions/cards/osoyoos.jpg', srcset: null });
-  assert.deepEqual(m.summerland, { src: '/images/regions/cards/summerland.jpg', srcset: null });
-  assert.deepEqual(m['big-white'], { src: '/images/regions/cards/big-white.jpg', srcset: null });
+  assert.deepEqual(Object.keys(m).sort(), Object.keys(app.REGION_LABELS).sort(), 'every destination has one');
+  assert.deepEqual(m.kelowna, { src: '/images/regions/photos/kelowna-2610.jpg', srcset: '/images/regions/photos/kelowna-2610-800.jpg 800w, /images/regions/photos/kelowna-2610.jpg 1600w' });
+  assert.deepEqual(m.armstrong, { src: '/images/regions/photos/armstrong-2610.jpg', srcset: null }, 'a small photo has no 800px copy in the srcset');
   for (const v of Object.values(m)) for (const url of [v.src, ...(v.srcset || '').split(', ').map((x) => x.split(' ')[0]).filter(Boolean)]) {
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', url)), url);
   }
   const page = app.renderTripPlannerV3Page({ preview: true });
-  assert.ok(page.includes('/images/regions/kelowna-explore-fall.jpg'), 'the map reaches the page');
+  assert.ok(page.includes('/images/regions/photos/kelowna-2610.jpg'), 'the map reaches the page');
   assert.ok(page.includes('/images/trip-v3/hero.webp'));
 });
 
@@ -16445,13 +16439,13 @@ test('Page weight: Food & Drink and guide ItemLists keep url + name per venue bu
 test('SEO audit: region pages get their own share image; ski resorts get après-ski wording', () => {
   const ogImage = (html) => (html.match(/<meta property="og:image" content="([^"]*)">/) || [])[1];
   const kelowna = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []);
-  assert.equal(ogImage(kelowna), 'https://okanaganroam.com/images/regions/wide/kelowna.webp');
+  assert.equal(ogImage(kelowna), 'https://okanaganroam.com/images/regions/photos/kelowna-2610.jpg');
   assert.match(kelowna, /<title>Things to Do in Kelowna: Beaches, Wineries &amp; Food \| Okanagan Roam<\/title>/);
 
   const bigWhite = app.renderRegionPage('big-white', app.getRegionCategoryCounts('big-white') || {}, []);
   assert.match(bigWhite, /<title>Big White Restaurants, Bars &amp; Après-Ski, BC \| Okanagan Roam<\/title>/);
   assert.doesNotMatch(bigWhite.match(/<meta name="description" content="([^"]*)">/)[1], /golf|winer/i);
-  assert.equal(ogImage(bigWhite), 'https://okanaganroam.com/images/ski-snow/big-white-sunset.jpg');
+  assert.equal(ogImage(bigWhite), 'https://okanaganroam.com/images/regions/photos/big-white-2610.jpg');
 });
 
 test('Region intros: every destination carries local copy; towns get a "Things to Do" title, ski resorts keep theirs', () => {
@@ -16499,9 +16493,7 @@ test('SEO audit: single-venue pages share their own generated card, not the bran
 });
 
 test('SEO audit: every share image referenced by pageHead exists on disk', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  const block = src.slice(src.indexOf('const REGION_SHARE_IMAGES'), src.indexOf('});', src.indexOf('const REGION_SHARE_IMAGES')));
-  const paths = [...block.matchAll(/'(\/images\/[^']+)'/g)].map((m) => m[1]).concat([
+  const paths = Object.values(app.REGION_SHARE_IMAGES).concat([
     '/images/outdoors/winter.webp', '/images/okanagan-valley-sunset-hero.webp', '/images/mood/eat.webp',
     '/images/hidden-gems/dog-friendly.webp', '/images/mood/whats-on.webp', '/images/whats-on/live-music.webp',
   ]);
@@ -17912,7 +17904,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.doesNotMatch(app.renderHiddenGemsPage(hgV, { types: ['beach'], regions: [] }, 'dog_friendly'), /Hidden Gem Beaches in the Okanagan/, 'badge views keep their own heading');
       // Ski & Snow: one ski-resort region chosen shows that resort's banner, heading and intro.
       const skiBW = app.renderSkiSnowPage([], [], { types: [], regions: ['big-white'] });
-      assert.match(skiBW, /id="lfBanner"><img src="\/images\/ski-snow\/big-white-sunset\.jpg"/);
+      assert.match(skiBW, /id="lfBanner"><img src="\/images\/regions\/photos\/big-white-2610\.jpg"/);
+      const skiApex = app.renderSkiSnowPage([], [], { types: [], regions: ['apex'] });
+      assert.match(skiApex, /id="lfBanner"><img src="\/images\/regions\/photos\/apex-2610\.jpg"[^>]*><p class="region-photo-credit">Photo: <a href="https:\/\/www\.flickr\.com\/photos\/mfoubister\/28658736018\/"[^>]*>Murray Foubister<\/a>, CC BY-SA 2\.0<\/p>/, 'a credited photo shows its credit');
       assert.match(skiBW, /<h1>Big White Ski Resort<\/h1>/);
       assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['apex'] }), /<h1>Apex Mountain Resort<\/h1>/);
       assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['big-white', 'apex'] }), /<h1>Ski &amp; Snow in the Okanagan<\/h1>/, 'two resorts: general text');
@@ -18688,20 +18682,23 @@ test('Guide photos of their own (2026-10-13): each guide-<name> banner has its 1
   }
 });
 
-test('Fall destination cards (2026-10-13): Sep-Nov all six destination cards show their fall photos; other months are unchanged', () => {
-  const srcOf = (html, region) => (html.match(new RegExp(`<a class="region-card" href="/${region}">\\s*<img class="region-card-img" src="([^"]+)" width="(\\d+)" height="(\\d+)"`)) || []).slice(1);
-  const at = (iso) => app.renderExploreRegionsHTML({ now: new Date(`${iso}T19:00:00Z`) });
-  assert.deepEqual(Object.keys(app.FALL_EXPLORE_REGION_PHOTOS).sort(), ['kelowna', 'lake-country', 'naramata', 'penticton', 'vernon', 'west-kelowna']);
-  const summer = app.renderExploreRegionsHTML({ now: SUMMER_NOW });
-  for (const iso of ['2026-09-01', '2026-10-13', '2026-11-30']) {
-    const html = at(iso);
-    for (const [region, src] of Object.entries(app.FALL_EXPLORE_REGION_PHOTOS)) {
-      assert.deepEqual(srcOf(html, region), [src, '960', '375'], `${iso} ${region}`);
-      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), `${src} exists`);
-    }
+test('One photo per destination (2026-10-15): every town has one photo, the same on every page, with all three sizes on disk', () => {
+  const regions = Object.keys(app.REGION_LABELS);
+  assert.deepEqual(Object.keys(app.REGION_PHOTOS).sort(), regions.slice().sort(), 'all 20 destinations');
+  for (const r of regions) {
+    const p = app.regionPhoto(r);
+    for (const f of [p.src, p.src800, p.card]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', f)), `${f} exists`);
+    assert.equal(app.regionBannerPhoto(r).src, p.src, `${r}: banner`);
+    assert.equal(app.REGION_SHARE_IMAGES[r], p.src, `${r}: share image`);
+    assert.equal(app.TRIP_V3_REGION_IMAGES[r].src, p.src, `${r}: trip day header`);
+    if (p.credit) assert.ok(p.credit.by && p.credit.license && /^https:\/\//.test(p.credit.url), `${r}: full credit`);
   }
-  for (const iso of ['2026-07-15', '2026-08-31', '2026-12-01', '2027-03-01']) assert.equal(at(iso), summer, `${iso} unchanged`);
-  assert.doesNotMatch(summer, /-explore-fall\.jpg/);
+  // The homepage cards no longer change for the season.
+  const at = (iso) => app.renderExploreRegionsHTML({ now: new Date(`${iso}T19:00:00Z`) });
+  assert.equal(at('2026-10-13'), at('2026-07-15'));
+  // A credited photo carries its credit on the town page.
+  assert.match(app.renderRegionPage('vernon', app.getRegionCategoryCounts('vernon') || {}, []), /<p class="region-photo-credit">Photo: <a href="https:\/\/www\.flickr\.com\/photos\/52450054@N04\/15340405619"[^>]*>Judy Gallagher<\/a>, CC BY 2\.0<\/p>/);
+  assert.doesNotMatch(app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || {}, []), /region-photo-credit"/, 'no credit line where none is needed');
 });
 
 test('Destination photos (2026-10-13): every /destinations card shows its town photo (3:2, like /categories) or, until one exists, its street map', () => {
@@ -18714,10 +18711,9 @@ test('Destination photos (2026-10-13): every /destinations card shows its town p
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', m[2])), `${m[2]} exists`);
     assert.equal(Boolean(m[1]), m[2].includes('/maps/'), `${region}: map class only on maps`);
   }
-  for (const [r, f] of [['kelowna', 'kelowna-2'], ['penticton', 'penticton-2'], ['vernon', 'vernon-2'], ['okanagan-falls', 'okanagan-falls'], ['kaleden', 'kaleden'], ['big-white', 'big-white']]) {
-    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'images', 'regions', 'cards', `${f}.jpg`)), `${r} photo`);
+  for (const r of ['kelowna', 'penticton', 'vernon', 'okanagan-falls', 'kaleden', 'big-white']) {
     const card = cards.find((c) => c[1] === r);
-    if (card) assert.match(card[0], new RegExp(`src="/images/regions/cards/${f}\\.jpg"`), r);
+    if (card) assert.ok(card[0].includes(`src="${app.regionPhoto(r).card}"`), r);
   }
 });
 

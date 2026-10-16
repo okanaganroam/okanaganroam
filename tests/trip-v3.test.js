@@ -294,12 +294,9 @@ function webpSize(file) {
 }
 const IMG = path.join(__dirname, '..', 'public', 'images');
 
-test('V3 images: the full-size day-header photos and hero exist at their native sizes; the homepage images are the same files as before', () => {
-  const wide = { kelowna: [1648, 640], 'lake-country': [1648, 640], naramata: [1648, 640], penticton: [1648, 640], vernon: [1648, 640], 'west-kelowna': [1648, 640], oliver: [1376, 768], osoyoos: [928, 521], summerland: [928, 521] };
-  for (const [slug, size] of Object.entries(wide)) assert.deepEqual(webpSize(path.join(IMG, 'regions', 'wide', `${slug}.webp`)), size, slug);
+test('V3 images: the hero exists at its native size; the homepage trip-cta photo is the same file as before', () => {
+  // Day headers use each town's one photo (REGION_PHOTOS, 2026-10-15), checked in server.test.js.
   assert.deepEqual(webpSize(path.join(IMG, 'trip-v3', 'hero.webp')), [1600, 656]);
-  // Untouched: the homepage's 640px region thumbnails and its trip-cta photo.
-  for (const slug of ['kelowna', 'lake-country', 'naramata', 'penticton', 'vernon', 'west-kelowna']) assert.deepEqual(webpSize(path.join(IMG, 'regions', `${slug}.webp`)), [640, 249], `${slug} thumbnail`);
   assert.deepEqual(webpSize(path.join(IMG, 'trip-cta.webp')), [1600, 656]);
   assert.equal(fs.statSync(path.join(IMG, 'trip-cta.webp')).size, 95206, 'trip-cta.webp is the same file');
 });
