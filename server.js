@@ -25550,7 +25550,7 @@ function buildVenueSubmissionEmail(sub) {
   if (sub.submitter_role) payload['Submitter role'] = VENUE_SUBMISSION_ROLES[sub.submitter_role] || sub.submitter_role;
   const existing = findExistingVenuesForSubmission(sub.name, sub.region);
   if (existing.length) payload['Possible existing listing'] = existing.map((v) => `${v.name} (venue #${v.id}, ${v.type})`).join('; ');
-  payload['How to review'] = `Approve or reject submission #${sub.id} with the admin token: GET /admin/venue-submissions, then POST /admin/venue-submissions/${sub.id}/approve or /reject.`;
+  payload['How to review'] = `Open ${ADMIN_REVIEW_URL} and approve or reject venue submission #${sub.id}.`;
   return payload;
 }
 
@@ -28084,7 +28084,7 @@ function buildEventSubmissionEmail(sub) {
   if (sub.image_link) payload['Poster / photo link (not published automatically)'] = sub.image_link;
   const existing = findExistingEventsForSubmission(sub);
   if (existing.length) payload['Possible existing event'] = existing.map((e) => `${e.name} (event #${e.event_id}, ${e.rule})`).join('; ');
-  payload['How to review'] = `Approve or reject submission #${sub.id} with the admin token: GET /admin/event-submissions, then POST /admin/event-submissions/${sub.id}/approve or /reject.`;
+  payload['How to review'] = `Open ${ADMIN_REVIEW_URL} and approve or reject event submission #${sub.id}.`;
   return payload;
 }
 
@@ -28773,7 +28773,7 @@ function buildOwnerChangeEmail(req) {
     else payload[`${OWNER_FIELD_LABELS[field]} (new)`] = ownerValueText(field, value);
   }
   if (req.note) payload['Note from the owner'] = req.note;
-  payload['How to review'] = `node scripts/owner-portal.js list, then node scripts/owner-portal.js approve ${req.id} (or reject ${req.id} "reason").`;
+  payload['How to review'] = `Open ${ADMIN_REVIEW_URL} and approve or reject owner update #${req.id}.`;
   return payload;
 }
 
@@ -28963,7 +28963,7 @@ function buildOwnerPhotoEmail(venue, photos, live = false) {
     'Listing': venueListingUrl(venue),
     'Photos': photos.map((p) => `#${p.id}: ${ownerPhotoPreviewUrl(p.preview_key)}`).join('\n'),
     'Credit': photos[0].credit,
-    'How to review': live ? 'node scripts/owner-portal.js photos approved, then photo-remove <id> "reason" for any that should come down.' : 'node scripts/owner-portal.js photos, then photo-approve <id> [--main] or photo-reject <id> "reason".',
+    'How to review': live ? `Already live. Open ${ADMIN_REVIEW_URL} to take a photo down if it shouldn't be there.` : `Open ${ADMIN_REVIEW_URL} to approve or reject it.`,
   };
 }
 
@@ -29664,6 +29664,384 @@ function rejectOwnerChange(id, reviewer, reason) {
   db.prepare("UPDATE owner_change_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
     .run(reviewer, String(reason || '').slice(0, 300) || null, id);
   return { ok: true };
+}
+
+// ---------- Admin review page + owner decision emails (2026-10-15) ----------
+//
+// /admin/review lists everything waiting for Dayton (owner updates, owner
+// photos, events, new venues) with Approve / Reject buttons, plus owner photos
+// that went live by themselves in the last 14 days (with Remove). It signs in
+// once with ENRICHMENT_ADMIN_TOKEN and keeps a 30-day cookie (okr_admin, Path
+// /admin, SameSite=Strict) that is an HMAC of its expiry keyed by the token,
+// so changing the token signs every browser out. Each decision emails the
+// owner (or the person who sent the event / venue) when BREVO_API_KEY is set;
+// without it nothing is emailed and owners still see the result in their portal.
+const ADMIN_REVIEW_URL = 'https://okanaganroam.com/admin/review';
+const ADMIN_SESSION_COOKIE = 'okr_admin';
+const ADMIN_SESSION_DAYS = 30;
+const ADMIN_LOGIN_RATE_LIMIT = 10;
+const ADMIN_REVIEWER = 'dayton';
+const OWNER_LOGIN_URL = 'https://okanaganroam.com/owner/login';
+const adminLoginAttempts = new Map();
+
+function adminSessionSig(expires) {
+  return crypto.createHmac('sha256', ENRICHMENT_ADMIN_TOKEN).update(`okanagan-roam-admin-session:${expires}`).digest('base64url');
+}
+
+function makeAdminSession(now = Date.now()) {
+  const expires = now + ADMIN_SESSION_DAYS * 86400000;
+  return `${expires}.${adminSessionSig(expires)}`;
+}
+
+function adminSessionValid(req, now = Date.now()) {
+  if (!ENRICHMENT_ADMIN_TOKEN) return false;
+  const m = /^(\d{13})\.([A-Za-z0-9_-]{43})$/.exec(readCookie(req, ADMIN_SESSION_COOKIE) || '');
+  if (!m || Number(m[1]) < now) return false;
+  return safeTokenEquals(m[2], adminSessionSig(m[1]));
+}
+
+function adminCookieHeader(req, value, maxAgeSeconds) {
+  const secure = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https' || /okanaganroam\.com$/.test(String(req.headers.host || ''));
+  return `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(value)}; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
+}
+
+function adminLoginRateLimited(ip, now = Date.now()) {
+  const recent = (adminLoginAttempts.get(ip) || []).filter((t) => now - t < 15 * 60000);
+  recent.push(now);
+  adminLoginAttempts.set(ip, recent);
+  return recent.length > ADMIN_LOGIN_RATE_LIMIT;
+}
+
+async function handleAdminReviewLogin(req, res) {
+  if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { ok: false, error: 'Admin review is not configured.' });
+  if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { ok: false, error: 'Please sign in from the review page.' });
+  if (adminLoginRateLimited(requestClientIp(req))) return sendJSON(res, 429, { ok: false, error: 'Too many attempts. Please wait 15 minutes.' });
+  let body;
+  try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { ok: false, error: 'Please try again.' }); }
+  const token = body && typeof body.token === 'string' ? body.token.trim() : '';
+  if (!token || !safeTokenEquals(token, ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { ok: false, error: 'That key is not right.' });
+  res.setHeader('Set-Cookie', adminCookieHeader(req, makeAdminSession(), ADMIN_SESSION_DAYS * 86400));
+  return sendJSON(res, 200, { ok: true });
+}
+
+// --- emails to owners -------------------------------------------------------
+
+// Login emails for the venue, or the contact email on its edit link when no
+// one has made a login yet.
+function ownerEmailsForVenue(venueId) {
+  const emails = db.prepare('SELECT a.email FROM owner_account_venues av JOIN owner_accounts a ON a.id = av.account_id WHERE av.venue_id = ?').all(venueId).map((r) => r.email);
+  if (!emails.length) {
+    const link = db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(venueId);
+    if (link && link.contact_email) emails.push(link.contact_email);
+  }
+  return [...new Set(emails.map((e) => String(e).trim().toLowerCase()).filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)))];
+}
+
+function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner }) {
+  const sign = '\n\nThanks,\nOkanagan Roam\ninfo@okanaganroam.com';
+  const manage = owner ? `\n\nYou can update your listing, add events or send photos any time: ${OWNER_LOGIN_URL} (or use your private edit link).` : '';
+  if (outcome === 'approved') {
+    return {
+      subject: `Approved: ${what} for ${venueName}`,
+      text: `Hi,\n\nGood news: we approved ${what} for ${venueName}, and it's now live on Okanagan Roam.${link ? `\n\nSee it here: ${link}` : ''}${manage}${sign}`,
+    };
+  }
+  const why = reason ? `\n\nReason: ${reason}` : '';
+  if (outcome === 'removed') {
+    return {
+      subject: `A photo was taken down from ${venueName}`,
+      text: `Hi,\n\nWe took ${what} down from the ${venueName} listing on Okanagan Roam.${why}${manage}\n\nQuestions? Email us at info@okanaganroam.com.${sign}`,
+    };
+  }
+  return {
+    subject: `Not published: ${what} for ${venueName}`,
+    text: `Hi,\n\nThanks for sending ${what} for ${venueName}. We weren't able to publish it this time.${why}${owner ? `\n\nYou can send a corrected version from your business login: ${OWNER_LOGIN_URL} (or your private edit link).` : ''}\n\nQuestions? Email us at info@okanaganroam.com.${sign}`,
+  };
+}
+
+// -> 'sent' | 'failed' | 'no_address' | 'email_off'
+async function sendOwnerDecision(to, message) {
+  if (!to.length) return 'no_address';
+  const send = ownerDirectEmail();
+  if (!send) return 'email_off';
+  try {
+    for (const addr of to) await send({ to: addr, subject: message.subject, text: message.text });
+    return 'sent';
+  } catch (err) {
+    console.error(`[admin-review] decision email failed: ${String((err && err.message) || err).slice(0, 300)}`);
+    return 'failed';
+  }
+}
+
+function ownerFieldList(fields) {
+  const names = fields.map((f) => (OWNER_FIELD_LABELS[f] || f).toLowerCase());
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0] || 'listing';
+}
+
+// Emails whoever sent item `id` after a successful decision. `extra` carries
+// what only the caller knows (the fields approved, the reason given).
+async function notifyReviewDecision(kind, id, action, extra = {}) {
+  const outcome = action === 'approve' ? 'approved' : action === 'remove' ? 'removed' : 'rejected';
+  const reason = typeof extra.reason === 'string' ? extra.reason.trim().slice(0, 300) : '';
+  if (kind === 'change') {
+    const r = getOwnerChange(id);
+    const v = r && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(r.venue_id);
+    if (!v) return 'no_address';
+    const fields = outcome === 'approved' && Array.isArray(extra.applied) ? extra.applied : Object.keys(r.changes);
+    return sendOwnerDecision(ownerEmailsForVenue(v.id), ownerDecisionEmail({ venueName: v.name, what: `your ${ownerFieldList(fields)} update`, outcome, reason, link: venueListingUrl(v), owner: true }));
+  }
+  if (kind === 'photo') {
+    const p = db.prepare('SELECT venue_id FROM owner_photos WHERE id = ?').get(id);
+    const v = p && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(p.venue_id);
+    if (!v) return 'no_address';
+    return sendOwnerDecision(ownerEmailsForVenue(v.id), ownerDecisionEmail({ venueName: v.name, what: 'your photo', outcome, reason, link: venueListingUrl(v), owner: true }));
+  }
+  if (kind === 'event') {
+    const s = getEventSubmission(id);
+    if (!s) return 'no_address';
+    const venue = s.owner_venue_id ? db.prepare('SELECT name FROM venues WHERE id = ?').get(s.owner_venue_id) : null;
+    const ev = s.event_id ? db.prepare('SELECT region, slug FROM events WHERE id = ?').get(s.event_id) : null;
+    const to = s.owner_venue_id ? ownerEmailsForVenue(s.owner_venue_id) : [];
+    if (!to.length && s.contact_email) to.push(String(s.contact_email).trim().toLowerCase());
+    return sendOwnerDecision(to, ownerDecisionEmail({ venueName: venue ? venue.name : 'Okanagan Roam', what: `your event "${s.name}"`, outcome, reason,
+      link: ev ? `https://okanaganroam.com/${ev.region}/events/${ev.slug}` : null, owner: !!s.owner_venue_id }));
+  }
+  if (kind === 'venue') {
+    const s = getVenueSubmission(id);
+    if (!s) return 'no_address';
+    const v = s.venue_id ? db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(s.venue_id) : null;
+    return sendOwnerDecision(s.contact_email ? [String(s.contact_email).trim().toLowerCase()] : [],
+      ownerDecisionEmail({ venueName: s.name, what: 'your new listing', outcome, reason, link: v ? venueListingUrl(v) : null, owner: false }));
+  }
+  return 'no_address';
+}
+
+// --- review actions ---------------------------------------------------------
+
+const ADMIN_REVIEW_ERRORS = {
+  not_found: 'This was already removed.', not_pending: 'This was already reviewed.', venue_unavailable: 'The listing no longer exists.',
+  file_missing: 'The photo file is missing.', no_fields: 'Tick at least one change to approve.', write_failed: 'Saving failed; nothing changed.',
+  hours_failed: 'The hours could not be saved.', happy_hour_failed: 'The happy hour could not be saved.',
+};
+
+// One decision from the review page -> { status, body }.
+async function adminReviewAction(kind, id, action, body) {
+  const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+  let r;
+  if (kind === 'change') {
+    if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
+    const fields = Array.isArray(body.fields) ? body.fields.filter((f) => typeof f === 'string') : undefined;
+    r = action === 'approve' ? approveOwnerChange(id, ADMIN_REVIEWER, fields) : rejectOwnerChange(id, ADMIN_REVIEWER, reason);
+    if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason, detail: r.detail } };
+  } else if (kind === 'photo') {
+    r = action === 'approve' ? approveOwnerPhoto(id, ADMIN_REVIEWER, { main: typeof body.main === 'boolean' ? body.main : undefined })
+      : action === 'remove' ? removeOwnerPhoto(id, ADMIN_REVIEWER, reason) : rejectOwnerPhoto(id, ADMIN_REVIEWER, reason);
+    if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason } };
+  } else if (kind === 'event' || kind === 'venue') {
+    if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
+    const payload = { reviewer: ADMIN_REVIEWER };
+    if (action === 'reject') { if (reason) payload.reason = reason; }
+    else if (kind === 'event' && Array.isArray(body.reviewed_duplicates)) payload.reviewed_duplicates = body.reviewed_duplicates.filter((n) => Number.isInteger(n) && n > 0);
+    else if (kind === 'venue') {
+      if (body.allow_duplicate === true) payload.allow_duplicate = true;
+      if (body.include_amenities === true) payload.include_amenities = true;
+    }
+    const out = kind === 'event'
+      ? (action === 'approve' ? approveEventSubmission(id, payload) : rejectEventSubmission(id, payload))
+      : (action === 'approve' ? approveVenueSubmission(id, payload) : rejectVenueSubmission(id, payload));
+    if (out.status !== 200) {
+      const dup = out.body.error === 'possible_duplicate' || out.body.error === 'duplicate_event';
+      return { status: out.status, body: { error: dup ? 'This looks like an event that is already listed. Check it, then tick "Not a duplicate" to publish anyway.' : out.body.error, detail: out.body.detail || out.body.existing } };
+    }
+    r = { ok: true };
+  } else {
+    return { status: 404, body: { error: 'Unknown item.' } };
+  }
+  const emailed = await notifyReviewDecision(kind, id, action, { reason, applied: r.applied });
+  return { status: 200, body: { ok: true, emailed } };
+}
+
+// --- the page ---------------------------------------------------------------
+
+const ADMIN_REVIEW_CSS = `
+  body.owner-page .op-wrap { max-width: 920px; }
+  .rv-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 22px; }
+  .rv-tabs a { background: var(--paper); border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  .rv-section { margin: 30px 0 10px; }
+  .rv-card { background: var(--paper); border-radius: 14px; padding: 16px 18px; margin: 12px 0; }
+  .rv-card h3 { margin: 0 0 4px; font-size: 1.05rem; }
+  .rv-meta { font-size: 0.82rem; color: rgba(42,32,25,0.66); margin: 0 0 10px; }
+  .rv-diff { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 6px 0 10px; }
+  .rv-diff th, .rv-diff td { text-align: left; vertical-align: top; padding: 6px 8px; border-top: 1px solid rgba(42,32,25,0.1); }
+  .rv-diff td.rv-old { color: rgba(42,32,25,0.55); text-decoration: line-through; }
+  .rv-diff td.rv-new { font-weight: 700; }
+  .rv-photo { max-width: 100%; max-height: 320px; border-radius: 10px; display: block; margin: 6px 0 10px; }
+  .rv-text { white-space: pre-wrap; font-size: 0.88rem; margin: 6px 0 10px; }
+  .rv-warn { background: #FFF4D6; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 6px 0 10px; }
+  .rv-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .rv-actions input[type=text] { flex: 1 1 220px; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.2); font: inherit; font-size: 0.88rem; }
+  .rv-btn { border: 0; border-radius: 10px; padding: 9px 16px; font-weight: 800; cursor: pointer; font: inherit; font-weight: 800; }
+  .rv-approve { background: #2E7D4F; color: #fff; }
+  .rv-reject { background: #fff; color: #A93226; border: 1px solid #E3B6B0; }
+  .rv-opt { font-size: 0.85rem; display: inline-flex; gap: 6px; align-items: center; margin-right: 12px; }
+  .rv-result { font-size: 0.86rem; font-weight: 700; margin: 8px 0 0; }
+  .rv-card.rv-done { opacity: 0.55; }
+  .rv-empty { font-size: 0.9rem; color: rgba(42,32,25,0.66); }
+  .rv-mail { font-size: 0.84rem; background: var(--paper); border-radius: 10px; padding: 8px 12px; }
+`;
+
+function adminReviewEsc(v) { return escapeHtml(v == null ? '' : String(v)); }
+
+// "Oct 15, 6:24 p.m." in Okanagan time.
+function adminReviewTime(utc) {
+  const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
+  if (Number.isNaN(d.getTime())) return String(utc || '');
+  return d.toLocaleString('en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function adminReviewActions(kind, id, opts = {}) {
+  const approve = opts.remove ? '' : `<button type="button" class="rv-btn rv-approve" data-act="approve">${opts.approveLabel || 'Approve'}</button>`;
+  const reject = `<button type="button" class="rv-btn rv-reject" data-act="${opts.remove ? 'remove' : 'reject'}">${opts.remove ? 'Remove from site' : 'Reject'}</button>`;
+  return `<div class="rv-actions">${opts.options || ''}</div>
+      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)'}">${reject}</div>
+      <p class="rv-result" hidden></p>`;
+}
+
+function renderAdminChangeCard(r) {
+  const rows = Object.keys(r.changes).map((f) => {
+    const before = f === 'badges' ? '' : ownerValueText(f, r.previous[f]);
+    return `<tr><th><label class="rv-opt"><input type="checkbox" name="field" value="${adminReviewEsc(f)}" checked>${adminReviewEsc(OWNER_FIELD_LABELS[f] || f)}</label></th>
+        <td class="rv-old">${adminReviewEsc(before)}</td><td class="rv-new">${adminReviewEsc(ownerValueText(f, r.changes[f]))}</td></tr>`;
+  }).join('');
+  return `<article class="rv-card" data-kind="change" data-id="${r.id}">
+      <h3>${adminReviewEsc(r.venue_name)}</h3>
+      <p class="rv-meta">Update #${r.id} · sent ${adminReviewEsc(adminReviewTime(r.submitted_at))}${r.contact_name ? ` by ${adminReviewEsc(r.contact_name)}` : ''} · <a href="${adminReviewEsc(r.listing_url)}" target="_blank" rel="noopener">listing</a></p>
+      <table class="rv-diff"><tr><th>Change</th><th>Now</th><th>New</th></tr>${rows}</table>
+      ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
+      ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
+    </article>`;
+}
+
+function renderAdminPhotoCard(p, live) {
+  const preview = String(p.preview_url || '').replace(/^https:\/\/okanaganroam\.com/, '');
+  const main = live ? '' : `<label class="rv-opt"><input type="checkbox" name="main"${p.venue_has_own_photo ? '' : ' checked'}>Make it the main photo</label>`;
+  return `<article class="rv-card" data-kind="photo" data-id="${p.id}">
+      <h3>${adminReviewEsc(p.venue_name)}</h3>
+      <p class="rv-meta">Photo #${p.id} · ${p.width}×${p.height} · sent ${adminReviewEsc(adminReviewTime(p.submitted_at))} · credit “${adminReviewEsc(p.credit)}”${p.is_main ? ' · <strong>main photo</strong>' : ''} · <a href="${adminReviewEsc(p.listing_url)}" target="_blank" rel="noopener">listing</a></p>
+      <img class="rv-photo" src="${adminReviewEsc(preview)}" alt="" loading="lazy">
+      ${adminReviewActions('photo', p.id, { remove: live, options: main })}
+    </article>`;
+}
+
+function renderAdminEventCard(s) {
+  const when = `${formatSubmissionLocalDate(s.start_date)}${s.end_date && s.end_date !== s.start_date ? ` – ${formatSubmissionLocalDate(s.end_date)}` : ''}${s.all_day || !s.start_time ? '' : `, ${formatSubmissionLocalTime(s.start_time)}${s.end_time ? `–${formatSubmissionLocalTime(s.end_time)}` : ''}`}`;
+  const dups = s.possible_existing_events || [];
+  const dupHtml = dups.length ? `<div class="rv-warn">Possibly already listed: ${dups.map((d) => adminReviewEsc(d.name)).join(', ')}</div>` : '';
+  const dupOpt = dups.length ? `<label class="rv-opt"><input type="checkbox" name="notdup" data-ids="${dups.map((d) => d.event_id).join(',')}">Not a duplicate</label>` : '';
+  return `<article class="rv-card" data-kind="event" data-id="${s.id}">
+      <h3>${adminReviewEsc(s.name)}</h3>
+      <p class="rv-meta">Event #${s.id} · ${adminReviewEsc(when)} · ${adminReviewEsc(s.venue_name || '')}, ${adminReviewEsc(REGION_LABELS[s.region] || s.region)} · by ${adminReviewEsc(s.organizer_name)} (${adminReviewEsc(s.contact_email)})${s.owner_venue_id ? ' · <strong>from the venue owner</strong>' : ''}${s.event_url ? ` · <a href="${adminReviewEsc(s.event_url)}" target="_blank" rel="noopener nofollow">their link</a>` : ''}</p>
+      <p class="rv-text">${adminReviewEsc(s.description)}</p>
+      ${dupHtml}
+      ${adminReviewActions('event', s.id, { options: dupOpt })}
+    </article>`;
+}
+
+function renderAdminVenueCard(s) {
+  const dups = s.possible_existing_venues || [];
+  const amen = (s.amenities || []).map((a) => (BADGE_LABELS[a] ? BADGE_LABELS[a].title : a));
+  const opts = `${amen.length ? `<label class="rv-opt"><input type="checkbox" name="amenities">Publish their badges (${adminReviewEsc(amen.join(', '))})</label>` : ''}${dups.length ? '<label class="rv-opt"><input type="checkbox" name="allowdup">Not a duplicate</label>' : ''}`;
+  return `<article class="rv-card" data-kind="venue" data-id="${s.id}">
+      <h3>${adminReviewEsc(s.name)}</h3>
+      <p class="rv-meta">New venue #${s.id} · ${adminReviewEsc(s.type)} · ${adminReviewEsc(REGION_LABELS[s.region] || s.region)} · from ${adminReviewEsc(s.contact_name)} (${adminReviewEsc(s.contact_email)})</p>
+      <p class="rv-text">${[s.address, s.phone, s.website].filter(Boolean).map(adminReviewEsc).join(' · ')}</p>
+      <p class="rv-text">${adminReviewEsc(s.description)}</p>
+      ${dups.length ? `<div class="rv-warn">Already listed with this name: ${dups.map((d) => adminReviewEsc(d.name)).join(', ')}</div>` : ''}
+      ${adminReviewActions('venue', s.id, { options: opts })}
+    </article>`;
+}
+
+function recentLiveOwnerPhotos() {
+  const ids = new Set(db.prepare("SELECT id FROM owner_photos WHERE status = 'approved' AND reviewed_by LIKE 'owner:%' AND submitted_at > datetime('now', '-14 days')").all().map((r) => r.id));
+  return listOwnerPhotos('approved').filter((p) => ids.has(p.id));
+}
+
+function renderAdminReviewPage() {
+  const changes = listOwnerChanges('pending');
+  const photos = listOwnerPhotos('pending');
+  const live = recentLiveOwnerPhotos();
+  const events = listEventSubmissions('pending');
+  const venues = listVenueSubmissions('pending');
+  const total = changes.length + photos.length + events.length + venues.length;
+  const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
+    ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
+  const mail = ownerDirectEmail()
+    ? '<p class="rv-mail">Owners get an email when you approve or reject something.</p>'
+    : '<p class="rv-mail"><strong>Owner emails are off</strong> until BREVO_API_KEY is added in Railway. Owners still see the result in their business login.</p>';
+  return ownerSimplePage('Review', `
+    <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
+    <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
+    ${mail}
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a><a href="#venues">New venues (${venues.length})</a><a href="#live">Live photos (${live.length})</a></nav>
+    ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
+    ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
+    ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
+    ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
+    ${section('live', 'Photos owners published (last 14 days)', live, (p) => renderAdminPhotoCard(p, true), 'None in the last 14 days.')}
+<script>
+(function(){
+  document.getElementById('rvLogout').addEventListener('click', function(){
+    fetch('/admin/review/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.reload(); });
+  });
+  var EMAIL = { sent: ' They were emailed.', failed: ' The email to them failed.', email_off: '', no_address: ' (No email address to tell them.)' };
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-act]'); if (!btn) return;
+    var card = btn.closest('.rv-card'), act = btn.getAttribute('data-act'), out = card.querySelector('.rv-result');
+    var body = { reason: card.querySelector('input[name=reason]').value };
+    var kind = card.getAttribute('data-kind');
+    if (kind === 'change') body.fields = Array.prototype.map.call(card.querySelectorAll('input[name=field]:checked'), function(i){ return i.value; });
+    var main = card.querySelector('input[name=main]'); if (main) body.main = main.checked;
+    var nd = card.querySelector('input[name=notdup]'); if (nd && nd.checked) body.reviewed_duplicates = nd.getAttribute('data-ids').split(',').map(Number);
+    var ad = card.querySelector('input[name=allowdup]'); if (ad) body.allow_duplicate = ad.checked;
+    var am = card.querySelector('input[name=amenities]'); if (am) body.include_amenities = am.checked;
+    var buttons = card.querySelectorAll('button'); Array.prototype.forEach.call(buttons, function(b){ b.disabled = true; });
+    fetch('/admin/review/' + kind + '/' + card.getAttribute('data-id') + '/' + act, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(x){
+        out.hidden = false;
+        if (x.ok) { out.textContent = (act === 'approve' ? 'Approved and live.' : act === 'remove' ? 'Removed from the site.' : 'Rejected.') + (EMAIL[x.j.emailed] || ''); card.classList.add('rv-done'); return; }
+        out.textContent = (x.j && x.j.error) || 'Something went wrong.';
+        Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
+      })
+      .catch(function(){ out.hidden = false; out.textContent = 'Could not reach the site. Check your connection.'; Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; }); });
+  });
+})();
+</script>`, `<style>${ADMIN_REVIEW_CSS}</style>`);
+}
+
+function renderAdminReviewLoginPage() {
+  return ownerSimplePage('Review sign in', `
+    <h1>Review</h1>
+    <p>Paste the admin key (ENRICHMENT_ADMIN_TOKEN from Railway, Variables). This browser stays signed in for 30 days.</p>
+    <form class="venue-form" id="rvForm" novalidate>
+      <div class="form-field"><label for="rvToken">Admin key</label><input type="password" id="rvToken" autocomplete="current-password" maxlength="400"></div>
+      <p class="lyv-error" id="rvError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="rvSubmit">Sign in</button>
+    </form>
+<script>
+(function(){
+  var f = document.getElementById('rvForm'), err = document.getElementById('rvError'), btn = document.getElementById('rvSubmit');
+  f.addEventListener('submit', function(e){
+    e.preventDefault(); err.hidden = true; btn.disabled = true;
+    fetch('/admin/review/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ token: document.getElementById('rvToken').value }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.reload(); return; } err.textContent = (j && j.error) || 'Please try again.'; err.hidden = false; })
+      .catch(function(){ btn.disabled = false; err.textContent = 'Could not sign in. Please check your connection.'; err.hidden = false; });
+  });
+})();
+</script>`);
 }
 
 // ---------- Owner status + photo controls (2026-10-15) ----------
@@ -31125,7 +31503,8 @@ const server = http.createServer(async (req, res) => {
         const r = m[2] === 'approve' ? approveOwnerPhoto(id, reviewer, { main: typeof body.main === 'boolean' ? body.main : undefined })
           : m[2] === 'remove' ? removeOwnerPhoto(id, reviewer, body.reason) : rejectOwnerPhoto(id, reviewer, body.reason);
         if (!r.ok) return sendJSON(res, { not_found: 404, not_pending: 409, venue_unavailable: 409, file_missing: 410 }[r.reason] || 400, { error: r.reason, status: r.status });
-        return sendJSON(res, 200, { id, ...r });
+        const emailed = await notifyReviewDecision('photo', id, m[2], { reason: body.reason });
+        return sendJSON(res, 200, { id, ...r, emailed });
       }
     }
     if (pathname.startsWith('/images/') && method === 'GET') {
@@ -32813,6 +33192,7 @@ const server = http.createServer(async (req, res) => {
       if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
       const id = Number(submissionReviewMatch[1]);
       const result = submissionReviewMatch[2] === 'approve' ? approveVenueSubmission(id, body) : rejectVenueSubmission(id, body);
+      if (result.status === 200) result.body.emailed = await notifyReviewDecision('venue', id, submissionReviewMatch[2], { reason: body.reason });
       return sendJSON(res, result.status, result.body);
     }
 
@@ -32914,6 +33294,31 @@ const server = http.createServer(async (req, res) => {
       if (!body || !Number.isInteger(body.venue_id)) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
       return sendJSON(res, 200, { venue_id: body.venue_id, revoked: revokeOwnerLink(body.venue_id) });
     }
+    // Review page (2026-10-15): see renderAdminReviewPage.
+    if ((pathname === '/admin/review' || pathname === '/admin/review/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Review', '<h1>Review</h1><p>The admin key is not set up on this server.</p>'));
+      return res.end(signedIn ? renderAdminReviewPage() : renderAdminReviewLoginPage());
+    }
+    if (pathname === '/admin/review/login' && method === 'POST') return await handleAdminReviewLogin(req, res);
+    if (pathname === '/admin/review/logout' && method === 'POST') {
+      res.setHeader('Set-Cookie', adminCookieHeader(req, '', 0));
+      return sendJSON(res, 200, { ok: true });
+    }
+    {
+      const m = /^\/admin\/review\/(change|photo|event|venue)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+        if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const out = await adminReviewAction(m[1], Number(m[2]), m[3], body);
+        return sendJSON(res, out.status, out.body);
+      }
+    }
     if (pathname === '/admin/owner-changes' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
       const status = ['pending', 'approved', 'rejected', 'superseded', 'all'].includes(query.status) ? query.status : 'pending';
@@ -32930,7 +33335,8 @@ const server = http.createServer(async (req, res) => {
         const id = Number(m[1]);
         const r = m[2] === 'approve' ? approveOwnerChange(id, reviewer, body.fields) : rejectOwnerChange(id, reviewer, body.reason);
         if (!r.ok) return sendJSON(res, { not_found: 404, not_pending: 409, venue_unavailable: 409 }[r.reason] || 400, { error: r.reason, detail: r.detail, applied: r.applied, status: r.status });
-        return sendJSON(res, 200, { id, ...r });
+        const emailed = await notifyReviewDecision('change', id, m[2], { reason: body.reason, applied: r.applied });
+        return sendJSON(res, 200, { id, ...r, emailed });
       }
     }
     if ((pathname === '/list-an-event' || pathname === '/list-an-event/') && method === 'GET') {
@@ -32963,6 +33369,7 @@ const server = http.createServer(async (req, res) => {
       if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
       const id = Number(eventSubmissionReviewMatch[1]);
       const result = eventSubmissionReviewMatch[2] === 'approve' ? approveEventSubmission(id, body) : rejectEventSubmission(id, body);
+      if (result.status === 200) result.body.emailed = await notifyReviewDecision('event', id, eventSubmissionReviewMatch[2], { reason: body.reason });
       return sendJSON(res, result.status, result.body);
     }
 
