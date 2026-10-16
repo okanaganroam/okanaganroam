@@ -20437,6 +20437,85 @@ test('Admin review page (2026-10-15): one sign-in, approve/reject everything in 
   }
 });
 
+test('Admin review (2026-10-15): fix text before approving; checked like the owner input, original kept, owner told', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Edit Review Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'edit-review-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'edit-review-fixture');
+  const token = app.createOwnerLink(v.id, { contact_email: 'edits@example.com' }).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.12.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const sent = [];
+  try {
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    const desc = 'A cozy cafe with good coffe and fresh baking every single morning of the week.';
+    const ch = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0173', description: desc }, started_at: Date.now() - 10000 });
+    assert.equal(ch.status, 201, JSON.stringify(ch.body));
+    const page = await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text());
+    assert.match(page, /<input type="text" class="rv-edit" name="phone" value="250-555-0173"/);
+    assert.match(page, /<textarea class="rv-edit" name="description"/);
+
+    // A bad edit is refused and nothing changes.
+    const bad = await post(`/admin/review/change/${ch.body.id}/approve`, { edits: { phone: '12' } }, cookie);
+    assert.equal(bad.status, 400);
+    assert.match(bad.body.errors.phone, /phone number/);
+    assert.equal(db.prepare('SELECT status, original_changes FROM owner_change_requests WHERE id = ?').get(ch.body.id).status, 'pending');
+
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    const fixed = desc.replace('coffe', 'coffee');
+    const ok = await post(`/admin/review/change/${ch.body.id}/approve`, { fields: ['phone', 'description'], edits: { description: fixed } }, cookie);
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    const row = db.prepare('SELECT phone, description FROM venues WHERE id = ?').get(v.id);
+    assert.equal(row.description, fixed);
+    assert.equal(row.phone, '250-555-0173');
+    const saved = db.prepare('SELECT changes, original_changes FROM owner_change_requests WHERE id = ?').get(ch.body.id);
+    assert.equal(JSON.parse(saved.original_changes).description, desc, 'the owner original is kept');
+    assert.equal(JSON.parse(saved.changes).description, fixed);
+    assert.match(sent[0].text, /We made a small edit before publishing it/);
+
+    // Editing a field back to what the listing says drops it; nothing left -> refused, request untouched.
+    const ch2 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0174' }, started_at: Date.now() - 10000 });
+    const none = await post(`/admin/review/change/${ch2.body.id}/approve`, { fields: ['phone'], edits: { phone: '250-555-0173' } }, cookie);
+    assert.equal(none.status, 400);
+    assert.equal(JSON.parse(db.prepare('SELECT changes FROM owner_change_requests WHERE id = ?').get(ch2.body.id).changes).phone, '250-555-0174', 'restored');
+
+    // Photo credit
+    const photoId = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, rights_confirmed_at)
+      VALUES (?, 'editreviewfixture0000000.jpg', 'editreviewfixturekey', 1200, 900, 100, 'edit reveiw cafe', CURRENT_TIMESTAMP)`).run(v.id).lastInsertRowid);
+    require('node:fs').mkdirSync(app.OWNER_PHOTO_DIR, { recursive: true });
+    require('node:fs').writeFileSync(require('node:path').join(app.OWNER_PHOTO_DIR, 'editreviewfixture0000000.jpg'), Buffer.from([0xFF, 0xD8, 0xFF, 0xD9]));
+    assert.equal((await post(`/admin/review/photo/${photoId}/approve`, { edits: { credit: 'x' } }, cookie)).status, 400);
+    const pa = await post(`/admin/review/photo/${photoId}/approve`, { main: false, edits: { credit: 'Edit Review Cafe' } }, cookie);
+    assert.equal(pa.status, 200, JSON.stringify(pa.body));
+    assert.equal(db.prepare('SELECT credit, status FROM owner_photos WHERE id = ?').get(photoId).credit, 'Edit Review Cafe');
+
+    // Event name and description
+    const eventId = Number(db.prepare(`INSERT INTO event_submissions (status, name, region, categories, description, venue_name, start_date, end_date, event_url, organizer_name, contact_name, contact_email, consent, consent_version, owner_venue_id)
+      VALUES ('pending', 'jazz nite at edit review', 'kelowna', '["live-music"]', 'Live jazz with a local trio, all ages welcome.', 'Edit Review Fixture', '2027-02-11', '2027-02-11', '', 'Edit Review', 'Sam', 'sam@example.com', 1, 'v1', ?)`).run(v.id).lastInsertRowid);
+    const ev = await post(`/admin/review/event/${eventId}/approve`, { edits: { name: 'Jazz Night at Edit Review', description: 'Live jazz with a local trio, all ages welcome.' } }, cookie);
+    assert.equal(ev.status, 200, JSON.stringify(ev.body));
+    const evRow = db.prepare('SELECT e.name FROM event_submissions s JOIN events e ON e.id = s.event_id WHERE s.id = ?').get(eventId);
+    assert.equal(evRow.name, 'Jazz Night at Edit Review');
+
+    // New venue
+    const subId = Number(db.prepare(`INSERT INTO venue_submissions (name, type, region, description, phone, contact_name, contact_email, consent, consent_version)
+      VALUES ('edit review bakry', 'cafe', 'kelowna', 'Small-batch sourdough and pastries baked daily.', '250 555 0175', 'Lee', 'lee@example.com', 1, 'v1')`).run().lastInsertRowid);
+    const vn = await post(`/admin/review/venue/${subId}/approve`, { edits: { name: 'Edit Review Bakery', phone: '250-555-0175' } }, cookie);
+    assert.equal(vn.status, 200, JSON.stringify(vn.body));
+    const made = db.prepare('SELECT v.name, v.phone FROM venue_submissions s JOIN venues v ON v.id = s.venue_id WHERE s.id = ?').get(subId);
+    assert.equal(made.name, 'Edit Review Bakery');
+    assert.equal(made.phone, '250-555-0175');
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
 test('Owner emails (2026-10-15): link-only owners can leave an email and hear back; admins can fill in link emails', async () => {
   const http = require('node:http');
   seasonInsert.run({ name: 'Link Email Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'link-email-fixture' });
