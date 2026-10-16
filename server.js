@@ -320,12 +320,33 @@ function getVenue(id) {
 // idx_region_type_slug remains the real backstop regardless.
 const EXPLICIT_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+// Price level (2026-10-12): every reader treats venues.price as an integer
+// 1-4 ('$'.repeat(venue.price) on venue pages, Number(v.price) in the browse
+// data), so createVenue()/updateVenue() normalize it on the way in. Accepted:
+// null, an integer 1-4, a numeric string "1"-"4", or a dollar-sign string
+// "$"-"$$$$" (stored as its length). Anything else is a 400 -- a "$$" string
+// once slipped through and '$'.repeat('$$') silently rendered nothing.
+const PRICE_ERROR = 'price must be null, an integer 1-4, a numeric string "1"-"4", or "$"-"$$$$".';
+
+function normalizePrice(price) {
+  if (price === null) return null;
+  if (Number.isInteger(price) && price >= 1 && price <= 4) return price;
+  if (typeof price === 'string') {
+    if (/^[1-4]$/.test(price)) return Number(price);
+    if (/^\${1,4}$/.test(price)) return price.length;
+  }
+  const err = new Error(PRICE_ERROR);
+  err.status = 400;
+  throw err;
+}
+
 function createVenue(data) {
   if (!data.name || !data.region || !data.type) {
     const err = new Error('name, region, and type are required');
     err.status = 400;
     throw err;
   }
+  if (data.price !== undefined) data = { ...data, price: normalizePrice(data.price) };
 
   let slug;
   if (data.slug !== undefined && data.slug !== null) {
@@ -383,6 +404,7 @@ function createVenue(data) {
 function updateVenue(id, data) {
   const existing = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
   if (!existing) return null;
+  if (data.price !== undefined) data = { ...data, price: normalizePrice(data.price) };
 
   const cols = ALL_FIELDS.filter((f) => data[f] !== undefined);
   if (cols.length === 0) return rowToVenue(existing);
