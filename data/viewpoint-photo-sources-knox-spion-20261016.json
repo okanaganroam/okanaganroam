@@ -1,0 +1,48 @@
+[
+  {
+    "id": 1226,
+    "name": "Knox Mountain Park",
+    "region": "kelowna",
+    "slug": "knox-mountain-park",
+    "website": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/knox-mountain-park",
+    "image_url": "/images/hiking/venues/knox-mountain-park-20261015.jpg?v=20261015h1live",
+    "current_file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1226-current.jpg",
+    "status": "Alternative for review",
+    "reason": "Sunny lake lookout, trail and open grass fit a viewpoint cover better than the cloudy distant hillside.",
+    "candidate": {
+      "id": 1226,
+      "index": "browser-2",
+      "file": "/Users/dr/okanaganroam/output/hiking-photo-search/linked-page-audit/images/1226-browser-2.jpg",
+      "url": "https://www.kelowna.ca/sites/files/1/styles/inside_banner/public/uploads/banners/inside/parks/p1200977_large.jpg?itok=pCy_3n5L",
+      "width": 1038,
+      "height": 477
+    },
+    "credit": "Photo: City of Kelowna",
+    "capture_date": "Unknown capture date",
+    "approved": true,
+    "deployed_asset": "/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update.jpg"
+  },
+  {
+    "id": 1262,
+    "name": "Spion Kop Recreation Reserve",
+    "region": "lake-country",
+    "slug": "spion-kop-recreation-reserve",
+    "website": "https://www.lakecountry.bc.ca/parks-recreation-culture/beaches-lakes-parks-trails/trails",
+    "image_url": "/images/hiking/venues/spion-kop-recreation-reserve-20261015-b2.jpg?v=20261015h2live",
+    "current_file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1262-current.jpg",
+    "status": "Alternative for review",
+    "reason": "A clearer, brighter lake-and-valley panorama with more depth than the current distant view.",
+    "candidate": {
+      "id": 1262,
+      "index": 6,
+      "url": "https://www.lakecountry.bc.ca/sites/default/files/styles/large/public/2024-06/Spion-Kop-L.Spanza.jpg?itok=PIX-SNJl",
+      "file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1262-06.jpg",
+      "width": 960,
+      "height": 578
+    },
+    "credit": "Photo: District of Lake Country / L. Spanza",
+    "capture_date": "Uploaded by June 2024; outside the one-year requirement",
+    "approved": true,
+    "deployed_asset": "/images/hiking/venues/spion-kop-recreation-reserve-20261016-viewpoint-update.jpg"
+  }
+]

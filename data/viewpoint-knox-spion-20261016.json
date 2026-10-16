@@ -1,0 +1,30 @@
+{
+  "reason": "User approved both visually reviewed linked-page alternatives, including documented capture-date exceptions.",
+  "batch_id": "viewpoint-knox-spion-20261016",
+  "venues": [
+    {
+      "id": 1226,
+      "name": "Knox Mountain Park",
+      "region": "kelowna",
+      "slug": "knox-mountain-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/knox-mountain-park-20261015.jpg?v=20261015h1live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update.jpg?v=20261016viewpointupdatelive"
+      }
+    },
+    {
+      "id": 1262,
+      "name": "Spion Kop Recreation Reserve",
+      "region": "lake-country",
+      "slug": "spion-kop-recreation-reserve",
+      "expect": {
+        "image_url": "/images/hiking/venues/spion-kop-recreation-reserve-20261015-b2.jpg?v=20261015h2live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/spion-kop-recreation-reserve-20261016-viewpoint-update.jpg?v=20261016viewpointupdatelive"
+      }
+    }
+  ]
+}
