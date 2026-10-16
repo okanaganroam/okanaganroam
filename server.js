@@ -24034,6 +24034,85 @@ const TRIP_V3_REGION_IMAGES = (() => {
   }
   return out;
 })();
+// ---------- Share button on the Build My Trip plan (2026-10-17) ----------
+// The V3 plan has "Copy link to this plan" (a link that re-runs the planner). This adds "Share trip": the plan's own
+// stops as a /my-trip link, which unfurls with the trip's preview card and opens as a clean trip page. It opens the
+// phone's share sheet where there is one, otherwise copies the link. trip-planner-v3-page.js is frozen, so the button
+// is added from here: a small script, appended to the served page, puts it into each plan's action row as the plan is
+// drawn (the plan is redrawn on every change) and reads the stops from the plan's own "Add to trip" buttons, the same
+// source "Add whole trip" uses. The script is plain text, so the French twin leaves it as it is; it picks its words
+// from <html lang>.
+function planShareScript() {
+  return `<script>
+(function(){
+  var MAX = ${MY_TRIP_MAX_REFS}, REF = /^(venue|event):[1-9][0-9]*$/;
+  function fr(){ return document.documentElement.lang === 'fr'; }
+  function T(en, f){ return fr() ? f : en; }
+  function stops(){
+    var res = document.getElementById('t3Result'), seen = {}, out = [];
+    if (!res) return out;
+    Array.prototype.forEach.call(res.querySelectorAll('.trip-btn[data-plan-stop]'), function(b){
+      var r = b.getAttribute('data-trip-ref');
+      if (!r || !REF.test(r) || seen[r]) return;
+      seen[r] = 1;
+      out.push({ ref: r, day: parseInt(b.getAttribute('data-plan-day'), 10) || 0 });
+    });
+    return out.slice(0, MAX);
+  }
+  function link(list){
+    var u = location.origin + (fr() ? '/fr' : '') + '/my-trip?stops=' + list.map(function(x){ return x.ref; }).join(',');
+    if (list.length && list.every(function(x){ return x.day > 0; })) u += '&days=' + list.map(function(x){ return x.day; }).join(',');
+    return u;
+  }
+  function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params); } catch (e) {} }
+  function say(text){
+    var s = document.getElementById('t3PlanStatus');
+    if (!s) return;
+    s.textContent = '';
+    setTimeout(function(){ s.textContent = text; }, 40);
+  }
+  function inject(){
+    var box = document.querySelector('#t3Result .t3-plan-actions');
+    if (!box || box.querySelector('[data-roam-share-trip]') || !stops().length) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 't3-btn t3-btn-ghost';
+    b.setAttribute('data-roam-share-trip', '');
+    b.textContent = T('Share trip', 'Partager le voyage');
+    box.insertBefore(b, box.querySelector('[data-t3-share]'));
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('[data-roam-share-trip]') : null;
+    if (!b) return;
+    var list = stops();
+    if (!list.length) return;
+    var url = link(list), n = list.length;
+    if (navigator.share) {
+      track('trip_share', { method: 'native', stop_count: n, source: 'plan' });
+      navigator.share({ title: T('My Okanagan trip', 'Mon voyage dans l\\u2019Okanagan'), url: url }).catch(function(){});
+      return;
+    }
+    var manual = function(){ track('trip_share', { method: 'manual', stop_count: n, source: 'plan' }); say(T('Copy this link: ', 'Copiez ce lien\\u00a0: ') + url); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function(){
+        track('trip_share', { method: 'copy', stop_count: n, source: 'plan' });
+        say(T('Trip link copied. Send it to whoever you are travelling with.', 'Lien du voyage copi\\u00e9. Envoyez-le aux personnes avec qui vous voyagez.'));
+      }, manual);
+    } else manual();
+  });
+  var res = document.getElementById('t3Result');
+  if (res && window.MutationObserver) new MutationObserver(inject).observe(res, { childList: true, subtree: true });
+  inject();
+})();
+</script>`;
+}
+// Placed just before the page's own (last) script, so that script stays the last one on the page.
+function withPlanShareButton(html) {
+  if (typeof html !== 'string' || !html.includes('id="t3Result"')) return html;
+  const at = html.lastIndexOf('<script>');
+  return at < 0 ? html : `${html.slice(0, at)}${planShareScript()}\n${html.slice(at)}`;
+}
+
 function renderTripPlannerV3Page({ preview = false } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
@@ -24049,7 +24128,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
       .replace(/href="#top"/g, 'href="/"')));
     headerHtml = withNavRefresh(headerHtml);
   }
-  return tripPlannerV3PageModule.renderTripPlannerV3Page({
+  return withPlanShareButton(tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
     title: 'Build My Trip \u2014 Okanagan Roam',
     description: 'Describe your Okanagan trip and get a day-by-day plan built from real wineries, restaurants, beaches and more, with why each stop fits.',
@@ -24066,7 +24145,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     mapHeaders: tripV3MapHeaders(),
     appScriptSrc: APP_JS_SRC,
     preview,
-  });
+  }));
 }
 
 // Mobile 404 (2026-09-26): the page had no viewport meta (phones laid it
@@ -36152,6 +36231,7 @@ module.exports = {
   tripPlannerV3Mode,
   tripPlannerV3ActiveFor,
   renderTripPlannerV3Page,
+  withPlanShareButton,
   TRIP_V3_REGION_IMAGES,
   renderHomeThisWeekendHTML,
   renderHomeTopPicksHTML,
