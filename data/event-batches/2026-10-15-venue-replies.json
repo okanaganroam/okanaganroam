@@ -1,0 +1,130 @@
+{
+ "batch_id": "2026-10-15-venue-replies",
+ "reason": "Events sent by venues in reply to the October 2026 outreach (Nighthawk Vineyards, Summerland Heritage Cider, The Office Brewery, Priest Creek), each from the venue's own email of 2026-10-15 and linked to its listing.",
+ "reviewed_by": "owner-approved 2026-10-15",
+ "events": [
+  {
+   "name": "A Very Nighthawk Christmas",
+   "region": "okanagan-falls",
+   "venue_id": 439,
+   "description": "Nighthawk Vineyards' annual holiday weekend, part of the Okanagan Falls Winery Association's Holiday Cheer. The winery opens from 12 to 3 p.m. on both days, its last weekend before closing for the winter.",
+   "categories": [
+    "holiday-seasonal",
+    "wineries-wine-events"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-14",
+     "start_time": "12:00",
+     "end_time": "15:00"
+    },
+    {
+     "start_date": "2026-11-15",
+     "start_time": "12:00",
+     "end_time": "15:00"
+    }
+   ],
+   "source_name": "Nighthawk Vineyards (email from Allison, 2026-10-15)",
+   "source_url": "https://nighthawkvineyards.com/",
+   "source_type": "official_venue",
+   "source_checked_at": "2026-10-15",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Light Up The Vines",
+   "region": "summerland",
+   "venue_id": 624,
+   "description": "Summerland Heritage Cider's holiday evening event at the cidery on Johnson Street, on three nights in late November and early December.",
+   "categories": [
+    "holiday-seasonal",
+    "food-drink-events"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-11-28",
+     "start_time": "15:00",
+     "end_time": "21:00"
+    },
+    {
+     "start_date": "2026-12-04",
+     "start_time": "16:00",
+     "end_time": "21:00"
+    },
+    {
+     "start_date": "2026-12-05",
+     "start_time": "15:00",
+     "end_time": "21:00"
+    }
+   ],
+   "source_name": "Summerland Heritage Cider Company (email from Lauren Vollo, 2026-10-15)",
+   "source_url": "https://www.summerlandcider.com/",
+   "source_type": "official_venue",
+   "source_checked_at": "2026-10-15",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Halloween Cocktail Flight at The Office Brewery",
+   "region": "kelowna",
+   "venue_id": 1416,
+   "description": "The Office Brewery's Halloween cocktail flight, available at the Clement Avenue taproom during opening hours until Halloween.",
+   "categories": [
+    "food-drink-events",
+    "holiday-seasonal"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-10-15",
+     "end_date": "2026-10-31",
+     "all_day": 1,
+     "label": "During opening hours"
+    }
+   ],
+   "source_name": "The Office Brewery (email from Maggie McCarron, 2026-10-15)",
+   "source_url": "https://www.officebrewery.ca/",
+   "source_type": "official_venue",
+   "source_checked_at": "2026-10-15",
+   "event_confidence": "high"
+  },
+  {
+   "name": "Movies in the Vineyard",
+   "region": "kelowna",
+   "venue_id": 526,
+   "description": "Outdoor movie nights among the vines at Priest Creek Family Estate Winery, every Friday and Saturday in October from 6:30 p.m. See the winery's events page for the films and tickets.",
+   "categories": [
+    "wineries-wine-events",
+    "arts-culture"
+   ],
+   "occurrences": [
+    {
+     "start_date": "2026-10-16",
+     "start_time": "18:30"
+    },
+    {
+     "start_date": "2026-10-17",
+     "start_time": "18:30"
+    },
+    {
+     "start_date": "2026-10-23",
+     "start_time": "18:30"
+    },
+    {
+     "start_date": "2026-10-24",
+     "start_time": "18:30"
+    },
+    {
+     "start_date": "2026-10-30",
+     "start_time": "18:30"
+    },
+    {
+     "start_date": "2026-10-31",
+     "start_time": "18:30"
+    }
+   ],
+   "source_name": "Priest Creek Family Estate Winery (email from Margarita, 2026-10-15)",
+   "source_url": "https://www.priestcreekwinery.com/events",
+   "source_type": "official_venue",
+   "source_checked_at": "2026-10-15",
+   "event_confidence": "high"
+  }
+ ]
+}

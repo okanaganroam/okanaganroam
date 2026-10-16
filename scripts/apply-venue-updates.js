@@ -6,7 +6,8 @@
 //   ENRICHMENT_ADMIN_TOKEN=... node scripts/apply-venue-updates.js <file.json> --apply
 //
 // Each entry: { id, region, slug, expect: {field: currentValue}, set: {field: newValue},
-// hours?: { expected_current_hours, hours, hours_source, hours_checked_at } }.
+// hours?: { expected_current_hours, hours, hours_source, hours_checked_at },
+// season?: { status, until_date, reopens_date, source_url, checked_at } | null }.
 // A venue is re-read first and changed only when its region/slug still match and
 // every `expect` value is still exactly what is live, so nothing edited since is
 // overwritten. Fields go through PUT /api/venues/:id (only the fields given);
@@ -84,6 +85,14 @@ async function main() {
           }),
         });
       }
+    }
+    // Seasonal notice (2026-10-15): { status, until_date, reopens_date, source_url, checked_at }, or null to clear.
+    // POST /admin/set-season is itself a no-op when the stored season already matches.
+    if (v.season !== undefined) {
+      steps.push({
+        label: `${v.name}: season (${v.season ? v.season.status : 'cleared'})`,
+        run: () => send('POST', '/admin/set-season', { id: v.id, season: v.season, reason: data.reason, batch_id: data.batch_id }),
+      });
     }
     if (steps.some((s) => s.label.startsWith(`${v.name}:`))) backup.push(live);
   }
