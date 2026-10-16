@@ -18188,10 +18188,12 @@ test('Card excerpts (2026-10-13): Food & Drink list cards show a short blurb, th
 
 test('Event images (SEO, 2026-10-13): event pages share a picture and their Event schema carries one -- the event\'s own image_url, else its What\'s On category photo, else the What\'s On banner', () => {
   assert.equal(app.eventImagePath({ image_url: 'https://cdn.example.com/poster.jpg' }, ['live-music']), 'https://cdn.example.com/poster.jpg');
-  assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'live-music']), '/images/whats-on/nightlife.jpg');
+  assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'community-events']), '/images/whats-on/nightlife.jpg');
+  // Event photos (2026-10-16): a kind of event wins over the category photo; live music with no clearer match shows a band.
+  assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'live-music']), '/images/events/rock-2610.jpg');
   assert.equal(app.eventImagePath({ image_url: null }, ['unknown-cat', 'markets-fairs']), '/images/whats-on/markets-fairs.jpg');
   assert.equal(app.eventImagePath({}, []), '/images/whats-on/whats-on.jpg');
-  const fake = { id: 1, name: 'Image Test Fest', region: 'kelowna', status: 'scheduled', description: '', image_url: null };
+  const fake = { id: 999999, name: 'Image Test Fest', region: 'kelowna', status: 'scheduled', description: '', image_url: null };
   const ld = app.eventJsonLd(fake, [{ id: 1, start_date: '2099-07-01', end_date: '2099-07-01', all_day: 1 }], ['markets-fairs'], null, 'https://okanaganroam.com/kelowna/events/x', '2099-01-01');
   assert.deepEqual(ld.image, ['https://okanaganroam.com/images/whats-on/markets-fairs.jpg']);
   assert.equal(ld.description, 'Image Test Fest in Kelowna, BC.', 'a description is always present');
@@ -18926,10 +18928,12 @@ test('Homepage: the counts strip, This Weekend and Top Picks render from real da
 
 test('Homepage events: a Halloween event gets the pumpkin photo (not the Christmas-lights holiday photo), hockey the rink, and two cards never share a photo', () => {
   const used = new Set();
-  assert.equal(app.homeEventImage({ name: 'Haunted Houses of Pleasant Valley Rd', categories: ['holiday-seasonal'] }, used), '/images/guides/halloween-pumpkins-800.jpg');
-  assert.equal(app.homeEventImage({ name: 'Kelowna Rockets Home Games', categories: ['sports-recreation'] }, used), '/images/whats-on/sports-recreation-800.jpg');
+  // Event photos (2026-10-16): the photo of the event's own kind of event.
+  assert.equal(app.homeEventImage({ name: 'Haunted Houses of Pleasant Valley Rd', categories: ['holiday-seasonal'] }, used), '/images/events/haunted-2610-800.jpg');
+  assert.equal(app.homeEventImage({ name: 'Kelowna Rockets Home Games', description: 'WHL hockey.', categories: ['sports-recreation'] }, used), '/images/events/hockey-2610-800.jpg');
+  assert.equal(app.homeEventImage({ name: 'Pumpkin Carving Party', categories: ['holiday-seasonal'] }, used), '/images/guides/halloween-pumpkins-800.jpg', 'no kind matched: the Halloween picker still applies');
   const second = app.homeEventImage({ name: 'Another game night', categories: ['sports-recreation'] }, used);
-  assert.notEqual(second, '/images/whats-on/sports-recreation-800.jpg');
+  assert.ok(!used.has(second) || second === '/images/whats-on/sports-recreation-800.jpg');
   for (const url of used) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', url)), url);
 });
 
@@ -21324,4 +21328,21 @@ test('Water Activities photos (2026-10-16): example photos exist in both sizes; 
     assert.ok(credits[rel], `${rel} is credited`);
   }
   assert.equal(app.venueHeroPhoto({ id: 1448, name: 'Splashdown Vernon', type: 'outdoor' }).src, '/images/outdoors/examples/water-waterslide-2610.jpg');
+});
+
+test('Event photos (2026-10-16): each event shows its kind of event; new events are matched by keywords', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const map = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/event-photo-themes.json'), 'utf8')).events;
+  assert.equal(map['453'], 'booksale', 'the Great Okanagan Book Sale is a book sale');
+  assert.equal(app.eventKindPhoto({ id: 453, name: 'Fall 36th Annual Great Okanagan Book Sale' }), '/images/events/booksale-2610-800.jpg');
+  // New events (no id in the map) are matched by name, then description.
+  assert.equal(app.eventKindPhoto({ id: 99999, name: 'Kelowna Rockets vs Kamloops Blazers', description: 'WHL hockey at Prospera Place.' }), '/images/events/hockey-2610-800.jpg');
+  assert.equal(app.eventKindPhoto({ id: 99998, name: 'Laugh Night', description: 'A stand-up comedy showcase with four comedians.' }), '/images/events/comedy-2610-800.jpg');
+  assert.equal(app.eventKindPhoto({ id: 99997, name: 'Lake Country Cider Fest', description: '' }), '/images/events/cider-2610-800.jpg');
+  assert.equal(app.eventKindPhoto({ id: 99996, name: 'Something Else', description: 'Nothing that matches.', categories: ['community-events'] }), null);
+  // Every photo the map or the rules point at exists in both sizes once in place.
+  for (const f of fs.readdirSync(path.join(__dirname, '..', 'public/images/events')).filter((f) => f.endsWith('-2610.jpg'))) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public/images/events', f.replace('-2610.jpg', '-2610-800.jpg'))), `${f} has an -800 copy`);
+  }
 });

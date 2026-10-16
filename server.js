@@ -7033,8 +7033,86 @@ const HOME_EVENT_IMAGES = Object.freeze({
 });
 // The event's own image, else a photo for its kind of event; a Halloween event gets the pumpkin photo (the holiday
 // photo is Christmas lights), and two cards in the row never share a photo.
+// Event photos (2026-10-16): a photo of the event's own kind of event --
+// a hockey game, a book sale, a string quartet -- instead of one picture per
+// What's On category. Each upcoming event was read and given its kind in
+// data/event-photo-themes.json; events added later are matched by the first
+// rule below that fits their name, then their description. Photos are free
+// Adobe Stock (public/images/events/<kind>-2610[-800].jpg); a kind whose
+// photo is not in place yet is skipped. An event's own image always wins.
+const EVENT_PHOTO_RULES = [
+  // Halloween outings, comedy and other stage acts, sports and wellness
+  // first: their names are specific.
+  ['cornmaze', /corn maze/], ['hayride', /horse[- ]drawn|hayride|wagon ride/],
+  ['ghosttour', /ghost (tour|walk)|cemetery tour|tombstone/], ['haunted', /haunted\b.*\b(house|trail|forest|maze)|walk of terror|horrorfest|house of horrors/],
+  ['rollerskate', /roller[ -]?(skat|disco)|roller'?ween/],
+  ['halloweenkids', /(hallowe'?en|spook|trick[- ]or[- ]treat|gnome-a-ween).*(famil|kids|children|little|all ages|non-scary)|(famil|kids|children).*(hallowe'?en|trick[- ]or[- ]treat)/],
+  ['candlelight', /candlelight/], ['drag', /\bdrag\b/], ['burlesque', /burlesque/],
+  ['comedy', /comed(y|ian)|stand-up|stand up|comic strippers|improv/], ['magic', /magician|magic show/],
+  ['hockey', /\bhockey\b|\bwhl\b|\bbchl\b|\bkijhl\b|puck drop/], ['basketball', /basketball/], ['volleyball', /volleyball/], ['rugby', /\brugby\b/],
+  ['pickleball', /pickleball|tennis/], ['golf', /\bgolf\b/], ['skating', /figure skat|skate canada/],
+  ['mtbrace', /mountain bike|enduro|downhill race|pedalfest/], ['speedway', /speedway|stock car|race car/],
+  ['kickboxing', /kickboxing|muay thai|boxing|martial arts/],
+  ['soundbath', /sound (bath|healing|journey)|singing bowls|\bgongs?\b/], ['yoga', /\byoga\b|breathwork|meditation|asana/],
+  // Shows and screenings.
+  ['aerial', /aerial|acrobat|circus/], ['carnival', /sideshow|carnival of/], ['ballet', /ballet|contemporary dance|dance work/],
+  ['kidstheatre', /puppet|theatre for young|(family|kids|children'?s) (musical|theatre|play)/],
+  ['outdoormovie', /movie night|movies in the|outdoor (movie|cinema)|cinema series/], ['cinema', /film festival|film series|\bfilm\b|screening|cinema|\bmovie/],
+  // Books, food and drink outings, markets, classes and gatherings.
+  ['booksale', /book sale|book market|bookish/], ['books', /book launch|author reading|writing workshop|poetry/], ['openmic', /open mic/],
+  ['murder', /murder mystery|murder in/], ['oktoberfest', /oktoberfest/], ['whisky', /whisk(e)?y/],
+  ['cookingclass', /cooking class|culinary class/], ['charcuterie', /charcuterie|cheese (class|tasting|pairing)/],
+  ['tea', /afternoon tea|high tea/], ['smores', /s'mores|smores/], ['baking', /bake sale|baking|\bbake\b/],
+  ['market', /farmers.? market/], ['xmasmarket', /christmas market|holiday market|yuletide|winter (warm-up )?market|christmas at the/],
+  ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage|antique|rummage|retromania|collectibles|flea market/],
+  ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/],
+  ['storytime', /storytime|story time/], ['games', /video game|mario kart|minecraft|gaming|esports/],
+  ['artgallery', /exhibition|art show|art walk|art gallery|artists?'? (show|sale)/],
+  ['wreath', /wreath/], ['ceramics', /ceramic|pottery/],
+  ['crafts', /craft(ing|s)?\b.*(night|workshop|session|class)|workshop|mosaic|silk scarf|make your own|frankenstuff/],
+  ['techclass', /android|iphone|computer|tablet|tech help|digital literacy/], ['language', /language|nsyilx/],
+  ['moms', /\bmoms?\b|motherhood/], ['gala', /\bgala\b/], ['talk', /tedx|\btalks?\b|lecture|open house|speakers?\b/],
+  ['coffee', /coffee social|networking|forget-me-not|dementia/], ['pubnight', /bingo|trivia|quiz night/],
+  ['dinner', /dinner|long table|feast|friendsgiving|four courses|pasta/], ['wine', /wine (tasting|info)|holiday cheer|barrel|wine club/],
+  // Music, by sound; a big-arena show gets the crowd photo.
+  ['dj', /\bdj\b|turntable/], ['linedance', /line danc/],
+  ['latin', /\blatin\b|salsa|mambo|cuban|flamenco|buena vista/], ['bigband', /big band|swing band/],
+  ['classical', /chamber music|symphony|orchestra|string quartet|piano trio|classical/], ['jazz', /\bjazz\b|saxophon|\bsax\b|speakeasy/],
+  ['blues', /\bblues\b|harmonica/], ['fiddle', /fiddle|celtic|irish|bluegrass/],
+  ['country', /\bcountry (music|singer|star|band|hits|favourites)|honky|johnny cash|garth|nashville|cowboy/], ['acoustic', /acoustic|folk|singer-songwriter|fingerstyle|roots/],
+  ['arena', /south okanagan events centre|prospera place/],
+  ['rock', /\brock\b|tribute|covers?\b|cover songs|punk|metal|\bband\b/],
+  // Drinks, then what is left of Halloween, the stage and heritage.
+  ['cider', /\bcider/], ['beer', /\bbeer|brew(fest|phoria)|street fest/], ['cocktails', /cocktail/],
+  ['halloweenparty', /hallowe'?en|spook|howl-?oween|hallowine|haunting|witches/],
+  ['theatre', /theatre|musical|\bplay\b|stage thriller/], ['heritage', /heritage house|historic house|guided tours?|house tour/],
+];
+const EVENT_PHOTO_SPECIAL = Object.freeze({ golf: '/images/golf/golf-courses-800.jpg', pickleball: '/images/sports/activity-courts-800.jpg' });
+let EVENT_PHOTO_BY_ID = {};
+try { EVENT_PHOTO_BY_ID = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'event-photo-themes.json'), 'utf8')).events || {}; } catch (e) { EVENT_PHOTO_BY_ID = {}; }
+const eventPhotoReady = new Map();
+function eventThemePhoto(key) {
+  const src = EVENT_PHOTO_SPECIAL[key] || `/images/events/${key}-2610-800.jpg`;
+  if (!eventPhotoReady.has(key)) eventPhotoReady.set(key, fs.existsSync(path.join(__dirname, 'public', src)));
+  return eventPhotoReady.get(key) ? src : null;
+}
+// The photo for an event's kind of event, or null (then the What's On
+// category picker below decides). Live music with no clearer match shows a
+// band on stage.
+function eventKindPhoto(e) {
+  const byId = EVENT_PHOTO_BY_ID[String(e.id)];
+  if (byId) return eventThemePhoto(byId);
+  for (const field of [e.name, e.description]) {
+    const text = String(field || '').toLowerCase().replace(/[’‘]/g, "'");
+    for (const [key, re] of EVENT_PHOTO_RULES) if (re.test(text) && eventThemePhoto(key)) return eventThemePhoto(key);
+  }
+  if ((e.categories || []).includes('live-music')) return eventThemePhoto('rock');
+  return null;
+}
 function homeEventImage(e, used = new Set()) {
   if (e.image && /^\/(?!\/)/.test(e.image)) return e.image;
+  const kind = eventKindPhoto(e);
+  if (kind) { used.add(kind); return kind; }
   const text = `${e.name || ''} ${e.description || ''}`.toLowerCase();
   const options = [];
   if (/hallowe|haunt|spook|pumpkin|ghost|fright|scream/.test(text)) options.push('/images/guides/halloween-pumpkins-800.jpg');
@@ -22154,6 +22232,8 @@ function eventLocationAddress(event, hostVenue) {
 // schema's image, which Google's event results strongly recommend.
 function eventImagePath(event, categories) {
   if (event.image_url && /^https?:\/\//.test(event.image_url)) return event.image_url;
+  const kind = eventKindPhoto({ id: event.id, name: event.name, description: event.description, categories });
+  if (kind) { const big = kind.replace(/-800\.jpg$/, '.jpg'); return fs.existsSync(path.join(__dirname, 'public', big)) ? big : kind; }
   const key = (categories || []).find((c) => WHATSON_CATEGORY_BANNERS[c]);
   return (key ? WHATSON_CATEGORY_BANNERS[key] : WHATS_ON_BANNER).src;
 }
@@ -22258,7 +22338,7 @@ function readableRecurrence(rule, refYear) {
 // What's On card's picker), at full size when one exists beside the -800 copy.
 function eventHeroImage(full, categories) {
   if (full.image_url && /^https:\/\//.test(full.image_url)) return { small: full.image_url, big: full.image_url };
-  const small = homeEventImage({ name: full.name, description: full.description, categories, image: full.image_url });
+  const small = homeEventImage({ id: full.id, name: full.name, description: full.description, categories, image: full.image_url });
   const big = small.replace(/-800\.jpg$/, '.jpg');
   return { small, big: big !== small && fs.existsSync(path.join(__dirname, 'public', big)) ? big : small };
 }
@@ -35625,6 +35705,7 @@ module.exports = {
   venuePageUsesEngagement,
   venueHeroPhoto,
   foodDrinkCardPhotoCss,
+  eventKindPhoto,
   venueThumbPhoto,
   trimVenueTagline,
   venueDayHoursText,
