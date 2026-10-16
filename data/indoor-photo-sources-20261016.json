@@ -1,0 +1,842 @@
+[
+  {
+    "id": 1711,
+    "name": "Mackie Lake House",
+    "file": "/images/venues/mackie-lake-house-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.mackiehouse.ca/about-us/",
+    "image_url": "https://www.mackiehouse.ca/wp-content/uploads/2025/03/IMG_5035-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Exterior of the Arts-and-Crafts heritage house with gardens on a sunny day; clean wide shot, no text overlay (homepage banners all have script text)."
+  },
+  {
+    "id": 1540,
+    "name": "Cardiff Miller Art Warehouse",
+    "file": "/images/venues/cardiff-miller-art-warehouse-2610.jpg",
+    "dimensions": "1800x1202",
+    "source_page": "https://cardiffmillerartwarehouse.ca/",
+    "image_url": "https://cardiffmillerartwarehouse.ca/wp-content/uploads/2024/11/cmaw-at-night.jpg",
+    "source_kind": "official_website",
+    "note": "Dusk exterior of the warehouse gallery buildings with the lit QR-code sign; the only real venue photo on the site (other image is a small graphic)."
+  },
+  {
+    "id": 1547,
+    "name": "Courtyard Gallery",
+    "file": "/images/venues/courtyard-gallery-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://courtyardgallery.ca/gallery",
+    "image_url": "https://assets.zyrosite.com/A1aPDlNj75C5RWE7/gift-shop-A1aPDXpp2Bs4NQJ1.jpg",
+    "source_kind": "official_website",
+    "note": "Inside the gallery shop: shelves of local artists' cards, books and glass; best landscape interior shot (others are portrait, mural close-up or posters)."
+  },
+  {
+    "id": 1541,
+    "name": "Enderby & District Museum & Archives",
+    "file": "/images/venues/enderby-district-museum-archives-2610.jpg",
+    "dimensions": "1661x600",
+    "source_page": "https://enderbymuseum.ca/",
+    "image_url": "https://enderbymuseum.ca/images/901George.jpg",
+    "source_kind": "official_website",
+    "note": "Entrance of the museum with its carved wooden Museum & Archives sign and flower beds; very wide 1661x600 banner image (full-building shot was only 967px)."
+  },
+  {
+    "id": 1566,
+    "name": "Dominion Radio Astrophysical Observatory (DRAO)",
+    "file": "/images/venues/dominion-radio-astrophysical-observatory-drao-2610.jpg",
+    "dimensions": "1800x1134",
+    "source_page": "https://visitpenticton.com/nm_event/open-house-at-the-dominion-radio-astrophysical-observatory/",
+    "image_url": "https://visitpenticton.com/wp-content/uploads/2026/05/D214-23-0400-0017-1-1.jpg",
+    "source_kind": "tourism_board",
+    "note": "Aerial of the NRC observatory building, the big Galt dish and CHIME telescope in the White Lake valley; NRC site images are only 825px."
+  },
+  {
+    "id": 1459,
+    "name": "Airhouse Kelowna",
+    "file": "/images/venues/airhouse-kelowna-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://airhouse.ca/kelowna",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/685e22bf405e3434e0e88c98/568821e7-bafc-42a9-a7b3-399fae949236/Airhouse_Kelowna_250619_065.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Coach vaulting in the Kelowna parkour gym with bars, boxes and climbing wall; kids seen from behind, wide action scene."
+  },
+  {
+    "id": 1467,
+    "name": "Alternator Centre for Contemporary Art",
+    "file": "/images/venues/alternator-centre-for-contemporary-art-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.alternatorcentre.com/",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/5de1ac5d065f5b7bc7586098/1785956039937-7SQDKLHOHLYJ85Y6LCLW/01_2026_l_felsing.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Installation view of the gallery space with suspended textile works; clean, well-lit wide room shot."
+  },
+  {
+    "id": 1461,
+    "name": "Beyond the Crux Climbing Gym",
+    "file": "/images/venues/beyond-the-crux-climbing-gym-2610.jpg",
+    "dimensions": "1440x900",
+    "source_page": "http://www.beyondthecrux.info/",
+    "image_url": "http://www.beyondthecrux.info/images/spotlight03.jpg",
+    "source_kind": "official_website",
+    "note": "Wide view of the gym's rope-climbing walls, mats and rope ladder; best of the few images (others are a gear close-up and portrait)."
+  },
+  {
+    "id": 1499,
+    "name": "Catelowna Cat Cafe",
+    "file": "/images/venues/catelowna-cat-cafe-2610.jpg",
+    "dimensions": "1800x1198",
+    "source_page": "https://catelowna.com/",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/62f66e9f5ac35b2fd7bf4672/f7c353a8-68c3-4ea7-a762-1d1bf7435dde/DSC_0728.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "The cat lounge with central cat tree, hammock chair, wall shelves and cats; bright, wide interior."
+  },
+  {
+    "id": 1548,
+    "name": "Chances Casino Kelowna",
+    "file": "/images/venues/chances-casino-kelowna-2610.jpg",
+    "dimensions": "1800x562",
+    "source_page": "https://chanceskelowna.ca/about/",
+    "image_url": "https://chanceskelowna.ca/wp-content/uploads/2020/08/about-page.jpg",
+    "source_kind": "official_website",
+    "note": "Neon \"Welcome to Chances\" sign with rows of lit slot machines; native wide banner (1920x600). Alternative: sportsbook lounge c5 (2560x1920)."
+  },
+  {
+    "id": 1497,
+    "name": "Cleopatra's Rituals Thermal Spa and Steam",
+    "file": "/images/venues/cleopatra-s-rituals-thermal-spa-and-steam-2610.jpg",
+    "dimensions": "1024x683",
+    "source_page": "https://www.cleopatrasrituals.com/",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/668d81685092141bb980a5df/5e25b349-5c44-4ec3-b70e-d30dd4242722/IMG_0215.JPG?format=2500w",
+    "source_kind": "official_website",
+    "note": "Warm-lit cedar sauna with a silhouetted guest and rolled towels; site serves max 1024px for landscape shots (hammam c4 is the alternative)."
+  },
+  {
+    "id": 1458,
+    "name": "Energyplex",
+    "file": "/images/venues/energyplex-2610.jpg",
+    "dimensions": "1800x1201",
+    "source_page": "https://www.energyplex.ca/arcade",
+    "image_url": "https://static.wixstatic.com/media/251a02_c1fd3158ccd04895a70731281bae9c68~mv2.jpg",
+    "source_kind": "official_website",
+    "note": "Two adults laughing on arcade racing games with neon lights; sharp 8192px original from the Wix media."
+  },
+  {
+    "id": 1492,
+    "name": "Gallery 421",
+    "file": "/images/venues/gallery-421-2610.jpg",
+    "dimensions": "1800x469",
+    "source_page": "https://www.gallery421.ca/",
+    "image_url": "https://www.gallery421.ca/cms/kcfinder/upload/images/gallery-eve-1.jpg",
+    "source_kind": "official_website",
+    "note": "Dusk street view of the brick-front gallery with lit windows full of paintings and the Gallery 421 sandwich board; native 1920x500 banner (interior shot is only 800px)."
+  },
+  {
+    "id": 1501,
+    "name": "Geert Maas Sculpture Gardens & Gallery",
+    "file": "/images/venues/geert-maas-sculpture-gardens-gallery-2610.jpg",
+    "dimensions": "1800x1201",
+    "source_page": "https://geertmaas.org/gallery-gardens/",
+    "image_url": "https://geertmaas.org/wp-content/uploads/2025/06/P64.Gall3_-1.jpg",
+    "source_kind": "official_website",
+    "note": "Indoor gallery room with bronze sculptures on plinths and framed abstract paintings; wide and well lit."
+  },
+  {
+    "id": 1490,
+    "name": "Gneiss Climbing - OG Banks",
+    "file": "/images/venues/gneiss-climbing-og-banks-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.gneissclimbing.com/work",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/5620574ae4b0c05fdc3737f5/1461352281427-YF14TPUEK9QGZGDCYJAV/IMG_1547.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Original Banks Rd gym (2016 opening photos): yellow and charcoal Walltopia bouldering wall with a youth climber and spotter seen from behind."
+  },
+  {
+    "id": 1457,
+    "name": "H2O Adventure + Fitness Centre",
+    "file": "/images/venues/h2o-adventure-fitness-centre-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.ymcasibc.ca/Locations/H2O",
+    "image_url": "https://www.ymcasibc.ca/sites/default/files/2021-07/hfa_aq_h2o_facility_waterslides_03.jpg",
+    "source_kind": "official_website",
+    "note": "Inside the waterpark: big blue and yellow tube slides over the lazy river and pools; wide and bright."
+  },
+  {
+    "id": 1494,
+    "name": "Hambleton Galleries",
+    "file": "/images/venues/hambleton-galleries-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.hambletongalleries.com/",
+    "image_url": "https://www.hambletongalleries.com/wp-content/uploads/2021/04/Gallery2.jpg",
+    "source_kind": "official_website",
+    "note": "Wide interior of the gallery with paintings on white walls, hanging panels, front desk and lounge chair."
+  },
+  {
+    "id": 1496,
+    "name": "KF Aerospace Centre for Excellence",
+    "file": "/images/venues/kf-aerospace-centre-for-excellence-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.kfaero.ca/kf-centre-for-excellence-gets-ready-to-take-flight/",
+    "image_url": "https://www.kfaero.ca/wp-content/uploads/2022/08/centre-roycesihlis-aug2022-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Dusk front view of the plane-shaped centre with lit hangars showing aircraft inside; from KF Aerospace's own site (filename credits photographer Royce Sihlis). kfcentre.ca heroes have fake cloud overlays. Cropped to 2:1 on the building."
+  },
+  {
+    "id": 1473,
+    "name": "Kelowna Actors Studio",
+    "file": "/images/venues/kelowna-actors-studio-2610.jpg",
+    "dimensions": "1800x1012",
+    "source_page": "https://kelownaactorsstudio.com/",
+    "image_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663458859900/87hYSDyYn7hmVCohLDW8N2/kas-interior-venue_892cde2f.webp",
+    "source_kind": "official_website",
+    "note": "Dinner-theatre auditorium: red velvet curtains, lit stage and set tables; wide and atmospheric."
+  },
+  {
+    "id": 1466,
+    "name": "Kelowna Art Gallery",
+    "file": "/images/venues/kelowna-art-gallery-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://kelownaartgallery.com/",
+    "image_url": "https://kelownaartgallery.com/wp-content/uploads/2026/01/membership2026_01-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Visitors viewing drawings and paintings in a white exhibition room; 2560px (installation shots on homepage are 1080px)."
+  },
+  {
+    "id": 1550,
+    "name": "Kelowna Comedy Club at Dakoda's Comedy Lounge",
+    "file": "/images/venues/kelowna-comedy-club-at-dakoda-s-comedy-lounge-2610.jpg",
+    "dimensions": "1536x1024",
+    "source_page": "https://kelownacomedy.ca/",
+    "image_url": "https://kelownacomedy.ca/wp-content/uploads/2026/10/Alison-Lujan-on-stage.jpg",
+    "source_kind": "official_website",
+    "note": "Comic performing on the brick-wall stage under the Kelowna Comedy sign, audience laughing; only real venue photo (rest are posters/AI graphics). Square 1536px, so it will crop tight."
+  },
+  {
+    "id": 1471,
+    "name": "Kelowna Community Theatre",
+    "file": "/images/venues/kelowna-community-theatre-2610.jpg",
+    "dimensions": "1038x477",
+    "source_page": "https://theatre.kelowna.ca/rental-information/main-stage",
+    "image_url": "https://theatre.kelowna.ca/sites/default/files/_smh6360_opt.jpg-_for_website.jpg",
+    "source_kind": "official_website",
+    "note": "Main-stage auditorium from the back of a full house during a concert; venue's own photo. Only 1038px exists (site blocks bots; fetched the identical file via web.archive.org id_ copy)."
+  },
+  {
+    "id": 1549,
+    "name": "Kelowna Curling Club",
+    "file": "/images/venues/kelowna-curling-club-2610.jpg",
+    "dimensions": "1800x1196",
+    "source_page": "https://www.tourismkelowna.com/listing/kelowna-curling-club/1357/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/KCC-Curling-Rink-4-_4814866A-5056-A36A-0B763ED507FE943B-481480dc5056a36_48149eb1-5056-a36a-0b59906a3ca05f1f.jpg",
+    "source_kind": "tourism_board",
+    "note": "Curler delivering a stone toward the house with sheets stretching back; club-supplied photo on its Tourism Kelowna listing, beats the site's plain exterior."
+  },
+  {
+    "id": 1635,
+    "name": "Kelowna Downtown YMCA",
+    "file": "/images/venues/kelowna-downtown-ymca-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.tourismkelowna.com/listing/kelowna-downtown-ymca/2801/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/HFA_DTY_MainArea_020-59e634985056a36_59e63698-5056-a36a-0b7fefd7a65a3905.jpg",
+    "source_kind": "tourism_board",
+    "note": "Wide view of the Downtown Y main fitness floor (rows of cardio machines); YMCA-supplied (DTY) photo on Tourism Kelowna listing."
+  },
+  {
+    "id": 1634,
+    "name": "Kelowna Family YMCA",
+    "file": "/images/venues/kelowna-family-ymca-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.ymcasibc.ca/Locations/Kelowna-Family-Y/Hours-Schedules",
+    "image_url": "https://www.ymcasibc.ca/sites/default/files/2023-04/hfa_kfy_exterior_newcolour.jpg",
+    "source_kind": "official_website",
+    "note": "Sunny exterior of the Kelowna Family YMCA with its name on the glass front; the only interior shots were close-ups of children in the pool."
+  },
+  {
+    "id": 1495,
+    "name": "Kelowna Karting Entertainment Centre",
+    "file": "/images/venues/kelowna-karting-entertainment-centre-2610.jpg",
+    "dimensions": "1800x1012",
+    "source_page": "https://kelownakarting.com/",
+    "image_url": "https://kelownakarting.com/cdn/shop/files/Adult_Karts.jpg?v=1728254704",
+    "source_kind": "official_website",
+    "note": "Driver in an electric kart cornering on the neon-lit indoor track; sharp, wide, venue's own shot."
+  },
+  {
+    "id": 1554,
+    "name": "Löyly Floating Sauna",
+    "file": "/images/venues/loyly-floating-sauna-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.loylyfloatingsauna.ca/",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/64fa52f9226ffb08327985d6/451e0a5d-f69b-4ea7-981f-8e4d24ab3a32/Loyly+Sauna+Oct+2024+%2820+of+23%29.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Inside the cedar sauna with bathers and the big window onto the lake and marina; inside-the-experience shot (aerial of the floating hut is the backup in raw/)."
+  },
+  {
+    "id": 1462,
+    "name": "McCurdy Bowling Centre",
+    "file": "/images/venues/mccurdy-bowling-centre-2610.jpg",
+    "dimensions": "1024x684",
+    "source_page": "https://www.tourismkelowna.com/listing/mccurdy-bowling-centre/284/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/mainbowlingphoto0-db910a775056a36_db910bc8-5056-a36a-0bd66b4f27cfa29c.jpg",
+    "source_kind": "tourism_board",
+    "note": "Bowler on the lanes with the mural wall and rows of Brunswick returns; venue-supplied. 1024px; the site's larger hero has text and arrows over it."
+  },
+  {
+    "id": 1468,
+    "name": "Okanagan Heritage Museum",
+    "file": "/images/venues/okanagan-heritage-museum-2610.jpg",
+    "dimensions": "1680x1121",
+    "source_page": "https://www.kelownamuseums.ca/museum/okanagan-heritage-museum/",
+    "image_url": "https://www.kelownamuseums.ca/wp-content/uploads/2021/01/Okanagan-Heritage-Museum_Kelowna-Museums.jpg",
+    "source_kind": "official_website",
+    "note": "Gallery interior with glass display cases of syilx/Okanagan artefacts; served as webp, converted to jpg."
+  },
+  {
+    "id": 1470,
+    "name": "Okanagan Military Museum",
+    "file": "/images/venues/okanagan-military-museum-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.tourismkelowna.com/listing/okanagan-military-museum/7178/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/OMM_Afghanistan_1792B0AB-278F-4810-B011BF94C396F67A_bc1bc6e1-53a2-4d9e-966a961b04a30cd2.jpg",
+    "source_kind": "tourism_board",
+    "note": "Afghanistan-era exhibit case with uniforms and gear; museum-supplied, sharper than the website's firearms-case photo."
+  },
+  {
+    "id": 1633,
+    "name": "Okanagan Regional Library – Kelowna Downtown Branch",
+    "file": "/images/venues/okanagan-regional-library-kelowna-downtown-branch-2610.jpg",
+    "dimensions": "1800x1199",
+    "source_page": "https://www.tourismkelowna.com/listing/okanagan-regional-library-kelowna-branch/317/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/Kelownas-Public-Library_1BDA853D-C23E-C7D2-C5DAD285ABCE9708_1bdba641-bb48-b864-9d4f31ab2f9ba95f.jpg",
+    "source_kind": "tourism_board",
+    "note": "Downtown branch at dusk with its glowing glass facade and plaza fountain; ORL site only had a 1024px interior and a map image."
+  },
+  {
+    "id": 1469,
+    "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+    "file": "/images/venues/okanagan-wine-orchard-museum-laurel-packinghouse-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.tourismkelowna.com/listing/okanagan-wine-%26-orchard-museum/7179/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/OWOM_DE431398-A4EE-4C92-8B1F3ADB5892CA02_3c48480e-ce1d-4279-bd7a57470aca5f7b.jpg",
+    "source_kind": "tourism_board",
+    "note": "Inside the Laurel Packinghouse: timber beams, arched windows and vintage fruit-packing machinery; museum-supplied."
+  },
+  {
+    "id": 1553,
+    "name": "Parkinson Recreation Centre",
+    "file": "/images/venues/parkinson-recreation-centre-2610.jpg",
+    "dimensions": "1050x546",
+    "source_page": "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/parkinson-recreation-centre",
+    "image_url": "https://www.kelowna.ca/sites/files/1/uploads/banners/inside/prcpool-web2.jpg",
+    "source_kind": "official_website",
+    "note": "Wide view of the PRC lap pool with swimmers. City banner, 1050px (largest available); fetched via web.archive.org id_ copy because kelowna.ca blocks scripted downloads."
+  },
+  {
+    "id": 1463,
+    "name": "Planet Lazer Kelowna",
+    "file": "/images/venues/planet-lazer-kelowna-2610.jpg",
+    "dimensions": "1008x672",
+    "source_page": "https://www.tourismkelowna.com/listing/planet-lazer/1320/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/IMG_4400_57A826B6-C8AA-47E0-9B6D0264C35A8FB2_bbf7ee4c-ec6b-4c2a-92e812759d82e5bd.jpg",
+    "source_kind": "tourism_board",
+    "note": "Neon-lit prize/claw machines in the Planet Lazer arcade; venue-supplied, 1008px. Website images are stock; laser-arena photo was only 800px."
+  },
+  {
+    "id": 1552,
+    "name": "Revelry Food + Music Hub",
+    "file": "/images/venues/revelry-food-music-hub-2610.jpg",
+    "dimensions": "1800x950",
+    "source_page": "https://www.revelrykelowna.com/venue",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/6646c5ff5a79061a1f9b8edb/e4d2000f-71de-4ab7-89d5-fbbf4069d772/Stage.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Symmetrical view of the main stage, mass-timber mezzanines and lighting rig; screens show a small ticket QR graphic. Webp converted to jpg."
+  },
+  {
+    "id": 1472,
+    "name": "Rotary Centre for the Arts",
+    "file": "/images/venues/rotary-centre-for-the-arts-2610.jpg",
+    "dimensions": "1800x1181",
+    "source_page": "https://rotarycentreforthearts.com/facility-rentals/",
+    "image_url": "https://rotarycentreforthearts.com/files/MIT-Concert-small-1.jpg",
+    "source_kind": "official_website",
+    "note": "Concert in the Mary Irwin Theatre seen from the balcony, stage lights and full audience; homepage hero is a dated show promo."
+  },
+  {
+    "id": 1493,
+    "name": "SOPA Fine Arts",
+    "file": "/images/venues/sopa-fine-arts-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://sopafinearts.com/",
+    "image_url": "https://sopafinearts.com/wp-content/uploads/2026/01/R62_8704-1.jpg",
+    "source_kind": "official_website",
+    "note": "Long view down the gallery: white walls with paintings, timber posts, polished concrete floor; very sharp 6000px."
+  },
+  {
+    "id": 1465,
+    "name": "Scandia Golf & Games",
+    "file": "/images/venues/scandia-golf-games-2610.jpg",
+    "dimensions": "1800x1012",
+    "source_page": "https://www.scandiagolfandgames.com/",
+    "image_url": "https://www.scandiagolfandgames.com/wp-content/uploads/2023/06/arcade-main.jpg",
+    "source_kind": "official_website",
+    "note": "Indoor arcade with lit-up game cabinets and claw machine (indoor part of the venue); the outdoor castle shot is the backup in raw/."
+  },
+  {
+    "id": 1489,
+    "name": "Virtual Rcades",
+    "file": "/images/venues/virtual-rcades-2610.jpg",
+    "dimensions": "1200x800",
+    "source_page": "https://www.tourismkelowna.com/listing/virtual-rcades-indoor-vr-theme-park-%26-arcade/6474/",
+    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/kelowna/image5_9821288B-024E-1180-840D2D56189B77AB-98212741e16ec9c_98213386-e194-ccfe-2ce9303b44a8bf3a.jpg",
+    "source_kind": "tourism_board",
+    "note": "Green-lit floor of VR flight and motion simulators; venue-supplied. Website only has thin banners and graphics."
+  },
+  {
+    "id": 1485,
+    "name": "Creekside Theatre",
+    "file": "/images/venues/creekside-theatre-2610.jpg",
+    "dimensions": "1550x480",
+    "source_page": "https://www.lakecountry.bc.ca/parks-recreation-culture/creekside-theatre",
+    "image_url": "https://www.lakecountry.bc.ca/sites/default/files/2024-08/Creekside%20theatre%20banner%20new%20webpage%20v2%202024_0.JPEG",
+    "source_kind": "official_website",
+    "note": "Packed auditorium during a Sloan concert, seen from the back rows. Best inside shot available. The original 1920x480 banner had a logo/phone-number box at the left, which I cropped out (no resampling). Only 480px tall, so it will look soft on phones."
+  },
+  {
+    "id": 1484,
+    "name": "Lake Country Art Gallery",
+    "file": "/images/venues/lake-country-art-gallery-2610.jpg",
+    "dimensions": "1100x733",
+    "source_page": "https://www.lakecountryartgallery.ca/exhibition-gallery.html",
+    "image_url": "https://www.lakecountryartgallery.ca/uploads/1/5/1/9/15194804/installation-1-2_1_orig.jpg",
+    "source_kind": "official_website",
+    "note": "Wide view of the gallery interior with a hanging-textile installation and wall works. Largest original on the Weebly site (1100px)."
+  },
+  {
+    "id": 1483,
+    "name": "Lake Country Museum & Archives",
+    "file": "/images/venues/lake-country-museum-archives-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://lakecountrymuseum.com/",
+    "image_url": "https://lakecountrymuseum.com/wp-content/uploads/2023/07/175653_10151171192806698_2146981408_o.jpg",
+    "source_kind": "official_website",
+    "note": "Museum's general-store exhibit: an ornate cash register in front of shelves of vintage tins. Warm, sharp interior shot. (The site blocks HTTP/2 bots; downloaded with curl --http1.1.)"
+  },
+  {
+    "id": 1519,
+    "name": "Venables Theatre",
+    "file": "/images/venues/venables-theatre-2610.jpg",
+    "dimensions": "1800x1208",
+    "source_page": "https://www.venablestheatre.ca/",
+    "image_url": "https://static.wixstatic.com/media/d78fb5_1f8d1f034b3e4e14bc82ba02d76cfd62~mv2.jpg",
+    "source_kind": "official_website",
+    "note": "Dusk exterior of the Venables Theatre / school complex with its domed glass rotunda against the hills. Site og:image, very high resolution."
+  },
+  {
+    "id": 1517,
+    "name": "Okanagan Art Gallery",
+    "file": "/images/venues/okanagan-art-gallery-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "http://okanaganartgallery.com/",
+    "image_url": "http://okanaganartgallery.com/works/okanaganartgallery/resized/img_0036.w4000h4000.jpg",
+    "source_kind": "official_website",
+    "note": "Gallery wall: red wall hung with local Okanagan landscape paintings and price cards. Sharp, but a straight-on wall view, not a room view."
+  },
+  {
+    "id": 1565,
+    "name": "Sonora Community Centre",
+    "file": "/images/venues/sonora-community-centre-2610.jpg",
+    "dimensions": "1800x1010",
+    "source_page": "https://www.osoyoos.v2.civikit.com/sonora",
+    "image_url": "https://www.osoyoos.v2.civikit.com/sites/42/files/2026-04/Sonora%2520Community%2520Centre.jpeg",
+    "source_kind": "official_website",
+    "note": "Sunny exterior of the red Sonora Community Centre building with its sign and landscaped entry. Town's official page photo."
+  },
+  {
+    "id": 1518,
+    "name": "The Art Gallery Osoyoos",
+    "file": "/images/venues/the-art-gallery-osoyoos-2610.jpg",
+    "dimensions": "1024x682",
+    "source_page": "https://www.destinationosoyoos.com/listing/the-art-gallery-osoyoos",
+    "image_url": "https://admin.destinationosoyoos.com/wp-content/uploads/47e29f9fe96a1771642fb05ac8a8fd00.jpg",
+    "source_kind": "tourism_board",
+    "note": "Entrance of the gallery: blue 'Art Gallery' awning walkway with flower beds and the heritage building. The gallery's own site only shows paintings."
+  },
+  {
+    "id": 1487,
+    "name": "Peachland Art Gallery",
+    "file": "/images/venues/peachland-art-gallery-2610.jpg",
+    "dimensions": "1067x711",
+    "source_page": "https://peachlandarts.ca/about-us",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/69af3a384679f11624bab789/a1bb0fd0-7be3-4499-876a-3a642b05f0e0/galleryexterior1.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Exterior of the gallery building framed by golden autumn leaves. Only 1067px wide (largest available). An interior shot at the same size exists but is plainer."
+  },
+  {
+    "id": 1557,
+    "name": "Peachland Community Centre – Drop-in Pickleball",
+    "file": "/images/venues/peachland-community-centre-drop-in-pickleball-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.peachland.ca/parks-recreation/facilities-rentals/community-centre",
+    "image_url": "https://www.peachland.ca/sites/default/files/2024-11/community-centre.jpg",
+    "source_kind": "official_website",
+    "note": "Peachland Community Centre exterior with its carved peach sign and the hillside behind. The pickleball page itself has only a schedule graphic."
+  },
+  {
+    "id": 1558,
+    "name": "Cascades Casino Penticton",
+    "file": "/images/venues/cascades-casino-penticton-2610.jpg",
+    "dimensions": "1800x1201",
+    "source_page": "https://cascadescasinopenticton.com/gaming/",
+    "image_url": "https://cascadescasinopenticton.com/wp-content/uploads/2021/01/Cascades-Casino-Hotel-Renovation-31-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Gaming floor with rows of lit slot machines and red stools. CAUTION: the filename ('Cascades Casino Hotel Renovation') suggests a chain-wide photo, possibly from another Cascades location such as Langley. It is on the Penticton site but may not be this building."
+  },
+  {
+    "id": 1507,
+    "name": "Cleland Community Theatre",
+    "file": "/images/venues/cleland-community-theatre-2610.jpg",
+    "dimensions": "1800x470",
+    "source_page": "https://www.penticton.ca/node/34",
+    "image_url": "https://www.penticton.ca/sites/default/files/2020-02/2020-02-02-PIC-Cleland%20Theatre%20seating%20banner.jpg",
+    "source_kind": "official_website",
+    "note": "Theatre auditorium: rows of red seats rising toward the booth. Very wide city banner (5971x1560)."
+  },
+  {
+    "id": 1521,
+    "name": "Donut House Studios",
+    "file": "/images/venues/donut-house-studios-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.donuthousestudios.com/",
+    "image_url": "https://static.wixstatic.com/media/cd63b0_97aae362215442cd8ba51fb501d46c9f~mv2.jpg",
+    "source_kind": "official_website",
+    "note": "Bright warehouse studio interior: picnic tables on turf and the red Donut House sign over the workshop counter. Other site photos were stock pottery shots or flyers."
+  },
+  {
+    "id": 1510,
+    "name": "Leir House Cultural Centre (Penticton Arts Council Gallery)",
+    "file": "/images/venues/leir-house-cultural-centre-penticton-arts-council-gallery-2610.jpg",
+    "dimensions": "1800x1012",
+    "source_page": "https://www.pentictonartscouncil.com/about-pdcac",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/5e5022d5f4cb5251c890fa8f/bb2f92ff-1842-4210-81f9-dbacf013d21d/Leir+House+Aerials-3.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Aerial view of the stone Leir House heritage building and grounds; wide, sharp, clearly the venue (site otherwise all event posters)."
+  },
+  {
+    "id": 1512,
+    "name": "Many Hats Theatre Company (Cannery Stage)",
+    "file": "/images/venues/many-hats-theatre-company-cannery-stage-2610.jpg",
+    "dimensions": "1800x998",
+    "source_page": "https://manyhatstheatre.com/",
+    "image_url": "https://storage.ghost.io/c/c9/f6/c9f65d77-c1f6-44f2-bf20-7d932001bf20/content/images/2023/12/IMG_5364--2--1.JPG",
+    "source_kind": "official_website",
+    "note": "Two actors mid-scene on the Cannery Stage set (warm sepia tone); only real performance photo, rest are show posters."
+  },
+  {
+    "id": 1502,
+    "name": "Penticton Art Gallery",
+    "file": "/images/venues/penticton-art-gallery-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.pentictonartgallery.com/facility-rentals",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/625855bd77238b513a9286aa/1752180951011-ZIAGT3QQUNW3BQDSQBR4/witnesstowonder-sd67highschool-20250520-017.JPG?format=2500w",
+    "source_kind": "official_website",
+    "note": "Wide gallery interior with orange freestanding walls and framed works on navy walls; clean exhibition-space shot."
+  },
+  {
+    "id": 1505,
+    "name": "Penticton Community Centre (Pool & Lazy River)",
+    "file": "/images/venues/penticton-community-centre-pool-lazy-river-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.penticton.ca/parks-recreation/facility-hours-rates-bookings/penticton-community-centre/pool",
+    "image_url": "https://www.penticton.ca/sites/default/files/2020-01/BLUE7748%282%29.jpg",
+    "source_kind": "official_website",
+    "note": "Adult aquafit class in the community centre pool with lap lanes behind; inside-the-pool shot preferred over the exterior banner (ext.jpg 6001x1564 kept in raw as backup)."
+  },
+  {
+    "id": 1559,
+    "name": "Penticton Curling Club",
+    "file": "/images/venues/penticton-curling-club-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://curlpenticton.com/",
+    "image_url": "https://curlpenticton.com/images/1000001041.jpg",
+    "source_kind": "official_website",
+    "note": "Interior of the curling rink: sheets of ice with houses, sponsor boards and wood ceiling; sharp 4000px."
+  },
+  {
+    "id": 1504,
+    "name": "Penticton Museum & Archives",
+    "file": "/images/venues/penticton-museum-archives-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.visitpenticton.com/listing/penticton-museum-and-archives/",
+    "image_url": "https://visitpenticton.com/wp-content/uploads/2015/08/IMG_3973.jpg",
+    "source_kind": "tourism_board",
+    "note": "Visitors at the curved \"water connects everything\" exhibit inside the museum; museum website is down, so taken from the Visit Penticton listing."
+  },
+  {
+    "id": 1561,
+    "name": "Penticton Virtual Reality Studio",
+    "file": "/images/venues/penticton-virtual-reality-studio-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.inthevive.com/gallery",
+    "image_url": "https://static.wixstatic.com/media/39bb96_8619af073bf74f1ab6d6feb07519058d~mv2.jpg",
+    "source_kind": "official_website",
+    "note": "Real studio interior: sci-fi hatch doorway, arcade cabinets and VR room; other site images are AI art, game screenshots or promos."
+  },
+  {
+    "id": 1503,
+    "name": "SS Sicamous Museum & Heritage Park",
+    "file": "/images/venues/ss-sicamous-museum-heritage-park-2610.jpg",
+    "dimensions": "1800x1012",
+    "source_page": "https://www.sssicamous.ca/",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/61db1f6f6c6b0048e8c878c1/464dadde-2267-450a-ab2b-efdf2f4eaf71/SS+Sicamous.+2022.+Genadity+Selivanov.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Aerial of the SS Sicamous sternwheeler on the Okanagan Lake shore with the heritage park; filename credits photographer Genadity Selivanov (used on the society's own homepage)."
+  },
+  {
+    "id": 1563,
+    "name": "Shelter Floating Sauna",
+    "file": "/images/venues/shelter-floating-sauna-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.sheltersauna.com/",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/68f916bee88a4a46cfb133cf/5ca25996-c85d-46a8-a8b3-25669f9e780c/Stenberg-251227-DSC00585.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "The black floating sauna cabins on the marina water with Munson Mountain and the Lakeside Resort behind; wide landscape, shows the actual venue."
+  },
+  {
+    "id": 1567,
+    "name": "South Okanagan Events Centre (SOEC)",
+    "file": "/images/venues/south-okanagan-events-centre-soec-2610.jpg",
+    "dimensions": "1800x1012",
+    "source_page": "https://soec.ca/business-opportunities/promoters/",
+    "image_url": "https://soec.ca/wp-content/uploads/2024/03/Billy-Talent-137.png",
+    "source_kind": "official_website",
+    "note": "Packed arena floor and stage during a Billy Talent concert at the SOEC; inside-the-experience shot."
+  },
+  {
+    "id": 1568,
+    "name": "Springers Gymnastics (Drop-in Gym)",
+    "file": "/images/venues/springers-gymnastics-drop-in-gym-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.pentictonspringers.com/",
+    "image_url": "https://static.wixstatic.com/media/d9020c_dda90edbc4524a4491f6330c2a657fe4~mv2.jpg",
+    "source_kind": "official_website",
+    "note": "Empty gym: foam pit, climbing wall, trampoline and mats; no children in frame. Near-square (3368x3019) so it will crop in tight on desktop, but other shots feature kids' faces."
+  },
+  {
+    "id": 1511,
+    "name": "Tempest Theatre & Film",
+    "file": "/images/venues/tempest-theatre-film-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://tempest.ca/",
+    "image_url": "https://tempest.ca/wp-content/uploads/2026/08/Dream-FP-feature2-aug2026.jpg",
+    "source_kind": "official_website",
+    "note": "Tempest cast performing on stage under purple light (2:1 production still); best wide performance shot on the site."
+  },
+  {
+    "id": 1509,
+    "name": "The Lloyd Gallery",
+    "file": "/images/venues/the-lloyd-gallery-2610.jpg",
+    "dimensions": "1170x569",
+    "source_page": "https://visitpenticton.com/listing/the-lloyd-gallery/",
+    "image_url": "https://visitpenticton.com/wp-content/uploads/2018/01/Lloyd-Gallery.jpg",
+    "source_kind": "tourism_board",
+    "note": "Front Street storefront of The Lloyd Gallery with artwork on display; gallery site blocks with Cloudflare, so taken from Visit Penticton. 1170px wide."
+  },
+  {
+    "id": 1514,
+    "name": "Nixdorf Classic Cars",
+    "file": "/images/venues/nixdorf-classic-cars-2610.jpg",
+    "dimensions": "1800x1012",
+    "source_page": "https://nixdorfclassiccars.com/showroom.html",
+    "image_url": "https://nixdorfclassiccars.com/images/background/background_3.jpg",
+    "source_kind": "official_website",
+    "note": "Showroom interior packed with rows of 1950s classic cars; wide and colourful."
+  },
+  {
+    "id": 1515,
+    "name": "Summerland Arts Council Gallery (George Ryga Arts & Culture Centre)",
+    "file": "/images/venues/summerland-arts-council-gallery-george-ryga-arts-culture-centre-2610.jpg",
+    "dimensions": "1024x682",
+    "source_page": "https://summerlandarts.com/our-story/",
+    "image_url": "https://summerlandarts.com/wp-content/uploads/2024/10/George_Ryga_Arts_Centre.webp",
+    "source_kind": "official_website",
+    "note": "Exterior of the George Ryga Arts & Cultural Centre with name on the gable; only 1024x768 (nothing larger exists on the site)."
+  },
+  {
+    "id": 1513,
+    "name": "Summerland Museum & Archives",
+    "file": "/images/venues/summerland-museum-archives-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.summerlandmuseum.org/exhibits",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/5995f4e96b8f5b9ef7c7355f/1601506192080-ZHOBNXKQRLJPJB6MDRDL/Permanent+Exhibits+Photo.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Permanent exhibit: recreated railway station counter with Canadian Pacific Express sign and period artifacts; a bit close but real and sharp."
+  },
+  {
+    "id": 1528,
+    "name": "Beyond Belief Escape Rooms",
+    "file": "/images/venues/beyond-belief-escape-rooms-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.tourismvernon.com/business-directory/beyond-belief-escape-rooms",
+    "image_url": "https://www.tourismvernon.com/sites/default/files/2024-10/DSC00395-large.jpg",
+    "source_kind": "tourism_board",
+    "note": "Moody wizard-themed escape room set (rune board, chains, trophy); own site only has stock/AI images and posters."
+  },
+  {
+    "id": 1531,
+    "name": "Caetani Cultural Centre",
+    "file": "/images/venues/caetani-cultural-centre-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://caetani.org/courtyard",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/65df5e2d47d8f44d63032282/b51a4e4f-5086-46f0-aa1d-5983eaaf615a/IMG_4693.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Sunny heritage grounds and courtyard path between the Caetani buildings with gardens; wide and sharp."
+  },
+  {
+    "id": 1530,
+    "name": "Gallery Vertigo",
+    "file": "/images/venues/gallery-vertigo-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://galleryvertigo.com/",
+    "image_url": "https://galleryvertigo.com/wp-content/uploads/2024/05/2024-04-11-19-43-32-0122-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Black-and-white exterior of the corner gallery storefront with the door open onto an opening-night exhibit; sharp, wide, the only real venue photo on the site."
+  },
+  {
+    "id": 1545,
+    "name": "Historic O'Keefe Ranch",
+    "file": "/images/venues/historic-o-keefe-ranch-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.okeeferanch.ca/attractions",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/6539a0a7d9f6060b8cb3fb27/1704757273013-CX4PCZF9094AV5DXGGMU/O_Keefe+Ranch+Mansion+Backdrop+-+Rose+Garden+Ceremony.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "The historic O'Keefe mansion with its rose garden on a bright day; sharp, landscape, the ranch's signature building."
+  },
+  {
+    "id": 1575,
+    "name": "Lake City Casino Vernon",
+    "file": "/images/venues/lake-city-casino-vernon-2610.jpg",
+    "dimensions": "1024x683",
+    "source_page": "https://vernon.lakecitycasinos.com/gaming/slots/",
+    "image_url": "https://vernon.lakecitycasinos.com/wp-content/uploads/2022/03/5078555725_3c63dac6c6_b.jpg",
+    "source_kind": "official_website",
+    "note": "Casino floor with Guest Services desk and slot machines, from the Vernon property's own slots page; only 1024px wide and location within Gateway chain not independently confirmed, but nothing better exists."
+  },
+  {
+    "id": 1537,
+    "name": "Lincoln Lanes",
+    "file": "/images/venues/lincoln-lanes-2610.jpg",
+    "dimensions": "1476x831",
+    "source_page": "https://www.lincolnlanes.ca/",
+    "image_url": "https://www.lincolnlanes.ca/wp-content/uploads/2025/05/unnamed-7.jpg",
+    "source_kind": "official_website",
+    "note": "Wide interior shot down the lanes toward the \"Welcome to Lincoln Lanes\" mural; sharp and clearly this venue."
+  },
+  {
+    "id": 1524,
+    "name": "Museum & Archives of Vernon",
+    "file": "/images/venues/museum-archives-of-vernon-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://vernonmuseum.ca/",
+    "image_url": "https://vernonmuseum.ca/wp-content/uploads/2024/05/Front-of-Museum-with-Fountain-2-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Museum building front with the civic-plaza fountain under blue sky; sharp, landscape, sign visible."
+  },
+  {
+    "id": 1526,
+    "name": "Okanagan Science Centre",
+    "file": "/images/venues/okanagan-science-centre-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://okscience.ca/pages/floor-plan",
+    "image_url": "https://okscience.ca/cdn/shop/files/PXL_20241008_154828334.jpg?v=1728415195",
+    "source_kind": "official_website",
+    "note": "Daytime exterior of the heritage brick Science Centre building with signage; sharp and wide. Interior shots were all close-ups of children."
+  },
+  {
+    "id": 1572,
+    "name": "Planet Bee Honey Farm & Honeymoon Meadery",
+    "file": "/images/venues/planet-bee-honey-farm-honeymoon-meadery-2610.jpg",
+    "dimensions": "1600x1000",
+    "source_page": "https://planetbee.com/",
+    "image_url": "https://planetbee.com/cdn/shop/files/Slideshow_Image_Storefront_5000x.jpg?v=1626386776",
+    "source_kind": "official_website",
+    "note": "Planet Bee storefront and sign behind a field of blooming lavender; real venue photo, bright and wide."
+  },
+  {
+    "id": 1533,
+    "name": "Powerhouse Theatre",
+    "file": "/images/venues/powerhouse-theatre-2610.jpg",
+    "dimensions": "1400x600",
+    "source_page": "https://powerhousetheatre.net/about-us/",
+    "image_url": "https://powerhousetheatre.net/wp-content/uploads/2025/10/image_50460161_banner.jpg",
+    "source_kind": "official_website",
+    "note": "Auditorium seating rows inside the theatre; wide 2.3:1 crop suits the banner. Exterior photos were smaller (800px) or tourism-board."
+  },
+  {
+    "id": 1574,
+    "name": "Vernon Curling Club",
+    "file": "/images/venues/vernon-curling-club-2610.jpg",
+    "dimensions": "1800x1011",
+    "source_page": "https://vernoncurling.ca/",
+    "image_url": "https://vernoncurling.ca/images/front_slideshow/iceshed.jpg",
+    "source_kind": "official_website",
+    "note": "Curlers on the sheets under the blue-beamed ice shed; sharp, wide, shows the activity."
+  },
+  {
+    "id": 1538,
+    "name": "Vernon Jazz Club",
+    "file": "/images/venues/vernon-jazz-club-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.vernonjazz.com/",
+    "image_url": "https://www.vernonjazz.com/wp-content/uploads/2026/10/PXL_20261008_025514013.NIGHT_-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Big band on the club stage with candle-lit tables and audience in the foreground; Oct 2026 photo from the club's own media library."
+  },
+  {
+    "id": 1525,
+    "name": "Vernon Public Art Gallery",
+    "file": "/images/venues/vernon-public-art-gallery-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://vernonpublicartgallery.com/",
+    "image_url": "https://vernonpublicartgallery.com/wordpress/wp-content/uploads/2024/03/SukeMultiWall-1-of-1-1-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Gallery wall with a row of colourful works in the exhibition hall (og:image); sharp, wide, clean."
+  },
+  {
+    "id": 1551,
+    "name": "FunSpace Kids",
+    "file": "/images/venues/funspace-kids-2610.jpg",
+    "dimensions": "1600x1066",
+    "source_page": "https://funspacekids.com/",
+    "image_url": "https://funspacekids.com/wp-content/uploads/2025/08/IMG_0052-scaled.jpeg",
+    "source_kind": "official_website",
+    "note": "Indoor play area with slides, ball pit, climbing wall and carousel; real venue photo from the site's media library, children small in frame."
+  },
+  {
+    "id": 1481,
+    "name": "Johnson Bentley Memorial Aquatic Centre",
+    "file": "/images/venues/johnson-bentley-memorial-aquatic-centre-2610.jpg",
+    "dimensions": "1800x1200",
+    "source_page": "https://www.westkelownacity.ca/parks-recreation-facilities/johnson-bentley-memorial-aquatic-centre/",
+    "image_url": "https://media-003-ca.cdn.govstack.com/westkelownacity-ca/media/irobvujy/638321168783613163_original.jpg",
+    "source_kind": "official_website",
+    "note": "Empty lap pool hall with lane ropes and flags; sharp, wide, from the City of West Kelowna facility page."
+  },
+  {
+    "id": 1482,
+    "name": "Pearl & Fern Pottery Studio",
+    "file": "/images/venues/pearl-fern-pottery-studio-2610.jpg",
+    "dimensions": "1800x1197",
+    "source_page": "https://www.pearlandfern.ca/membership-1",
+    "image_url": "https://images.squarespace-cdn.com/content/v1/67c14c5b6072911077ea666b/3ea2b4bd-229f-4786-bdbf-0cc51d49c377/29-P%26F+029.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Pottery wheels lined up at the studio window with a valley view; professional, sharp, landscape."
+  },
+  {
+    "id": 1479,
+    "name": "Sncewips Heritage Museum",
+    "file": "/images/venues/sncewips-heritage-museum-2610.jpg",
+    "dimensions": "1800x1190",
+    "source_page": "https://www.sncewips.com/about-us",
+    "image_url": "http://static1.squarespace.com/static/6022dfe9a92b875bbdf30e58/t/655e86dc333b464338f2aed3/1700693732417/IMG_6981.jpg?format=2500w",
+    "source_kind": "official_website",
+    "note": "Museum storefront with the illuminated Sncewips Heritage Museum sign; sharp and landscape. Interior event shot was soft."
+  }
+]
