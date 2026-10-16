@@ -21111,3 +21111,10 @@ test('Related cards (2026-10-16): a venue page does not repeat one stock photo a
   const pool = 5; // the winery example photos
   assert.equal(new Set(stock).size, Math.min(stock.length, pool), `no repeated stock photo: ${stock.join(', ')}`);
 }));
+
+test('Venue page top and "More in" links (2026-10-16): back link and language switch share one line; guide links are chips', () => withDiscoveryServer(async (base) => {
+  seasonInsert.run({ name: 'Top Links Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'top-links-fixture-cafe' });
+  const page = await fetch(`${base}/kelowna/cafes/top-links-fixture-cafe`).then((r) => r.text());
+  assert.match(page, /<div class="venue-top-links"[^>]*><a class="category-back-link" href="\/kelowna\/cafes">← Kelowna Cafes<\/a>/);
+  assert.doesNotMatch(page, /Also see:/);
+}));
