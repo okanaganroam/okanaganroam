@@ -21895,7 +21895,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     ${openStatusHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${(() => {
       const last = ownerLastUpdatedAt(venue.id);
-      return last ? `\n    <p class="venue-owner-updated" style="font-size:.84rem;margin:6px 0 0;color:#1E6B3A;font-weight:700"><span aria-hidden="true">&#10003;</span> ${L('Updated by the owner', 'Mis \u00e0 jour par le propri\u00e9taire')} &middot; ${escapeHtml(ownerUpdatedDate(last, fr))}</p>` : '';
+      return last ? `\n    <p class="venue-owner-updated" style="font-size:.84rem;margin:6px 0 0;color:#1E6B3A;font-weight:700"><span aria-hidden="true">&#10003;</span> ${L('Updated by the business', 'Mis \u00e0 jour par l\u2019entreprise')} &middot; ${escapeHtml(ownerUpdatedDate(last, fr))}</p>` : '';
     })()}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
