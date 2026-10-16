@@ -1,0 +1,126 @@
+{
+  "reason": "User approved all 10 visually reviewed linked-page alternatives, including documented capture-date exceptions.",
+  "batch_id": "cycling-approved-20261016",
+  "venues": [
+    {
+      "id": 1233,
+      "name": "Big White Ski Resort",
+      "region": "big-white",
+      "slug": "big-white-ski-resort",
+      "expect": {
+        "image_url": "/images/hiking/venues/big-white-ski-resort-20261015.jpg?v=20261015h1live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/big-white-ski-resort-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1282,
+      "name": "Campbell Mountain",
+      "region": "penticton",
+      "slug": "campbell-mountain",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/campbell-mountain-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1287,
+      "name": "Irrigation Canal Walkway",
+      "region": "osoyoos",
+      "slug": "irrigation-canal-walkway",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/irrigation-canal-walkway-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1285,
+      "name": "KVR Trail – Skaha Lake (Penticton to Okanagan Falls)",
+      "region": "penticton",
+      "slug": "kvr-trail-skaha-lake-penticton-to-okanagan-falls",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kvr-trail-skaha-lake-penticton-to-okanagan-falls-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1283,
+      "name": "Kruger Mountain / Blue Lake / Kilpoola Trails",
+      "region": "osoyoos",
+      "slug": "kruger-mountain-blue-lake-kilpoola-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kruger-mountain-blue-lake-kilpoola-trails-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1277,
+      "name": "Mission Creek Mountain Bike Skills Park",
+      "region": "kelowna",
+      "slug": "mission-creek-mountain-bike-skills-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mission-creek-mountain-bike-skills-park-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1443,
+      "name": "Myra Canyon Bicycle Rental & Tours",
+      "region": "kelowna",
+      "slug": "myra-canyon-bicycle-rental-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/myra-canyon-bicycle-rental-tours-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1212,
+      "name": "Myra Canyon – Myra-Bellevue Provincial Park",
+      "region": "kelowna",
+      "slug": "myra-canyon-myra-bellevue-provincial-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1250,
+      "name": "Okanagan Rail Trail",
+      "region": "lake-country",
+      "slug": "okanagan-rail-trail",
+      "expect": {
+        "image_url": "/images/hiking/venues/okanagan-rail-trail-20261015.jpg?v=20261015h1live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/okanagan-rail-trail-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    },
+    {
+      "id": 1286,
+      "name": "Shuswap North Okanagan Rail Trail – Enderby section",
+      "region": "enderby",
+      "slug": "shuswap-north-okanagan-rail-trail-enderby-section",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/shuswap-north-okanagan-rail-trail-enderby-section-20261016-cycling.jpg?v=20261016cyclinglive"
+      }
+    }
+  ]
+}
