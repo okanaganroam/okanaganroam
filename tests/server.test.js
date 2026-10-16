@@ -11881,6 +11881,26 @@ test('List Your Venue: admin routes require the admin token', () => withDiscover
   assert.equal((await lyvAdmin(base, '/admin/venue-submissions?status=bogus')).status, 400);
 }));
 
+test('List Your Venue (2026-10-16): an approved submission\'s Instagram or Facebook link goes on the listing and its card', () => withDiscoveryServer(async (base) => {
+  const ig = await (await lyvPost(base, lyvValid({ name: 'Social Link Test Cafe', type: 'cafe', region: 'penticton', social_url: 'https://www.instagram.com/social.link.test/?igsh=abc' }))).json();
+  const fb = await (await lyvPost(base, lyvValid({ name: 'Facebook Link Test Cafe', type: 'cafe', region: 'penticton', social_url: 'facebook.com/fblinktest' }))).json();
+  const other = await (await lyvPost(base, lyvValid({ name: 'Linktree Test Cafe', type: 'cafe', region: 'penticton', social_url: 'linktr.ee/linktreetest' }))).json();
+  const approve = async (id) => (await (await lyvAdmin(base, `/admin/venue-submissions/${id}/approve`, { reviewer: 'test-admin' })).json()).venue;
+  const igVenue = await approve(ig.id);
+  const fbVenue = await approve(fb.id);
+  const otherVenue = await approve(other.id);
+  const links = (id) => ({ ...(db.prepare('SELECT instagram_url, facebook_url FROM venue_links WHERE venue_id = ?').get(id) || {}) });
+  assert.deepEqual(links(igVenue.id), { instagram_url: 'https://www.instagram.com/social.link.test/', facebook_url: null });
+  assert.deepEqual(links(fbVenue.id), { instagram_url: null, facebook_url: 'https://facebook.com/fblinktest' });
+  assert.deepEqual(links(otherVenue.id), {}, 'only Instagram and Facebook links are carried over');
+  const listing = await fetch(`${base}/penticton/cafes/social-link-test-cafe`).then((r) => r.text());
+  assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/social\.link\.test\/" rel="nofollow noopener" target="_blank">Instagram<\/a>/);
+  const cards = await fetch(`${base}/penticton/cafes`).then((r) => r.text());
+  assert.match(cards, /aria-label="Social Link Test Cafe on Instagram"/);
+  assert.match(cards, /aria-label="Facebook Link Test Cafe on Facebook"/);
+  assert.doesNotMatch(cards, /aria-label="Linktree Test Cafe on/);
+}));
+
 test('List Your Venue: approval creates the venue exactly once through createVenue and records provenance', () => withDiscoveryServer(async (base) => {
   const created = await (await lyvPost(base, lyvValid({ name: 'Approved Orchard Cafe', type: 'cafe', region: 'penticton' }))).json();
   const venuesBefore = lyvVenueCount();
@@ -20923,6 +20943,9 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     assert.match(listing, /<a href="https:\/\/linksfixture\.ca\/menu" rel="nofollow noopener" target="_blank">See the menu/);
     assert.match(listing, /<a class="cta secondary" href="https:\/\/www\.opentable\.ca\/r\/links-fixture" rel="nofollow noopener" target="_blank">Book<\/a>/);
     assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
+    // The listing card shows the same links (2026-10-16).
+    const cards = await fetch(`${base}/kelowna/cafes`).then((r) => r.text());
+    assert.match(cards, /<p class="card-social"[^>]*><a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank" aria-label="Links Fixture Cafe &amp; Bakery on Instagram"[^>]*>Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
     const logged = db.prepare("SELECT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(v.id).map((r) => r.field_name).sort();
     assert.deepEqual(logged, ['address', 'booking_url', 'facebook_url', 'instagram_url', 'menu_url', 'name']);
     // The form now starts from the new values, and a link can be removed.

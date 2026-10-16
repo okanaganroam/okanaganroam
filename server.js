@@ -11636,6 +11636,8 @@ function venueCardHtml(venue, opts = {}) {
   // by default, 'Experience:' on the /tours hub's "More experiences to book".
   const cardNote = cardNotes && cardNotes.get(venue.id) ? String(cardNotes.get(venue.id)).trim() : '';
   const cardNoteHtml = cardNote ? `\n        <p class="card-note"><span class="card-note-label">${escapeHtml(cardNoteLabel)}</span> ${escapeHtml(cardNote)}</p>` : '';
+  // hideSocial (2026-10-16): the /browse hub's discovery cards never link off the site.
+  const socialHtml = (venue.redirect_to || opts.hideSocial) ? '' : cardSocialHtml(venue);
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${seasonTag ? seasonTagHtml(seasonTag) : advisoryNoticeHtml(advisoryNote)}`
     : '';
@@ -11653,7 +11655,7 @@ function venueCardHtml(venue, opts = {}) {
         <div class="card-slot card-slot-fee">${golfFeeHtml ? '\n        ' + golfFeeHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-desc">${desc ? '\n        ' + desc + '\n        ' : ''}</div>
         <div class="card-slot card-slot-notice">${advisoryHtml ? advisoryHtml + '\n        ' : ''}</div>
-        <div class="card-slot card-slot-notes">${dogNoteHtml || cardNoteHtml ? dogNoteHtml + cardNoteHtml + '\n        ' : ''}</div>
+        <div class="card-slot card-slot-notes">${dogNoteHtml || cardNoteHtml || socialHtml ? dogNoteHtml + cardNoteHtml + socialHtml + '\n        ' : ''}</div>
         ${chipsHtml}${cardActions || '\n        <div class="card-actions card-actions-empty"></div>'}
       </li>`;
   }
@@ -11661,7 +11663,7 @@ function venueCardHtml(venue, opts = {}) {
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${meta}</p>${golfFeeHtml ? '\n        ' + golfFeeHtml : ''}
-        ${desc}${advisoryHtml}${dogNoteHtml}${cardNoteHtml}
+        ${desc}${advisoryHtml}${dogNoteHtml}${cardNoteHtml}${socialHtml}
         ${chipsHtml}${cardActions}
       </li>`;
 }
@@ -24602,7 +24604,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
     return ` data-ph="${curatedPhotoKey(v)}"`;
   };
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true, hideSocial: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
   let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1)
     .map((x) => ('<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, '')).replace(/\n\s+/g, '\n').split(APP_FAV_HEART_OUTLINE).join(FD_HEART_USE));
@@ -25766,6 +25768,11 @@ function approveVenueSubmission(id, body) {
   db.exec('BEGIN');
   try {
     venue = createVenue(venueData);
+    // The submission's Instagram/Facebook link goes on the listing too (2026-10-16).
+    const social = socialLinkFromSubmission(final.social_url);
+    if (social) {
+      db.prepare(`INSERT INTO venue_links (venue_id, ${social.field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${social.field} = excluded.${social.field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, social.url);
+    }
     const updated = db.prepare(
       `UPDATE venue_submissions SET status = 'approved', venue_id = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
          WHERE id = ? AND status = 'pending'`
@@ -25776,6 +25783,7 @@ function approveVenueSubmission(id, body) {
     try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
     return fail(err.status || 500, err.status ? err.message : 'Approval failed; nothing was published.');
   }
+  clearVenueSocialCache();
   // Same slug path every other venue takes (normally run at startup), so
   // the new venue's page exists immediately.
   try { backfillSlugs(); } catch (err) { console.error('[venue-submissions] slug backfill after approval failed:', err); }
@@ -28570,6 +28578,46 @@ function venueLinks(venueId) {
   return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url FROM venue_links WHERE venue_id = ?').get(venueId)
     || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null };
 }
+// Instagram/Facebook links for listing cards (2026-10-16): one read of the
+// small venue_links table, kept for a minute and dropped whenever a link is
+// written, so a page of cards does not query once per card.
+let venueSocialCache = null;
+function venueSocialLinks(venueId) {
+  if (!venueSocialCache || Date.now() - venueSocialCache.at > 60000) {
+    const map = new Map();
+    for (const r of db.prepare('SELECT venue_id, instagram_url, facebook_url FROM venue_links WHERE instagram_url IS NOT NULL OR facebook_url IS NOT NULL').all()) {
+      map.set(r.venue_id, { instagram_url: r.instagram_url || null, facebook_url: r.facebook_url || null });
+    }
+    venueSocialCache = { at: Date.now(), map };
+  }
+  return venueSocialCache.map.get(venueId) || null;
+}
+function clearVenueSocialCache() { venueSocialCache = null; }
+// The one "Instagram or Facebook" link a List Your Venue submission gives ->
+// { field, url } for venue_links, or null for anything else (Linktree, TikTok...).
+function socialLinkFromSubmission(value) {
+  const url = normalizeSubmissionWebsite(String(value || ''));
+  if (!url) return null;
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { return null; }
+  const host = parsed.hostname.toLowerCase();
+  if (/(^|\.)instagram\.com$/.test(host)) {
+    const handle = parsed.pathname.split('/').filter(Boolean)[0];
+    const ig = handle ? normalizeInstagram(handle) : null;
+    return ig ? { field: 'instagram_url', url: ig } : null;
+  }
+  const fb = normalizeFacebook(url);
+  return fb ? { field: 'facebook_url', url: fb } : null;
+}
+// The small "Instagram · Facebook" line on a listing card, or '' when the
+// venue has no approved links (so those cards are unchanged).
+function cardSocialHtml(venue) {
+  const s = venueSocialLinks(venue.id);
+  if (!s) return '';
+  const link = (url, label) => `<a href="${escapeHtml(url)}" rel="nofollow noopener" target="_blank" aria-label="${escapeHtml(venue.name)} on ${label}" style="position:relative;z-index:2;color:inherit;font-weight:700;">${label}</a>`;
+  const parts = [s.instagram_url ? link(s.instagram_url, 'Instagram') : '', s.facebook_url ? link(s.facebook_url, 'Facebook') : ''].filter(Boolean);
+  return `\n        <p class="card-social" style="margin:6px 0 0;font-size:0.85rem;line-height:1.4;">${parts.join(' &middot; ')}</p>`;
+}
 // "@woodfire.bakery", "woodfire.bakery" or any instagram.com link -> https://www.instagram.com/woodfire.bakery/
 function normalizeInstagram(value) {
   const v = String(value || '').trim();
@@ -30131,6 +30179,7 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
       if (OWNER_LINK_FIELDS.includes(field)) {
         const before = venueLinks(venue.id)[field];
         db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, value);
+        clearVenueSocialCache();
         log.run(venue.id, field, before == null ? null : String(before), value == null ? null : String(value), meta.reason, meta.batch_id, reviewer);
         applied.push(field);
         continue;
