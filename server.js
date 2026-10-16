@@ -9229,7 +9229,7 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // Stage 5A (F12, 2026-10-01): 'trip_v3' labels the Build My Trip V3 view, so
 // V3 page views and its trip_plan_* events are told apart from V2's ('trip').
 // Same URL (/trip), served only while TRIP_PLANNER_V3 allows it.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse']);
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -21444,8 +21444,9 @@ function frJsonLd(json) {
   };
   return JSON.stringify(walk(data));
 }
-function twinHeadLinks(enPath) {
-  const en = `https://okanaganroam.com${enPath}`, fr = `https://okanaganroam.com${frTwinPath(enPath)}`;
+function twinHeadLinks(enPath, search = '') {
+  const q = search.replace(/&/g, '&amp;');
+  const en = `https://okanaganroam.com${enPath}${q}`, fr = `https://okanaganroam.com${frTwinPath(enPath)}${q}`;
   return `<link rel="alternate" hreflang="en-CA" href="${en}">\n<link rel="alternate" hreflang="fr-CA" href="${fr}">\n<link rel="alternate" hreflang="x-default" href="${en}">\n`;
 }
 // The header's EN / FR switch: a real link to the twin (app.js also handles it and remembers the choice).
@@ -21457,24 +21458,24 @@ function withTwinLangSwitch(html, href, lang) {
   }
   return withMobileLanguageItem(html);
 }
-function addTwinHead(html, enPath) {
+function addTwinHead(html, enPath, search = '') {
   if (/hreflang="fr-CA"/.test(html)) return html;
-  return html.replace(/(<link rel="canonical" href="[^"]*">\n)/, `$1${twinHeadLinks(enPath)}`);
+  return html.replace(/(<link rel="canonical" href="[^"]*">\n)/, `$1${twinHeadLinks(enPath, search)}`);
 }
 // The English page of a pair: hreflang, data-page-lang="en" (app.js keeps it English) and the switch. A visitor who
 // chose French before goes straight to the French twin.
-function englishTwinHtml(html, enPath) {
+function englishTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frHrefPath = frTwinPath(enPath);
-  let out = addTwinHead(html, enPath)
+  let out = addTwinHead(html, enPath, search)
     .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
     .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
-  out = withTwinLangSwitch(out, frHrefPath, 'en');
+  out = withTwinLangSwitch(out, frHrefPath + search.replace(/&/g, '&amp;'), 'en');
   // French readers are sent to the twin, so an English card carries its English blurb only (lighter list pages).
   out = out.replace(/<span class="desc-en" lang="en">([\s\S]*?)<\/span><span class="desc-fr" lang="fr">[\s\S]*?<\/span>/g, '$1');
   return out;
 }
-function frenchTwinHtml(html, enPath) {
+function frenchTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frPath = frTwinPath(enPath);
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
@@ -21488,18 +21489,19 @@ function frenchTwinHtml(html, enPath) {
     return m[1] + frScript(m[2]) + m[3];
   }).join('');
   // Head and switch last, so their English addresses are not turned French.
-  out = addTwinHead(out, enPath)
+  out = addTwinHead(out, enPath, search)
     .replace(/<html lang="en"(?: data-page-lang="en")?/, '<html lang="fr" data-page-lang="fr"')
-    .replace(/(<link rel="canonical" href=")https:\/\/okanaganroam\.com[^"]*"/, `$1https://okanaganroam.com${frPath}"`)
-    .replace(/(<meta property="og:url" content=")https:\/\/okanaganroam\.com[^"]*"/, `$1https://okanaganroam.com${frPath}"`)
+    .replace(/(<link rel="canonical" href=")https:\/\/okanaganroam\.com[^"?]*(\?[^"]*)?"/, (m, a, q) => `${a}https://okanaganroam.com${frPath}${q || ''}"`)
+    .replace(/(<meta property="og:url" content=")https:\/\/okanaganroam\.com[^"?]*(\?[^"]*)?"/, (m, a, q) => `${a}https://okanaganroam.com${frPath}${q || ''}"`)
     .replace(/(<meta property="og:type"[^>]*>\n)/, '$1<meta property="og:locale" content="fr_CA">\n');
-  out = withTwinLangSwitch(out, enPath, 'fr');
+  out = withTwinLangSwitch(out, enPath + search.replace(/&/g, '&amp;'), 'fr');
   // Deferred card batches and the rest of /browse load from their French addresses.
   return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
 }
 // Wraps writeHead/end for one request: the page goes out as its English or French twin; a redirect inside the set
 // stays French.
-function installTwinResponse(res, lang, enPath) {
+function installTwinResponse(res, lang, enPath, search = '') {
+  res.twinLang = lang;
   const realWriteHead = res.writeHead.bind(res), realEnd = res.end.bind(res);
   let status = 200, headers = {};
   res.writeHead = (code, h) => { status = code; headers = { ...(h || {}) }; return res; };
@@ -21507,7 +21509,7 @@ function installTwinResponse(res, lang, enPath) {
     const type = String(headers['Content-Type'] || headers['content-type'] || '');
     if (lang === 'fr' && status >= 300 && status < 400 && headers.Location) headers.Location = frHref(headers.Location);
     if (body != null && status === 200 && /text\/html/.test(type)) {
-      body = lang === 'fr' ? frenchTwinHtml(String(body), enPath) : englishTwinHtml(String(body), enPath);
+      body = lang === 'fr' ? frenchTwinHtml(String(body), enPath, search) : englishTwinHtml(String(body), enPath, search);
       delete headers['Content-Length']; delete headers.ETag;
     } else if (body != null && status === 404 && lang === 'fr' && /text\/html/.test(type)) {
       // A French address whose English page does not exist gets the French 404 page.
@@ -27487,14 +27489,114 @@ function tripStopsFor(refs) {
   }
   return out;
 }
-function renderMyTripPage() {
-  const title = 'My Trip | Okanagan Roam';
-  const description = 'Your Okanagan trip: every stop in order, by day, with a map, directions and a link to share it.';
-  const canonical = 'https://okanaganroam.com/my-trip';
+// ---------- Shareable trips (2026-10-16) ----------
+// A /my-trip?stops=...&days=... link used to open the same generic page for every trip, so pasted into a chat it
+// unfurled as the plain site card. The server now reads the link's stops, so the page head (title, description,
+// og:image) describes that trip, and /share/trip.png (and /share/fr/trip.png) draws a card for it with the same
+// generator as the place share cards. Nothing is stored: the link itself is the trip. The page stays noindex.
+const TRIP_SHARE_DAY_MAX = 14;
+function tripShareParams(query) {
+  const refs = String((query && query.stops) || '').split(',').filter((r) => /^(venue|event):[1-9][0-9]*$/.test(r)).slice(0, MY_TRIP_MAX_REFS);
+  const days = String((query && query.days) || '').split(',').map((n) => { const d = parseInt(n, 10); return d >= 1 && d <= TRIP_SHARE_DAY_MAX ? d : 0; });
+  return { refs, days };
+}
+// "?stops=...&days=..." for a shared trip (only validated refs and day numbers), '' for anything else. The EN / FR switch
+// carries it so changing language keeps the trip.
+function tripShareSearch(query) {
+  const { refs, days } = tripShareParams(query);
+  if (!refs.length) return '';
+  return `?stops=${refs.join(',')}` + (refs.every((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i]).join(',')}` : '');
+}
+function tripShareTowns(towns, fr) {
+  if (towns.length <= 1) return towns[0] || '';
+  const and = fr ? 'et' : '&';
+  if (towns.length <= 3) return `${towns.slice(0, -1).join(', ')} ${and} ${towns[towns.length - 1]}`;
+  return fr ? `${towns[0]}, ${towns[1]} et ${towns.length - 2} autres` : `${towns[0]}, ${towns[1]} & ${towns.length - 2} more`;
+}
+function tripShareClip(text, max) {
+  const t = String(text);
+  return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
+}
+// null when the link has no stop that is still listed (the plain My Trip head is used then).
+function tripShareSummary(query, lang = 'en') {
+  const { refs, days } = tripShareParams(query);
+  if (!refs.length) return null;
+  const live = tripStopsFor(refs).filter((s) => !s.missing);
+  if (!live.length) return null;
+  const fr = lang === 'fr';
+  const dayOf = new Map();
+  refs.forEach((r, i) => { if (!dayOf.has(r)) dayOf.set(r, days[i] || 0); });
+  const dayNums = live.map((s) => dayOf.get(s.ref) || 0);
+  const dayCount = dayNums.every((d) => d > 0) ? Math.max(...dayNums) : 0;
+  const towns = [...new Set(live.map((s) => s.regionLabel).filter(Boolean))];
+  const townText = tripShareTowns(towns, fr);
+  const names = live.map((s) => s.name);
+  const more = names.length - 3;
+  const nameText = names.slice(0, 3).join(', ') + (more > 0 ? (fr ? ` + ${more} ${more === 1 ? 'autre' : 'autres'}` : ` + ${more} more`) : '');
+  const stopWord = fr ? (live.length === 1 ? 'arrêt' : 'arrêts') : (live.length === 1 ? 'stop' : 'stops');
+  const dayLabel = fr ? (dayCount === 1 ? '1 JOUR' : `${dayCount} JOURS`) : `${dayCount}-DAY TRIP`;
+  const title = fr
+    ? (dayCount ? `Voyage de ${dayCount} ${dayCount === 1 ? 'jour' : 'jours'} dans l’Okanagan : ${townText} | Okanagan Roam` : `Voyage dans l’Okanagan : ${live.length} ${stopWord} à ${townText} | Okanagan Roam`)
+    : (dayCount ? `${dayCount}-day Okanagan trip: ${townText} | Okanagan Roam` : `Okanagan trip: ${live.length} ${stopWord} in ${townText} | Okanagan Roam`);
+  const description = tripShareClip(fr
+    ? `${live.length} ${stopWord} : ${nameText}. Voyez le plan sur la carte et enregistrez-le dans Mon voyage.`
+    : `${live.length} ${stopWord}: ${nameText}. See the plan on a map and save it to your own trip.`, 160);
+  const query_ = `stops=${refs.join(',')}` + (refs.every((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i]).join(',')}` : '');
+  const card = {
+    label: (dayCount ? `${dayLabel} · ${townText}` : `${live.length} ${stopWord} · ${townText}`).toUpperCase(),
+    name: nameText,
+  };
+  const v = require('crypto').createHash('sha1').update(`${card.label}|${card.name}`).digest('hex').slice(0, 8);
+  return {
+    title, description, card, lang,
+    canonicalAttr: `https://okanaganroam.com/my-trip?${query_.replace(/&/g, '&amp;')}`,
+    imageAttr: `https://okanaganroam.com/share/${fr ? 'fr/' : ''}trip.png?${query_.replace(/&/g, '&amp;')}&amp;v=${v}`,
+  };
+}
+const tripShareCardCache = new Map(); // "label|name" -> PNG buffer; oldest dropped past 100 entries
+function tripShareCardPng(card) {
+  const key = `${card.label}|${card.name}`;
+  if (tripShareCardCache.has(key)) return tripShareCardCache.get(key);
+  const png = shareCardModule.renderShareCard(card);
+  tripShareCardCache.set(key, png);
+  if (tripShareCardCache.size > 100) tripShareCardCache.delete(tripShareCardCache.keys().next().value);
+  return png;
+}
+
+function renderMyTripPage(opts = {}) {
+  const lang = opts.lang === 'fr' ? 'fr' : 'en';
+  const share = opts.share || null;
+  const L = (en, fr) => (lang === 'fr' ? fr : en);
+  // The words the page script uses; {name}, {n} and {d} are filled in there.
+  const T = {
+    stop: L('stop', 'arrêt'), stops: L('stops', 'arrêts'),
+    inShared: L(' in this shared trip', ' dans ce voyage partagé'), inMine: L(' in your trip', ' dans votre voyage'),
+    nothing: L('Nothing here yet.', 'Rien ici pour l’instant.'),
+    replaces: L('Saving it replaces the {n} in your own trip.', 'L’enregistrer remplace votre voyage actuel ({n}).'),
+    saveKeep: L('Save it to keep it and change it.', 'Enregistrez-le pour le garder et le modifier.'),
+    day: L('Day', 'Jour'), yourStops: L('Your stops', 'Vos arrêts'),
+    dirDay: L('Directions for Day {d} in Google Maps', 'Itinéraire du jour {d} dans Google Maps'),
+    dirAll: L('Directions in Google Maps', 'Itinéraire dans Google Maps'),
+    gone: L('No longer listed', 'N’est plus répertorié'),
+    moveUp: L('Move {name} up', 'Monter {name}'), moveDown: L('Move {name} down', 'Descendre {name}'), remove: L('Remove {name}', 'Retirer {name}'),
+    movedUp: L('Moved {name} up.', '{name} déplacé vers le haut.'), movedDown: L('Moved {name} down.', '{name} déplacé vers le bas.'),
+    removed: L('Removed {name}.', '{name} retiré.'), theStop: L('the stop', 'l’arrêt'),
+    copied: L('Trip link copied. Send it to whoever you are travelling with.', 'Lien du voyage copié. Envoyez-le aux personnes avec qui vous voyagez.'),
+    older1: L(' (1 older stop is not in the link.)', ' (1 ancien arrêt n’est pas dans le lien.)'),
+    olderN: L(' ({n} older stops are not in the link.)', ' ({n} anciens arrêts ne sont pas dans le lien.)'),
+    copyPrompt: L('Copy this link:', 'Copiez ce lien :'),
+    shareTitle: L('My Okanagan trip', 'Mon voyage dans l’Okanagan'),
+    tapClear: L('Tap again to clear', 'Touchez de nouveau pour vider'), clearTrip: L('Clear trip', 'Vider le voyage'),
+    cleared: L('Your trip is cleared.', 'Votre voyage est vidé.'), saved: L('Saved to My Trip.', 'Enregistré dans Mon voyage.'),
+  };
+  const title = share ? share.title : L('My Trip | Okanagan Roam', 'Mon voyage | Okanagan Roam');
+  const description = share ? share.description : L('Your Okanagan trip: every stop in order, by day, with a map, directions and a link to share it.', 'Votre voyage dans l’Okanagan : chaque arrêt dans l’ordre, par jour, avec une carte, les itinéraires et un lien à partager.');
+  const canonical = share ? share.canonicalAttr : 'https://okanaganroam.com/my-trip';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [], { golfTheme: true })}
+${pageHead(title, description, canonical, [], { golfTheme: true, shareImage: share ? share.imageAttr : null })}
+${renderAnalyticsHeadHtml('my_trip')}
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style id="my-trip">
@@ -27502,6 +27604,7 @@ ${pageHead(title, description, canonical, [], { golfTheme: true })}
   body.my-trip-page .mt-head { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; justify-content: space-between; margin: 0 0 18px; }
   body.my-trip-page .mt-head p { margin: 4px 0 0; opacity: 0.75; }
   body.my-trip-page .mt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.my-trip-page [hidden] { display: none !important; }
   body.my-trip-page .mt-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 800; font-size: 0.92rem; cursor: pointer; text-decoration: none; }
   body.my-trip-page .mt-btn.primary { background: var(--teal-deep, #1F5450); border-color: transparent; color: #fff; }
   body.my-trip-page .mt-shared { margin: 0 0 18px; padding: 14px 18px; border-radius: 14px; background: #FFF4DA; }
@@ -27533,27 +27636,28 @@ ${pageHead(title, description, canonical, [], { golfTheme: true })}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
-  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'My Trip' }])}
+  ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: L('My Trip', 'Mon voyage') }])}
   <div class="mt-wrap">
     <div class="mt-head">
-      <div><h1>My Trip</h1><p id="mtSummary">Loading your trip&hellip;</p></div>
+      <div><h1>${L('My Trip', 'Mon voyage')}</h1><p id="mtSummary">${L('Loading your trip&hellip;', 'Chargement de votre voyage&hellip;')}</p></div>
       <div class="mt-actions" id="mtActions" hidden>
-        <button type="button" class="mt-btn primary" id="mtCopy">Copy trip link</button>
-        <a class="mt-btn" href="/trip">Build My Trip</a>
-        <button type="button" class="mt-btn" id="mtClear">Clear trip</button>
+        <button type="button" class="mt-btn primary" id="mtShare" hidden>${L('Share trip', 'Partager le voyage')}</button>
+        <button type="button" class="mt-btn primary" id="mtCopy">${L('Copy trip link', 'Copier le lien du voyage')}</button>
+        <a class="mt-btn" href="/trip">${L('Build My Trip', 'Planifiez mon voyage')}</a>
+        <button type="button" class="mt-btn" id="mtClear">${T.clearTrip}</button>
       </div>
     </div>
     <div class="mt-shared" id="mtShared" hidden>
-      <strong>Someone shared this trip with you.</strong> <span id="mtSharedText"></span>
-      <div class="mt-actions" style="margin-top:10px"><button type="button" class="mt-btn primary" id="mtSave">Save to My Trip</button></div>
+      <strong>${L('Someone shared this trip with you.', 'Quelqu’un a partagé ce voyage avec vous.')}</strong> <span id="mtSharedText"></span>
+      <div class="mt-actions" style="margin-top:10px"><button type="button" class="mt-btn primary" id="mtSave">${L('Save to My Trip', 'Enregistrer dans Mon voyage')}</button><a class="mt-btn" id="mtOwn" href="/trip">${L('Plan your own trip in one sentence', 'Planifiez votre propre voyage en une phrase')}</a></div>
     </div>
     <p class="mt-status" id="mtStatus" role="status" aria-live="polite"></p>
     <div id="mtMap" hidden></div>
     <div id="mtDays"></div>
     <div class="mt-empty" id="mtEmpty" hidden>
-      <h2>Your trip is empty</h2>
-      <p>Tap <strong>Add to trip</strong> on any place, or let us plan it for you.</p>
-      <div class="mt-actions"><a class="mt-btn primary" href="/trip">Build My Trip</a><a class="mt-btn" href="/food-drink">Food &amp; Drink</a><a class="mt-btn" href="/destinations">Destinations</a></div>
+      <h2>${L('Your trip is empty', 'Votre voyage est vide')}</h2>
+      <p>${L('Tap <strong>Add to trip</strong> on any place, or let us plan it for you.', 'Touchez <strong>Ajouter au voyage</strong> sur un endroit, ou laissez-nous planifier le voyage pour vous.')}</p>
+      <div class="mt-actions"><a class="mt-btn primary" href="/trip">${L('Build My Trip', 'Planifiez mon voyage')}</a><a class="mt-btn" href="/food-drink">Food &amp; Drink</a><a class="mt-btn" href="/destinations">Destinations</a></div>
     </div>
   </div>
   </main>
@@ -27562,7 +27666,9 @@ ${renderGolfHeaderHtml()}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function(){
+  var T = ${JSON.stringify(T).replace(/</g, '\\u003c')};
   var KEY = 'okanaganTrip', DAYS = 'okanaganTripDays', REF = /^(venue|event):[1-9][0-9]*$/;
+  function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params || {}); } catch (e) {} }
   function load(k, d){ try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
   function store(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -27596,8 +27702,8 @@ ${renderGolfHeaderHtml()}
     el('mtEmpty').hidden = stops.length > 0;
     el('mtActions').hidden = viewing !== 'mine' || !stops.length;
     el('mtShared').hidden = viewing !== 'shared';
-    el('mtSummary').textContent = stops.length ? (stops.length + (stops.length === 1 ? ' stop' : ' stops') + (viewing === 'shared' ? ' in this shared trip' : ' in your trip')) : 'Nothing here yet.';
-    if (viewing === 'shared') el('mtSharedText').textContent = trip.length ? 'Saving it replaces the ' + trip.length + (trip.length === 1 ? ' stop' : ' stops') + ' in your own trip.' : 'Save it to keep it and change it.';
+    el('mtSummary').textContent = stops.length ? (stops.length + ' ' + (stops.length === 1 ? T.stop : T.stops) + (viewing === 'shared' ? T.inShared : T.inMine)) : T.nothing;
+    if (viewing === 'shared') el('mtSharedText').textContent = trip.length ? T.replaces.replace('{n}', trip.length + ' ' + (trip.length === 1 ? T.stop : T.stops)) : T.saveKeep;
     // Group by day only when every stop has one; otherwise one list in order.
     var byDay = stops.length && stops.every(function(s){ return s.day > 0; });
     var groups = [];
@@ -27609,13 +27715,13 @@ ${renderGolfHeaderHtml()}
     });
     var mine = viewing === 'mine';
     el('mtDays').innerHTML = groups.map(function(g){
-      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? 'Day ' + g.key : 'Your stops') + '</h2>' +
-        '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">Directions' + (g.key ? ' for Day ' + g.key : '') + ' in Google Maps</a></div>' +
+      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key : T.yourStops) + '</h2>' +
+        '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : T.dirAll) + '</a></div>' +
         '<ol class="mt-list">' + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
           var name = d.url ? '<a class="mt-name" href="' + esc(d.url) + '">' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
-          var meta = d.missing ? 'No longer listed' : [d.type, d.regionLabel].filter(Boolean).join(' · ');
-          var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="Move ' + esc(x.s.name) + ' up"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="Move ' + esc(x.s.name) + ' down"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="Remove ' + esc(x.s.name) + '">✕</button></div>' : '';
+          var meta = d.missing ? T.gone : [d.type, d.regionLabel].filter(Boolean).join(' · ');
+          var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + (x.i + 1) + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p></div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
@@ -27636,23 +27742,39 @@ ${renderGolfHeaderHtml()}
     var t = e.target.closest ? e.target.closest('[data-mt-up],[data-mt-down],[data-mt-remove]') : null;
     if (!t || viewing !== 'mine') return;
     var i;
-    if (t.hasAttribute('data-mt-up')) { i = +t.getAttribute('data-mt-up'); if (i > 0) { var a = trip[i]; trip[i] = trip[i - 1]; trip[i - 1] = a; status('Moved ' + trip[i - 1].name + ' up.'); } }
-    else if (t.hasAttribute('data-mt-down')) { i = +t.getAttribute('data-mt-down'); if (i < trip.length - 1) { var b = trip[i]; trip[i] = trip[i + 1]; trip[i + 1] = b; status('Moved ' + trip[i + 1].name + ' down.'); } }
-    else { i = +t.getAttribute('data-mt-remove'); var gone = trip.splice(i, 1)[0]; if (gone && gone.ref) delete days[gone.ref]; store(DAYS, days); status('Removed ' + (gone ? gone.name : 'the stop') + '.'); }
+    if (t.hasAttribute('data-mt-up')) { i = +t.getAttribute('data-mt-up'); if (i > 0) { var a = trip[i]; trip[i] = trip[i - 1]; trip[i - 1] = a; status(T.movedUp.replace('{name}', trip[i - 1].name)); } }
+    else if (t.hasAttribute('data-mt-down')) { i = +t.getAttribute('data-mt-down'); if (i < trip.length - 1) { var b = trip[i]; trip[i] = trip[i + 1]; trip[i + 1] = b; status(T.movedDown.replace('{name}', trip[i + 1].name)); } }
+    else { i = +t.getAttribute('data-mt-remove'); var gone = trip.splice(i, 1)[0]; if (gone && gone.ref) delete days[gone.ref]; store(DAYS, days); status(T.removed.replace('{name}', gone ? gone.name : T.theStop)); }
     save(); render();
   });
-  el('mtCopy').addEventListener('click', function(){
+  function tripLink(){
     var refs = trip.filter(function(x){ return x.ref; });
-    var url = location.origin + '/my-trip?stops=' + refs.map(function(x){ return x.ref; }).join(',');
+    var url = location.origin + (document.documentElement.lang === 'fr' ? '/fr' : '') + '/my-trip?stops=' + refs.map(function(x){ return x.ref; }).join(',');
     if (refs.length && refs.every(function(x){ return days[x.ref]; })) url += '&days=' + refs.map(function(x){ return days[x.ref]; }).join(',');
-    var done = function(){ status('Trip link copied. Send it to whoever you are travelling with.' + (refs.length < trip.length ? ' (' + (trip.length - refs.length) + ' older stop' + (trip.length - refs.length === 1 ? ' is' : 's are') + ' not in the link.)' : '')); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function(){ window.prompt('Copy this link:', url); });
-    else window.prompt('Copy this link:', url);
+    return { url: url, refs: refs };
+  }
+  function copyNote(refs){
+    var older = trip.length - refs.length;
+    return T.copied + (older === 1 ? T.older1 : older > 1 ? T.olderN.replace('{n}', older) : '');
+  }
+  el('mtCopy').addEventListener('click', function(){
+    var l = tripLink();
+    track('trip_share', { method: 'copy', stop_count: l.refs.length });
+    var done = function(){ status(copyNote(l.refs)); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(l.url).then(done, function(){ window.prompt(T.copyPrompt, l.url); });
+    else window.prompt(T.copyPrompt, l.url);
+  });
+  // Phones and tablets: the system share sheet (Messages, WhatsApp, Mail ...). Hidden where it does not exist.
+  if (navigator.share) el('mtShare').hidden = false;
+  el('mtShare').addEventListener('click', function(){
+    var l = tripLink();
+    track('trip_share', { method: 'native', stop_count: l.refs.length });
+    navigator.share({ title: T.shareTitle, url: l.url }).catch(function(){});
   });
   var clearArmed = false;
   el('mtClear').addEventListener('click', function(){
-    if (!clearArmed) { clearArmed = true; el('mtClear').textContent = 'Tap again to clear'; setTimeout(function(){ clearArmed = false; el('mtClear').textContent = 'Clear trip'; }, 4000); return; }
-    trip = []; days = {}; save(); store(DAYS, days); clearArmed = false; el('mtClear').textContent = 'Clear trip'; status('Your trip is cleared.'); render();
+    if (!clearArmed) { clearArmed = true; el('mtClear').textContent = T.tapClear; setTimeout(function(){ clearArmed = false; el('mtClear').textContent = T.clearTrip; }, 4000); return; }
+    trip = []; days = {}; save(); store(DAYS, days); clearArmed = false; el('mtClear').textContent = T.clearTrip; status(T.cleared); render();
   });
   el('mtSave').addEventListener('click', function(){
     trip = []; days = {};
@@ -27660,9 +27782,12 @@ ${renderGolfHeaderHtml()}
     save(); store(DAYS, days);
     viewing = 'mine';
     history.replaceState(null, '', '/my-trip');
-    status('Saved to My Trip.');
+    status(T.saved);
+    track('shared_trip_save', { stop_count: trip.length });
     render();
   });
+  el('mtOwn').addEventListener('click', function(){ track('shared_trip_cta_click', { stop_count: shared.length }); });
+  if (viewing === 'shared') track('shared_trip_view', { stop_count: shared.length });
   fetchInfo(viewing === 'shared' ? shared : trip.map(function(x){ return x.ref; })).then(render);
 })();
 </script>
@@ -32047,10 +32172,10 @@ const server = http.createServer(async (req, res) => {
     const frTwinReq = frenchTwinRequest(req.url);
     if (frTwinReq) {
       req.url = frTwinReq.enUrl;
-      installTwinResponse(res, 'fr', frTwinReq.enPath);
+      installTwinResponse(res, 'fr', frTwinReq.enPath, frTwinReq.enPath === '/my-trip' ? tripShareSearch(url.parse(req.url, true).query) : '');
     } else {
       const p = String(req.url).split('?')[0].replace(/(.)\/$/, '$1');
-      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p);
+      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p, p === '/my-trip' ? tripShareSearch(url.parse(req.url, true).query) : '');
     }
   }
   const parsed = url.parse(req.url, true);
@@ -32624,6 +32749,18 @@ const server = http.createServer(async (req, res) => {
       '/badges/featured-on-okanagan-roam.svg': { file: 'public/badges/featured-on-okanagan-roam.svg', type: 'image/svg+xml' },
       '/badges/featured-on-okanagan-roam.png': { file: 'public/badges/featured-on-okanagan-roam.png', type: 'image/png' },
     };
+    // GET /share/trip.png and /share/fr/trip.png?stops=...&days=... -- the preview card of a shared trip (2026-10-16).
+    const tripCardMatch = method === 'GET' ? pathname.match(/^\/share\/(fr\/)?trip\.png$/) : null;
+    if (tripCardMatch) {
+      const tripSummary = shareCardModule ? tripShareSummary(query, tripCardMatch[1] ? 'fr' : 'en') : null;
+      if (!tripSummary) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('Not found');
+      }
+      const png = tripShareCardPng(tripSummary.card);
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': png.length, 'Cache-Control': 'public, max-age=86400' });
+      return res.end(png);
+    }
     // GET /share/<region>/<category>/<slug>.png -- a place's share card (2026-10-13). Only live places with a public page get one.
     const shareCardMatch = method === 'GET' ? pathname.match(/^\/share\/(fr\/)?([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\.png$/) : null;
     if (shareCardMatch) {
@@ -34359,8 +34496,9 @@ const server = http.createServer(async (req, res) => {
       return res.end(renderSkiGuidePage());
     }
     if ((pathname === '/my-trip' || pathname === '/my-trip/') && method === 'GET') {
+      const tripLang = res.twinLang === 'fr' ? 'fr' : 'en';
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(renderMyTripPage());
+      return res.end(renderMyTripPage({ lang: tripLang, share: tripShareSummary(query, tripLang) }));
     }
     // GET /api/trip-stops?refs=venue:1,event:2 (2026-10-14): name, type, town,
     // page link, photo, map position and directions query for My Trip.
@@ -35485,6 +35623,8 @@ module.exports = {
   outdoorActivitiesByVenue,
   renderMyTripPage,
   tripStopsFor,
+  tripShareSummary,
+  tripShareSearch,
   renderContactPage,
   CONTACT_TOPICS,
   venueLookup,

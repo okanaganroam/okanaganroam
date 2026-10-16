@@ -13084,8 +13084,8 @@ const ga4Check = (html, pageType, label) => {
 };
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
-  // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip). 2026-10-05: + 'browse' (the hub-style /browse).
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
+  // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip). 2026-10-05: + 'browse' (the hub-style /browse). 2026-10-16: + 'my_trip' (/my-trip, for the shared-trip events).
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'my_trip', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
@@ -21324,4 +21324,73 @@ test('Water Activities photos (2026-10-16): example photos exist in both sizes; 
     assert.ok(credits[rel], `${rel} is credited`);
   }
   assert.equal(app.venueHeroPhoto({ id: 1448, name: 'Splashdown Vernon', type: 'outdoor' }).src, '/images/outdoors/examples/water-waterslide-2610.jpg');
+});
+
+// ---- Shareable trips (2026-10-16) ----
+async function tripShareFetch(urlPath) {
+  return new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try {
+        const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`);
+        resolve({ status: res.status, type: res.headers.get('content-type') || '', bytes: Buffer.from(await res.arrayBuffer()) });
+      } catch (err) { reject(err); } finally { tmp.close(); }
+    });
+  });
+}
+test('Shareable trips: a shared link describes its own trip in the page head, in English and French', async () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const q = `stops=venue:${venue.id}&days=1`;
+  const en = (await s4request('GET', `/my-trip?${q}`)).text;
+  const head = en.split('</head>')[0];
+  assert.match(head, /<title>1-day Okanagan trip: Kelowna \| Okanagan Roam<\/title>/);
+  assert.match(head, new RegExp(`<meta property="og:image" content="https://okanaganroam\\.com/share/trip\\.png\\?stops=venue:${venue.id}&amp;days=1&amp;v=[0-9a-f]{8}">`));
+  assert.match(head, new RegExp(`<link rel="canonical" href="https://okanaganroam\\.com/my-trip\\?stops=venue:${venue.id}&amp;days=1">`));
+  assert.match(head, /<meta name="robots" content="noindex">/);
+  assert.match(head, /Test Trattoria/);
+  assert.match(en, /id="langToggle" href="\/fr\/my-trip\?stops=venue:\d+&amp;days=1"/, 'the EN / FR switch keeps the trip');
+  assert.match(en, /class="mt-btn primary" id="mtShare" hidden>Share trip</);
+  assert.match(en, /id="mtOwn" href="\/trip">Plan your own trip in one sentence</);
+  assert.match(en, /body\.my-trip-page \[hidden\] \{ display: none !important; \}/);
+
+  const fr = (await s4request('GET', `/fr/my-trip?${q}`)).text;
+  const frHead = fr.split('</head>')[0];
+  assert.match(fr, /<html lang="fr"/);
+  assert.match(frHead, /<title>Voyage de 1 jour dans l\u2019Okanagan : Kelowna \| Okanagan Roam<\/title>/);
+  assert.match(frHead, new RegExp(`<meta property="og:image" content="https://okanaganroam\\.com/share/fr/trip\\.png\\?stops=venue:${venue.id}&amp;days=1&amp;v=[0-9a-f]{8}">`));
+  assert.match(frHead, new RegExp(`<meta property="og:url" content="https://okanaganroam\\.com/fr/my-trip\\?stops=venue:${venue.id}&amp;days=1">`));
+  assert.match(frHead, /1 arr\u00eat : Test Trattoria\./);
+  assert.match(fr, /id="langToggle" href="\/my-trip\?stops=venue:\d+&amp;days=1"/);
+  assert.match(fr, />Partager le voyage</);
+  assert.match(fr, />Copier le lien du voyage</);
+  assert.doesNotMatch(fr, />Copy trip link</);
+  assert.match(fr, /"dirDay":"Itin\u00e9raire du jour \{d\} dans Google Maps"/);
+  assert.match(fr, /id="mtOwn" href="\/fr\/trip">Planifiez votre propre voyage en une phrase</);
+
+  // A plain /my-trip, and a link with nothing usable in it, keep the ordinary head.
+  for (const plain of ['/my-trip', '/my-trip?stops=venue:999999999', '/my-trip?stops=venue:abc,%3Cscript%3E']) {
+    const html = (await s4request('GET', plain)).text;
+    assert.match(html.split('</head>')[0], /<title>My Trip \| Okanagan Roam<\/title>/, plain);
+    assert.match(html, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/og-image\.png">/, plain);
+    assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/my-trip">/, plain);
+  }
+});
+
+test('Shareable trips: the preview card is a PNG for a real trip and a 404 for anything else', async () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  for (const path of [`/share/trip.png?stops=venue:${venue.id}&days=1`, `/share/fr/trip.png?stops=venue:${venue.id}`]) {
+    const r = await tripShareFetch(path);
+    assert.equal(r.status, 200, path);
+    assert.match(r.type, /image\/png/);
+    assert.deepEqual([...r.bytes.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], 'PNG signature');
+  }
+  for (const path of ['/share/trip.png', '/share/trip.png?stops=venue:999999999', '/share/fr/trip.png?stops=nope']) {
+    const r = await tripShareFetch(path);
+    assert.equal(r.status, 404, path);
+  }
+  // At most MY_TRIP_MAX_REFS stops are read, however long the link is.
+  const many = Array.from({ length: 80 }, (_, i) => `venue:${venue.id + (i % 2)}`).join(',');
+  assert.ok(app.tripShareSearch({ stops: many }).split(',').length <= 30);
+  assert.equal(app.tripShareSearch({ stops: 'junk' }), '');
+  assert.equal(app.tripShareSummary({ stops: 'junk' }), null);
 });
