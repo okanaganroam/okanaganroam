@@ -1555,19 +1555,46 @@ const REGION_TAGLINES = {
 // their title/description talk about après-ski rather than wineries/golf.
 const SKI_RESORT_REGIONS = new Set(['big-white', 'silverstar', 'apex', 'baldy']);
 
-// SEO audit (2026-10-10): per-region share images (og:image), reusing the
-// existing wide region photography. Regions without one keep og-image.png.
-const REGION_SHARE_IMAGES = Object.freeze({
-  kelowna: '/images/regions/wide/kelowna.webp',
-  'lake-country': '/images/regions/wide/lake-country.webp',
-  naramata: '/images/regions/wide/naramata.webp',
-  oliver: '/images/regions/wide/oliver.webp',
-  osoyoos: '/images/regions/wide/osoyoos.webp',
-  penticton: '/images/regions/wide/penticton.webp',
-  summerland: '/images/regions/wide/summerland.webp',
-  vernon: '/images/regions/wide/vernon.webp',
-  'west-kelowna': '/images/regions/wide/west-kelowna.webp',
+// One photo per destination (2026-10-15). Every place the site shows a town --
+// the town page banner, its og:image, the homepage destination cards, the
+// /destinations cards, guide banners and /trip day headers -- uses this one
+// photo. Files in public/images/regions/photos/: <slug>-2610.jpg (1600px,
+// 12:5 banner crop), <slug>-2610-800.jpg (800px of the same crop) and
+// <slug>-2610-card.jpg (800x533, 3:2). A new photo gets a new file stamp.
+// `pos` is the banner's vertical focus; `small` marks a photo too small for
+// the full banner (it gets the shorter one). `credit` is shown on the banner
+// where the licence asks for attribution.
+const REGION_PHOTO_STAMP = '2610';
+const REGION_PHOTOS = Object.freeze({
+  kelowna: { alt: 'Kelowna’s marina and the Delta Grand on Okanagan Lake', pos: 50 }, // Unsplash Vc6DcC6CUJc (Jeffrey Eisen)
+  'west-kelowna': { alt: 'Mission Hill vineyards above Okanagan Lake in West Kelowna', pos: 50 }, // Unsplash 0UCSYkG_RMk (Mike Benna)
+  'lake-country': { alt: 'Kalamalka Lake shoreline at Oyama, Lake Country', pos: 50, credit: { by: 'Murray Foubister', license: 'CC BY-SA 2.0', url: 'https://commons.wikimedia.org/w/index.php?curid=51909669' } },
+  penticton: { alt: 'Penticton between the orchards and Skaha Lake', pos: 50 }, // Adobe Stock 218718206
+  naramata: { alt: 'Orchards and vineyards on the Naramata Bench above Okanagan Lake', pos: 50 }, // supplied by Dayton
+  summerland: { alt: 'A double rainbow over Okanagan Lake and Summerland’s vineyards', pos: 50, credit: { by: 'GoToVan', license: 'CC BY 2.0', url: 'https://commons.wikimedia.org/w/index.php?curid=113182308' } },
+  peachland: { alt: 'Peachland’s waterfront from Okanagan Lake', pos: 50 }, // supplied by Dayton
+  vernon: { alt: 'Vernon and the north end of Kalamalka Lake', pos: 50, credit: { by: 'Judy Gallagher', license: 'CC BY 2.0', url: 'https://www.flickr.com/photos/52450054@N04/15340405619' } },
+  coldstream: { alt: 'Coldstream above Kalamalka Lake', pos: 50 }, // Adobe Stock 212523544
+  oliver: { alt: 'Vineyard rows near Oliver', pos: 50 }, // Adobe Stock 535400006
+  osoyoos: { alt: 'Osoyoos and Osoyoos Lake from Anarchist Mountain', pos: 50 }, // Adobe Stock 1157692482
+  'okanagan-falls': { alt: 'Vineyards running down to Vaseux Lake near Okanagan Falls', pos: 50 }, // supplied by Dayton
+  kaleden: { alt: 'Kaleden on Skaha Lake from above', pos: 50 }, // supplied by Dayton
+  armstrong: { alt: 'The Welcome to Armstrong sign and the CN caboose', pos: 50, small: true }, // Wikimedia Commons, public domain
+  enderby: { alt: 'The Shuswap River valley from the Enderby Cliffs', pos: 50, credit: { by: 'LPeezy', license: 'CC BY-SA 4.0', url: 'https://commons.wikimedia.org/wiki/File:Enderby_Cliff_Panoramic.jpg' } },
+  lumby: { alt: 'Downtown Lumby’s park below Saddle Mountain', pos: 50 }, // supplied by Dayton
+  'big-white': { alt: 'Sunset over snow-covered firs and mountain ridges at Big White', pos: 50 }, // Adobe Stock 567585920
+  silverstar: { alt: 'SilverStar’s colourful village in deep snow', pos: 50, credit: { by: 'Ruth Hartnup', license: 'CC BY 2.0', url: 'https://www.flickr.com/photos/95142644@N00/52202990099/' } },
+  apex: { alt: 'Apex Mountain’s village below the ski runs at golden hour', pos: 50, credit: { by: 'Murray Foubister', license: 'CC BY-SA 2.0', url: 'https://www.flickr.com/photos/mfoubister/28658736018/' } },
+  baldy: { alt: 'Snow-plastered rock near the top of Mt. Baldy', pos: 50, small: true, credit: { by: 'Brent Sisson', license: 'CC BY-SA 4.0', url: 'https://commons.wikimedia.org/w/index.php?curid=99455022' } },
 });
+function regionPhoto(region) {
+  const p = REGION_PHOTOS[region];
+  if (!p) return null;
+  const base = `/images/regions/photos/${region}-${REGION_PHOTO_STAMP}`;
+  return { ...p, src: `${base}.jpg`, src800: `${base}-800.jpg`, card: `${base}-card.jpg`, small: !!p.small };
+}
+// og:image for each town page: its one photo.
+const REGION_SHARE_IMAGES = Object.freeze(Object.fromEntries(Object.keys(REGION_PHOTOS).map((r) => [r, regionPhoto(r).src])));
 
 // Region intros (SEO audit, 2026-10-10): 230-280 words of local copy under
 // the H1 on the busiest region hubs, which were otherwise only counts and
@@ -6600,7 +6627,7 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
   const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
     .map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural }));
   const town = regionBannerPhoto(region);
-  const banner = (GUIDE_BADGE_BANNERS[badge] && GUIDE_BADGE_BANNERS[badge]()) || (town ? { src: town.src, alt: town.alt, pos: town.pos } : FOOD_DRINK_HUB_BANNER);
+  const banner = (GUIDE_BADGE_BANNERS[badge] && GUIDE_BADGE_BANNERS[badge]()) || (town ? { src: town.src, alt: town.alt, pos: town.pos, credit: town.credit } : FOOD_DRINK_HUB_BANNER);
   const picks = GUIDE_BADGE_PICKS[`${region}/${badge}`] ? GUIDE_BADGE_PICKS[`${region}/${badge}`]() : null;
   const path = `/guide/${region}/${badge}`;
   const others = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && c.badge !== badge).map((c) => c.badge);
@@ -6804,17 +6831,6 @@ function renderExploreByCategoryHTML() {
 </section>`;
 }
 
-const EXPLORE_REGION_PHOTOS = Object.freeze({ kelowna: '/images/regions/kelowna-explore.webp', penticton: '/images/regions/penticton-explore.webp' });
-// Fall destination photos (2026-10-13): September through November (isFallHeroSeason), a card with a photo here shows it
-// instead, like the mood tiles and Hidden Gems cards. 960x375, each under its own file name; real photos tagged in that town.
-const FALL_EXPLORE_REGION_PHOTOS = Object.freeze({
-  kelowna: '/images/regions/kelowna-explore-fall.jpg', // Unsplash 6YVHxWkRrxY (Dithira Hettiarachchi), Kelowna: downtown and the lake from Knox Mountain, November
-  'west-kelowna': '/images/regions/west-kelowna-explore-fall.jpg', // Unsplash 0UCSYkG_RMk (Mike Benna), Mission Hill, West Kelowna: vines over the lake, colour-shifted to fall gold
-  'lake-country': '/images/regions/lake-country-explore-fall.jpg', // supplied by Dayton (2026-10-13): aerial of Wood Lake and orchards in fall colour
-  penticton: '/images/regions/penticton-explore-fall.jpg', // supplied by Dayton (2026-10-13): aerial of the SS Sicamous and Okanagan Beach
-  naramata: '/images/regions/naramata-explore-fall.jpg', // supplied by Dayton (2026-10-13): the Naramata Bench above Okanagan Lake in early fall
-  vernon: '/images/regions/vernon-explore-fall.jpg', // supplied by Dayton (2026-10-13): downtown Vernon's tree-lined main street in fall
-});
 function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
   // Zero database queries — a curated subset of the existing, authoritative
   // REGION_LABELS taxonomy (no new destination schema, nothing invented).
@@ -6835,12 +6851,9 @@ function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
   // ends right after the card row, so that link is removed rather than
   // kept pointing at a since-removed #directory anchor.
   const curated = ['kelowna', 'west-kelowna', 'lake-country', 'penticton', 'naramata', 'vernon'];
-  // Kelowna and Penticton (2026-10-06): new 960x375 photos made for these
-  // cards. They have their own files so the shared 640px thumbnails (which
-  // /trip's day headers also use) stay as they were.
-  const fall = isFallHeroSeason(now);
-  const exploreImage = (region) => (fall && FALL_EXPLORE_REGION_PHOTOS[region] ? { src: FALL_EXPLORE_REGION_PHOTOS[region], w: 960, h: 375 }
-    : EXPLORE_REGION_PHOTOS[region] ? { src: EXPLORE_REGION_PHOTOS[region], w: 960, h: 375 } : { src: `/images/regions/${region}.webp`, w: 640, h: 250 });
+  // One photo per destination (2026-10-15): the card shows the town's own
+  // photo (REGION_PHOTOS), the same one as its page banner, all year.
+  const exploreImage = (region) => { const p = regionPhoto(region); return { src: p.src800, w: 800, h: 333 }; };
   const cardHtml = curated
     .filter((region) => REGION_LABELS[region])
     .map((region) => {
@@ -11669,24 +11682,23 @@ function regionPageSchemas(region, regionLabel, description, canonical, categori
 }
 
 // Region page photos and cards (2026-10-14). Every town page opens with its
-// own photo: the wide region photo where there is one, the ski photos for the
-// resorts, otherwise the town's /destinations photo (800px, so it gets a
-// shorter banner). Below the guide, "Places to start" shows the places the
+// one photo (REGION_PHOTOS, 2026-10-15); a photo too small for the full
+// banner gets the shorter one. Below the guide, "Places to start" shows the places the
 // guide itself names as photo cards -- the guide's own picks, never a paid or
 // ranked slot -- and the categories become one photo grid with the empty
 // ones left out.
 function regionBannerPhoto(region) {
-  const label = REGION_LABELS[region];
-  if (region === 'big-white') return { src: '/images/ski-snow/big-white-sunset.jpg', alt: 'Sunset over snow-covered firs and mountain ridges at Big White', pos: 55, small: false };
-  if (SKI_RESORT_REGIONS.has(region)) return { src: SKI_SNOW_BANNER.src, alt: SKI_SNOW_BANNER.alt, pos: SKI_SNOW_BANNER.pos, small: false };
-  if (REGION_SHARE_IMAGES[region]) return { src: REGION_SHARE_IMAGES[region], alt: `${label} in the Okanagan Valley`, pos: 50, small: false };
-  const card = destinationCardPhoto(region);
-  return card && !card.map ? { src: card.src, alt: `${label} in the Okanagan Valley`, pos: 50, small: true } : null;
+  const p = regionPhoto(region);
+  return p ? { src: p.src, src800: p.src800, alt: p.alt, pos: p.pos, small: p.small, credit: p.credit || null } : null;
+}
+function regionPhotoCreditHtml(credit) {
+  if (!credit) return '';
+  return `<p class="region-photo-credit">Photo: <a href="${escapeHtml(credit.url)}" rel="nofollow noopener" target="_blank">${escapeHtml(credit.by)}</a>, ${escapeHtml(credit.license)}</p>`;
 }
 function regionBannerHtml(region) {
   const b = regionBannerPhoto(region);
   if (!b) return '';
-  return `<div class="category-banner${b.small ? ' region-banner-small' : ''}"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="${b.small ? 800 : 1600}" height="${b.small ? 533 : 667}" style="object-position: 50% ${b.pos}%" fetchpriority="high"></div>`;
+  return `<div class="category-banner${b.small ? ' region-banner-small' : ''}"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="667" style="object-position: 50% ${b.pos}%" fetchpriority="high">${regionPhotoCreditHtml(b.credit)}</div>`;
 }
 // Ski hills are named as resorts ("Big White Ski Resort"), towns as "Kelowna, BC".
 function regionHeading(region) {
@@ -11822,9 +11834,8 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
       ? `${totalVenues} verified spots at ${regionLabel}, BC: restaurants, bars, cafés and après-ski, all reviewed and badge-checked by Okanagan Roam.`
       : `${totalVenues} verified venues in ${regionLabel}, BC — restaurants, wineries, breweries, golf courses, and more, all reviewed and badge-checked by Okanagan Roam.`;
   const canonical = `https://okanaganroam.com/${region}`;
-  // Ski resorts share the real ski photos (SEO, 2026-10-13): Big White its
-  // sunset, the others the Ski & Snow skier.
-  const shareImage = isSkiResort ? (region === 'big-white' ? '/images/ski-snow/big-white-sunset.jpg' : SKI_SNOW_BANNER.src) : (REGION_SHARE_IMAGES[region] || null);
+  // Every town and ski hill shares its one photo (REGION_PHOTOS).
+  const shareImage = REGION_SHARE_IMAGES[region] || null;
 
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -12100,21 +12111,15 @@ function destinationRegionEntries() {
   }
   return entries;
 }
-// Destination photos (2026-10-13): each /destinations card shows its town's photo, 3:2 (up to 800x533), from
-// public/images/regions/cards/<region>.jpg (real photos: the site's region photography, Big White's ski photo,
-// and photos Dayton supplied). A town without one yet shows its street map (OpenStreetMap, credited in the image).
-// Updated photos (2026-10-13): these towns use the newer photos from the homepage destination cards, each under a
-// new file name (images are cached, so a replaced photo always gets a new name).
-const DESTINATION_CARD_FILES = Object.freeze({
-  kelowna: 'kelowna-2', 'west-kelowna': 'west-kelowna-2', 'lake-country': 'lake-country-2',
-  naramata: 'naramata-2', penticton: 'penticton-2', vernon: 'vernon-2',
-});
+// Destination photos (2026-10-13; one photo per town since 2026-10-15): each /destinations card shows its town's
+// photo (REGION_PHOTOS), cropped 3:2 at 800x533. A town without one shows its street map (OpenStreetMap, credited
+// in the image).
 const destinationCardPhotoCache = new Map();
 function destinationCardPhoto(region) {
   if (destinationCardPhotoCache.has(region)) return destinationCardPhotoCache.get(region);
-  const photo = `/images/regions/cards/${DESTINATION_CARD_FILES[region] || region}.jpg`;
+  const p = regionPhoto(region);
   const map = `/images/regions/maps/${region}-d.webp`;
-  const out = fs.existsSync(path.join(__dirname, 'public', photo)) ? { src: photo, map: false }
+  const out = p && fs.existsSync(path.join(__dirname, 'public', p.card)) ? { src: p.card, map: false }
     : fs.existsSync(path.join(__dirname, 'public', map)) ? { src: map, map: true } : null;
   destinationCardPhotoCache.set(region, out);
   return out;
@@ -16829,6 +16834,10 @@ const CATEGORY_BANNER_STYLE = `<style id="category-banner">
   .category-banner { margin: 0 0 16px; border-radius: 16px; overflow: hidden; aspect-ratio: 2 / 1; max-height: min(44vh, 440px); width: 100%; background: #2A6B67; }
   .category-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .category-banner[hidden] { display: none; }
+  /* Town photo credit (2026-10-15), where the photo's licence asks for one. */
+  .category-banner { position: relative; }
+  .region-photo-credit { position: absolute; right: 8px; bottom: 6px; margin: 0; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,.45); color: #fff; font-size: 11px; line-height: 1.4; }
+  .category-banner .region-photo-credit a, .category-banner .region-photo-credit a:visited { color: #fff; text-decoration: underline; }
   @media (max-width: 700px) { .category-banner { border-radius: 12px; } }
   @media (min-width: 900px) {
     .category-hero { margin: 8px 0 22px; }
@@ -18965,7 +18974,7 @@ ${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHe
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: heading }])}
-  ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${swapContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high"></div>${swapContent ? `
+  ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${swapContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(heroBanner.credit)}</div>${swapContent ? `
   <script>
   (function(){
     var c = ${JSON.stringify(cfg.categoryContent || {}).replace(/</g, '\\u003c')}, rc = ${JSON.stringify(cfg.regionContent || {}).replace(/</g, '\\u003c')}, all = ${JSON.stringify({ banner: cfg.banner, heading: h1Text, introHtml: cfg.introHtml }).replace(/</g, '\\u003c')};
@@ -18976,6 +18985,13 @@ ${renderGolfHeaderHtml()}
       var rs = Array.prototype.slice.call(document.querySelectorAll('button.outdoor-filter-chip[data-region][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-region'); });
       var one = (on.length === 1 && c[on[0]]) || (rs.length === 1 && rc[rs[0]]), b = one ? one.banner : all.banner;
       if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      var cr = box.querySelector('.region-photo-credit');
+      if (cr) cr.remove();
+      if (b.credit) {
+        cr = document.createElement('p'); cr.className = 'region-photo-credit'; cr.appendChild(document.createTextNode('Photo: '));
+        var a = document.createElement('a'); a.href = b.credit.url; a.rel = 'nofollow noopener'; a.target = '_blank'; a.textContent = b.credit.by;
+        cr.appendChild(a); cr.appendChild(document.createTextNode(', ' + b.credit.license)); box.appendChild(cr);
+      }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       var ht = one ? one.heading : all.heading;
       if (h && h.textContent !== ht) h.textContent = ht;
@@ -19222,7 +19238,7 @@ ${CATEGORY_BANNER_STYLE}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, ...crumbs, { name: cfg.name }])}
-  ${categoryHeroHtml(`<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high"></div>
+  ${categoryHeroHtml(`<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(content.banner.credit)}</div>
   <script>
   (function(){
     var c = ${JSON.stringify(cfg.categoryContent).replace(/</g, '\\u003c')};
@@ -19597,14 +19613,14 @@ function renderSkiSnowStyles() {
 </style>`;
 }
 // Per-resort banner, heading and intro on /ski-snow (2026-10-12): choosing a
-// single ski-resort region swaps them in. Big White has a real photo
-// (licensed free Adobe Stock 567585920, "Sunset at Big White"); no free photo
-// of SilverStar, Apex or Baldy exists yet, so they keep the general skier.
+// single ski-resort region swaps them in. Each resort shows its one photo
+// (REGION_PHOTOS, 2026-10-15), with its credit where the licence asks.
+const skiResortBanner = (r) => { const p = regionPhoto(r); return { src: p.src, alt: p.alt, pos: p.pos, ...(p.credit ? { credit: p.credit } : {}) }; };
 const SKI_SNOW_REGION_CONTENT = Object.freeze({
-  'big-white': { banner: { src: '/images/ski-snow/big-white-sunset.jpg', alt: 'Sunset over snow-covered firs and mountain ridges at Big White', pos: 55 }, heading: 'Big White Ski Resort', intro: 'The Okanagan\u2019s biggest ski hill, up the mountain from Kelowna \u2014 famous for light, dry powder and snow-frosted trees, with a ski-in, ski-out village, night skiing and plenty to do off the slopes.' },
-  silverstar: { banner: SKI_SNOW_BANNER, heading: 'SilverStar Mountain Resort', intro: 'Above Vernon in the North Okanagan \u2014 a colourful, car-free village, terrain on several faces of the mountain and one of the region\u2019s best-known Nordic trail networks next door.' },
-  apex: { banner: SKI_SNOW_BANNER, heading: 'Apex Mountain Resort', intro: 'A short drive from Penticton \u2014 a smaller, friendly hill known for steep runs, short lift lines and a relaxed village feel.' },
-  baldy: { banner: SKI_SNOW_BANNER, heading: 'Baldy Mountain Resort', intro: 'The South Okanagan\u2019s family-friendly ski hill near Oliver and Osoyoos \u2014 quiet glades, sunny days and an easygoing, local feel.' },
+  'big-white': { banner: skiResortBanner('big-white'), heading: 'Big White Ski Resort', intro: 'The Okanagan\u2019s biggest ski hill, up the mountain from Kelowna \u2014 famous for light, dry powder and snow-frosted trees, with a ski-in, ski-out village, night skiing and plenty to do off the slopes.' },
+  silverstar: { banner: skiResortBanner('silverstar'), heading: 'SilverStar Mountain Resort', intro: 'Above Vernon in the North Okanagan \u2014 a colourful, car-free village, terrain on several faces of the mountain and one of the region\u2019s best-known Nordic trail networks next door.' },
+  apex: { banner: skiResortBanner('apex'), heading: 'Apex Mountain Resort', intro: 'A short drive from Penticton \u2014 a smaller, friendly hill known for steep runs, short lift lines and a relaxed village feel.' },
+  baldy: { banner: skiResortBanner('baldy'), heading: 'Baldy Mountain Resort', intro: 'The South Okanagan\u2019s family-friendly ski hill near Oliver and Osoyoos \u2014 quiet glades, sunny days and an easygoing, local feel.' },
 });
 function renderSkiSnowPage(venues, eats, filter = null) {
   const resortNames = SKI_SNOW_REGIONS.map((r) => REGION_LABELS[r]).filter(Boolean);
@@ -23524,14 +23540,6 @@ ${APP_JS_SCRIPT_TAG}${v2 ? '\n' + renderTripPlannerV2Script() + '\n' + renderSav
 // Same URL, canonical, breadcrumb, header, Trip tray, footer and analytics
 // page_type as the current page; the planner API is unchanged.
 const tripPlannerV3PageModule = (() => { try { return require('./trip-planner-v3-page.js'); } catch (e) { return null; } })();
-// Day-header photos (V3 image-quality fix, 2026-09-29). The homepage's
-// region cards use 640px thumbnails (public/images/regions/<slug>.webp,
-// unchanged); a full-width V3 day header needs more, so V3 uses its own
-// full-size copies in public/images/regions/wide/ -- the region originals
-// from the repo's history (1648x640) or, where no larger original exists,
-// the same-size WebP of the current PNG. Native widths are listed here for
-// srcset; phones get the 640px thumbnail where one exists.
-const TRIP_V3_WIDE_REGION_WIDTHS = { kelowna: 1648, 'lake-country': 1648, naramata: 1648, penticton: 1648, vernon: 1648, 'west-kelowna': 1648, oliver: 1376, osoyoos: 928, summerland: 928 };
 // Build My Trip real-map day headers: pre-rendered OSM Carto maps (Geoapify Static
 // Maps, built by scripts/build-region-maps.js into public/images/regions/maps/,
 // described by manifest.json). Two images per region -- desktop and narrow -- each
@@ -23566,24 +23574,13 @@ function tripV3MapHeaders(dir = TRIP_V3_MAPS_DIR) {
   if (dir === TRIP_V3_MAPS_DIR) tripV3MapHeadersCache = out;
   return out;
 }
+// Day-header photos: each town's one photo (REGION_PHOTOS, 2026-10-15), the 800px copy for phones.
 const TRIP_V3_REGION_IMAGES = (() => {
   const out = {};
-  const has = (rel) => fs.existsSync(path.join(__dirname, 'public', 'images', rel));
   for (const slug of Object.keys(REGION_LABELS)) {
-    // 2026-10-14: the day headers use the same, current town photos as the Destinations page -- the autumn panorama where
-    // there is one, otherwise the town's destination card photo -- not the older wide photos (Kelowna showed an old one).
-    if (has(`regions/${slug}-explore-fall.jpg`)) { out[slug] = { src: `/images/regions/${slug}-explore-fall.jpg`, srcset: null }; continue; }
-    const card = `regions/cards/${DESTINATION_CARD_FILES[slug] || slug}.jpg`;
-    if (has(card)) { out[slug] = { src: `/images/${card}`, srcset: null }; continue; }
-    const wide = TRIP_V3_WIDE_REGION_WIDTHS[slug] && has(`regions/wide/${slug}.webp`) ? `/images/regions/wide/${slug}.webp` : null;
-    const thumb = has(`regions/${slug}.webp`) ? `/images/regions/${slug}.webp` : null;
-    if (wide) {
-      out[slug] = { src: wide, srcset: (thumb ? `${thumb} 640w, ` : '') + `${wide} ${TRIP_V3_WIDE_REGION_WIDTHS[slug]}w` };
-      continue;
-    }
-    for (const ext of ['webp', 'png', 'jpg']) {
-      if (has(`regions/${slug}.${ext}`)) { out[slug] = { src: `/images/regions/${slug}.${ext}`, srcset: null }; break; }
-    }
+    const p = regionPhoto(slug);
+    if (!p || !fs.existsSync(path.join(__dirname, 'public', p.src))) continue;
+    out[slug] = { src: p.src, srcset: p.small ? null : `${p.src800} 800w, ${p.src} 1600w` };
   }
   return out;
 })();
@@ -27226,7 +27223,7 @@ function renderAboutPage() {
     title: 'About Okanagan Roam | A Local Guide to the Okanagan Valley',
     description: 'Okanagan Roam is a free, locally run guide to the Okanagan Valley, made in Kelowna: restaurants, wineries, beaches, trails and events from Enderby to Osoyoos in one place.',
     heading: 'About Okanagan Roam',
-    banner: { src: REGION_SHARE_IMAGES.kelowna, alt: 'Kelowna and Okanagan Lake from above', pos: 50 },
+    banner: { src: regionPhoto('kelowna').src, alt: regionPhoto('kelowna').alt, pos: regionPhoto('kelowna').pos },
     lead: 'Okanagan Roam is a free, locally run guide to the Okanagan Valley &mdash; the restaurants, wineries, beaches, trails, hidden corners and events worth knowing about, from Enderby to Osoyoos, all in one place.',
     bodyHtml: `<h2>Made here, by a local</h2>
     <p>I was born and raised in Kelowna, and Okanagan Roam began with a simple love for this valley. For the people behind its caf&eacute;s, wineries and family-run businesses. For the lakes, orchards and mountains that never get old. For the quiet trails where you can still spot an osprey over the water or a bighorn sheep on the hillside.</p>
@@ -33201,7 +33198,9 @@ module.exports = {
   breadcrumbListSchema,
   FALL_MOOD_IMAGES,
   FALL_HIDDEN_GEM_IMAGES,
-  FALL_EXPLORE_REGION_PHOTOS,
+  REGION_PHOTOS,
+  REGION_SHARE_IMAGES,
+  regionPhoto,
   seasonalHeroText,
   isFallHeroSeason,
   retimeEventOccurrence,
