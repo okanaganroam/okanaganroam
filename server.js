@@ -6753,17 +6753,17 @@ function comboGuideHeading(region, combo) {
   return { heading: combo.h.replace('{T}', town), intro: combo.i.replace(/\{T\}/g, town) };
 }
 const comboGuideShortName = (region, combo) => comboGuideHeading(region, combo).heading.slice(0, -(` in ${REGION_LABELS[region]}`).length);
-// "Popular with visitors: A, B and C." -- from the page's own list, so each
-// town's page reads differently and stays true as the list changes.
-function comboGuidePopularLine(venues) {
-  const names = venues.slice(0, 3).map((v) => v.name);
-  if (names.length < 2) return '';
-  return ` Among the most-reviewed: ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}.`;
+// "Among the most-reviewed: A, B and C." -- links to the page's own top three,
+// so each town's page reads differently and stays true as the list changes.
+function comboGuidePopularHtml(venues) {
+  const top = venues.slice(0, 3);
+  if (top.length < 2) return '';
+  const links = top.map((v) => `<a href="${escapeHtml(venuePagePath(v))}">${escapeHtml(v.name)}</a>`);
+  return `\n  <p class="guide-popular">Among the most-reviewed: ${links.slice(0, -1).join(', ')} and ${links[links.length - 1]}.</p>`;
 }
 function renderComboGuidePage(region, combo, venues, filter = null, now = new Date()) {
   const regionLabel = REGION_LABELS[region];
   const { heading, intro } = comboGuideHeading(region, combo);
-  const fullIntro = `${intro}${comboGuidePopularLine(venues)}`;
   const tally = {};
   for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
   const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
@@ -6779,7 +6779,7 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
   const afterHtml = `<section class="guide-more" aria-labelledby="guideMoreHeading">
     <h2 class="category-subsection-heading" id="guideMoreHeading">More in ${escapeHtml(regionLabel)}</h2>
     ${others.length ? `<p class="guide-more-row">${others.map((c) => chip(`/guide/${region}/${c.slug}`, comboGuideShortName(region, c))).join('')}</p>` : ''}
-    ${singles.length ? `<p class="venue-meta">All ${singles.map((b) => `<a href="/guide/${region}/${b}">${escapeHtml(guideBadgeHeading(region, b).heading.slice(0, -(` in ${regionLabel}`).length).toLowerCase())}</a>`).join(' and ')} in ${escapeHtml(regionLabel)}${combo.type && CATEGORY_SLUGS[combo.type] ? `, or all <a href="/${region}/${CATEGORY_SLUGS[combo.type]}">${escapeHtml(CATEGORY_LABELS[combo.type].plural.toLowerCase())}</a>` : ''}.</p>` : ''}
+    ${singles.length || combo.type ? `<p class="guide-more-row">${singles.map((b) => chip(`/guide/${region}/${b}`, guideBadgeHeading(region, b).heading.slice(0, -(` in ${regionLabel}`).length))).join('')}${combo.type && CATEGORY_SLUGS[combo.type] ? chip(`/${region}/${CATEGORY_SLUGS[combo.type]}`, `${CATEGORY_LABELS[combo.type].plural} in ${regionLabel}`) : ''}</p>` : ''}
   </section>`;
   const crumbs = [{ name: regionLabel, href: `/${region}` }];
   if (singles[0]) crumbs.push({ name: guideBadgeHeading(region, singles[0]).heading.slice(0, -(` in ${regionLabel}`).length), href: `/guide/${region}/${singles[0]}` });
@@ -6798,10 +6798,12 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
     photoKeyFor: (v) => curatedPhotoKey(v),
     features: GUIDE_FEATURES.filter((k) => !combo.badges.includes(k)),
     openNow: true,
-    search: { label: `Search ${heading.toLowerCase()}`, placeholder: 'Search by name or what you feel like...' },
-    categoryContent: { all: { banner, heading, intro: fullIntro } },
-    heroExtraHtml: '',
+    search: { label: 'Search these places', placeholder: 'Search by name or what you feel like...' },
+    categoryContent: { all: { banner, heading, intro } },
+    heroExtraHtml: comboGuidePopularHtml(venues),
     extraHead: `<style id="guide-page">
+  body.guide-page .guide-popular { margin: 8px 0 0; color: var(--ink-soft, #4a5560); }
+  body.guide-page .guide-popular a { color: var(--teal-deep, #1F5450); font-weight: 700; }
   body.guide-page .guide-more { margin: 32px 0 8px; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
   body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
