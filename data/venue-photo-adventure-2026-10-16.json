@@ -1,0 +1,30 @@
+{
+  "reason": "Adventure photo pass 2026-10-16 (Dayton picked V1, V3): real, freely licensed photos \u2014 LocoLanding's own mini golf (Flickr, Ruth and Dave, CC BY 2.0, https://www.flickr.com/photos/95142644@N00/3906186351) and the Adra Tunnel on the KVR, where Hoodoo's e-bike tours go (Wikimedia Commons, Jset22, CC BY 4.0, https://commons.wikimedia.org/w/index.php?curid=191605548).",
+  "batch_id": "venue-photo-adventure-2026-10-16",
+  "venues": [
+    {
+      "id": 1308,
+      "name": "LocoLanding Adventure Park",
+      "region": "penticton",
+      "slug": "locolanding-adventure-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/locolanding-mini-golf.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1444,
+      "name": "Hoodoo Adventure Company",
+      "region": "penticton",
+      "slug": "hoodoo-adventure-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hoodoo-adra-tunnel-kvr.jpg?v=20261016"
+      }
+    }
+  ]
+}

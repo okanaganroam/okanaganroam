@@ -6541,6 +6541,85 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   await new Promise((resolve) => app.server.close(resolve));
 }));
 
+// ---- price validation on POST /api/venues and PUT /api/venues/:id (2026-10-12) ----
+// venue pages render '$'.repeat(venue.price), so a "$$" string stored as-is
+// rendered nothing. Both endpoints now normalize to an integer 1-4 (or null)
+// and reject anything else with a 400, writing nothing.
+test('POST/PUT /api/venues normalize price to an integer 1-4 and reject anything else', () => withDiscoveryServer(async (base) => {
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` };
+  const post = (body) => fetch(`${base}/api/venues`, { method: 'POST', headers, body: JSON.stringify(body) });
+  const put = (id, body) => fetch(`${base}/api/venues/${id}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+  const fixture = (n) => ({ name: `Price Fixture ${n}`, region: 'kelowna', type: 'restaurant', description: 'Disposable price-validation fixture.' });
+  const createdIds = [];
+  const total = async () => (await (await fetch(`${base}/api/venues?limit=1`)).json()).total;
+
+  try {
+    // Accepted inputs on POST and what they are stored as.
+    const accepted = [
+      [1, 1], [4, 4], ['1', 1], ['4', 4], ['$', 1], ['$$', 2], ['$$$', 3], ['$$$$', 4], [null, null],
+    ];
+    for (const [input, expected] of accepted) {
+      const res = await post({ ...fixture(createdIds.length), price: input });
+      assert.equal(res.status, 201, `POST price ${JSON.stringify(input)} must be accepted`);
+      const venue = await res.json();
+      createdIds.push(venue.id);
+      assert.strictEqual(venue.price, expected, `POST price ${JSON.stringify(input)} must be stored as ${expected}`);
+    }
+    // Omitting price is unchanged: stored as null.
+    {
+      const res = await post(fixture('omitted'));
+      assert.equal(res.status, 201);
+      const venue = await res.json();
+      createdIds.push(venue.id);
+      assert.strictEqual(venue.price, null);
+    }
+
+    const rejected = [0, 5, -1, 2.5, '0', '5', '', ' 2', '2.0', '$$$$$', '$2', 'cheap', '££', true, false, [2], { level: 2 }];
+
+    // Rejected inputs on POST: 400 with the error message, no row created.
+    {
+      const before = await total();
+      for (const input of rejected) {
+        const res = await post({ ...fixture('bad'), price: input });
+        assert.equal(res.status, 400, `POST price ${JSON.stringify(input)} must be rejected`);
+        assert.match((await res.json()).error, /price must be/, `POST price ${JSON.stringify(input)} must explain the rule`);
+      }
+      assert.equal(await total(), before, 'a rejected price must not create a venue');
+    }
+
+    // PUT converts the same way.
+    const id = createdIds[0];
+    for (const [input, expected] of accepted) {
+      const res = await put(id, { price: input });
+      assert.equal(res.status, 200, `PUT price ${JSON.stringify(input)} must be accepted`);
+      assert.strictEqual((await res.json()).price, expected, `PUT price ${JSON.stringify(input)} must be stored as ${expected}`);
+    }
+
+    // Rejected inputs on PUT: 400, and nothing in the body is written.
+    assert.equal((await put(id, { price: '$$$' })).status, 200);
+    for (const input of rejected) {
+      const res = await put(id, { price: input, description: 'must not be written' });
+      assert.equal(res.status, 400, `PUT price ${JSON.stringify(input)} must be rejected`);
+      assert.match((await res.json()).error, /price must be/);
+    }
+    const after = await (await fetch(`${base}/api/venues/${id}`)).json();
+    assert.strictEqual(after.price, 3, 'a rejected PUT must leave the stored price unchanged');
+    assert.equal(after.description, 'Disposable price-validation fixture.', 'a rejected PUT must not write its other fields');
+
+    // A PUT without price leaves price alone.
+    {
+      const res = await put(id, { description: 'price untouched' });
+      assert.equal(res.status, 200);
+      assert.strictEqual((await res.json()).price, 3);
+    }
+
+    // A PUT to a missing venue is still a 404.
+    assert.equal((await put(999999999, { price: 2 })).status, 404);
+  } finally {
+    for (const createdId of createdIds) await fetch(`${base}/api/venues/${createdId}`, { method: 'DELETE', headers });
+  }
+}));
+
 // ---- /admin/correct-phone: 503 when ENRICHMENT_ADMIN_TOKEN is unset -----
 //
 // server.js reads ENRICHMENT_ADMIN_TOKEN exactly once, at module load. The
@@ -21117,6 +21196,24 @@ test('Venue page top and "More in" links (2026-10-16): back link and language sw
   const page = await fetch(`${base}/kelowna/cafes/top-links-fixture-cafe`).then((r) => r.text());
   assert.match(page, /<div class="venue-top-links"[^>]*><a class="category-back-link" href="\/kelowna\/cafes">← Kelowna Cafes<\/a>/);
   assert.doesNotMatch(page, /Also see:/);
+}));
+
+test('Adventure photos (2026-10-16): new banner anchored left for phones; activity example photos exist in both sizes', () => withDiscoveryServer(async (base) => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const b = app.OUTDOOR_ACTIVITY_BANNERS.adventure;
+  assert.equal(b.src, '/images/outdoors/activity-adventure-2610.jpg');
+  assert.equal(b.posX, 8);
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)));
+  for (const f of ['zipline', 'ropes', 'paraglide', 'skydive', 'horseback', 'atv', 'buggy', 'balloon']) {
+    for (const suffix of ['', '-800']) {
+      const rel = `public/images/outdoors/examples/adventure-${f}-2610${suffix}.jpg`;
+      assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
+    }
+  }
+  for (const rel of ['public/images/outdoors/activity-adventure-2610-800.jpg', 'public/images/outdoors/thumbs/activity-adventure-2610.jpg']) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
+  }
 }));
 
 // ---- Campaign tags (2026-10-16): utm_* survive redirects; scripts/utm-links.js tags outgoing links ----
