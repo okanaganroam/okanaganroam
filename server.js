@@ -9221,6 +9221,23 @@ const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', '
 // The cookie holds only "1" and is read only by this snippet; the server
 // never reads it. okanagan.html (/, /browse) is frozen and does not read it.
 const GA4_LIVE_HOSTNAME = 'okanaganroam.com';
+
+// Campaign tags on redirects (2026-10-16): GA4 reads utm_* (and the ad
+// click ids) from the landing URL, so a redirect that drops the query
+// string turns a tagged email or Instagram link into plain "direct"
+// traffic. Redirects that don't already pass the whole query through
+// carry just these parameters onto the new location -- nothing else, so
+// a redirect's own parameters (e.g. ?activity=, ?openMap=1) are not
+// repeated on the target.
+function withCampaignParams(location, search) {
+  const kept = new URLSearchParams();
+  for (const [k, v] of new URLSearchParams(search || '')) {
+    if (/^utm_[a-z_]+$/.test(k) || k === 'gclid' || k === 'fbclid') kept.append(k, v);
+  }
+  const extra = kept.toString();
+  if (!extra) return location;
+  return location + (location.includes('?') ? '&' : '?') + extra;
+}
 const GA4_INTERNAL_COOKIE = 'roam_internal';
 
 // The GA4 config IIFE shared by every server template (via
@@ -34084,7 +34101,7 @@ const server = http.createServer(async (req, res) => {
     // /whats-on so old bookmarks and links keep working. Individual
     // /:region/events/:slug pages are untouched (route below).
     if ((pathname === '/events' || pathname === '/events/') && method === 'GET') {
-      res.writeHead(301, { Location: '/whats-on' });
+      res.writeHead(301, { Location: withCampaignParams('/whats-on', parsed.search) });
       return res.end();
     }
 
@@ -34160,7 +34177,7 @@ const server = http.createServer(async (req, res) => {
       }
       // Too few to list on their own (the header links here): the Food &
       // Drink hub filtered to the type, never a 404.
-      res.writeHead(302, { Location: `/food-drink?types=${type}` });
+      res.writeHead(302, { Location: withCampaignParams(`/food-drink?types=${type}`, parsed.search) });
       return res.end();
     }
 
@@ -34589,13 +34606,13 @@ const server = http.createServer(async (req, res) => {
       if (venue && venue.redirect_to) {
         const target = getVenue(venue.redirect_to);
         if (target && !target.redirect_to && CATEGORY_SLUGS[target.type] && target.slug) {
-          res.writeHead(301, { Location: venueHasFrench(target) ? venuePagePath(target, 'fr') : venuePagePath(target) });
+          res.writeHead(301, { Location: withCampaignParams(venueHasFrench(target) ? venuePagePath(target, 'fr') : venuePagePath(target), parsed.search) });
           return res.end();
         }
       }
       if (venue && !venue.redirect_to) {
         if (!venueHasFrench(venue)) {
-          res.writeHead(302, { Location: venuePagePath(venue) });
+          res.writeHead(302, { Location: withCampaignParams(venuePagePath(venue), parsed.search) });
           return res.end();
         }
         const venueGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && venue[c.badge]);
@@ -34675,7 +34692,7 @@ const server = http.createServer(async (req, res) => {
       const list = ACTIVITY_HUBS[activityHubType];
       const hubSlug = activityHubMatch[1];
       if (!activityHubMatch[2] && query.activity && list.some((a) => a.slug === query.activity)) {
-        res.writeHead(301, { Location: `/${hubSlug}/${query.activity}` });
+        res.writeHead(301, { Location: withCampaignParams(`/${hubSlug}/${query.activity}`, parsed.search) });
         return res.end();
       }
       if (activityHubMatch[2]) {
