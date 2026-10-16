@@ -21215,3 +21215,54 @@ test('Adventure photos (2026-10-16): new banner anchored left for phones; activi
     assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
   }
 }));
+
+// ---- Campaign tags (2026-10-16): utm_* survive redirects; scripts/utm-links.js tags outgoing links ----
+test('Redirects carry utm_*/gclid/fbclid onto the new location and nothing else', () => withDiscoveryServer(async (base) => {
+  const res = await fetch(`${base}/events?utm_source=venue_outreach&utm_medium=email&utm_campaign=oct&other=1&gclid=abc`, { redirect: 'manual' });
+  assert.equal(res.status, 301);
+  assert.equal(res.headers.get('location'), '/whats-on?utm_source=venue_outreach&utm_medium=email&utm_campaign=oct&gclid=abc');
+  const plain = await fetch(`${base}/events?other=1`, { redirect: 'manual' });
+  assert.equal(plain.headers.get('location'), '/whats-on', 'without campaign tags the redirect is unchanged');
+}));
+
+test('scripts/utm-links.js tags okanaganroam.com page links only', () => {
+  const { tagUrl, tagText, tagJson, main } = require('../scripts/utm-links.js');
+  const tags = { source: 'venue_outreach', medium: 'email', campaign: '2026-10-follow-up' };
+  const q = 'utm_source=venue_outreach&utm_medium=email&utm_campaign=2026-10-follow-up';
+
+  assert.equal(tagUrl('https://okanaganroam.com/kelowna/restaurants/x', tags), `https://okanaganroam.com/kelowna/restaurants/x?${q}`);
+  assert.equal(tagUrl('https://okanaganroam.com/browse?types=cafe', tags), `https://okanaganroam.com/browse?types=cafe&${q}`);
+  assert.equal(tagUrl('https://okanaganroam.com', tags), `https://okanaganroam.com/?${q}`);
+  // Left alone: private owner links, files, already-tagged links.
+  for (const url of [
+    'https://okanaganroam.com/owner/abcDEF123',
+    'https://okanaganroam.com/badges/featured-on-okanagan-roam.png',
+    'https://okanaganroam.com/kelowna?utm_source=instagram',
+  ]) assert.equal(tagUrl(url, tags), url);
+
+  const text = [
+    'See https://okanaganroam.com/list-an-event.',
+    'Other sites: https://example.com/page',
+    'Badge: <a href="https://okanaganroam.com/kelowna/cafes/y"><img src="https://okanaganroam.com/badges/b.png"></a>',
+    'Bare domain okanaganroam.com stays as typed.',
+  ].join('\n');
+  assert.equal(tagText(text, tags), [
+    `See https://okanaganroam.com/list-an-event?${q}.`,
+    'Other sites: https://example.com/page',
+    'Badge: <a href="https://okanaganroam.com/kelowna/cafes/y"><img src="https://okanaganroam.com/badges/b.png"></a>',
+    'Bare domain okanaganroam.com stays as typed.',
+  ].join('\n'));
+
+  // JSON (an outbox chunk): strings tagged, the badge's href left alone even after JSON escaping.
+  const chunk = [{ n: 1, to: 'a@b.c', body: 'Page: https://okanaganroam.com/kelowna/cafes/y\n<a href="https://okanaganroam.com/kelowna/cafes/y">badge</a>' }];
+  const tagged = tagJson(JSON.parse(JSON.stringify(chunk)), tags);
+  assert.equal(tagged[0].body, `Page: https://okanaganroam.com/kelowna/cafes/y?${q}\n<a href="https://okanaganroam.com/kelowna/cafes/y">badge</a>`);
+  assert.equal(tagged[0].n, 1);
+
+  // The CLI requires all three tags, with safe values.
+  assert.equal(main(['link', 'https://okanaganroam.com/', '--source', 'instagram', '--medium', 'social', '--campaign', 'bio']),
+    'https://okanaganroam.com/?utm_source=instagram&utm_medium=social&utm_campaign=bio\n');
+  assert.throws(() => main(['link', 'https://okanaganroam.com/', '--source', 'instagram', '--medium', 'social']), /--campaign is required/);
+  assert.throws(() => main(['link', 'https://okanaganroam.com/', '--source', 'Insta Gram', '--medium', 'social', '--campaign', 'bio']), /--source is required/);
+  assert.throws(() => main(['link', 'https://example.com/', '--source', 'a', '--medium', 'b', '--campaign', 'c']), /okanaganroam\.com address/);
+});
