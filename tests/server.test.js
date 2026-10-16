@@ -21094,3 +21094,20 @@ test('Venue galleries (2026-10-16): every photo in data/venue-gallery.json exist
     }
   }
 });
+
+test('Related cards (2026-10-16): a venue page does not repeat one stock photo across its "Other ..." cards', () => withDiscoveryServer(async (base) => {
+  // Keep only wineries whose ids land on the same example photo (id % 5), the case that used to repeat.
+  const ids = [];
+  for (let i = 1; i <= 25; i += 1) ids.push(Number(seasonInsert.run({ name: `Stock Photo Fixture Winery ${i}`, type: 'winery', hours: SEASON_WEEK, slug: `stock-photo-fixture-winery-${i}` }).lastInsertRowid));
+  const keep = ids.filter((id) => id % 5 === ids[0] % 5);
+  for (const id of ids) if (!keep.includes(id)) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  assert.ok(keep.length >= 4);
+  const first = db.prepare('SELECT slug FROM venues WHERE id = ?').get(keep[0]).slug;
+  const page = await fetch(`${base}/kelowna/wineries/${first}`).then((r) => r.text());
+  const section = page.slice(page.indexOf('Other wineries in'), page.indexOf('</div>\n      </div>', page.indexOf('Other wineries in')));
+  const srcs = [...section.matchAll(/<img class="related-photo" src="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(srcs.length >= 3, `has photo cards (${srcs.length})`);
+  const stock = srcs.filter((s) => !/^\/images\/(?:venues|owner)\//.test(s));
+  const pool = 5; // the winery example photos
+  assert.equal(new Set(stock).size, Math.min(stock.length, pool), `no repeated stock photo: ${stock.join(', ')}`);
+}));
