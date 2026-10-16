@@ -1,0 +1,54 @@
+{
+  "reason": "User approved deployment of all four reviewed hiking photo selections.",
+  "batch_id": "hiking-photos-batch-06-2026-10-16",
+  "venues": [
+    {
+      "id": 1230,
+      "name": "Grey Canal Trail",
+      "region": "vernon",
+      "slug": "grey-canal-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/grey-canal-trail-20261016-b6.jpg?v=20261016h6live"
+      }
+    },
+    {
+      "id": 1268,
+      "name": "Golden Mile Trail",
+      "region": "oliver",
+      "slug": "golden-mile-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/golden-mile-trail-20261016-b6.jpg?v=20261016h6live"
+      }
+    },
+    {
+      "id": 1263,
+      "name": "Jack Seaton Park",
+      "region": "lake-country",
+      "slug": "jack-seaton-park",
+      "expect": {
+        "image_url": "/images/sports/venues/lake-country-jack-seaton-park.jpg?v=sports-photo-2"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/jack-seaton-park-20261016-b6.jpg?v=20261016h6live"
+      }
+    },
+    {
+      "id": 1271,
+      "name": "Brent Mountain Trail",
+      "region": "apex",
+      "slug": "brent-mountain-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/brent-mountain-trail-20261016-b6.jpg?v=20261016h6live"
+      }
+    }
+  ]
+}

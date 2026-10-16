@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1230,
+    "name": "Grey Canal Trail",
+    "author": "San Esp",
+    "capture_date": "2026-10-04",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-dd86e6d",
+    "file": "grey-canal.webp",
+    "visually_reviewed": true,
+    "note": "Bella Vista panorama over Okanagan Lake.",
+    "dimensions": [
+      2048,
+      1536
+    ],
+    "slug": "grey-canal-trail",
+    "region": "vernon",
+    "deployed_asset": "/images/hiking/venues/grey-canal-trail-20261016-b6.jpg",
+    "approved": true
+  },
+  {
+    "id": 1268,
+    "name": "Golden Mile Trail",
+    "author": "Bill Wilby",
+    "capture_date": "2026-06",
+    "source": "https://trailstales.ca/golden-mile-stamp-mill-trail-and-a-bear-tale/",
+    "file": "golden-mile.jpg",
+    "visually_reviewed": true,
+    "note": "Open hillside trail view over the valley. The author describes the hike last Thursday in his June 2026 post.",
+    "dimensions": [
+      1080,
+      675
+    ],
+    "slug": "golden-mile-trail",
+    "region": "oliver",
+    "deployed_asset": "/images/hiking/venues/golden-mile-trail-20261016-b6.jpg",
+    "approved": true
+  },
+  {
+    "id": 1263,
+    "name": "Jack Seaton Park",
+    "file": "jack-seaton.webp",
+    "author": "Tanya Koob",
+    "capture_date": "2026-06-27",
+    "source": "https://www.alltrails.com/explore/recording/evening-hike-at-okanagan-lake-lookout-via-jack-seaton-park-cfef82b",
+    "visually_reviewed": true,
+    "note": "Hikers resting at the rocky lake viewpoint on the park’s Home Run / Panorama route.",
+    "dimensions": [
+      2048,
+      1536
+    ],
+    "slug": "jack-seaton-park",
+    "region": "lake-country",
+    "deployed_asset": "/images/hiking/venues/jack-seaton-park-20261016-b6.jpg",
+    "approved": true
+  },
+  {
+    "id": 1271,
+    "name": "Brent Mountain Trail",
+    "file": "brent-mountain.webp",
+    "author": "Mackenzie Nachura",
+    "capture_date": "2026-10-10",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-mount-brent-33614cf",
+    "visually_reviewed": true,
+    "note": "Snow-covered trail through alpine firs. A seasonal winter option; summit panoramas from this hike were obscured by fog.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "brent-mountain-trail",
+    "region": "apex",
+    "deployed_asset": "/images/hiking/venues/brent-mountain-trail-20261016-b6.jpg",
+    "approved": true
+  }
+]
