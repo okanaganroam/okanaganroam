@@ -21331,13 +21331,13 @@ test('Water Activities photos (2026-10-16): example photos exist in both sizes; 
 });
 
 // ---- Shareable trips (2026-10-16) ----
-async function tripShareFetch(urlPath) {
+async function tripShareFetch(urlPath, headers = {}) {
   return new Promise((resolve, reject) => {
     const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
     tmp.listen(0, '127.0.0.1', async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`);
-        resolve({ status: res.status, type: res.headers.get('content-type') || '', bytes: Buffer.from(await res.arrayBuffer()) });
+        const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`, { headers });
+        resolve({ status: res.status, type: res.headers.get('content-type') || '', retryAfter: res.headers.get('retry-after'), cache: res.headers.get('cache-control'), bytes: Buffer.from(await res.arrayBuffer()) });
       } catch (err) { reject(err); } finally { tmp.close(); }
     });
   });
@@ -21444,4 +21444,61 @@ test('Combination guides (2026-10-16): /guide/<town>/<dog-friendly-patios> lists
       assert.match(sitemap, /https:\/\/okanaganroam\.com\/guide\/peachland\/dog-friendly-patios/);
     });
   } finally { for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+});
+
+// ---- Shareable trips, hardening (2026-10-16): image size tags and a limit on drawing new cards ----
+test('Shareable trips: a shared trip page states its preview image size; the plain page does not', async () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  for (const path of [`/my-trip?stops=venue:${venue.id}&days=1`, `/fr/my-trip?stops=venue:${venue.id}&days=1`]) {
+    const head = (await s4request('GET', path)).text.split('</head>')[0];
+    assert.equal((head.match(/<meta property="og:image:width" content="1200">/g) || []).length, 1, path);
+    assert.equal((head.match(/<meta property="og:image:height" content="630">/g) || []).length, 1, path);
+    assert.ok(head.indexOf('property="og:image"') < head.indexOf('og:image:width'), 'size tags follow og:image');
+  }
+  const plain = (await s4request('GET', '/my-trip')).text.split('</head>')[0];
+  assert.doesNotMatch(plain, /og:image:width|og:image:height/);
+  const other = (await s4request('GET', '/kelowna')).text.split('</head>')[0];
+  assert.doesNotMatch(other, /og:image:width/, 'other pages keep their head');
+});
+
+test('Shareable trips: the limit on drawing new trip cards (unit)', () => {
+  const saved = { ...app.TRIP_CARD_RATE };
+  try {
+    app.tripCardRateReset();
+    Object.assign(app.TRIP_CARD_RATE, { perIp: 3, global: 5, windowMs: 1000 });
+    assert.deepEqual([1, 2, 3, 4].map((i) => app.tripCardRateAllow('1.1.1.1', 1000 + i)), [true, true, true, false], 'per visitor');
+    assert.equal(app.tripCardRateAllow('2.2.2.2', 1010), true, 'another visitor is unaffected');
+    assert.equal(app.tripCardRateAllow('2.2.2.2', 1011), true);
+    assert.equal(app.tripCardRateAllow('3.3.3.3', 1012), false, 'site-wide limit reached (5 draws)');
+    assert.equal(app.tripCardRateAllow('1.1.1.1', 2100), true, 'allowed again after the window');
+  } finally { Object.assign(app.TRIP_CARD_RATE, saved); app.tripCardRateReset(); }
+});
+
+test('Shareable trips: new cards are rationed per visitor, cached cards are free, and the answer is 429 with Retry-After', async () => {
+  const picks = db.prepare("SELECT id FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL ORDER BY id LIMIT 40").all().map((r) => r.id);
+  const seen = new Set(); const cards = [];
+  for (const id of picks) {
+    const sum = app.tripShareSummary({ stops: `venue:${id}` });
+    if (!sum || seen.has(sum.card.name)) continue;
+    seen.add(sum.card.name);
+    // A distinct day count per card keeps each label new, so no earlier test has already drawn (and cached) it.
+    cards.push(`/share/trip.png?stops=venue:${id}&days=${5 + cards.length}`);
+    if (cards.length === 6) break;
+  }
+  assert.ok(cards.length >= 4, 'enough distinct fixture cards');
+  const saved = { ...app.TRIP_CARD_RATE };
+  try {
+    app.tripCardRateReset();
+    Object.assign(app.TRIP_CARD_RATE, { perIp: 2, global: 100, windowMs: 60000 });
+    const a = { 'X-Real-IP': '203.0.113.10' }, b = { 'X-Real-IP': '203.0.113.11' };
+    assert.equal((await tripShareFetch(cards[0], a)).status, 200);
+    assert.equal((await tripShareFetch(cards[1], a)).status, 200);
+    const limited = await tripShareFetch(cards[2], a);
+    assert.equal(limited.status, 429);
+    assert.equal(limited.retryAfter, '30');
+    assert.equal(limited.cache, 'no-store');
+    assert.equal((await tripShareFetch(cards[0], a)).status, 200, 'a card already drawn is served even when the visitor is over the limit');
+    assert.equal((await tripShareFetch(cards[2], b)).status, 200, 'another visitor can still have a new card drawn');
+    assert.equal((await s4request('GET', '/my-trip?stops=venue:1')).status, 200, 'pages are not affected');
+  } finally { Object.assign(app.TRIP_CARD_RATE, saved); app.tripCardRateReset(); }
 });
