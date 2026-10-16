@@ -9539,8 +9539,15 @@ const NAV_REFRESH_STYLE = `<style id="nav-refresh">
 .live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: #E11D48; animation: live-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
 @keyframes live-ping { 0% { transform: scale(1); opacity: 0.7; } 75%, 100% { transform: scale(2.8); opacity: 0; } }
 .nav-links a.nav-roam-now { font-weight: 800; white-space: nowrap; }
-/* Business login (2026-10-15): last in Discover, set apart from the visitor links. */
+/* Business login (2026-10-15): last in Discover, set apart from the visitor links. On phones it is its own
+   last menu item instead (nav-business-li), since owners rarely think to open Discover. */
 .nav-dropdown-panel a.nav-business-login { border-top: 1px solid rgba(42,32,25,0.12); margin-top: 4px; padding-top: 10px; font-size: 0.9em; opacity: 0.85; }
+#navLinks > li.nav-business-li { display: none; }
+@media (max-width: 940px) {
+  #navLinks > li.nav-business-li { display: block; }
+  #navLinks > li.nav-business-li > a { font-size: 0.92em; opacity: 0.85; }
+  .nav-dropdown-panel a.nav-business-login { display: none !important; }
+}
 @media (max-width: 940px) {
   #navHamburger { position: relative; }
   #navHamburger::before { content: ''; position: absolute; bottom: -1px; right: -5px; width: 9px; height: 9px; border-radius: 50%; background: #E11D48; box-shadow: 0 0 0 2px #fff; animation: live-glow 2s ease-in-out infinite; }
@@ -9590,6 +9597,9 @@ function withNavRefresh(headerHtml) {
   if (things) out = out.replace(things[0], NAV_THINGS_PANEL);
   // Roam Now on its own, right after Discover, so it is seen on every page.
   if (!out.includes('class="nav-roam-now"')) out = out.replace(/(\n\s*)<li><a href="\/hidden-gems"/, '$1<li><a class="nav-roam-now" href="/map"><span class="live-dot" aria-hidden="true"></span>Roam Now</a></li>$1<li><a href="/hidden-gems"');
+  // Phones: Business login as its own menu item, just above Favorites / the phone-only Build My Trip row (on computers it
+  // stays in Discover; only one of the two shows at a time).
+  if (!out.includes('class="nav-business-li"')) out = out.replace(/(\n\s*)(<li class="nav-links-(?:favorites|trip)">)/, '$1<li class="nav-business-li"><a href="/owner/login">Business login</a></li>$1$2');
   // After everything else the fragment carries (other header rules sit right after </header>).
   return `${out}\n${NAV_REFRESH_STYLE}`;
 }
@@ -29367,7 +29377,6 @@ function renderOwnerLoginPage() {
       <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">Forgot your password?</a></p>
     </form>
     <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there.
-    <br><strong>Forgot your password?</strong> <a href="/owner/forgot">Reset it here</a>.
     <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>
 <script>
 (function(){
@@ -30457,7 +30466,8 @@ function renderOwnerPage(found, token, pending) {
             <span class="op-second"${w[1] ? '' : ' hidden'}>and <input type="time" class="op-t" data-i="2" value="${escapeHtml(w2[0])}" aria-label="${OWNER_DAY_LABELS[d]} second range from"> to
             <input type="time" class="op-t" data-i="3" value="${escapeHtml(w2[1])}" aria-label="${OWNER_DAY_LABELS[d]} second range until"></span>
             <button type="button" class="op-add"${w[1] ? ' hidden' : ''}>+ second time</button>
-          </span>
+          </span>${d === 'mon' ? `
+          <span class="op-copy">Copy Monday to: <button type="button" data-copy="weekdays">Tue&ndash;Fri</button> <button type="button" data-copy="all">every day</button></span>` : ''}
         </div>`;
   }).join('');
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
@@ -30484,7 +30494,12 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-times { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   body.owner-page .op-times input { width: auto; min-width: 110px; }
   body.owner-page .op-day.is-off .op-times { opacity: 0.35; pointer-events: none; }
+  body.owner-page .op-done-login { display: block; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(42,32,25,0.12); }
+  body.owner-page .op-done-login[hidden] { display: none; }
   body.owner-page .op-add { background: none; border: 0; color: var(--ref-navy); font-weight: 700; cursor: pointer; padding: 4px; }
+  body.owner-page .op-copy { display: block; flex-basis: 100%; font-size: 0.84rem; color: rgba(42,32,25,0.7); margin-top: 6px; }
+  body.owner-page .op-copy button { background: var(--sand-deep, #EFE6D6); border: 0; border-radius: 999px; padding: 5px 12px; margin: 2px 4px 2px 0; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
+  body.owner-page .op-copy-done { font-weight: 700; color: #2E7D4F; }
   body.owner-page .op-hint { font-size: 0.82rem; color: rgba(42,32,25,0.62); margin: 4px 0 8px; }
   body.owner-page .lyv-error { font-size: 0.85rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
   body.owner-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
@@ -30521,7 +30536,7 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">Owner edit page</span>
       <h1>${escapeHtml(venue.name)}</h1>
-      <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : ' Keep this link private; anyone with it can suggest changes.'}</p>
+      <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : '<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span>'}</p>
       <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
       ${pendingNote}
       ${ownerActivityHtml(ownerVenueActivity(venue.id))}
@@ -30583,7 +30598,8 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opFormError" hidden></p>
       <button type="submit" class="venue-form-submit" id="opSubmit">Send changes</button>
     </form>
-    <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them shortly. You can come back to this page any time to send more.</div>
+    <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them, usually within a day.<span id="opDoneMail"${found.account ? '' : ' hidden'}> We&rsquo;ll email you when they&rsquo;re live.</span> You can come back any time to send more.${found.account ? '' : `
+      <span class="op-done-login" id="opDoneLogin"><strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.</span>`}</div>
     <h2 id="photos" style="margin-top:44px">Photos</h2>
     <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. ${found.account ? 'Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.' : 'We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.'}</p>
     ${(() => {
@@ -30667,6 +30683,23 @@ ${renderGolfHeaderHtml()}
     var add = row.querySelector('.op-add');
     add.addEventListener('click', function(){ row.querySelector('.op-second').hidden = false; add.hidden = true; });
   });
+  // "Copy Monday to" Tue-Fri or every day: same Closed tick, times and second time.
+  Array.prototype.forEach.call(document.querySelectorAll('.op-copy button'), function(b){
+    b.addEventListener('click', function(){
+      var list = rows(b.closest('[id]').id), mon = list[0], src = mon.querySelectorAll('.op-t');
+      var two = !mon.querySelector('.op-second').hidden && (src[2].value || src[3].value);
+      list.slice(1, b.getAttribute('data-copy') === 'all' ? 7 : 5).forEach(function(row){
+        row.querySelector('.op-off').checked = mon.querySelector('.op-off').checked;
+        var t = row.querySelectorAll('.op-t');
+        for (var i = 0; i < 4; i++) t[i].value = (i < 2 || two) ? src[i].value : '';
+        row.querySelector('.op-second').hidden = !two;
+        row.querySelector('.op-add').hidden = !!two;
+        syncRow(row);
+      });
+      var note = b.parentNode.querySelector('.op-copy-done') || b.parentNode.appendChild(document.createElement('span'));
+      note.className = 'op-copy-done'; note.textContent = ' Copied.';
+    });
+  });
   function week(id){
     var out = {}, bad = '', blank = '', any = false;
     rows(id).forEach(function(row){
@@ -30727,7 +30760,12 @@ ${renderGolfHeaderHtml()}
       .then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }); })
       .then(function(r){
         btn.disabled = false;
-        if (r.body && r.body.ok) { rememberName(document.getElementById('opName').value); rememberEmail(emailVal('opEmail')); form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
+        if (r.body && r.body.ok) {
+          rememberName(document.getElementById('opName').value); rememberEmail(emailVal('opEmail'));
+          if (emailVal('opEmail').trim()) document.getElementById('opDoneMail').hidden = false;
+          var pe = document.getElementById('ofEmail'); if (pe && emailVal('opEmail').trim()) pe.value = emailVal('opEmail');
+          var le = document.getElementById('olsEmail'); if (le && !le.value) le.value = emailVal('opEmail');
+          form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opEmailError', errs.contact_email);
@@ -30832,6 +30870,14 @@ ${renderGolfHeaderHtml()}
       if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); }
     }).catch(function(){ btn.disabled = false; show('ofFormError', 'Could not upload. Please check your connection and try again.'); });
   });
+  // "create a login" in the thank-you note opens the login box.
+  Array.prototype.forEach.call(document.querySelectorAll('a[href="#opLogin"]'), function(a){
+    a.addEventListener('click', function(e){
+      var d = document.getElementById('opLogin'); if (!d) return;
+      e.preventDefault(); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var f = document.getElementById(document.getElementById('olsEmail').value ? 'olsPassword' : 'olsEmail'); if (f) setTimeout(function(){ f.focus(); }, 400);
+    });
+  });
   var ls = document.getElementById('olsForm');
   if (ls) ls.addEventListener('submit', function(e){
     e.preventDefault(); show('olsEmailError', ''); show('olsPasswordError', ''); show('olsError', '');
@@ -30841,7 +30887,11 @@ ${renderGolfHeaderHtml()}
       .then(function(r){ return r.json(); })
       .then(function(j){
         b.disabled = false;
-        if (j && j.ok) { ls.style.display = 'none'; document.getElementById('olsDone').classList.add('show'); return; }
+        if (j && j.ok) {
+          ls.style.display = 'none'; document.getElementById('olsDone').classList.add('show');
+          ['opLinkNote', 'opDoneLogin'].forEach(function(id){ var el = document.getElementById(id); if (el) el.hidden = true; });
+          return;
+        }
         var errs = (j && j.errors) || {};
         show('olsEmailError', errs.email); show('olsPasswordError', errs.password);
         if (!errs.email && !errs.password) show('olsError', (j && j.error) || 'Please try again.');
