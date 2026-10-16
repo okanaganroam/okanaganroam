@@ -20755,3 +20755,86 @@ test('Owner follow-ups (2026-10-15): pending note says new changes are added; ev
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner event changes (2026-10-15): change or withdraw a waiting event; change (reviewed) or cancel (straight away) a live one', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Event Change Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'event-change-fixture' });
+  seasonInsert.run({ name: 'Event Change Other', type: 'cafe', hours: SEASON_WEEK, slug: 'event-change-other' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'event-change-fixture');
+  const other = app.findVenueBySlug('kelowna', 'cafe', 'event-change-other');
+  const token = app.createOwnerLink(v.id, { contact_email: 'events@example.com' }).url.split('/owner/')[1];
+  const otherToken = app.createOwnerLink(other.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, headers = {}) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.16.0.${ip++}`, ...headers }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const ev = (extra = {}) => ({ name: 'Bread Class', categories: ['workshops-classes'], description: 'Learn to bake bread with our head baker, all ages welcome.',
+    start_date: '2027-03-06', start_time: '10:00', end_time: '12:00', contact_name: 'Sam', contact_email: 'sam@example.com', started_at: Date.now() - 10000, ...extra });
+  const sent = [];
+  const before = lyvSent.length;
+  try {
+    // Waiting for review: a change edits it in place, withdraw takes it back.
+    const a = await post(`/owner/${token}/events`, ev());
+    assert.equal(a.status, 201, JSON.stringify(a.body));
+    let page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, new RegExp(`data-ev-change="${a.body.id}">Change</button> &middot; <button type="button" class="op-linkbtn" data-ev-cancel="${a.body.id}" data-ev-live="0">Withdraw`));
+    assert.match(page, /var ownerEvents = \{"\d+":\{"name":"Bread Class"/);
+    const ch = await post(`/owner/${token}/events`, ev({ change_of: a.body.id, start_time: '13:00', end_time: '15:00' }));
+    assert.equal(ch.status, 200, JSON.stringify(ch.body));
+    assert.equal(ch.body.updated, true);
+    assert.equal(db.prepare('SELECT start_time, status FROM event_submissions WHERE id = ?').get(a.body.id).start_time, '13:00');
+    assert.equal((await post(`/owner/${otherToken}/events/${a.body.id}/cancel`, {})).status, 404, 'not another venue');
+    assert.equal((await post(`/owner/${otherToken}/events`, ev({ change_of: a.body.id }))).status, 404);
+    const w = await post(`/owner/${token}/events/${a.body.id}/cancel`, {});
+    assert.equal(w.body.withdrawn, true);
+    assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /Event: Bread Class<\/strong>[\s\S]*?Withdrawn by you/);
+
+    // Live: approve it, then change it (waits for review) and approve the change.
+    const b = await post(`/owner/${token}/events`, ev({ name: 'Pastry Class', start_date: '2027-03-13' }));
+    const appr = await post(`/admin/event-submissions/${b.body.id}/approve`, { reviewer: 'dayton' }, { Authorization: `Bearer ${LYV_TOKEN}` });
+    assert.equal(appr.status, 200, JSON.stringify(appr.body));
+    const eventId = appr.body.event.id;
+    page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, new RegExp(`data-ev-cancel="${b.body.id}" data-ev-live="1">Cancel event`));
+    const c2 = await post(`/owner/${token}/events`, ev({ change_of: b.body.id, name: 'Pastry Class (afternoon)', start_date: '2027-03-13', start_time: '14:00', end_time: '16:00' }));
+    assert.equal(c2.status, 200, JSON.stringify(c2.body));
+    assert.ok(c2.body.change);
+    assert.equal(db.prepare('SELECT name FROM events WHERE id = ?').get(eventId).name, 'Pastry Class', 'unchanged until approved');
+    assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /Change waiting for review/);
+    assert.ok(lyvSent.slice(before).some((m) => /\[PENDING REVIEW\] Event change/.test(m._subject)));
+
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    const review = await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text());
+    assert.match(review, /Changes to live events/);
+    assert.match(review, /<td class="rv-new">Pastry Class \(afternoon\)<\/td>/);
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    const ok = await post(`/admin/review/eventchange/${c2.body.change}/approve`, {}, { Cookie: cookie });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(db.prepare('SELECT name FROM events WHERE id = ?').get(eventId).name, 'Pastry Class (afternoon)');
+    const occ = db.prepare("SELECT start_time, end_time FROM event_occurrences WHERE event_id = ? AND status = 'scheduled'").all(eventId);
+    assert.deepEqual(occ.map((o) => [o.start_time, o.end_time]), [['14:00', '16:00']]);
+    assert.ok(sent.some((m) => /Approved: the change to your event/.test(m.subject)));
+
+    // Cancel the live event: off What's On straight away, and we're told.
+    const cx = await post(`/owner/${token}/events/${b.body.id}/cancel`, {});
+    assert.equal(cx.body.cancelled, true, JSON.stringify(cx.body));
+    assert.equal(db.prepare('SELECT status FROM events WHERE id = ?').get(eventId).status, 'cancelled');
+    assert.ok(lyvSent.slice(before).some((m) => /\[LIVE\] Owner cancelled an event: Pastry Class \(afternoon\)/.test(m._subject)));
+    page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /Event: Pastry Class \(afternoon\)<\/strong>[\s\S]*?Cancelled/);
+    assert.doesNotMatch(page, new RegExp(`data-ev-cancel="${b.body.id}"`), 'no buttons once cancelled');
+    assert.equal((await post(`/owner/${token}/events`, ev({ change_of: b.body.id }))).status, 409);
+
+    // The other two fixes are on the page.
+    assert.match(page, /id="opDescCount"/);
+    assert.match(page, /Need to change your business name, address, menu or booking link, or social links\? Tell us here/);
+    assert.match(page, /function jumpToError\(scope\)/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

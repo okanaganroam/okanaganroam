@@ -878,4 +878,23 @@ for (const table of ['owner_change_requests', 'owner_photos']) {
   if (!cols.includes('contact_email')) db.exec(`ALTER TABLE ${table} ADD COLUMN contact_email TEXT`);
 }
 
+// Owner event changes (2026-10-15): an owner's change to an event that is
+// already live waits here for review; approving it updates the event.
+db.exec(`
+CREATE TABLE IF NOT EXISTS owner_event_changes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  submission_id INTEGER NOT NULL REFERENCES event_submissions(id),
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  data TEXT NOT NULL,
+  contact_email TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'superseded')),
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_owner_event_changes_status ON owner_event_changes (status, submitted_at);
+`);
+
 module.exports = db;
