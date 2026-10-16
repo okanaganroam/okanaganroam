@@ -21282,3 +21282,21 @@ test('Fishing photos (2026-10-16): new banner; fishing example photos exist in b
     }
   }
 });
+
+test('Camping photos (2026-10-16): example photos exist in both sizes; credited area photos exist', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const f of ['tent-lake', 'family-tents', 'campfire-lake', 'tent-sunrise', 'tent-night', 'tent-stars', 'rv-trees', 'caravan-river', 'rv-site', 'rv-meadow', 'glamping', 'rv-park']) {
+    for (const suffix of ['', '-800']) {
+      const rel = `public/images/outdoors/examples/camping-${f}-2610${suffix}.jpg`;
+      assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
+    }
+  }
+  const credits = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photo-credits.json'), 'utf8'));
+  const batch = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photo-camping-2026-10-16.json'), 'utf8'));
+  for (const v of batch.venues) {
+    const rel = v.set.image_url.split('?')[0];
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', rel)), `${rel} exists`);
+    assert.ok(credits[rel], `${rel} is credited`);
+  }
+});
