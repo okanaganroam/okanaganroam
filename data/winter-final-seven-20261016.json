@@ -1,0 +1,90 @@
+{
+  "reason": "User approved all seven previewed winter options, including disclosed older and unknown capture dates and the Crawford video still.",
+  "batch_id": "winter-final-seven-20261016",
+  "venues": [
+    {
+      "id": 1272,
+      "name": "Carmi Recreational Trails",
+      "region": "penticton",
+      "slug": "carmi-recreational-trails",
+      "expect": {
+        "image_url": "/images/hiking/venues/carmi-recreational-trails-20261016-b5.jpg?v=20261016h5live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/carmi-recreational-trails-20261016-winter-final.jpg?v=20261016winterfinal"
+      }
+    },
+    {
+      "id": 1220,
+      "name": "Johns Family Nature Conservancy Regional Park",
+      "region": "kelowna",
+      "slug": "johns-family-nature-conservancy-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261016-winter-final.jpg?v=20261016winterfinal"
+      }
+    },
+    {
+      "id": 1226,
+      "name": "Knox Mountain Park",
+      "region": "kelowna",
+      "slug": "knox-mountain-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update.jpg?v=20261016viewpointupdatelive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/knox-mountain-park-20261016-winter-final.jpg?v=20261016winterfinal"
+      }
+    },
+    {
+      "id": 1212,
+      "name": "Myra Canyon – Myra-Bellevue Provincial Park",
+      "region": "kelowna",
+      "slug": "myra-canyon-myra-bellevue-provincial-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261016-cycling.jpg?v=20261016cyclinglive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261016-winter-final.jpg?v=20261016winterfinal"
+      }
+    },
+    {
+      "id": 1320,
+      "name": "MNP Place",
+      "region": "kelowna",
+      "slug": "mnp-place",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mnp-place-20261016-winter-final.jpg?v=20261016winterfinal"
+      }
+    },
+    {
+      "id": 1334,
+      "name": "Vernon Snowmobile Association – Silver Star Trails",
+      "region": "silverstar",
+      "slug": "vernon-snowmobile-association-silver-star-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/vernon-snowmobile-association-silver-star-trails-20261016-winter-final.jpg?v=20261016winterfinal"
+      }
+    },
+    {
+      "id": 1278,
+      "name": "Crawford Trails – Myra-Bellevue Provincial Park",
+      "region": "kelowna",
+      "slug": "crawford-trails-myra-bellevue-provincial-park",
+      "expect": {
+        "image_url": "/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-2"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/crawford-trails-myra-bellevue-provincial-park-20261016-winter-final.jpg?v=20261016winterfinal"
+      }
+    }
+  ]
+}
