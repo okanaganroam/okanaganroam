@@ -1,0 +1,126 @@
+{
+  "reason": "User approved the third batch of ten visually reviewed hiking photos and explicitly requested deployment. Source permissions confirmed by user in chat.",
+  "batch_id": "hiking-photos-batch-03-2026-10-15",
+  "venues": [
+    {
+      "id": 1225,
+      "name": "Hardy Falls Regional Park",
+      "region": "peachland",
+      "slug": "hardy-falls-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/hardy-falls-regional-park-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1266,
+      "name": "KVR Trail – Naramata Bench (Little Tunnel & Adra Tunnel)",
+      "region": "naramata",
+      "slug": "kvr-trail-naramata-bench-little-tunnel-adra-tunnel",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kvr-trail-naramata-bench-little-tunnel-adra-tunnel-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1223,
+      "name": "Glen Canyon Regional Park",
+      "region": "west-kelowna",
+      "slug": "glen-canyon-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/glen-canyon-regional-park-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1215,
+      "name": "Tplaqín / Enderby Cliffs Provincial Park",
+      "region": "enderby",
+      "slug": "tplaqin-enderby-cliffs-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/tplaqin-enderby-cliffs-provincial-park-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1240,
+      "name": "SilverStar Mountain Resort",
+      "region": "silverstar",
+      "slug": "silverstar-mountain-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/silverstar-mountain-resort-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1255,
+      "name": "Swan Lake Nature Reserve Trail",
+      "region": "vernon",
+      "slug": "swan-lake-nature-reserve-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/swan-lake-nature-reserve-trail-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1269,
+      "name": "International Hike and Bike Trail",
+      "region": "oliver",
+      "slug": "international-hike-and-bike-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/international-hike-and-bike-trail-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1214,
+      "name": "Skaha Bluffs Provincial Park",
+      "region": "penticton",
+      "slug": "skaha-bluffs-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/skaha-bluffs-provincial-park-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1208,
+      "name": "Fintry Provincial Park",
+      "region": "west-kelowna",
+      "slug": "fintry-provincial-park",
+      "expect": {
+        "image_url": "/images/beaches/venues/west-kelowna-fintry-provincial-park.jpg?v=beach-photo-2"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/fintry-provincial-park-20261015-b3.jpg?v=20261015h3live"
+      }
+    },
+    {
+      "id": 1238,
+      "name": "Telemark Nordic Club",
+      "region": "west-kelowna",
+      "slug": "telemark-nordic-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/telemark-nordic-club-20261015-b3.jpg?v=20261015h3live"
+      }
+    }
+  ]
+}
