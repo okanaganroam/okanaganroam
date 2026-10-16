@@ -1,0 +1,100 @@
+{
+  "reason": "Owner replies to the October 2026 outreach (checked 2026-10-15): Nighthawk fall hours and season (Allison, Oct 15), Blue Mountain tasting room closed until spring (Kirsten Munro, Oct 15), Bistro Lapin Perdu price level (Michael Ziff, Oct 15: 'I don't consider us that high end'), Okanagan Bowling Club photo showed 10-pin bowling (Kevin & Kristina Cheale, Oct 15: they are 5-pin).",
+  "batch_id": "venue-replies-fixes-2026-10-15",
+  "venues": [
+    {
+      "id": 439,
+      "name": "Nighthawk Vineyards",
+      "region": "okanagan-falls",
+      "slug": "nighthawk-vineyards",
+      "expect": {
+        "description": "Nighthawk Vineyards offers an upscale, dog-friendly patio dinner overlooking Green Lake in Okanagan Falls, worth planning around. Gluten-free needs are fully accommodated: the gluten-free pear and brie pizza is good, so order it and bring the dog."
+      },
+      "set": {
+        "description": "Nighthawk Vineyards overlooks Green Lake in Okanagan Falls, and in season its patio serves an upscale, dog-friendly dinner (the gluten-free pear and brie pizza is good, so bring the dog). Fall wine shop hours are Saturday and Sunday, 11 a.m. to 4 p.m., until November 8. It opens again 12 to 3 p.m. on November 14 and 15 for A Very Nighthawk Christmas, then closes until spring. The restaurant is closed for the season."
+      },
+      "hours": {
+        "expected_current_hours": "{\"mon\":[[\"11:00\",\"17:00\"]],\"tue\":null,\"wed\":null,\"thu\":[[\"11:00\",\"18:00\"]],\"fri\":[[\"11:00\",\"18:00\"]],\"sat\":[[\"11:00\",\"18:00\"]],\"sun\":[[\"10:00\",\"18:00\"]]}",
+        "hours": {
+          "mon": [],
+          "tue": [],
+          "wed": [],
+          "thu": [],
+          "fri": [],
+          "sat": [
+            [
+              "11:00",
+              "16:00"
+            ]
+          ],
+          "sun": [
+            [
+              "11:00",
+              "16:00"
+            ]
+          ]
+        },
+        "hours_source": "venue_owner",
+        "hours_checked_at": "2026-10-15"
+      },
+      "season": {
+        "status": "open_until",
+        "until_date": "2026-11-15",
+        "reopens_date": null,
+        "source_url": "https://nighthawkvineyards.com/",
+        "checked_at": "2026-10-15"
+      }
+    },
+    {
+      "id": 763,
+      "name": "Vineyard Kitchen & Patio at Nighthawk Vineyards",
+      "region": "okanagan-falls",
+      "slug": "vineyard-kitchen-patio-at-nighthawk-vineyards",
+      "season": {
+        "status": "closed",
+        "until_date": null,
+        "reopens_date": null,
+        "source_url": "https://nighthawkvineyards.com/",
+        "checked_at": "2026-10-15"
+      }
+    },
+    {
+      "id": 819,
+      "name": "Blue Mountain Vineyard and Cellars",
+      "region": "okanagan-falls",
+      "slug": "blue-mountain-vineyard-and-cellars",
+      "expect": {
+        "description": "Blue Mountain Vineyard and Cellars is a reservation-only, family-owned winery overlooking the Okanagan Falls valley, specializing in cool-climate sparkling wines, chardonnays and terroir-driven pinot noirs. Tastings run Fridays and Saturdays only, so book ahead.",
+        "hours": "{\"mon\":[],\"tue\":[],\"wed\":[],\"thu\":[[\"12:00\",\"15:45\"]],\"fri\":[[\"12:00\",\"15:45\"]],\"sat\":[[\"12:00\",\"15:45\"]],\"sun\":[]}"
+      },
+      "set": {
+        "hours": null,
+        "description": "Blue Mountain Vineyard and Cellars is a family-owned winery overlooking the Okanagan Falls valley, specializing in cool-climate sparkling wines, chardonnays and terroir-driven pinot noirs. The tasting room is closed for tastings until spring, but you can still buy wine Monday to Friday, 11 a.m. to 3 p.m. Tastings are by reservation once it reopens."
+      }
+    },
+    {
+      "id": 70,
+      "name": "Bistro Lapin Perdu",
+      "region": "naramata",
+      "slug": "bistro-lapin-perdu",
+      "expect": {
+        "price": 4
+      },
+      "set": {
+        "price": 3
+      }
+    },
+    {
+      "id": 1498,
+      "name": "Okanagan Bowling Club (OBC)",
+      "region": "kelowna",
+      "slug": "okanagan-bowling-club-obc",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-bowling-club-5pin-pins.jpg?v=20261015"
+      }
+    }
+  ]
+}
