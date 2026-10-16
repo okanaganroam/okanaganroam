@@ -21420,7 +21420,7 @@ test('Combination guides (2026-10-16): /guide/<town>/<dog-friendly-patios> lists
   const mk = (i, extra) => app.createVenue({ name: `Combo Test ${i}`, slug: `combo-test-${i}`, region: 'peachland', type: 'winery', description: 'A test winery.', ...extra });
   const made = [];
   try {
-    for (let i = 0; i < 6; i += 1) made.push(mk(i, { dog_friendly: 1, patio: 1, lake_view: 1 }));
+    for (let i = 0; i < 6; i += 1) made.push(mk(i, { dog_friendly: 1, patio: 1, lake_view: 1, kid_friendly: i < 3 ? 1 : 0 }));
     made.push(mk(9, { dog_friendly: 1, patio: 0, lake_view: 1 }));
     const combo = app.GUIDE_COMBOS.find((c) => c.slug === 'dog-friendly-patios');
     assert.deepEqual(combo.badges, ['dog_friendly', 'patio']);
@@ -21440,6 +21440,14 @@ test('Combination guides (2026-10-16): /guide/<town>/<dog-friendly-patios> lists
       assert.match(fr.text, /Parmi les plus commentés/);
       assert.doesNotMatch(fr.text, /where your dog can come along|Among the most-reviewed/);
       if (process.env.DUMP_FR) require('node:fs').writeFileSync(process.env.DUMP_FR, fr.text);
+      assert.match(fr.text, /En bref/);
+      assert.doesNotMatch(fr.text, /At a glance|Popular searches|also have|Average rating/);
+      if (process.env.DUMP_EN) require('node:fs').writeFileSync(process.env.DUMP_EN, page.text);
+      assert.match(page.text, /At a glance/);
+      // Linked from the town page, the town's wineries page and the /guides index.
+      assert.match((await WINTER_GET(base, '/peachland')).text, /Popular searches in Peachland[\s\S]*href="\/guide\/peachland\/dog-friendly-patios"/);
+      assert.match((await WINTER_GET(base, '/peachland/wineries')).text, /href="\/guide\/peachland\/wineries-with-lake-views"/);
+      assert.match((await WINTER_GET(base, '/guides')).text, /href="\/guide\/peachland\/dog-friendly-patios"/);
       const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
       assert.match(sitemap, /https:\/\/okanaganroam\.com\/guide\/peachland\/dog-friendly-patios/);
     });
