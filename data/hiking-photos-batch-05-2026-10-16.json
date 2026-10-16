@@ -1,0 +1,210 @@
+{
+  "reason": "User approved deployment of all seventeen reviewed hiking photo selections.",
+  "batch_id": "hiking-photos-batch-05-2026-10-16",
+  "venues": [
+    {
+      "id": 1253,
+      "name": "Denison Lake Trail",
+      "region": "lumby",
+      "slug": "denison-lake-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/denison-lake-trail-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1232,
+      "name": "Pelmewash Parkway",
+      "region": "lake-country",
+      "slug": "pelmewash-parkway",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/pelmewash-parkway-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1222,
+      "name": "Mill Creek Regional Park",
+      "region": "kelowna",
+      "slug": "mill-creek-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mill-creek-regional-park-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1249,
+      "name": "Coldstream Ranchlands Trail",
+      "region": "coldstream",
+      "slug": "coldstream-ranchlands-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/coldstream-ranchlands-trail-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1245,
+      "name": "Mount Kobau",
+      "region": "osoyoos",
+      "slug": "mount-kobau",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mount-kobau-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1231,
+      "name": "Pincushion Mountain Trail",
+      "region": "peachland",
+      "slug": "pincushion-mountain-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/pincushion-mountain-trail-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1273,
+      "name": "Spectrum Lake Trail (Monashee Provincial Park)",
+      "region": "lumby",
+      "slug": "spectrum-lake-trail-monashee-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/spectrum-lake-trail-monashee-provincial-park-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1247,
+      "name": "Trepanier Creek Greenway Regional Park",
+      "region": "peachland",
+      "slug": "trepanier-creek-greenway-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/trepanier-creek-greenway-regional-park-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1272,
+      "name": "Carmi Recreational Trails",
+      "region": "penticton",
+      "slug": "carmi-recreational-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/carmi-recreational-trails-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1248,
+      "name": "Thomas Hayes Ecological Reserve Trails",
+      "region": "armstrong",
+      "slug": "thomas-hayes-ecological-reserve-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/thomas-hayes-ecological-reserve-trails-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1258,
+      "name": "McKinley Mountain Park",
+      "region": "kelowna",
+      "slug": "mckinley-mountain-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mckinley-mountain-park-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1251,
+      "name": "Camel's Hump",
+      "region": "lumby",
+      "slug": "camels-hump",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/camels-hump-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1259,
+      "name": "KLO Creek Regional Park",
+      "region": "kelowna",
+      "slug": "klo-creek-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/klo-creek-regional-park-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1219,
+      "name": "sntsk‘il’ntən–Black Mountain Regional Park",
+      "region": "kelowna",
+      "slug": "sntskilnten-black-mountain-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/sntskilnten-black-mountain-regional-park-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1270,
+      "name": "Ellis Ridge & Canyon View Trails",
+      "region": "penticton",
+      "slug": "ellis-ridge-canyon-view-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/ellis-ridge-canyon-view-trails-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1252,
+      "name": "Lumby Salmon Trail",
+      "region": "lumby",
+      "slug": "lumby-salmon-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/lumby-salmon-trail-20261016-b5.jpg?v=20261016h5live"
+      }
+    },
+    {
+      "id": 1436,
+      "name": "High Rim Trail",
+      "region": "kelowna",
+      "slug": "high-rim-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/high-rim-trail-20261016-b5.jpg?v=20261016h5live"
+      }
+    }
+  ]
+}

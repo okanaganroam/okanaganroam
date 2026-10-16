@@ -1,0 +1,309 @@
+[
+  {
+    "id": 1253,
+    "name": "Denison Lake Trail",
+    "file": "denison-lake.webp",
+    "author": "Alexis Desautels",
+    "capture_date": "2026-07-12",
+    "photo_display_date": "2026-07-13",
+    "source": "https://www.alltrails.com/explore/recording/morning-hike-at-denison-lake-trail-3c6380b",
+    "visually_reviewed": true,
+    "note": "Forest reflections across Denison Lake; photo attached to dated recorded hike.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "denison-lake-trail",
+    "region": "lumby",
+    "deployed_asset": "/images/hiking/venues/denison-lake-trail-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1232,
+    "name": "Pelmewash Parkway",
+    "file": "pelmewash-four-food-chiefs.webp",
+    "author": "Sally Quon / Featherstone Creative",
+    "capture_date": "2026-01",
+    "source": "https://featherstonecreative.wordpress.com/2026/01/29/oyama-january-2026/",
+    "visually_reviewed": true,
+    "note": "Four Food Chiefs public artwork along Pelmewash Parkway, photographed during the explicitly January 2026 trip.",
+    "dimensions": [
+      2048,
+      1361
+    ],
+    "slug": "pelmewash-parkway",
+    "region": "lake-country",
+    "deployed_asset": "/images/hiking/venues/pelmewash-parkway-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1222,
+    "name": "Mill Creek Regional Park",
+    "author": "Phil Ashman",
+    "capture_date": "2026-09-30",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-mill-creek-37a5cb6",
+    "file": "mill-creek.webp",
+    "visually_reviewed": true,
+    "note": "Full waterfall framed by mossy rocks, from a dated recorded hike.",
+    "dimensions": [
+      1152,
+      2048
+    ],
+    "slug": "mill-creek-regional-park",
+    "region": "kelowna",
+    "deployed_asset": "/images/hiking/venues/mill-creek-regional-park-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1249,
+    "name": "Coldstream Ranchlands Trail",
+    "author": "Catrina Yu",
+    "capture_date": "2026-06-28",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-coldstream-ranchland-trail-loop-144a38e",
+    "file": "coldstream-ranchlands.webp",
+    "visually_reviewed": true,
+    "note": "Grassland trail and valley/lake vista, dramatic cloudy sky.",
+    "dimensions": [
+      946,
+      2048
+    ],
+    "slug": "coldstream-ranchlands-trail",
+    "region": "coldstream",
+    "deployed_asset": "/images/hiking/venues/coldstream-ranchlands-trail-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1245,
+    "name": "Mount Kobau",
+    "file": "mount-kobau.webp",
+    "author": "Tanya McNeice",
+    "capture_date": "2026-06-18",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-mount-kobau-f6ba3ce",
+    "visually_reviewed": true,
+    "note": "Wide mountain summit panorama under clear skies.",
+    "dimensions": [
+      2048,
+      1536
+    ],
+    "slug": "mount-kobau",
+    "region": "osoyoos",
+    "deployed_asset": "/images/hiking/venues/mount-kobau-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1231,
+    "name": "Pincushion Mountain Trail",
+    "file": "pincushion-mountain.webp",
+    "author": "Mylene Torres",
+    "capture_date": "2026-10-12",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-pincushion-mountain-trail-0724b4a",
+    "visually_reviewed": true,
+    "note": "Summit flag, rocky lookout and Okanagan Lake under a clear blue sky.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "pincushion-mountain-trail",
+    "region": "peachland",
+    "deployed_asset": "/images/hiking/venues/pincushion-mountain-trail-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1273,
+    "name": "Spectrum Lake Trail",
+    "file": "spectrum-lake.webp",
+    "author": "Emma Stubbs",
+    "capture_date": "2026-06-22",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-monashee-day-1-trailhead-to-spectrum-lake-971fd2d",
+    "visually_reviewed": true,
+    "note": "Mountain and lake panorama; source image has strong saturation.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "spectrum-lake-trail-monashee-provincial-park",
+    "region": "lumby",
+    "deployed_asset": "/images/hiking/venues/spectrum-lake-trail-monashee-provincial-park-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1247,
+    "name": "Trepanier Creek Greenway Regional Park",
+    "file": "trepanier-creek.webp",
+    "author": "Sharmon Senay",
+    "capture_date": "2025-10-22",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-trepanier-creek-greenway-bd60b10",
+    "visually_reviewed": true,
+    "note": "Autumn colour in the creek valley.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "trepanier-creek-greenway-regional-park",
+    "region": "peachland",
+    "deployed_asset": "/images/hiking/venues/trepanier-creek-greenway-regional-park-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1272,
+    "name": "Carmi Recreational Trails",
+    "file": "carmi-trails.webp",
+    "author": "Nicole Hislop",
+    "capture_date": "2025-10-23",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-carmi-loop-0a9ffc9",
+    "visually_reviewed": true,
+    "note": "Inviting forest path with autumn aspens.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "carmi-recreational-trails",
+    "region": "penticton",
+    "deployed_asset": "/images/hiking/venues/carmi-recreational-trails-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1248,
+    "name": "Thomas Hayes Ecological Reserve Trails",
+    "file": "thomas-hayes.webp",
+    "author": "Hayden Gerlach",
+    "capture_date": "2026-04-25",
+    "source": "https://www.alltrails.com/explore/recording/morning-hike-87ea2ee",
+    "visually_reviewed": true,
+    "note": "Woodland steps leading through green forest.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "thomas-hayes-ecological-reserve-trails",
+    "region": "armstrong",
+    "deployed_asset": "/images/hiking/venues/thomas-hayes-ecological-reserve-trails-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1258,
+    "name": "McKinley Mountain Park",
+    "file": "mckinley-mountain.webp",
+    "author": "carter hillis",
+    "capture_date": "2025-10-18",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-mckinley-mountain-b8c546d",
+    "visually_reviewed": true,
+    "note": "Okanagan Lake framed by pine trees on an overcast day.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "mckinley-mountain-park",
+    "region": "kelowna",
+    "deployed_asset": "/images/hiking/venues/mckinley-mountain-park-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1251,
+    "name": "Camel’s Hump",
+    "file": "camels-hump.webp",
+    "author": "Ashley Dwan",
+    "capture_date": "2026-05-09",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-camel-s-hump-cb89561",
+    "visually_reviewed": true,
+    "note": "Rocky summit view over the forested ridge.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "camels-hump",
+    "region": "lumby",
+    "deployed_asset": "/images/hiking/venues/camels-hump-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1259,
+    "name": "KLO Creek Regional Park",
+    "file": "klo-creek.webp",
+    "author": "Kid Citizen",
+    "capture_date": "2026-07-29",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-angel-springs-via-klo-creek-9c5879c",
+    "visually_reviewed": true,
+    "note": "Canyon cliff walls framed by leafy forest.",
+    "dimensions": [
+      1536,
+      2048
+    ],
+    "slug": "klo-creek-regional-park",
+    "region": "kelowna",
+    "deployed_asset": "/images/hiking/venues/klo-creek-regional-park-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1219,
+    "name": "sntsk‘il’ntən–Black Mountain Regional Park",
+    "file": "black-mountain.webp",
+    "author": "Stephanie Oldford",
+    "capture_date": "2026-07-05",
+    "source": "https://www.alltrails.com/explore/recording/morning-run-21cf08e",
+    "visually_reviewed": true,
+    "note": "Open hillside panorama over Kelowna and Okanagan Lake.",
+    "dimensions": [
+      2048,
+      1536
+    ],
+    "slug": "sntskilnten-black-mountain-regional-park",
+    "region": "kelowna",
+    "deployed_asset": "/images/hiking/venues/sntskilnten-black-mountain-regional-park-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1270,
+    "name": "Ellis Ridge & Canyon View Trails",
+    "file": "ellis-ridge.webp",
+    "author": "Lin Schmoll",
+    "capture_date": "2026-10-06",
+    "source": "https://www.alltrails.com/explore/recording/evening-hike-at-canyon-view-and-ellis-ridge-trails-21c208a",
+    "visually_reviewed": true,
+    "note": "Lake and forest panorama from the ridge.",
+    "dimensions": [
+      2048,
+      1536
+    ],
+    "slug": "ellis-ridge-canyon-view-trails",
+    "region": "penticton",
+    "deployed_asset": "/images/hiking/venues/ellis-ridge-canyon-view-trails-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1252,
+    "name": "Lumby Salmon Trail",
+    "author": "Angela Pells",
+    "capture_date": "2026-10",
+    "source": "https://www.instagram.com/p/DeHdWfmGsSd/",
+    "file": "lumby-salmon-trail.jpg",
+    "visually_reviewed": true,
+    "note": "Clean fourth frame without text overlay. Caption describes photographing the current autumn birches; published October 5, 2026.",
+    "dimensions": [
+      3072,
+      4096
+    ],
+    "slug": "lumby-salmon-trail",
+    "region": "lumby",
+    "deployed_asset": "/images/hiking/venues/lumby-salmon-trail-20261016-b5.jpg",
+    "approved": true
+  },
+  {
+    "id": 1436,
+    "name": "High Rim Trail",
+    "file": "high-rim-trail.webp",
+    "author": "Jennifer L",
+    "capture_date": "2025-11-24",
+    "source": "https://www.alltrails.com/explore/recording/afternoon-hike-at-bear-valley-and-high-rim-loop-d1316c7",
+    "visually_reviewed": true,
+    "note": "Northern High Rim / Bear Valley loop: open grassland and Kalamalka Lake vista.",
+    "dimensions": [
+      2048,
+      1536
+    ],
+    "slug": "high-rim-trail",
+    "region": "kelowna",
+    "deployed_asset": "/images/hiking/venues/high-rim-trail-20261016-b5.jpg",
+    "approved": true
+  }
+]
