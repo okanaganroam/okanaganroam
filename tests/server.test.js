@@ -21365,6 +21365,12 @@ test('Combination guides (2026-10-16): /guide/<town>/<dog-friendly-patios> lists
       assert.match(page.text, /Combo Test 0/);
       assert.doesNotMatch(page.text, /Combo Test 9/, 'a place without a patio is not listed');
       assert.equal((await WINTER_GET(base, '/guide/peachland/not-a-combo')).status, 404);
+      const fr = await WINTER_GET(base, '/fr/guide/peachland/dog-friendly-patios');
+      assert.equal(fr.status, 200);
+      assert.match(fr.text, /<h1[^>]*>Terrasses qui accueillent les chiens à Peachland/);
+      assert.match(fr.text, /Parmi les plus commentés/);
+      assert.doesNotMatch(fr.text, /where your dog can come along|Among the most-reviewed/);
+      if (process.env.DUMP_FR) require('node:fs').writeFileSync(process.env.DUMP_FR, fr.text);
       const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
       assert.match(sitemap, /https:\/\/okanaganroam\.com\/guide\/peachland\/dog-friendly-patios/);
     });
