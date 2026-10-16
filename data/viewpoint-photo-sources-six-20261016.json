@@ -1,0 +1,121 @@
+[
+  {
+    "number": 1,
+    "id": 1351,
+    "name": "Dilworth Mountain Park",
+    "candidate": {
+      "id": 1351,
+      "index": "browser-0",
+      "url": "https://www.kelowna.ca/sites/files/1/styles/inside_banner/public/uploads/banners/inside/parks/_smh6617_web1.jpg?itok=bDsU5DKq",
+      "file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1351-browser-0.jpg"
+    },
+    "reason": "Recommended — lake and city framed by pines",
+    "credit": "Photo: City of Kelowna",
+    "website": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/dilworth-mountain-park",
+    "capture_date": "Unconfirmed; not verified within the past year",
+    "approved": true,
+    "source_page": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/dilworth-mountain-park",
+    "deployed_asset": "/images/hiking/venues/dilworth-mountain-park-20261016-viewpoint.jpg"
+  },
+  {
+    "number": 4,
+    "id": 1348,
+    "name": "Anarchist Mountain Lookout",
+    "candidate": {
+      "id": 1348,
+      "index": 5,
+      "url": "https://bcbirdtrail.ca/app/uploads/2024/02/10-Anarchist-Mountain-Viewpoint-Osoyoos-BC-Bird-Trail-1024x684.jpg",
+      "file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1348-05.jpg",
+      "width": 1024,
+      "height": 684
+    },
+    "reason": "Recommended — Osoyoos panorama",
+    "credit": "Photo: BC Bird Trail",
+    "website": "https://bcbirdtrail.ca/trails/osoyoos",
+    "capture_date": "Unconfirmed; not verified within the past year",
+    "approved": true,
+    "source_page": "https://bcbirdtrail.ca/trails/osoyoos",
+    "deployed_asset": "/images/hiking/venues/anarchist-mountain-lookout-20261016-viewpoint.jpg"
+  },
+  {
+    "number": 6,
+    "id": 1349,
+    "name": "Spotted Lake (kłlilx'w) Viewpoint",
+    "candidate": {
+      "id": 1349,
+      "index": 3,
+      "url": "https://images.squarespace-cdn.com/content/v1/5b5a35175ffd20fc6ce125cd/1548710279411-WOX12QPT10D1DD2RXZZD/IMG_8974.jpg",
+      "file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1349-03.jpg",
+      "width": 2500,
+      "height": 1534
+    },
+    "reason": "Recommended — visible lake spots with roadside foreground",
+    "credit": "Photo: Thompson Okanagan Tourism Association",
+    "website": "https://www.thompsonokanagan.com/content/discover-spotted-lake",
+    "capture_date": "Present in 2019 source asset folders; outside the one-year requirement",
+    "approved": true,
+    "source_page": "https://www.thompsonokanagan.com/content/discover-spotted-lake",
+    "deployed_asset": "/images/hiking/venues/spotted-lake-klilxw-viewpoint-20261016-viewpoint.jpg"
+  },
+  {
+    "number": 8,
+    "id": 1352,
+    "name": "Rocky Ridge Park (Turtle Mountain)",
+    "candidate": {
+      "id": 1352,
+      "index": 0,
+      "url": "https://www.rdno.ca/sites/default/files/styles/73_30/public/2021-06/Rocky-Ridge-Park-Vernon-British-Columbia.jpeg?itok=hD0Iea8A",
+      "file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1352-00.jpg",
+      "width": 730,
+      "height": 300
+    },
+    "reason": "Candidate — official park view; modest resolution and older image",
+    "credit": "Photo: Regional District of North Okanagan",
+    "website": "https://www.rdno.ca/parks-rec-culture/parks/rocky-ridge-park",
+    "capture_date": "Published in a 2021 image folder; outside the one-year requirement",
+    "approved": true,
+    "source_page": "https://www.rdno.ca/parks-rec-culture/parks/rocky-ridge-park",
+    "deployed_asset": "/images/hiking/venues/rocky-ridge-park-turtle-mountain-20261016-viewpoint.jpg"
+  },
+  {
+    "number": 9,
+    "id": 1284,
+    "name": "Mount Conkle Park",
+    "candidate": {
+      "id": 1284,
+      "index": "tourism-23",
+      "url": "https://res.cloudinary.com/spheremedia/image/upload/f_auto/q_auto/w_969,ar_3:2,c_auto/v1706049698/BCCH/mountain_biker_on_Mount_Conkle_overlooking_Summerland_rjstpi.avif",
+      "file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1284-tourism-23.jpg",
+      "alt": "A mountain biker on a trail on Mount Conkle overlooking Summerland",
+      "width": 969,
+      "height": 646
+    },
+    "reason": "Recommended — cyclist above the valley",
+    "credit": "Photo: Destination Summerland",
+    "website": "https://www.summerland.ca/parks-recreation/parks-trails",
+    "capture_date": "Unconfirmed; not verified within the past year",
+    "approved": true,
+    "source_page": "https://summerland.com/articles/exploring-mount-conkle-a-trail-runners-and-bikers-guide/",
+    "deployed_asset": "/images/hiking/venues/mount-conkle-park-20261016-viewpoint.jpg"
+  },
+  {
+    "number": 10,
+    "id": 1350,
+    "name": "Kalamalka Lake Lookout (Highway 97 Rest Area)",
+    "candidate": {
+      "id": 1350,
+      "index": "fallback-26",
+      "url": "https://images.squarespace-cdn.com/content/v1/5adf25b575f9ee4695083a1a/1608125851832-LP2I0DPQ673223O4285B/Kalamalaka-Lakeview-Drive-Lookout.jpeg",
+      "file": "/Users/dr/okanaganroam/output/viewpoint-photo-search/linked-page-audit/images/1350-fallback-26.jpg",
+      "source_page": "https://www.exploratoryglory.com/travel-blog/kalamalaka-lakeview-drive-lookout-vernon-bc"
+    },
+    "reason": "Fallback — actual lookout view; older photographer image",
+    "credit": "Photo: Exploratory Glory",
+    "website": "https://www.tourismvernon.com/blog/10-scenic-drives-trail-stops-vernons-best-dual-experiences",
+    "capture_date": "Source asset dates to 2020; outside the one-year requirement",
+    "approved": true,
+    "permission_note": "External photographer fallback: confirm that your existing permission includes Exploratory Glory before deployment.",
+    "source_page": "https://www.exploratoryglory.com/travel-blog/kalamalaka-lakeview-drive-lookout-vernon-bc",
+    "deployed_asset": "/images/hiking/venues/kalamalka-lake-lookout-highway-97-rest-area-20261016-viewpoint.jpg"
+  }
+]

@@ -1,0 +1,78 @@
+{
+  "reason": "User approved all six visually reviewed linked-page alternatives, including documented capture-date exceptions.",
+  "batch_id": "viewpoint-six-20261016",
+  "venues": [
+    {
+      "id": 1351,
+      "name": "Dilworth Mountain Park",
+      "region": "kelowna",
+      "slug": "dilworth-mountain-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/dilworth-mountain-park-20261016-viewpoint.jpg?v=20261016viewpointlive"
+      }
+    },
+    {
+      "id": 1348,
+      "name": "Anarchist Mountain Lookout",
+      "region": "osoyoos",
+      "slug": "anarchist-mountain-lookout",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/anarchist-mountain-lookout-20261016-viewpoint.jpg?v=20261016viewpointlive"
+      }
+    },
+    {
+      "id": 1349,
+      "name": "Spotted Lake (kłlilx'w) Viewpoint",
+      "region": "osoyoos",
+      "slug": "spotted-lake-klilxw-viewpoint",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/spotted-lake-klilxw-viewpoint-20261016-viewpoint.jpg?v=20261016viewpointlive"
+      }
+    },
+    {
+      "id": 1352,
+      "name": "Rocky Ridge Park (Turtle Mountain)",
+      "region": "vernon",
+      "slug": "rocky-ridge-park-turtle-mountain",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/rocky-ridge-park-turtle-mountain-20261016-viewpoint.jpg?v=20261016viewpointlive"
+      }
+    },
+    {
+      "id": 1284,
+      "name": "Mount Conkle Park",
+      "region": "summerland",
+      "slug": "mount-conkle-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mount-conkle-park-20261016-viewpoint.jpg?v=20261016viewpointlive"
+      }
+    },
+    {
+      "id": 1350,
+      "name": "Kalamalka Lake Lookout (Highway 97 Rest Area)",
+      "region": "coldstream",
+      "slug": "kalamalka-lake-lookout-highway-97-rest-area",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kalamalka-lake-lookout-highway-97-rest-area-20261016-viewpoint.jpg?v=20261016viewpointlive"
+      }
+    }
+  ]
+}
