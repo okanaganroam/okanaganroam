@@ -1,0 +1,18 @@
+{
+  "reason": "User approved deployment of all one reviewed hiking photo selections.",
+  "batch_id": "hiking-photos-ponds-city-20261016-2026-10-16",
+  "venues": [
+    {
+      "id": 1261,
+      "name": "Ponds Park & Trail",
+      "region": "kelowna",
+      "slug": "ponds-park-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/ponds-park-trail-20261016-ponds-city.jpg?v=20261016pondscitylive"
+      }
+    }
+  ]
+}
