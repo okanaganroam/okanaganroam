@@ -6739,14 +6739,38 @@ function getComboGuideVenues(region, combo) {
     .all(...[region, combo.type].filter(Boolean));
 }
 // Every town + combination page with enough places: { region, slug, count, lastmod }.
+// Town and category pages link these too, so the list is kept until a venue changes.
+let comboGuidesCache = null;
 function listComboGuides(minCount = MIN_COMBO_GUIDE_VENUES) {
+  let sig = '';
+  try { const r = db.prepare('SELECT COUNT(*) AS n, MAX(updated_at) AS m, MAX(id) AS i FROM venues').get(); sig = `${r.n}|${r.m}|${r.i}|${minCount}`; } catch (e) { sig = String(Math.random()); }
+  if (comboGuidesCache && comboGuidesCache.sig === sig) return comboGuidesCache.list.slice();
   const out = [];
   for (const combo of GUIDE_COMBOS) {
     const rows = db.prepare(`SELECT region, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE ${comboGuideWhere(combo)} GROUP BY region`)
       .all(...[combo.type].filter(Boolean));
     for (const r of rows) if (REGION_LABELS[r.region] && r.n >= minCount) out.push({ region: r.region, slug: combo.slug, count: r.n, lastmod: r.lastmod });
   }
-  return out;
+  comboGuidesCache = { sig, list: out };
+  return out.slice();
+}
+// "Popular searches in Oliver": a town's combination guides (only one kind of
+// place's on its category page), biggest first, linked from the town page,
+// the town category pages and the /guides index.
+function comboGuideLinksForTown(region, type = null, max = 14) {
+  return listComboGuides()
+    .filter((c) => c.region === region && (!type || GUIDE_COMBO_BY_SLUG[c.slug].type === type))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, max)
+    .map((c) => ({ ...c, label: comboGuideShortName(region, GUIDE_COMBO_BY_SLUG[c.slug]) }));
+}
+function comboGuideLinksSection(region, type = null) {
+  const list = comboGuideLinksForTown(region, type);
+  if (!list.length) return '';
+  return `<div class="related-section">
+        <h2>Popular searches in ${escapeHtml(REGION_LABELS[region])}</h2>
+        <p>${list.map((c) => `<a href="/guide/${region}/${c.slug}">${escapeHtml(c.label)}</a>`).join(', ')}</p>
+      </div>`;
 }
 function comboGuideHeading(region, combo) {
   const town = REGION_LABELS[region];
@@ -6761,6 +6785,41 @@ function comboGuidePopularHtml(venues) {
   const links = top.map((v) => `<a href="${escapeHtml(venuePagePath(v))}">${escapeHtml(v.name)}</a>`);
   return `\n  <p class="guide-popular">Among the most-reviewed: ${links.slice(0, -1).join(', ')} and ${links[links.length - 1]}.</p>`;
 }
+// "At a glance" (2026-10-16): facts from the page's own list -- the main kind
+// of place, what else these places offer, the average and the best rating --
+// so each town's page says something of its own.
+const COMBO_FACT_TEXT = {
+  live_music: '{0} also have live music.', kid_friendly: '{0} are also kid-friendly.', lake_view: '{0} also have a lake view.',
+  dog_friendly: '{0} also welcome dogs.', patio: '{0} also have a patio.', great_groups: '{0} are also good for groups.',
+  happy_hour: '{0} also have a happy hour.', vegetarian: '{0} also have vegetarian options.', open_late: '{0} are also open late.',
+};
+const COMBO_MOSTLY_TEXT = { restaurant: 'Mostly restaurants', winery: 'Mostly wineries', cafe: 'Mostly caf\u00e9s', brewery: 'Mostly breweries', pub: 'Mostly pubs', cocktail: 'Mostly cocktail lounges' };
+function comboGuideFactsHtml(combo, venues) {
+  const items = [];
+  const n = venues.length;
+  if (!combo.type) {
+    const tally = {};
+    for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
+    const [top, count] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0] || [];
+    if (top && COMBO_MOSTLY_TEXT[top] && count / n >= 0.5 && count < n) items.push(`${COMBO_MOSTLY_TEXT[top]} (${count} of ${n}).`);
+  }
+  const extras = Object.keys(COMBO_FACT_TEXT)
+    .filter((b) => !combo.badges.includes(b))
+    .map((b) => [b, venues.filter((v) => Number(v[b]) === 1).length])
+    .filter(([, c]) => c >= 2 && c < n)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2);
+  for (const [b, c] of extras) items.push(COMBO_FACT_TEXT[b].replace('{0}', String(c)));
+  const rated = venues.filter((v) => Number(v.rating) > 0 && Number(v.reviews) > 0);
+  if (rated.length >= 3) {
+    const avg = rated.reduce((a, v) => a + Number(v.rating), 0) / rated.length;
+    items.push(`Average rating ${avg.toFixed(1)}\u2605 across ${rated.length} rated places.`);
+    const best = rated.filter((v) => Number(v.reviews) >= 20).sort((a, b) => Number(b.rating) - Number(a.rating) || Number(b.reviews) - Number(a.reviews))[0];
+    if (best) items.push(`Highest rated: <a href="${escapeHtml(venuePagePath(best))}">${escapeHtml(best.name)}</a>, ${Number(best.rating).toFixed(1)}\u2605 from ${Number(best.reviews).toLocaleString('en-US')} reviews.`);
+  }
+  if (!items.length) return '';
+  return `\n  <div class="guide-facts"><p class="guide-facts-title">At a glance</p><ul>${items.map((t) => `<li>${t}</li>`).join('')}</ul></div>`;
+}
 function renderComboGuidePage(region, combo, venues, filter = null, now = new Date()) {
   const regionLabel = REGION_LABELS[region];
   const { heading, intro } = comboGuideHeading(region, combo);
@@ -6769,9 +6828,18 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
   const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
     .map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural }));
   const town = regionBannerPhoto(region);
-  const banner = (combo.type && CATEGORY_BANNER_IMAGES[combo.type])
-    || (GUIDE_BADGE_BANNERS[combo.badges[0]] && GUIDE_BADGE_BANNERS[combo.badges[0]]())
-    || (town ? { src: town.src, alt: town.alt, pos: town.pos, credit: town.credit } : FOOD_DRINK_HUB_BANNER);
+  // Banners (2026-10-16): lake-view pages and plain patio pages show the
+  // town's own photo (a real view of its lake or streets); patios with live
+  // music or a happy hour, dogs or kids show that; the rest their kind of place.
+  const townBanner = town ? { src: town.src, alt: town.alt, pos: town.pos, credit: town.credit } : null;
+  const badgeBanner = (b) => (GUIDE_BADGE_BANNERS[b] ? GUIDE_BADGE_BANNERS[b]() : null);
+  const other = combo.badges.find((b) => b !== 'patio');
+  const banner = (combo.badges.includes('lake_view') && townBanner)
+    || (combo.badges.includes('patio') && !combo.type && other && other !== 'lake_view' && badgeBanner(other))
+    || (combo.badges.includes('patio') && townBanner)
+    || (combo.type && CATEGORY_BANNER_IMAGES[combo.type])
+    || badgeBanner(combo.badges[0])
+    || townBanner || FOOD_DRINK_HUB_BANNER;
   const path = `/guide/${region}/${combo.slug}`;
   const others = listComboGuides().filter((c) => c.region === region && c.slug !== combo.slug).map((c) => GUIDE_COMBO_BY_SLUG[c.slug]);
   const singles = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && combo.badges.includes(c.badge)).map((c) => c.badge);
@@ -6800,10 +6868,14 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
     openNow: true,
     search: { label: 'Search these places', placeholder: 'Search by name or what you feel like...' },
     categoryContent: { all: { banner, heading, intro } },
-    heroExtraHtml: comboGuidePopularHtml(venues),
+    heroExtraHtml: comboGuidePopularHtml(venues) + comboGuideFactsHtml(combo, venues),
     extraHead: `<style id="guide-page">
   body.guide-page .guide-popular { margin: 8px 0 0; color: var(--ink-soft, #4a5560); }
-  body.guide-page .guide-popular a { color: var(--teal-deep, #1F5450); font-weight: 700; }
+  body.guide-page .guide-popular a, body.guide-page .guide-facts a { color: var(--teal-deep, #1F5450); font-weight: 700; }
+  body.guide-page .guide-facts { margin: 14px 0 0; padding: 12px 16px; border-radius: 12px; background: var(--paper, #fff); border: 1px solid var(--line, #d9e0e6); max-width: 720px; }
+  body.guide-page .guide-facts-title { margin: 0 0 4px; font-weight: 800; font-size: 0.82rem; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft, #4a5560); }
+  body.guide-page .guide-facts ul { margin: 0; padding-left: 18px; }
+  body.guide-page .guide-facts li { margin: 2px 0; }
   body.guide-page .guide-more { margin: 32px 0 8px; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
   body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
@@ -12131,6 +12203,7 @@ ${upcomingEvents.map((e) => {
           .join(', ')}</p>
       </div>`
     : '';
+  const comboLinksHtml = comboGuideLinksSection(region);
 
   // Destination mini-directory (2026-09-25): the same themed shell as
   // /food-drink and /local-favorites (homepage header, Trip tray, footer),
@@ -12166,7 +12239,7 @@ ${renderGolfHeaderHtml()}
   ${startHtml}
   </div>
   ${categorySections}
-  ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}
+  ${eventLinks ? `${eventLinks}\n  ` : ''}${guideLinks}${comboLinksHtml ? `\n  ${comboLinksHtml}` : ''}
   <p class="region-more"><a href="/destinations">See all Okanagan destinations &rarr;</a></p>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -14752,6 +14825,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
           .join(', ')}</p>
       </div>`
     : '';
+  const comboLinksHtml = region ? comboGuideLinksSection(region, type) : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -14772,7 +14846,7 @@ ${golfEngagementHeadHtml(type, true, 'category')}
     ? (sportsAlso.length ? '' : `<p class="subtitle">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`)
     : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} in ${escapeHtml(regionLabel)}.</p>
   ${cardsHtml}`}${sportsAlsoHtml ? '\n  ' + sportsAlsoHtml : ''}
-  ${guideLinks}
+  ${guideLinks}${comboLinksHtml ? `\n  ${comboLinksHtml}` : ''}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
@@ -17325,6 +17399,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
           .join(', ')}</p>
       </div>`
     : '';
+  const comboLinksHtml = region ? comboGuideLinksSection(region, type) : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -17359,7 +17434,7 @@ ${renderGolfHeaderHtml()}
   ${cardsHtml}
   <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
   </section>
-  ${guideLinks}
+  ${guideLinks}${comboLinksHtml ? `\n  ${comboLinksHtml}` : ''}
   ${valleyWide ? '<a class="cta" href="/food-drink">Back to all Food &amp; Drink</a>' : `<a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>`}
   </main>
   ${renderHomeFooterHTML(true)}
@@ -27468,12 +27543,15 @@ function seasonalGuideLink(now = new Date()) {
 function guidesByTownHtml() {
   const byTown = new Map();
   for (const c of listGuideCombos(MIN_GUIDE_VENUES)) { if (!byTown.has(c.region)) byTown.set(c.region, []); byTown.get(c.region).push(c); }
+  // A town with only combination guides (2026-10-16) is listed too.
+  for (const c of listComboGuides()) if (!byTown.has(c.region)) byTown.set(c.region, []);
   if (!byTown.size) return '';
   return `<section class="guides-group guides-by-town" id="by-town">
         <h2>By town</h2>
         <p class="guides-index-intro">Patios, happy hours, dog-friendly spots and more, town by town.</p>${[...byTown].map(([r, list], i) => `
         <details class="guides-town"${i === 0 ? ' open' : ''}><summary>${escapeHtml(REGION_LABELS[r])}</summary>
-          <p class="guides-town-links">${list.map((c) => `<a href="/guide/${r}/${c.badge}">${escapeHtml(guideBadgeHeading(r, c.badge).heading.slice(0, -(` in ${REGION_LABELS[r]}`).length))} <span>${c.count}</span></a>`).join('')}</p>
+          <p class="guides-town-links">${list.map((c) => `<a href="/guide/${r}/${c.badge}">${escapeHtml(guideBadgeHeading(r, c.badge).heading.slice(0, -(` in ${REGION_LABELS[r]}`).length))} <span>${c.count}</span></a>`).join('')}</p>${(() => { const more = comboGuideLinksForTown(r, null, 30); return more.length ? `
+          <p class="guides-town-links guides-town-combos">${more.map((c) => `<a href="/guide/${r}/${c.slug}">${escapeHtml(c.label)} <span>${c.count}</span></a>`).join('')}</p>` : ''; })()}
         </details>`).join('')}
       </section>`;
 }
