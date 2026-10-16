@@ -15951,6 +15951,8 @@ const EXAMPLE_ACTIVITY_FILES = Object.freeze({
   excampsunrise: 'camping-tent-sunrise', excampnight: 'camping-tent-night', excampstars: 'camping-tent-stars',
   excamprvtrees: 'camping-rv-trees', excampcaravan: 'camping-caravan-river', excamprvsite: 'camping-rv-site',
   excamprvmeadow: 'camping-rv-meadow', excampglamp: 'camping-glamping', excamprvpark: 'camping-rv-park',
+  exwatersail: 'water-sailboat', exwaterslide: 'water-waterslide', exwatertube: 'water-inner-tube',
+  exwaterwake: 'water-wakesurf', exwaterinflatable: 'water-inflatable-park', exwaterjetski: 'water-jet-ski', exwaterkayak: 'water-kayaks',
 });
 const FD_CARD_PHOTOS = Object.freeze({
   restaurant: ['/images/trip-v3/stops/stop-restaurant-480.jpg', '/images/trip-v3/stops/stop-restaurant-2-480.jpg', '/images/trip-v3/stops/stop-restaurant-3-480.jpg', '/images/food-drink/restaurants-800.jpg'],
@@ -16040,6 +16042,14 @@ const EXAMPLE_ACTIVITY_PHOTOS = Object.freeze({
   excamprvmeadow: { alt: 'Motorhomes parked on a grassy campground at sunset', pos: 65 },
   excampglamp: { alt: 'A furnished glamping tent lit up at dusk', pos: 50 },
   excamprvpark: { alt: 'Trailers and picnic tables at a lakeside RV park', pos: 55 },
+  // Water Activities (2026-10-16).
+  exwatersail: { alt: 'A sailboat on a lake below forested hills', pos: 55 },
+  exwaterslide: { alt: 'Friends riding a big tube down a waterslide', pos: 50 },
+  exwatertube: { alt: 'Floating in an inner tube on calm water', pos: 55 },
+  exwaterwake: { alt: 'A wakesurfer riding behind a boat', pos: 45 },
+  exwaterinflatable: { alt: 'An inflatable water-park slide on the lake', pos: 55 },
+  exwaterjetski: { alt: 'A personal watercraft speeding across the lake', pos: 50 },
+  exwaterkayak: { alt: 'Two paddlers in kayaks wearing life vests', pos: 50 },
 });
 const VENUE_EXAMPLE_PHOTOS = Object.freeze({
   1242: 'exzipline', 1243: 'exzipline', 1244: 'exropes', 1308: 'exropes',
@@ -16058,6 +16068,11 @@ const VENUE_EXAMPLE_PHOTOS = Object.freeze({
   1370: 'excamprvtrees', 1382: 'excamprvtrees', 1405: 'excamprvtrees',
   1374: 'excampcaravan', 1381: 'excampcaravan',
   1376: 'excamprvsite', 1379: 'excamprvmeadow', 1380: 'excampglamp', 1450: 'excamprvpark',
+  // Water Activities (2026-10-16): Holy Doodle, Splashdown, Shuswap River
+  // Float, Wakepilot, Splash BC Penticton and Peachland, Penticton Boat
+  // Rentals, Lakefront Marina (Osoyoos).
+  1446: 'exwatersail', 1448: 'exwaterslide', 1437: 'exwatertube', 1299: 'exwaterwake',
+  1291: 'exwaterinflatable', 1292: 'exwaterinflatable', 1445: 'exwaterjetski', 1442: 'exwaterkayak',
 });
 const FD_CARD_DOG_PHOTOS = Object.freeze({
   restaurant: '/images/trip-v3/stops/stop-dog-restaurant-480.jpg', cafe: '/images/trip-v3/stops/stop-dog-cafe-480.jpg',

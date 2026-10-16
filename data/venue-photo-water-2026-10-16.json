@@ -1,0 +1,138 @@
+{
+  "reason": "Water Activities photo pass 2026-10-16 (Dayton chose my picks): freely licensed Wikimedia Commons photos, credited on the page. The Penticton river channel, kayakers on Okanagan Lake in Kelowna and the downtown Kelowna marina show the actual place or activity; the rest show the lake or beach each business works from. Sources: 1288 https://commons.wikimedia.org/wiki/File:The_Canal_(19365542094).jpg (Fil.Al, CC BY 2.0, Wikimedia Commons); 1289 https://commons.wikimedia.org/wiki/File:Kelowna_Leisure_(3969448897).jpg (Kelowna09, CC BY 2.0, Wikimedia Commons (cropped)); 1441 https://commons.wikimedia.org/wiki/File:Kelowna_(BC,_Canada),_Kelowna_Downtown_Marina_--_2022_--_201928.jpg (Dietmar Rabich, CC BY-SA 4.0, Wikimedia Commons); 1296 https://commons.wikimedia.org/wiki/File:Reflections_on_Kalamalka_Lake_near_Oyama,_BC_(16032810838).jpg (Murray Foubister, CC BY-SA 2.0, Wikimedia Commons); 1295 https://commons.wikimedia.org/wiki/File:Nature's_colour_palette,_Kalamalka_Lake.jpg (marneejill, CC BY-SA 2.0, Wikimedia Commons); 1293 https://commons.wikimedia.org/wiki/File:Penticton,_BC_-_Okanagan_Beach_01.jpg (Joe Mabel, CC BY-SA 4.0, Wikimedia Commons); 1447 https://commons.wikimedia.org/wiki/File:Kelowna_City_Park.jpg (MissAlienous, CC BY-SA 4.0, Wikimedia Commons); 1294 https://commons.wikimedia.org/wiki/File:Okanagan_Lake_from_Naramata.jpg (Insiya Rasiwala-Finn, CC BY-SA 2.0, Wikimedia Commons); 1298 https://commons.wikimedia.org/wiki/File:Lake_Okanagan_-_Summerland_-_panoramio.jpg (Jack Borno, CC BY-SA 3.0, Wikimedia Commons); 1297 https://commons.wikimedia.org/wiki/File:Peachland,_British_Columbia.jpg (erwlas, CC BY 2.0, Wikimedia Commons); 1290 https://commons.wikimedia.org/wiki/File:Kelowna_City_Park,_Kelowna,_Okanagan_(48167893701).jpg (GoToVan, CC BY 2.0, Wikimedia Commons).",
+  "batch_id": "venue-photo-water-2026-10-16",
+  "venues": [
+    {
+      "id": 1288,
+      "name": "Coyote Cruises – Penticton Channel Float",
+      "region": "penticton",
+      "slug": "coyote-cruises-penticton-channel-float",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-river-channel.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1289,
+      "name": "Kelowna Paddle Centre",
+      "region": "kelowna",
+      "slug": "kelowna-paddle-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kayakers-okanagan-lake-kelowna.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1441,
+      "name": "Lakefront Sports Centre",
+      "region": "kelowna",
+      "slug": "lakefront-sports-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-downtown-marina-rentals.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1296,
+      "name": "Oyama General Store Paddle Rentals",
+      "region": "lake-country",
+      "slug": "oyama-general-store-paddle-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kalamalka-lake-oyama.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1295,
+      "name": "Kalavida Surf Shop",
+      "region": "coldstream",
+      "slug": "kalavida-surf-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kalamalka-lake-colours.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1293,
+      "name": "Pier Water Sports",
+      "region": "penticton",
+      "slug": "pier-water-sports",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-beach-penticton.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1447,
+      "name": "Luxury Lake Tours",
+      "region": "kelowna",
+      "slug": "luxury-lake-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boats-off-city-park-kelowna.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1294,
+      "name": "Sun n’ SUP",
+      "region": "naramata",
+      "slug": "sun-n-sup",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-lake-from-naramata.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1298,
+      "name": "SWR Boat & SUP Rentals",
+      "region": "summerland",
+      "slug": "swr-boat-and-sup-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-lake-summerland.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1297,
+      "name": "Peachland Beach Rentals",
+      "region": "peachland",
+      "slug": "peachland-beach-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-beach.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1290,
+      "name": "Splash BC Floating Water Park – Kelowna",
+      "region": "kelowna",
+      "slug": "splash-bc-floating-water-park-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hot-sands-beach-kelowna.jpg?v=20261016"
+      }
+    }
+  ]
+}
