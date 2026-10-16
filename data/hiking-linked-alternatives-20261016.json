@@ -1,0 +1,210 @@
+{
+  "reason": "User approved all 17 visually reviewed linked-page alternatives, including documented capture-date exceptions.",
+  "batch_id": "hiking-linked-alternatives-20261016",
+  "venues": [
+    {
+      "id": 1229,
+      "name": "BX Creek Trail & BX Falls",
+      "region": "vernon",
+      "slug": "bx-creek-trail-bx-falls",
+      "expect": {
+        "image_url": "/images/hiking/venues/bx-creek-trail-bx-falls-20261015-b2.jpg?v=20261015h2live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/bx-creek-trail-bx-falls-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1140,
+      "name": "Ellison Provincial Park",
+      "region": "vernon",
+      "slug": "ellison-provincial-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/ellison-provincial-park-20261015.jpg?v=20261015h1live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/ellison-provincial-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1208,
+      "name": "Fintry Provincial Park",
+      "region": "west-kelowna",
+      "slug": "fintry-provincial-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/fintry-provincial-park-20261015-b3.jpg?v=20261015h3live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/fintry-provincial-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1224,
+      "name": "Goats Peak Regional Park",
+      "region": "west-kelowna",
+      "slug": "goats-peak-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/goats-peak-regional-park-20261015-b2.jpg?v=20261015h2live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/goats-peak-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1220,
+      "name": "Johns Family Nature Conservancy Regional Park",
+      "region": "kelowna",
+      "slug": "johns-family-nature-conservancy-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261015.jpg?v=20261015h1live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1259,
+      "name": "KLO Creek Regional Park",
+      "region": "kelowna",
+      "slug": "klo-creek-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/klo-creek-regional-park-20261016-b5.jpg?v=20261016h5live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/klo-creek-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1258,
+      "name": "McKinley Mountain Park",
+      "region": "kelowna",
+      "slug": "mckinley-mountain-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/mckinley-mountain-park-20261016-b5.jpg?v=20261016h5live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mckinley-mountain-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1222,
+      "name": "Mill Creek Regional Park",
+      "region": "kelowna",
+      "slug": "mill-creek-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/mill-creek-regional-park-20261016-b5.jpg?v=20261016h5live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mill-creek-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1216,
+      "name": "Mission Creek Greenway Regional Park",
+      "region": "kelowna",
+      "slug": "mission-creek-greenway-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/mission-creek-greenway-regional-park-20261015-b2.jpg?v=20261015h2live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mission-creek-greenway-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1217,
+      "name": "Mission Creek Regional Park",
+      "region": "kelowna",
+      "slug": "mission-creek-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/mission-creek-regional-park-20261015-b4.jpg?v=20261015h4live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mission-creek-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1212,
+      "name": "Myra Canyon – Myra-Bellevue Provincial Park",
+      "region": "kelowna",
+      "slug": "myra-canyon-myra-bellevue-provincial-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261015-b2.jpg?v=20261015h2live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1246,
+      "name": "Rose Valley Regional Park",
+      "region": "west-kelowna",
+      "slug": "rose-valley-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/rose-valley-regional-park-20261015-b4.jpg?v=20261015h4live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/rose-valley-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1218,
+      "name": "Scenic Canyon Regional Park",
+      "region": "kelowna",
+      "slug": "scenic-canyon-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/scenic-canyon-regional-park-20261015.jpg?v=20261015h1live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/scenic-canyon-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1214,
+      "name": "Skaha Bluffs Provincial Park",
+      "region": "penticton",
+      "slug": "skaha-bluffs-provincial-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/skaha-bluffs-provincial-park-20261015-b3.jpg?v=20261015h3live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/skaha-bluffs-provincial-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1247,
+      "name": "Trepanier Creek Greenway Regional Park",
+      "region": "peachland",
+      "slug": "trepanier-creek-greenway-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/trepanier-creek-greenway-regional-park-20261016-b5.jpg?v=20261016h5live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/trepanier-creek-greenway-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1221,
+      "name": "Woodhaven Nature Conservancy Regional Park",
+      "region": "kelowna",
+      "slug": "woodhaven-nature-conservancy-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/woodhaven-nature-conservancy-regional-park-20261015-b2.jpg?v=20261015h2live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/woodhaven-nature-conservancy-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    },
+    {
+      "id": 1219,
+      "name": "sntsk‘il’ntən–Black Mountain Regional Park",
+      "region": "kelowna",
+      "slug": "sntskilnten-black-mountain-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/sntskilnten-black-mountain-regional-park-20261016-b5.jpg?v=20261016h5live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/sntskilnten-black-mountain-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      }
+    }
+  ]
+}
