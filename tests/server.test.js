@@ -20414,7 +20414,7 @@ test('Admin review page (2026-10-15): one sign-in, approve/reject everything in 
 
     const ev = await post(`/admin/review/event/${eventId}/reject`, { reason: 'Please add a ticket link' }, cookie);
     assert.equal(ev.status, 200, JSON.stringify(ev.body));
-    assert.equal(sent[2].to, 'review.owner@example.com', 'the venue login, not just the form email');
+    assert.deepEqual(sent.slice(2, 4).map((m) => m.to), ['sam@example.com', 'review.owner@example.com'], 'the sender and the venue login');
     assert.match(sent[2].subject, /your event "Review Fixture Jazz Night"/);
 
     // The owner portal shows the same results.
@@ -20427,10 +20427,134 @@ test('Admin review page (2026-10-15): one sign-in, approve/reject everything in 
     const api = await fetch(`${base}/admin/owner-changes/${c2.body.id}/reject`, { method: 'POST',
       headers: { Authorization: `Bearer ${LYV_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ reviewer: 'dayton', reason: 'Wrong number' }) }).then((r) => r.json());
     assert.equal(api.emailed, 'sent');
-    assert.match(sent[3].text, /Reason: Wrong number/);
+    assert.match(sent[4].text, /Reason: Wrong number/);
 
     const logout = await post('/admin/review/logout', {}, cookie);
     assert.match(logout.setCookie, /okr_admin=; Path=\/admin;.*Max-Age=0/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner emails (2026-10-15): link-only owners can leave an email and hear back; admins can fill in link emails', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Link Email Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'link-email-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'link-email-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie, headers = {}) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.10.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const admin = (path, body) => post(path, body, null, { Authorization: `Bearer ${LYV_TOKEN}` });
+  const sent = [];
+  try {
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /id="opEmail"/);
+    assert.match(page, /id="ofEmail"/);
+    const bad = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0164' }, contact_email: 'not an email', started_at: Date.now() - 10000 });
+    assert.equal(bad.status, 400);
+    assert.match(bad.body.errors.contact_email, /check your email/);
+    const ok = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0164' }, contact_email: ' Casey@Example.com ', started_at: Date.now() - 10000 });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal(db.prepare('SELECT contact_email FROM owner_change_requests WHERE id = ?').get(ok.body.id).contact_email, 'casey@example.com');
+    assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'casey@example.com', 'kept on the link');
+    assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /id="opEmail"[^>]*value="casey@example.com"/);
+
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    const r = await admin(`/admin/owner-changes/${ok.body.id}/approve`, { reviewer: 'dayton' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.emailed, 'sent');
+    assert.deepEqual(sent.map((m) => m.to), ['casey@example.com']);
+
+    // Filling in link emails: only where none is stored, unless replace.
+    seasonInsert.run({ name: 'Link Email Fixture Two', type: 'cafe', hours: SEASON_WEEK, slug: 'link-email-fixture-two' });
+    const v2 = app.findVenueBySlug('kelowna', 'cafe', 'link-email-fixture-two');
+    app.createOwnerLink(v2.id, {});
+    assert.equal((await post('/admin/owner-links/contacts', { contacts: [] })).status, 401);
+    const filled = await admin('/admin/owner-links/contacts', { contacts: [
+      { venue_id: v.id, email: 'other@example.com' }, { venue_id: v2.id, email: 'Two@Example.com' }, { venue_id: 999999, email: 'x@example.com' }, { venue_id: v2.id, email: 'nope' }] });
+    assert.deepEqual(filled.body, { updated: 1, already_set: 1, no_link: 1, invalid: 1 });
+    assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v2.id).contact_email, 'two@example.com');
+    assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'casey@example.com');
+    assert.equal((await admin('/admin/owner-links/contacts', { contacts: [{ venue_id: v.id, email: 'new@example.com' }], replace: true })).body.updated, 1);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner account settings (2026-10-15): change email and password, sign out other devices, remove a business', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Settings Fixture A', type: 'cafe', hours: SEASON_WEEK, slug: 'settings-fixture-a' });
+  seasonInsert.run({ name: 'Settings Fixture B', type: 'cafe', hours: SEASON_WEEK, slug: 'settings-fixture-b' });
+  const a = app.findVenueBySlug('kelowna', 'cafe', 'settings-fixture-a');
+  const b = app.findVenueBySlug('kelowna', 'cafe', 'settings-fixture-b');
+  const tokenA = app.createOwnerLink(a.id, {}).url.split('/owner/')[1];
+  const tokenB = app.createOwnerLink(b.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie, origin = base) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin, 'X-Real-IP': `10.11.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), cookie: (r.headers.get('set-cookie') || '').split(';')[0] }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
+  const sent = [];
+  try {
+    const pw = 'settings password one';
+    const c1 = (await post(`/owner/${tokenA}/account`, { email: 'settings@example.com', password: pw })).cookie;
+    await post(`/owner/${tokenB}/account`, { email: 'settings@example.com', password: pw });
+    const c2 = (await post('/owner/login', { email: 'settings@example.com', password: pw })).cookie;
+    await post(`/owner/${tokenA}/account`, { email: 'taken@example.com', password: 'another long password' });
+
+    assert.equal((await get('/owner/account/settings')).status, 302);
+    const page = await (await get('/owner/account/settings', c1)).text();
+    assert.match(page, /Account settings/);
+    assert.match(page, /signed in on 3 devices/);
+    assert.match(page, /Settings Fixture A[\s\S]*Remove from my login/);
+    assert.match(await (await get('/owner/account', c1)).text(), /href="\/owner\/account\/settings"/);
+
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    // Email
+    assert.equal((await post('/owner/account/email', { email: 'new@example.com', password: pw })).status, 401, 'signed out');
+    assert.equal((await post('/owner/account/email', { email: 'new@example.com', password: pw }, c1, 'https://evil.example')).status, 403);
+    assert.equal((await post('/owner/account/email', { email: 'new@example.com', password: 'wrong password!' }, c1)).status, 401);
+    assert.equal((await post('/owner/account/email', { email: 'Taken@example.com', password: pw }, c1)).status, 409);
+    const em = await post('/owner/account/email', { email: 'New.Settings@example.com', password: pw }, c1);
+    assert.equal(em.status, 200, JSON.stringify(em.body));
+    assert.equal(em.body.email, 'new.settings@example.com');
+    assert.equal(sent[0].to, 'settings@example.com', 'the old address is told');
+    assert.equal((await post('/owner/login', { email: 'settings@example.com', password: pw })).status, 401);
+    assert.equal((await post('/owner/login', { email: 'new.settings@example.com', password: pw })).status, 200);
+
+    // Password: other devices are signed out, this one stays in.
+    assert.equal((await post('/owner/account/password', { current: 'wrong password!', password: 'brand new password' }, c1)).status, 401);
+    assert.equal((await post('/owner/account/password', { current: pw, password: 'short' }, c1)).status, 400);
+    const pc = await post('/owner/account/password', { current: pw, password: 'brand new password' }, c1);
+    assert.equal(pc.status, 200, JSON.stringify(pc.body));
+    assert.equal((await get('/owner/account', c1)).status, 200);
+    assert.equal((await get('/owner/account', c2)).status, 302, 'the other device is signed out');
+    assert.equal(sent[1].subject, 'Your Okanagan Roam password was changed');
+    assert.equal((await post('/owner/login', { email: 'new.settings@example.com', password: 'brand new password' })).status, 200);
+
+    // Sign out everywhere else
+    const c3 = (await post('/owner/login', { email: 'new.settings@example.com', password: 'brand new password' })).cookie;
+    assert.equal((await post('/owner/account/signout-others', {}, c1)).status, 200);
+    assert.equal((await get('/owner/account', c3)).status, 302);
+    assert.equal((await get('/owner/account', c1)).status, 200);
+
+    // Remove a business from the login
+    assert.equal((await post(`/owner/account/venue/${b.id}/unlink`, {}, c1)).status, 200);
+    assert.equal((await get(`/owner/account/venue/${b.id}`, c1)).status, 404);
+    assert.equal((await post(`/owner/account/venue/${b.id}/unlink`, {}, c1)).status, 404);
+    assert.equal((await get(`/owner/account/venue/${a.id}`, c1)).status, 200);
+    assert.ok(db.prepare('SELECT 1 FROM venues WHERE id = ?').get(b.id), 'the listing itself stays');
   } finally {
     app.setOwnerEmailTransport(null);
     await new Promise((resolve) => srv.close(resolve));

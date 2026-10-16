@@ -11,6 +11,9 @@
 //   node scripts/owner-portal.js photo-approve <photo id> [--main|--not-main]
 //   node scripts/owner-portal.js photo-reject <photo id> "reason"   # also deletes the file
 //   node scripts/owner-portal.js photo-remove <photo id> "reason"   # take a live photo down (and delete it)
+//   node scripts/owner-portal.js contacts <file.csv> [--replace]  # save owner emails on links (CSV: venue_id,email)
+//
+// Day to day, review at https://okanaganroam.com/admin/review instead.
 //
 // Needs ENRICHMENT_ADMIN_TOKEN in the environment. OKR_BASE_URL overrides the target site.
 // Venue ids are in each listing's data (or ask Claude); request ids come from `list`.
@@ -21,7 +24,7 @@ const REVIEWER = process.env.OKR_REVIEWER || 'dayton';
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 function usage() {
-  console.error('Usage: node scripts/owner-portal.js link|revoke|list|approve|reject|photos|photo-approve|photo-reject|photo-remove ... (see the top of this file)');
+  console.error('Usage: node scripts/owner-portal.js link|revoke|list|approve|reject|photos|photo-approve|photo-reject|photo-remove|contacts ... (see the top of this file)');
   process.exit(1);
 }
 
@@ -126,6 +129,15 @@ function printRequest(r) {
     if (!Number.isInteger(id)) usage();
     const r = await call('POST', `/admin/owner-photos/${id}/remove`, { reviewer: REVIEWER, reason: args[1] || '' });
     console.log(`Removed photo #${id} from the site and deleted the file.${r.was_main ? ' It was the main photo; the listing shows its example photo again.' : ''}`);
+  } else if (cmd === 'contacts') {
+    if (!args[0]) usage();
+    const lines = require('fs').readFileSync(args[0], 'utf8').split(/\r?\n/).filter(Boolean);
+    const head = lines.shift().split(',').map((h) => h.trim().toLowerCase());
+    const vi = head.indexOf('venue_id'), ei = head.indexOf('email');
+    if (vi < 0 || ei < 0) { console.error('The CSV needs venue_id and email columns.'); process.exit(1); }
+    const contacts = lines.map((l) => l.split(',')).map((c) => ({ venue_id: Number(c[vi]), email: (c[ei] || '').trim() })).filter((c) => Number.isInteger(c.venue_id) && c.email);
+    const r = await call('POST', '/admin/owner-links/contacts', { contacts, replace: args.includes('--replace') });
+    console.log(`Saved ${r.updated} owner emails. Already had one: ${r.already_set}. No link for the venue: ${r.no_link}. Invalid rows: ${r.invalid}.`);
   } else {
     usage();
   }

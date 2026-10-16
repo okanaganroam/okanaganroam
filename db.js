@@ -865,4 +865,11 @@ CREATE TABLE IF NOT EXISTS owner_password_resets (
 );
 `);
 
+// Owner decision emails (2026-10-15): an owner using only their edit link can
+// leave an email on each update or photo so we can tell them the outcome.
+for (const table of ['owner_change_requests', 'owner_photos']) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes('contact_email')) db.exec(`ALTER TABLE ${table} ADD COLUMN contact_email TEXT`);
+}
+
 module.exports = db;
