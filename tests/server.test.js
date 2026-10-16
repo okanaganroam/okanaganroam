@@ -21077,3 +21077,17 @@ test('Venue photo gallery (2026-10-16): main photo plus approved owner photos op
   assert.equal((page.match(/class="vg-thumb"/g) || []).length, 3);
   assert.match(page, /aria-label="Next photo"/);
 }));
+
+test('Venue galleries (2026-10-16): every photo in data/venue-gallery.json exists and has a credit', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const g = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'venue-gallery.json'), 'utf8'));
+  for (const [id, photos] of Object.entries(g)) {
+    assert.match(id, /^\d+$/);
+    for (const p of photos) {
+      assert.match(p.src, /^\/images\/venues\/[a-z0-9-]+\.jpg$/, p.src);
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', p.src)), `${p.src} exists`);
+      assert.ok(p.credit && p.credit.length > 3, `${p.src} has a credit`);
+    }
+  }
+});
