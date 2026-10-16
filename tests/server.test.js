@@ -21532,3 +21532,19 @@ test('Plan screen: the markup the Share trip script reads is still produced by t
     assert.ok(src.includes(marker), `trip-planner-v3-page.js still has ${marker}`);
   }
 });
+
+test('Tours & Experiences photos (2026-10-16): example photos exist in both sizes; credited photos exist', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const [key, file] of Object.entries(app.EXAMPLE_ACTIVITY_FILES || {}).filter(([k]) => k.startsWith('tour'))) {
+    for (const suffix of ['', '-800']) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public/images/outdoors/examples', `${file}-2610${suffix}.jpg`)), `${key}: ${file}${suffix}`);
+  }
+  const credits = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photo-credits.json'), 'utf8'));
+  const batch = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photo-tours-2026-10-16.json'), 'utf8'));
+  for (const v of batch.venues) {
+    const rel = v.set.image_url.split('?')[0];
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', rel)), `${rel} exists`);
+    assert.ok(credits[rel], `${rel} is credited`);
+  }
+  assert.equal(app.venueHeroPhoto({ id: 1628, name: 'GottaGoat Farm', type: 'tour' }).src, '/images/outdoors/examples/tour-goat-2610.jpg');
+});
