@@ -1,0 +1,78 @@
+{
+  "reason": "User approved all ten photo options: six listing covers and four alternate assets.",
+  "batch_id": "hiking-photos-batch-04-2026-10-15",
+  "venues": [
+    {
+      "id": 1217,
+      "name": "Mission Creek Regional Park",
+      "region": "kelowna",
+      "slug": "mission-creek-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mission-creek-regional-park-20261015-b4.jpg?v=20261015h4live"
+      }
+    },
+    {
+      "id": 1150,
+      "name": "Kekuli Bay Provincial Park",
+      "region": "vernon",
+      "slug": "kekuli-bay-provincial-park",
+      "expect": {
+        "image_url": "/images/beaches/venues/vernon-kekuli-bay-provincial-park.jpg?v=beach-photo-2"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kekuli-bay-provincial-park-20261015-b4.jpg?v=20261015h4live"
+      }
+    },
+    {
+      "id": 1257,
+      "name": "Kal Crystal Waters Trail",
+      "region": "vernon",
+      "slug": "kal-crystal-waters-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kal-crystal-waters-trail-20261015-b4.jpg?v=20261015h4live"
+      }
+    },
+    {
+      "id": 1254,
+      "name": "Goose Lake Range Park",
+      "region": "vernon",
+      "slug": "goose-lake-range-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/goose-lake-range-park-20261015-b4.jpg?v=20261015h4live"
+      }
+    },
+    {
+      "id": 1246,
+      "name": "Rose Valley Regional Park",
+      "region": "west-kelowna",
+      "slug": "rose-valley-regional-park",
+      "expect": {
+        "image_url": "/images/sports/venues/west-kelowna-rose-valley-regional-park.jpg?v=sports-photo-2"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/rose-valley-regional-park-20261015-b4.jpg?v=20261015h4live"
+      }
+    },
+    {
+      "id": 1213,
+      "name": "Okanagan Mountain Provincial Park",
+      "region": "kelowna",
+      "slug": "okanagan-mountain-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/okanagan-mountain-provincial-park-20261015-b4.jpg?v=20261015h4live"
+      }
+    }
+  ]
+}
