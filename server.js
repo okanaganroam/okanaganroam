@@ -21869,7 +21869,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     : '';
 
   const guideLinks = fr ? '' : featuredInGuidesHtml(`${venue.region}/${venue.slug}`) + (venueGuidePages.length
-    ? `<p class="venue-meta">Also see: ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}">${escapeHtml(BADGE_LABELS[c.badge].title)} in ${escapeHtml(regionLabel)}</a>`).join(', ')}</p>`
+    ? `<p class="venue-meta venue-more-in" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px"><span>More in ${escapeHtml(regionLabel)}:</span> ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}" aria-label="${escapeHtml(BADGE_LABELS[c.badge].title)} places in ${escapeHtml(regionLabel)}" style="display:inline-block;padding:3px 10px;border:1px solid rgba(42,107,103,0.35);border-radius:999px;text-decoration:none;font-weight:700;font-size:.82rem">${escapeHtml(BADGE_LABELS[c.badge].title)}</a>`).join(' ')}</p>`
     : '');
 
   // Back-link to the venue's regional category page (2026-09-19), only
@@ -21899,8 +21899,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
     { name: label.plural, href: `/${venue.region}/${catSlug}` },
     { name: venue.name },
   ])}
-  ${hasFrench ? `<p class="venue-lang-switch" style="margin:-4px 0 10px;font-size:.92rem">${fr ? `<a href="${venuePagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${venuePagePath(venue, 'fr')}" hreflang="fr" lang="fr">Fran\u00e7ais</a>`}</p>` : ''}
-  ${venueBackLink}
+  <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">${venueBackLink}${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${venuePagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${venuePagePath(venue, 'fr')}" hreflang="fr" lang="fr">Fran\u00e7ais</a>`}</p>` : ''}</div>
   ${imageHtml}
   <div class="venue-layout">
   <div class="venue-main">
