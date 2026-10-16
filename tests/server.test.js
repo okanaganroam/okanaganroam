@@ -20886,6 +20886,8 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
   try {
     const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
     assert.match(page, /id="opBizName" maxlength="100" value="Links Fixture Cafe"/);
+    assert.match(page, /<details class="op-fold" id="opLinksBox">\s*<summary><span class="lyv-section-label">Name, address &amp; links<\/span>/, 'folded by default');
+    assert.match(page, /var fold = first\.closest\('details'\); if \(fold\) fold\.open = true;/, 'opens itself to show an error');
     assert.match(page, /id="opInstagram"[^>]*placeholder="@yourbusiness"/);
     // Bad input is refused with a clear message.
     const bad = await send({ instagram_url: 'not an instagram!', facebook_url: 'twitter.com/x', address: 'abc', name: 'x' });
