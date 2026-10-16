@@ -21002,3 +21002,31 @@ test('Email me my edit link (2026-10-15): a fresh link to the email on file, the
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner accessibility (2026-10-15): errors announce and tie to their box, description has a label, buttons say Sending…', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'A11y Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'a11y-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'a11y-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.doesNotMatch(page, /<p class="lyv-error" id="/, 'every error message has role=alert');
+    assert.match(page, /<p class="lyv-error" role="alert" id="opDescriptionError" hidden><\/p>/);
+    assert.match(page, /<p class="lyv-section-label" id="opDescriptionLabel">Description<\/p>/);
+    assert.match(page, /<textarea id="opDescription"[^>]*aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">/);
+    assert.match(page, /input\.setAttribute\('aria-invalid', 'true'\)/);
+    assert.match(page, /\.venue-form-submit:disabled::after \{ content: 'Sending…';/);
+    for (const p of ['/owner/login', '/owner/forgot', '/owner/link']) {
+      const html = await fetch(`${base}${p}`).then((r) => r.text());
+      assert.doesNotMatch(html, /<p class="lyv-error" id="/, p);
+      assert.match(html, /role="alert"/, p);
+      assert.match(html, /#olSubmit:disabled::after, body\.owner-page #olsSubmit:disabled::after \{ content: 'Signing in…'; \}/, p);
+    }
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
