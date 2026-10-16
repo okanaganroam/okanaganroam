@@ -1,0 +1,366 @@
+{
+  "reason": "Tours & Experiences photo pass 2026-10-16 (Dayton chose my picks): freely licensed Wikimedia Commons photos, credited on the page. The Kettle Valley Steam Railway, Kelowna Downtown Marina, Eldorado’s piers, Gyro Beach (Fun 4 Rent) and the Okanagan Rail Trail (Pedego Oyama) show the actual place; wine tours show vineyards in the area they tour; the rest the lake, beach or town they run from. Three reuse photos already on the site.",
+  "batch_id": "venue-photo-tours-2026-10-16",
+  "venues": [
+    {
+      "id": 1576,
+      "name": "Bare Wine Tours",
+      "region": "kelowna",
+      "slug": "bare-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-vineyards-okanagan-lake.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1577,
+      "name": "Toast the Okanagan Wine Tours",
+      "region": "kelowna",
+      "slug": "toast-the-okanagan-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/quails-gate-winery-west-kelowna.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1579,
+      "name": "Cheers! Okanagan Tours and Transportation",
+      "region": "kelowna",
+      "slug": "cheers-okanagan-tours-and-transportation",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-vineyards-hillside.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1581,
+      "name": "Signature Connections (formerly Kelowna Concierge)",
+      "region": "kelowna",
+      "slug": "signature-connections-formerly-kelowna-concierge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mission-hill-winery-grapes.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1587,
+      "name": "A Grape Experience Wine Tours",
+      "region": "kelowna",
+      "slug": "a-grape-experience-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/quails-gate-vineyards.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1591,
+      "name": "Wicked Wine Tours",
+      "region": "kelowna",
+      "slug": "wicked-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-lake-from-quails-gate.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1593,
+      "name": "Canadian Craft Tours (Kelowna)",
+      "region": "kelowna",
+      "slug": "canadian-craft-tours-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mission-hill-winery-arches.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1771,
+      "name": "Vine49 Wine Tours",
+      "region": "kelowna",
+      "slug": "vine49-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/quails-gate-winery-building.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1610,
+      "name": "Elite Mile Shuttle & Wine Tours",
+      "region": "vernon",
+      "slug": "elite-mile-shuttle-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gray-monk-vineyards-okanagan-lake.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1595,
+      "name": "Grape Friends Lounge & Tours",
+      "region": "penticton",
+      "slug": "grape-friends-lounge-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/naramata-bench-wine-tasting.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1597,
+      "name": "Grape Escapes Wine Tours",
+      "region": "penticton",
+      "slug": "grape-escapes-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/naramata-vineyards.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1606,
+      "name": "Top Cat Tours",
+      "region": "penticton",
+      "slug": "top-cat-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/naramata-wineries-lake-view.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1596,
+      "name": "Grape Savvy Trolley Co",
+      "region": "penticton",
+      "slug": "grape-savvy-trolley-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vines-over-okanagan-lake-naramata.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1599,
+      "name": "DeVino Wine Tours",
+      "region": "oliver",
+      "slug": "devino-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/burrowing-owl-black-sage-road.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1604,
+      "name": "South Okanagan Tours",
+      "region": "oliver",
+      "slug": "south-okanagan-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-hills-vineyard-oliver.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1602,
+      "name": "Swiws Spirit Tours",
+      "region": "osoyoos",
+      "slug": "swiws-spirit-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-vineyards-and-lake.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1607,
+      "name": "Corks & Cactus Tours",
+      "region": "osoyoos",
+      "slug": "corks-cactus-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-desert-vineyard.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1580,
+      "name": "Smile Cycle Tours",
+      "region": "kelowna",
+      "slug": "smile-cycle-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-downtown-waterfront.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1601,
+      "name": "Epic Cycling",
+      "region": "penticton",
+      "slug": "epic-cycling",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/naramata-bench-view.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1793,
+      "name": "Pedego Electric Bikes Oyama",
+      "region": "lake-country",
+      "slug": "pedego-electric-bikes-oyama",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-rail-trail-oyama.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1637,
+      "name": "Eldorado Yacht Club",
+      "region": "kelowna",
+      "slug": "eldorado-yacht-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/eldorado-piers-kelowna.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1802,
+      "name": "Fun 4 Rent (Rent4Fun)",
+      "region": "osoyoos",
+      "slug": "fun-4-rent-rent4fun",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gyro-beach-osoyoos.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1600,
+      "name": "Kettle Valley Steam Railway",
+      "region": "summerland",
+      "slug": "kettle-valley-steam-railway",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kettle-valley-steam-railway-locomotive.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1605,
+      "name": "AnReal Travel Walking Tours",
+      "region": "penticton",
+      "slug": "anreal-travel-walking-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-peach-plaza.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1615,
+      "name": "Gostlin Keefer Lake Lodge – Catskiing",
+      "region": "lumby",
+      "slug": "gostlin-keefer-lake-lodge-catskiing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/monashee-mountains-winter.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1636,
+      "name": "Kelowna Downtown Marina",
+      "region": "kelowna",
+      "slug": "kelowna-downtown-marina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-downtown-marina-rentals.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1770,
+      "name": "Okanagan Lake Boat Rentals",
+      "region": "kelowna",
+      "slug": "okanagan-lake-boat-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-downtown-marina-rentals.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1822,
+      "name": "Turtle Bay Marina Boat Rentals",
+      "region": "lake-country",
+      "slug": "turtle-bay-marina-boat-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wood-lake-shore-lake-country.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1608,
+      "name": "Wake the Lake Penticton",
+      "region": "penticton",
+      "slug": "wake-the-lake-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/skaha-lake-park-penticton.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1723,
+      "name": "Tiki Water Bikes (Peachland)",
+      "region": "peachland",
+      "slug": "tiki-water-bikes-peachland",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-beach.jpg?v=20261016"
+      }
+    }
+  ]
+}
