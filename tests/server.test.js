@@ -20954,3 +20954,51 @@ test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar an
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Email me my edit link (2026-10-15): a fresh link to the email on file, the old one stops working; small-phone layout', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'New Link Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'new-link-fixture' });
+  seasonInsert.run({ name: 'New Link Fixture Two', type: 'cafe', hours: SEASON_WEEK, slug: 'new-link-fixture-two' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'new-link-fixture');
+  const v2 = app.findVenueBySlug('kelowna', 'cafe', 'new-link-fixture-two');
+  const oldToken = app.createOwnerLink(v.id, { contact_email: 'Owner@NewLink.example' }).url.split('/owner/')[1];
+  app.createOwnerLink(v2.id, { contact_email: 'owner@newlink.example' });
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (body) => fetch(`${base}/owner/link`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.19.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const sent = [];
+  try {
+    assert.match(await fetch(`${base}/owner/link`).then((r) => r.text()), /Get your edit link[\s\S]*Email me my link/);
+    assert.match(await fetch(`${base}/owner/login`).then((r) => r.text()), /Can&rsquo;t find it\? <a href="\/owner\/link">Email me a new link<\/a>/);
+    assert.match(await fetch(`${base}/owner/not-a-real-token-123`).then((r) => r.text()), /href="\/owner\/link"><strong>Email me a new link/);
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    // Unknown email: same answer, nothing sent.
+    assert.deepEqual((await post({ email: 'nobody@example.com' })).body, { ok: true });
+    assert.equal(sent.length, 0);
+    // Known email (any case): one email listing both businesses with fresh links.
+    assert.deepEqual((await post({ email: 'OWNER@newlink.example' })).body, { ok: true });
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, 'owner@newlink.example');
+    assert.equal(sent[0].subject, 'Your Okanagan Roam edit links');
+    const urls = sent[0].text.match(/https:\/\/okanaganroam\.com\/owner\/[A-Za-z0-9_-]{20,}/g);
+    assert.equal(urls.length, 2);
+    assert.match(sent[0].text, /New Link Fixture: https/);
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 404, 'the old link stops working');
+    const fresh = urls.map((u) => u.split('/owner/')[1]);
+    const statuses = await Promise.all(fresh.map((t) => fetch(`${base}/owner/${t}`).then((r) => r.status)));
+    assert.deepEqual(statuses, [200, 200]);
+    const page = await fetch(`${base}/owner/${fresh[0]}`).then((r) => r.text());
+    assert.match(page, /@media \(max-width: 480px\) \{ body\.owner-page \.form-row \{ grid-template-columns: 1fr; \} \}/);
+    assert.match(page, /body\.owner-page \.form-row > \* \{ min-width: 0; \}/);
+    // At most 3 per hour per email.
+    await post({ email: 'owner@newlink.example' }); await post({ email: 'owner@newlink.example' }); await post({ email: 'owner@newlink.example' });
+    assert.equal(sent.length, 3);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

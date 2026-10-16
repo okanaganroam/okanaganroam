@@ -29620,7 +29620,7 @@ function renderOwnerLoginPage() {
       <button type="submit" class="venue-form-submit" id="olSubmit">Sign in</button>
       <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">Forgot your password?</a></p>
     </form>
-    <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there.
+    <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
     <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>
 <script>
 (function(){
@@ -29913,6 +29913,92 @@ async function handleOwnerForgot(req, res) {
   return sendSubmissionResponse(res, 200, { ok: true, direct: !!ownerDirectEmail() });
 }
 
+// ---------- "Email me my edit link" (2026-10-15) ----------
+//
+// /owner/link: an owner who can't find the private link we emailed enters the
+// email we have on file for their business (venue_owner_links.contact_email).
+// For each business with that email we make a fresh link (the old one stops
+// working) and email it straight to that address. The page says the same thing
+// whether or not the email is on file. At most 3 requests per email per hour.
+const OWNER_NEW_LINK_PATH = '/owner/link';
+const ownerNewLinkRecent = new Map();
+
+function ownerNewLinkEmailText(items) {
+  return ['Hi,', '', items.length === 1
+    ? `Here's a new private link to update ${items[0].name} on Okanagan Roam:`
+    : 'Here are new private links to update your businesses on Okanagan Roam:',
+  '', ...items.map((it) => (items.length === 1 ? it.url : `${it.name}: ${it.url}`)), '',
+  'No password needed. Keep the link private; anyone with it can suggest changes. Any older link we sent you no longer works.',
+  '', 'Tip: on that page you can create a login, so next time you can sign in at https://okanaganroam.com/owner/login instead.',
+  '', 'If you didn’t ask for this, you can ignore this email.', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n');
+}
+
+async function handleOwnerNewLink(req, res) {
+  const body = await readOwnerJson(req, res, ['email']);
+  if (!body) return;
+  const email = validOwnerEmail(body.email);
+  if (!email) return sendSubmissionResponse(res, 400, { ok: false, errors: { email: 'Please enter the email we have for your business.' } });
+  const now = Date.now();
+  const recent = (ownerNewLinkRecent.get(email) || []).filter((t) => now - t < 3600000);
+  const venues = db.prepare(`SELECT v.id, v.name FROM venue_owner_links l JOIN venues v ON v.id = l.venue_id
+    WHERE LOWER(l.contact_email) = ? AND v.redirect_to IS NULL ORDER BY v.name LIMIT 10`).all(email);
+  if (venues.length && recent.length < 3) {
+    recent.push(now); ownerNewLinkRecent.set(email, recent);
+    const items = [];
+    for (const v of venues) {
+      const r = createOwnerLink(v.id, { reset: true });
+      if (r.ok) items.push({ name: v.name, url: r.url });
+    }
+    const direct = ownerDirectEmail();
+    try {
+      if (items.length && direct) {
+        await direct({ to: email, subject: items.length === 1 ? `Your edit link for ${items[0].name}` : 'Your Okanagan Roam edit links', text: ownerNewLinkEmailText(items) });
+      } else if (items.length) {
+        await venueSubmissionTransport({ _subject: `[ACTION] Edit link request: ${email}`, _template: 'table', _captcha: 'false',
+          'What to do': `Forward the email below to ${email} from info@okanaganroam.com.`, 'Email to forward': ownerNewLinkEmailText(items) });
+      }
+    } catch (err) {
+      console.error(`[owner-portal] new edit link email failed: ${String((err && err.message) || err).slice(0, 200)}`);
+    }
+  }
+  return sendSubmissionResponse(res, 200, { ok: true });
+}
+
+function renderOwnerNewLinkPage() {
+  return ownerSimplePage('Get your edit link', `
+    <span class="eyebrow">For businesses</span>
+    <h1>Get your edit link</h1>
+    <p>Can&rsquo;t find the private link we emailed you? Enter the email address we have for your business and we&rsquo;ll send you a new one straight away.</p>
+    <form class="venue-form" id="onlForm" novalidate>
+      <div class="form-field"><label for="onlEmail">Your business email</label><input type="email" id="onlEmail" autocomplete="email" maxlength="254"><p class="lyv-error" id="onlEmailError" hidden></p></div>
+      <p class="lyv-error" id="onlError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="onlSubmit">Email me my link</button>
+    </form>
+    <p class="op-done" id="onlDone" hidden>If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Any older link stops working.</p>
+    <p class="op-hint" style="margin-top:20px"><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
+    <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>
+<script>
+(function(){
+  var f = document.getElementById('onlForm'), btn = document.getElementById('onlSubmit');
+  var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
+  f.addEventListener('submit', function(e){
+    e.preventDefault(); show('onlEmailError', ''); show('onlError', ''); btn.disabled = true;
+    fetch('${OWNER_NEW_LINK_PATH}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ email: document.getElementById('onlEmail').value }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        btn.disabled = false;
+        if (j && j.ok) { f.hidden = true; document.getElementById('onlDone').hidden = false; return; }
+        var errs = (j && j.errors) || {};
+        show('onlEmailError', errs.email);
+        if (!errs.email) show('onlError', (j && j.error) || 'Please try again.');
+      })
+      .catch(function(){ btn.disabled = false; show('onlError', 'Could not connect. Please try again.'); });
+  });
+})();
+</script>`);
+}
+
 // POST /owner/reset/<token>
 async function handleOwnerReset(req, res, value) {
   const body = await readOwnerJson(req, res, ['password']);
@@ -29950,7 +30036,7 @@ function renderOwnerForgotPage() {
     </form>
     <p class="op-done" id="ofgDone" hidden>If that email has a login, a reset link is on its way. Check your inbox (and spam folder). <span id="ofgSlow" hidden>It can take a few hours to arrive.</span></p>
     <p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
-    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there.</p>
+    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there, or <a href="${OWNER_NEW_LINK_PATH}">get a new link</a>.</p>
 <script>
 (function(){
   var f = document.getElementById('ofgForm'), btn = document.getElementById('ofgSubmit');
@@ -30176,7 +30262,7 @@ function ownerDecisionRecipients(venueId, senderEmail) {
 
 function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edited }) {
   const sign = '\n\nThanks,\nOkanagan Roam\ninfo@okanaganroam.com';
-  const manage = owner ? `\n\nYou can update your listing, add events or send photos any time: ${OWNER_LOGIN_URL} (or use your private edit link).` : '';
+  const manage = owner ? `\n\nYou can update your listing, add events or send photos any time: ${OWNER_LOGIN_URL} (no login yet? Get your private edit link at https://okanaganroam.com${OWNER_NEW_LINK_PATH}).` : '';
   if (outcome === 'approved') {
     return {
       subject: `Approved: ${what} for ${venueName}`,
@@ -30192,7 +30278,7 @@ function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edi
   }
   return {
     subject: `Not published: ${what} for ${venueName}`,
-    text: `Hi,\n\nThanks for sending ${what} for ${venueName}. We weren't able to publish it this time.${why}${owner ? `\n\nYou can send a corrected version from your business login: ${OWNER_LOGIN_URL} (or your private edit link).` : ''}\n\nQuestions? Email us at info@okanaganroam.com.${sign}`,
+    text: `Hi,\n\nThanks for sending ${what} for ${venueName}. We weren't able to publish it this time.${why}${owner ? `\n\nYou can send a corrected version from your business login: ${OWNER_LOGIN_URL}. No login yet? Get your private edit link here: https://okanaganroam.com${OWNER_NEW_LINK_PATH}` : ''}\n\nQuestions? Email us at info@okanaganroam.com.${sign}`,
   };
 }
 
@@ -30760,7 +30846,7 @@ ${pageHead('Edit link not valid | Okanagan Roam', 'This edit link is not valid.'
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" style="padding:48px 0;max-width:640px">
     <h1>This edit link isn&rsquo;t valid</h1>
-    <p>It may have been replaced with a newer link. Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll send you a fresh one.</p>
+    <p>It may have been replaced with a newer link. <a href="${OWNER_NEW_LINK_PATH}"><strong>Email me a new link</strong></a> (it arrives in a minute), or email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
   </main>
 </body>
 </html>`;
@@ -30776,6 +30862,10 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-act-btns button, body.owner-page .op-changing button { background: none; border: 0; padding: 2px 0; color: var(--ref-navy); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   body.owner-page .op-act-btns button[data-sure="1"] { color: #9C2F22; }
   body.owner-page .op-count { margin: 4px 0 0; font-size: 0.8rem; }
+  /* Small phones (2026-10-15): nothing wider than the screen, and one box per row below 480px. */
+  body.owner-page .form-row > * { min-width: 0; }
+  body.owner-page .form-field input, body.owner-page .form-field textarea, body.owner-page .form-field select { max-width: 100%; min-width: 0; box-sizing: border-box; }
+  @media (max-width: 480px) { body.owner-page .form-row { grid-template-columns: 1fr; } }
   body.owner-page .op-reassure { font-size: 0.9rem; font-weight: 700; color: #1E6B3A; margin: 6px 0 12px; }
   body.owner-page .op-more { display: block; margin-top: 12px; background: #fff; border: 1px solid rgba(42,32,25,0.2); border-radius: 10px; padding: 9px 16px; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
   body.owner-page .op-unsent { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; max-width: 560px; margin: 0 auto; background: #1F2A36; color: #fff; border-radius: 14px; padding: 10px 12px 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.45); font-size: 0.9rem; font-weight: 700; }
@@ -34010,6 +34100,13 @@ const server = http.createServer(async (req, res) => {
         if (ownerAccountForRequest(req)) { res.writeHead(302, { Location: '/owner/account', 'Cache-Control': 'no-store' }); return res.end(); }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
         return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage());
+      }
+    }
+    if (pathname === OWNER_NEW_LINK_PATH || pathname === `${OWNER_NEW_LINK_PATH}/`) {
+      if (method === 'POST') return await handleOwnerNewLink(req, res);
+      if (method === 'GET' || method === 'HEAD') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+        return res.end(method === 'HEAD' ? undefined : renderOwnerNewLinkPage());
       }
     }
     if (pathname === '/owner/forgot' || pathname === '/owner/forgot/') {
