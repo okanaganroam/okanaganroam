@@ -20087,11 +20087,104 @@ test('Owner portal: logins (create from the link, sign in, my listings, edit via
     // Five wrong passwords lock the account for a while.
     for (let i = 0; i < 5; i++) await post('/owner/login', { email: 'pat@example.com', password: `wrong ${i} password` });
     assert.equal((await post('/owner/login', { email: 'pat@example.com', password: 'a long enough password' })).status, 429);
-    // The edit link resets the password (and unlocks).
-    const reset = await post(`/owner/${tokenA}/account`, { email: 'pat@example.com', password: 'a brand new password' });
-    assert.equal(reset.body.action, 'password_reset');
-    assert.equal((await post('/owner/login', { email: 'pat@example.com', password: 'a brand new password' })).status, 200);
+    // The edit link never changes an existing password (2026-10-15): a link for one venue must not open
+    // every venue on the login. While locked, even the right password is refused there too.
+    const viaLink = await post(`/owner/${tokenA}/account`, { email: 'pat@example.com', password: 'a brand new password' });
+    assert.equal(viaLink.status, 429);
+    assert.equal(viaLink.body.action, undefined);
+    assert.equal(app.checkOwnerPassword('a long enough password', db.prepare('SELECT password_hash FROM owner_accounts WHERE email = ?').get('pat@example.com').password_hash), true, 'password unchanged');
   } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner portal: the edit link never resets a password; forgot password sends a one-time link (2026-10-15)', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Reset Fixture A', type: 'pub', hours: SEASON_WEEK, slug: 'owner-reset-fixture-a' });
+  seasonInsert.run({ name: 'Owner Reset Fixture B', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-reset-fixture-b' });
+  const a = app.findVenueBySlug('kelowna', 'pub', 'owner-reset-fixture-a');
+  const b = app.findVenueBySlug('kelowna', 'cafe', 'owner-reset-fixture-b');
+  const tokenA = app.createOwnerLink(a.id, {}).url.split('/owner/')[1];
+  const tokenB = app.createOwnerLink(b.id, {}).url.split('/owner/')[1];
+  const sent = [];
+  const forwarded = [];
+  app.setVenueSubmissionTransport(async (payload) => { forwarded.push(payload); });
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie) => fetch(`${base}${path}`, { method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.7.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
+  const linkFrom = (text) => (text.match(/https:\/\/okanaganroam\.com(\/owner\/reset\/[A-Za-z0-9_-]{43})/) || [])[1];
+  try {
+    // One login managing two venues.
+    assert.equal((await post(`/owner/${tokenA}/account`, { email: 'sam@example.com', password: 'the original password' })).body.action, 'created');
+    assert.equal((await post(`/owner/${tokenB}/account`, { email: 'sam@example.com', password: 'the original password' })).body.action, 'venue_added');
+    const session = (await post('/owner/login', { email: 'sam@example.com', password: 'the original password' })).cookie;
+    // Holding only venue B's link plus the email no longer takes the login over.
+    const takeover = await post(`/owner/${tokenB}/account`, { email: 'sam@example.com', password: 'an attacker password' });
+    assert.equal(takeover.status, 409);
+    assert.match(takeover.body.errors.password, /owner\/forgot/);
+    assert.equal((await post('/owner/login', { email: 'sam@example.com', password: 'an attacker password' })).status, 401);
+    assert.equal((await get('/owner/account', session)).status, 200, 'the owner stays signed in');
+    // The right password on a venue already on the login just signs in.
+    const again = await post(`/owner/${tokenA}/account`, { email: 'sam@example.com', password: 'the original password' });
+    assert.equal(again.status, 201);
+    assert.equal(again.body.action, 'signed_in');
+    // Guesses through the link count toward the lockout.
+    for (let i = 0; i < 5; i++) await post(`/owner/${tokenB}/account`, { email: 'sam@example.com', password: `wrong guess ${i} here` });
+    assert.equal((await post('/owner/login', { email: 'sam@example.com', password: 'the original password' })).status, 429);
+
+    // Forgot password pages and links.
+    assert.match(await get('/owner/login').then((r) => r.text()), /href="\/owner\/forgot"/);
+    assert.match(await get('/owner/forgot').then((r) => r.text()), /Reset your password/);
+    assert.equal((await post('/owner/forgot', { email: 'not an email' })).status, 400);
+    // Without direct email the request goes to Dayton with the link to forward.
+    const unknown = await post('/owner/forgot', { email: 'nobody@example.com' });
+    assert.deepEqual(unknown.body, { ok: true, direct: false });
+    assert.equal(forwarded.length, 0, 'no email for an unknown address');
+    const fwd = await post('/owner/forgot', { email: 'SAM@example.com' });
+    assert.deepEqual(fwd.body, { ok: true, direct: false }, 'same answer either way');
+    assert.equal(forwarded.length, 1);
+    assert.match(forwarded[0]._subject, /Password reset request: sam@example\.com/);
+    assert.match(forwarded[0]['Businesses on this login'], /Owner Reset Fixture A/);
+    const fwdLink = linkFrom(forwarded[0]['Email to forward']);
+    assert.ok(fwdLink);
+    // With direct email the owner gets it themselves.
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    const direct = await post('/owner/forgot', { email: 'sam@example.com' });
+    assert.deepEqual(direct.body, { ok: true, direct: true });
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, 'sam@example.com');
+    const link = linkFrom(sent[0].text);
+    assert.ok(link);
+    assert.equal((await get(fwdLink)).status, 410, 'a newer link replaces the older one');
+    // Rate limit: 3 an hour per login; the 4th answers the same but sends nothing.
+    assert.deepEqual((await post('/owner/forgot', { email: 'sam@example.com' })).body, { ok: true, direct: true });
+    assert.equal(sent.length, 2);
+    assert.deepEqual((await post('/owner/forgot', { email: 'sam@example.com' })).body, { ok: true, direct: true });
+    assert.equal(sent.length, 2, 'the 4th request in an hour sends nothing');
+    const resetPath = linkFrom(sent[1].text);
+    assert.equal((await get(link)).status, 410, 'older links stop working');
+    const page = await get(resetPath);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /Choose a new password/);
+    assert.equal((await post(resetPath, { password: 'short' })).status, 400);
+    const done = await post(resetPath, { password: 'a fresh new password' });
+    assert.equal(done.status, 200);
+    assert.match(done.cookie, /^okr_owner=/);
+    assert.equal((await get('/owner/account', done.cookie)).status, 200, 'signed in after the reset');
+    assert.equal((await get('/owner/account', session)).status, 302, 'other devices are signed out');
+    assert.equal((await post('/owner/login', { email: 'sam@example.com', password: 'a fresh new password' })).status, 200, 'and the lock is cleared');
+    assert.equal((await post(resetPath, { password: 'yet another password' })).status, 410, 'a link works once');
+    assert.equal(sent.at(-1).subject, 'Your Okanagan Roam password was changed');
+    assert.equal((await get('/owner/reset/not-a-real-token')).status, 410);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
     await new Promise((resolve) => srv.close(resolve));
   }
 });
