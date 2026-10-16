@@ -4921,7 +4921,8 @@ const OUTDOOR_ACTIVITY_BANNERS = Object.freeze({
   nature: { src: '/images/outdoors/activity-nature-wildlife.jpg', alt: 'Painted turtles basking on a log at Chichester Wetland Park in Kelowna', pos: 50 },
   cycling: { src: '/images/outdoors/activity-cycling.jpg', alt: 'A cyclist crossing a wooden trestle on the Myra Canyon trail', pos: 55 },
   winter: { src: '/images/outdoors/activity-winter.jpg', alt: 'Snow-covered trees in a winter forest at Big White', pos: 50 },
-  adventure: { src: '/images/outdoors/activity-adventure.jpg', alt: 'Climbers on a rocky bluff above Penticton', pos: 20 },
+  // posX (2026-10-16): the climbers sit at the left edge, so narrow (phone) crops keep the left side.
+  adventure: { src: '/images/outdoors/activity-adventure-2610.jpg', alt: 'Two climbers roped together on a rocky summit at sunset', pos: 30, posX: 8 },
   fishing: { src: '/images/outdoors/activity-fishing.jpg', alt: 'Two men fishing from a boat on a calm lake at dawn', pos: 50 },
   camping: { src: '/images/outdoors/activity-camping.jpg', alt: 'A tent pitched beside the lake near Kelowna', pos: 55 },
   water: { src: '/images/outdoors/activity-water.jpg', alt: 'Friends leaping off a wooden dock into the lake on a summer day', pos: 25 },
@@ -4940,7 +4941,7 @@ function renderOutdoorBannerSwapScript() {
       var img = document.querySelector('.category-banner img'); if (!img) return;
       var on = {}; Array.prototype.forEach.call(document.querySelectorAll('[data-activity][aria-pressed="true"]'), function(x){ on[x.getAttribute('data-activity')] = 1; });
       var keys = Object.keys(on), t = (keys.length === 1 && c[keys[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.outdoors-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -4951,7 +4952,7 @@ function renderOutdoorBannerSwapScript() {
   </script>`;
 }
 function outdoorActivityBannerHtml(b, id) {
-  return `<div class="category-banner"${id ? ` id="${id}"` : ''}><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" style="object-position: 50% ${b.pos}%" fetchpriority="high"></div>`;
+  return `<div class="category-banner"${id ? ` id="${id}"` : ''}><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" style="object-position: ${b.posX ?? 50}% ${b.pos}%" fetchpriority="high"></div>`;
 }
 const OUTDOOR_ACTIVITY_BY_SLUG = Object.fromEntries(OUTDOOR_ACTIVITIES.map((a) => [a.slug, a]));
 // Finalized visitor-facing display order (I.3, 2026-09-20) for every
@@ -11710,7 +11711,7 @@ function regionPhotoCreditHtml(credit) {
 function regionBannerHtml(region) {
   const b = regionBannerPhoto(region);
   if (!b) return '';
-  return `<div class="category-banner${b.small ? ' region-banner-small' : ''}"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="667" style="object-position: 50% ${b.pos}%" fetchpriority="high">${regionPhotoCreditHtml(b.credit)}</div>`;
+  return `<div class="category-banner${b.small ? ' region-banner-small' : ''}"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="667" style="object-position: ${b.posX ?? 50}% ${b.pos}%" fetchpriority="high">${regionPhotoCreditHtml(b.credit)}</div>`;
 }
 // Ski hills are named as resorts ("Big White Ski Resort"), towns as "Kelowna, BC".
 function regionHeading(region) {
@@ -15953,6 +15954,29 @@ const FD_CARD_PHOTOS = Object.freeze({
   dogbeach: ['/images/trip-v3/stops/stop-dog-outdoor-480.jpg', '/images/trip-v3/stops/stop-beach-480.jpg', '/images/trip-v3/stops/stop-beach-2-480.jpg', '/images/beaches/beaches-800.jpg'],
   dogoutdoor: ['/images/trip-v3/stops/stop-hiking-480.jpg', '/images/trip-v3/stops/stop-hiking-2-480.jpg', '/images/trip-v3/stops/stop-outdoor-480.jpg', '/images/trip-v3/stops/stop-viewpoints-480.jpg', '/images/outdoors/activity-hiking-800.jpg'],
   winery: ['/images/trip-v3/stops/stop-winery-480.jpg', '/images/trip-v3/stops/stop-winery-2-480.jpg', '/images/trip-v3/stops/stop-winery-3-480.jpg', '/images/food-drink/wineries-800.jpg', '/images/trip-v3/stops/stop-tour-wine-480.jpg'],
+  // Activity example photos for single venues (VENUE_EXAMPLE_PHOTOS).
+  ...Object.fromEntries(Object.entries({ exzipline: 'zipline', exropes: 'ropes', exparaglide: 'paraglide', exskydive: 'skydive', exhorse: 'horseback', exatv: 'atv', exbuggy: 'buggy', exballoon: 'balloon' })
+    .map(([k, f]) => [k, [`/images/outdoors/examples/adventure-${f}-2610-800.jpg`]])),
+});
+// Adventure businesses without a photo of their own (2026-10-16): an example
+// photo of their actual activity (free Adobe Stock), still labelled "Example
+// photo" on the venue page, instead of one generic adventure picture. A
+// venue's own image_url always wins.
+const EXAMPLE_ACTIVITY_PHOTOS = Object.freeze({
+  exzipline: { file: 'zipline', alt: 'A rider on a forest zipline', pos: 40 },
+  exropes: { file: 'ropes', alt: 'A treetop rope walk in an adventure park', pos: 40 },
+  exparaglide: { file: 'paraglide', alt: 'A paraglider against a blue sky', pos: 40 },
+  exskydive: { file: 'skydive', alt: 'A tandem skydive under an open canopy', pos: 35 },
+  exhorse: { file: 'horseback', alt: 'Riders on a guided trail ride', pos: 45 },
+  exatv: { file: 'atv', alt: 'An ATV rider on a rocky mountain trail', pos: 50 },
+  exbuggy: { file: 'buggy', alt: 'A side-by-side off-road buggy in the mountains', pos: 55 },
+  exballoon: { file: 'balloon', alt: 'A hot-air balloon over rolling hills at sunrise', pos: 45 },
+});
+const VENUE_EXAMPLE_PHOTOS = Object.freeze({
+  1242: 'exzipline', 1243: 'exzipline', 1244: 'exropes',
+  1301: 'exparaglide', 1302: 'exparaglide', 1300: 'exskydive',
+  1305: 'exhorse', 1306: 'exhorse', 1307: 'exhorse', 1449: 'exhorse',
+  1303: 'exatv', 1304: 'exbuggy', 1451: 'exballoon',
 });
 const FD_CARD_DOG_PHOTOS = Object.freeze({
   restaurant: '/images/trip-v3/stops/stop-dog-restaurant-480.jpg', cafe: '/images/trip-v3/stops/stop-dog-cafe-480.jpg',
@@ -16859,7 +16883,7 @@ const CATEGORY_BANNER_STYLE = `<style id="category-banner">
 function categoryBannerHtml(type) {
   const b = CATEGORY_BANNER_IMAGES[type];
   if (!b) return '';
-  return `<div class="category-banner"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" style="object-position: 50% ${b.pos}%" fetchpriority="high"></div>`;
+  return `<div class="category-banner"><img src="${b.src}" alt="${escapeHtml(b.alt)}" width="1600" height="1067" style="object-position: ${b.posX ?? 50}% ${b.pos}%" fetchpriority="high"></div>`;
 }
 // The page's heading block with its banner: the photo, then the heading.
 // No banner: the text exactly as before.
@@ -16918,7 +16942,7 @@ function foodDrinkHubBannerHtml(types) {
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-fd-type'); });
       var b = (on.length === 1 && map[on[0]]) || general;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
       var t = (on.length === 1 && text[on[0]]) || text.all;
       var h = document.getElementById('fdHeading'), p = document.getElementById('fdIntro');
       if (h && h.textContent !== t.h) h.textContent = t.h;
@@ -18460,7 +18484,7 @@ ${renderGolfHeaderHtml()}
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-fd-type'); });
       var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -18996,7 +19020,7 @@ ${renderGolfHeaderHtml()}
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-lf-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-lf-type'); });
       var rs = Array.prototype.slice.call(document.querySelectorAll('button.outdoor-filter-chip[data-region][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-region'); });
       var one = (on.length === 1 && c[on[0]]) || (rs.length === 1 && rc[rs[0]]), b = one ? one.banner : all.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
       var cr = box.querySelector('.region-photo-credit');
       if (cr) cr.remove();
       if (b.credit) {
@@ -19259,7 +19283,7 @@ ${renderGolfHeaderHtml()}
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-fd-type'); });
       var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -19296,6 +19320,7 @@ ${renderGolfHeaderHtml()}
 const CURATED_PHOTO_SET_BY_TYPE = Object.freeze({ golf: 'golf', beach: 'beach', outdoor: 'park', tour: 'tour', sport: 'sport', winery: 'winery' });
 function curatedPhotoKey(v, set = null) {
   const id = Number(v.id) || 0;
+  if (VENUE_EXAMPLE_PHOTOS[id]) return `${VENUE_EXAMPLE_PHOTOS[id]}-0`;
   const k = set || CURATED_PHOTO_SET_BY_TYPE[v.type];
   if (k && FD_CARD_PHOTOS[k]) return `${k}-${id % FD_CARD_PHOTOS[k].length}`;
   if (v.type === 'indoor') return 'indoorall-0';
@@ -20885,7 +20910,7 @@ ${renderGolfHeaderHtml()}
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.whatson-cat-chip[data-category][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-category'); });
       var b = (on.length === 1 && map[on[0]]) || general;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = '50% ' + b.pos + '%'; }
+      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
       var t = (on.length === 1 && text[on[0]]) || text.all;
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .whatson-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
@@ -21441,6 +21466,11 @@ function venuePageUsesEngagement(type) {
 function venueHeroPhoto(venue) {
   const own = String(venue.image_url || '').trim();
   if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return { src: own, small: null, alt: venue.name, pos: 50, example: false };
+  const ex = EXAMPLE_ACTIVITY_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(venue.id) || 0]];
+  if (ex) {
+    const src = `/images/outdoors/examples/adventure-${ex.file}-2610.jpg`;
+    return { src, small: smallBannerFor(src), alt: ex.alt, pos: ex.pos, example: true };
+  }
   const b = CATEGORY_BANNER_IMAGES[venue.type];
   if (!b) return null;
   return { src: b.src, small: smallBannerFor(b.src), alt: b.alt, pos: b.pos, example: true };
@@ -21453,6 +21483,7 @@ function venueHeroPhoto(venue) {
 function venueThumbPhoto(v, used) {
   const own = String(v.image_url || '').trim();
   if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return own;
+  if (VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]) return FD_CARD_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]][0];
   if (used && FD_CARD_PHOTOS[v.type]) {
     const first = venueThumbPhoto(v);
     const pool = [first, ...FD_CARD_PHOTOS[v.type]];
