@@ -29579,7 +29579,7 @@ async function handleOwnerLogin(req, res) {
 }
 
 function ownerSimplePage(title, inner, extraHead = '') {
-  return `<!DOCTYPE html>
+  return ownerA11y(`<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead(`${title} | Okanagan Roam`, 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
@@ -29605,7 +29605,7 @@ ${renderGolfHeaderHtml()}
 ${inner}
   </div></main>
 </body>
-</html>`;
+</html>`);
 }
 
 function renderOwnerLoginPage() {
@@ -30862,6 +30862,11 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-act-btns button, body.owner-page .op-changing button { background: none; border: 0; padding: 2px 0; color: var(--ref-navy); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   body.owner-page .op-act-btns button[data-sure="1"] { color: #9C2F22; }
   body.owner-page .op-count { margin: 4px 0 0; font-size: 0.8rem; }
+  /* While a send is in progress the button says so (slow phone connections). */
+  body.owner-page .venue-form-submit:disabled { position: relative; color: transparent !important; opacity: 0.85; cursor: wait; }
+  body.owner-page .venue-form-submit:disabled::after { content: 'Sending…'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--paper, #fff); }
+  body.owner-page #olSubmit:disabled::after, body.owner-page #olsSubmit:disabled::after { content: 'Signing in…'; }
+  body.owner-page #ofSubmit:disabled::after { content: 'Uploading…'; }
   /* Small phones (2026-10-15): nothing wider than the screen, and one box per row below 480px. */
   body.owner-page .form-row > * { min-width: 0; }
   body.owner-page .form-field input, body.owner-page .form-field textarea, body.owner-page .form-field select { max-width: 100%; min-width: 0; box-sizing: border-box; }
@@ -30881,7 +30886,16 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-count-low { color: #9C2F22; font-weight: 700; }
   body.owner-page .op-changing { background: #FFF4D6; border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; margin: 0 0 12px; }
   body.owner-page .op-changing[hidden] { display: none; }`;
+// Accessibility (2026-10-15): error messages announce themselves to screen readers.
+function ownerA11y(html) {
+  return html.replace(/<p class="lyv-error" id="/g, '<p class="lyv-error" role="alert" id="');
+}
+
 function renderOwnerPage(found, token, pending) {
+  return ownerA11y(renderOwnerPageHtml(found, token, pending));
+}
+
+function renderOwnerPageHtml(found, token, pending) {
   const { venue, happyHourTimes } = found;
   const snap = ownerVenueSnapshot(venue, happyHourTimes);
   const listing = venueListingUrl(venue);
@@ -31030,9 +31044,9 @@ ${renderGolfHeaderHtml()}
       </div>
       </details>
 
-      <p class="lyv-section-label">Description</p>
+      <p class="lyv-section-label" id="opDescriptionLabel">Description</p>
       <div class="form-row full"><div class="form-field">
-        <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}">${escapeHtml(snap.description)}</textarea>
+        <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}" aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">${escapeHtml(snap.description)}</textarea>
         <p class="op-hint">A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match. We may lightly edit for length and style.</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
         <p class="lyv-error" id="opDescriptionError" hidden></p>
@@ -31183,7 +31197,15 @@ ${renderGolfHeaderHtml()}
     // An open day needs times (opening hours only; a blank happy-hour day just means none).
     return { week: out, bad: bad, blank: any ? blank : '' };
   }
-  function show(id, msg){ var el = document.getElementById(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg; }
+  function show(id, msg){
+    var el = document.getElementById(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg;
+    // Tie a field's message to its box, so a screen reader reads both when the box gets focus.
+    var f = el.closest('.form-field'), input = f && f.querySelector('input:not([type=checkbox]), textarea, select');
+    if (!input) return;
+    var ids = (input.getAttribute('aria-describedby') || '').split(' ').filter(function(x){ return x && x !== id; });
+    if (msg) { ids.push(id); input.setAttribute('aria-invalid', 'true'); } else input.removeAttribute('aria-invalid');
+    if (ids.length) input.setAttribute('aria-describedby', ids.join(' ')); else input.removeAttribute('aria-describedby');
+  }
   // On a problem, scroll to the first field that needs fixing (not the note by the button) and put the cursor in it.
   function jumpToError(scope){
     var errs = Array.prototype.filter.call(scope.querySelectorAll('.lyv-error'), function(x){ return !x.hidden && x.textContent; });
