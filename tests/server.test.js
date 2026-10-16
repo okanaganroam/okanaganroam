@@ -21510,3 +21510,25 @@ test('Shareable trips: new cards are rationed per visitor, cached cards are free
     assert.equal((await s4request('GET', '/my-trip?stops=venue:1')).status, 200, 'pages are not affected');
   } finally { Object.assign(app.TRIP_CARD_RATE, saved); app.tripCardRateReset(); }
 });
+
+// ---- Share button on the plan screen (2026-10-17) ----
+test('Plan screen: the Build My Trip page carries the Share trip script, once, and other pages are untouched', () => {
+  const html = app.renderTripPlannerV3Page();
+  assert.ok(html.includes('data-roam-share-trip'));
+  assert.equal((html.match(/<script>\n\(function\(\)\{\n  var MAX = 30, REF = /g) || []).length, 1, 'one share script');
+  assert.ok(html.indexOf('var MAX = 30') > html.indexOf('id="t3Result"') && html.indexOf('var MAX = 30') < html.lastIndexOf('</body>'), 'after the plan container, inside the body');
+  assert.match(html, /T\('Share trip', 'Partager le voyage'\)/);
+  assert.match(html, /\/my-trip\?stops=/);
+  assert.match(html, /trip_share/);
+  assert.equal(app.withPlanShareButton('<html><body>no plan here</body></html>'), '<html><body>no plan here</body></html>');
+  assert.equal(app.withPlanShareButton(undefined), undefined);
+  const twice = app.withPlanShareButton(html);
+  assert.equal((twice.match(/var MAX = 30/g) || []).length, 2, 'applying it again adds another copy (it is applied once, at render)');
+});
+
+test('Plan screen: the markup the Share trip script reads is still produced by the V3 page', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  for (const marker of ["id=\"t3Result\"", "t3-plan-actions", "data-t3-share", "data-plan-stop", "data-plan-day", "data-trip-ref=\"venue:", "data-trip-ref=\"event:", "id=\"t3PlanStatus\"", "t3-btn t3-btn-ghost"]) {
+    assert.ok(src.includes(marker), `trip-planner-v3-page.js still has ${marker}`);
+  }
+});
