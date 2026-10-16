@@ -1,0 +1,126 @@
+{
+  "reason": "User approved the second batch of ten visually reviewed hiking photos and explicitly requested deployment. Source permissions confirmed by user in chat.",
+  "batch_id": "hiking-photos-batch-02-2026-10-15",
+  "venues": [
+    {
+      "id": 1224,
+      "name": "Goats Peak Regional Park",
+      "region": "west-kelowna",
+      "slug": "goats-peak-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/goats-peak-regional-park-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1221,
+      "name": "Woodhaven Nature Conservancy Regional Park",
+      "region": "kelowna",
+      "slug": "woodhaven-nature-conservancy-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/woodhaven-nature-conservancy-regional-park-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1264,
+      "name": "Clover Creek – Lacoma Lake Trail (Trepanier Provincial Park)",
+      "region": "peachland",
+      "slug": "clover-creek-lacoma-lake-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/clover-creek-lacoma-lake-trail-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1216,
+      "name": "Mission Creek Greenway Regional Park",
+      "region": "kelowna",
+      "slug": "mission-creek-greenway-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mission-creek-greenway-regional-park-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1212,
+      "name": "Myra Canyon – Myra-Bellevue Provincial Park",
+      "region": "kelowna",
+      "slug": "myra-canyon-myra-bellevue-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1262,
+      "name": "Spion Kop Recreation Reserve",
+      "region": "lake-country",
+      "slug": "spion-kop-recreation-reserve",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/spion-kop-recreation-reserve-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1146,
+      "name": "Kalamalka Lake Provincial Park – Cosens Bay",
+      "region": "coldstream",
+      "slug": "kalamalka-lake-provincial-park-cosens-bay",
+      "expect": {
+        "image_url": "/images/beaches/venues/coldstream-kalamalka-lake-provincial-park-cosens-bay.jpg?v=beach-photo-2"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kalamalka-lake-provincial-park-cosens-bay-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1229,
+      "name": "BX Creek Trail & BX Falls",
+      "region": "vernon",
+      "slug": "bx-creek-trail-bx-falls",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/bx-creek-trail-bx-falls-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1267,
+      "name": "Naramata Creek Park Waterfall Trail",
+      "region": "naramata",
+      "slug": "naramata-creek-park-waterfall-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/naramata-creek-park-waterfall-trail-20261015-b2.jpg?v=20261015h2live"
+      }
+    },
+    {
+      "id": 1228,
+      "name": "Munson Mountain",
+      "region": "penticton",
+      "slug": "munson-mountain",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/munson-mountain-20261015-b2.jpg?v=20261015h2live"
+      }
+    }
+  ]
+}
