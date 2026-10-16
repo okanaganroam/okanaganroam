@@ -1,0 +1,643 @@
+[
+  {
+    "id": 1397,
+    "name": "Adventure Skating Loop & Shinny Pond – Apex",
+    "status": "Winter people / activity",
+    "note": "People skating the forest loop between snow-covered trees.",
+    "selected": {
+      "id": 1397,
+      "index": 5,
+      "url": "https://apexresort.com/wp-content/uploads/2023/07/100B9900.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1397-05.jpg",
+      "width": 2304,
+      "height": 1728
+    },
+    "current_file": null,
+    "source_page": "https://apexresort.com/adventure-skating-loop/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Apex Mountain Resort",
+    "deployed_asset": "/images/hiking/venues/adventure-skating-loop-apex-20261016-winter.jpg"
+  },
+  {
+    "id": 1234,
+    "name": "Apex Mountain Resort",
+    "status": "Winter people / activity",
+    "note": "A skier carving through powder; strong winter-action cover.",
+    "selected": {
+      "id": 1234,
+      "index": 5,
+      "url": "https://apexresort.com/wp-content/uploads/2023/05/Photo16-1600x1028.png",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1234-05.jpg",
+      "width": 1600,
+      "height": 1028
+    },
+    "current_file": null,
+    "source_page": "https://www.apexresort.com/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Apex Mountain Resort",
+    "deployed_asset": "/images/hiking/venues/apex-mountain-resort-20261016-winter.jpg"
+  },
+  {
+    "id": 1235,
+    "name": "Baldy Mountain Resort",
+    "status": "Winter people / activity",
+    "note": "Snowboarder carving powder at Baldy.",
+    "selected": {
+      "id": 1235,
+      "index": 9,
+      "url": "https://baldyresort.com/wp-content/uploads/2025/10/snowboarder-baldy-mountain.webp",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1235-09.jpg",
+      "width": 1200,
+      "height": 675
+    },
+    "current_file": null,
+    "source_page": "https://www.baldyresort.com/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Baldy Mountain Resort",
+    "deployed_asset": "/images/hiking/venues/baldy-mountain-resort-20261016-winter.jpg"
+  },
+  {
+    "id": 1399,
+    "name": "Baldy Snowshoe Trails",
+    "status": "Winter people / activity",
+    "note": "Snowshoer on Baldy’s snowy trail with a distant view.",
+    "selected": {
+      "id": 1399,
+      "index": "retry-22",
+      "url": "https://baldyresort.com/wp-content/uploads/2025/09/snowshoe.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1399-retry-22.jpg",
+      "source_page": "https://baldyresort.com/mountain/winter-activities/",
+      "alt": "",
+      "width": 800,
+      "height": 500
+    },
+    "current_file": null,
+    "source_page": "https://baldyresort.com/mountain/winter-activities/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Baldy Mountain Resort",
+    "deployed_asset": "/images/hiking/venues/baldy-snowshoe-trails-20261016-winter.jpg"
+  },
+  {
+    "id": 1396,
+    "name": "Big White Horse-Drawn Sleigh Rides & Dining Tours",
+    "status": "Winter people / activity",
+    "note": "Passengers in a horse-drawn sleigh at Big White.",
+    "selected": {
+      "id": 1396,
+      "index": 10,
+      "url": "https://www.bigwhite.com/sites/default/files/inline-images/small%20horse.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1396-10.jpg",
+      "width": 600,
+      "height": 400
+    },
+    "current_file": null,
+    "source_page": "https://www.bigwhite.com/events-activities/tours/sleigh-rides-group-or-private",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/big-white-horse-drawn-sleigh-rides-20261016-winter.jpg"
+  },
+  {
+    "id": 1392,
+    "name": "Big White Nordic & Wilderness Trails",
+    "status": "Winter people / activity",
+    "note": "Nordic skier on a snowy trail. Current cover also shows winter fat biking; either fits this shared listing.",
+    "selected": {
+      "id": 1392,
+      "index": 0,
+      "url": "http://www.bigwhite.com/sites/default/files/2026-01/Nordc-Skier-200x800px.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1392-00.jpg",
+      "width": 2000,
+      "height": 800
+    },
+    "current_file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1392-current.jpg",
+    "source_page": "https://www.bigwhite.com/events-activities/winter-activities/nordic-trails",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/big-white-nordic-wilderness-trails-20261016-winter.jpg"
+  },
+  {
+    "id": 1233,
+    "name": "Big White Ski Resort",
+    "status": "Winter people / activity",
+    "note": "Skier carving a sunny groomed slope. Replaces the current summer biking cover.",
+    "selected": {
+      "id": 1233,
+      "index": 15,
+      "url": "https://www.bigwhite.com/sites/default/files/styles/stack_large_992w/public/2026-02/BW-26-RSA-125-Save-25-Early-Season-Website-Hot-Deals-Thumbnail-600x600_0.jpg?itok=JzaolWnv",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1233-15.jpg",
+      "width": 992,
+      "height": 600
+    },
+    "current_file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1233-current.jpg",
+    "source_page": "https://www.bigwhite.com/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/big-white-ski-resort-20261016-winter.jpg"
+  },
+  {
+    "id": 1390,
+    "name": "Big White Tube Park (Happy Valley)",
+    "status": "Winter people / activity",
+    "note": "People tubing together in the snow.",
+    "selected": {
+      "id": 1390,
+      "index": 0,
+      "url": "http://www.bigwhite.com/sites/default/files/2025-12/Winter-Activities-Tubing-family-2000px.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1390-00.jpg",
+      "width": 2000,
+      "height": 800
+    },
+    "current_file": null,
+    "source_page": "https://www.bigwhite.com/events-activities/winter-activities/tubing",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/big-white-tube-park-20261016-winter.jpg"
+  },
+  {
+    "id": 1385,
+    "name": "Brewer's Pond Skating – SilverStar",
+    "status": "Winter people / activity",
+    "note": "Skaters playing on Brewer’s Pond, with snowy trees behind them.",
+    "selected": {
+      "id": 1385,
+      "index": "extra-249",
+      "url": "https://destinationsilverstar.com/wp-content/uploads/2022/03/PondHockey-JaclynTenamura-1024x683.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1385-extra-249.jpg",
+      "source_page": "https://destinationsilverstar.com/experience/ice-skating/",
+      "alt": "",
+      "width": 1024,
+      "height": 683
+    },
+    "current_file": null,
+    "source_page": "https://destinationsilverstar.com/experience/ice-skating/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Jaclyn Tanemura / Destination Silver Star",
+    "deployed_asset": "/images/hiking/venues/brewers-pond-skating-silverstar-20261016-winter.jpg"
+  },
+  {
+    "id": 1394,
+    "name": "Candle Creek Kennels – Dog Sled Tours at Big White",
+    "status": "Winter people / activity",
+    "note": "Passenger’s view of the dog-sled team crossing the snow.",
+    "selected": {
+      "id": 1394,
+      "index": 0,
+      "url": "http://www.bigwhite.com/sites/default/files/2018-06/Winter-Activities-Dog-Sledding-2000x800px_0.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1394-00.jpg",
+      "width": 2000,
+      "height": 800
+    },
+    "current_file": null,
+    "source_page": "https://www.bigwhite.com/events-activities/tours/dog-sled-tours",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/candle-creek-kennels-dog-sled-tours-20261016-winter.jpg"
+  },
+  {
+    "id": 1333,
+    "name": "Graystokes Snowmobile Area – Kelowna Snowmobile Club",
+    "status": "Winter people / activity",
+    "note": "Riders with their snowmobiles at the Kelowna Snowmobile Club sign; posed rather than riding.",
+    "selected": {
+      "id": 1333,
+      "index": 0,
+      "url": "https://img1.wsimg.com/isteam/ip/65e047f6-b30b-4fa0-8ef7-dc52633142bb/IMG_9792.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1333-00.jpg",
+      "width": 1000,
+      "height": 667
+    },
+    "current_file": null,
+    "source_page": "https://kelownasnowmobileclub.com/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Kelowna Snowmobile Club",
+    "deployed_asset": "/images/hiking/venues/graystokes-snowmobile-area-kelowna-snowmobile-club-20261016-winter.jpg"
+  },
+  {
+    "id": 1391,
+    "name": "Happy Valley Ice Skating Rink – Big White",
+    "status": "Winter people / activity",
+    "note": "People skating on Happy Valley’s outdoor ice.",
+    "selected": {
+      "id": 1391,
+      "index": 0,
+      "url": "http://www.bigwhite.com/sites/default/files/2026-01/skating-2000x800px.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1391-00.jpg",
+      "width": 2000,
+      "height": 800
+    },
+    "current_file": null,
+    "source_page": "https://www.bigwhite.com/events-activities/adventure-activities/ice-skating",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/happy-valley-ice-skating-rink-20261016-winter.jpg"
+  },
+  {
+    "id": 1332,
+    "name": "Jeffers Park Skating Rink",
+    "status": "Scenery / venue fallback",
+    "note": "Correct outdoor rink in winter, but no skaters visible.",
+    "selected": {
+      "id": 1332,
+      "index": 2,
+      "url": "http://www.lavingtoncommunity.ca/uploads/1/3/0/7/130771317/img-0598.jpeg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1332-02.jpg",
+      "width": 800,
+      "height": 600
+    },
+    "current_file": null,
+    "source_page": "http://www.lavingtoncommunity.ca/jeffers-park-skating-rink.html",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Lavington Community Association",
+    "deployed_asset": "/images/hiking/venues/jeffers-park-skating-rink-20261016-winter.jpg"
+  },
+  {
+    "id": 1241,
+    "name": "Kelowna Nordic Ski and Snowshoe Club",
+    "status": "Winter people / activity",
+    "note": "Skate skier on a snowy forest trail, from the club’s ski-group page.",
+    "selected": {
+      "id": 1241,
+      "index": "manual",
+      "url": "https://static.wixstatic.com/media/bc010b_00386285c8fe47b8af4ed4b30293ad26~mv2.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1241-manual.jpg",
+      "source_page": "https://www.kelownanordic.ca/group/ladies-intermediate-skate-ski-group",
+      "width": 1161,
+      "height": 1280
+    },
+    "current_file": null,
+    "source_page": "https://www.kelownanordic.ca/group/ladies-intermediate-skate-ski-group",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Kelowna Nordic Ski and Snowshoe Club",
+    "deployed_asset": "/images/hiking/venues/kelowna-nordic-ski-snowshoe-club-20261016-winter.jpg"
+  },
+  {
+    "id": 1260,
+    "name": "Kuipers' Peak Mountain Park",
+    "status": "Winter people / activity",
+    "note": "Winter hikers on the snowy rocky summit, from the City gallery.",
+    "selected": {
+      "id": 1260,
+      "index": "browser-1",
+      "file": "/Users/dr/okanaganroam/output/hiking-photo-search/linked-page-audit/images/1260-browser-1.jpg",
+      "url": "https://www.kelowna.ca/sites/files/1/styles/inside_banner/public/uploads/banners/inside/parks/kuiperspeak_2_website.jpg?itok=_0rInGxe",
+      "width": 1038,
+      "height": 477
+    },
+    "current_file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1260-current.jpg",
+    "source_page": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/kuipers-peak-mountain-park",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: City of Kelowna",
+    "deployed_asset": "/images/hiking/venues/kuipers-peak-mountain-park-20261016-winter.jpg"
+  },
+  {
+    "id": 1400,
+    "name": "McKinney Nordic Ski Club – Snowshoe & Cross-Country Trails",
+    "status": "Scenery / venue fallback",
+    "note": "Snow-covered trees and Nordic terrain; no participants visible.",
+    "selected": {
+      "id": 1400,
+      "index": 2,
+      "url": "https://images.squarespace-cdn.com/content/v1/5d78764f94fe555e530fae4a/1569951004197-20HDL66K3VXZQNGA4UL0/banner.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1400-02.jpg",
+      "width": 1280,
+      "height": 596
+    },
+    "current_file": null,
+    "source_page": "https://www.mckinneynordicskiclub.com/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: McKinney Nordic Ski Club",
+    "deployed_asset": "/images/hiking/venues/mckinney-nordic-ski-club-trails-20261016-winter.jpg"
+  },
+  {
+    "id": 1237,
+    "name": "Nickel Plate Nordic Centre",
+    "status": "Winter people / activity",
+    "note": "Snowshoe group on Nickel Plate’s snowshoe-tour page.",
+    "selected": {
+      "id": 1237,
+      "index": "gap-39",
+      "url": "https://nickelplatenordic.org/wp-content/uploads/2025/01/processed-866C1CD0-4596-4DA9-AF44-F5B8BF4D8590.jpeg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1237-gap-39.jpg",
+      "source_page": "https://nickelplatenordic.org/snowshoe-tours/",
+      "alt": "",
+      "width": 2000,
+      "height": 1336
+    },
+    "current_file": null,
+    "source_page": "https://nickelplatenordic.org/snowshoe-tours/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Nickel Plate Nordic Centre",
+    "deployed_asset": "/images/hiking/venues/nickel-plate-nordic-centre-20261016-winter.jpg"
+  },
+  {
+    "id": 1335,
+    "name": "Okanagan Rec Rentals – Snowmobile Tours",
+    "status": "Winter people / activity",
+    "note": "Operator’s snowmobile dinner-tour image: people beside a snowmobile near a cabin, rather than riding.",
+    "selected": {
+      "id": 1335,
+      "index": 3,
+      "url": "https://www.okanaganrecrentals.com/wp-content/uploads/2016/07/nav-dinner-tours.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1335-03.jpg",
+      "width": 600,
+      "height": 400
+    },
+    "current_file": null,
+    "source_page": "https://www.okanaganrecrentals.com/snowmobile-tours/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Okanagan Rec Rentals",
+    "deployed_asset": "/images/hiking/venues/okanagan-rec-rentals-snowmobile-tours-20261016-winter.jpg"
+  },
+  {
+    "id": 1395,
+    "name": "Outback Snowmobile Tours – Big White",
+    "status": "Winter people / activity",
+    "note": "Snowmobile riders on a snowy forest trail at Big White.",
+    "selected": {
+      "id": 1395,
+      "index": 0,
+      "url": "http://www.bigwhite.com/sites/default/files/2025-11/BW-25-MKT-460%20-%20Snowmobile%20Tours_Website-Header-Desktop_2000x800.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1395-00.jpg",
+      "width": 2000,
+      "height": 800
+    },
+    "current_file": null,
+    "source_page": "https://www.bigwhite.com/events-activities/tours/snowmobile-tours",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/outback-snowmobile-tours-big-white-20261016-winter.jpg"
+  },
+  {
+    "id": 1331,
+    "name": "Peachland Outdoor Ice Rink (Mountain View Park)",
+    "status": "Winter people / activity",
+    "note": "People playing hockey at the covered outdoor rink, snow around the building.",
+    "selected": {
+      "id": 1331,
+      "index": 1,
+      "url": "https://www.peachland.ca/sites/default/files/styles/medium/public/2024-10/ice-rink.jpg?itok=9Ic9Ramv",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1331-01.jpg",
+      "width": 480,
+      "height": 348
+    },
+    "current_file": null,
+    "source_page": "https://www.peachland.ca/parks-recreation/parks-trails/ice-rink",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: District of Peachland",
+    "deployed_asset": "/images/hiking/venues/peachland-outdoor-ice-rink-mountain-view-park-20261016-winter.jpg"
+  },
+  {
+    "id": 1329,
+    "name": "Penticton Outdoor Skating Rink (Gyro Park)",
+    "status": "Winter people / activity",
+    "note": "City’s photo of players on the Gyro Park outdoor rink. Older appearance: the City reports boards are being removed in fall 2026.",
+    "selected": {
+      "id": 1329,
+      "index": "manual",
+      "url": "https://www.penticton.ca/sites/default/files/2025-01/Activate%20rink%201.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1329-manual.jpg",
+      "source_page": "https://www.penticton.ca/city-hall/news-alerts/outdoor-rink-gyro-park-opening-soon-public-skating",
+      "width": 2048,
+      "height": 1534
+    },
+    "current_file": null,
+    "source_page": "https://www.penticton.ca/city-hall/news-alerts/outdoor-rink-gyro-park-opening-soon-public-skating",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: City of Penticton",
+    "deployed_asset": "/images/hiking/venues/penticton-outdoor-skating-rink-gyro-park-20261016-winter.jpg"
+  },
+  {
+    "id": 1280,
+    "name": "Predator Ridge Trails",
+    "status": "Winter people / activity",
+    "note": "Snowshoers on Predator Ridge’s winter trails, from its snowshoeing page.",
+    "selected": {
+      "id": 1280,
+      "index": "gap-79",
+      "url": "https://www.predatorridge.com/wp-content/uploads/snowshoeinh-9-1920x1080-1.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1280-gap-79.jpg",
+      "source_page": "https://www.predatorridge.com/activities/snowshoeing/",
+      "alt": "",
+      "width": 1920,
+      "height": 1080
+    },
+    "current_file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1280-current.jpg",
+    "source_page": "https://www.predatorridge.com/activities/snowshoeing/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Predator Ridge",
+    "deployed_asset": "/images/hiking/venues/predator-ridge-trails-20261016-winter.jpg"
+  },
+  {
+    "id": 1389,
+    "name": "Ravenwood Snowshoe Dinner Tours – SilverStar",
+    "status": "Scenery / venue fallback",
+    "note": "Ravenwood cabin in snow at dusk. No guests visible; this is a cabin option rather than a snowshoe-action photo. Source filename includes “photoshop”, so treat as edited promotional imagery pending review.",
+    "selected": {
+      "id": 1389,
+      "index": "tour-2",
+      "url": "https://images.squarespace-cdn.com/content/v1/6719869403911558a290d7d7/de0c9671-4cfd-4217-928a-957a099aa469/Night-Time-photoshop+2.JPG?format=2500w",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1389-tour-2.jpg",
+      "source_page": "https://bear-primrose-8dbw.squarespace.com/",
+      "alt": "",
+      "width": 2500,
+      "height": 1667
+    },
+    "current_file": null,
+    "source_page": "https://bear-primrose-8dbw.squarespace.com/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Ravenwood",
+    "deployed_asset": "/images/hiking/venues/ravenwood-snowshoe-dinner-tours-20261016-winter.jpg"
+  },
+  {
+    "id": 1336,
+    "name": "Rodney's REEL Outdoors – Ice Fishing Charters",
+    "status": "Winter people / activity",
+    "note": "Guests with their catch on the frozen lake, supplied on the operator’s ice-fishing page; posed after fishing.",
+    "selected": {
+      "id": 1336,
+      "index": "retry-30",
+      "url": "https://www.kelownafishing.com/wp-content/uploads/2019/03/Ice-fishing-charter-in-Kelowna-BC.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1336-retry-30.jpg",
+      "source_page": "https://www.kelownafishing.com/",
+      "alt": "",
+      "width": 3000,
+      "height": 2000
+    },
+    "current_file": null,
+    "source_page": "https://www.kelownafishing.com/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Rodney’s REEL Outdoors",
+    "deployed_asset": "/images/hiking/venues/rodneys-reel-outdoors-ice-fishing-charters-20261016-winter.jpg"
+  },
+  {
+    "id": 1386,
+    "name": "SilverStar Cross-Country Ski Trails",
+    "status": "Winter people / activity",
+    "note": "Cross-country skier on groomed snowy trails.",
+    "selected": {
+      "id": 1386,
+      "index": "extra-255",
+      "url": "https://destinationsilverstar.com/wp-content/uploads/2022/03/26-DSS-Jackson-Parker-1024x683.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1386-extra-255.jpg",
+      "source_page": "https://destinationsilverstar.com/experience/cross-country-skiing/",
+      "alt": "",
+      "width": 1024,
+      "height": 683
+    },
+    "current_file": null,
+    "source_page": "https://destinationsilverstar.com/experience/cross-country-skiing/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Jackson Parker / Destination Silver Star",
+    "deployed_asset": "/images/hiking/venues/silverstar-cross-country-ski-trails-20261016-winter.jpg"
+  },
+  {
+    "id": 1240,
+    "name": "SilverStar Mountain Resort",
+    "status": "Winter people / activity",
+    "note": "Skier descending through snow-covered trees. Replaces the current summer mountain view.",
+    "selected": {
+      "id": 1240,
+      "index": "extra-281",
+      "url": "https://destinationsilverstar.com/wp-content/uploads/2022/03/DaveHeath-PerfectPowder.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1240-extra-281.jpg",
+      "source_page": "https://destinationsilverstar.com/experience/skiing-snowboarding/",
+      "alt": "",
+      "width": 2000,
+      "height": 1331
+    },
+    "current_file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1240-current.jpg",
+    "source_page": "https://destinationsilverstar.com/experience/skiing-snowboarding/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Dave Heath / Destination Silver Star",
+    "deployed_asset": "/images/hiking/venues/silverstar-mountain-resort-20261016-winter.jpg"
+  },
+  {
+    "id": 1387,
+    "name": "SilverStar Snowshoe Trails",
+    "status": "Winter people / activity",
+    "note": "Snowshoers walking through heavily snow-covered trees.",
+    "selected": {
+      "id": 1387,
+      "index": "extra-262",
+      "url": "https://destinationsilverstar.com/wp-content/uploads/2023/04/SamEgan-Snowshoe-2-large-1024x683.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1387-extra-262.jpg",
+      "source_page": "https://destinationsilverstar.com/experience/snowshoeing-tours/",
+      "alt": "",
+      "width": 1024,
+      "height": 683
+    },
+    "current_file": null,
+    "source_page": "https://destinationsilverstar.com/experience/snowshoeing-tours/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Sam Egan / Destination Silver Star",
+    "deployed_asset": "/images/hiking/venues/silverstar-snowshoe-trails-20261016-winter.jpg"
+  },
+  {
+    "id": 1321,
+    "name": "Stuart Park Outdoor Rink",
+    "status": "Winter people / activity",
+    "note": "People skating at Stuart Park; City gallery image.",
+    "selected": {
+      "id": 1321,
+      "index": "browser-1",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1321-browser-1.jpg",
+      "url": "https://www.kelowna.ca/sites/files/1/styles/inside_banner/public/uploads/banners/inside/parks/stuart_park_rink.jpg?itok=DfylgVyX",
+      "source_page": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/stuart-park"
+    },
+    "current_file": null,
+    "source_page": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/stuart-park",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: City of Kelowna",
+    "deployed_asset": "/images/hiking/venues/stuart-park-outdoor-rink-20261016-winter.jpg"
+  },
+  {
+    "id": 1398,
+    "name": "Tim Hortons Tube Park – Apex",
+    "status": "Winter people / activity",
+    "note": "Person riding a tube at Apex’s tube park.",
+    "selected": {
+      "id": 1398,
+      "index": 0,
+      "url": "https://apexresort.com/wp-content/uploads/2025/03/IMG_7995.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1398-00.jpg",
+      "width": 2048,
+      "height": 1638
+    },
+    "current_file": null,
+    "source_page": "https://apexresort.com/tim-hortons-tube-park/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Apex Mountain Resort",
+    "deployed_asset": "/images/hiking/venues/tim-hortons-tube-park-apex-20261016-winter.jpg"
+  },
+  {
+    "id": 1384,
+    "name": "Tube Town – SilverStar Tube Park",
+    "status": "Winter people / activity",
+    "note": "Tubers descending snowy lanes at SilverStar.",
+    "selected": {
+      "id": 1384,
+      "index": "extra-274",
+      "url": "https://destinationsilverstar.com/wp-content/uploads/2022/03/JaclynTanemura-Tube-Town-2048x1365.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1384-extra-274.jpg",
+      "source_page": "https://destinationsilverstar.com/experience/winter-tubing/",
+      "alt": "",
+      "width": 2048,
+      "height": 1365
+    },
+    "current_file": null,
+    "source_page": "https://destinationsilverstar.com/experience/winter-tubing/",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Jaclyn Tanemura / Destination Silver Star",
+    "deployed_asset": "/images/hiking/venues/tube-town-silverstar-tube-park-20261016-winter.jpg"
+  },
+  {
+    "id": 1393,
+    "name": "Twinkling Trail – Big White",
+    "status": "Winter people / activity",
+    "note": "People exploring Big White’s illuminated winter trail.",
+    "selected": {
+      "id": 1393,
+      "index": 0,
+      "url": "http://www.bigwhite.com/sites/default/files/2025-01/Winter-Activities-twinkling-trail--2000x800px.jpg",
+      "file": "/Users/dr/okanaganroam/output/winter-photo-search/linked-page-audit/images/1393-00.jpg",
+      "width": 2000,
+      "height": 800
+    },
+    "current_file": null,
+    "source_page": "https://www.bigwhite.com/events-activities/winter-activities/twinkling-trail",
+    "capture_date": "Not verified",
+    "deployment_approved": true,
+    "credit": "Photo: Big White Ski Resort",
+    "deployed_asset": "/images/hiking/venues/twinkling-trail-big-white-20261016-winter.jpg"
+  }
+]

@@ -1,0 +1,378 @@
+{
+  "reason": "User approved all winter candidates from the full 41-listing preview, including disclosed unknown capture dates. Excludes nonwinter MNP exterior and unmatched listings.",
+  "batch_id": "winter-photos-20261016",
+  "venues": [
+    {
+      "id": 1397,
+      "name": "Adventure Skating Loop & Shinny Pond – Apex",
+      "region": "apex",
+      "slug": "adventure-skating-loop-apex",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/adventure-skating-loop-apex-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1234,
+      "name": "Apex Mountain Resort",
+      "region": "apex",
+      "slug": "apex-mountain-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/apex-mountain-resort-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1235,
+      "name": "Baldy Mountain Resort",
+      "region": "baldy",
+      "slug": "baldy-mountain-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/baldy-mountain-resort-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1399,
+      "name": "Baldy Snowshoe Trails",
+      "region": "baldy",
+      "slug": "baldy-snowshoe-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/baldy-snowshoe-trails-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1396,
+      "name": "Big White Horse-Drawn Sleigh Rides & Dining Tours",
+      "region": "big-white",
+      "slug": "big-white-horse-drawn-sleigh-rides",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/big-white-horse-drawn-sleigh-rides-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1392,
+      "name": "Big White Nordic & Wilderness Trails",
+      "region": "big-white",
+      "slug": "big-white-nordic-wilderness-trails",
+      "expect": {
+        "image_url": "/images/hiking/venues/big-white-nordic-wilderness-trails-20261016-cycling-final.jpg?v=20261016cyclingfinallive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/big-white-nordic-wilderness-trails-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1233,
+      "name": "Big White Ski Resort",
+      "region": "big-white",
+      "slug": "big-white-ski-resort",
+      "expect": {
+        "image_url": "/images/hiking/venues/big-white-ski-resort-20261016-cycling.jpg?v=20261016cyclinglive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/big-white-ski-resort-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1390,
+      "name": "Big White Tube Park (Happy Valley)",
+      "region": "big-white",
+      "slug": "big-white-tube-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/big-white-tube-park-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1385,
+      "name": "Brewer's Pond Skating – SilverStar",
+      "region": "silverstar",
+      "slug": "brewers-pond-skating-silverstar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/brewers-pond-skating-silverstar-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1394,
+      "name": "Candle Creek Kennels – Dog Sled Tours at Big White",
+      "region": "big-white",
+      "slug": "candle-creek-kennels-dog-sled-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/candle-creek-kennels-dog-sled-tours-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1333,
+      "name": "Graystokes Snowmobile Area – Kelowna Snowmobile Club",
+      "region": "kelowna",
+      "slug": "graystokes-snowmobile-area-kelowna-snowmobile-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/graystokes-snowmobile-area-kelowna-snowmobile-club-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1391,
+      "name": "Happy Valley Ice Skating Rink – Big White",
+      "region": "big-white",
+      "slug": "happy-valley-ice-skating-rink",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/happy-valley-ice-skating-rink-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1332,
+      "name": "Jeffers Park Skating Rink",
+      "region": "coldstream",
+      "slug": "jeffers-park-skating-rink",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/jeffers-park-skating-rink-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1241,
+      "name": "Kelowna Nordic Ski and Snowshoe Club",
+      "region": "kelowna",
+      "slug": "kelowna-nordic-ski-snowshoe-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kelowna-nordic-ski-snowshoe-club-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1260,
+      "name": "Kuipers' Peak Mountain Park",
+      "region": "kelowna",
+      "slug": "kuipers-peak-mountain-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/kuipers-peak-mountain-park-20261015.jpg?v=20261015h1live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kuipers-peak-mountain-park-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1400,
+      "name": "McKinney Nordic Ski Club – Snowshoe & Cross-Country Trails",
+      "region": "baldy",
+      "slug": "mckinney-nordic-ski-club-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mckinney-nordic-ski-club-trails-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1237,
+      "name": "Nickel Plate Nordic Centre",
+      "region": "apex",
+      "slug": "nickel-plate-nordic-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/nickel-plate-nordic-centre-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1335,
+      "name": "Okanagan Rec Rentals – Snowmobile Tours",
+      "region": "vernon",
+      "slug": "okanagan-rec-rentals-snowmobile-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/okanagan-rec-rentals-snowmobile-tours-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1395,
+      "name": "Outback Snowmobile Tours – Big White",
+      "region": "big-white",
+      "slug": "outback-snowmobile-tours-big-white",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/outback-snowmobile-tours-big-white-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1331,
+      "name": "Peachland Outdoor Ice Rink (Mountain View Park)",
+      "region": "peachland",
+      "slug": "peachland-outdoor-ice-rink-mountain-view-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/peachland-outdoor-ice-rink-mountain-view-park-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1329,
+      "name": "Penticton Outdoor Skating Rink (Gyro Park)",
+      "region": "penticton",
+      "slug": "penticton-outdoor-skating-rink-gyro-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/penticton-outdoor-skating-rink-gyro-park-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1280,
+      "name": "Predator Ridge Trails",
+      "region": "vernon",
+      "slug": "predator-ridge-trails",
+      "expect": {
+        "image_url": "/images/hiking/venues/predator-ridge-trails-20261016-nature.jpg?v=20261016naturelive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/predator-ridge-trails-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1389,
+      "name": "Ravenwood Snowshoe Dinner Tours – SilverStar",
+      "region": "silverstar",
+      "slug": "ravenwood-snowshoe-dinner-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/ravenwood-snowshoe-dinner-tours-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1336,
+      "name": "Rodney's REEL Outdoors – Ice Fishing Charters",
+      "region": "west-kelowna",
+      "slug": "rodneys-reel-outdoors-ice-fishing-charters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/rodneys-reel-outdoors-ice-fishing-charters-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1386,
+      "name": "SilverStar Cross-Country Ski Trails",
+      "region": "silverstar",
+      "slug": "silverstar-cross-country-ski-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/silverstar-cross-country-ski-trails-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1240,
+      "name": "SilverStar Mountain Resort",
+      "region": "silverstar",
+      "slug": "silverstar-mountain-resort",
+      "expect": {
+        "image_url": "/images/hiking/venues/silverstar-mountain-resort-20261015-b3.jpg?v=20261015h3live"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/silverstar-mountain-resort-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1387,
+      "name": "SilverStar Snowshoe Trails",
+      "region": "silverstar",
+      "slug": "silverstar-snowshoe-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/silverstar-snowshoe-trails-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1321,
+      "name": "Stuart Park Outdoor Rink",
+      "region": "kelowna",
+      "slug": "stuart-park-outdoor-rink",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/stuart-park-outdoor-rink-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1398,
+      "name": "Tim Hortons Tube Park – Apex",
+      "region": "apex",
+      "slug": "tim-hortons-tube-park-apex",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/tim-hortons-tube-park-apex-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1384,
+      "name": "Tube Town – SilverStar Tube Park",
+      "region": "silverstar",
+      "slug": "tube-town-silverstar-tube-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/tube-town-silverstar-tube-park-20261016-winter.jpg?v=20261016winterlive"
+      }
+    },
+    {
+      "id": 1393,
+      "name": "Twinkling Trail – Big White",
+      "region": "big-white",
+      "slug": "twinkling-trail-big-white",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/twinkling-trail-big-white-20261016-winter.jpg?v=20261016winterlive"
+      }
+    }
+  ]
+}
