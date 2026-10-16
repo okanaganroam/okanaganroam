@@ -16012,7 +16012,7 @@ const EXAMPLE_ACTIVITY_PHOTOS = Object.freeze({
   exballoon: { file: 'balloon', alt: 'A hot-air balloon over rolling hills at sunrise', pos: 45 },
 });
 const VENUE_EXAMPLE_PHOTOS = Object.freeze({
-  1242: 'exzipline', 1243: 'exzipline', 1244: 'exropes',
+  1242: 'exzipline', 1243: 'exzipline', 1244: 'exropes', 1308: 'exropes',
   1301: 'exparaglide', 1302: 'exparaglide', 1300: 'exskydive',
   1305: 'exhorse', 1306: 'exhorse', 1307: 'exhorse', 1449: 'exhorse',
   1303: 'exatv', 1304: 'exbuggy', 1451: 'exballoon',
