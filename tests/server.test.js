@@ -20933,3 +20933,24 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar and leave warning, Make more changes', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Unsent Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'unsent-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'unsent-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /<p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it\.<\/p>/);
+    assert.match(page, /<div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t sent yet\.<\/span> <button type="button" id="opUnsentSend">Send changes<\/button><\/div>/);
+    assert.match(page, /<button type="button" class="op-more" id="opMore">Make more changes<\/button>/);
+    assert.match(page, /window\.addEventListener\('beforeunload', function\(e\)\{/);
+    assert.doesNotMatch(page, /You can come back any time to send more/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

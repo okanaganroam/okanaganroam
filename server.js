@@ -30776,6 +30776,11 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-act-btns button, body.owner-page .op-changing button { background: none; border: 0; padding: 2px 0; color: var(--ref-navy); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   body.owner-page .op-act-btns button[data-sure="1"] { color: #9C2F22; }
   body.owner-page .op-count { margin: 4px 0 0; font-size: 0.8rem; }
+  body.owner-page .op-reassure { font-size: 0.9rem; font-weight: 700; color: #1E6B3A; margin: 6px 0 12px; }
+  body.owner-page .op-more { display: block; margin-top: 12px; background: #fff; border: 1px solid rgba(42,32,25,0.2); border-radius: 10px; padding: 9px 16px; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
+  body.owner-page .op-unsent { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; max-width: 560px; margin: 0 auto; background: #1F2A36; color: #fff; border-radius: 14px; padding: 10px 12px 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.45); font-size: 0.9rem; font-weight: 700; }
+  body.owner-page .op-unsent[hidden] { display: none; }
+  body.owner-page .op-unsent button { background: #F2C14E; color: #1F2A36; border: 0; border-radius: 10px; padding: 9px 14px; font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
   body.owner-page .op-fold { border-top: 1px solid rgba(42,32,25,0.12); border-bottom: 1px solid rgba(42,32,25,0.12); margin: 18px 0; padding: 4px 0; }
   body.owner-page .op-fold > summary { cursor: pointer; padding: 10px 0; list-style: none; }
   body.owner-page .op-fold > summary::-webkit-details-marker { display: none; }
@@ -30887,6 +30892,7 @@ ${renderGolfHeaderHtml()}
       <span class="eyebrow">Owner edit page</span>
       <h1>${escapeHtml(venue.name)}</h1>
       <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : '<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span>'}</p>
+      <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it.</p>
       <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">Last updated ${ownerUpdatedDate(last)}</p>` : ''; })()}
       ${pendingNote}
@@ -30966,8 +30972,10 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opFormError" hidden></p>
       <button type="submit" class="venue-form-submit" id="opSubmit">Send changes</button>
     </form>
-    <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them, usually within a day.<span id="opDoneMail"${found.account ? '' : ' hidden'}> We&rsquo;ll email you when they&rsquo;re live.</span> You can come back any time to send more.${found.account ? '' : `
+    <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them, usually within a day.<span id="opDoneMail"${found.account ? '' : ' hidden'}> We&rsquo;ll email you when they&rsquo;re live.</span>
+      <button type="button" class="op-more" id="opMore">Make more changes</button>${found.account ? '' : `
       <span class="op-done-login" id="opDoneLogin"><strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.</span>`}</div>
+    <div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t sent yet.</span> <button type="button" id="opUnsentSend">Send changes</button></div>
     <h2 id="photos" style="margin-top:44px">Photos</h2>
     <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. ${found.account ? 'Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.' : 'We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.'}</p>
     ${(() => {
@@ -31066,6 +31074,7 @@ ${renderGolfHeaderHtml()}
         row.querySelector('.op-add').hidden = !!two;
         syncRow(row);
       });
+      setListingDirty(true);
       var note = b.parentNode.querySelector('.op-copy-done') || b.parentNode.appendChild(document.createElement('span'));
       note.className = 'op-copy-done'; note.textContent = ' Copied.';
     });
@@ -31160,6 +31169,7 @@ ${renderGolfHeaderHtml()}
           rememberName(document.getElementById('opName').value); rememberEmail(emailVal('opEmail'));
           if (emailVal('opEmail').trim()) document.getElementById('opDoneMail').hidden = false;
           shareEmail(emailVal('opEmail'));
+          setListingDirty(false);
           form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
@@ -31251,6 +31261,7 @@ ${renderGolfHeaderHtml()}
           if (j.updated) document.getElementById('oeDoneText').textContent = 'Updated. Your event is still waiting for review, usually within a day.';
           if (j.change) document.getElementById('oeDoneText').textContent = 'Thanks! Your change is in for review, usually within a day. The event stays as it is until then, and we\u2019ll email you when it\u2019s updated.';
           document.getElementById('oeDone').classList.add('show');
+          eventDirty = false;
           if (j.updated || j.change) setTimeout(function(){ location.hash = 'opActivityHead'; location.reload(); }, 3500);
           return;
         }
@@ -31260,6 +31271,26 @@ ${renderGolfHeaderHtml()}
         jumpToError(ev);
       })
       .catch(function(){ b.disabled = false; show('oeFormError', 'Could not send. Please check your connection and try again.'); });
+  });
+  // Unsent changes (2026-10-15): while the listing has edits that weren't sent, a bar at the
+  // bottom says so (with its own Send button), and leaving the page with anything unsent
+  // -- listing edits, a half-filled event or chosen photos -- asks first.
+  var listingDirty = false, eventDirty = false;
+  function setListingDirty(v){
+    listingDirty = v;
+    var bar = document.getElementById('opUnsent'); if (bar) bar.hidden = !v || form.style.display === 'none';
+  }
+  form.addEventListener('input', function(e){ if (e.target.id !== 'opHp') setListingDirty(true); });
+  form.addEventListener('change', function(){ setListingDirty(true); });
+  document.getElementById('opUnsentSend').addEventListener('click', function(){ document.getElementById('opSubmit').click(); });
+  ev.addEventListener('input', function(){ eventDirty = true; });
+  window.addEventListener('beforeunload', function(e){
+    var files = document.getElementById('ofFiles');
+    if (listingDirty || eventDirty || (files && files.files && files.files.length)) { e.preventDefault(); e.returnValue = ''; }
+  });
+  document.getElementById('opMore').addEventListener('click', function(){
+    form.style.display = ''; document.getElementById('opDone').classList.remove('show');
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   var pf = document.getElementById('ofForm');
   var pfStarted = Date.now();
