@@ -29128,9 +29128,10 @@ function sendOwnerPhotoFile(res, file, headers) {
 // An owner turns their private edit link into a login: from /owner/<token>
 // they set an email + password (owner_accounts), which grants that account
 // the venue (owner_account_venues). Later they sign in at /owner/login and
-// manage every venue on the account from /owner/account. The same link also
-// resets a forgotten password, so "forgot password" = Dayton sends a fresh
-// link. Passwords use scrypt; the session cookie (okr_owner) is httpOnly,
+// manage every venue on the account from /owner/account. A forgotten
+// password is reset from /owner/forgot with a one-time emailed link (the edit
+// link can't change an existing password: since 2026-10-15 a link for one
+// venue no longer opens every venue on a login). Passwords use scrypt; the session cookie (okr_owner) is httpOnly,
 // SameSite=Lax and Secure on https, and only a hash of it is stored.
 const OWNER_SESSION_COOKIE = 'okr_owner';
 const OWNER_SESSION_DAYS = 30;
@@ -29220,6 +29221,24 @@ function validOwnerEmail(value) {
   return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
+function ownerLockedNow(account) {
+  return !!(account.locked_until && account.locked_until > new Date().toISOString().replace('T', ' ').slice(0, 19));
+}
+// Checks a password against a login, counting wrong guesses toward the lockout.
+// 'ok' | 'wrong' | 'locked'.
+function ownerPasswordAttempt(account, password) {
+  if (ownerLockedNow(account)) return 'locked';
+  if (checkOwnerPassword(password, account.password_hash)) return 'ok';
+  const fails = account.failed_logins + 1;
+  if (fails >= OWNER_LOGIN_MAX_FAILS) {
+    db.prepare("UPDATE owner_accounts SET failed_logins = 0, locked_until = datetime('now', ?) WHERE id = ?").run(`+${OWNER_LOGIN_LOCK_MINUTES} minutes`, account.id);
+  } else {
+    db.prepare('UPDATE owner_accounts SET failed_logins = ? WHERE id = ?').run(fails, account.id);
+  }
+  return 'wrong';
+}
+const OWNER_LOCKED_MESSAGE = `Too many wrong passwords. Please try again in ${OWNER_LOGIN_LOCK_MINUTES} minutes, or reset your password at okanaganroam.com/owner/forgot.`;
+
 async function readOwnerJson(req, res, keys) {
   if (!isSameOriginSubmission(req)) { sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' }); return null; }
   if (ownerLoginRateLimited(requestClientIp(req))) { sendSubmissionResponse(res, 429, { ok: false, error: 'Too many attempts. Please wait a while and try again.' }); return null; }
@@ -29233,9 +29252,10 @@ async function readOwnerJson(req, res, keys) {
   return body;
 }
 
-// POST /owner/<token>/account: create a login for this venue, add this venue
-// to an existing login (needs that login's password), or reset the password
-// of a login that already manages this venue (the link proves ownership).
+// POST /owner/<token>/account: create a login for this venue, or add this
+// venue to an existing login. An existing login always needs its password:
+// the link proves access to this one venue, not to everything else on the
+// login, so it never changes a password (that's /owner/forgot).
 async function handleOwnerAccountSetup(req, res, token) {
   const body = await readOwnerJson(req, res, ['email', 'password']);
   if (!body) return;
@@ -29256,15 +29276,12 @@ async function handleOwnerAccountSetup(req, res, token) {
     action = 'created';
   } else {
     const manages = db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(account.id, venueId);
-    if (manages) {
-      db.prepare('UPDATE owner_accounts SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?').run(hashOwnerPassword(password), account.id);
-      db.prepare('DELETE FROM owner_sessions WHERE account_id = ?').run(account.id); // signs out other devices
-      action = 'password_reset';
-    } else if (checkOwnerPassword(password, account.password_hash)) {
-      action = 'venue_added';
-    } else {
-      return sendSubmissionResponse(res, 409, { ok: false, errors: { password: 'That email already has a login. Enter its password to add this business to it.' } });
+    const attempt = ownerPasswordAttempt(account, password);
+    if (attempt === 'locked') return sendSubmissionResponse(res, 429, { ok: false, errors: { password: OWNER_LOCKED_MESSAGE } });
+    if (attempt !== 'ok') {
+      return sendSubmissionResponse(res, 409, { ok: false, errors: { password: 'That email already has a login. Enter its password, or reset it at okanaganroam.com/owner/forgot.' } });
     }
+    action = manages ? 'signed_in' : 'venue_added';
   }
   db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(account.id, venueId);
   const session = startOwnerSession(account.id);
@@ -29278,22 +29295,13 @@ async function handleOwnerLogin(req, res) {
   if (!body) return;
   const email = validOwnerEmail(body.email);
   const password = typeof body.password === 'string' ? body.password : '';
-  const wrong = () => sendSubmissionResponse(res, 401, { ok: false, error: 'That email and password don’t match. Forgot your password? Email info@okanaganroam.com and we’ll send you a link to set a new one.' });
+  const wrong = () => sendSubmissionResponse(res, 401, { ok: false, error: 'That email and password don’t match. Forgot your password? Reset it at okanaganroam.com/owner/forgot.' });
   if (!email || !password) return wrong();
   const account = db.prepare('SELECT * FROM owner_accounts WHERE email = ?').get(email);
   if (!account) { checkOwnerPassword(password, hashOwnerPassword('timing-padding')); return wrong(); }
-  if (account.locked_until && account.locked_until > new Date().toISOString().replace('T', ' ').slice(0, 19)) {
-    return sendSubmissionResponse(res, 429, { ok: false, error: `Too many wrong passwords. Please try again in ${OWNER_LOGIN_LOCK_MINUTES} minutes.` });
-  }
-  if (!checkOwnerPassword(password, account.password_hash)) {
-    const fails = account.failed_logins + 1;
-    if (fails >= OWNER_LOGIN_MAX_FAILS) {
-      db.prepare("UPDATE owner_accounts SET failed_logins = 0, locked_until = datetime('now', ?) WHERE id = ?").run(`+${OWNER_LOGIN_LOCK_MINUTES} minutes`, account.id);
-    } else {
-      db.prepare('UPDATE owner_accounts SET failed_logins = ? WHERE id = ?').run(fails, account.id);
-    }
-    return wrong();
-  }
+  const attempt = ownerPasswordAttempt(account, password);
+  if (attempt === 'locked') return sendSubmissionResponse(res, 429, { ok: false, error: OWNER_LOCKED_MESSAGE });
+  if (attempt !== 'ok') return wrong();
   const session = startOwnerSession(account.id);
   res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
   return res.end(JSON.stringify({ ok: true }));
@@ -29314,6 +29322,8 @@ ${extraHead}
   body.owner-page .op-venues a.op-edit { font-weight: 800; }
   body.owner-page .op-bar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 0.9rem; }
   body.owner-page .op-linkbtn { background: none; border: 0; padding: 0; color: var(--ref-navy); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+  body.owner-page .op-done { background: #E9F6EE; border-radius: 14px; padding: 18px; font-weight: 600; }
+  body.owner-page .op-done[hidden] { display: none; }
 </style>
 </head>
 <body class="golf-page owner-page">
@@ -29335,9 +29345,10 @@ function renderOwnerLoginPage() {
       <div class="form-field"><label for="olPassword">Password</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
       <p class="lyv-error" id="olError" hidden></p>
       <button type="submit" class="venue-form-submit" id="olSubmit">Sign in</button>
+      <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">Forgot your password?</a></p>
     </form>
     <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there.
-    <br><strong>Forgot your password?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll send you a link to set a new one.
+    <br><strong>Forgot your password?</strong> <a href="/owner/forgot">Reset it here</a>.
     <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>
 <script>
 (function(){
@@ -29368,6 +29379,212 @@ function renderOwnerAccountPage(account) {
 document.getElementById('opLogout').addEventListener('click', function(){
   fetch('/owner/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.href = '/owner/login'; });
 });
+</script>`);
+}
+
+// ---------- Forgot password (2026-10-15) ----------
+//
+// /owner/forgot takes an email. If it has a login, a one-time link
+// (/owner/reset/<token>, only its hash stored) lets the owner choose a new
+// password; using it signs out every other device. The page says the same
+// thing whether or not the email has a login. With BREVO_API_KEY set the link
+// is emailed straight to the owner (Brevo transactional email, from
+// info@okanaganroam.com) and works for an hour; without it the request goes to
+// Dayton's inbox with the link to forward, and it works for 48 hours.
+const OWNER_RESET_PATH = '/owner/reset/';
+const OWNER_RESET_DIRECT_MINUTES = 60;
+const OWNER_RESET_FORWARD_HOURS = 48;
+const OWNER_RESET_MAX_PER_HOUR = 3;
+const OWNER_EMAIL_SENDER = { name: 'Okanagan Roam', email: 'info@okanaganroam.com' };
+
+function ownerResetHash(value) {
+  return crypto.createHash('sha256').update(`okanagan-roam-owner-reset:${value}`).digest('hex');
+}
+
+async function sendOwnerEmailViaBrevo({ to, subject, text }) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text }),
+  });
+  if (!res.ok) throw new Error(`Brevo HTTP ${res.status}`);
+}
+// Swapped out by the test suite; null means "no direct email, forward via Dayton".
+let ownerEmailTransport = null;
+function setOwnerEmailTransport(fn) { ownerEmailTransport = fn || null; }
+function ownerDirectEmail() {
+  if (ownerEmailTransport) return ownerEmailTransport;
+  return process.env.BREVO_API_KEY ? sendOwnerEmailViaBrevo : null;
+}
+
+function ownerResetRecentCount(accountId) {
+  return db.prepare("SELECT COUNT(*) AS n FROM owner_password_resets WHERE account_id = ? AND created_at > datetime('now', '-1 hour')").get(accountId).n;
+}
+
+function createOwnerPasswordReset(accountId, minutes) {
+  const value = crypto.randomBytes(32).toString('base64url');
+  db.prepare("UPDATE owner_password_resets SET used_at = CURRENT_TIMESTAMP WHERE account_id = ? AND used_at IS NULL").run(accountId);
+  db.prepare("INSERT INTO owner_password_resets (token_hash, account_id, expires_at) VALUES (?, ?, datetime('now', ?))")
+    .run(ownerResetHash(value), accountId, `+${minutes} minutes`);
+  return value;
+}
+
+// The login a reset link belongs to, while the link is unused and unexpired.
+function ownerResetAccount(value) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(String(value || ''))) return null;
+  return db.prepare(`SELECT a.id, a.email, r.token_hash FROM owner_password_resets r JOIN owner_accounts a ON a.id = r.account_id
+    WHERE r.token_hash = ? AND r.used_at IS NULL AND r.expires_at > datetime('now')`).get(ownerResetHash(value)) || null;
+}
+
+function ownerResetEmailText(url, hours) {
+  return [
+    'Hi,',
+    '',
+    'Someone (hopefully you) asked to reset the password for your Okanagan Roam business login.',
+    '',
+    `Choose a new password here (the link works once, for ${hours}):`,
+    url,
+    '',
+    'If you didn’t ask for this, you can ignore this email. Your password won’t change.',
+    '',
+    'Okanagan Roam',
+    'okanaganroam.com',
+  ].join('\n');
+}
+
+// POST /owner/forgot
+async function handleOwnerForgot(req, res) {
+  const body = await readOwnerJson(req, res, ['email']);
+  if (!body) return;
+  const email = validOwnerEmail(body.email);
+  if (!email) return sendSubmissionResponse(res, 400, { ok: false, errors: { email: 'Please enter the email you sign in with.' } });
+  const account = db.prepare('SELECT * FROM owner_accounts WHERE email = ?').get(email);
+  if (account && ownerResetRecentCount(account.id) < OWNER_RESET_MAX_PER_HOUR) {
+    const direct = ownerDirectEmail();
+    const minutes = direct ? OWNER_RESET_DIRECT_MINUTES : OWNER_RESET_FORWARD_HOURS * 60;
+    const url = `https://okanaganroam.com${OWNER_RESET_PATH}${createOwnerPasswordReset(account.id, minutes)}`;
+    try {
+      if (direct) {
+        await direct({ to: account.email, subject: 'Reset your Okanagan Roam password', text: ownerResetEmailText(url, '1 hour') });
+      } else {
+        const names = ownerAccountVenues(account.id).map((v) => v.name).join(', ') || '(none yet)';
+        await venueSubmissionTransport({
+          _subject: `[ACTION] Password reset request: ${account.email}`,
+          _template: 'table',
+          _captcha: 'false',
+          'What to do': `Forward the email below to ${account.email} from info@okanaganroam.com. The link works once, for ${OWNER_RESET_FORWARD_HOURS} hours. If you didn't expect this request, ignore it.`,
+          'Owner login': account.email,
+          'Businesses on this login': names,
+          'Email to forward': ownerResetEmailText(url, `${OWNER_RESET_FORWARD_HOURS} hours`),
+        });
+      }
+    } catch (err) {
+      console.error(`[owner-portal] password reset email for account #${account.id} failed: ${String((err && err.message) || err).slice(0, 200)}`);
+    }
+  } else if (!account) {
+    hashOwnerPassword('timing-padding');
+  }
+  return sendSubmissionResponse(res, 200, { ok: true, direct: !!ownerDirectEmail() });
+}
+
+// POST /owner/reset/<token>
+async function handleOwnerReset(req, res, value) {
+  const body = await readOwnerJson(req, res, ['password']);
+  if (!body) return;
+  const account = ownerResetAccount(value);
+  if (!account) return sendSubmissionResponse(res, 410, { ok: false, error: 'This link has expired or was already used. Please ask for a new one at okanaganroam.com/owner/forgot.' });
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (password.length < OWNER_PASSWORD_MIN || password.length > 200) {
+    return sendSubmissionResponse(res, 400, { ok: false, errors: { password: `Please use at least ${OWNER_PASSWORD_MIN} characters.` } });
+  }
+  db.prepare('UPDATE owner_accounts SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?').run(hashOwnerPassword(password), account.id);
+  db.prepare('UPDATE owner_password_resets SET used_at = CURRENT_TIMESTAMP WHERE account_id = ? AND used_at IS NULL').run(account.id);
+  db.prepare('DELETE FROM owner_sessions WHERE account_id = ?').run(account.id); // signs out every other device
+  const session = startOwnerSession(account.id);
+  const direct = ownerDirectEmail();
+  if (direct) {
+    direct({ to: account.email, subject: 'Your Okanagan Roam password was changed', text: [
+      'Hi,', '', 'The password for your Okanagan Roam business login was just changed.', '',
+      'If that wasn’t you, reset it now at https://okanaganroam.com/owner/forgot and email info@okanaganroam.com.', '', 'Okanagan Roam',
+    ].join('\n') }).catch(() => {});
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
+  return res.end(JSON.stringify({ ok: true }));
+}
+
+function renderOwnerForgotPage() {
+  return ownerSimplePage('Reset your password', `
+    <span class="eyebrow">For businesses</span>
+    <h1>Reset your password</h1>
+    <p>Enter the email you sign in with. We&rsquo;ll send you a link to choose a new password.</p>
+    <form class="venue-form" id="ofgForm" novalidate>
+      <div class="form-field"><label for="ofgEmail">Email</label><input type="email" id="ofgEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="ofgEmailError" hidden></p></div>
+      <p class="lyv-error" id="ofgError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="ofgSubmit">Send reset link</button>
+    </form>
+    <p class="op-done" id="ofgDone" hidden>If that email has a login, a reset link is on its way. Check your inbox (and spam folder). <span id="ofgSlow" hidden>It can take a few hours to arrive.</span></p>
+    <p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
+    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there.</p>
+<script>
+(function(){
+  var f = document.getElementById('ofgForm'), btn = document.getElementById('ofgSubmit');
+  var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
+  f.addEventListener('submit', function(e){
+    e.preventDefault(); show('ofgEmailError', ''); show('ofgError', ''); btn.disabled = true;
+    fetch('/owner/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ email: document.getElementById('ofgEmail').value }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        btn.disabled = false;
+        if (j && j.ok) { f.hidden = true; document.getElementById('ofgDone').hidden = false; document.getElementById('ofgSlow').hidden = !!j.direct; return; }
+        var errs = (j && j.errors) || {};
+        show('ofgEmailError', errs.email);
+        if (!errs.email) show('ofgError', (j && j.error) || 'Please try again.');
+      })
+      .catch(function(){ btn.disabled = false; show('ofgError', 'Could not connect. Please try again.'); });
+  });
+})();
+</script>`);
+}
+
+function renderOwnerResetPage(valid) {
+  if (!valid) {
+    return ownerSimplePage('Reset link expired', `
+    <span class="eyebrow">For businesses</span>
+    <h1>This link has expired</h1>
+    <p>Reset links work once and only for a short time. <a href="/owner/forgot">Ask for a new one</a>.</p>`);
+  }
+  return ownerSimplePage('Choose a new password', `
+    <span class="eyebrow">For businesses</span>
+    <h1>Choose a new password</h1>
+    <form class="venue-form" id="orsForm" novalidate>
+      <div class="form-field"><label for="orsPassword">New password (${OWNER_PASSWORD_MIN}+ characters)</label><input type="password" id="orsPassword" autocomplete="new-password" maxlength="200"></div>
+      <div class="form-field"><label for="orsPassword2">Type it again</label><input type="password" id="orsPassword2" autocomplete="new-password" maxlength="200"></div>
+      <p class="lyv-error" id="orsError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="orsSubmit">Save new password</button>
+    </form>
+    <p class="op-hint" style="margin-top:16px">Saving signs you out on every other device.</p>
+<script>
+(function(){
+  var f = document.getElementById('orsForm'), btn = document.getElementById('orsSubmit'), err = document.getElementById('orsError');
+  var fail = function(text){ err.textContent = text; err.hidden = false; };
+  f.addEventListener('submit', function(e){
+    e.preventDefault(); err.hidden = true;
+    var p1 = document.getElementById('orsPassword').value, p2 = document.getElementById('orsPassword2').value;
+    if (p1.length < ${OWNER_PASSWORD_MIN}) return fail('Please use at least ${OWNER_PASSWORD_MIN} characters.');
+    if (p1 !== p2) return fail('Those two passwords don’t match.');
+    btn.disabled = true;
+    fetch(location.pathname, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ password: p1 }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        btn.disabled = false;
+        if (j && j.ok) { location.href = '/owner/account'; return; }
+        fail((j && ((j.errors && j.errors.password) || j.error)) || 'Please try again.');
+      })
+      .catch(function(){ btn.disabled = false; fail('Could not connect. Please try again.'); });
+  });
+})();
 </script>`);
 }
 
@@ -29546,7 +29763,7 @@ ${renderGolfHeaderHtml()}
       <details class="op-login" id="opLogin">
         <summary><strong>Create a login</strong> so you don&rsquo;t need this link next time</summary>
         <form id="olsForm" novalidate>
-          <p class="op-hint">Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login for another business? Use the same email and password to add this one.</p>
+          <p class="op-hint">Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login? Use the same email and password to add this business to it. <a href="/owner/forgot">Forgot your password?</a></p>
           <div class="form-row">
             <div class="form-field"><label for="olsEmail">Email</label><input type="email" id="olsEmail" autocomplete="username" maxlength="254" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="olsEmailError" hidden></p></div>
             <div class="form-field"><label for="olsPassword">Password (${OWNER_PASSWORD_MIN}+ characters)</label><input type="password" id="olsPassword" autocomplete="new-password" maxlength="200"><p class="lyv-error" id="olsPasswordError" hidden></p></div>
@@ -32456,6 +32673,22 @@ const server = http.createServer(async (req, res) => {
         return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage());
       }
     }
+    if (pathname === '/owner/forgot' || pathname === '/owner/forgot/') {
+      if (method === 'POST') return await handleOwnerForgot(req, res);
+      if (method === 'GET' || method === 'HEAD') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+        return res.end(method === 'HEAD' ? undefined : renderOwnerForgotPage());
+      }
+    }
+    if (pathname.startsWith(OWNER_RESET_PATH)) {
+      const value = pathname.slice(OWNER_RESET_PATH.length);
+      if (method === 'POST') return await handleOwnerReset(req, res, value);
+      if (method === 'GET' || method === 'HEAD') {
+        const valid = !!ownerResetAccount(value);
+        res.writeHead(valid ? 200 : 410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+        return res.end(method === 'HEAD' ? undefined : renderOwnerResetPage(valid));
+      }
+    }
     if (pathname === '/owner/logout' && method === 'POST') {
       const value = readCookie(req, OWNER_SESSION_COOKIE);
       if (value) db.prepare('DELETE FROM owner_sessions WHERE token_hash = ?').run(ownerSessionHash(value));
@@ -33156,6 +33389,8 @@ module.exports = {
   validateVenueSubmission,
   buildVenueSubmissionEmail,
   setVenueSubmissionTransport,
+  setOwnerEmailTransport,
+  createOwnerPasswordReset,
   setContactTransport,
   resetContactLimits,
   validateContactMessage,

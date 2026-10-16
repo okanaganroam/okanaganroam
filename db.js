@@ -855,6 +855,14 @@ CREATE TABLE IF NOT EXISTS owner_sessions (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   expires_at TEXT NOT NULL
 );
+-- Forgot-password links (2026-10-15): one-time, short-lived; only a hash is stored.
+CREATE TABLE IF NOT EXISTS owner_password_resets (
+  token_hash TEXT PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES owner_accounts(id),
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL,
+  used_at TEXT
+);
 `);
 
 module.exports = db;
