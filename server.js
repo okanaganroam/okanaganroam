@@ -11755,7 +11755,7 @@ function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // a photo that reads as a specific business. Pages that don't pass it
   // keep the exact previous head. No twitter:image is added: X falls back
   // to og:image, and other hubs' heads are pinned to have none.
-  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, indoorTheme = false, tourTheme = false, sportTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null, alternates = null, locale = null } = opts;
+  const { noindex = false, golfTheme = false, beachTheme = false, outdoorTheme = false, indoorTheme = false, tourTheme = false, sportTheme = false, advisoryStyles = false, golfDataStyles = false, savedSidecar = false, shareImage = null, shareImageSize = null, alternates = null, locale = null } = opts;
   const ogImage = shareImage ? (/^https?:\/\//.test(shareImage) ? shareImage : `https://okanaganroam.com${shareImage}`) : 'https://okanaganroam.com/og-image.png';
   return `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11766,7 +11766,7 @@ ${canonical === null ? '' : `<link rel="canonical" href="${canonical}">\n`}${alt
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:image" content="${ogImage}">
-${canonical === null ? '' : `<meta property="og:url" content="${canonical}">\n`}<meta name="twitter:card" content="summary_large_image">
+${shareImageSize ? `<meta property="og:image:width" content="${shareImageSize[0]}">\n<meta property="og:image:height" content="${shareImageSize[1]}">\n` : ''}${canonical === null ? '' : `<meta property="og:url" content="${canonical}">\n`}<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
 ${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.stringify(block)}\n</script>`).join('\n')}
@@ -27835,6 +27835,30 @@ function tripShareSummary(query, lang = 'en') {
   };
 }
 const tripShareCardCache = new Map(); // "label|name" -> PNG buffer; oldest dropped past 100 entries
+// Drawing a card takes ~65 ms of the server's one thread, and the space of possible trips is huge, so only DRAWING a
+// new card is rationed (a cached one costs nothing): per visitor and across the site, per minute. Over the limit the
+// answer is 429 with Retry-After; link-preview bots retry later and the page itself is unaffected.
+const TRIP_CARD_RATE = { perIp: 30, global: 120, windowMs: 60000 };
+const tripCardDraws = new Map(); // ip -> draw timestamps inside the window
+let tripCardGlobalDraws = [];
+function tripCardRateAllow(ip, now = Date.now()) {
+  const from = now - TRIP_CARD_RATE.windowMs;
+  tripCardGlobalDraws = tripCardGlobalDraws.filter((t) => t > from);
+  const mine = (tripCardDraws.get(ip) || []).filter((t) => t > from);
+  if (mine.length >= TRIP_CARD_RATE.perIp || tripCardGlobalDraws.length >= TRIP_CARD_RATE.global) {
+    tripCardDraws.set(ip, mine);
+    return false;
+  }
+  mine.push(now);
+  tripCardDraws.set(ip, mine);
+  tripCardGlobalDraws.push(now);
+  if (tripCardDraws.size > 2000) {
+    for (const [k, v] of tripCardDraws) if (!v.some((t) => t > from)) tripCardDraws.delete(k);
+  }
+  return true;
+}
+function tripCardRateReset() { tripCardDraws.clear(); tripCardGlobalDraws = []; }
+function tripShareCardCached(card) { return tripShareCardCache.has(`${card.label}|${card.name}`); }
 function tripShareCardPng(card) {
   const key = `${card.label}|${card.name}`;
   if (tripShareCardCache.has(key)) return tripShareCardCache.get(key);
@@ -27876,7 +27900,7 @@ function renderMyTripPage(opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [], { golfTheme: true, shareImage: share ? share.imageAttr : null })}
+${pageHead(title, description, canonical, [], { golfTheme: true, shareImage: share ? share.imageAttr : null, shareImageSize: share ? [1200, 630] : null })}
 ${renderAnalyticsHeadHtml('my_trip')}
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
@@ -33042,6 +33066,10 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         return res.end('Not found');
       }
+      if (!tripShareCardCached(tripSummary.card) && !tripCardRateAllow(requestClientIp(req))) {
+        res.writeHead(429, { 'Content-Type': 'text/plain', 'Retry-After': '30', 'Cache-Control': 'no-store' });
+        return res.end('Too many requests. Please try again shortly.');
+      }
       const png = tripShareCardPng(tripSummary.card);
       res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': png.length, 'Cache-Control': 'public, max-age=86400' });
       return res.end(png);
@@ -35922,6 +35950,9 @@ module.exports = {
   tripStopsFor,
   tripShareSummary,
   tripShareSearch,
+  TRIP_CARD_RATE,
+  tripCardRateAllow,
+  tripCardRateReset,
   renderContactPage,
   CONTACT_TOPICS,
   venueLookup,
