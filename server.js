@@ -21715,8 +21715,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const themedHeroTitle = themedShell && !venue.image_url;
   const heroPhoto = themedHeroTitle ? venueHeroPhoto(venue) : null;
   const photoCredit = venue.image_url ? (ownerPhotoCreditFor(venue.image_url) || require('./data/venue-photo-credits.json')[venue.image_url.split('?')[0]]) : null;
+  // Gallery (2026-10-16): with two or more photos the hero gets a "See all"
+  // button and a thumbnail row that open a full-screen viewer.
+  const galleryPhotos = venue.image_url ? venueGalleryPhotos(venue) : [];
+  const galleryHtml = venueGalleryHtml(venue, galleryPhotos, L);
   const imageHtml = venue.image_url
-    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy"></div>${photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : ''}`
+    ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>${photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : ''}${galleryHtml}`
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
         <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
@@ -29260,6 +29264,90 @@ function ownerPhotoPreviewUrl(key) {
 }
 
 // The credit for a venue's main photo when it is an approved owner upload.
+// Venue photo gallery (2026-10-16): the main photo first, then every approved
+// owner upload, then any extra photos listed for the venue in
+// data/venue-gallery.json ({"<venue id>": [{"src": "/images/venues/x.jpg", "credit": "..."}]}),
+// with each photo shown once.
+function venueGalleryPhotos(venue) {
+  const credits = require('./data/venue-photo-credits.json');
+  let extra = {};
+  try { extra = require('./data/venue-gallery.json'); } catch (e) { extra = {}; }
+  const out = [];
+  const seen = new Set();
+  const add = (src, credit) => {
+    const key = String(src || '').split('?')[0];
+    if (!/^\/images\//.test(key) || seen.has(key)) return;
+    seen.add(key);
+    out.push({ src: String(src), credit: credit || credits[key] || null });
+  };
+  if (venue.image_url) add(venue.image_url, ownerPhotoCreditFor(venue.image_url));
+  for (const p of db.prepare("SELECT file, credit FROM owner_photos WHERE venue_id = ? AND status = 'approved' ORDER BY id").all(venue.id)) {
+    add(`/images/owner/${p.file}`, p.credit);
+  }
+  for (const p of (Array.isArray(extra[String(venue.id)]) ? extra[String(venue.id)] : [])) add(p && p.src, p && p.credit);
+  return out;
+}
+
+// The thumbnail row, "See all photos" button and full-screen viewer for a
+// venue page, or '' when the venue has fewer than two photos.
+function venueGalleryHtml(venue, photos, L) {
+  if (!photos || photos.length < 2) return '';
+  const n = photos.length;
+  const name = escapeHtml(venue.name);
+  const shown = photos.slice(0, 5);
+  const thumbs = shown.map((p, i) => {
+    const more = (i === shown.length - 1 && n > shown.length) ? `<span class="vg-more">+${n - shown.length}</span>` : '';
+    return `<button type="button" class="vg-thumb" data-vg-open="${i}" aria-label="${L(`Open photo ${i + 1} of ${n}`, `Ouvrir la photo ${i + 1} sur ${n}`)}"><img src="${escapeHtml(p.src)}" alt="" loading="lazy">${more}</button>`;
+  }).join('');
+  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}" alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo', 'Photo')}: ${escapeHtml(p.credit)}</figcaption>` : ''}</figure>`).join('');
+  return `
+      <div class="vg-strip">${thumbs}</div>
+      <dialog class="vg-dialog" id="venueGallery" aria-label="${L(`Photos of ${name}`, `Photos de ${name}`)}">
+        <div class="vg-bar"><span class="vg-count" aria-live="polite">1 / ${n}</span><button type="button" class="vg-close" aria-label="${L('Close photos', 'Fermer les photos')}">&times;</button></div>
+        <div class="vg-track" tabindex="0">${slides}</div>
+        <button type="button" class="vg-nav vg-prev" aria-label="${L('Previous photo', 'Photo pr\u00e9c\u00e9dente')}">&#8249;</button>
+        <button type="button" class="vg-nav vg-next" aria-label="${L('Next photo', 'Photo suivante')}">&#8250;</button>
+      </dialog>
+      <style>
+        .venue-hero-photo { position: relative; }
+        .vg-all { position: absolute; right: 12px; bottom: 12px; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(27,43,58,0.85); color: #fff; font: 700 0.85rem/1.2 'Nunito', sans-serif; cursor: pointer; }
+        .vg-all:hover, .vg-all:focus-visible { background: rgba(27,43,58,1); }
+        .vg-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 8px 0 18px; }
+        .vg-thumb { position: relative; padding: 0; border: 0; border-radius: 8px; overflow: hidden; aspect-ratio: 4 / 3; cursor: pointer; background: #EAE6D9; }
+        .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
+        .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1.1rem 'Nunito', sans-serif; }
+        .vg-dialog { width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #101B24; color: #fff; }
+        .vg-dialog::backdrop { background: rgba(0,0,0,0.85); }
+        .vg-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; z-index: 2; font: 700 0.95rem 'Nunito', sans-serif; }
+        .vg-close { border: 0; background: none; color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; padding: 4px 8px; }
+        .vg-track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+        .vg-track::-webkit-scrollbar { display: none; }
+        .vg-slide { flex: 0 0 100%; height: 100%; margin: 0; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 52px 12px 16px; box-sizing: border-box; }
+        .vg-slide img { max-width: 100%; max-height: calc(100% - 28px); object-fit: contain; }
+        .vg-slide figcaption { margin-top: 8px; font-size: 0.8rem; opacity: 0.75; }
+        .vg-nav { position: absolute; top: 50%; transform: translateY(-50%); border: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.15); color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; z-index: 2; }
+        .vg-prev { left: 12px; } .vg-next { right: 12px; }
+        @media (max-width: 600px) { .vg-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } .vg-strip .vg-thumb:nth-child(5) { display: none; } .vg-nav { display: none; } }
+      </style>
+      <script>
+      (function(){
+        var d = document.getElementById('venueGallery'); if (!d || !d.showModal) return;
+        var track = d.querySelector('.vg-track'), count = d.querySelector('.vg-count'), n = ${n};
+        function cur(){ return Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); }
+        function go(i, smooth){ i = Math.max(0, Math.min(n - 1, i)); track.scrollTo({ left: i * track.clientWidth, behavior: smooth ? 'smooth' : 'auto' }); count.textContent = (i + 1) + ' / ' + n; }
+        function open(i){ d.showModal(); go(i, false); track.focus(); }
+        document.querySelectorAll('[data-vg-open]').forEach(function(b){ b.addEventListener('click', function(){ open(+b.getAttribute('data-vg-open') || 0); }); });
+        d.querySelector('.vg-close').addEventListener('click', function(){ d.close(); });
+        d.querySelector('.vg-prev').addEventListener('click', function(){ go(cur() - 1, true); });
+        d.querySelector('.vg-next').addEventListener('click', function(){ go(cur() + 1, true); });
+        track.addEventListener('scroll', function(){ count.textContent = (cur() + 1) + ' / ' + n; }, { passive: true });
+        d.addEventListener('keydown', function(e){ if (e.key === 'ArrowRight') { e.preventDefault(); go(cur() + 1, true); } else if (e.key === 'ArrowLeft') { e.preventDefault(); go(cur() - 1, true); } });
+        d.addEventListener('click', function(e){ if (e.target === d) d.close(); });
+      })();
+      </script>`;
+}
+
 function ownerPhotoCreditFor(imageUrl) {
   const m = /^\/images\/owner\/([a-z0-9]{24}\.jpg)$/.exec(String(imageUrl || ''));
   if (!m) return null;
