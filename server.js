@@ -30776,6 +30776,13 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-act-btns button, body.owner-page .op-changing button { background: none; border: 0; padding: 2px 0; color: var(--ref-navy); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   body.owner-page .op-act-btns button[data-sure="1"] { color: #9C2F22; }
   body.owner-page .op-count { margin: 4px 0 0; font-size: 0.8rem; }
+  body.owner-page .op-fold { border-top: 1px solid rgba(42,32,25,0.12); border-bottom: 1px solid rgba(42,32,25,0.12); margin: 18px 0; padding: 4px 0; }
+  body.owner-page .op-fold > summary { cursor: pointer; padding: 10px 0; list-style: none; }
+  body.owner-page .op-fold > summary::-webkit-details-marker { display: none; }
+  body.owner-page .op-fold > summary .lyv-section-label::after { content: ' ▸'; font-size: 1.1em; color: var(--ref-navy); }
+  body.owner-page .op-fold[open] > summary .lyv-section-label::after { content: ' ▾'; }
+  body.owner-page .op-fold > summary .lyv-section-label { display: inline; margin: 0; }
+  body.owner-page .op-fold-hint { display: block; font-size: 0.84rem; color: rgba(42,32,25,0.66); margin-top: 2px; }
   body.owner-page .op-count-low { color: #9C2F22; font-weight: 700; }
   body.owner-page .op-changing { background: #FFF4D6; border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; margin: 0 0 12px; }
   body.owner-page .op-changing[hidden] { display: none; }`;
@@ -30911,7 +30918,8 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="opWebsite">Website</label><input type="url" id="opWebsite" maxlength="300" placeholder="yourbusiness.com" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
-      <p class="lyv-section-label">Name, address &amp; links</p>
+      <details class="op-fold" id="opLinksBox">
+      <summary><span class="lyv-section-label">Name, address &amp; links</span> <span class="op-fold-hint">Change your business name, address, menu, booking or social links</span></summary>
       <div class="form-row">
         <div class="form-field"><label for="opBizName">Business name</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
         <div class="form-field"><label for="opAddress">Street address</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
@@ -30924,6 +30932,7 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="opInstagram">Instagram (optional)</label><input type="text" id="opInstagram" maxlength="200" placeholder="@yourbusiness" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
         <div class="form-field"><label for="opFacebook">Facebook page (optional)</label><input type="url" id="opFacebook" maxlength="300" placeholder="facebook.com/yourbusiness" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
       </div>
+      </details>
 
       <p class="lyv-section-label">Description</p>
       <div class="form-row full"><div class="form-field">
@@ -31081,6 +31090,7 @@ ${renderGolfHeaderHtml()}
     var errs = Array.prototype.filter.call(scope.querySelectorAll('.lyv-error'), function(x){ return !x.hidden && x.textContent; });
     var first = errs.filter(function(x){ return !/FormError$/.test(x.id); })[0] || errs[0];
     if (!first) return;
+    var fold = first.closest('details'); if (fold) fold.open = true;
     first.scrollIntoView({ behavior: 'smooth', block: 'center' });
     var f = first.closest('.form-field') || first.parentNode;
     var input = f && f.querySelector('input:not([type=checkbox]):not([disabled]), textarea, select');
