@@ -28684,7 +28684,9 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     } else if (phone !== current.phone) changes.phone = phone;
   }
   if ('website' in input) {
-    const site = typeof input.website === 'string' ? input.website.trim() : '';
+    let site = typeof input.website === 'string' ? input.website.trim() : '';
+    // Most people type "woodfirebakery.ca" or "www.…": add the https:// for them.
+    if (site && !/^[a-z][a-z0-9+.-]*:\/\//i.test(site)) site = `https://${site}`;
     let ok = site === '';
     if (site) {
       try {
@@ -28692,7 +28694,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         ok = (u.protocol === 'https:' || u.protocol === 'http:') && /\./.test(u.hostname) && site.length <= 300 && !/\s/.test(site);
       } catch (e) { ok = false; }
     }
-    if (!ok) errors.website = 'Please enter the full web address, starting with https://';
+    if (!ok) errors.website = 'Please check the web address, for example yourbusiness.com';
     else if (site !== current.website) changes.website = site || null;
   }
   if ('description' in input) {
@@ -30842,13 +30844,13 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-section-label">Contact</p>
       <div class="form-row">
         <div class="form-field"><label for="opPhone">Phone</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
-        <div class="form-field"><label for="opWebsite">Website</label><input type="url" id="opWebsite" maxlength="300" placeholder="https://" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
+        <div class="form-field"><label for="opWebsite">Website</label><input type="url" id="opWebsite" maxlength="300" placeholder="yourbusiness.com" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
       <p class="lyv-section-label">Description</p>
       <div class="form-row full"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}">${escapeHtml(snap.description)}</textarea>
-        <p class="op-hint">A few sentences about what makes your place worth a visit. We may lightly edit for length and style.</p>
+        <p class="op-hint">A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match. We may lightly edit for length and style.</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
@@ -31086,12 +31088,17 @@ ${renderGolfHeaderHtml()}
     changeOf = null; document.getElementById('oeChanging').hidden = true;
     document.getElementById('oeSubmit').textContent = 'Send event'; document.getElementById('events').textContent = 'Add an event';
   }
-  document.getElementById('oeChangeStop').addEventListener('click', function(){ ev.reset(); stopChange(); });
+  document.getElementById('oeChangeStop').addEventListener('click', function(){
+    var keepName = document.getElementById('oeContactName').value, keepEmail = document.getElementById('oeContactEmail').value;
+    ev.reset(); stopChange(); document.getElementById('oeContactName').value = keepName; document.getElementById('oeContactEmail').value = keepEmail;
+  });
   document.addEventListener('click', function(e){
     var c = e.target.closest ? e.target.closest('[data-ev-change]') : null;
     if (c) {
       var d = ownerEvents[c.getAttribute('data-ev-change')]; if (!d) return;
+      var keepName = document.getElementById('oeContactName').value || savedName(), keepEmail = document.getElementById('oeContactEmail').value || lastEmail;
       ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now() - 10000;
+      document.getElementById('oeContactName').value = keepName; if (keepEmail) document.getElementById('oeContactEmail').value = keepEmail;
       document.getElementById('oeName').value = d.name || '';
       Array.prototype.forEach.call(document.querySelectorAll('#oeCategories input'), function(x){ x.checked = (d.categories || []).indexOf(x.value) >= 0; });
       [['oeDescription', 'description'], ['oeStartDate', 'start_date'], ['oeEndDate', 'end_date'], ['oeStartTime', 'start_time'], ['oeEndTime', 'end_time'],
