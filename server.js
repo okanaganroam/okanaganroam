@@ -21686,11 +21686,19 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // Good to Know (2026-10-14): type, town and rating are already in the line
   // under the name, so the card keeps only what is new -- and the address
   // carries the map link, replacing the separate Location box.
+  const venueLinkRow = venueLinks(venue.id);
   const detailRows = [
     venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
     venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
+    // Owner-supplied links (2026-10-15, venue_links): shown only once approved.
+    venueLinkRow.menu_url ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
+    venueLinkRow.booking_url ? [L('Book', 'R\u00e9server'), `<a href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book online', 'R\u00e9server en ligne')} \u2197</a>`] : null,
+    (venueLinkRow.instagram_url || venueLinkRow.facebook_url) ? [L('Social', 'R\u00e9seaux'), [
+      venueLinkRow.instagram_url ? `<a href="${escapeHtml(venueLinkRow.instagram_url)}" rel="nofollow noopener" target="_blank">Instagram</a>` : '',
+      venueLinkRow.facebook_url ? `<a href="${escapeHtml(venueLinkRow.facebook_url)}" rel="nofollow noopener" target="_blank">Facebook</a>` : '',
+    ].filter(Boolean).join(' &middot; ')] : null,
     (venue.price && venue.type !== 'golf') ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
@@ -21746,6 +21754,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // exists; nothing here fabricates a website, phone number, or address.
   const ctaButtons = [
     venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${L('Visit Website', 'Visiter le site Web')}</a>` : null,
+    venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book', 'R\u00e9server')}</a>` : null,
     mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('Get Directions', 'Itin\u00e9raire')}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
@@ -28554,7 +28563,26 @@ function ownerOptionalEmail(value) {
 function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
-const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour'];
+const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+// Name, address and links (2026-10-15). Links live in venue_links.
+const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+function venueLinks(venueId) {
+  return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url FROM venue_links WHERE venue_id = ?').get(venueId)
+    || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null };
+}
+// "@woodfire.bakery", "woodfire.bakery" or any instagram.com link -> https://www.instagram.com/woodfire.bakery/
+function normalizeInstagram(value) {
+  const v = String(value || '').trim();
+  const m = /^(?:@|(?:https?:\/\/)?(?:www\.)?instagram\.com\/)?([A-Za-z0-9._]{1,30})\/?(?:\?.*)?$/i.exec(v);
+  return m ? `https://www.instagram.com/${m[1]}/` : null;
+}
+// A facebook.com (or fb.com) page link, with or without https://.
+function normalizeFacebook(value) {
+  const url = normalizeSubmissionWebsite(String(value || ''));
+  if (!url) return null;
+  const host = new URL(url).hostname.toLowerCase();
+  return /(^|\.)(facebook\.com|fb\.com)$/.test(host) ? url.replace(/^http:/, 'https:') : null;
+}
 const OWNER_DESCRIPTION_MIN = 30;
 const OWNER_DESCRIPTION_MAX = 1200;
 const OWNER_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -28620,6 +28648,9 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     description: venue.description || '',
     badges,
     happy_hour: happyHourTimes || null,
+    name: venue.name || '',
+    address: venue.address || '',
+    ...Object.fromEntries(Object.entries(venueLinks(venue.id)).map(([k, x]) => [k, x || ''])),
   };
 }
 
@@ -28705,6 +28736,29 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       errors.description = 'Please leave out < and > characters.';
     } else if (text !== current.description) changes.description = text;
   }
+  if ('name' in input) {
+    const name = typeof input.name === 'string' ? input.name.trim().replace(/\s+/g, ' ') : '';
+    if (name.length < 2 || name.length > 100 || /[<>]/.test(name)) errors.name = 'Please enter your business name (2 to 100 characters).';
+    else if (name !== current.name) changes.name = name;
+  }
+  if ('address' in input) {
+    const address = typeof input.address === 'string' ? input.address.trim().replace(/\s+/g, ' ') : '';
+    if (address.length < 6 || address.length > 200 || /[<>]/.test(address)) errors.address = 'Please enter the full street address, like 1475 Fairview Rd, Penticton.';
+    else if (address !== current.address) changes.address = address;
+  }
+  for (const f of OWNER_LINK_FIELDS) {
+    if (!(f in input)) continue;
+    const raw = typeof input[f] === 'string' ? input[f].trim() : '';
+    let url = '';
+    if (raw) {
+      url = f === 'instagram_url' ? normalizeInstagram(raw) : f === 'facebook_url' ? normalizeFacebook(raw) : (raw.length <= 300 ? normalizeSubmissionWebsite(raw) : null);
+      if (!url) {
+        errors[f] = f === 'instagram_url' ? 'Please enter your Instagram name, like @yourbusiness.' : f === 'facebook_url' ? 'Please enter your Facebook page link, like facebook.com/yourbusiness.' : 'Please check the link, for example yourbusiness.com/menu.';
+        continue;
+      }
+    }
+    if (url !== current[f]) changes[f] = url || null;
+  }
   if ('badges' in input) {
     const b = input.badges;
     if (!b || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).some((k) => !RESEARCHED_BOOL_FIELDS.includes(k) || typeof b[k] !== 'boolean')) {
@@ -28768,7 +28822,8 @@ function listOwnerChanges(status = 'pending') {
   });
 }
 
-const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour' };
+const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
+  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook' };
 function ownerWeekText(json) {
   if (!json) return '(none)';
   try {
@@ -29987,6 +30042,13 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
         continue;
       }
       if (field === 'happy_hour') continue; // same reason; written below
+      if (OWNER_LINK_FIELDS.includes(field)) {
+        const before = venueLinks(venue.id)[field];
+        db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, value);
+        log.run(venue.id, field, before == null ? null : String(before), value == null ? null : String(value), meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
       if (field === 'badges') {
         const update = {};
         for (const [k, on] of Object.entries(value)) {
@@ -30200,7 +30262,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
 
 // --- review actions ---------------------------------------------------------
 
-const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description'];
+const OWNER_EDITABLE_FIELDS = ['phone', 'website', 'description', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
 
 // Applies the reviewer's edits to a pending update's text fields, checked
 // exactly like the owner's own input. The owner's original is kept in
@@ -30386,7 +30448,9 @@ function renderAdminChangeCard(r) {
       <p class="rv-meta">Update #${r.id} · sent ${adminReviewEsc(adminReviewTime(r.submitted_at))}${r.contact_name ? ` by ${adminReviewEsc(r.contact_name)}` : ''} · <a href="${adminReviewEsc(r.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <table class="rv-diff"><tr><th>Change</th><th>Now</th><th>New</th></tr>${rows}</table>
       ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
-      ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix the phone, website or description before approving.</p>' : ''}
+      ${'address' in r.changes ? '<div class="rv-warn">New address: after approving, check the map pin on the listing (it isn\u2019t moved automatically).</div>' : ''}
+      ${'name' in r.changes ? '<div class="rv-warn">New business name: the page address (URL) stays the same, so links keep working.</div>' : ''}
+      ${Object.keys(r.changes).some((f) => OWNER_EDITABLE_FIELDS.includes(f)) ? '<p class="rv-meta">You can fix any text before approving.</p>' : ''}
       ${adminReviewActions('change', r.id, { approveLabel: 'Approve ticked changes' })}
     </article>`;
 }
@@ -30847,6 +30911,20 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="opWebsite">Website</label><input type="url" id="opWebsite" maxlength="300" placeholder="yourbusiness.com" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
+      <p class="lyv-section-label">Name, address &amp; links</p>
+      <div class="form-row">
+        <div class="form-field"><label for="opBizName">Business name</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
+        <div class="form-field"><label for="opAddress">Street address</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label for="opMenu">Menu link (optional)</label><input type="url" id="opMenu" maxlength="300" placeholder="yourbusiness.com/menu" autocapitalize="off" value="${escapeHtml(snap.menu_url)}"><p class="lyv-error" id="opMenuError" hidden></p></div>
+        <div class="form-field"><label for="opBooking">Booking or tickets link (optional)</label><input type="url" id="opBooking" maxlength="300" placeholder="opentable.ca/…" autocapitalize="off" value="${escapeHtml(snap.booking_url)}"><p class="lyv-error" id="opBookingError" hidden></p></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label for="opInstagram">Instagram (optional)</label><input type="text" id="opInstagram" maxlength="200" placeholder="@yourbusiness" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
+        <div class="form-field"><label for="opFacebook">Facebook page (optional)</label><input type="url" id="opFacebook" maxlength="300" placeholder="facebook.com/yourbusiness" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
+      </div>
+
       <p class="lyv-section-label">Description</p>
       <div class="form-row full"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}">${escapeHtml(snap.description)}</textarea>
@@ -30872,7 +30950,6 @@ ${renderGolfHeaderHtml()}
         ${found.account ? '' : `<div class="form-field"><label for="opEmail">Your email (optional)</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">We&rsquo;ll email you when it&rsquo;s live.</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
       <div class="form-row full"><div class="form-field">
-        <p class="op-hint" style="margin:0 0 6px">Need to change your business name, address, menu or booking link, or social links? Tell us here and we&rsquo;ll update it.</p>
         <label for="opNote">Note for us (optional)</label>
         <textarea id="opNote" rows="3" maxlength="1000" placeholder="Seasonal closures, new menu, anything we should know."></textarea>
       </div></div>
@@ -31035,7 +31112,7 @@ ${renderGolfHeaderHtml()}
   ['opName', 'oeContactName'].forEach(function(id){ var el = document.getElementById(id); if (el && !el.value) el.value = savedName(); });
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opHoursError','opPhoneError','opWebsiteError','opDescriptionError','opBadgesError','opHappyError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
+    ['opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', 'Please fill in both times for each day you are open.'); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', 'Add the times for ' + h.blank + ', or tick Closed.'); jumpToError(form); return; }
@@ -31043,6 +31120,9 @@ ${renderGolfHeaderHtml()}
       hours: h.week,
       phone: document.getElementById('opPhone').value,
       website: document.getElementById('opWebsite').value,
+      name: document.getElementById('opBizName').value, address: document.getElementById('opAddress').value,
+      menu_url: document.getElementById('opMenu').value, booking_url: document.getElementById('opBooking').value,
+      instagram_url: document.getElementById('opInstagram').value, facebook_url: document.getElementById('opFacebook').value,
       description: document.getElementById('opDescription').value,
       badges: {}
     };
@@ -31056,6 +31136,7 @@ ${renderGolfHeaderHtml()}
     if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
     if (changes.phone === initial.phone) delete changes.phone;
     if (changes.website === initial.website) delete changes.website;
+    ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url'].forEach(function(k){ if (changes[k] === initial[k]) delete changes[k]; });
     if (changes.description === initial.description) delete changes.description;
     var btn = document.getElementById('opSubmit');
     btn.disabled = true;
@@ -31072,6 +31153,8 @@ ${renderGolfHeaderHtml()}
           form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
+        show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
+        show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opEmailError', errs.contact_email);
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? 'Please fix the highlighted fields.' : 'Sorry, something went wrong. Please try again.'));
         jumpToError(form);
