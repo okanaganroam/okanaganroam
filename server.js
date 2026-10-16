@@ -29562,20 +29562,32 @@ function ownerResetHash(value) {
   return crypto.createHash('sha256').update(`okanagan-roam-owner-reset:${value}`).digest('hex');
 }
 
+// The key as pasted into Railway, without stray spaces, line breaks or quotes.
+function brevoApiKey() {
+  return String(process.env.BREVO_API_KEY || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
+}
+
 async function sendOwnerEmailViaBrevo({ to, subject, text }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
-    headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'api-key': brevoApiKey(), 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text }),
   });
-  if (!res.ok) throw new Error(`Brevo HTTP ${res.status}`);
+  if (!res.ok) {
+    // Brevo's own reason (e.g. "Key not found"), never the key itself.
+    let why = '';
+    try { const j = await res.json(); why = [j.code, j.message].filter(Boolean).join(': ').slice(0, 200); } catch (e) { /* not JSON */ }
+    const k = brevoApiKey();
+    const shape = k.startsWith('xkeysib-') ? 'API key' : k.startsWith('xsmtpsib-') ? 'SMTP key (wrong kind)' : 'unrecognised key format';
+    throw new Error(`Brevo HTTP ${res.status}${why ? ` (${why})` : ''}; BREVO_API_KEY looks like: ${shape}`);
+  }
 }
 // Swapped out by the test suite; null means "no direct email, forward via Dayton".
 let ownerEmailTransport = null;
 function setOwnerEmailTransport(fn) { ownerEmailTransport = fn || null; }
 function ownerDirectEmail() {
   if (ownerEmailTransport) return ownerEmailTransport;
-  return process.env.BREVO_API_KEY ? sendOwnerEmailViaBrevo : null;
+  return brevoApiKey() ? sendOwnerEmailViaBrevo : null;
 }
 
 function ownerResetRecentCount(accountId) {
