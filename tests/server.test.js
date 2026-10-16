@@ -21306,3 +21306,22 @@ test('Example photo cards keep the photo focal height (camping tent sits low in 
   assert.match(css, /\[data-ph="excamptent-0"\]\{--fd-ph:url\('\/images\/outdoors\/examples\/camping-tent-lake-2610-800\.jpg'\);--fd-ph-y:72%\}/);
   assert.match(css, /\[data-ph="restaurant-0"\]\{--fd-ph:url\('[^']+'\)\}/);
 });
+
+test('Water Activities photos (2026-10-16): example photos exist in both sizes; credited photos exist', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const f of ['sailboat', 'waterslide', 'inner-tube', 'wakesurf', 'inflatable-park', 'jet-ski', 'kayaks']) {
+    for (const suffix of ['', '-800']) {
+      const rel = `public/images/outdoors/examples/water-${f}-2610${suffix}.jpg`;
+      assert.ok(fs.existsSync(path.join(__dirname, '..', rel)), `${rel} exists`);
+    }
+  }
+  const credits = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photo-credits.json'), 'utf8'));
+  const batch = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photo-water-2026-10-16.json'), 'utf8'));
+  for (const v of batch.venues) {
+    const rel = v.set.image_url.split('?')[0];
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', rel)), `${rel} exists`);
+    assert.ok(credits[rel], `${rel} is credited`);
+  }
+  assert.equal(app.venueHeroPhoto({ id: 1448, name: 'Splashdown Vernon', type: 'outdoor' }).src, '/images/outdoors/examples/water-waterslide-2610.jpg');
+});
