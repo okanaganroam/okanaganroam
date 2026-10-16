@@ -1,0 +1,126 @@
+{
+  "reason": "User visually approved all ten hiking photos and authorized deployment. User confirmed source permissions in chat.",
+  "batch_id": "hiking-photos-batch-01-2026-10-15",
+  "venues": [
+    {
+      "id": 1250,
+      "name": "Okanagan Rail Trail",
+      "region": "lake-country",
+      "slug": "okanagan-rail-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/okanagan-rail-trail-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1218,
+      "name": "Scenic Canyon Regional Park",
+      "region": "kelowna",
+      "slug": "scenic-canyon-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/scenic-canyon-regional-park-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1233,
+      "name": "Big White Ski Resort",
+      "region": "big-white",
+      "slug": "big-white-ski-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/big-white-ski-resort-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1260,
+      "name": "Kuipers' Peak Mountain Park",
+      "region": "kelowna",
+      "slug": "kuipers-peak-mountain-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/kuipers-peak-mountain-park-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1227,
+      "name": "Giant's Head Mountain Park",
+      "region": "summerland",
+      "slug": "giants-head-mountain-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/giants-head-mountain-park-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1256,
+      "name": "Middleton Mountain (Farnsworth Nature Reserve)",
+      "region": "vernon",
+      "slug": "middleton-mountain-farnsworth-nature-reserve",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/middleton-mountain-farnsworth-nature-reserve-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1265,
+      "name": "Mount Boucherie \u2013 Boucherie Rush Trail",
+      "region": "west-kelowna",
+      "slug": "mount-boucherie-boucherie-rush-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mount-boucherie-boucherie-rush-trail-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1226,
+      "name": "Knox Mountain Park",
+      "region": "kelowna",
+      "slug": "knox-mountain-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/knox-mountain-park-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1220,
+      "name": "Johns Family Nature Conservancy Regional Park",
+      "region": "kelowna",
+      "slug": "johns-family-nature-conservancy-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261015.jpg?v=20261015h1"
+      }
+    },
+    {
+      "id": 1140,
+      "name": "Ellison Provincial Park",
+      "region": "vernon",
+      "slug": "ellison-provincial-park",
+      "expect": {
+        "image_url": "/images/beaches/venues/vernon-ellison-provincial-park.jpg?v=beach-photo-2"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/ellison-provincial-park-20261015.jpg?v=20261015h1"
+      }
+    }
+  ]
+}
