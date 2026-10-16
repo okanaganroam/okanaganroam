@@ -20831,7 +20831,7 @@ test('Owner event changes (2026-10-15): change or withdraw a waiting event; chan
 
     // The other two fixes are on the page.
     assert.match(page, /id="opDescCount"/);
-    assert.match(page, /Need to change your business name, address, menu or booking link, or social links\? Tell us here/);
+    assert.match(page, /Name, address &amp; links/);
     assert.match(page, /function jumpToError\(scope\)/);
   } finally {
     app.setOwnerEmailTransport(null);
@@ -20864,6 +20864,69 @@ test('Owner final polish (2026-10-15): website without https is accepted, Change
     assert.match(page, /placeholder="yourbusiness\.com"/);
     assert.match(page, /If it mentions your hours or prices, check they still match\./);
     assert.match(page, /var keepName = document\.getElementById\('oeContactName'\)\.value \|\| savedName\(\)/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner name, address & links (2026-10-15): owners propose them, we approve, the listing shows them; the URL stays', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Links Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'links-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'links-fixture-cafe');
+  const token = app.createOwnerLink(v.id, { contact_email: 'links@example.com' }).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, headers = {}) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.18.0.${ip++}`, ...headers }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const send = (changes) => post(`/owner/${token}/changes`, { changes, started_at: Date.now() - 10000 });
+  try {
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /id="opBizName" maxlength="100" value="Links Fixture Cafe"/);
+    assert.match(page, /id="opInstagram"[^>]*placeholder="@yourbusiness"/);
+    // Bad input is refused with a clear message.
+    const bad = await send({ instagram_url: 'not an instagram!', facebook_url: 'twitter.com/x', address: 'abc', name: 'x' });
+    assert.equal(bad.status, 400);
+    assert.match(bad.body.errors.instagram_url, /@yourbusiness/);
+    assert.match(bad.body.errors.facebook_url, /facebook\.com\/yourbusiness/);
+    assert.match(bad.body.errors.address, /full street address/);
+    assert.match(bad.body.errors.name, /business name/);
+    // Good input, typed the way people type it.
+    const ok = await send({ name: 'Links Fixture Cafe & Bakery', address: '1475 Fairview Road, Kelowna, BC', menu_url: 'linksfixture.ca/menu',
+      booking_url: 'https://www.opentable.ca/r/links-fixture', instagram_url: '@links.fixture', facebook_url: 'facebook.com/linksfixture' });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    const req = app.getOwnerChange(ok.body.id);
+    assert.deepEqual(req.changes, { name: 'Links Fixture Cafe & Bakery', address: '1475 Fairview Road, Kelowna, BC', menu_url: 'https://linksfixture.ca/menu',
+      booking_url: 'https://www.opentable.ca/r/links-fixture', instagram_url: 'https://www.instagram.com/links.fixture/', facebook_url: 'https://facebook.com/linksfixture' });
+    // Nothing shows until approved.
+    let listing = await fetch(`${base}/kelowna/cafes/links-fixture-cafe`).then((r) => r.text());
+    assert.doesNotMatch(listing, /See the menu/);
+    // The review page warns about the address and the name.
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    const review = await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text());
+    assert.match(review, /check the map pin/);
+    assert.match(review, /the page address \(URL\) stays the same/);
+    assert.match(review, /name="instagram_url" value="https:\/\/www\.instagram\.com\/links\.fixture\/"/);
+    const appr = await post(`/admin/review/change/${ok.body.id}/approve`, {}, { Cookie: cookie });
+    assert.equal(appr.status, 200, JSON.stringify(appr.body));
+    const row = db.prepare('SELECT name, address, slug FROM venues WHERE id = ?').get(v.id);
+    assert.equal(row.name, 'Links Fixture Cafe & Bakery');
+    assert.equal(row.address, '1475 Fairview Road, Kelowna, BC');
+    assert.equal(row.slug, 'links-fixture-cafe', 'the URL does not change');
+    listing = await fetch(`${base}/kelowna/cafes/links-fixture-cafe`).then((r) => r.text());
+    assert.match(listing, /<h1>Links Fixture Cafe &amp; Bakery<\/h1>|Links Fixture Cafe &amp; Bakery/);
+    assert.match(listing, /<a href="https:\/\/linksfixture\.ca\/menu" rel="nofollow noopener" target="_blank">See the menu/);
+    assert.match(listing, /<a class="cta secondary" href="https:\/\/www\.opentable\.ca\/r\/links-fixture" rel="nofollow noopener" target="_blank">Book<\/a>/);
+    assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
+    const logged = db.prepare("SELECT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(v.id).map((r) => r.field_name).sort();
+    assert.deepEqual(logged, ['address', 'booking_url', 'facebook_url', 'instagram_url', 'menu_url', 'name']);
+    // The form now starts from the new values, and a link can be removed.
+    assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /id="opMenu"[^>]*value="https:\/\/linksfixture\.ca\/menu"/);
+    const clear = await send({ menu_url: '' });
+    assert.deepEqual(app.getOwnerChange(clear.body.id).changes, { menu_url: null });
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }

@@ -897,4 +897,18 @@ CREATE TABLE IF NOT EXISTS owner_event_changes (
 CREATE INDEX IF NOT EXISTS idx_owner_event_changes_status ON owner_event_changes (status, submitted_at);
 `);
 
+// Venue links (2026-10-15): menu, booking and social links an owner sends
+// (approved like every owner change). Kept off the venues table so the
+// venue API and every list that reads venues stay exactly as they are.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_links (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  menu_url TEXT,
+  booking_url TEXT,
+  instagram_url TEXT,
+  facebook_url TEXT,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 module.exports = db;
