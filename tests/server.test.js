@@ -19892,10 +19892,16 @@ test('Owner portal: edit link, owner page, change request, review and approval',
     assert.equal(reqRow.previous.badges.patio, false);
     assert.match(await fetch(`${base}/owner/${token}`).then((r) => r.text()), /waiting for review/);
 
-    // A newer request supersedes the older pending one.
+    // A newer request is added to the older pending one (2026-10-15): the earlier
+    // fields stay, the field sent again takes the new value, and it is reviewed once.
     const second = await send(token, { started_at: started, changes: { phone: '250-555-0199' } });
     assert.equal(second.status, 201);
     assert.equal(app.getOwnerChange(ok.body.id).status, 'superseded');
+    const merged = app.getOwnerChange(second.body.id);
+    assert.deepEqual(Object.keys(merged.changes).sort(), ['badges', 'description', 'happy_hour', 'hours', 'phone', 'website']);
+    assert.equal(merged.changes.phone, '250-555-0199');
+    assert.equal(merged.changes.website, app.getOwnerChange(ok.body.id).changes.website);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'pending'").get(v.id).n, 1);
     assert.equal((await admin(`/admin/owner-changes/${ok.body.id}/approve`, { reviewer: 'test' })).status, 409);
 
     // Reject, then approve a fresh full request.
@@ -20717,6 +20723,34 @@ test('Last updated (2026-10-15): only the owner\'s own changes date the listing,
     assert.match(await get(`/owner/${token}`), /<p class="op-last">Last updated Sept 2, 2026<\/p>/);
     const cookie = (await post(`/owner/${token}/account`, { email: 'lastupdated@example.com', password: 'a long enough password' })).cookie;
     assert.match(await get('/owner/account', cookie), /<span class="op-last">Last updated Sept 2, 2026<\/span>/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner follow-ups (2026-10-15): pending note says new changes are added; event and photo messages say we will email; email shared across forms', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Follow Up Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'follow-up-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'follow-up-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const post = (path, body) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.15.0.1' }, body: JSON.stringify(body) }).then((r) => r.json());
+  try {
+    const a = await post(`/owner/${token}/changes`, { changes: { website: 'https://followup.example' }, note: 'First note', started_at: Date.now() - 10000 });
+    const b = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0197' }, note: 'Second note', contact_email: 'fu@example.com', started_at: Date.now() - 10000 });
+    const merged = app.getOwnerChange(b.id);
+    assert.equal(app.getOwnerChange(a.id).status, 'superseded');
+    assert.deepEqual(merged.changes, { website: 'https://followup.example', phone: '250-555-0197' });
+    assert.equal(merged.note, 'First note\n\nSecond note');
+    assert.equal(merged.contact_email, 'fu@example.com');
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /waiting for review\. Anything else you send now is added to them\./);
+    assert.match(page, /Thanks! Your event is in for review, usually within a day\. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On\./);
+    assert.match(page, /and email you when ' \+ \(sent === 1 \? 'it’s' : 'they’re'\) \+ ' live\./);
+    assert.match(page, /\['opEmail', 'ofEmail', 'oeContactEmail'\]\.forEach\(function\(id\)\{ var el = document\.getElementById\(id\); if \(el\) el\.value = v; \}\)/);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }

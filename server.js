@@ -28847,10 +28847,25 @@ async function handleOwnerChangeSubmission(req, res, token) {
   let id;
   db.exec('BEGIN');
   try {
-    // A newer request replaces an older one still waiting for review.
+    // A newer request is ADDED to one still waiting for review (2026-10-15): the
+    // form starts from the live listing, so anything the owner didn't touch this
+    // time keeps what they sent before; a field sent again takes the newer value.
+    // The combined request replaces the old one, so you review it once.
+    const waiting = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1").get(venue.id);
+    let all = changes, prev = previous, allNote = note, name = contactName, email = contact.email;
+    if (waiting) {
+      const before = JSON.parse(waiting.changes), beforePrev = JSON.parse(waiting.previous);
+      all = { ...before, ...changes };
+      if (before.badges && changes.badges) all.badges = { ...before.badges, ...changes.badges };
+      prev = { ...beforePrev, ...previous };
+      if (beforePrev.badges && previous.badges) prev.badges = { ...beforePrev.badges, ...previous.badges };
+      allNote = [waiting.note, note].filter(Boolean).join('\n\n').slice(0, 2000) || null;
+      name = contactName || waiting.contact_name;
+      email = contact.email || waiting.contact_email;
+    }
     db.prepare("UPDATE owner_change_requests SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status = 'pending'").run(venue.id);
     id = Number(db.prepare('INSERT INTO owner_change_requests (venue_id, changes, previous, note, contact_name, contact_email, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(venue.id, JSON.stringify(changes), JSON.stringify(previous), note, contactName, contact.email, ipHash).lastInsertRowid);
+      .run(venue.id, JSON.stringify(all), JSON.stringify(prev), allNote, name, email, ipHash).lastInsertRowid);
     if (!found.account) rememberOwnerContact(venue.id, contact.email);
     db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
     db.exec('COMMIT');
@@ -30501,7 +30516,7 @@ function renderOwnerPage(found, token, pending) {
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
           <label class="amenity-check"><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(BADGE_LABELS[f].title)}</label>`).join('');
   const pendingNote = pending
-    ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review. If you send new changes, they replace that request.</p>`
+    ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review. Anything else you send now is added to them.</p>`
     : '';
   const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
   return `<!DOCTYPE html>
@@ -30695,7 +30710,7 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="oeFormError" hidden></p>
       <button type="submit" class="venue-form-submit" id="oeSubmit">Send event</button>
     </form>
-    <div class="op-done" id="oeDone">Thanks! Your event is in for review. <a href="#events" id="oeAnother">Add another event</a></div>
+    <div class="op-done" id="oeDone">Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On. <a href="#events" id="oeAnother">Add another event</a></div>
 
   </div>
   </main>
@@ -30752,8 +30767,15 @@ ${renderGolfHeaderHtml()}
   // Remember the owner's name on this device for the next form.
   var NAME_KEY = 'okrOwnerName', EMAIL_KEY = 'okrOwnerEmail';
   function emailVal(id){ var el = document.getElementById(id); return el ? el.value : ''; }
+  // The email typed in any form fills the others on this page (and the login box, if empty).
+  var lastEmail = '';
+  function shareEmail(v){
+    v = (v || '').trim(); if (!v) return; lastEmail = v;
+    ['opEmail', 'ofEmail', 'oeContactEmail'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = v; });
+    var le = document.getElementById('olsEmail'); if (le && !le.value) le.value = v;
+  }
   function rememberEmail(v){ try { if (v && v.trim()) localStorage.setItem(EMAIL_KEY, v.trim().slice(0, 254)); } catch (e) {} }
-  ['opEmail', 'ofEmail'].forEach(function(id){ var el = document.getElementById(id); if (el && !el.value) { try { el.value = localStorage.getItem(EMAIL_KEY) || ''; } catch (e) {} } });
+  ['opEmail', 'ofEmail', 'oeContactEmail'].forEach(function(id){ var el = document.getElementById(id); if (el && !el.value) { try { el.value = localStorage.getItem(EMAIL_KEY) || ''; } catch (e) {} } });
   function savedName(){ try { return localStorage.getItem(NAME_KEY) || ''; } catch (e) { return ''; } }
   function rememberName(v){ try { if (v && v.trim()) localStorage.setItem(NAME_KEY, v.trim().slice(0, 100)); } catch (e) {} }
   ['opName', 'oeContactName'].forEach(function(id){ var el = document.getElementById(id); if (el && !el.value) el.value = savedName(); });
@@ -30792,8 +30814,7 @@ ${renderGolfHeaderHtml()}
         if (r.body && r.body.ok) {
           rememberName(document.getElementById('opName').value); rememberEmail(emailVal('opEmail'));
           if (emailVal('opEmail').trim()) document.getElementById('opDoneMail').hidden = false;
-          var pe = document.getElementById('ofEmail'); if (pe && emailVal('opEmail').trim()) pe.value = emailVal('opEmail');
-          var le = document.getElementById('olsEmail'); if (le && !le.value) le.value = emailVal('opEmail');
+          shareEmail(emailVal('opEmail'));
           form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
@@ -30806,7 +30827,7 @@ ${renderGolfHeaderHtml()}
   var evStarted = Date.now();
   var allDay = document.getElementById('oeAllDay');
   allDay.addEventListener('change', function(){ ['oeStartTime','oeEndTime'].forEach(function(id){ document.getElementById(id).disabled = allDay.checked; }); });
-  document.getElementById('oeAnother').addEventListener('click', function(){ ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); });
+  document.getElementById('oeAnother').addEventListener('click', function(){ ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); if (lastEmail) document.getElementById('oeContactEmail').value = lastEmail; });
   // Signed-in owners: remove a photo, or make one the main photo.
   var grid = document.getElementById('opPhotoGrid');
   if (grid) grid.addEventListener('click', function(e){
@@ -30836,7 +30857,7 @@ ${renderGolfHeaderHtml()}
       .then(function(r){ return r.json(); })
       .then(function(j){
         b.disabled = false;
-        if (j && j.ok) { rememberName(v('oeContactName')); ev.style.display = 'none'; document.getElementById('oeDone').classList.add('show'); return; }
+        if (j && j.ok) { rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none'; document.getElementById('oeDone').classList.add('show'); return; }
         var errs = (j && j.errors) || {};
         Object.keys(errs).forEach(function(k){ if (ids[k]) show(ids[k], errs[k]); });
         show('oeFormError', (j && j.error) || 'Sorry, something went wrong. Please try again.');
@@ -30894,9 +30915,9 @@ ${renderGolfHeaderHtml()}
     });
     chain.then(function(){
       btn.disabled = false;
-      progress.textContent = !sent ? '' : liveCount ? sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded and live on your page. Thanks!' : sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded. Thanks! We will review them shortly.';
+      progress.textContent = !sent ? '' : liveCount ? sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded and live on your page. Thanks!' : sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded. Thanks! We\u2019ll review ' + (sent === 1 ? 'it' : 'them') + ', usually within a day' + (emailVal('ofEmail').trim() ? ', and email you when ' + (sent === 1 ? 'it\u2019s' : 'they\u2019re') + ' live.' : '.');
       if (problems.length) show('ofFormError', problems.join(' '));
-      if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); }
+      if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); }
     }).catch(function(){ btn.disabled = false; show('ofFormError', 'Could not upload. Please check your connection and try again.'); });
   });
   // "create a login" in the thank-you note opens the login box.
