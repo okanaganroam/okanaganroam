@@ -16028,7 +16028,7 @@ const EXAMPLE_ACTIVITY_PHOTOS = Object.freeze({
   exfishkid: { alt: 'A child fishing from a small dock', pos: 50 },
   exfishtackle: { alt: 'Hand-tied flies, lures and a rod laid out on a table', pos: 50 },
   // Camping (2026-10-16).
-  excamptent: { alt: 'A tent pitched at a waterfront lake campsite', pos: 65 },
+  excamptent: { alt: 'A tent pitched at a waterfront lake campsite', pos: 72 },
   excampfamily: { alt: 'A family camping among the trees by a lake', pos: 45 },
   excampfire: { alt: 'A campfire at a forest campsite', pos: 60 },
   excampsunrise: { alt: 'A tent and kayak beside the water at sunrise', pos: 60 },
@@ -16080,7 +16080,10 @@ function foodDrinkCardPhotoKey(v) {
 }
 function foodDrinkCardPhotoCss() {
   const rules = [];
-  for (const [t, list] of Object.entries(FD_CARD_PHOTOS)) list.forEach((src, i) => rules.push(`[data-ph="${t}-${i}"]{--fd-ph:url('${src}')}`));
+  // Activity example photos keep their focal height on the short card strip
+  // (the camping tent sits low in its photo).
+  const y = (t) => (EXAMPLE_ACTIVITY_PHOTOS[t] && EXAMPLE_ACTIVITY_PHOTOS[t].pos !== 50 ? `;--fd-ph-y:${EXAMPLE_ACTIVITY_PHOTOS[t].pos}%` : '');
+  for (const [t, list] of Object.entries(FD_CARD_PHOTOS)) list.forEach((src, i) => rules.push(`[data-ph="${t}-${i}"]{--fd-ph:url('${src}')${y(t)}}`));
   for (const [t, src] of Object.entries(FD_CARD_DOG_PHOTOS)) rules.push(`[data-ph="${t}-dog"]{--fd-ph:url('${src}')}`);
   rules.push(`[data-ph="noodle"]{--fd-ph:url('/images/trip-v3/stops/stop-restaurant-noodle-480.jpg')}`);
   return rules.map((r) => `  body.fd-page li.venue-card${r}`).join('\n');
@@ -16430,7 +16433,7 @@ function renderFoodDrinkHubStyles() {
      (or the venue's own) instead of the one lake illustration on every card.
      Only cards carrying data-ph (the Food & Drink lists) change. */
   body.fd-page li.venue-card[data-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; }
-  body.fd-page li.venue-card[data-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--fd-ph) center 50% / cover no-repeat; pointer-events: none; }
+  body.fd-page li.venue-card[data-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--fd-ph) center var(--fd-ph-y, 50%) / cover no-repeat; pointer-events: none; }
 ${foodDrinkCardPhotoCss()}
   /* The excerpt is already shortened, and the name opens the full page, so
      the list cards drop the inline Read more and keep the text short. */
@@ -35606,6 +35609,7 @@ module.exports = {
   FD_HEART_USE,
   venuePageUsesEngagement,
   venueHeroPhoto,
+  foodDrinkCardPhotoCss,
   venueThumbPhoto,
   trimVenueTagline,
   venueDayHoursText,
