@@ -1,0 +1,18 @@
+{
+  "reason": "Dayton chose the rope-course example photo for LocoLanding (2026-10-16): the Flickr mini-golf photo was too small and cropped badly as the main photo.",
+  "batch_id": "venue-photo-locolanding-example-2026-10-16",
+  "venues": [
+    {
+      "id": 1308,
+      "name": "LocoLanding Adventure Park",
+      "region": "penticton",
+      "slug": "locolanding-adventure-park",
+      "expect": {
+        "image_url": "/images/venues/locolanding-mini-golf.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": null
+      }
+    }
+  ]
+}
