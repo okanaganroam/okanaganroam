@@ -1,0 +1,18 @@
+{
+  "reason": "Owner-supplied photo for The Mission Creamery, sent by Francine Horne (founder) by email on 2026-10-16 asking us to use the attached photos.",
+  "batch_id": "venue-photo-mission-creamery-2026-10-16",
+  "venues": [
+    {
+      "id": 702,
+      "name": "The Mission Creamery",
+      "region": "kelowna",
+      "slug": "the-mission-creamery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mission-creamery-cookie-cake.jpg?v=20261016"
+      }
+    }
+  ]
+}
