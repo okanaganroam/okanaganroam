@@ -1143,4 +1143,32 @@ FR_PATTERNS.unshift(
   [/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `Les ${DAYS_LONG[m[1]]}s jusqu’au ${m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
 );
 
+// Weekend pages (2026-10-17): the description and intro carry the weekend's dates, which change through the week
+// ("Fri Oct 16 – Sun Oct 18", then "Sat Oct 17 – Sun Oct 18", then "Sun Oct 18", or across a month). The FR_TEXT
+// entries only matched a Friday start inside one month, so on other days the French twins fell back to the English.
+const SHORT_DATE = '(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\\d{1,2})';
+const WEEKEND_DATES = `(?:${SHORT_DATE}(?: – ${SHORT_DATE})?|this weekend)`;
+const frShortDate = (d, mo, n) => `${DAYS[d]} ${n === '1' ? '1er' : n} ${MONTHS[mo]}`;
+// "du sam. 17 oct. au dim. 18 oct.", "le dim. 18 oct.", or null for the undated "this weekend".
+function frWeekendDates(m, i) {
+  if (!m[i]) return null;
+  const from = frShortDate(m[i], m[i + 1], m[i + 2]);
+  return m[i + 3] ? `du ${from} au ${frShortDate(m[i + 3], m[i + 4], m[i + 5])}` : `le ${from}`;
+}
+const frWeekendPlace = (place, c) => (place === 'the Okanagan' ? 'dans l’Okanagan' : Object.values(c.regions).includes(place) ? `à ${place}` : null);
+FR_PATTERNS.unshift(
+  [new RegExp(`^What['’]s on in (.+?)(, BC,)? this weekend \\(${WEEKEND_DATES}\\): festivals, live music, markets, shows and family events, with times and details for each\\.$`), (m, tr, c) => {
+    const where = frWeekendPlace(m[1], c);
+    if (!where) return null;
+    const dates = frWeekendDates(m, 3);
+    return `À l’affiche ${where}${m[2] ? ' (C.-B.)' : ''} cette fin de semaine${dates ? ` (${dates})` : ''} : festivals, musique en direct, marchés, spectacles et événements familiaux, avec les heures et les détails de chacun.`;
+  }],
+  [new RegExp(`^What['’]s on in (.+?) this weekend, ${WEEKEND_DATES}: festivals, live music, markets, shows and family events\\. Pick a type of event to narrow it down\\.$`), (m, tr, c) => {
+    const where = frWeekendPlace(m[1], c);
+    if (!where) return null;
+    const dates = frWeekendDates(m, 2);
+    return `À l’affiche ${where} cette fin de semaine${dates ? `, ${dates}` : ''} : festivals, musique en direct, marchés, spectacles et événements familiaux. Choisissez un type d’événement pour préciser votre recherche.`;
+  }],
+);
+
 module.exports = { FR_TEXT, FR_PATTERNS, FR_SCRIPT, FR_CUISINE, frTime };

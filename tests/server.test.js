@@ -19713,6 +19713,36 @@ test('French twins: which addresses have one, and how a /fr request maps to its 
   assert.equal(app.frenchTwinRequest('/fr/kelowna/restaurants/test-trattoria'), null, 'place pages keep their own route');
 });
 
+test('French twins: weekend page description and intro are French on every day of the week, across months too', () => {
+  const at = (d) => new Date(`${d}T19:00:00Z`); // noon in the Okanagan
+  const text = (scope, d) => app.whatsOnScopeText(scope, app.whatsOnWeekendWindow(at(d)));
+  // Saturday: the window is Sat-Sun (the old Friday-only entry missed this and left the English).
+  const sat = text({ region: 'kelowna', weekend: true }, '2026-10-17');
+  assert.equal(app.frText(sat.description), 'À l’affiche à Kelowna (C.-B.) cette fin de semaine (du sam. 17 oct. au dim. 18 oct.) : festivals, musique en direct, marchés, spectacles et événements familiaux, avec les heures et les détails de chacun.');
+  assert.equal(app.frText(sat.intro), 'À l’affiche à Kelowna cette fin de semaine, du sam. 17 oct. au dim. 18 oct. : festivals, musique en direct, marchés, spectacles et événements familiaux. Choisissez un type d’événement pour préciser votre recherche.');
+  // Sunday: a single date.
+  assert.match(app.frText(text({ region: 'big-white', weekend: true }, '2026-10-18').description), /^À l’affiche à Big White \(C\.-B\.\) cette fin de semaine \(le dim\. 18 oct\.\) : /);
+  // The whole valley, across a month: Fri Oct 30 - Sun Nov 1.
+  const valley = text({ weekend: true }, '2026-10-28');
+  assert.equal(app.frText(valley.description), 'À l’affiche dans l’Okanagan cette fin de semaine (du ven. 30 oct. au dim. 1er nov.) : festivals, musique en direct, marchés, spectacles et événements familiaux, avec les heures et les détails de chacun.');
+  assert.match(app.frText(valley.intro), /^À l’affiche dans l’Okanagan cette fin de semaine, du ven\. 30 oct\. au dim\. 1er nov\. : /);
+  // No dates at all.
+  assert.match(app.frText(app.whatsOnScopeText({ region: 'oliver', weekend: true }).description), /^À l’affiche à Oliver \(C\.-B\.\) cette fin de semaine : festivals/);
+  // Every day of two weeks, every town and the valley: never English.
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(Date.UTC(2026, 9, 26 + i)).toISOString().slice(0, 10);
+    for (const region of [null, ...Object.keys(app.REGION_LABELS || { kelowna: 1 })]) {
+      const t = text(region ? { region, weekend: true } : { weekend: true }, d);
+      for (const s of [t.description, t.intro]) {
+        const fr = app.frText(s);
+        assert.ok(fr && fr.startsWith('À l’affiche') && !/What|weekend|festivals, live/.test(fr), `${d} ${region}: ${s} -> ${fr}`);
+      }
+    }
+  }
+  // Not a town or the valley: left alone rather than guessed.
+  assert.equal(app.frText('What’s on in Narnia this weekend, Sat Oct 17 – Sun Oct 18: festivals, live music, markets, shows and family events. Pick a type of event to narrow it down.'), null);
+});
+
 test('French twins: the word list and its patterns (times, opening status, counts, cuisines, ratings)', () => {
   assert.equal(app.frText('View details →'), 'Voir les détails →');
   assert.equal(app.frText('Closes 8:30 PM'), 'Ferme à 20 h 30');
