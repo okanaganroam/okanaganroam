@@ -19916,7 +19916,9 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
     name: activity ? activity.label : 'Outdoors',
     crumbs: activity ? [{ name: 'Outdoors', href: '/outdoors' }] : [],
     title: activity ? `${activity.label} in the Okanagan | Okanagan Roam` : 'Outdoor Adventures in the Okanagan | Okanagan Roam',
-    description: activity ? `${activity.blurb} ${acts.size ? [...acts.values()].filter((x) => x.includes(activity.slug)).length : 0} spots across the Okanagan Valley.` : `${venues.length} outdoor destinations across the Okanagan Valley: hiking, viewpoints, nature, cycling, winter, adventure, fishing, camping and water, from Enderby to Osoyoos.`,
+    description: activity ? `${activity.blurb} ${acts.size ? [...acts.values()].filter((x) => x.includes(activity.slug)).length : 0} spots across the Okanagan Valley.`
+      : town.townLabel ? `${venues.length} parks, trails, viewpoints and nature spots in and around ${town.townLabel}, BC, with directions and what to know before you go.`
+        : `${venues.length} outdoor destinations across the Okanagan Valley: hiking, viewpoints, nature, cycling, winter, adventure, fishing, camping and water, from Enderby to Osoyoos.`,
     bodyClass: 'outdoors-hub-page',
     surface: 'outdoors',
     types: live.map((a) => ({ type: a.slug, label: a.label })),
@@ -19953,7 +19955,9 @@ function renderBeachesHubPage(venues, filter = null, opts = {}, now = new Date()
     path: '/beaches',
     name: 'Beaches',
     title: 'Beaches in the Okanagan | Okanagan Roam',
-    description: `${venues.length} beaches and lakeside parks across the Okanagan Valley, from Kalamalka and Okanagan Lake to Skaha and Osoyoos, with dog beaches and their rules.`,
+    description: town.townLabel
+      ? (venues.length === 1 ? `1 beach or lakeside park in ${town.townLabel}, BC, with swimming, dog rules and how to get there.` : `${venues.length} beaches and lakeside parks in ${town.townLabel}, BC, with swimming, dog rules and how to get there.`)
+      : `${venues.length} beaches and lakeside parks across the Okanagan Valley, from Kalamalka and Okanagan Lake to Skaha and Osoyoos, with dog beaches and their rules.`,
     bodyClass: 'beaches-hub-page',
     surface: 'beaches',
     types: BEACH_KINDS,
@@ -19992,7 +19996,9 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
     crumbs: activity ? [{ name: 'Tours & Experiences', href: '/tours' }] : [],
     schemaFilter: activity ? (v) => tourActivityOf(v) === activity.slug : null,
     title: activity ? `${activity.heading || `${activity.label} in the Okanagan`} | Okanagan Roam` : 'Tours & Experiences in the Okanagan | Okanagan Roam',
-    description: `${all.length} tours and experiences in the Okanagan: wine tours, lake cruises, guided hikes, bike tours, farm visits, sleigh rides and more, booked with local operators.`,
+    description: activity && activity.intro ? activity.intro
+      : town.townLabel ? (all.length === 1 ? `1 tour or experience in ${town.townLabel}, BC: wine tours, boat rentals, bike tours, farm visits and more, booked with local operators.` : `${all.length} tours and experiences in ${town.townLabel}, BC: wine tours, boat rentals, bike tours, farm visits and more, booked with local operators.`)
+        : `${all.length} tours and experiences in the Okanagan: wine tours, lake cruises, guided hikes, bike tours, farm visits, sleigh rides and more, booked with local operators.`,
     bodyClass: 'tours-hub-page',
     surface: 'tours',
     types: TOUR_ACTIVITIES.map((a) => ({ type: a.slug, label: a.label })),
@@ -21529,7 +21535,15 @@ const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'placehol
 // 26 novembre."), from french-text.js's season patterns; null for any other text.
 function frSeasonText(t) {
   if (!/^(Closed for the season|Open for the season until|Reopening for the season)/.test(t)) return null;
-  for (const [rx, fn] of frenchText.FR_PATTERNS || []) { const m = t.match(rx); if (m) return fn(m, null, FR_CTX); }
+  // Only the season patterns (2026-10-16): a notice with a comma in its date
+  // ("Reopens May 1, 2027.") also fits the general list pattern, which needs
+  // the translate helper -- it crashed the whole French page.
+  for (const [rx, fn] of frenchText.FR_PATTERNS || []) {
+    if (!/season|Reopen/i.test(rx.source)) continue;
+    const m = t.match(rx);
+    if (!m) continue;
+    try { return fn(m, (x) => frTextOr(x), FR_CTX); } catch (e) { return null; }
+  }
   return null;
 }
 function localizeStaticFr(html) {
@@ -21858,6 +21872,30 @@ function frenchTwinHtml(html, enPath, search = '') {
 }
 // Wraps writeHead/end for one request: the page goes out as its English or French twin; a redirect inside the set
 // stays French.
+// Search-result lengths (2026-10-16): Google cuts titles at about 65
+// characters and descriptions at about 160. A title that runs long drops the
+// " | Okanagan Roam" suffix (Google shows the site name anyway); a long
+// description ends at the last whole word before 157 characters with "…".
+// Applied to every English and French page on its way out.
+function clampMetaText(t, max = 160) {
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 3);
+  const at = cut.lastIndexOf(' ');
+  return `${(at > 80 ? cut.slice(0, at) : cut).replace(/[\s,;:\u2014\u2013-]+$/, '')}\u2026`;
+}
+function tidySeoHead(html) {
+  if (typeof html !== 'string' || !/^<!DOCTYPE html>/i.test(html)) return html;
+  const decode = (x) => x.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+  return html
+    .replace(/<title>([^<]*)<\/title>/, (m, t) => {
+      const plain = decode(t);
+      return plain.length > 65 && / \| Okanagan Roam$/.test(plain) ? `<title>${t.replace(/ \| Okanagan Roam$/, '')}</title>` : m;
+    })
+    .replace(/(<meta (?:name="description"|property="og:description"|name="twitter:description") content=")([^"]*)(")/g, (m, a, d, b) => {
+      const plain = decode(d);
+      return plain.length > 160 ? `${a}${escapeHtml(clampMetaText(plain))}${b}` : m;
+    });
+}
 function installTwinResponse(res, lang, enPath, search = '') {
   res.twinLang = lang;
   const realWriteHead = res.writeHead.bind(res), realEnd = res.end.bind(res);
@@ -21867,7 +21905,14 @@ function installTwinResponse(res, lang, enPath, search = '') {
     const type = String(headers['Content-Type'] || headers['content-type'] || '');
     if (lang === 'fr' && status >= 300 && status < 400 && headers.Location) headers.Location = frHref(headers.Location);
     if (body != null && status === 200 && /text\/html/.test(type)) {
-      body = lang === 'fr' ? frenchTwinHtml(String(body), enPath, search) : englishTwinHtml(String(body), enPath, search);
+      // A French page that fails to translate is served from its English
+      // HTML (French shell) rather than a server error (2026-10-16).
+      let twin;
+      try { twin = lang === 'fr' ? frenchTwinHtml(String(body), enPath, search) : englishTwinHtml(String(body), enPath, search); } catch (e) {
+        console.error(`[fr-twin] ${enPath}: ${e && e.message}`);
+        twin = englishTwinHtml(String(body), enPath, search);
+      }
+      body = tidySeoHead(twin);
       delete headers['Content-Length']; delete headers.ETag;
     } else if (body != null && status === 404 && lang === 'fr' && /text\/html/.test(type)) {
       // A French address whose English page does not exist gets the French 404 page.
@@ -32632,6 +32677,12 @@ ${renderGolfHeaderHtml()}
 }
 
 const server = http.createServer(async (req, res) => {
+  // One address per page (2026-10-16): /kelowna/ redirects to /kelowna.
+  if ((req.method === 'GET' || req.method === 'HEAD') && /^\/(?!api\/|images\/|styles\/|scripts\/)[^?#]*[^/]\/(\?|$)/.test(req.url)) {
+    const [p, q] = String(req.url).split('?');
+    res.writeHead(301, { Location: p.replace(/\/+$/, '') + (q != null ? `?${q}` : '') });
+    return res.end();
+  }
   // French twins (2026-10-14): /fr + a main or town page renders that page and translates it on the way out; the
   // English page of a pair gets its hreflang and EN / FR switch the same way.
   if (req.method === 'GET' || req.method === 'HEAD') {
@@ -36255,6 +36306,8 @@ module.exports = {
   venueHeroPhoto,
   foodDrinkCardPhotoCss,
   eventKindPhoto,
+  tidySeoHead,
+  frSeasonText,
   EXAMPLE_ACTIVITY_FILES,
   listComboGuides,
   renderComboGuidePage,
