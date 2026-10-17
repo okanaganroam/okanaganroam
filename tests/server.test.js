@@ -10571,7 +10571,7 @@ test('Phase 3: the planner flag is off by default and /trip is unchanged without
   assert.doesNotMatch(legacy, /tripPlanForm|trip-plan-summary/);
   const page = await (await fetch(`${base}/trip`)).text();
   // French twins (2026-10-14): only the EN / FR switch and hreflang are added on the way out.
-  assert.equal(page, app.englishTwinHtml(legacy, '/trip'), 'GET /trip serves the unchanged page');
+  assert.equal(page, app.tidySeoHead(app.englishTwinHtml(legacy, '/trip')), 'GET /trip serves the unchanged page');
   const api = await fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Plan 3 days in Kelowna' }) });
   assert.equal(api.status, 404, 'the route does not exist when the flag is off');
 })));
@@ -11508,7 +11508,7 @@ test('/categories: 200, each visitor-facing category once, linking to its own ex
   assert.equal((html.match(/<p class="category-count">/g) || []).length, counted.length, 'a count line for every card with a count');
   const towns = html.slice(html.indexOf('<nav class="categories-towns"'));
   assert.match(towns, /<a href="\/[a-z-]+">[^<]+ <span>\d[\d,]*<\/span><\/a>/, 'town links with place counts');
-  assert.match(html, /<title>All Categories: Food, Wine, Outdoors &amp; Events in the Okanagan \| Okanagan Roam<\/title>/);
+  assert.match(html, /<title>All Categories: Food, Wine, Outdoors &amp; Events in the Okanagan<\/title>/);
   // Photos (2026-10-12): every Food & Drink card carries its page's banner photo as a lazy thumbnail.
   const fd = html.slice(html.indexOf('<ul class="card-grid category-photo-grid">'));
   assert.ok(html.includes('<ul class="card-grid category-photo-grid">'), 'Food & Drink is a photo grid');
@@ -21629,4 +21629,28 @@ test('Trip cards: /share/trip.jpg serves the photo card, /share/trip.png is stil
     const head = (await s4request('GET', `/my-trip?stops=venue:${venue.id}&days=1`)).text.split('</head>')[0];
     assert.match(head, /og:image" content="https:\/\/okanaganroam\.com\/share\/trip\.jpg\?/);
   } finally { Object.assign(app.TRIP_CARD_RATE, saved); app.tripCardRateReset(); }
+});
+
+// ---- SEO fixes: French season crash, trailing slash, head clamping ----------
+test('SEO fixes: season notice with a comma, trailing-slash 301, clamped head tags', async () => {
+  assert.equal(app.frSeasonText('Closed for the season. Reopens May 1, 2027.'), 'Fermé pour la saison. Réouverture le 1er mai 2027.');
+  const longDesc = 'word '.repeat(60).trim();
+  const head = `<!DOCTYPE html><title>${'A very long page title that keeps going and going past the limit'} | Okanagan Roam</title><meta name="description" content="${longDesc}"><meta property="og:description" content="${longDesc}">`;
+  const tidy = app.tidySeoHead(head);
+  assert.ok(!/\| Okanagan Roam<\/title>/.test(tidy), 'long title drops the site suffix');
+  for (const m of tidy.matchAll(/content="([^"]*)"/g)) assert.ok(m[1].length <= 160, 'description clamped to 160');
+  assert.match(app.tidySeoHead('<!DOCTYPE html><title>Short | Okanagan Roam</title>'), /Short \| Okanagan Roam/);
+  await new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try {
+        let res = await fetch(`http://127.0.0.1:${tmp.address().port}/kelowna/?x=1`, { redirect: 'manual' });
+        assert.equal(res.status, 301);
+        assert.equal(res.headers.get('location'), '/kelowna?x=1');
+        res = await fetch(`http://127.0.0.1:${tmp.address().port}/api/venues/`, { redirect: 'manual' });
+        assert.notEqual(res.status, 301, 'API paths are left alone');
+        resolve();
+      } catch (err) { reject(err); } finally { tmp.close(); }
+    });
+  });
 });
