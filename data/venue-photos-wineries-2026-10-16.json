@@ -1,0 +1,2310 @@
+{
+  "reason": "Winery listing photos from each winery's website, Google Maps, or tourism-board listing; Dayton approved the contact sheet on 2026-10-16 (24 rejected photos replaced or left out).",
+  "batch_id": "venue-photos-wineries-2026-10-16",
+  "venues": [
+    {
+      "id": 194,
+      "name": "Edge of the Earth Vineyards",
+      "region": "armstrong",
+      "slug": "edge-of-the-earth-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/edge-of-the-earth-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 47,
+      "name": "Baccata Ridge Winery",
+      "region": "enderby",
+      "slug": "baccata-ridge-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/baccata-ridge-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 811,
+      "name": "Anthony Buchanan Wines",
+      "region": "kaleden",
+      "slug": "anthony-buchanan-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/anthony-buchanan-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1422,
+      "name": "Farm Gate Winery & Fruit Stand",
+      "region": "kaleden",
+      "slug": "farm-gate-winery-fruit-stand",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/farm-gate-winery-fruit-stand-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 343,
+      "name": "Kraze Legz Vineyard and Winery",
+      "region": "kaleden",
+      "slug": "kraze-legz-vineyard-and-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kraze-legz-vineyard-and-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1420,
+      "name": "Ailm Estate",
+      "region": "kelowna",
+      "slug": "ailm-estate",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ailm-estate-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 21,
+      "name": "Ancient Hill Winery",
+      "region": "kelowna",
+      "slug": "ancient-hill-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ancient-hill-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 812,
+      "name": "Azhadi Vineyards",
+      "region": "kelowna",
+      "slug": "azhadi-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/azhadi-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 125,
+      "name": "CedarCreek Estate Winery",
+      "region": "kelowna",
+      "slug": "cedarcreek-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cedarcreek-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 253,
+      "name": "Grizzli Winery",
+      "region": "kelowna",
+      "slug": "grizzli-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/grizzli-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 837,
+      "name": "Hidden Vines Family Estate Winery",
+      "region": "kelowna",
+      "slug": "hidden-vines-family-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hidden-vines-family-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 396,
+      "name": "Martin's Lane Winery",
+      "region": "kelowna",
+      "slug": "martin-s-lane-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/martin-s-lane-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 401,
+      "name": "Meadow Vista Honey Wines",
+      "region": "kelowna",
+      "slug": "meadow-vista-honey-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/meadow-vista-honey-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 429,
+      "name": "Nagging Doubt Winery",
+      "region": "kelowna",
+      "slug": "nagging-doubt-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nagging-doubt-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 571,
+      "name": "Sandhill Wines",
+      "region": "kelowna",
+      "slug": "sandhill-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sandhill-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 867,
+      "name": "Scorched Earth Winery",
+      "region": "kelowna",
+      "slug": "scorched-earth-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/scorched-earth-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 606,
+      "name": "SpearHead Winery",
+      "region": "kelowna",
+      "slug": "spearhead-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spearhead-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 608,
+      "name": "Sperling Vineyards",
+      "region": "kelowna",
+      "slug": "sperling-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sperling-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 611,
+      "name": "St Hubertus & Oak Bay Estate Winery",
+      "region": "kelowna",
+      "slug": "st-hubertus-oak-bay-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/st-hubertus-oak-bay-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 622,
+      "name": "Summerhill Pyramid Winery",
+      "region": "kelowna",
+      "slug": "summerhill-pyramid-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerhill-pyramid-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 654,
+      "name": "Tantalus Vineyards",
+      "region": "kelowna",
+      "slug": "tantalus-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tantalus-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 716,
+      "name": "The Vibrant Vine Winery",
+      "region": "kelowna",
+      "slug": "the-vibrant-vine-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-vibrant-vine-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 717,
+      "name": "The View Winery & Vineyard",
+      "region": "kelowna",
+      "slug": "the-view-winery-vineyard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-view-winery-vineyard-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 883,
+      "name": "Waldhof Family Estate Winery",
+      "region": "kelowna",
+      "slug": "waldhof-family-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/waldhof-family-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 7,
+      "name": "50th Parallel Estate Winery - Block One Restaurant",
+      "region": "lake-country",
+      "slug": "50th-parallel-estate-winery-block-one-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/50th-parallel-estate-winery-block-one-restaurant-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 8,
+      "name": "50th Parallel Estate Winery - Tasting Room",
+      "region": "lake-country",
+      "slug": "50th-parallel-estate-winery-tasting-room",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/50th-parallel-estate-winery-tasting-room-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 32,
+      "name": "Arrowleaf Cellars",
+      "region": "lake-country",
+      "slug": "arrowleaf-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/arrowleaf-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 80,
+      "name": "Blind Tiger Vineyards",
+      "region": "lake-country",
+      "slug": "blind-tiger-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blind-tiger-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 207,
+      "name": "Ex Nihilo Vineyards & Tasting Room",
+      "region": "lake-country",
+      "slug": "ex-nihilo-vineyards-tasting-room",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ex-nihilo-vineyards-tasting-room-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 250,
+      "name": "Gray Monk Estate Winery",
+      "region": "lake-country",
+      "slug": "gray-monk-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gray-monk-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 291,
+      "name": "Intrigue Wines",
+      "region": "lake-country",
+      "slug": "intrigue-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/intrigue-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 445,
+      "name": "O'Rourke Family Estate",
+      "region": "lake-country",
+      "slug": "o-rourke-family-estate",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/o-rourke-family-estate-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 489,
+      "name": "Peak Cellars",
+      "region": "lake-country",
+      "slug": "peak-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peak-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 818,
+      "name": "Aasha Wines",
+      "region": "naramata",
+      "slug": "aasha-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/aasha-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 65,
+      "name": "Bench 1775 Winery",
+      "region": "naramata",
+      "slug": "bench-1775-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bench-1775-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 816,
+      "name": "Black Widow Winery",
+      "region": "naramata",
+      "slug": "black-widow-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-widow-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 823,
+      "name": "Chain Reaction Winery",
+      "region": "naramata",
+      "slug": "chain-reaction-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chain-reaction-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 165,
+      "name": "D'Angelo Estate Winery",
+      "region": "naramata",
+      "slug": "d-angelo-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/d-angelo-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 171,
+      "name": "Daydreamer Wines",
+      "region": "naramata",
+      "slug": "daydreamer-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/daydreamer-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 172,
+      "name": "Deep Roots Winery",
+      "region": "naramata",
+      "slug": "deep-roots-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/deep-roots-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 198,
+      "name": "Elephant Island Winery",
+      "region": "naramata",
+      "slug": "elephant-island-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/elephant-island-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 206,
+      "name": "Evolve Sparkling House",
+      "region": "naramata",
+      "slug": "evolve-sparkling-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/evolve-sparkling-house-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 831,
+      "name": "Fox & Archer Wines",
+      "region": "naramata",
+      "slug": "fox-archer-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fox-archer-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 832,
+      "name": "Foxtrot Vineyards",
+      "region": "naramata",
+      "slug": "foxtrot-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/foxtrot-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 273,
+      "name": "Hillside Winery",
+      "region": "naramata",
+      "slug": "hillside-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hillside-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 280,
+      "name": "Howling Bluff Estate Winery",
+      "region": "naramata",
+      "slug": "howling-bluff-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/howling-bluff-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1666,
+      "name": "Kettle Valley Winery",
+      "region": "naramata",
+      "slug": "kettle-valley-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kettle-valley-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 355,
+      "name": "Lake Breeze Vineyards Tasting Room",
+      "region": "naramata",
+      "slug": "lake-breeze-vineyards-tasting-room",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lake-breeze-vineyards-tasting-room-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 843,
+      "name": "Lang Vineyards",
+      "region": "naramata",
+      "slug": "lang-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lang-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 845,
+      "name": "Laughing Stock Vineyards",
+      "region": "naramata",
+      "slug": "laughing-stock-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/laughing-stock-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 369,
+      "name": "Little Engine Wines",
+      "region": "naramata",
+      "slug": "little-engine-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/little-engine-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 394,
+      "name": "Marichel Winery",
+      "region": "naramata",
+      "slug": "marichel-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/marichel-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 852,
+      "name": "Mocojo Winery",
+      "region": "naramata",
+      "slug": "mocojo-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mocojo-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 853,
+      "name": "Modesta Winery",
+      "region": "naramata",
+      "slug": "modesta-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/modesta-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 855,
+      "name": "Nichol Vineyards",
+      "region": "naramata",
+      "slug": "nichol-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nichol-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 859,
+      "name": "Origin Wines",
+      "region": "naramata",
+      "slug": "origin-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/origin-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 863,
+      "name": "Red Rooster Winery",
+      "region": "naramata",
+      "slug": "red-rooster-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-rooster-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 578,
+      "name": "Serendipity Winery",
+      "region": "naramata",
+      "slug": "serendipity-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/serendipity-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 659,
+      "name": "Terravista Vineyards",
+      "region": "naramata",
+      "slug": "terravista-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/terravista-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 879,
+      "name": "Therapy Vineyards",
+      "region": "naramata",
+      "slug": "therapy-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/therapy-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 880,
+      "name": "Tightrope Winery",
+      "region": "naramata",
+      "slug": "tightrope-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tightrope-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 730,
+      "name": "Township 7 Vineyards & Winery",
+      "region": "naramata",
+      "slug": "township-7-vineyards-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/township-7-vineyards-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 755,
+      "name": "Van Westen Vineyards",
+      "region": "naramata",
+      "slug": "van-westen-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/van-westen-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 778,
+      "name": "Wesbert Winery",
+      "region": "naramata",
+      "slug": "wesbert-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wesbert-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 813,
+      "name": "BC Wine Studio & Carter Wine Co",
+      "region": "okanagan-falls",
+      "slug": "bc-wine-studio-carter-wine-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bc-wine-studio-carter-wine-co-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 76,
+      "name": "Blasted Church Vineyards",
+      "region": "okanagan-falls",
+      "slug": "blasted-church-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blasted-church-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 820,
+      "name": "Bonamici Cellars",
+      "region": "okanagan-falls",
+      "slug": "bonamici-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bonamici-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 825,
+      "name": "CODE Wines",
+      "region": "okanagan-falls",
+      "slug": "code-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/code-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 828,
+      "name": "Echo Bay Vineyard",
+      "region": "okanagan-falls",
+      "slug": "echo-bay-vineyard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/echo-bay-vineyard-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 847,
+      "name": "Liquidity Wines",
+      "region": "okanagan-falls",
+      "slug": "liquidity-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/liquidity-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 851,
+      "name": "Mayhem Wines",
+      "region": "okanagan-falls",
+      "slug": "mayhem-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mayhem-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 404,
+      "name": "Meyer Family Vineyards",
+      "region": "okanagan-falls",
+      "slug": "meyer-family-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/meyer-family-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 415,
+      "name": "Montakarn Estate Winery",
+      "region": "okanagan-falls",
+      "slug": "montakarn-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/montakarn-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 442,
+      "name": "Noble Ridge Vineyard & Winery",
+      "region": "okanagan-falls",
+      "slug": "noble-ridge-vineyard-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/noble-ridge-vineyard-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 862,
+      "name": "Ramification Cellars",
+      "region": "okanagan-falls",
+      "slug": "ramification-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ramification-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 577,
+      "name": "See Ya Later Ranch Winery",
+      "region": "okanagan-falls",
+      "slug": "see-ya-later-ranch-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/see-ya-later-ranch-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 612,
+      "name": "Stag's Hollow Winery",
+      "region": "okanagan-falls",
+      "slug": "stag-s-hollow-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/stag-s-hollow-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 875,
+      "name": "Synchromesh Wines",
+      "region": "okanagan-falls",
+      "slug": "synchromesh-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/synchromesh-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 763,
+      "name": "Vineyard Kitchen & Patio at Nighthawk Vineyards",
+      "region": "okanagan-falls",
+      "slug": "vineyard-kitchen-patio-at-nighthawk-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vineyard-kitchen-patio-at-nighthawk-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 784,
+      "name": "Wild Goose Winery",
+      "region": "okanagan-falls",
+      "slug": "wild-goose-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wild-goose-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1407,
+      "name": "Apricus Cellars",
+      "region": "oliver",
+      "slug": "apricus-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/apricus-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 56,
+      "name": "Bartier Bros. Vineyard & Winery",
+      "region": "oliver",
+      "slug": "bartier-bros-vineyard-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bartier-bros-vineyard-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 72,
+      "name": "Black Hills Estate Winery",
+      "region": "oliver",
+      "slug": "black-hills-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-hills-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 104,
+      "name": "Burrowing Owl Estate Winery",
+      "region": "oliver",
+      "slug": "burrowing-owl-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/burrowing-owl-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 821,
+      "name": "Canter Cellars",
+      "region": "oliver",
+      "slug": "canter-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/canter-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 822,
+      "name": "Castoro de Oro Estate Winery",
+      "region": "oliver",
+      "slug": "castoro-de-oro-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/castoro-de-oro-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 838,
+      "name": "Cellar Door & More",
+      "region": "oliver",
+      "slug": "jackson-triggs-inniskillin-okanagan",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jackson-triggs-inniskillin-okanagan-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 824,
+      "name": "Checkmate Artisanal Winery",
+      "region": "oliver",
+      "slug": "checkmate-artisanal-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/checkmate-artisanal-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 142,
+      "name": "Church & State Wines",
+      "region": "oliver",
+      "slug": "church-state-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/church-state-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 153,
+      "name": "Covert Farms Family Estate",
+      "region": "oliver",
+      "slug": "covert-farms-family-estate",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/covert-farms-family-estate-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 827,
+      "name": "Culmina Family Estate Winery",
+      "region": "oliver",
+      "slug": "culmina-family-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/culmina-family-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 181,
+      "name": "Domaine Artema",
+      "region": "oliver",
+      "slug": "domaine-artema",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/domaine-artema-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 829,
+      "name": "Fairview Cellars",
+      "region": "oliver",
+      "slug": "fairview-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fairview-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1408,
+      "name": "Foolish Wine",
+      "region": "oliver",
+      "slug": "foolish-wine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/foolish-wine-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 223,
+      "name": "French Door Estate Winery",
+      "region": "oliver",
+      "slug": "french-door-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/french-door-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 237,
+      "name": "Gehringer Brothers Estate Winery",
+      "region": "oliver",
+      "slug": "gehringer-brothers-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gehringer-brothers-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 834,
+      "name": "Gneiss Wines",
+      "region": "oliver",
+      "slug": "gneiss-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gneiss-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 243,
+      "name": "Gold Hill Winery",
+      "region": "oliver",
+      "slug": "gold-hill-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gold-hill-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 271,
+      "name": "Here's the Thing Vineyards",
+      "region": "oliver",
+      "slug": "here-s-the-thing-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/here-s-the-thing-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 272,
+      "name": "Hester Creek Estate Winery",
+      "region": "oliver",
+      "slug": "hester-creek-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hester-creek-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 836,
+      "name": "Hidden Chapel Winery",
+      "region": "oliver",
+      "slug": "hidden-chapel-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hidden-chapel-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 290,
+      "name": "Intersection Estate Winery",
+      "region": "oliver",
+      "slug": "intersection-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/intersection-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 840,
+      "name": "La Casa Bianca Winery",
+      "region": "oliver",
+      "slug": "la-casa-bianca-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-casa-bianca-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 363,
+      "name": "Le Vieux Pin",
+      "region": "oliver",
+      "slug": "le-vieux-pin",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/le-vieux-pin-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 390,
+      "name": "Manzil Indian Restaurant at Kismet Estate Winery",
+      "region": "oliver",
+      "slug": "manzil-indian-restaurant-at-kismet-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/manzil-indian-restaurant-at-kismet-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 850,
+      "name": "Maverick Estate Winery",
+      "region": "oliver",
+      "slug": "maverick-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/maverick-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 856,
+      "name": "Nostalgia Wines",
+      "region": "oliver",
+      "slug": "nostalgia-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nostalgia-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 857,
+      "name": "Oak & Sparrow Estate Winery",
+      "region": "oliver",
+      "slug": "oak-sparrow-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oak-sparrow-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 500,
+      "name": "Phantom Creek Estates",
+      "region": "oliver",
+      "slug": "phantom-creek-estates",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/phantom-creek-estates-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 861,
+      "name": "Pipe Dreams Vineyard & Winery",
+      "region": "oliver",
+      "slug": "pipe-dreams-vineyard-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pipe-dreams-vineyard-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 516,
+      "name": "Platinum Bench Estate Winery & Artisan Bread Co.",
+      "region": "oliver",
+      "slug": "platinum-bench-estate-winery-artisan-bread-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/platinum-bench-estate-winery-artisan-bread-co-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 534,
+      "name": "Quinta Ferreira Estate Winery",
+      "region": "oliver",
+      "slug": "quinta-ferreira-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/quinta-ferreira-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 539,
+      "name": "Rainmaker Wines",
+      "region": "oliver",
+      "slug": "rainmaker-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rainmaker-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 544,
+      "name": "Red Barn Winery at Jagged Rock",
+      "region": "oliver",
+      "slug": "red-barn-winery-at-jagged-rock",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-barn-winery-at-jagged-rock-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 550,
+      "name": "River Stone Estate Winery",
+      "region": "oliver",
+      "slug": "river-stone-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/river-stone-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 865,
+      "name": "Road 13 Vineyards",
+      "region": "oliver",
+      "slug": "road-13-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/road-13-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 561,
+      "name": "Rust Wine Co - Oliver/Osoyoos",
+      "region": "oliver",
+      "slug": "rust-wine-co-oliver-osoyoos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rust-wine-co-oliver-osoyoos-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 868,
+      "name": "Second Chapter Wine Company",
+      "region": "oliver",
+      "slug": "second-chapter-wine-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/second-chapter-wine-company-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 586,
+      "name": "Silver Sage Winery",
+      "region": "oliver",
+      "slug": "silver-sage-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/silver-sage-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1684,
+      "name": "SpaceDog Wines",
+      "region": "oliver",
+      "slug": "spacedog-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spacedog-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 872,
+      "name": "Squeezed Wines",
+      "region": "oliver",
+      "slug": "squeezed-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/squeezed-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 873,
+      "name": "Stoneboat Vineyards",
+      "region": "oliver",
+      "slug": "stoneboat-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/stoneboat-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 876,
+      "name": "Tender Hope Winery",
+      "region": "oliver",
+      "slug": "tender-hope-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tender-hope-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 878,
+      "name": "The Opera Room",
+      "region": "oliver",
+      "slug": "the-opera-room",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-opera-room-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 727,
+      "name": "Tinhorn Creek Vineyards",
+      "region": "oliver",
+      "slug": "tinhorn-creek-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tinhorn-creek-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 881,
+      "name": "Vasanti Estate Winery",
+      "region": "oliver",
+      "slug": "vasanti-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vasanti-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 884,
+      "name": "Winemaker's Cut",
+      "region": "oliver",
+      "slug": "winemaker-s-cut",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/winemaker-s-cut-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 885,
+      "name": "vinAmité Cellars",
+      "region": "oliver",
+      "slug": "vinamite-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vinamite-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 13,
+      "name": "Adega On 45th Estate Winery",
+      "region": "osoyoos",
+      "slug": "adega-on-45th-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/adega-on-45th-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 90,
+      "name": "Bordertown Vineyards & Estate Winery",
+      "region": "osoyoos",
+      "slug": "bordertown-vineyards-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bordertown-vineyards-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 841,
+      "name": "La Stella Winery",
+      "region": "osoyoos",
+      "slug": "la-stella-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-stella-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 842,
+      "name": "Lakeside Cellars",
+      "region": "osoyoos",
+      "slug": "lakeside-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakeside-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 844,
+      "name": "Lariana Cellars",
+      "region": "osoyoos",
+      "slug": "lariana-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lariana-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 846,
+      "name": "Liber Farms & Winery",
+      "region": "osoyoos",
+      "slug": "liber-farms-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/liber-farms-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 418,
+      "name": "Moon Curser Vineyards",
+      "region": "osoyoos",
+      "slug": "moon-curser-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/moon-curser-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 428,
+      "name": "Mythology Vineyard",
+      "region": "osoyoos",
+      "slug": "mythology-vineyard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mythology-vineyard-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 438,
+      "name": "Night Bird Estate Winery",
+      "region": "osoyoos",
+      "slug": "night-bird-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/night-bird-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 441,
+      "name": "Nk'Mip Cellars",
+      "region": "osoyoos",
+      "slug": "nk-mip-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nk-mip-cellars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 468,
+      "name": "Over the Fence Winery",
+      "region": "osoyoos",
+      "slug": "over-the-fence-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/over-the-fence-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 216,
+      "name": "Fitzpatrick Family Vineyards at Greata Ranch",
+      "region": "peachland",
+      "slug": "fitzpatrick-family-vineyards-at-greata-ranch",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fitzpatrick-family-vineyards-at-greata-ranch-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 258,
+      "name": "Hainle Vineyards Estate Winery",
+      "region": "peachland",
+      "slug": "hainle-vineyards-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hainle-vineyards-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 73,
+      "name": "Black Market Wine Co.",
+      "region": "penticton",
+      "slug": "black-market-wine-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-market-wine-co-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 140,
+      "name": "Chronos Winery",
+      "region": "penticton",
+      "slug": "chronos-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chronos-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 160,
+      "name": "Crescent Hill Winery",
+      "region": "penticton",
+      "slug": "crescent-hill-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/crescent-hill-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 167,
+      "name": "Da Silva Vineyards and Winery",
+      "region": "penticton",
+      "slug": "da-silva-vineyards-and-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/da-silva-vineyards-and-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 830,
+      "name": "Four Shadows Vineyard & Winery",
+      "region": "penticton",
+      "slug": "four-shadows-vineyard-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/four-shadows-vineyard-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 350,
+      "name": "La Frenz Winery",
+      "region": "penticton",
+      "slug": "la-frenz-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-frenz-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 357,
+      "name": "Lakeboat Vineyard & Winery",
+      "region": "penticton",
+      "slug": "lakeboat-vineyard-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakeboat-vineyard-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 848,
+      "name": "Lock & Worth Winery",
+      "region": "penticton",
+      "slug": "lock-worth-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lock-worth-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 419,
+      "name": "Moraine Estate Winery",
+      "region": "penticton",
+      "slug": "moraine-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/moraine-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 473,
+      "name": "Painted Rock Estate Winery",
+      "region": "penticton",
+      "slug": "painted-rock-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/painted-rock-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 491,
+      "name": "Pentage Winery",
+      "region": "penticton",
+      "slug": "pentage-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pentage-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 517,
+      "name": "Play Estate Winery",
+      "region": "penticton",
+      "slug": "play-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/play-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 521,
+      "name": "Poplar Grove Winery",
+      "region": "penticton",
+      "slug": "poplar-grove-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/poplar-grove-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 866,
+      "name": "Roche Wines",
+      "region": "penticton",
+      "slug": "roche-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/roche-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 560,
+      "name": "Ruby Blues Winery",
+      "region": "penticton",
+      "slug": "ruby-blues-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ruby-blues-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 722,
+      "name": "Three Sisters Winery",
+      "region": "penticton",
+      "slug": "three-sisters-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/three-sisters-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 751,
+      "name": "Upper Bench Estate Winery and Creamery",
+      "region": "penticton",
+      "slug": "upper-bench-estate-winery-and-creamery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/upper-bench-estate-winery-and-creamery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 9,
+      "name": "8th Generation Vineyard",
+      "region": "summerland",
+      "slug": "8th-generation-vineyard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/8th-generation-vineyard-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 179,
+      "name": "Dirty Laundry Winery",
+      "region": "summerland",
+      "slug": "dirty-laundry-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dirty-laundry-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 833,
+      "name": "Garnet Valley Ranch Winery",
+      "region": "summerland",
+      "slug": "garnet-valley-ranch-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/garnet-valley-ranch-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 835,
+      "name": "Haywire Winery",
+      "region": "summerland",
+      "slug": "haywire-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/haywire-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 269,
+      "name": "Heaven's Gate Estate Winery",
+      "region": "summerland",
+      "slug": "heaven-s-gate-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/heaven-s-gate-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 366,
+      "name": "Lightning Rock Winery",
+      "region": "summerland",
+      "slug": "lightning-rock-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lightning-rock-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 849,
+      "name": "Lunessence Winery & Vineyards",
+      "region": "summerland",
+      "slug": "lunessence-winery-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lunessence-winery-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 858,
+      "name": "Observatory Wines",
+      "region": "summerland",
+      "slug": "observatory-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/observatory-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 860,
+      "name": "Pamplemousse Jus Natural Winery",
+      "region": "summerland",
+      "slug": "pamplemousse-jus-natural-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pamplemousse-jus-natural-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 565,
+      "name": "Sage Hills Wine",
+      "region": "summerland",
+      "slug": "sage-hills-wine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sage-hills-wine-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 869,
+      "name": "Silkscarf Winery",
+      "region": "summerland",
+      "slug": "silkscarf-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/silkscarf-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 870,
+      "name": "Sleeping Giant Fruit Winery",
+      "region": "summerland",
+      "slug": "sleeping-giant-fruit-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sleeping-giant-fruit-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 871,
+      "name": "Solvero Wines",
+      "region": "summerland",
+      "slug": "solvero-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/solvero-wines-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 621,
+      "name": "SummerGate Winery",
+      "region": "summerland",
+      "slug": "summergate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summergate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 720,
+      "name": "Thornhaven Estates Winery",
+      "region": "summerland",
+      "slug": "thornhaven-estates-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/thornhaven-estates-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 757,
+      "name": "Ve Oh Lay Acres Winery & Farm",
+      "region": "summerland",
+      "slug": "ve-oh-lay-acres-winery-farm",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ve-oh-lay-acres-winery-farm-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 882,
+      "name": "Vows & Vines Vineyard",
+      "region": "summerland",
+      "slug": "vows-vines-vineyard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vows-vines-vineyard-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 705,
+      "name": "The Perch Winery",
+      "region": "vernon",
+      "slug": "the-perch-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-perch-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 64,
+      "name": "Beaumont Family Estate Winery",
+      "region": "west-kelowna",
+      "slug": "beaumont-family-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/beaumont-family-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 75,
+      "name": "Black Swift Vineyards",
+      "region": "west-kelowna",
+      "slug": "black-swift-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-swift-vineyards-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 144,
+      "name": "Ciao Bella Winery",
+      "region": "west-kelowna",
+      "slug": "ciao-bella-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ciao-bella-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 826,
+      "name": "Crown & Thieves",
+      "region": "west-kelowna",
+      "slug": "crown-thieves",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/crown-thieves-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 228,
+      "name": "Frind Estate Winery",
+      "region": "west-kelowna",
+      "slug": "frind-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/frind-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 839,
+      "name": "Kalala Organic Estate Winery",
+      "region": "west-kelowna",
+      "slug": "kalala-organic-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kalala-organic-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 370,
+      "name": "Little Straw Vineyards Family Estate Winery",
+      "region": "west-kelowna",
+      "slug": "little-straw-vineyards-family-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/little-straw-vineyards-family-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 412,
+      "name": "Mission Hill Family Estate Winery",
+      "region": "west-kelowna",
+      "slug": "mission-hill-family-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mission-hill-family-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 422,
+      "name": "Mt. Boucherie Estate Winery",
+      "region": "west-kelowna",
+      "slug": "mt-boucherie-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mt-boucherie-estate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 854,
+      "name": "Niche Wine Company",
+      "region": "west-kelowna",
+      "slug": "niche-wine-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/niche-wine-company-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 452,
+      "name": "Off The Grid Organic Winery",
+      "region": "west-kelowna",
+      "slug": "off-the-grid-organic-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/off-the-grid-organic-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 530,
+      "name": "Quails' Gate Winery",
+      "region": "west-kelowna",
+      "slug": "quails-gate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/quails-gate-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 554,
+      "name": "Rollingdale Winery",
+      "region": "west-kelowna",
+      "slug": "rollingdale-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rollingdale-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 877,
+      "name": "The Gallery Winery",
+      "region": "west-kelowna",
+      "slug": "the-gallery-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-gallery-winery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 689,
+      "name": "The Hatch",
+      "region": "west-kelowna",
+      "slug": "the-hatch",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-hatch-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 767,
+      "name": "Volcanic Hills Estate Winery",
+      "region": "west-kelowna",
+      "slug": "volcanic-hills-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/volcanic-hills-estate-winery-2610.jpg?v=20261016"
+      }
+    }
+  ]
+}
