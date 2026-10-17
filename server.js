@@ -22334,6 +22334,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // still shown to visitors on the page.
     openingHoursSpecification: buildOpeningHoursSpecification(pageHours),
   };
+  // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
+  const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
+  if (venueMenu) localBusiness.hasMenu = menuMenuUrl(venue, fr ? 'fr' : 'en');
 
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
@@ -22575,7 +22578,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, localBusiness], { alternates: hasFrench ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
-${golfEngagementHeadHtml(venue.type, true, 'venue')}
+${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
+${VENUE_MENU_CSS}` : ''}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
@@ -22598,6 +22602,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
+  ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${guideLinks}
   </div>
   <aside class="venue-aside">
@@ -30475,6 +30480,1177 @@ async function handleOwnerPhotoUpload(req, res, token) {
   return sendSubmissionResponse(res, 201, { ok: true, id, live, main, preview: `/owner-photos/preview/${previewKey}.jpg` });
 }
 
+// ---------- Menus (2026-10-17) ----------
+//
+// An owner photographs their printed menu in the business login (or sends a PDF); the server has Claude read it
+// into sections and dishes; the owner checks it on a preview and publishes. The menu then shows as text on the
+// venue's own /menu page (and a short preview on the venue page), so search engines can read every dish.
+// Signed-in owners publish straight away; owners on a private link wait for Dayton, like photos. "Can you do it
+// for me?" sends the pages to info@ instead, and Dayton finishes the menu in the same editor from /admin/review.
+// Page files stay private on the persistent volume (only the text is ever published).
+const MENU_DIR = process.env.MENU_DIR
+  || (fs.existsSync('/data') ? '/data/owner-menus' : path.join(__dirname, '.owner-menus-local'));
+const MENU_VENUE_TYPES = new Set([...FOOD_DRINK_TYPES, 'winery']);
+const MENU_MAX_PAGES = 10;
+const MENU_JPEG_MAX_BYTES = 4 * 1024 * 1024;
+const MENU_PDF_MAX_BYTES = 10 * 1024 * 1024;
+const MENU_MAX_BODY = Math.ceil(MENU_PDF_MAX_BYTES * 4 / 3) + 64 * 1024; // base64 + fields
+const MENU_MIN_EDGE = 500;
+const MENU_MAX_EDGE = 4000;
+const MENU_UPLOAD_RATE_LIMIT = 60; // page uploads per IP per hour
+const MENU_READS_PER_VENUE_PER_DAY = 8;
+const MENU_READS_PER_DAY = Number(process.env.MENU_DAILY_READ_LIMIT) || 200;
+const MENU_INDEX_MIN_ITEMS = 5; // fewer dishes: the /menu page is noindex and left out of the sitemap
+const MENU_LIMITS = { sections: 40, items: 500, name: 140, description: 500, price: 40, note: 300 };
+const MENU_DIETARY = ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'spicy'];
+const MENU_DIETARY_LABELS = {
+  en: { vegan: 'Vegan', vegetarian: 'Vegetarian', gluten_free: 'Gluten-free', dairy_free: 'Dairy-free', spicy: 'Spicy' },
+  fr: { vegan: 'Végane', vegetarian: 'Végétarien', gluten_free: 'Sans gluten', dairy_free: 'Sans produits laitiers', spicy: 'Épicé' },
+};
+const MENU_DIET_SCHEMA = { vegan: 'https://schema.org/VeganDiet', vegetarian: 'https://schema.org/VegetarianDiet', gluten_free: 'https://schema.org/GlutenFreeDiet' };
+const MENU_MODEL = 'claude-opus-5-5';
+
+function menuFilePath(file) {
+  if (!/^[a-f0-9]{24}\.(?:jpg|pdf)$/.test(file)) throw new Error('bad menu file name');
+  return path.join(MENU_DIR, file);
+}
+function menuPagePath(venue, lang = 'en') { return `${venuePagePath(venue, lang)}/menu`; }
+function menuPreviewUrl(f) { return `/owner-menus/preview/${f.preview_key}.${f.kind === 'pdf' ? 'pdf' : 'jpg'}`; }
+
+// A menu as stored and published: { sections: [{ name, note, items: [{ name, description, price, dietary, check }] }] }.
+// Anything else in what was sent is dropped; text is trimmed, flattened and capped. Empty dishes and sections go.
+function normalizeMenuData(raw) {
+  const text = (v, max) => (typeof v === 'string' ? v : '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const out = { sections: [] };
+  let items = 0;
+  const sections = raw && Array.isArray(raw.sections) ? raw.sections : [];
+  for (const s of sections.slice(0, MENU_LIMITS.sections)) {
+    if (!s || typeof s !== 'object') continue;
+    const sec = { name: text(s.name, MENU_LIMITS.name), note: text(s.note, MENU_LIMITS.note), items: [] };
+    for (const it of Array.isArray(s.items) ? s.items : []) {
+      if (!it || typeof it !== 'object' || items >= MENU_LIMITS.items) continue;
+      const name = text(it.name, MENU_LIMITS.name);
+      if (!name) continue;
+      const dietary = Array.isArray(it.dietary) ? [...new Set(it.dietary.filter((d) => MENU_DIETARY.includes(d)))] : [];
+      sec.items.push({ name, description: text(it.description, MENU_LIMITS.description), price: text(it.price, MENU_LIMITS.price), dietary, check: it.check === true });
+      items++;
+    }
+    if (sec.items.length) out.sections.push(sec);
+  }
+  if (raw && raw.partial === true) out.partial = true;
+  return out;
+}
+function menuItemCount(data) { return data && Array.isArray(data.sections) ? data.sections.reduce((n, s) => n + s.items.length, 0) : 0; }
+function parseMenuData(json) { try { return normalizeMenuData(JSON.parse(json || 'null')); } catch (e) { return { sections: [] }; } }
+
+// "18" -> 18, "$18.50" -> 18.5, "12 / 16" -> 12 (the first price), "MP" -> null.
+function menuPriceNumber(price) {
+  const m = /(\d{1,5}(?:[.,]\d{1,2})?)/.exec(String(price || ''));
+  return m ? Number(m[1].replace(',', '.')) : null;
+}
+// How a price shows: a bare number gets a dollar sign ("18.50" -> "$18.50", French "18,50 $"); anything else as printed.
+function menuPriceLabel(price, lang = 'en') {
+  const p = String(price || '').trim();
+  if (!/^\$?\d{1,5}(?:[.,]\d{1,2})?$/.test(p)) return p;
+  const n = p.replace('$', '');
+  return lang === 'fr' ? `${n.replace('.', ',')} $` : `$${n.replace(',', '.')}`;
+}
+
+// ----- Reading a menu with Claude -----
+const MENU_READ_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['readable', 'problem', 'sections'],
+  properties: {
+    readable: { type: 'boolean' },
+    problem: { type: 'string', enum: ['none', 'not_a_menu', 'too_blurry', 'partly_unreadable'] },
+    sections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'note', 'items'],
+        properties: {
+          name: { type: 'string' },
+          note: { type: 'string' },
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['name', 'description', 'price', 'dietary', 'check'],
+              properties: {
+                name: { type: 'string' },
+                description: { type: 'string' },
+                price: { type: 'string' },
+                dietary: { type: 'array', items: { type: 'string', enum: MENU_DIETARY } },
+                check: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+const MENU_READ_SYSTEM = `You turn photos or PDFs of a restaurant, cafe, bar, brewery or winery menu into structured text for the business's page on Okanagan Roam, a local guide to BC's Okanagan Valley. The business owner will check your work before it is published, so accuracy matters more than completeness.
+
+How to transcribe:
+- Copy dish and drink names, descriptions and prices exactly as printed. Join words split across lines and fix obvious print glitches, but never rewrite, translate, summarize, or add anything that is not on the menu.
+- Keep the menu's own sections, in its order. If the menu has no headings, use one section named "Menu". Several pages are one menu: continue across pages, and merge a section that carries on to the next page.
+- price: as printed, without adding a currency sign ("18", "18.50", "12 / 16", "MP", "Market price"). Empty when no price is shown.
+- description: the ingredients or notes printed with the item, plus size or add-on options in a few words. Empty when there are none.
+- note: text that applies to a whole section, such as "Served with fries or salad" or "Add chicken $6". Empty when there is none.
+- dietary: only what the menu itself marks, such as V, VG, GF or DF letters, a leaf or chili icon, or the words written out. Never guess from the ingredients.
+- check: true when you are not confident you read the name or price correctly (blurry, cut off, handwritten, covered); otherwise false.
+- Leave out everything that is not a dish or drink: the business's address, hours, phone, website, social handles, slogans, payment and allergy disclaimers.
+
+readable and problem:
+- Not a menu at all (a photo of food, a storefront, a receipt): readable false, problem "not_a_menu", no sections.
+- Too blurry, dark or far away to read most of it: readable false, problem "too_blurry", no sections.
+- Mostly readable but parts are cut off or unreadable: readable true, problem "partly_unreadable", and mark the doubtful items with check.
+- Otherwise: readable true, problem "none".`;
+
+function anthropicApiKey() {
+  return String(process.env.ANTHROPIC_API_KEY || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
+}
+// pages: [{ kind: 'jpeg' | 'pdf', buf }]. Resolves { ok: true, result, usage, model } or { ok: false, error }.
+async function readMenuWithClaude(pages) {
+  const key = anthropicApiKey();
+  if (!key) return { ok: false, error: 'unavailable' };
+  const content = pages.map((p) => (p.kind === 'pdf'
+    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: p.buf.toString('base64') } }
+    : { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.buf.toString('base64') } }));
+  content.push({ type: 'text', text: pages.length > 1 ? `These ${pages.length} pages are one menu, in order. Transcribe it.` : 'Transcribe this menu.' });
+  let res;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        // Refusal fallback (opt-in): a safety-classifier decline is re-run server-side on the recommended model.
+        'anthropic-beta': 'server-side-fallback-2026-07-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MENU_MODEL,
+        max_tokens: 32000,
+        system: MENU_READ_SYSTEM,
+        output_config: { effort: 'medium', format: { type: 'json_schema', schema: MENU_READ_SCHEMA } },
+        fallbacks: 'default',
+        messages: [{ role: 'user', content }],
+      }),
+      signal: AbortSignal.timeout(300000),
+    });
+  } catch (err) {
+    return { ok: false, error: 'network', detail: String((err && err.message) || err).slice(0, 200) };
+  }
+  let j = null;
+  try { j = await res.json(); } catch (e) { /* not JSON */ }
+  if (!res.ok || !j) return { ok: false, error: `api_${res.status}`, detail: j && j.error ? String(j.error.message || '').slice(0, 200) : '' };
+  const usage = { input: j.usage ? j.usage.input_tokens : null, output: j.usage ? j.usage.output_tokens : null };
+  if (j.stop_reason === 'refusal') return { ok: false, error: 'refused', usage, model: j.model };
+  if (j.stop_reason === 'max_tokens') return { ok: false, error: 'too_long', usage, model: j.model };
+  const text = (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+  let result;
+  try { result = JSON.parse(text); } catch (e) { return { ok: false, error: 'bad_output', usage, model: j.model }; }
+  return { ok: true, result, usage, model: j.model };
+}
+// Swapped out by the test suite so tests never call the API.
+let menuReader = readMenuWithClaude;
+function setMenuReader(fn) { menuReader = fn || readMenuWithClaude; }
+
+function menuReadsToday(venueId) {
+  const all = db.prepare("SELECT COUNT(*) AS n FROM menu_reads WHERE created_at > datetime('now', '-1 day')").get().n;
+  const venue = db.prepare("SELECT COUNT(*) AS n FROM menu_reads WHERE venue_id = ? AND created_at > datetime('now', '-1 day')").get(venueId).n;
+  return { all, venue };
+}
+// Why reading can't start right now, or null.
+function menuReadBlocked(venueId) {
+  if (menuReader === readMenuWithClaude && !anthropicApiKey()) return 'unavailable';
+  const n = menuReadsToday(venueId);
+  if (n.venue >= MENU_READS_PER_VENUE_PER_DAY || n.all >= MENU_READS_PER_DAY) return 'busy';
+  return null;
+}
+
+// Starts reading in the background; the page polls the menu's state. A read that never finished (a restart
+// mid-read) shows as failed, so the owner can simply try again.
+const menuReadsRunning = new Set();
+function startMenuRead(menu) {
+  db.prepare("UPDATE venue_menus SET status = 'reading', read_error = NULL, read_started_at = datetime('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
+  menuReadsRunning.add(menu.id);
+  // Dayton reading a "do it for me" or emailed-link menu: it stays in the review queue either way.
+  const keep = ['help', 'pending'].includes(menu.status) ? menu.status : null;
+  const done = (fields) => {
+    menuReadsRunning.delete(menu.id);
+    const cur = db.prepare('SELECT status FROM venue_menus WHERE id = ?').get(menu.id);
+    if (!cur || cur.status !== 'reading') return; // removed or replaced meanwhile
+    if (fields.data !== undefined) {
+      db.prepare("UPDATE venue_menus SET status = ?, data = ?, read_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(keep || 'ready', JSON.stringify(fields.data), menu.id);
+    } else {
+      db.prepare("UPDATE venue_menus SET status = ?, read_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(keep || 'draft', fields.error, menu.id);
+    }
+  };
+  const p = (async () => {
+    const files = db.prepare('SELECT * FROM venue_menu_files WHERE menu_id = ? ORDER BY position').all(menu.id);
+    const pages = [];
+    for (const f of files) {
+      try { pages.push({ kind: f.kind, buf: fs.readFileSync(menuFilePath(f.file)) }); } catch (e) { /* missing file: skip it */ }
+    }
+    if (!pages.length) { done({ error: 'failed' }); return; }
+    let r;
+    try { r = await menuReader(pages); } catch (err) { r = { ok: false, error: 'failed', detail: String((err && err.message) || err).slice(0, 200) }; }
+    db.prepare('INSERT INTO menu_reads (venue_id, menu_id, ok, error, model, input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(menu.venue_id, menu.id, r.ok ? 1 : 0, r.ok ? null : `${r.error}${r.detail ? `: ${r.detail}` : ''}`.slice(0, 300), r.model || null,
+        r.usage && Number.isFinite(r.usage.input) ? r.usage.input : null, r.usage && Number.isFinite(r.usage.output) ? r.usage.output : null);
+    if (!r.ok) {
+      if (r.error !== 'unavailable') console.error(`[menus] reading menu #${menu.id} failed: ${r.error}${r.detail ? ` (${r.detail})` : ''}`);
+      done({ error: r.error === 'unavailable' ? 'unavailable' : 'failed' });
+      return;
+    }
+    const res = r.result || {};
+    if (res.readable === false || res.problem === 'not_a_menu' || res.problem === 'too_blurry') {
+      done({ error: res.problem === 'not_a_menu' ? 'not_menu' : 'blurry' });
+      return;
+    }
+    const data = normalizeMenuData({ sections: res.sections, partial: res.problem === 'partly_unreadable' });
+    if (!menuItemCount(data)) { done({ error: 'blurry' }); return; }
+    done({ data });
+  })().catch((err) => {
+    // Never let a background read take the server down; the owner sees "try again".
+    console.error(`[menus] reading menu #${menu.id} crashed: ${String((err && err.stack) || err).slice(0, 500)}`);
+    try { done({ error: 'failed' }); } catch (e) { menuReadsRunning.delete(menu.id); }
+  });
+  return p;
+}
+
+// ----- State -----
+function menuFiles(menuId) {
+  return db.prepare('SELECT id, kind, preview_key, bytes, width, height FROM venue_menu_files WHERE menu_id = ? ORDER BY position').all(menuId)
+    .map((f) => ({ id: f.id, kind: f.kind, preview: menuPreviewUrl(f), width: f.width, height: f.height }));
+}
+// The menu the owner is working on: the newest one not yet published or closed.
+function activeMenuDraft(venueId) {
+  return db.prepare("SELECT * FROM venue_menus WHERE venue_id = ? AND status IN ('draft', 'reading', 'ready', 'pending', 'help') ORDER BY id DESC LIMIT 1").get(venueId) || null;
+}
+function publishedMenuRow(venueId) {
+  return db.prepare("SELECT * FROM venue_menus WHERE venue_id = ? AND status = 'published' ORDER BY published_at DESC, id DESC LIMIT 1").get(venueId) || null;
+}
+// The published menu a venue page shows, or null.
+function publishedMenu(venueId) {
+  const row = publishedMenuRow(venueId);
+  if (!row) return null;
+  const data = parseMenuData(row.data);
+  const items = menuItemCount(data);
+  return items ? { id: row.id, data, items, publishedAt: row.published_at } : null;
+}
+function menuStateJson(venue, menu) {
+  const pub = publishedMenu(venue.id);
+  let m = null;
+  if (menu) {
+    let { status, read_error: readError } = menu;
+    // A read that never came back (the server restarted mid-read) is a failed read.
+    // Reads run in this process, so one that isn't running any more was cut off (a restart or deploy mid-read).
+    if (status === 'reading' && !menuReadsRunning.has(menu.id)) {
+      db.prepare("UPDATE venue_menus SET status = 'draft', read_error = 'failed' WHERE id = ? AND status = 'reading'").run(menu.id);
+      status = 'draft'; readError = 'failed';
+    }
+    m = { id: menu.id, status, read_error: readError || null, data: menu.data ? parseMenuData(menu.data) : null, pages: menuFiles(menu.id) };
+  }
+  return {
+    menu: m,
+    published: pub ? { items: pub.items, published_at: pub.publishedAt, url: menuPagePath(venue) } : null,
+    reading_available: !menuReadBlocked(venue.id) || (m && m.status === 'reading'),
+  };
+}
+
+function publishMenu(menuId, reviewer) {
+  const menu = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(menuId);
+  if (!menu) return { ok: false, reason: 'not_found' };
+  if (!menuItemCount(parseMenuData(menu.data))) return { ok: false, reason: 'empty' };
+  db.prepare("UPDATE venue_menus SET status = 'superseded', updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status = 'published' AND id <> ?").run(menu.venue_id, menuId);
+  db.prepare("UPDATE venue_menus SET status = 'published', published_at = datetime('now'), reviewed_at = datetime('now'), reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(reviewer, menuId);
+  db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(menu.venue_id);
+  return { ok: true, venue_id: menu.venue_id };
+}
+function rejectMenu(menuId, reviewer, reason) {
+  const r = db.prepare("UPDATE venue_menus SET status = 'rejected', rejection_reason = ?, reviewed_at = datetime('now'), reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN ('pending', 'help', 'ready', 'draft')")
+    .run(typeof reason === 'string' ? reason.trim().slice(0, 300) || null : null, reviewer, menuId);
+  return r.changes ? { ok: true } : { ok: false, reason: 'not_pending' };
+}
+
+// ----- Emails -----
+// kind: 'help' ("Can you do it for me?"), 'pending' (sent from a private link) or 'published' (a signed-in owner).
+function buildMenuEmail(venue, menu, kind, extra = {}) {
+  const pages = menuFiles(menu.id).map((f, i) => `Page ${i + 1}: https://okanaganroam.com${f.preview}`).join('\n') || 'No pages were added.';
+  const items = menuItemCount(parseMenuData(menu.data));
+  const fields = {
+    _subject: kind === 'help' ? `[MENU HELP] ${venue.name} asked us to type up their menu`
+      : kind === 'pending' ? `[PENDING REVIEW] Menu from ${venue.name} (${items} dishes)` : `[LIVE] Menu from ${venue.name} (${items} dishes)`,
+    _template: 'table',
+    _captcha: 'false',
+    'Status': kind === 'help' ? 'They pressed "Can you do it for me?". Nothing is on the site yet: open the menu editor, read the pages, then publish.'
+      : kind === 'pending' ? 'PENDING REVIEW. Sent from their private link, so it is not on the site until you publish it.'
+        : 'LIVE NOW. Published by a signed-in owner. Open the review page to take it down if needed.',
+    'Venue': `${venue.name} (venue #${venue.id})`,
+    'Listing': venueListingUrl(venue),
+  };
+  if (kind === 'published') fields['Menu page'] = `https://okanaganroam.com${menuPagePath(venue)}`;
+  if (extra.contactEmail) fields['Email'] = extra.contactEmail;
+  if (extra.contactPhone) fields['Phone'] = extra.contactPhone;
+  if (extra.note) fields['Their note'] = extra.note;
+  fields['Menu pages'] = pages;
+  fields['How to review'] = `Open ${ADMIN_REVIEW_URL}#menus (menu #${menu.id}).`;
+  const text = Object.entries(fields).filter(([k]) => !k.startsWith('_')).map(([k, v]) => `${k}: ${v}`).join('\n\n');
+  return { fields, subject: fields._subject, text };
+}
+// "Can you do it for me?" goes to info@ (Dayton asked, 2026-10-17); without Brevo, or if Brevo fails, it goes
+// through the usual FormSubmit notification instead, so it is never lost.
+async function sendMenuHelpEmail(venue, menu, extra) {
+  const { fields, subject, text } = buildMenuEmail(venue, menu, 'help', extra);
+  const direct = ownerDirectEmail();
+  if (direct) {
+    try { await direct({ to: INFO_CONTACT_EMAIL, subject, text }); return 'info'; } catch (err) {
+      console.error(`[menus] help email to info@ for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+    }
+  }
+  await venueSubmissionTransport(fields);
+  return 'formsubmit';
+}
+async function sendMenuNotice(venue, menu, kind) {
+  try { await venueSubmissionTransport(buildMenuEmail(venue, menu, kind).fields); } catch (err) {
+    console.error(`[menus] ${kind} notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+  }
+}
+
+// ----- Owner and admin endpoints -----
+// ctx: { found: { venue, account? }, live, actor, menuId (admin: the one menu being finished) }.
+const menuUploadAttempts = new Map(); // ip -> [timestamps]
+function menuUploadRateLimited(ip, now = Date.now()) {
+  const recent = (menuUploadAttempts.get(ip) || []).filter((t) => now - t < 60 * 60 * 1000);
+  recent.push(now);
+  menuUploadAttempts.set(ip, recent);
+  if (menuUploadAttempts.size > 5000) for (const [k, t] of menuUploadAttempts) if (!t.some((x) => now - x < 60 * 60 * 1000)) menuUploadAttempts.delete(k);
+  return recent.length > MENU_UPLOAD_RATE_LIMIT;
+}
+function menuIpHash(ip) { return crypto.createHash('sha256').update(`okanagan-roam-menu:${ip}`).digest('hex'); }
+
+async function handleMenuApi(req, res, ctx, action, arg) {
+  const generic = 'Sorry, something went wrong. Please try again, or tap "Can you do it for me?".';
+  const { venue } = ctx.found;
+  const send = (status, data) => sendSubmissionResponse(res, status, data);
+  // The menu this request works on: admins work on one fixed menu; owners on their current draft.
+  const current = () => (ctx.menuId ? db.prepare('SELECT * FROM venue_menus WHERE id = ? AND venue_id = ?').get(ctx.menuId, venue.id) || null : activeMenuDraft(venue.id));
+  if (action === 'state') return send(200, { ok: true, ...menuStateJson(venue, current()) });
+  if (!isSameOriginSubmission(req)) return send(403, { ok: false, error: generic });
+  const ip = requestClientIp(req);
+  if (action === 'pages') {
+    if (menuUploadRateLimited(ip)) return send(429, { ok: false, error: 'Lots of pages at once! Please wait a few minutes and try again.' });
+    let body;
+    try { body = await readLimitedJsonBody(req, MENU_MAX_BODY); } catch (err) {
+      return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'That file is too big. Try a photo instead.' : generic }, err.status === 413);
+    }
+    if (!body || typeof body !== 'object') return send(400, { ok: false, error: generic });
+    let kind = null, buf = null, dims = null;
+    const jm = typeof body.image === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(body.image) : null;
+    const pm = typeof body.pdf === 'string' ? /^data:application\/pdf;base64,([A-Za-z0-9+/=]+)$/.exec(body.pdf) : null;
+    if (jm) {
+      buf = Buffer.from(jm[1], 'base64'); kind = 'jpeg'; dims = jpegDimensions(buf);
+      if (!dims || buf.length > MENU_JPEG_MAX_BYTES) return send(400, { ok: false, error: 'We couldn’t open that photo. Please try another one.' });
+      const long = Math.max(dims.width, dims.height);
+      if (long < MENU_MIN_EDGE) return send(400, { ok: false, error: 'That photo is a bit small to read. Try taking it a little closer.' });
+      if (long > MENU_MAX_EDGE) return send(400, { ok: false, error: 'We couldn’t open that photo. Please try another one.' });
+    } else if (pm) {
+      buf = Buffer.from(pm[1], 'base64'); kind = 'pdf';
+      if (buf.length > MENU_PDF_MAX_BYTES) return send(400, { ok: false, error: 'That PDF is too big. Try a photo of the menu instead.' });
+      if (buf.slice(0, 5).toString('latin1') !== '%PDF-') return send(400, { ok: false, error: 'We couldn’t open that PDF. Try a photo of the menu instead.' });
+    } else {
+      return send(400, { ok: false, error: 'Please choose a photo or a PDF of your menu.' });
+    }
+    let menu = current();
+    if (menu && !['draft', 'ready'].includes(menu.status) && !ctx.menuId) menu = null;
+    if (menu && menu.status === 'ready') {
+      // New pages after a read: the menu is read again from all its pages.
+      db.prepare("UPDATE venue_menus SET status = 'draft', read_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
+    }
+    if (!menu) {
+      const id = Number(db.prepare('INSERT INTO venue_menus (venue_id, status, submitted_by, ip_hash) VALUES (?, ?, ?, ?)')
+        .run(venue.id, 'draft', ctx.actor, menuIpHash(ip)).lastInsertRowid);
+      menu = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
+    }
+    const count = db.prepare('SELECT COUNT(*) AS n, MAX(position) AS p FROM venue_menu_files WHERE menu_id = ?').get(menu.id);
+    if (count.n >= MENU_MAX_PAGES) return send(409, { ok: false, error: `That’s ${MENU_MAX_PAGES} pages, the most for one menu. Press "That’s everything" to carry on.` });
+    const file = `${crypto.randomBytes(12).toString('hex')}.${kind === 'pdf' ? 'pdf' : 'jpg'}`;
+    const previewKey = crypto.randomBytes(18).toString('base64url');
+    try {
+      fs.mkdirSync(MENU_DIR, { recursive: true });
+      fs.writeFileSync(menuFilePath(file), buf, { flag: 'wx' });
+    } catch (err) {
+      console.error(`[menus] writing ${file} for venue #${venue.id} failed: ${err.message}`);
+      return send(500, { ok: false, error: generic });
+    }
+    const fid = Number(db.prepare('INSERT INTO venue_menu_files (menu_id, position, file, kind, preview_key, bytes, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(menu.id, (count.p || 0) + 1, file, kind, previewKey, buf.length, dims ? dims.width : null, dims ? dims.height : null).lastInsertRowid);
+    db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
+    return send(201, { ok: true, menu_id: menu.id, page: { id: fid, kind, preview: menuPreviewUrl({ kind, preview_key: previewKey }) } });
+  }
+  let body = {};
+  try { body = await readLimitedJsonBody(req, 512 * 1024); } catch (err) { return send(400, { ok: false, error: generic }); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) body = {};
+  const menu = current();
+  if (action === 'remove-page') {
+    if (!menu || !(ctx.menuId ? ['draft', 'ready', 'help', 'pending'] : ['draft', 'ready']).includes(menu.status)) return send(409, { ok: false, error: generic });
+    const f = db.prepare('SELECT * FROM venue_menu_files WHERE id = ? AND menu_id = ?').get(arg, menu.id);
+    if (!f) return send(404, { ok: false, error: generic });
+    db.prepare('DELETE FROM venue_menu_files WHERE id = ?').run(f.id);
+    try { fs.unlinkSync(menuFilePath(f.file)); } catch (e) { /* already gone */ }
+    if (menu.status === 'ready') db.prepare("UPDATE venue_menus SET status = 'draft', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
+    return send(200, { ok: true, ...menuStateJson(venue, current()) });
+  }
+  if (action === 'read') {
+    if (!menu || !(ctx.menuId ? ['draft', 'ready', 'help', 'pending'] : ['draft', 'ready']).includes(menu.status)) return send(409, { ok: false, error: generic });
+    if (!db.prepare('SELECT 1 FROM venue_menu_files WHERE menu_id = ? LIMIT 1').get(menu.id)) return send(400, { ok: false, error: 'Please add a photo of your menu first.' });
+    const blocked = menuReadBlocked(venue.id);
+    if (blocked && !ctx.menuId) {
+      db.prepare("UPDATE venue_menus SET read_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(blocked, menu.id);
+      return send(200, { ok: true, ...menuStateJson(venue, current()) });
+    }
+    startMenuRead(menu);
+    return send(200, { ok: true, ...menuStateJson(venue, current()) });
+  }
+  if (action === 'save' || action === 'publish') {
+    if (!menu || !['draft', 'ready', 'help', 'pending'].includes(menu.status) || (menu.status === 'pending' && !ctx.menuId)) {
+      return send(409, { ok: false, error: 'This menu was already sent. Reload the page to see where it is.' });
+    }
+    const data = normalizeMenuData(body.data);
+    db.prepare("UPDATE venue_menus SET data = ?, status = CASE WHEN status = 'draft' THEN 'ready' ELSE status END, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(JSON.stringify(data), menu.id);
+    if (action === 'save') return send(200, { ok: true, saved: true });
+    if (!menuItemCount(data)) return send(400, { ok: false, error: 'Your menu needs at least one dish before it can go live.' });
+    const contact = ctx.live ? { email: null } : ownerOptionalEmail(body.contact_email);
+    if (contact.error) return send(400, { ok: false, errors: { contact_email: contact.error } });
+    const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
+    db.prepare("UPDATE venue_menus SET submitted_at = datetime('now'), contact_email = COALESCE(?, contact_email), contact_name = COALESCE(?, contact_name) WHERE id = ?")
+      .run(contact.email, contactName, menu.id);
+    rememberOwnerContact(venue.id, contact.email);
+    const fresh = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(menu.id);
+    if (ctx.live) {
+      const r = publishMenu(menu.id, ctx.actor);
+      if (!r.ok) return send(400, { ok: false, error: generic });
+      if (!ctx.menuId) await sendMenuNotice(venue, fresh, 'published');
+      else await notifyReviewDecision('menu', menu.id, 'approve');
+      return send(200, { ok: true, live: true, url: menuPagePath(venue) });
+    }
+    db.prepare("UPDATE venue_menus SET status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
+    await sendMenuNotice(venue, fresh, 'pending');
+    return send(200, { ok: true, live: false });
+  }
+  if (action === 'help') {
+    const note = typeof body.note === 'string' ? body.note.replace(/[<>]/g, '').trim().slice(0, 1000) : '';
+    const contact = ctx.found.account ? { email: ctx.found.account.email } : ownerOptionalEmail(body.contact_email);
+    if (contact.error) return send(400, { ok: false, errors: { contact_email: contact.error } });
+    const phone = typeof body.contact_phone === 'string' ? body.contact_phone.replace(/[^\d+()\-.\s]/g, '').trim().slice(0, 40) : '';
+    let m = menu && ['draft', 'ready', 'help'].includes(menu.status) ? menu : null;
+    const hasPages = m && db.prepare('SELECT 1 FROM venue_menu_files WHERE menu_id = ? LIMIT 1').get(m.id);
+    if (!hasPages && !note) return send(400, { ok: false, error: 'Add a photo of your menu first, or tell us where to find it (like a link to your website).' });
+    if (!m) {
+      const id = Number(db.prepare('INSERT INTO venue_menus (venue_id, status, submitted_by, ip_hash) VALUES (?, ?, ?, ?)').run(venue.id, 'draft', ctx.actor, menuIpHash(ip)).lastInsertRowid);
+      m = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
+    }
+    db.prepare("UPDATE venue_menus SET status = 'help', help_note = ?, contact_email = COALESCE(?, contact_email), submitted_at = datetime('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(note || null, contact.email, m.id);
+    if (!ctx.found.account) rememberOwnerContact(venue.id, contact.email);
+    try {
+      await sendMenuHelpEmail(venue, m, { note, contactEmail: contact.email, contactPhone: phone });
+    } catch (err) {
+      console.error(`[menus] help request for venue #${venue.id} could not be sent: ${String((err && err.message) || err).slice(0, 300)}`);
+    }
+    return send(200, { ok: true });
+  }
+  if (action === 'restart') {
+    // "Start over with new photos": the current attempt is closed and a fresh one begins with the next photo.
+    if (menu && ['draft', 'ready'].includes(menu.status)) db.prepare("UPDATE venue_menus SET status = 'removed', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
+    return send(200, { ok: true, ...menuStateJson(venue, null) });
+  }
+  if (action === 'edit') {
+    // "Make a change" to the live menu: a copy to edit, published (or sent for review) like a new one.
+    const pubRow = publishedMenuRow(venue.id);
+    if (!pubRow) return send(409, { ok: false, error: generic });
+    db.prepare("UPDATE venue_menus SET status = 'removed', updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status IN ('draft', 'ready')").run(venue.id);
+    db.prepare('INSERT INTO venue_menus (venue_id, status, data, submitted_by, ip_hash) VALUES (?, ?, ?, ?, ?)').run(venue.id, 'ready', pubRow.data, ctx.actor, menuIpHash(ip));
+    return send(200, { ok: true, ...menuStateJson(venue, current()) });
+  }
+  if (action === 'unpublish') {
+    const r = db.prepare("UPDATE venue_menus SET status = 'removed', updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status = 'published'").run(venue.id);
+    if (r.changes) db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(venue.id);
+    return send(200, { ok: true, ...menuStateJson(venue, current()) });
+  }
+  return send(404, { ok: false, error: generic });
+}
+
+// The owner's menu screen: one step at a time, big buttons, plain words. Owners use it on a phone, often in a
+// hurry, so every screen has the "Can you do it for me?" way out and nothing they type is ever lost (the draft is
+// saved on the server as they go and the page picks up where they left off). Dayton finishes "do it for me" and
+// emailed-link menus in the same screen from /admin/review (mode 'admin').
+const MENU_APP_STRINGS = {
+  en: {
+    title: 'Add your menu', adminTitle: 'Menu editor',
+    intro: 'Take a photo of your menu and we&rsquo;ll turn it into text on your page, so people searching for your food can find you. It takes about 2 minutes.',
+    take: '&#128247;&nbsp;Take a photo of your menu', choose: 'or choose a photo or PDF',
+    tip: 'Tip: good light, phone held straight above the page, the whole page in the picture.',
+    adding: 'Adding your page&hellip;', gotIt: 'Got it! Is there another page?', addAnother: '&#128247;&nbsp;Add another page', thatsAll: 'That&rsquo;s everything',
+    pageN: 'Page {n}', remove: 'Remove',
+    reading: 'Reading your menu&hellip; about {s} seconds &#9749;', readingSub: 'You can stay on this page. Your menu will show up here when it&rsquo;s ready.',
+    blurry: 'This photo is a little hard to read. Could you try again in good light, holding the phone straight above the menu?',
+    notMenu: 'Hmm, that doesn&rsquo;t look like a menu. Could you try another photo?',
+    failed: 'Sorry, that didn&rsquo;t work this time. Please try again.',
+    unavailable: 'Our menu reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
+    busy: 'That&rsquo;s a lot of menus today! Press the button below and we&rsquo;ll finish it for you, or try again tomorrow.',
+    tryAgain: 'Try again', newPhoto: '&#128247;&nbsp;Take a new photo', startOver: 'Start over with new photos',
+    reviewTitle: 'Here&rsquo;s your menu', reviewIntro: 'This is how customers will see it. Tap any dish or price to fix it.',
+    checkCount: 'Please check the {n} in yellow.', checkOne: 'Please check the one in yellow.', checkThis: 'Please check this',
+    partial: 'Some parts were hard to read. Please check the yellow ones, and add anything that&rsquo;s missing.',
+    yourPhotos: 'Your photos (tap to see them big)',
+    publish: 'Looks good, publish!', send: 'Looks good, send it!', publishing: 'Publishing&hellip;',
+    saved: 'Saved', saving: 'Saving&hellip;',
+    dishName: 'Dish name', price: 'Price', description: 'Description (optional)', done: 'Done', deleteDish: 'Delete this dish',
+    addDish: '+ Add a dish', sectionName: 'Section name', addSection: '+ Add a section', deleteSection: 'Delete this section',
+    newDish: 'New dish', newSection: 'New section', noPrice: 'add price', emptySection: 'No dishes yet.',
+    live: '&#127881; Your menu is live!', liveSub: 'Customers can now see your menu on Okanagan Roam.', seeIt: 'See it on Okanagan Roam',
+    sent: '&#127881; Thanks! Your menu is on its way.', sentSub: 'We&rsquo;ll give it a quick check and put it live, usually within a day.',
+    email: 'Your email (optional, so we can tell you when it&rsquo;s live)', helpEmail: 'Your email (optional)',
+    back: 'Back to my listing',
+    help: 'Can you do it for me?', helpTitle: 'No problem, we&rsquo;ll do it for you!',
+    helpIntro: 'We&rsquo;ll type up your menu and put it on your page, usually within a couple of days.',
+    helpPages: 'We&rsquo;ll use the photos you added.', helpNoPages: 'No photo yet? Tell us where to find your menu, like a link to it on your website.',
+    helpNote: 'Anything we should know? (optional)', helpNoteNeeded: 'Where can we find your menu?', helpPhone: 'Phone (optional)',
+    helpSend: 'Send it to us', helpCancel: 'Never mind', helpDone: 'Thanks! We&rsquo;ve got it. We&rsquo;ll put your menu up and let you know.',
+    haveMenu: 'Your menu is live', haveMenuSub: '{n} dishes &middot; updated {date}',
+    replace: '&#128247;&nbsp;Replace it with a new menu', change: '&#9999;&#65039;&nbsp;Make a change', takeDown: 'Take it off my page',
+    takeDownConfirm: 'Take your menu off Okanagan Roam? You can add it again any time.',
+    waiting: 'Thanks! Your menu is waiting for a quick check. It will be live soon.',
+    helpWaiting: 'Thanks! We&rsquo;re typing up your menu and will let you know when it&rsquo;s up.',
+    photoBad: 'We couldn&rsquo;t open that photo. Try taking it with your phone&rsquo;s camera instead.',
+    pdfBig: 'That PDF is too big. Try a photo of the menu instead.',
+    network: 'No connection right now. Please check your internet and try again.',
+    other: 'Fran&ccedil;ais', diet: { vegan: 'Vegan', vegetarian: 'Vegetarian', gluten_free: 'Gluten-free', dairy_free: 'Dairy-free', spicy: 'Spicy' },
+  },
+  fr: {
+    title: 'Ajoutez votre menu', adminTitle: '&Eacute;diteur de menu',
+    intro: 'Prenez votre menu en photo et nous le transformons en texte sur votre page, pour que les gens qui cherchent vos plats vous trouvent. Environ 2&nbsp;minutes.',
+    take: '&#128247;&nbsp;Prendre votre menu en photo', choose: 'ou choisir une photo ou un PDF',
+    tip: 'Astuce&nbsp;: bonne lumi&egrave;re, t&eacute;l&eacute;phone bien au-dessus de la page, toute la page dans la photo.',
+    adding: 'Ajout de votre page&hellip;', gotIt: 'C&rsquo;est not&eacute;&nbsp;! Y a-t-il une autre page&nbsp;?', addAnother: '&#128247;&nbsp;Ajouter une autre page', thatsAll: 'C&rsquo;est tout',
+    pageN: 'Page {n}', remove: 'Retirer',
+    reading: 'Lecture de votre menu&hellip; environ {s}&nbsp;secondes &#9749;', readingSub: 'Restez sur cette page. Votre menu s&rsquo;affichera ici d&egrave;s qu&rsquo;il sera pr&ecirc;t.',
+    blurry: 'Cette photo est un peu difficile &agrave; lire. Pourriez-vous r&eacute;essayer avec une bonne lumi&egrave;re, le t&eacute;l&eacute;phone bien au-dessus du menu&nbsp;?',
+    notMenu: 'Hmm, cela ne ressemble pas &agrave; un menu. Pourriez-vous essayer une autre photo&nbsp;?',
+    failed: 'D&eacute;sol&eacute;, &ccedil;a n&rsquo;a pas fonctionn&eacute; cette fois. Veuillez r&eacute;essayer.',
+    unavailable: 'Notre lecteur de menus fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous le taperons pour vous.',
+    busy: 'Beaucoup de menus aujourd&rsquo;hui&nbsp;! Appuyez ci-dessous et nous le terminerons pour vous, ou r&eacute;essayez demain.',
+    tryAgain: 'R&eacute;essayer', newPhoto: '&#128247;&nbsp;Prendre une nouvelle photo', startOver: 'Recommencer avec de nouvelles photos',
+    reviewTitle: 'Voici votre menu', reviewIntro: 'Voici ce que verront vos clients. Touchez un plat ou un prix pour le corriger.',
+    checkCount: 'V&eacute;rifiez les {n} en jaune.', checkOne: 'V&eacute;rifiez celui en jaune.', checkThis: '&Agrave; v&eacute;rifier',
+    partial: 'Certaines parties &eacute;taient difficiles &agrave; lire. V&eacute;rifiez celles en jaune et ajoutez ce qui manque.',
+    yourPhotos: 'Vos photos (touchez pour agrandir)',
+    publish: 'C&rsquo;est bon, publier&nbsp;!', send: 'C&rsquo;est bon, envoyer&nbsp;!', publishing: 'Publication&hellip;',
+    saved: 'Enregistr&eacute;', saving: 'Enregistrement&hellip;',
+    dishName: 'Nom du plat', price: 'Prix', description: 'Description (facultatif)', done: 'Termin&eacute;', deleteDish: 'Supprimer ce plat',
+    addDish: '+ Ajouter un plat', sectionName: 'Nom de la section', addSection: '+ Ajouter une section', deleteSection: 'Supprimer cette section',
+    newDish: 'Nouveau plat', newSection: 'Nouvelle section', noPrice: 'ajouter le prix', emptySection: 'Aucun plat pour l&rsquo;instant.',
+    live: '&#127881; Votre menu est en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir votre menu sur Okanagan Roam.', seeIt: 'Le voir sur Okanagan Roam',
+    sent: '&#127881; Merci&nbsp;! Votre menu est en route.', sentSub: 'Nous le v&eacute;rifions rapidement et le mettons en ligne, g&eacute;n&eacute;ralement en moins d&rsquo;une journ&eacute;e.',
+    email: 'Votre courriel (facultatif, pour vous pr&eacute;venir quand il est en ligne)', helpEmail: 'Votre courriel (facultatif)',
+    back: 'Retour &agrave; ma fiche',
+    help: 'Pouvez-vous le faire pour moi&nbsp;?', helpTitle: 'Pas de souci, on s&rsquo;en occupe&nbsp;!',
+    helpIntro: 'Nous taperons votre menu et le mettrons sur votre page, g&eacute;n&eacute;ralement en quelques jours.',
+    helpPages: 'Nous utiliserons les photos que vous avez ajout&eacute;es.', helpNoPages: 'Pas encore de photo&nbsp;? Dites-nous o&ugrave; trouver votre menu, par exemple un lien vers votre site.',
+    helpNote: 'Quelque chose &agrave; nous dire&nbsp;? (facultatif)', helpNoteNeeded: 'O&ugrave; trouver votre menu&nbsp;?', helpPhone: 'T&eacute;l&eacute;phone (facultatif)',
+    helpSend: 'Nous l&rsquo;envoyer', helpCancel: 'Annuler', helpDone: 'Merci&nbsp;! C&rsquo;est re&ccedil;u. Nous mettrons votre menu en ligne et vous pr&eacute;viendrons.',
+    haveMenu: 'Votre menu est en ligne', haveMenuSub: '{n}&nbsp;plats &middot; mis &agrave; jour {date}',
+    replace: '&#128247;&nbsp;Le remplacer par un nouveau menu', change: '&#9999;&#65039;&nbsp;Faire une modification', takeDown: 'Le retirer de ma page',
+    takeDownConfirm: 'Retirer votre menu d&rsquo;Okanagan Roam&nbsp;? Vous pourrez le rajouter quand vous voulez.',
+    waiting: 'Merci&nbsp;! Votre menu attend une v&eacute;rification rapide. Il sera bient&ocirc;t en ligne.',
+    helpWaiting: 'Merci&nbsp;! Nous tapons votre menu et vous pr&eacute;viendrons quand il sera en ligne.',
+    photoBad: 'Impossible d&rsquo;ouvrir cette photo. Essayez de la prendre avec l&rsquo;appareil photo de votre t&eacute;l&eacute;phone.',
+    pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo du menu.',
+    network: 'Pas de connexion pour l&rsquo;instant. V&eacute;rifiez votre internet et r&eacute;essayez.',
+    other: 'English', diet: MENU_DIETARY_LABELS.fr,
+  },
+};
+
+// The page's client code (ES5 so older phones run it). Config comes from window.MENU_CFG.
+const MENU_APP_SCRIPT = String.raw`(function(){
+  var C = window.MENU_CFG, T = C.t, S = C.state, base = C.base, app = document.getElementById('mnApp');
+  var data = null, openItem = null, saveTimer = null, pollTimer = null, readStart = 0, busyUpload = false;
+  function h(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function f(s, o){ return String(s).replace(/\{(\w+)\}/g, function(m, k){ return o[k]; }); }
+  function api(path, body){
+    return fetch(base + path, body === undefined ? { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }
+      : { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
+      .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); }, function(){ return { ok: false, error: T.networkText }; });
+  }
+  function el(id){ return document.getElementById(id); }
+  function pages(){ return (S.menu && S.menu.pages) || []; }
+  function thumbs(removable){
+    var p = pages(); if (!p.length) return '';
+    return '<div class="mn-thumbs">' + p.map(function(pg, i){
+      var inner = pg.kind === 'pdf' ? '<span class="mn-pdf">PDF</span>' : '<img src="' + h(pg.preview) + '" alt="">';
+      return '<figure><a href="' + h(pg.preview) + '" target="_blank" rel="noopener">' + inner + '</a><figcaption>' + f(T.pageN, { n: i + 1 })
+        + (removable ? ' &middot; <button type="button" class="mn-link" data-rm="' + pg.id + '">' + T.remove + '</button>' : '') + '</figcaption></figure>';
+    }).join('') + '</div>';
+  }
+  function err(msg){ return msg ? '<p class="mn-error" role="alert">' + msg + '</p>' : ''; }
+  function helpBtn(){ return C.mode === 'admin' ? '' : '<p class="mn-help"><button type="button" class="mn-link" data-act="help">' + T.help + '</button></p>'; }
+  function pickers(first){
+    return '<label class="mn-btn mn-big">' + (first ? T.take : T.addAnother) + '<input type="file" accept="image/*" capture="environment" data-pick class="mn-file"></label>'
+      + '<label class="mn-btn mn-plain">' + T.choose + '<input type="file" accept="image/*,application/pdf" multiple data-pick class="mn-file"></label>';
+  }
+  function setScreen(html){ app.innerHTML = html; window.scrollTo(0, 0); }
+  function render(message){
+    clearTimeout(pollTimer);
+    var m = S.menu, st = m ? m.status : null;
+    if (C.mode !== 'admin' && st === 'pending') return setScreen('<div class="mn-card mn-ok"><p>' + T.waiting + '</p></div>' + backLink());
+    if (C.mode !== 'admin' && st === 'help') return setScreen('<div class="mn-card mn-ok"><p>' + T.helpWaiting + '</p></div>' + backLink());
+    if (st === 'reading') return readingScreen();
+    if (st === 'ready' || (C.mode === 'admin' && m)) { data = (m && m.data) || { sections: [] }; return reviewScreen(m && m.read_error && C.mode === 'admin' ? 'Reading did not work: ' + h(m.read_error) : message); }
+    if (m && pages().length) return pagesScreen(message);
+    if (S.published && !message) return publishedScreen();
+    return startScreen(message);
+  }
+  function backLink(){ return C.back ? '<p class="mn-back"><a href="' + h(C.back) + '">' + T.back + '</a></p>' : ''; }
+  function startScreen(message){
+    setScreen('<h1>' + T.title + '</h1><p class="mn-lead">' + T.intro + '</p>' + err(message) + pickers(true) + '<p class="mn-tip">' + T.tip + '</p>' + helpBtn() + backLink());
+  }
+  function publishedScreen(){
+    var p = S.published;
+    setScreen('<h1>' + T.haveMenu + ' &#9989;</h1><p class="mn-lead">' + f(T.haveMenuSub, { n: p.items, date: h(p.date) }) + '</p>'
+      + '<a class="mn-btn mn-big" href="' + h(p.url) + '" target="_blank" rel="noopener">' + T.seeIt + '</a>'
+      + '<button type="button" class="mn-btn mn-plain" data-act="edit">' + T.change + '</button>'
+      + '<button type="button" class="mn-btn mn-plain" data-act="replace">' + T.replace + '</button>'
+      + helpBtn() + '<p class="mn-help"><button type="button" class="mn-link mn-danger" data-act="unpublish">' + T.takeDown + '</button></p>' + backLink());
+  }
+  function pagesScreen(message){
+    var m = S.menu, re = m.read_error, note = '';
+    if (re === 'blurry') note = T.blurry; else if (re === 'not_menu') note = T.notMenu; else if (re === 'failed') note = T.failed;
+    else if (re === 'unavailable') note = T.unavailable; else if (re === 'busy') note = T.busy;
+    var out = thumbs(true);
+    if (note) {
+      out = '<div class="mn-card mn-warn"><p>' + note + '</p></div>' + out;
+      if (re === 'unavailable' || re === 'busy') out += '<button type="button" class="mn-btn mn-big" data-act="help">' + T.help + '</button>';
+      else out += '<button type="button" class="mn-btn mn-big" data-act="restart-take">' + T.newPhoto + '</button>'
+        + '<button type="button" class="mn-btn mn-plain" data-act="read">' + T.tryAgain + '</button>' + helpBtn();
+    } else {
+      out = '<h1>' + T.gotIt + '</h1>' + err(message) + out + '<button type="button" class="mn-btn mn-big mn-go" data-act="read">' + T.thatsAll + ' &rarr;</button>'
+        + pickers(false) + helpBtn();
+    }
+    setScreen(out + (note ? err(message) : '') + backLink());
+  }
+  function readingScreen(){
+    if (!readStart) readStart = Date.now();
+    var secs = Math.max(20, 15 + pages().length * 10);
+    setScreen('<h1 class="mn-center">' + f(T.reading, { s: secs }) + '</h1><div class="mn-bar"><span id="mnBar"></span></div><p class="mn-center mn-sub">' + T.readingSub + '</p>' + thumbs(false) + helpBtn());
+    (function tick(){
+      var bar = el('mnBar'); if (!bar) return;
+      var t = (Date.now() - readStart) / 1000;
+      bar.style.width = Math.min(95, 100 * (1 - Math.exp(-t / secs * 1.6))) + '%';
+      pollTimer = setTimeout(function(){
+        api('/state').then(function(r){
+          if (r && r.ok && r.menu && r.menu.status !== 'reading') { readStart = 0; S = r; return render(); }
+          tick();
+        });
+      }, 2500);
+    })();
+  }
+  // ----- Review -----
+  function countChecks(){ var n = 0; data.sections.forEach(function(s){ s.items.forEach(function(it){ if (it.check) n++; }); }); return n; }
+  function priceText(p){ p = String(p || '').trim(); return /^\$?\d{1,5}([.,]\d{1,2})?$/.test(p) ? (C.lang === 'fr' ? p.replace('$', '').replace('.', ',') + ' $' : '$' + p.replace('$', '')) : p; }
+  function itemHtml(it, si, ii){
+    var key = si + ':' + ii;
+    if (openItem === key) {
+      var diets = Object.keys(T.diet).map(function(d){
+        return '<label class="mn-chip"><input type="checkbox" data-diet="' + d + '"' + (it.dietary.indexOf(d) >= 0 ? ' checked' : '') + '> ' + T.diet[d] + '</label>';
+      }).join('');
+      return '<div class="mn-item mn-open" data-item="' + key + '">'
+        + '<label>' + T.dishName + '<input type="text" data-f="name" maxlength="140" value="' + h(it.name) + '"></label>'
+        + '<label>' + T.price + '<input type="text" data-f="price" maxlength="40" inputmode="decimal" value="' + h(it.price) + '"></label>'
+        + '<label>' + T.description + '<textarea data-f="description" maxlength="500" rows="2">' + h(it.description) + '</textarea></label>'
+        + '<div class="mn-chips">' + diets + '</div>'
+        + '<div class="mn-row"><button type="button" class="mn-btn mn-small" data-act="close">' + T.done + '</button>'
+        + '<button type="button" class="mn-link mn-danger" data-act="del-item">' + T.deleteDish + '</button></div></div>';
+    }
+    var tags = it.dietary.map(function(d){ return '<span class="mn-tag">' + T.diet[d] + '</span>'; }).join('');
+    return '<button type="button" class="mn-item' + (it.check ? ' mn-check' : '') + '" data-item="' + key + '">'
+      + '<span class="mn-line"><span class="mn-name">' + h(it.name) + '</span><span class="mn-price">' + (it.price ? h(priceText(it.price)) : '<em>' + T.noPrice + '</em>') + '</span></span>'
+      + (it.description ? '<span class="mn-desc">' + h(it.description) + '</span>' : '') + (tags ? '<span class="mn-tags">' + tags + '</span>' : '')
+      + (it.check ? '<span class="mn-flag">&#9888;&#65039; ' + T.checkThis + '</span>' : '') + '</button>';
+  }
+  function reviewScreen(message){
+    var n = countChecks(), m = S.menu;
+    var head = C.mode === 'admin' ? '<h1>' + T.adminTitle + ': ' + h(C.venueName) + '</h1><p class="mn-sub">Menu #' + m.id + ' &middot; ' + h(m.status) + '</p>'
+      + (C.adminNote ? '<div class="mn-card mn-warn"><p>' + h(C.adminNote) + '</p></div>' : '')
+      : '<h1>' + T.reviewTitle + '</h1><p class="mn-lead">' + T.reviewIntro + '</p>';
+    var notes = (data.partial ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + '</p></div>' : '');
+    var secs = data.sections.map(function(s, si){
+      return '<section class="mn-sec" data-sec="' + si + '"><input class="mn-sec-name" type="text" data-sec-name="' + si + '" maxlength="140" value="' + h(s.name) + '" aria-label="' + T.sectionName + '">'
+        + (s.note ? '<p class="mn-note">' + h(s.note) + '</p>' : '')
+        + (s.items.length ? s.items.map(function(it, ii){ return itemHtml(it, si, ii); }).join('') : '<p class="mn-sub">' + T.emptySection + '</p>')
+        + '<div class="mn-row"><button type="button" class="mn-link" data-act="add-item" data-s="' + si + '">' + T.addDish + '</button>'
+        + (s.items.length ? '' : '<button type="button" class="mn-link mn-danger" data-act="del-sec" data-s="' + si + '">' + T.deleteSection + '</button>') + '</div></section>';
+    }).join('');
+    var photos = pages().length ? '<details class="mn-photos"' + (C.mode === 'admin' ? ' open' : '') + '><summary>' + T.yourPhotos + '</summary>' + thumbs(C.mode === 'admin') + '</details>' : '';
+    var admin = C.mode === 'admin' ? '<div class="mn-admin">'
+      + '<label class="mn-btn mn-plain">+ Add page<input type="file" accept="image/*,application/pdf" multiple data-pick class="mn-file"></label>'
+      + (pages().length ? '<button type="button" class="mn-btn mn-plain" data-act="read">Read the pages with AI (replaces the text below)</button>' : '')
+      + '<button type="button" class="mn-btn mn-plain" data-act="add-sec">' + T.addSection + '</button></div>' : '';
+    var email = C.mode === 'token' ? '<label class="mn-email">' + T.email + '<input type="email" id="mnEmail" maxlength="254" autocomplete="email" value="' + h(C.email || '') + '"></label>' : '';
+    setScreen(head + photos + admin + notes + err(message) + '<div class="mn-menu">' + secs + '</div>'
+      + (C.mode === 'admin' ? '' : '<p class="mn-row"><button type="button" class="mn-link" data-act="add-sec">' + T.addSection + '</button></p>')
+      + email + '<p class="mn-saved" id="mnSaved" aria-live="polite"></p>'
+      + '<button type="button" class="mn-btn mn-big mn-go" data-act="publish">' + (C.mode === 'admin' ? 'Publish it (goes live now)' : C.mode === 'token' ? T.send : T.publish) + '</button>'
+      + (C.mode === 'admin' ? '' : '<p class="mn-help"><button type="button" class="mn-link" data-act="restart">' + T.startOver + '</button></p>') + helpBtn() + backLink());
+  }
+  function rerender(){ var y = window.scrollY; reviewScreen(); window.scrollTo(0, y); }
+  function save(now){
+    clearTimeout(saveTimer);
+    var s = el('mnSaved'); if (s) s.innerHTML = T.saving;
+    var go = function(){ return api('/save', { data: data }).then(function(r){ var s2 = el('mnSaved'); if (s2) s2.innerHTML = r && r.ok ? T.saved + ' &#10003;' : ''; return r; }); };
+    if (now) return go();
+    saveTimer = setTimeout(go, 800);
+  }
+  // ----- Adding pages -----
+  function toJpeg(file){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function(){
+        var w = img.naturalWidth, hh = img.naturalHeight, long = Math.max(w, hh);
+        URL.revokeObjectURL(url);
+        var scale = Math.min(1, 2000 / long), c = document.createElement('canvas');
+        c.width = Math.round(w * scale); c.height = Math.round(hh * scale);
+        var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+        var q = 0.85, out = c.toDataURL('image/jpeg', q);
+        while (out.length > 5200000 && q > 0.4) { q -= 0.15; out = c.toDataURL('image/jpeg', q); }
+        resolve(out);
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('photo')); };
+      img.src = url;
+    });
+  }
+  function readPdf(file){
+    return new Promise(function(resolve, reject){
+      if (file.size > 10 * 1024 * 1024) return reject(new Error('pdfbig'));
+      var r = new FileReader(); r.onload = function(){ resolve(r.result); }; r.onerror = function(){ reject(new Error('photo')); }; r.readAsDataURL(file);
+    });
+  }
+  function addFiles(files){
+    if (busyUpload || !files.length) return;
+    busyUpload = true;
+    var list = Array.prototype.slice.call(files), problem = null, i = 0;
+    setScreen('<h1 class="mn-center">' + T.adding + '</h1><div class="mn-bar"><span style="width:40%" class="mn-pulse"></span></div>' + thumbs(false));
+    (function next(){
+      if (i >= list.length) {
+        busyUpload = false;
+        return api('/state').then(function(r){ if (r && r.ok) S = r; render(problem); });
+      }
+      var file = list[i++], isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+      (isPdf ? readPdf(file).then(function(d){ return { pdf: d.replace(/^data:[^;]*;/, 'data:application/pdf;') }; }) : toJpeg(file).then(function(d){ return { image: d }; }))
+        .then(function(body){ return api('/pages', body); })
+        .then(function(r){ if (!r || !r.ok) problem = (r && r.error) ? h(r.error) : T.failed; next(); },
+          function(e){ problem = e && e.message === 'pdfbig' ? T.pdfBig : T.photoBad; next(); });
+    })();
+  }
+  // ----- Help -----
+  function helpScreen(){
+    var has = pages().length > 0;
+    setScreen('<h1>' + T.helpTitle + '</h1><p class="mn-lead">' + T.helpIntro + '</p><p>' + (has ? T.helpPages : T.helpNoPages) + '</p>' + thumbs(false)
+      + '<label class="mn-email">' + (has ? T.helpNote : T.helpNoteNeeded) + '<textarea id="mnNote" rows="3" maxlength="1000"></textarea></label>'
+      + (C.mode === 'token' ? '<label class="mn-email">' + T.helpEmail + '<input type="email" id="mnEmail" maxlength="254" autocomplete="email" value="' + h(C.email || '') + '"></label>' : '')
+      + '<label class="mn-email">' + T.helpPhone + '<input type="tel" id="mnPhone" maxlength="40" autocomplete="tel"></label>'
+      + '<p class="mn-error" id="mnHelpErr" role="alert" hidden></p>'
+      + '<button type="button" class="mn-btn mn-big mn-go" data-act="help-send">' + T.helpSend + '</button>'
+      + '<button type="button" class="mn-btn mn-plain" data-act="help-cancel">' + T.helpCancel + '</button>');
+  }
+  // ----- Events -----
+  app.addEventListener('change', function(e){
+    var t = e.target;
+    if (t.hasAttribute('data-pick')) return addFiles(t.files || []);
+    if (t.hasAttribute('data-diet')) {
+      var it = currentItem(); if (!it) return;
+      var d = t.getAttribute('data-diet'), at = it.dietary.indexOf(d);
+      if (t.checked && at < 0) it.dietary.push(d); if (!t.checked && at >= 0) it.dietary.splice(at, 1);
+      save();
+    }
+  });
+  function currentItem(){ if (!openItem) return null; var p = openItem.split(':'); return data.sections[+p[0]] && data.sections[+p[0]].items[+p[1]]; }
+  app.addEventListener('input', function(e){
+    var t = e.target;
+    if (t.hasAttribute('data-f')) { var it = currentItem(); if (it) { it[t.getAttribute('data-f')] = t.value; it.check = false; save(); } }
+    if (t.hasAttribute('data-sec-name')) { data.sections[+t.getAttribute('data-sec-name')].name = t.value; save(); }
+  });
+  app.addEventListener('click', function(e){
+    if (!e.target.closest) return;
+    var t = e.target.closest('[data-act],[data-rm]') || e.target.closest('button[data-item]');
+    if (!t || !app.contains(t)) return;
+    if (t.hasAttribute('data-rm')) {
+      e.preventDefault();
+      return api('/pages/' + t.getAttribute('data-rm') + '/remove', {}).then(function(r){ if (r && r.ok) { S = r; render(); } });
+    }
+    var act = t.getAttribute('data-act');
+    if (!act && t.hasAttribute('data-item')) { openItem = t.getAttribute('data-item'); rerender(); var inp = app.querySelector('.mn-open input'); if (inp) inp.focus(); return; }
+    if (act === 'close') { openItem = null; save(); return rerender(); }
+    if (act === 'del-item') { var p = openItem.split(':'); data.sections[+p[0]].items.splice(+p[1], 1); openItem = null; save(); return rerender(); }
+    if (act === 'add-item') { var si = +t.getAttribute('data-s'); data.sections[si].items.push({ name: T.newDishText, description: '', price: '', dietary: [], check: false }); openItem = si + ':' + (data.sections[si].items.length - 1); save(); rerender(); var i2 = app.querySelector('.mn-open input'); if (i2) i2.select(); return; }
+    if (act === 'add-sec') { data.sections.push({ name: T.newSectionText, note: '', items: [{ name: T.newDishText, description: '', price: '', dietary: [], check: false }] }); openItem = (data.sections.length - 1) + ':0'; save(); return rerender(); }
+    if (act === 'del-sec') { data.sections.splice(+t.getAttribute('data-s'), 1); save(); return rerender(); }
+    if (act === 'read') { t.disabled = true; return api('/read', {}).then(function(r){ if (r && r.ok) { S = r; readStart = Date.now(); render(); } else { t.disabled = false; render(r && r.error ? h(r.error) : T.failed); } }); }
+    if (act === 'restart' || act === 'restart-take' || act === 'replace') {
+      return api('/restart', {}).then(function(r){ if (r && r.ok) { S = r; S.published = act === 'replace' ? null : S.published; } startScreen(); });
+    }
+    if (act === 'edit') { return api('/edit', {}).then(function(r){ if (r && r.ok) { S = r; render(); } else render(r && r.error ? h(r.error) : T.failed); }); }
+    if (act === 'unpublish') { if (!window.confirm(T.takeDownConfirmText)) return; return api('/unpublish', {}).then(function(r){ if (r && r.ok) { S = r; render(); } }); }
+    if (act === 'help') return helpScreen();
+    if (act === 'help-cancel') return render();
+    if (act === 'help-send') {
+      t.disabled = true;
+      var body = { note: el('mnNote').value, contact_phone: el('mnPhone').value };
+      if (el('mnEmail')) body.contact_email = el('mnEmail').value;
+      return api('/help', body).then(function(r){
+        if (r && r.ok) return setScreen('<div class="mn-card mn-ok"><p>' + T.helpDone + '</p></div>' + backLink());
+        t.disabled = false; var x = el('mnHelpErr'); x.hidden = false;
+        x.innerHTML = r && r.errors && r.errors.contact_email ? h(r.errors.contact_email) : r && r.error ? h(r.error) : T.failed;
+      });
+    }
+    if (act === 'publish') {
+      openItem = null; clearTimeout(saveTimer); t.disabled = true; t.innerHTML = T.publishing;
+      var pb = { data: data }; if (el('mnEmail')) pb.contact_email = el('mnEmail').value;
+      return api('/publish', pb).then(function(r){
+        if (!r || !r.ok) { t.disabled = false; return reviewScreen(r && r.errors && r.errors.contact_email ? h(r.errors.contact_email) : r && r.error ? h(r.error) : T.failed); }
+        if (C.mode === 'admin') return setScreen('<div class="mn-card mn-ok"><p>Published. <a href="' + h(r.url) + '" target="_blank" rel="noopener">See the menu page</a></p></div><p class="mn-back"><a href="/admin/review#menus">Back to review</a></p>');
+        if (r.live) return setScreen('<div class="mn-done"><h1>' + T.live + '</h1><p class="mn-lead">' + T.liveSub + '</p><a class="mn-btn mn-big mn-go" href="' + h(r.url) + '">' + T.seeIt + '</a>' + backLink() + '</div>');
+        setScreen('<div class="mn-done"><h1>' + T.sent + '</h1><p class="mn-lead">' + T.sentSub + '</p>' + backLink() + '</div>');
+      });
+    }
+  });
+  render();
+})();`;
+
+function renderMenuAppPage(found, opts) {
+  const { venue } = found;
+  const lang = opts.lang === 'fr' ? 'fr' : 'en';
+  const t = MENU_APP_STRINGS[lang];
+  const plain = (s) => String(s).replace(/&rsquo;/g, '\u2019').replace(/&nbsp;/g, '\u00a0').replace(/&Eacute;/g, '\u00c9').replace(/&eacute;/g, '\u00e9').replace(/&egrave;/g, '\u00e8').replace(/&agrave;/g, '\u00e0');
+  const pub = publishedMenu(venue.id);
+  const state = menuStateJson(venue, opts.mode === 'admin' ? db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(opts.menuId) : activeMenuDraft(venue.id));
+  if (state.published && pub) state.published.date = ownerUpdatedDate(pub.publishedAt, lang === 'fr');
+  const cfg = {
+    base: opts.base, mode: opts.mode, lang, back: opts.back || null, email: found.contactEmail || '', venueName: venue.name, adminNote: opts.adminNote || null,
+    t: { ...t, networkText: t.network, newDishText: plain(t.newDish), newSectionText: plain(t.newSection), takeDownConfirmText: plain(t.takeDownConfirm) },
+    state,
+  };
+  const other = lang === 'fr' ? 'en' : 'fr';
+  const switcher = opts.mode === 'admin' ? '' : `<p class="mn-lang"><a href="?lang=${other}">${t.other}</a></p>`;
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}: ${venue.name} | Okanagan Roam`, 'Add your menu to your Okanagan Roam page.', null, [], { golfTheme: true, noindex: true })}
+<meta name="referrer" content="no-referrer">
+<style>
+  body.owner-page .mn-wrap { max-width: 560px; margin: 0 auto; padding: 12px 0 64px; }
+  body.owner-page .mn-wrap h1 { font-size: clamp(1.5rem, 6vw, 2rem); line-height: 1.2; margin: 8px 0 12px; }
+  body.owner-page .mn-lead { font-size: 1.08rem; line-height: 1.5; }
+  body.owner-page .mn-sub, body.owner-page .mn-tip { color: rgba(42,32,25,0.68); font-size: 0.95rem; }
+  body.owner-page .mn-center { text-align: center; }
+  body.owner-page .mn-lang { text-align: right; margin: 0; font-size: 0.9rem; }
+  body.owner-page .mn-btn { display: flex; align-items: center; justify-content: center; width: 100%; box-sizing: border-box; min-height: 56px; margin: 12px 0; padding: 14px 18px; border-radius: 16px; border: 2px solid var(--ref-navy, #1F3A5F); background: #fff; color: var(--ref-navy, #1F3A5F); font: inherit; font-size: 1.08rem; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
+  body.owner-page .mn-big { min-height: 72px; font-size: 1.2rem; background: var(--ref-navy, #1F3A5F); color: #fff; }
+  body.owner-page .mn-go { background: #2E7D4F; border-color: #2E7D4F; color: #fff; }
+  body.owner-page .mn-small { width: auto; min-height: 44px; margin: 0; padding: 8px 22px; }
+  body.owner-page .mn-btn { position: relative; }
+  body.owner-page .mn-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+  body.owner-page .mn-btn:disabled { opacity: 0.6; cursor: wait; }
+  body.owner-page .mn-link { background: none; border: 0; padding: 6px 0; font: inherit; font-weight: 700; color: var(--ref-navy, #1F3A5F); text-decoration: underline; cursor: pointer; }
+  body.owner-page .mn-danger { color: #9C2F22; }
+  body.owner-page .mn-help, body.owner-page .mn-back { text-align: center; margin: 18px 0 0; font-size: 1.02rem; }
+  body.owner-page .mn-card { border-radius: 14px; padding: 14px 18px; margin: 14px 0; font-weight: 600; font-size: 1.04rem; line-height: 1.45; }
+  body.owner-page .mn-card p { margin: 0; }
+  body.owner-page .mn-warn { background: #FFF4CC; }
+  body.owner-page .mn-ok { background: #E9F6EE; }
+  body.owner-page .mn-error { color: #9C2F22; font-weight: 700; background: #FDECEA; padding: 10px 14px; border-radius: 12px; }
+  body.owner-page .mn-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin: 14px 0; }
+  body.owner-page .mn-thumbs figure { margin: 0; }
+  body.owner-page .mn-thumbs img, body.owner-page .mn-pdf { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--paper, #F7F1E6); font-weight: 800; color: var(--ref-navy, #1F3A5F); }
+  body.owner-page .mn-thumbs figcaption { font-size: 0.82rem; font-weight: 700; margin-top: 4px; }
+  body.owner-page .mn-bar { height: 14px; border-radius: 999px; background: rgba(42,32,25,0.1); overflow: hidden; margin: 22px 0; }
+  body.owner-page .mn-bar span { display: block; height: 100%; width: 5%; background: #2E7D4F; border-radius: 999px; transition: width 2.4s linear; }
+  body.owner-page .mn-pulse { animation: mnPulse 1.2s ease-in-out infinite alternate; }
+  @keyframes mnPulse { from { opacity: 0.4; } to { opacity: 1; } }
+  body.owner-page .mn-menu { background: var(--paper, #F7F1E6); border-radius: 16px; padding: 6px 14px 10px; margin: 16px 0; }
+  body.owner-page .mn-sec { padding: 10px 0 6px; border-bottom: 1px solid rgba(42,32,25,0.1); }
+  body.owner-page .mn-sec:last-child { border-bottom: 0; }
+  body.owner-page .mn-sec-name { width: 100%; box-sizing: border-box; border: 0; background: transparent; font: inherit; font-size: 1.15rem; font-weight: 800; color: var(--ref-navy, #1F3A5F); padding: 6px 0; border-bottom: 1px dashed transparent; }
+  body.owner-page .mn-sec-name:focus { border-bottom-color: currentColor; outline: none; }
+  body.owner-page .mn-note { font-style: italic; font-size: 0.92rem; margin: 0 0 6px; }
+  body.owner-page .mn-item { display: block; width: 100%; text-align: left; background: #fff; border: 0; border-radius: 12px; padding: 12px 14px; margin: 8px 0; font: inherit; color: inherit; cursor: pointer; box-sizing: border-box; }
+  body.owner-page .mn-check { background: #FFF1B8; box-shadow: inset 0 0 0 2px #E8B400; }
+  body.owner-page .mn-line { display: flex; justify-content: space-between; gap: 12px; font-weight: 800; }
+  body.owner-page .mn-price { white-space: nowrap; }
+  body.owner-page .mn-price em { font-weight: 600; color: rgba(42,32,25,0.5); }
+  body.owner-page .mn-desc { display: block; font-size: 0.92rem; color: rgba(42,32,25,0.75); margin-top: 3px; }
+  body.owner-page .mn-tags, body.owner-page .mn-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  body.owner-page .mn-tag { font-size: 0.75rem; font-weight: 800; background: #E9F6EE; color: #22603C; border-radius: 999px; padding: 2px 8px; }
+  body.owner-page .mn-flag { display: block; font-size: 0.85rem; font-weight: 800; color: #7A5A00; margin-top: 6px; }
+  body.owner-page .mn-open { cursor: default; box-shadow: 0 0 0 2px var(--ref-navy, #1F3A5F); }
+  body.owner-page .mn-open label, body.owner-page .mn-email { display: block; font-weight: 700; font-size: 0.92rem; margin: 0 0 10px; }
+  body.owner-page .mn-open input[type=text], body.owner-page .mn-open textarea, body.owner-page .mn-email input, body.owner-page .mn-email textarea { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 1.05rem; padding: 10px 12px; margin-top: 4px; border: 1px solid rgba(42,32,25,0.3); border-radius: 10px; background: #fff; }
+  body.owner-page .mn-chip { display: inline-flex !important; align-items: center; gap: 6px; font-weight: 700; font-size: 0.88rem !important; background: var(--paper, #F7F1E6); border-radius: 999px; padding: 6px 12px; margin: 0 !important; }
+  body.owner-page .mn-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0 4px; }
+  body.owner-page .mn-saved { text-align: center; min-height: 1.2em; font-size: 0.88rem; color: #2E7D4F; font-weight: 700; margin: 6px 0 0; }
+  body.owner-page .mn-photos { margin: 12px 0; }
+  body.owner-page .mn-photos summary { cursor: pointer; font-weight: 700; }
+  body.owner-page .mn-admin { display: grid; gap: 0; }
+  body.owner-page .mn-done { text-align: center; padding-top: 24px; }
+  body.owner-page .mn-done h1 { font-size: clamp(1.8rem, 8vw, 2.4rem); }
+</style>
+</head>
+<body class="golf-page owner-page">
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main"><div class="mn-wrap">
+    ${switcher}
+    <div id="mnApp"><p class="mn-lead">${t.adding.replace('votre page', 'votre menu').replace('your page', 'your menu')}</p></div>
+    <noscript><p class="mn-card mn-warn">Please turn on JavaScript, or email your menu to <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</p></noscript>
+  </div></main>
+<script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
+<script>${MENU_APP_SCRIPT}</script>
+</body>
+</html>`;
+}
+
+// Serves the menu screen and its endpoints under base (an owner link, a signed-in owner's venue, or an admin's
+// menu). sub is what follows "/menu" in the path.
+async function handleMenuRoute(req, res, method, sub, ctx) {
+  const htmlHeaders = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
+  if (!ctx.found) {
+    if (method === 'GET' && !sub) { res.writeHead(404, htmlHeaders); return res.end(renderOwnerInvalidLinkPage()); }
+    return sendSubmissionResponse(res, 404, { ok: false, error: 'This link is not valid any more. Please sign in again or ask us at info@okanaganroam.com.' });
+  }
+  if (!sub && (method === 'GET' || method === 'HEAD')) {
+    const q = new URL(req.url, 'http://x').searchParams.get('lang');
+    const lang = q === 'fr' || q === 'en' ? q : /^fr\b/i.test(String(req.headers['accept-language'] || '')) ? 'fr' : 'en';
+    res.writeHead(200, htmlHeaders);
+    return res.end(method === 'HEAD' ? undefined : renderMenuAppPage(ctx.found, { ...ctx, lang }));
+  }
+  if (sub === '/state' && method === 'GET') return handleMenuApi(req, res, ctx, 'state');
+  if (method !== 'POST') return sendSubmissionResponse(res, 405, { ok: false, error: 'Not allowed.' });
+  const rp = /^\/pages\/(\d+)\/remove$/.exec(sub);
+  if (rp) return handleMenuApi(req, res, ctx, 'remove-page', Number(rp[1]));
+  const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit' }[sub];
+  if (!action || (ctx.mode === 'admin' && ['help', 'restart', 'unpublish', 'edit'].includes(action))) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
+  return handleMenuApi(req, res, ctx, action);
+}
+
+// ----- Public menu pages -----
+function menuUpdatedLabel(utc, lang = 'en') {
+  const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'short', year: 'numeric' });
+}
+function menuDishCountText(n, lang) { return lang === 'fr' ? `${n} plat${n === 1 ? '' : 's'}` : `${n} dish${n === 1 ? '' : 'es'}`; }
+function menuMenuUrl(venue, lang = 'en') { return `https://okanaganroam.com${menuPagePath(venue, lang)}`; }
+function menuIndexable(menu) { return !!menu && menu.items >= MENU_INDEX_MIN_ITEMS; }
+
+// schema.org Menu for a published menu: sections, dishes, prices in CAD, and the diets the menu itself marks.
+function menuSchema(venue, menu, lang) {
+  return {
+    '@type': 'Menu',
+    '@id': `${menuMenuUrl(venue, lang)}#menu`,
+    name: lang === 'fr' ? `Menu ${frDe(venue.name)}` : `${venue.name} menu`,
+    url: menuMenuUrl(venue, lang),
+    inLanguage: lang === 'fr' ? 'fr-CA' : 'en-CA',
+    hasMenuSection: menu.data.sections.map((s) => ({
+      '@type': 'MenuSection',
+      name: s.name || (lang === 'fr' ? 'Menu' : 'Menu'),
+      description: s.note || undefined,
+      hasMenuItem: s.items.map((it) => {
+        const price = menuPriceNumber(it.price);
+        const diets = it.dietary.map((d) => MENU_DIET_SCHEMA[d]).filter(Boolean);
+        return {
+          '@type': 'MenuItem',
+          name: it.name,
+          description: it.description || undefined,
+          offers: price != null ? { '@type': 'Offer', price: price.toFixed(2), priceCurrency: 'CAD' } : undefined,
+          suitableForDiet: diets.length ? diets : undefined,
+        };
+      }),
+    })),
+  };
+}
+
+function menuItemHtml(it, lang) {
+  const labels = MENU_DIETARY_LABELS[lang === 'fr' ? 'fr' : 'en'];
+  const tags = it.dietary.map((d) => `<span class="vm-tag">${escapeHtml(labels[d])}</span>`).join('');
+  return `<li class="vm-item"><div class="vm-line"><span class="vm-name">${escapeHtml(it.name)}</span>${it.price ? `<span class="vm-price">${escapeHtml(menuPriceLabel(it.price, lang))}</span>` : ''}</div>${it.description ? `<p class="vm-desc">${escapeHtml(it.description)}</p>` : ''}${tags ? `<p class="vm-tags">${tags}</p>` : ''}</li>`;
+}
+const VENUE_MENU_CSS = `<style>
+  .vm-preview { margin: 22px 0 8px; }
+  .vm-list { list-style: none; padding: 0; margin: 8px 0 12px; }
+  .vm-item { padding: 10px 0; border-bottom: 1px solid rgba(42,32,25,0.1); }
+  .vm-item:last-child { border-bottom: 0; }
+  .vm-line { display: flex; justify-content: space-between; gap: 14px; font-weight: 700; }
+  .vm-price { white-space: nowrap; }
+  .vm-desc { margin: 3px 0 0; font-size: 0.92rem; opacity: 0.8; }
+  .vm-tags { margin: 5px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vm-tag { font-size: 0.74rem; font-weight: 800; background: #E9F6EE; color: #22603C; border-radius: 999px; padding: 2px 8px; }
+  .vm-section { margin: 26px 0 8px; }
+  .vm-section h2 { margin: 0 0 4px; }
+  .vm-note { font-style: italic; margin: 0 0 6px; opacity: 0.85; }
+  .vm-meta { font-size: 0.88rem; opacity: 0.75; margin: 4px 0 0; }
+  .vm-note-box { background: var(--paper, #F7F1E6); border-radius: 12px; padding: 12px 16px; font-size: 0.9rem; margin: 26px 0 12px; }
+  .vm-page { max-width: 760px; }
+  a.vm-btn { display: inline-block; background: #1B2B3A; padding: 12px 22px; border-radius: 16px; text-align: center; font-weight: 800; text-decoration: none; margin: 4px 8px 6px 0; }
+  a.vm-btn, a.vm-btn:visited, a.vm-btn:hover, a.vm-btn:focus { color: #fff !important; }
+  a.vm-btn:hover, a.vm-btn:focus { background: #2C4257; }
+</style>`;
+
+// The short menu on the place page: the first few dishes and a link to the full menu page.
+function venueMenuPreviewHtml(venue, menu, lang) {
+  if (!menu) return '';
+  const fr = lang === 'fr';
+  const picks = [];
+  for (const s of menu.data.sections) for (const it of s.items) if (picks.length < 5) picks.push(it);
+  return `<section class="venue-section vm-preview" id="menu">
+    <h2>${fr ? 'Menu' : 'Menu'}</h2>
+    <ul class="vm-list">${picks.map((it) => menuItemHtml(it, lang)).join('')}</ul>
+    <a class="vm-btn" href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${fr ? `Voir tout le menu (${menuDishCountText(menu.items, 'fr')})` : `See the full menu (${menuDishCountText(menu.items, 'en')})`} &rarr;</a>
+    <p class="vm-meta">${fr ? 'Menu mis à jour' : 'Menu updated'} ${escapeHtml(menuUpdatedLabel(menu.publishedAt, lang))}</p>
+  </section>`;
+}
+
+function renderVenueMenuPage(venue, menu, opts = {}) {
+  const fr = opts.lang === 'fr';
+  const lang = fr ? 'fr' : 'en';
+  const L = (en, frText) => (fr ? frText : en);
+  const hasFrench = venueHasFrench(venue);
+  const regionLabel = REGION_LABELS[venue.region];
+  const catSlug = CATEGORY_SLUGS[venue.type];
+  const label = (fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[venue.type];
+  const canonical = menuMenuUrl(venue, lang);
+  const venueUrl = `https://okanaganroam.com${venuePagePath(venue, lang)}`;
+  const updated = menuUpdatedLabel(menu.publishedAt, lang);
+  const title = fr
+    ? fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`Menu et prix ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `Menu et prix ${frDe(n)} — ${regionLabel}`, `Menu ${frDe(n)} — ${regionLabel}`, `Menu ${frDe(n)}`]))
+    : fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`${n} Menu & Prices — ${regionLabel}, BC | Okanagan Roam`, `${n} Menu & Prices — ${regionLabel}, BC`, `${n} Menu — ${regionLabel}`, `${n} Menu`]));
+  const names = [];
+  for (const s of menu.data.sections) for (const it of s.items) if (names.length < 3) names.push(it.name);
+  const rawDesc = fr
+    ? `Le menu ${frDe(venue.name)} à ${regionLabel}, C.-B., avec les prix : ${names.join(', ')} et plus. Mis à jour ${updated}.`
+    : `See the ${venue.name} menu in ${regionLabel}, BC, with prices: ${names.join(', ')} and more. Updated ${updated}.`;
+  const description = rawDesc.length > 155 ? `${rawDesc.slice(0, 152).replace(/[\s,]+\S*$/, '')}...` : rawDesc;
+  const crumbBase = `https://okanaganroam.com${fr ? '/fr' : ''}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: L('Home', 'Accueil'), url: fr ? 'https://okanaganroam.com/fr' : 'https://okanaganroam.com/' },
+    { name: regionLabel, url: `${crumbBase}/${venue.region}` },
+    { name: label.plural, url: `${crumbBase}/${venue.region}/${catSlug}` },
+    { name: venue.name, url: venueUrl },
+    { name: 'Menu', url: canonical },
+  ]);
+  const business = {
+    '@context': 'https://schema.org',
+    '@type': SCHEMA_TYPE_MAP[venue.type] || 'LocalBusiness',
+    '@id': `${venueUrl}#business`,
+    name: venue.name,
+    url: venueUrl,
+    telephone: venue.phone || undefined,
+    address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressLocality: regionLabel, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
+    servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
+    hasMenu: menuSchema(venue, menu, lang),
+  };
+  const themedShell = usesThemedVenueShell(venue.type);
+  const sections = menu.data.sections.map((s) => `<section class="vm-section">
+    ${s.name ? `<h2>${escapeHtml(s.name)}</h2>` : ''}${s.note ? `<p class="vm-note">${escapeHtml(s.note)}</p>` : ''}
+    <ul class="vm-list">${s.items.map((it) => menuItemHtml(it, lang)).join('')}</ul>
+  </section>`).join('\n  ');
+  const website = normalizeWebsiteUrl(venue.website);
+  const page = `<!DOCTYPE html>
+<html lang="${lang}"${hasFrench ? ` data-page-lang="${lang}"` : ''}>
+<head>
+${pageHead(title, description, canonical, [breadcrumb, business], { noindex: !menuIndexable(menu), alternates: hasFrench ? [{ hreflang: 'en-CA', href: menuMenuUrl(venue) }, { hreflang: 'fr-CA', href: menuMenuUrl(venue, 'fr') }, { hreflang: 'x-default', href: menuMenuUrl(venue) }] : null, locale: hasFrench && fr ? 'fr_CA' : null, shareImage: venueShareCardUrl(venue, lang), golfTheme: themedShell })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}
+${VENUE_MENU_CSS}
+</head>
+<body${themedBodyClassAttr(venue.type, themedShell)}>
+  ${themedShell ? renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+  ${breadcrumbNavHtml([
+    { name: L('Home', 'Accueil'), href: '/' },
+    { name: regionLabel, href: `/${venue.region}` },
+    { name: label.plural, href: `/${venue.region}/${catSlug}` },
+    { name: venue.name, href: venuePagePath(venue) },
+    { name: 'Menu' },
+  ])}
+  <div class="vm-page">
+  <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><p style="margin:0 0 14px"><a href="${venuePagePath(venue, lang)}">&larr; ${escapeHtml(venue.name)}</a></p>${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${menuPagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${menuPagePath(venue, 'fr')}" hreflang="fr" lang="fr">Français</a>`}</p>` : ''}</div>
+  <h1>${fr ? `Menu ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Menu`}</h1>
+  <p class="vm-meta">${escapeHtml(label.singular)} ${fr ? 'à' : 'in'} ${escapeHtml(regionLabel)}, ${fr ? 'C.-B.' : 'BC'} &middot; ${menuDishCountText(menu.items, lang)} &middot; ${fr ? 'Menu mis à jour' : 'Menu updated'} ${escapeHtml(updated)}</p>
+  ${sections}
+  <div class="vm-note-box">${fr
+    ? `Les plats et les prix peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant d’y aller, et confirmez toute allergie ou restriction alimentaire directement avec l’établissement.`
+    : `Dishes and prices can change. Check with ${escapeHtml(venue.name)} before you go, and confirm any allergies or dietary needs with them directly.`}</div>
+  <p>
+    <a class="vm-btn" href="${venuePagePath(venue, lang)}">${fr ? `Infos, heures et carte ${escapeHtml(frDe(venue.name))}` : `Hours, map and more for ${escapeHtml(venue.name)}`}</a>
+    ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
+    ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
+  </p>
+  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise ?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
+  <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} à ${escapeHtml(regionLabel)}` : `More ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
+  </div>
+  ${themedShell ? '</main>' : ''}
+  ${renderHomeFooterHTML(true)}
+  ${themedShell ? GOLF_APP_SCRIPT_TAG : ''}
+</body>
+</html>`;
+  return fr ? frPageLinks(localizeStaticFr(localizeHtml(page, 'fr'))) : page;
+}
+
+function listIndexableMenusForSitemap() {
+  const rows = db.prepare(`SELECT m.venue_id, MAX(m.published_at) AS published_at FROM venue_menus m JOIN venues v ON v.id = m.venue_id
+    WHERE m.status = 'published' AND v.redirect_to IS NULL GROUP BY m.venue_id`).all();
+  const out = [];
+  for (const r of rows) {
+    const menu = publishedMenu(r.venue_id);
+    const v = menu && getVenue(r.venue_id);
+    if (v && !v.redirect_to && CATEGORY_SLUGS[v.type] && v.slug && MENU_VENUE_TYPES.has(v.type) && menuIndexable(menu)) out.push({ venue: v, publishedAt: menu.publishedAt });
+  }
+  return out;
+}
+
+// GET /<region>/<category>/<slug>/menu and its /fr twin. A place with no live menu has no menu page (404); the French
+// one goes to the English one when the place has no French page.
+function handleVenueMenuPage(req, res, pathname, parsed) {
+  const m = /^(\/fr)?\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/menu\/?$/.exec(pathname);
+  if (!m) return false;
+  const [, frPrefix, region, categorySlug, slug] = m;
+  const type = SLUG_TO_TYPE[categorySlug];
+  const venue = REGION_LABELS[region] && type ? findVenueBySlug(region, type, slug) : null;
+  if (venue && venue.redirect_to) {
+    const target = getVenue(venue.redirect_to);
+    if (target && !target.redirect_to && CATEGORY_SLUGS[target.type] && target.slug && publishedMenu(target.id)) {
+      res.writeHead(301, { Location: menuPagePath(target, frPrefix && venueHasFrench(target) ? 'fr' : 'en') });
+      return res.end() || true;
+    }
+  }
+  const menu = venue && !venue.redirect_to ? publishedMenu(venue.id) : null;
+  if (!menu) {
+    if (venue && !venue.redirect_to) { res.writeHead(302, { Location: venuePagePath(venue, frPrefix && venueHasFrench(venue) ? 'fr' : 'en') }); return res.end() || true; }
+    res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(render404Page(pathname)) || true;
+  }
+  if (frPrefix && !venueHasFrench(venue)) {
+    res.writeHead(302, { Location: withCampaignParams(menuPagePath(venue), parsed.search) });
+    return res.end() || true;
+  }
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...(frPrefix ? { 'Content-Language': 'fr-CA' } : {}) });
+  res.end(req.method === 'HEAD' ? undefined : renderVenueMenuPage(venue, menu, { lang: frPrefix ? 'fr' : 'en' }));
+  return true;
+}
+
 function listOwnerPhotos(status = 'pending') {
   const rows = status === 'all'
     ? db.prepare('SELECT * FROM owner_photos ORDER BY id DESC LIMIT 300').all()
@@ -31505,6 +32681,13 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     return sendOwnerDecision(s.contact_email ? [String(s.contact_email).trim().toLowerCase()] : [],
       ownerDecisionEmail({ venueName: s.name, what: 'your new listing', outcome, reason, edited: !!extra.edited, link: v ? venueListingUrl(v) : null, owner: false }));
   }
+  if (kind === 'menu') {
+    const m = db.prepare('SELECT venue_id, contact_email FROM venue_menus WHERE id = ?').get(id);
+    const v = m && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(m.venue_id);
+    if (!v) return 'no_address';
+    const link = outcome === 'approved' ? `https://okanaganroam.com${menuPagePath(v)}` : venueListingUrl(v);
+    return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: 'your menu', outcome, reason, link, owner: true }));
+  }
   return 'no_address';
 }
 
@@ -31615,6 +32798,19 @@ async function adminReviewAction(kind, id, action, body) {
         : errs ? `Please check your edits: ${Object.values(errs).join(' ')}` : out.body.error, errors: errs || undefined, detail: out.body.detail || out.body.existing } };
     }
     r = { ok: true, edited: !!payload.overrides };
+  } else if (kind === 'menu') {
+    // Publishing happens in the menu editor (/admin/review/menu/<id>); here a menu is only turned down or taken off.
+    if (action === 'approve') return { status: 400, body: { error: 'Open the menu editor to publish it.' } };
+    if (action === 'remove') {
+      const row = db.prepare("SELECT venue_id FROM venue_menus WHERE id = ? AND status = 'published'").get(id);
+      if (!row) return { status: 409, body: { error: 'This menu is not live.' } };
+      db.prepare("UPDATE venue_menus SET status = 'removed', rejection_reason = ?, reviewed_at = datetime('now'), reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(reason || null, ADMIN_REVIEWER, id);
+      db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(row.venue_id);
+      r = { ok: true };
+    } else {
+      r = rejectMenu(id, ADMIN_REVIEWER, reason);
+      if (!r.ok) return { status: 409, body: { error: ADMIN_REVIEW_ERRORS.not_pending || 'Already reviewed.' } };
+    }
   } else {
     return { status: 404, body: { error: 'Unknown item.' } };
   }
@@ -31703,6 +32899,33 @@ function renderAdminChangeCard(r) {
     </article>`;
 }
 
+// Menus waiting for Dayton: "do it for me" requests and menus sent from a private link.
+function listMenusForReview() {
+  return db.prepare(`SELECT m.*, v.name AS venue_name FROM venue_menus m JOIN venues v ON v.id = m.venue_id
+    WHERE m.status IN ('pending', 'help') ORDER BY m.submitted_at, m.id`).all();
+}
+function recentLiveMenus() {
+  return db.prepare(`SELECT m.*, v.name AS venue_name FROM venue_menus m JOIN venues v ON v.id = m.venue_id
+    WHERE m.status = 'published' AND m.published_at >= datetime('now', '-14 days') AND m.reviewed_by LIKE 'owner:%' ORDER BY m.published_at DESC`).all();
+}
+function renderAdminMenuCard(m) {
+  const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(m.venue_id);
+  const pages = menuFiles(m.id);
+  const items = menuItemCount(parseMenuData(m.data));
+  const what = m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
+  const thumbs = pages.map((f, i) => (f.kind === 'pdf'
+    ? `<a class="rv-btn rv-reject" href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener">PDF page ${i + 1}</a>`
+    : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
+  return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
+      <h3>${adminReviewEsc(m.venue_name)}</h3>
+      <p class="rv-meta">Menu #${m.id} · ${what} · ${items} dishes · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
+      ${thumbs ? `<div>${thumbs}</div>` : ''}
+      ${m.status === 'published' ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
+      ${adminReviewActions('menu', m.id, { remove: m.status === 'published', approveLabel: '' }).replace(/<button type="button" class="rv-btn rv-approve"[^>]*>[^<]*<\/button>/, '')}
+    </article>`;
+}
+
 function renderAdminPhotoCard(p, live) {
   const preview = String(p.preview_url || '').replace(/^https:\/\/okanaganroam\.com/, '');
   const main = live ? '' : `<label class="rv-opt"><input type="checkbox" name="main"${p.venue_has_own_photo ? '' : ' checked'}>Make it the main photo</label>`;
@@ -31781,7 +33004,9 @@ function renderAdminReviewPage() {
   const events = listEventSubmissions('pending');
   const eventChanges = listOwnerEventChanges('pending');
   const venues = listVenueSubmissions('pending');
-  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length;
+  const menus = listMenusForReview();
+  const liveMenus = recentLiveMenus();
+  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
   const mail = ownerDirectEmail()
@@ -31791,12 +33016,14 @@ function renderAdminReviewPage() {
     <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#live">Live photos (${live.length})</a></nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#live">Live photos (${live.length})</a></nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
     ${eventChanges.length ? section('eventchanges', 'Changes to live events', eventChanges, renderAdminEventChangeCard, '') : ''}
     ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
+    ${section('menus', 'Menus', menus, renderAdminMenuCard, 'No menus waiting.')}
+    ${liveMenus.length ? section('livemenus', 'Menus owners published (last 14 days)', liveMenus, renderAdminMenuCard, '') : ''}
     ${section('live', 'Photos owners published (last 14 days)', live, (p) => renderAdminPhotoCard(p, true), 'None in the last 14 days.')}
 <script>
 (function(){
@@ -32053,6 +33280,18 @@ function ownerA11y(html) {
   return html.replace(/<p class="lyv-error" id="/g, '<p class="lyv-error" role="alert" id="');
 }
 
+// The big "Add your menu" button at the top of the owner page (food, drink and wineries only).
+function ownerMenuCardHtml(venue, href) {
+  if (!MENU_VENUE_TYPES.has(venue.type)) return '';
+  const pub = publishedMenu(venue.id);
+  const draft = activeMenuDraft(venue.id);
+  const sub = pub ? `Your menu is live (${pub.items} dishes). Tap to change or replace it.`
+    : draft && ['pending', 'help'].includes(draft.status) ? 'Thanks! We have your menu and will put it up soon.'
+      : draft ? 'You started adding your menu. Tap to pick up where you left off.'
+        : 'Take a photo of your menu. We turn it into text on your page in about 2 minutes.';
+  return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${pub ? '&#128203; Your menu' : '&#128247; Add your menu'}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
+}
+
 function renderOwnerPage(found, token, pending) {
   return ownerA11y(renderOwnerPageHtml(found, token, pending));
 }
@@ -32107,6 +33346,10 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-wrap { max-width: 760px; margin: 0 auto; padding: 16px 0 48px; }
   body.owner-page .op-head p { color: rgba(42,32,25,0.75); }
   body.owner-page .op-pending { background: #FFF6E5; border-radius: 12px; padding: 12px 16px; font-weight: 600; }
+  body.owner-page .op-menu-card { display: block; background: var(--ref-navy, #1F3A5F); color: #fff; border-radius: 18px; padding: 18px 20px; margin: 16px 0; text-decoration: none; }
+  body.owner-page .op-menu-card:hover, body.owner-page .op-menu-card:focus { color: #fff; filter: brightness(1.1); }
+  body.owner-page .op-menu-big { display: block; font-size: 1.35rem; font-weight: 800; }
+  body.owner-page .op-menu-sub { display: block; font-size: 0.95rem; opacity: 0.9; margin-top: 4px; }
   body.owner-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 28px 0 10px; }
   body.owner-page .op-day { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 0; border-bottom: 1px solid rgba(42,32,25,0.08); }
   body.owner-page .op-day-name { width: 96px; font-weight: 700; }
@@ -32159,6 +33402,7 @@ ${renderGolfHeaderHtml()}
       <h1>${escapeHtml(venue.name)}</h1>
       <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : '<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span>'}</p>
       <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it.</p>
+      ${ownerMenuCardHtml(venue, token ? `${OWNER_LINK_PATH}${token}/menu` : `/owner/account/venue/${venue.id}/menu`)}
       <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">Last updated ${ownerUpdatedDate(last)}</p>` : ''; })()}
       ${pendingNote}
@@ -33450,6 +34694,13 @@ const server = http.createServer(async (req, res) => {
           const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
           return alts ? [entry(enUrl), entry(`https://okanaganroam.com${venuePagePath(v, 'fr')}`)] : [entry(enUrl)];
         }),
+        // Menus (2026-10-17): menu pages with enough dishes to be indexed, with the French twin when the place has one.
+        ...listIndexableMenusForSitemap().flatMap(({ venue: v, publishedAt }) => {
+          const alts = venueHasFrench(v) ? [['en-CA', menuMenuUrl(v)], ['fr-CA', menuMenuUrl(v, 'fr')], ['x-default', menuMenuUrl(v)]]
+            .map(([hl, href]) => `\n    <xhtml:link rel="alternate" hreflang="${hl}" href="${href}"/>`).join('') : '';
+          const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(publishedAt)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
+          return alts ? [entry(menuMenuUrl(v)), entry(menuMenuUrl(v, 'fr'))] : [entry(menuMenuUrl(v))];
+        }),
         // Phase 1 (Events architecture gate): only non-expired events —
         // listEventsForSitemap() already applies the same "don't advertise
         // dead pages" filtering the venue rows above get via redirect_to.
@@ -33597,6 +34848,15 @@ const server = http.createServer(async (req, res) => {
         const row = db.prepare("SELECT file FROM owner_photos WHERE preview_key = ? AND status != 'rejected'").get(pm[1]);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
         return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex' });
+      }
+      const mp = /^\/owner-menus\/preview\/([A-Za-z0-9_-]{24})\.(jpg|pdf)$/.exec(pathname);
+      if (mp && method === 'GET') {
+        const row = db.prepare('SELECT file, kind FROM venue_menu_files WHERE preview_key = ?').get(mp[1]);
+        let buf = null;
+        try { if (row && (row.kind === 'pdf') === (mp[2] === 'pdf')) buf = fs.readFileSync(menuFilePath(row.file)); } catch (e) { /* missing */ }
+        if (!buf) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+        res.writeHead(200, { 'Content-Type': row.kind === 'pdf' ? 'application/pdf' : 'image/jpeg', 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
+        return res.end(buf);
       }
       const im = /^\/images\/owner\/([a-z0-9]{24}\.jpg)$/.exec(pathname);
       if (im && method === 'GET') {
@@ -35391,6 +36651,18 @@ const server = http.createServer(async (req, res) => {
       }
       const pa = /^\/owner\/account\/venue\/(\d+)\/photos\/(\d+)\/(remove|main)$/.exec(pathname);
       if (pa && method === 'POST') return await handleOwnerPhotoAction(req, res, account, Number(pa[1]), Number(pa[2]), pa[3]);
+      const mr = /^\/owner\/account\/venue\/(\d+)\/menu(\/[a-z0-9/]*)?$/.exec(pathname);
+      if (mr) {
+        if (!account) {
+          if (method === 'GET' && !mr[2]) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
+          return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
+        }
+        const id = Number(mr[1]);
+        return await handleMenuRoute(req, res, method, mr[2] || '', {
+          found: venueForOwnerAccount(account, id), live: true, mode: 'account', actor: `owner:${account.email}`,
+          base: `/owner/account/venue/${id}/menu`, back: `/owner/account/venue/${id}`,
+        });
+      }
       const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos))?$/.exec(pathname);
       if (vm) {
         const resolve = () => venueForOwnerAccount(account, Number(vm[1]));
@@ -35420,6 +36692,13 @@ const server = http.createServer(async (req, res) => {
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
       if (photosMatch && method === 'POST') return await handleOwnerPhotoUpload(req, res, photosMatch[1]);
+      const menuMatch = /^([A-Za-z0-9_-]+)\/menu(\/[a-z0-9/]*)?$/.exec(rest);
+      if (menuMatch) {
+        return await handleMenuRoute(req, res, method, menuMatch[2] || '', {
+          found: venueForOwnerToken(menuMatch[1]), live: false, mode: 'token', actor: 'owner-link',
+          base: `${OWNER_LINK_PATH}${menuMatch[1]}/menu`, back: `${OWNER_LINK_PATH}${menuMatch[1]}`,
+        });
+      }
       const accountMatch = /^([A-Za-z0-9_-]+)\/account$/.exec(rest);
       if (accountMatch && method === 'POST') return await handleOwnerAccountSetup(req, res, accountMatch[1]);
       if (/^[A-Za-z0-9_-]+$/.test(rest) && (method === 'GET' || method === 'HEAD')) {
@@ -35481,7 +36760,7 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true });
     }
     {
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
@@ -35490,6 +36769,22 @@ const server = http.createServer(async (req, res) => {
         if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
         const out = await adminReviewAction(m[1], Number(m[2]), m[3], body);
         return sendJSON(res, out.status, out.body);
+      }
+    }
+    {
+      // Dayton's menu editor: finishes "do it for me" and private-link menus; publishing here goes live.
+      const m = /^\/admin\/review\/menu\/(\d+)(\/[a-z0-9/]*)?$/.exec(pathname);
+      if (m) {
+        if (!adminSessionValid(req)) {
+          if (method === 'GET' && !m[2]) { res.writeHead(302, { Location: '/admin/review', 'Cache-Control': 'no-store' }); return res.end(); }
+          return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+        }
+        const menu = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(Number(m[1]));
+        const row = menu && db.prepare('SELECT * FROM venues WHERE id = ?').get(menu.venue_id);
+        return await handleMenuRoute(req, res, method, m[2] || '', {
+          found: row ? { venue: rowToVenue(row), contactEmail: menu.contact_email } : null, live: true, mode: 'admin', menuId: menu ? menu.id : null,
+          actor: ADMIN_REVIEWER, base: `/admin/review/menu/${m[1]}`, back: '/admin/review#menus', adminNote: menu && menu.help_note ? `Their note: ${menu.help_note}` : null,
+        });
       }
     }
     if (pathname === '/admin/owner-changes' && method === 'GET') {
@@ -35631,6 +36926,7 @@ const server = http.createServer(async (req, res) => {
 
     // GET /fr/:region/:category/:slug -- a place's French page (2026-10-13). A place without a French description, or a
     // retired one, goes to its English page / its successor's French page; anything else under /fr/ is not served.
+    if ((method === 'GET' || method === 'HEAD') && /\/menu\/?$/.test(pathname) && handleVenueMenuPage(req, res, pathname, parsed)) return;
     const frVenueMatch = method === 'GET' ? pathname.match(/^\/fr\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/) : null;
     if (frVenueMatch) {
       const [, region, categorySlug, slug] = frVenueMatch;
@@ -36065,6 +37361,14 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Menus (2026-10-17)
+  setMenuReader,
+  readMenuWithClaude,
+  normalizeMenuData,
+  menuPriceLabel,
+  menuPriceNumber,
+  publishedMenu,
+  MENU_DIR,
   // Derived hours badges (Open Early / Open Late)
   RESEARCHED_BOOL_FIELDS,
   DERIVED_BOOL_FIELDS,

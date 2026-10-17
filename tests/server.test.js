@@ -21913,3 +21913,229 @@ test('Ski-hill town pages (2026-10-17): approved winter titles and descriptions 
   // Other towns keep their own titles.
   assert.match(app.renderRegionPage('kelowna', { restaurant: 3 }, []), /<title>(?!Big White|SilverStar|Apex|Mount Baldy)/);
 });
+
+test('Menus (2026-10-17): reading, checking and publishing a menu; private links wait for review; menu page and SEO', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Menu Fixture Bistro', type: 'restaurant', hours: SEASON_WEEK, slug: 'menu-fixture-bistro' });
+  seasonInsert.run({ name: 'Menu Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'menu-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'menu-fixture-bistro');
+  const c = app.findVenueBySlug('kelowna', 'cafe', 'menu-fixture-cafe');
+  const token = app.createOwnerLink(v.id, { contact_email: 'chef@example.com' }).url.split('/owner/')[1];
+  const tokenC = app.createOwnerLink(c.id, {}).url.split('/owner/')[1];
+  const jpeg = (w, h) => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const dataUrl = (buf) => `data:image/jpeg;base64,${buf.toString('base64')}`;
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.21.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const get = (p, cookie) => fetch(`${base}${p}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
+  const state = (p, cookie) => get(`${p}/state`, cookie).then((r) => r.json());
+  const waitRead = async (p, cookie) => {
+    for (let i = 0; i < 50; i++) { const s = await state(p, cookie); if (s.menu.status !== 'reading') return s; await new Promise((r) => setTimeout(r, 20)); }
+    throw new Error('read never finished');
+  };
+  const reads = [];
+  const MENU = { readable: true, problem: 'none', sections: [
+    { name: 'Starters', note: '', items: [
+      { name: 'Poutine', description: 'Fries, cheese curds, gravy', price: '14', dietary: ['gluten_free'], check: false },
+      { name: 'Caesar Salad', description: '', price: '12.50', dietary: [], check: true },
+      { name: '<b>Wings</b>', description: '', price: '16', dietary: ['spicy', 'made-up'], check: false }] },
+    { name: 'Mains', note: 'Served with fries or salad', items: [
+      { name: 'Smash Burger', description: '', price: '19', dietary: [], check: false },
+      { name: 'Fish & Chips', description: 'Ling cod', price: 'MP', dietary: [], check: false },
+      { name: 'Veggie Bowl', description: '', price: '17', dietary: ['vegan'], check: false }] },
+  ] };
+  app.setMenuReader(async (pages) => { reads.push(pages.map((p) => p.kind)); return { ok: true, result: JSON.parse(JSON.stringify(MENU)), usage: { input: 1, output: 1 }, model: 'stub' }; });
+  const sent = [], ownerMail = [];
+  app.setVenueSubmissionTransport(async (payload) => { sent.push(payload); });
+  app.setOwnerEmailTransport(async (m) => { ownerMail.push(m); });
+  const menuBase = `/owner/${token}/menu`;
+  try {
+    // The owner page leads with the big menu button; the menu screen works.
+    assert.match(await get(`/owner/${token}`).then((r) => r.text()), /class="op-menu-card" href="\/owner\/[^"]+\/menu"[^>]*><span class="op-menu-big">&#128247; Add your menu/);
+    const page = await get(menuBase).then((r) => r.text());
+    assert.match(page, /window\.MENU_CFG = /);
+    assert.match(page, /Take a photo of your menu/);
+    assert.match(await get(`${menuBase}?lang=fr`).then((r) => r.text()), /Prendre votre menu en photo/);
+    assert.equal((await get(`/owner/${'z'.repeat(32)}/menu`)).status, 404);
+
+    // Pages: photos and PDFs; bad files get kind messages.
+    assert.equal((await post(`${menuBase}/pages`, { image: 'data:image/png;base64,AAAA' })).status, 400);
+    assert.match((await post(`${menuBase}/pages`, { image: dataUrl(jpeg(300, 200)) })).body.error, /a bit small/);
+    assert.equal((await post(`${menuBase}/pages`, { pdf: `data:application/pdf;base64,${Buffer.from('not a pdf').toString('base64')}` })).status, 400);
+    const p1 = await post(`${menuBase}/pages`, { image: dataUrl(jpeg(1600, 1200)) });
+    assert.equal(p1.status, 201, JSON.stringify(p1.body));
+    const p2 = await post(`${menuBase}/pages`, { pdf: `data:application/pdf;base64,${Buffer.from('%PDF-1.4 fake').toString('base64')}` });
+    assert.equal(p2.status, 201);
+    assert.equal((await get(p1.body.page.preview)).status, 200);
+    assert.equal((await get(p2.body.page.preview)).headers.get('content-type'), 'application/pdf');
+    let s = await state(menuBase);
+    assert.equal(s.menu.pages.length, 2);
+    assert.equal(s.menu.status, 'draft');
+    // Nothing public yet.
+    assert.equal((await get('/kelowna/restaurants/menu-fixture-bistro/menu')).status, 302);
+
+    // Reading: both pages go to the reader; the result is cleaned up.
+    assert.equal((await post(`${menuBase}/read`, {})).status, 200);
+    s = await waitRead(menuBase);
+    assert.deepEqual(reads[0], ['jpeg', 'pdf']);
+    assert.equal(s.menu.status, 'ready');
+    assert.equal(s.menu.data.sections.length, 2);
+    assert.equal(s.menu.data.sections[0].items[2].name, 'bWings/b', 'no markup survives');
+    assert.deepEqual(s.menu.data.sections[0].items[2].dietary, ['spicy']);
+    assert.equal(s.menu.data.sections[0].items[1].check, true);
+
+    // The owner fixes a price; autosave keeps it; publishing from a private link waits for review.
+    const data = s.menu.data;
+    data.sections[0].items[1] = { ...data.sections[0].items[1], price: '13', check: false };
+    data.sections[0].items[2].name = 'Wings';
+    assert.equal((await post(`${menuBase}/save`, { data })).status, 200);
+    assert.equal((await state(menuBase)).menu.data.sections[0].items[1].price, '13');
+    const pub = await post(`${menuBase}/publish`, { data, contact_email: 'chef@example.com' });
+    assert.equal(pub.status, 200, JSON.stringify(pub.body));
+    assert.equal(pub.body.live, false);
+    assert.match(sent.at(-1)._subject, /\[PENDING REVIEW\] Menu from Menu Fixture Bistro \(6 dishes\)/);
+    assert.equal((await state(menuBase)).menu.status, 'pending');
+    assert.equal(app.publishedMenu(v.id), null);
+
+    // Dayton sees it, opens the editor and publishes it; the owner is emailed.
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    const review = await get('/admin/review', cookie).then((r) => r.text());
+    const menuId = s.menu.id;
+    assert.match(review, new RegExp(`href="/admin/review/menu/${menuId}">Open the menu editor`));
+    assert.equal((await get(`/admin/review/menu/${menuId}`)).status, 302, 'needs the admin session');
+    assert.match(await get(`/admin/review/menu/${menuId}`, cookie).then((r) => r.text()), /"mode":"admin"/);
+    const ap = await post(`/admin/review/menu/${menuId}/publish`, { data }, cookie);
+    assert.equal(ap.status, 200, JSON.stringify(ap.body));
+    assert.equal(ap.body.live, true);
+    assert.ok(ownerMail.some((m) => m.to === 'chef@example.com' && /Approved: your menu/.test(m.subject)));
+    const live = app.publishedMenu(v.id);
+    assert.equal(live.items, 6);
+
+    // The menu page: title, prices, schema, indexable (6 dishes), linked from the place page and the sitemap.
+    const mp = await get('/kelowna/restaurants/menu-fixture-bistro/menu');
+    assert.equal(mp.status, 200);
+    const html = await mp.text();
+    assert.match(html, /<title>Menu Fixture Bistro Menu &amp; Prices — Kelowna, BC \| Okanagan Roam<\/title>|<title>Menu Fixture Bistro Menu & Prices — Kelowna, BC \| Okanagan Roam<\/title>/);
+    assert.match(html, /<h1>Menu Fixture Bistro Menu<\/h1>/);
+    assert.match(html, /\$12\.50|\$13/);
+    assert.match(html, /<span class="vm-price">MP<\/span>/);
+    assert.match(html, /Menu updated/);
+    assert.doesNotMatch(html, /name="robots" content="noindex"/);
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+    const biz = ld.find((x) => x.hasMenu);
+    assert.equal(biz.hasMenu['@type'], 'Menu');
+    const poutine = biz.hasMenu.hasMenuSection[0].hasMenuItem[0];
+    assert.deepEqual(poutine.offers, { '@type': 'Offer', price: '14.00', priceCurrency: 'CAD' });
+    assert.deepEqual(poutine.suitableForDiet, ['https://schema.org/GlutenFreeDiet']);
+    assert.equal(biz.hasMenu.hasMenuSection[1].hasMenuItem[1].offers, undefined, 'market price has no Offer');
+    const venuePage = await get('/kelowna/restaurants/menu-fixture-bistro').then((r) => r.text());
+    assert.match(venuePage, /See the full menu \(6 dishes\)/);
+    assert.match(venuePage, /"hasMenu":"https:\/\/okanaganroam\.com\/kelowna\/restaurants\/menu-fixture-bistro\/menu"/);
+    // No French page for this place: the French menu address goes to the English one.
+    assert.equal((await get('/fr/kelowna/restaurants/menu-fixture-bistro/menu')).headers.get('location'), '/kelowna/restaurants/menu-fixture-bistro/menu');
+    const sitemap = await get('/sitemap.xml').then((r) => r.text());
+    assert.match(sitemap, /<loc>https:\/\/okanaganroam\.com\/kelowna\/restaurants\/menu-fixture-bistro\/menu<\/loc>/);
+
+    // "Make a change" copies the live menu; a short menu is noindex and not in the sitemap.
+    const ed = await post(`${menuBase}/edit`, {});
+    assert.equal(ed.body.menu.status, 'ready');
+    assert.equal(ed.body.menu.data.sections.length, 2);
+
+    // Signed-in owners publish straight away.
+    const made = await post(`/owner/${tokenC}/account`, { email: 'barista@example.com', password: 'a long enough password' });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const oc = made.setCookie.split(';')[0];
+    const cBase = `/owner/account/venue/${c.id}/menu`;
+    assert.equal((await get(cBase)).status, 302, 'signed out goes to the login');
+    assert.equal((await post(`${cBase}/pages`, { image: dataUrl(jpeg(1600, 1200)) }, oc)).status, 201);
+    assert.equal((await post(`${cBase}/read`, {}, oc)).status, 200);
+    const cs = await waitRead(cBase, oc);
+    const short = { sections: [{ name: 'Coffee', note: '', items: [{ name: 'Latte', description: '', price: '5.25', dietary: [], check: false }] }] };
+    const cp = await post(`${cBase}/publish`, { data: short }, oc);
+    assert.equal(cp.body.live, true, JSON.stringify(cp.body));
+    assert.equal(cs.menu.status, 'ready');
+    assert.match(sent.at(-1)._subject, /\[LIVE\] Menu from Menu Fixture Cafe/);
+    const cafeMenu = await get('/kelowna/cafes/menu-fixture-cafe/menu').then((r) => r.text());
+    assert.match(cafeMenu, /name="robots" content="noindex"/);
+    assert.doesNotMatch(await get('/sitemap.xml').then((r) => r.text()), /menu-fixture-cafe\/menu/);
+    // Taking it down removes the page.
+    assert.equal((await post(`${cBase}/unpublish`, {}, oc)).status, 200);
+    assert.equal((await get('/kelowna/cafes/menu-fixture-cafe/menu')).status, 302);
+
+    // "Can you do it for me?" goes to info@, with the photos, and lands in Dayton's queue.
+    assert.equal((await post(`${cBase}/pages`, { image: dataUrl(jpeg(1600, 1200)) }, oc)).status, 201);
+    const help = await post(`${cBase}/help`, { note: 'Our specials change weekly', contact_phone: '250-555-0101' }, oc);
+    assert.equal(help.status, 200, JSON.stringify(help.body));
+    const helpMail = ownerMail.at(-1);
+    assert.equal(helpMail.to, 'info@okanaganroam.com');
+    assert.match(helpMail.subject, /\[MENU HELP\] Menu Fixture Cafe/);
+    assert.match(helpMail.text, /owner-menus\/preview\/[A-Za-z0-9_-]{24}\.jpg/);
+    assert.match(helpMail.text, /Our specials change weekly/);
+    assert.match(await get('/admin/review', cookie).then((r) => r.text()), /Asked us to do it/);
+    // Without Brevo the request still reaches Dayton through FormSubmit.
+    app.setOwnerEmailTransport(null);
+    const n = sent.length;
+    assert.equal((await post(`/owner/${token}/menu/help`, { note: 'https://example.com/menu.pdf' })).status, 200);
+    assert.equal(sent.length, n + 1);
+    assert.match(sent.at(-1)._subject, /\[MENU HELP\]/);
+
+    // A blurry photo gets the retake message, not a broken menu.
+    app.setMenuReader(async () => ({ ok: true, usage: {}, result: { readable: false, problem: 'too_blurry', sections: [] } })); // usage {} once crashed the server
+    const t2 = `/owner/${token}/menu`;
+    assert.equal((await post(`${t2}/restart`, {})).status, 200);
+    assert.equal((await post(`${t2}/pages`, { image: dataUrl(jpeg(1600, 1200)) })).status, 201);
+    await post(`${t2}/read`, {});
+    const blurry = await waitRead(t2);
+    assert.equal(blurry.menu.status, 'draft');
+    assert.equal(blurry.menu.read_error, 'blurry');
+  } finally {
+    app.setMenuReader(null);
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    for (const f of db.prepare('SELECT file FROM venue_menu_files').all()) { try { fs.unlinkSync(path.join(app.MENU_DIR, f.file)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Menus: the Claude request (model, refusal fallback, structured output) and price helpers', async () => {
+  const realFetch = global.fetch;
+  const realKey = process.env.ANTHROPIC_API_KEY;
+  let req = null;
+  process.env.ANTHROPIC_API_KEY = '"sk-test-key"';
+  global.fetch = async (url, init) => {
+    req = { url, init, body: JSON.parse(init.body) };
+    return { ok: true, status: 200, json: async () => ({ model: 'claude-opus-5-5', stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 5 },
+      content: [{ type: 'text', text: JSON.stringify({ readable: true, problem: 'none', sections: [] }) }] }) };
+  };
+  try {
+    const r = await app.readMenuWithClaude([{ kind: 'jpeg', buf: Buffer.from('a') }, { kind: 'pdf', buf: Buffer.from('b') }]);
+    assert.equal(r.ok, true);
+    assert.equal(req.url, 'https://api.anthropic.com/v1/messages');
+    assert.equal(req.init.headers['x-api-key'], 'sk-test-key', 'quotes around the pasted key are dropped');
+    assert.equal(req.init.headers['anthropic-beta'], 'server-side-fallback-2026-07-01');
+    assert.equal(req.body.model, 'claude-opus-5-5');
+    assert.equal(req.body.fallbacks, 'default');
+    assert.equal(req.body.output_config.format.type, 'json_schema');
+    assert.equal(req.body.thinking, undefined);
+    assert.deepEqual(req.body.messages[0].content.map((b) => b.type), ['image', 'document', 'text']);
+    global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ stop_reason: 'refusal', content: [] }) });
+    assert.equal((await app.readMenuWithClaude([{ kind: 'jpeg', buf: Buffer.from('a') }])).error, 'refused');
+    delete process.env.ANTHROPIC_API_KEY;
+    assert.equal((await app.readMenuWithClaude([{ kind: 'jpeg', buf: Buffer.from('a') }])).error, 'unavailable');
+  } finally {
+    global.fetch = realFetch;
+    if (realKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = realKey;
+  }
+  assert.equal(app.menuPriceLabel('18'), '$18');
+  assert.equal(app.menuPriceLabel('18.50', 'fr'), '18,50 $');
+  assert.equal(app.menuPriceLabel('12 / 16'), '12 / 16');
+  assert.equal(app.menuPriceNumber('$18.50'), 18.5);
+  assert.equal(app.menuPriceNumber('MP'), null);
+  assert.deepEqual(app.normalizeMenuData({ sections: [{ name: 'Empty', items: [] }, { name: 'X', items: [{ name: '  ' }, { name: 'Tea', price: 3 }] }] }),
+    { sections: [{ name: 'X', note: '', items: [{ name: 'Tea', description: '', price: '', dietary: [], check: false }] }] });
+});
